@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================= */
+/* DataTables Styling */
+/* ============================= */
+
+.dataTable-selector {
+  @apply border border-gray-300 rounded-lg px-2 py-1 text-sm bg-white text-gray-700;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg fill='none' stroke='black' stroke-width='1.5' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem;
+  padding-right: 2rem;
+}
+
+.dataTable-top {
+  display: flex !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem;
+  align-items: flex-start !important;
+}
+
+.dataTable-search {
+  margin-left: auto !important;
+  order: 1;
+}
+
+.dataTable-input {
+  width: 220px !important;
+  max-width: 100% !important;
+  padding: 0.5rem 0.75rem !important;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.dataTable-dropdown {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  order: 2 !important;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+.dataTable-dropdown label {
+  margin-bottom: 0.25rem;
+}
+
+.dataTable-pagination ul {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+.dataTable-pagination li {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+.dataTable-pagination .active {
+  background-color: #2563eb;
+  color: white;
+}
+
+#jobRequestsTable {
+  color: #374151;
+  font-size: 0.875rem;
+}
+#jobRequestsTable thead th {
+  color: #4b5563;
+  font-weight: 600;
+}
+
+/* ============================= */
+/* Calendar Styling */
+/* ============================= */
+
+.fc {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+.fc .fc-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #374151;
+}
+.fc .fc-toolbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.fc .fc-button {
+  background: none !important;
+  border: none !important;
+  color: #6b7280 !important;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.fc .fc-button:hover {
+  color: #111827 !important;
+}
+.fc .fc-col-header-cell {
+  padding: 0.5rem 0;
+  background: #f9fafb;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.8rem;
+  border: none;
+}
+.fc .fc-daygrid-day {
+  border: none !important;
+  text-align: center;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+.fc .fc-daygrid-day-number {
+  font-size: 0.85rem;
+  color: #374151;
+  padding: 0.25rem;
+  display: inline-block;
+  border-radius: 0.375rem;
+}
+.fc .fc-day-today .fc-daygrid-day-number {
+  color: rgb(21, 0, 247) !important;
+  font-weight: 600;
+}
+.fc .fc-daygrid-event {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin-top: 0.25rem;
+}
+.fc .fc-daygrid-event-dot {
+  border: none !important;
+  background-color: #3b82f6;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  display: inline-block;
+}
+
+/* ============================= */
+/* Chart.js Styling */
+/* ============================= */
+
+/* Wrapper for charts */
+.chart-container {
+  @apply flex justify-center items-center;
+  position: relative;
+  width: 100% !important;
+  max-width: 320px;   /* keeps charts compact */
+  height: auto;
+  margin: 0 auto;
+}
+
+/* Specifically shrink Pie & Doughnut */
+.chart-container.pie-chart,
+.chart-container.doughnut-chart {
+  max-width: 260px;   /* make them smaller */
+  max-height: 260px;
+}
+
+/* Bar / Line responsiveness */
+.chart-container.bar-chart {
+  min-height: 280px;  /* base size */
+  width: 100%;       /* grow with card */
+  
+}
+.chart-container.line-chart {
+  max-height: 320px;
+}
