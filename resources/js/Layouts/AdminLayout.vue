@@ -24,6 +24,8 @@ import {
   HeartIcon,
   ChatBubbleLeftRightIcon,
   HomeModernIcon,
+  UserIcon,
+  CursorArrowRippleIcon,
 } from "@heroicons/vue/24/outline";
 
 // Props
@@ -72,6 +74,13 @@ const menuItems = [
         icon: UserGroupIcon,
         roles: ["Administrator"],
       },
+      {
+        label: "User Roles",
+        routeName: "roles.index",
+        href: route("roles.index"),
+        icon: CursorArrowRippleIcon,
+        roles: ["Administrator"],
+      },
     ],
   },
   {
@@ -106,6 +115,13 @@ const menuItems = [
         href: route("mis.ict-equipment.index"),
         icon: QueueListIcon,
         roles: ["Administrator", "OCD"],
+      },
+      {
+        label: "Repair Category",
+        routeName: "mis.ict-equipment.index",
+        href: route("mis.ict-equipment.index"),
+        icon: QueueListIcon,
+        roles: ["Administrator"],
       },
     ],
   },

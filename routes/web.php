@@ -3,6 +3,8 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\RolesController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -99,7 +101,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('role:Administrator')->group(function () {
-        Route::get('/users', fn () => Inertia::render('Users/Index'))->name('users.index');
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('users/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+        Route::get('/users-roles', [RolesController::class, 'index'])->name('roles.index');
+        Route::post('users-roles', [RolesController::class, 'store'])->name('roles.store');
+        Route::put('users-roles/{id}', [RolesController::class, 'update'])->name('roles.update');
+        Route::delete('users-roles/{id}', [RolesController::class, 'destroy'])->name('roles.destroy');
         Route::get('/reports', fn () => Inertia::render('Reports/Index'))->name('reports.index');
         Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
     });
