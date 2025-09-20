@@ -9,29 +9,50 @@ class ICTEquipment extends Model
 {
     use HasFactory;
 
-    protected $table = 'ict_equipments'; // explicit table name
+    protected $table = 'ict_equipments';
 
     protected $fillable = [
-        'property_no',
-        'device_type',
-        'description',
-        'location',
-        'date_entry',
-        'unit',
-        'owner',
-        'status',
-        'remarks',
-        'encodedby',
-        'amount',
-        'date_acquired',
-        'serialno',
         'category',
+        'owner_id',
+        'property_no',
+        'serial_no',
+        'description',
+        'date_acquired',
+        'amount',
+        'status',
+        'location',
+        'remarks',
         'qr_code_path',
     ];
 
     protected $casts = [
-        'date_entry'    => 'date',
         'date_acquired' => 'date',
         'amount'        => 'decimal:2',
     ];
+
+    /**
+     * Belongs to an owner (User)
+     */
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * Many-to-Many: Equipment ↔ PMS
+     */
+    public function pmsSchedules()
+    {
+        return $this->belongsToMany(
+            PMS::class,
+            'ict_pms_equipment', // pivot table
+            'equipment_id',      // FK to Equipment
+            'ict_pms_id'         // FK to PMS
+        )->withTimestamps();
+    }
+    public function histories()
+    {
+        return $this->hasMany(\App\Models\ICTPMSHistory::class, 'equipment_id');
+    }
+
 }

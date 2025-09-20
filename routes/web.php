@@ -3,8 +3,10 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
+use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RolesController;
+use App\Http\Controllers\PMSController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -62,9 +64,20 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::put('/job-requests/{itJobRequest}/update', [ITJobRequestController::class, 'update'])
     ->name('job-requests.update');
 
-    Route::get('/ict-equipments', [ICTEquipmentController::class, 'index'])->name('mis.ict-equipment.index');
-    Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('mis.ict-equipment.store');
-    Route::get('/ict-equipments/{id}', [ICTEquipmentController::class, 'show'])->name('mis.ict-equipment.show');
+    Route::get('/ict-equipments', [ICTEquipmentController::class, 'index'])->name('ict-equipments.index');
+    Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('ict-equipments.store');
+    Route::get('/ict-equipments/{id}', [ICTEquipmentController::class, 'show'])->name('ict-equipments.show');
+    Route::get('/ict-equipment/{ictEquipment}', [ICTEquipmentController::class, 'publicShow'])->name('ict-equipments.public.show');
+
+    Route::get('/ict-pms', [PMSController::class, 'index'])->name('ict-pms.index');
+    Route::post('/ict-pms', [PMSController::class, 'store'])->name('ict-pms.store');
+    Route::get('/ict-pms/{id}', [PMSController::class, 'show'])->name('ict-pms.show');
+
+    // Assign multiple equipment to PMS
+    Route::post('/ict-pms/{pmsId}/assign-equipments', [PMSController::class, 'assignEquipments'])->name('ict-pms.assign-equipments');
+    Route::get('/ict-pms/{pms}/equipments', [PMSController::class, 'showEquipments'])->name('ict-pms.show-equipments');
+
+    Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');
 
     /*
     |--------------------------------------------------------------------------

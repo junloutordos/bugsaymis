@@ -120,7 +120,7 @@ export function useJobRequests(initialRequests = []) {
     }
 
     if (modalMode.value === "mis-assessment" && form.id) {
-      // 🔥 Use dedicated assessment route
+      //  Use dedicated assessment route
       router.put(`/job-requests/${form.id}/update`, form.data(), {
         preserveScroll: true,
         onSuccess: async () => {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ITJobRequest;
 use App\Models\ITJRTrackingLog;
+use App\Models\ITJobCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -31,9 +32,23 @@ class ITJobRequestController extends Controller
             ])
             ->latest()
             ->get();
+        
+        $categories = ITJobCategory::orderBy('name')->get();
+        
+        // ✅ Get Division Chiefs & Administrators
+        $divisionChiefs = \App\Models\User::whereHas('role', fn($q) => 
+            $q->where('name', 'DivisionChief')
+        )->select('id', 'name')->get();
+
+        $administrators = \App\Models\User::whereHas('role', fn($q) => 
+            $q->where('name', 'Administrator')
+        )->select('id', 'name')->get();
 
         return Inertia::render('ITJobRequests/Index', [
-            'requests' => $requests
+            'requests' => $requests,
+            'categories' => $categories,
+            'divisionChiefs' => $divisionChiefs,
+            'administrators' => $administrators,
         ]);
     }
 
@@ -222,22 +237,28 @@ class ITJobRequestController extends Controller
             'completed_at' => 'nullable|date',
         ]);
 
+        // Determine status based on action_taken and completed_at
+        $status = (empty($validated['action_taken']) && empty($validated['completed_at']))
+            ? 'MIS Assessed the Request'
+            : 'Acted by MIS';
+
         // Update MIS fields + set status + attended_by
         $itJobRequest->update(array_merge($validated, [
-            'status' => 'Acted by MIS',
-            'attendedby' => $request->user()->name, //  store the administrator's name
+            'status' => $status,
+            'attendedby' => $request->user()->name, // store the administrator's name
         ]));
 
         // Save tracking log
         ITJRTrackingLog::create([
             'it_job_request_id' => $itJobRequest->id,
-            'status' => 'Acted by MIS',
+            'status' => $status,
             'remarks' => "Assessment: {$request->mis_assessment}\nExpected Completion: {$request->expected_completion_date}\nAction Taken: {$request->action_taken}\nCompleted At: {$request->completed_at}",
             'updated_by' => $request->user()->id,
         ]);
 
         return redirect()->back()->with('success', 'MIS assessment updated successfully.');
     }
+
 
 
 

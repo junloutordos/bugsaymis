@@ -49,6 +49,11 @@ class User extends Authenticatable
     public function role()
     {
         return $this->belongsTo(Role::class);
-}
+    }
+    public function pmsPerformed()
+    {
+        return $this->hasMany(PMS::class, 'performed_by');
+    }
+
 
 }

@@ -1,6 +1,6 @@
-// resources/js/Composables/useEquipments.js
 import { ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
+import Swal from "sweetalert2"
 
 export default function useEquipments(initialEquipments = []) {
   // State
@@ -15,12 +15,16 @@ export default function useEquipments(initialEquipments = []) {
 
   // Form state
   const form = ref({
-    property_no: "",
-    description: "",
-    location: "",
-    status: "",
     category: "",
+    owner_id: "",
+    property_no: "",
+    serial_no: "",
+    description: "",
+    date_acquired: "",
     amount: "",
+    status: "",
+    location: "",
+    remarks: "",
   })
 
   // Search, sort, pagination
@@ -42,17 +46,23 @@ export default function useEquipments(initialEquipments = []) {
 
   const filteredEquipments = computed(() => {
     const q = searchQuery.value.toLowerCase()
-    return sortedEquipments.value.filter(eq =>
-      Object.values(eq).some(v => String(v).toLowerCase().includes(q))
-    ).slice((currentPage.value - 1) * perPage.value, currentPage.value * perPage.value)
+    return sortedEquipments.value
+      .filter(eq =>
+        Object.values(eq).some(v => String(v).toLowerCase().includes(q))
+      )
+      .slice((currentPage.value - 1) * perPage.value, currentPage.value * perPage.value)
   })
 
   const totalPages = computed(() => {
-    return Math.ceil(
-      sortedEquipments.value.filter(eq =>
-        Object.values(eq).some(v => String(v).toLowerCase().includes(searchQuery.value.toLowerCase()))
-      ).length / perPage.value
-    ) || 1
+    return (
+      Math.ceil(
+        sortedEquipments.value.filter(eq =>
+          Object.values(eq).some(v =>
+            String(v).toLowerCase().includes(searchQuery.value.toLowerCase())
+          )
+        ).length / perPage.value
+      ) || 1
+    )
   })
 
   // CRUD
@@ -62,7 +72,7 @@ export default function useEquipments(initialEquipments = []) {
       replace: true,
       onSuccess: (page) => {
         equipments.value = page.props.equipments
-      }
+      },
     })
   }
 
@@ -72,38 +82,71 @@ export default function useEquipments(initialEquipments = []) {
       replace: true,
       onSuccess: (page) => {
         equipment.value = page.props.equipment
-      }
+      },
     })
   }
 
   const storeEquipment = async () => {
     errors.value = {}
     router.post(route("ict-equipments.store"), form.value, {
-      onError: (e) => errors.value = e,
+      onError: (e) => (errors.value = e),
       onSuccess: () => {
         closeModal()
         getEquipments()
-      }
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: "New equipment has been added!",
+          timer: 2000,
+          showConfirmButton: false,
+        })
+      },
     })
   }
 
   const updateEquipment = async (id) => {
     errors.value = {}
     router.put(route("ict-equipments.update", id), form.value, {
-      onError: (e) => errors.value = e,
+      onError: (e) => (errors.value = e),
       onSuccess: () => {
         closeModal()
         getEquipments()
-      }
+        Swal.fire({
+          icon: "success",
+          title: "Updated",
+          text: "Equipment details have been updated!",
+          timer: 2000,
+          showConfirmButton: false,
+        })
+      },
     })
   }
 
   const destroyEquipment = async (id) => {
-    if (confirm("Are you sure you want to delete this equipment?")) {
-      router.delete(route("ict-equipments.destroy", id), {
-        onSuccess: () => getEquipments()
-      })
-    }
+    Swal.fire({
+      title: "Are you sure?",
+      text: "This equipment will be permanently deleted!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        router.delete(route("ict-equipments.destroy", id), {
+          onSuccess: () => {
+            getEquipments()
+            Swal.fire({
+              icon: "success",
+              title: "Deleted",
+              text: "Equipment has been deleted.",
+              timer: 2000,
+              showConfirmButton: false,
+            })
+          },
+        })
+      }
+    })
   }
 
   // Helpers
@@ -123,12 +166,16 @@ export default function useEquipments(initialEquipments = []) {
       form.value = { ...eq }
     } else if (mode === "create") {
       form.value = {
-        property_no: "",
-        description: "",
-        location: "",
-        status: "",
         category: "",
+        owner_id: "",
+        property_no: "",
+        serial_no: "",
+        description: "",
+        date_acquired: "",
         amount: "",
+        status: "",
+        location: "",
+        remarks: "",
       }
     }
     showModal.value = true
@@ -155,7 +202,15 @@ export default function useEquipments(initialEquipments = []) {
     const csv = equipments.value.map(eq =>
       `${eq.id},${eq.property_no},${eq.description},${eq.status},${eq.location},${eq.category},${eq.amount}`
     )
-    const blob = new Blob([["ID,Property No,Description,Status,Location,Category,Amount\n", ...csv].join("\n")], { type: "text/csv" })
+    const blob = new Blob(
+      [
+        [
+          "ID,Property No,Description,Status,Location,Category,Amount\n",
+          ...csv,
+        ].join("\n"),
+      ],
+      { type: "text/csv" }
+    )
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -166,7 +221,7 @@ export default function useEquipments(initialEquipments = []) {
   const printTable = () => {
     const w = window.open("", "_blank")
     let html = `<h3>ICT Equipment Inventory</h3><table border="1" cellspacing="0" cellpadding="5"><tr><th>ID</th><th>Property No</th><th>Description</th><th>Status</th><th>Location</th><th>Category</th><th>Amount</th></tr>`
-    equipments.value.forEach(eq => {
+    equipments.value.forEach((eq) => {
       html += `<tr><td>${eq.id}</td><td>${eq.property_no}</td><td>${eq.description}</td><td>${eq.status}</td><td>${eq.location}</td><td>${eq.category}</td><td>${eq.amount}</td></tr>`
     })
     html += "</table>"

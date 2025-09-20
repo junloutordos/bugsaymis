@@ -65,8 +65,8 @@ const googleLogin = async () => {
     <div class="w-full max-w-md bg-white shadow-xl rounded-2xl p-8">
 
       <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">
-        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-16 mx-auto mb-4" />
-        Welcome to <span class="text-indigo-600">BUGSAYMIS</span>
+        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-32 mx-auto mb-4" />
+      <span class="text-indigo-600">BUGSAY-MIS</span>
       </h1>
 
       <!-- Google Login -->
@@ -77,7 +77,7 @@ const googleLogin = async () => {
           class="w-full flex items-center justify-center py-2 px-4 bg-red-600 text-white font-semibold rounded-lg shadow hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition"
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="h-5 w-5 mr-2" />
-          Continue with Google
+          Login using PSHS-CRC Official Google Account
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from "vue"
 import { Head, usePage } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import {
@@ -11,7 +12,11 @@ import {
 import { useJobRequests } from "@/Composables/useJobRequests.js"
 
 // Props from backend
-const props = defineProps({ requests: Array })
+const props = defineProps({ 
+  requests: Array,
+  categories: Array,
+  divisionChiefs: Array,   
+  administrators: Array    })
 
 // Composable: all request logic
 const {
@@ -44,7 +49,13 @@ const userRole = page.props.auth?.user?.role?.name ?? null
 function openMISAssessment(request) {
   misAssessment(request)
 }
-
+// Ensure frontend filtering too for administrators
+const visibleRequests = computed(() => {
+  if (userRole === "Administrator") {
+    return filteredRequests.value
+  }
+  return filteredRequests.value.filter(req => req.user_id === user?.id)
+})
 </script>
 
 <template>
@@ -96,7 +107,7 @@ function openMISAssessment(request) {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-gray-50">
+              <tr v-for="req in visibleRequests" :key="req.id" class="hover:bg-gray-50">
                 <td class="px-4 py-3">{{ req.itjr_no }}</td>
                 <td class="px-4 py-3">{{ req.title }}</td>
                 <td class="px-4 py-3">{{ req.category }}</td>
@@ -107,9 +118,11 @@ function openMISAssessment(request) {
                     class="px-3 py-1 text-xs rounded-full"
                     :class="{
                       'bg-yellow-100 text-yellow-700': req.status==='Pending Division Chief Approval',
-                      'bg-orange-100 text-orange-700': req.status==='Pending OCD Approval',
+                      'bg-orange-100 text-orange-700': req.status==='MIS Assessed the Request',
+                      'bg-violet-100 text-violet-700': req.status==='Pending OCD Approval',
                       'bg-blue-100 text-blue-700': req.status==='In Progress',
-                      'bg-green-100 text-green-700': req.status==='Acted by MIS'
+                      'bg-green-100 text-green-700': req.status==='Acted by MIS',
+                      'bg-red-100 text-red-700': req.status==='Request Completed'
                     }"
                   >
                     {{ req.status }}
@@ -131,11 +144,12 @@ function openMISAssessment(request) {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredRequests.length===0">
+              <tr v-if="visibleRequests.length===0">
                 <td :colspan="userRole==='Administrator'?7:6" class="px-4 py-6 text-center text-gray-500">
                   No requests found.
                 </td>
               </tr>
+
             </tbody>
           </table>
         </div>
@@ -216,29 +230,10 @@ function openMISAssessment(request) {
                   required
                   >
                   <option value="">-- Select Request Type --</option>
-                  <option value="Hardware Repair">Hardware Repair</option>
-                  <option value="Hardware Installation">Hardware Installation</option>
-                  <option value="Preventive Maintenance">Preventive Maintenance</option>
-                  <option value="Software Modification">Software Modification</option>
-                  <option value="Software Installation">Software Installation</option>
-                  <option value="Software Development">Software Development</option>
-                  <option value="Network Connection">Network Connection</option>
-                  <option value="Account Access">Account Access</option>
-                  <option value="Technical Assistance on Events">Technical Assistance on Events</option>
-                  <option value="Graphic Design">Graphic Design</option>
-                  <option value="Video Editing/Production">Video Editing/Production</option>
-                  <option value="Posting to Website">Posting to Website</option>
-                  <option value="Posting to Social Media">Posting to Social Media</option>
-                  <option value="Poll Survey Creation">Poll Survey Creation</option>
-                  <option value="Online Meeting Request">Online Meeting Request</option>
-                  <option value="DTR Generation">DTR Generation</option>
-                  <option value="DTR System Concerns">DTR System Concerns</option>
-                  <option value="CCTV Footage Review">CCTV Footage Review</option>
-                  <option value="CCTV Footage Retrieval">CCTV Footage Retrieval</option>
-                  <option value="SIMS Concerns">SIMS Concerns</option>
-                  <option value="Document Tracking Concerns">Document Tracking Concerns</option>
-                  <option value="eNGAS Concerns">eNGAS Concerns</option>
-                  <option value="Other">Other</option>
+                  <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">
+                    {{ cat.name }}
+                  </option>
+
                   </select>
               </div>
 
@@ -255,34 +250,34 @@ function openMISAssessment(request) {
 
               <!-- Division Approval -->
               <div>
-                  <label class="block text-sm font-medium text-gray-700">Division Approval</label>
-                  <select
+                <label class="block text-sm font-medium text-gray-700">Division Approval</label>
+                <select
                   v-model="form.divisionchief"
                   class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   required
-                  >
-                  <option value="">-- Select Your Division Chief --</option>
-                  <option value="Jasmine S. Gumapac">Jasmine S. Gumapac, SSD Chief</option>
-                  <option value="Michelle B. Fernando">Michelle B. Fernando, CID Chief</option>
-                  <option value="Charity S. Romano">Charity S. Romano, FAD Chief</option>
-                  <option value="Jay M. Maique">Jay M. Maique, Information Officer</option>
-                  </select>
+                >
+                  <option value="">-- Select Division Chief --</option>
+                  <option v-for="chief in props.divisionChiefs" :key="chief.id" :value="chief.name">
+                    {{ chief.name }}
+                  </option>
+                </select>
               </div>
 
               <!-- Assign Personnel -->
               <div>
-                  <label class="block text-sm font-medium text-gray-700">Assign Personnel</label>
-                  <select
+                <label class="block text-sm font-medium text-gray-700">Assign Personnel</label>
+                <select
                   v-model="form.assignedto"
                   class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   required
-                  >
+                >
                   <option value="">-- Select MIS Personnel --</option>
-                  <option value="Michael A. Francisco">Michael A. Francisco</option>
-                  <option value="Junlou R. Tordos">Junlou R. Tordos</option>
-                  <option value="Alexis Dave M. San Miguel">Alexis Dave M. San Miguel</option>
-                  </select>
+                  <option v-for="admin in props.administrators" :key="admin.id" :value="admin.name">
+                    {{ admin.name }}
+                  </option>
+                </select>
               </div>
+
             </template>
 
             <!-- MIS Assessment fields -->
