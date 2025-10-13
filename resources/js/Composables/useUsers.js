@@ -5,11 +5,11 @@ import Swal from "sweetalert2"
 export function useUsers(props) {
   const usersList = ref(props.users || [])
   const rolesList = ref(props.roles || [])
+  const divisionsList = ref(props.divisions || []) // ✅ make it reactive
 
   const showModal = ref(false)
   const modalMode = ref("create")
   const selectedUser = ref(null)
-
   const searchQuery = ref("")
   const currentPage = ref(1)
   const perPage = 10
@@ -20,13 +20,17 @@ export function useUsers(props) {
     name: "",
     email: "",
     role_id: "",
+    position: "",
+    division_id: "",
+    office: "", // manual input
   })
 
-  // Computed: filtered and paginated users
+  // Filtered + paginated users
   const filteredUsers = computed(() => {
-    let results = usersList.value.filter(u =>
-      u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
+    let results = usersList.value.filter(
+      (u) =>
+        u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
     const start = (currentPage.value - 1) * perPage
     return results.slice(start, start + perPage)
@@ -36,14 +40,30 @@ export function useUsers(props) {
     Math.ceil(usersList.value.length / perPage)
   )
 
-  // Open modal
+  // Modal logic
   const openModal = (mode, user = null) => {
     modalMode.value = mode
     showModal.value = true
     if (mode === "edit" && user) {
-      form.value = { id: user.id, name: user.name, email: user.email, role_id: user.role_id }
+      form.value = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role_id: user.role_id,
+        position: user.position ?? "",
+        division_id: user.division_id ?? "",
+        office: user.office ?? "",
+      }
     } else {
-      form.value = { id: null, name: "", email: "", role_id: "" }
+      form.value = {
+        id: null,
+        name: "",
+        email: "",
+        role_id: "",
+        position: "",
+        division_id: "",
+        office: "",
+      }
     }
     selectedUser.value = user
   }
@@ -59,39 +79,34 @@ export function useUsers(props) {
     showModal.value = true
   }
 
-  // Submit (create / edit)
+  // Submit
   const submitUser = async () => {
-  if (modalMode.value === "create") {
-    router.post("/users", form.value, {
-      onSuccess: async (page) => {
-        // Wait for the user to click OK
-        closeModal()
-        await Swal.fire("Success", "The user has been added successfully", "success")
-        window.location.reload()
-        usersList.value.unshift(page.props.user)
-      },
-      onError: async (errors) => {
-        await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
-      },
-    })
-  } else if (modalMode.value === "edit") {
-    router.put(`/users/${form.value.id}`, form.value, {
-      onSuccess: async (page) => {
-        closeModal()
-        await Swal.fire("Updated", "The user has been updated successfully", "success")
-        window.location.reload()
-        const index = usersList.value.findIndex(u => u.id === form.value.id)
-        if (index !== -1) usersList.value[index] = page.props.user
-      },
-      onError: async (errors) => {
-        await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
-      },
-    })
+    if (modalMode.value === "create") {
+      router.post("/users", form.value, {
+        onSuccess: async () => {
+          closeModal()
+          await Swal.fire("Success", "The user has been added successfully", "success")
+          window.location.reload()
+        },
+        onError: async (errors) => {
+          await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
+        },
+      })
+    } else if (modalMode.value === "edit") {
+      router.put(`/users/${form.value.id}`, form.value, {
+        onSuccess: async () => {
+          closeModal()
+          await Swal.fire("Updated", "The user has been updated successfully", "success")
+          window.location.reload()
+        },
+        onError: async (errors) => {
+          await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
+        },
+      })
+    }
   }
-}
 
-
-  // Delete user
+  // Delete
   const deleteUser = async (user) => {
     const result = await Swal.fire({
       title: `Delete ${user.name}?`,
@@ -101,11 +116,10 @@ export function useUsers(props) {
       confirmButtonText: "Yes, delete",
       cancelButtonText: "Cancel",
     })
-
     if (result.isConfirmed) {
       router.delete(`/users/${user.id}`, {
         onSuccess: async () => {
-          usersList.value = usersList.value.filter(u => u.id !== user.id)
+          usersList.value = usersList.value.filter((u) => u.id !== user.id)
           await Swal.fire("Deleted", "User has been deleted", "success")
           closeModal()
         },
@@ -119,6 +133,7 @@ export function useUsers(props) {
   return {
     usersList,
     rolesList,
+    divisionsList, // ✅ return it
     showModal,
     modalMode,
     selectedUser,

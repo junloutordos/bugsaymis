@@ -82,6 +82,14 @@ const menuItems = [
         icon: CursorArrowRippleIcon,
         roles: ["Administrator"],
       },
+      {
+        label: "Division",
+        routeName: "roles.divisions",
+        href: route("roles.divisions"),
+        icon: CursorArrowRippleIcon,
+        roles: ["Administrator"],
+      },
+      
     ],
   },
   {
@@ -132,14 +140,35 @@ const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
   },
   {
-    label: "Human Resource",
+    label: "Performance Mngmt",
     icon: UserGroupIcon,
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
     children: [
       {
-        label: "PDS",
-        routeName: null,
-        href: "#",
+        label: "Agency Org Outcome",
+        routeName: "outcome.index",
+        href: route("outcome.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+      },
+      {
+        label: "Performance Indicators",
+        routeName: "performanceindicator.index",
+        href: route("performanceindicator.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+      },
+      {
+        label: "Work Distribution Plan",
+        routeName: "workdistribution.index",
+        href: route("workdistribution.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+      },
+      {
+        label: "IPCR",
+        routeName: "ipcr.index",
+        href: route("ipcr.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
       },

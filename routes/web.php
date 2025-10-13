@@ -7,6 +7,10 @@ use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RolesController;
 use App\Http\Controllers\PMSController;
+use App\Http\Controllers\AgencyOutcomeController;
+use App\Http\Controllers\PerformanceIndicatorController;
+use App\Http\Controllers\WorkDistributionPlanController;
+use App\Http\Controllers\IPCRController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -124,6 +128,46 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::delete('users-roles/{id}', [RolesController::class, 'destroy'])->name('roles.destroy');
         Route::get('/reports', fn () => Inertia::render('Reports/Index'))->name('reports.index');
         Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
+
+        Route::get('/users-division', [RolesController::class, 'showDivisions'])->name('roles.divisions');
+        Route::post('users-divisions', [RolesController::class, 'storeDivision'])->name('roles.divisions_store');
+        Route::put('users-divisions/{id}', [RolesController::class, 'updateDivision'])->name('roles.division_update');
+        
+        Route::get('/agency-outcomes', [AgencyOutcomeController::class, 'index'])->name('outcome.index');
+        Route::post('agency-outcomes', [AgencyOutcomeController::class, 'store'])->name('outcome.store');
+        Route::put('agency-outcomes/{id}', [AgencyOutcomeController::class, 'update'])->name('outcome.update');
+        Route::delete('agency-outcomes/{id}', [AgencyOutcomeController::class, 'destroy'])->name('outcome.destroy');
+        
+        Route::get('/performance-indicators', [PerformanceIndicatorController::class, 'index'])->name('performanceindicator.index');
+        Route::post('performance-indicators', [PerformanceIndicatorController::class, 'store'])->name('performanceindicator.store');
+        Route::put('performance-indicators/{id}', [PerformanceIndicatorController::class, 'update'])->name('performanceindicator.update');
+        Route::delete('performance-indicators/{id}', [PerformanceIndicatorController::class, 'destroy'])->name('performanceindicator.destroy');
+
+        Route::get('/work-distributions', [WorkDistributionPlanController::class, 'index'])->name('workdistribution.index');
+        Route::post('work-distributions', [WorkDistributionPlanController::class, 'store'])->name('workdistribution.store');
+        Route::put('work-distributions/{id}', [WorkDistributionPlanController::class, 'update'])->name('workdistribution.update');
+        Route::delete('work-distributions/{id}', [WorkDistributionPlanController::class, 'destroy'])->name('workdistribution.destroy');
+
+        Route::get('/ipcrs', [IPCRController::class, 'index'])->name('ipcr.index');
+
+        // Submit target for a plan
+        Route::post('/ipcrs/{plan}/target', [IPCRController::class, 'submitTarget'])
+            ->name('ipcr.submitTarget');
+
+        // Submit accomplishment + self-rating
+        Route::put('/ipcrs/{ipcr}/accomplishment', [IPCRController::class, 'submitAccomplishment'])
+            ->name('ipcr.submitAccomplishment');
+
+        // Supervisor approves target
+        Route::put('/ipcrs/{ipcr}/approve', [IPCRController::class, 'approveTarget'])
+            ->name('ipcr.approveTarget');
+
+        // Supervisor reviews accomplishment
+        Route::put('/ipcrs/{ipcr}/review', [IPCRController::class, 'reviewAccomplishment'])
+            ->name('ipcr.reviewAccomplishment');
+        Route::post('ipcrs', [IPCRController::class, 'store'])->name('ipcr.store');
+        Route::put('ipcrs/{id}', [IPCRController::class, 'update'])->name('ipcr.update');
+        Route::delete('ipcrs/{id}', [IPCRController::class, 'destroy'])->name('ipcr.destroy');
     });
 
     Route::middleware('role:Faculty')->group(function () {

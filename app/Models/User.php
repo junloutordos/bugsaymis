@@ -22,6 +22,9 @@ class User extends Authenticatable
         'email',
         'password',
         'role_id',
+        'position',
+        'division_id',
+        'office',
     ];
 
     /**
@@ -54,6 +57,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(PMS::class, 'performed_by');
     }
+    public function division()
+    {
+        return $this->belongsTo(Division::class);
+    }
+    
+    // app/Models/User.php
+
+    public function workDistributionPlans()
+    {
+        return $this->belongsToMany(WorkDistributionPlan::class, 'work_distribution_plan_user')
+            ->withPivot('role_in_plan')
+            ->withTimestamps();
+    }
+
 
 
 }

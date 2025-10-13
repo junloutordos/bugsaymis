@@ -398,7 +398,7 @@ function formatFrequencyAndDates(schedule) {
                 placeholder="Pick equipment(s)"
                 label="description"
                 track-by="id"
-                :custom-label="eq => `${eq.description} (${eq.serial_no})`"
+                :custom-label="eq => `${eq.serial_no} - ${eq.description} - ${eq.category}`"
                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
               />
             </div>

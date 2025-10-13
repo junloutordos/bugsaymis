@@ -1,16 +1,19 @@
 <script setup>
-import { Head } from "@inertiajs/vue3"
+import { Head, usePage, useForm, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { computed, ref, reactive } from "vue"
 import html2pdf from "html2pdf.js"
 import { ArrowDownTrayIcon } from "@heroicons/vue/24/outline"
-import { router, useForm } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 
 const props = defineProps({
   pms: Object,
   equipments: Array // equipments should now include `history_dates` array from backend
 })
+
+// ✅ Access logged-in user
+const page = usePage()
+const currentUser = computed(() => page.props.auth.user)
 
 // Months
 const months = [
@@ -306,12 +309,12 @@ const equipmentHistoryMap = computed(() => {
                 <!-- Refactored cell -->
                 <td v-for="(m, idx) in months" :key="m" class="border border-black p-1">
                   <!-- PMS History always wins -->
-                  <span v-if="equipmentHistoryMap[eq.id]?.includes(idx)" class="text-blue-600">*</span>
+                  <span v-if="equipmentHistoryMap[eq.id]?.includes(idx)" class="text-blue-600 text-2xl font-bold">*</span>
 
                   <!-- Scheduled but no history yet -->
                   <span 
                     v-else-if="monthStatusMap[idx]" 
-                    class="text-green-600 cursor-pointer" 
+                    class="text-green-600 text-2xl font-bold cursor-pointer" 
                     @click="openModal(eq, idx)"
                   >
                     ✓
@@ -337,30 +340,35 @@ const equipmentHistoryMap = computed(() => {
           </p>
         </div>
 
-        <div class="mt-4 border text-sm">
-          <table class="w-full border-collapse">
-            <tbody>
-              <tr>
-                <td class="border border-black px-2 py-2 align-top w-1/4">
-                  <p class="mb-2">Prepared By:</p><br />
-                  <p class="font-semibold underline text-center">JUNLOU R. TORDOS</p>
-                  <p class="text-center">Information Systems Analyst I</p>
-                </td>
-                <td class="border border-black px-2 py-2 w-1/4 align-top">
-                  <p>Date:</p>
-                </td>
-                <td class="border border-black px-2 py-2 align-top w-1/4">
-                  <p class="mb-2">Noted By:</p><br />
-                  <p class="font-semibold underline text-center">ENGR. RAMIL A. SANCHEZ</p>
-                  <p class="text-center">Campus Director</p>
-                </td>
-                <td class="border border-black px-2 py-2 w-1/4 align-top">
-                  <p>Date:</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <!-- Footer -->
+    <div class="mt-4 border text-sm">
+      <table class="w-full border-collapse">
+        <tbody>
+          <tr>
+            <td class="border border-black px-2 py-2 align-top w-1/4">
+              <p class="mb-2">Prepared By:</p><br />
+              <p class="font-semibold underline text-center uppercase">
+                {{ currentUser?.name || "________________" }}
+              </p>
+              <p class="text-center">
+                {{ currentUser?.position || "________________" }}
+              </p>
+            </td>
+            <td class="border border-black px-2 py-2 w-1/4 align-top">
+              <p>Date: </p>
+            </td>
+            <td class="border border-black px-2 py-2 align-top w-1/4">
+              <p class="mb-2">Noted By:</p><br />
+              <p class="font-semibold underline text-center">ENGR. RAMIL A. SANCHEZ</p>
+              <p class="text-center">Campus Director</p>
+            </td>
+            <td class="border border-black px-2 py-2 w-1/4 align-top">
+              <p>Date: </p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
         <div class="flex justify-between text-sm mb-4 mt-2">
           <p>PSHS-00-F-GSM-06-Ver02-Rev0-02/01/20</p>
