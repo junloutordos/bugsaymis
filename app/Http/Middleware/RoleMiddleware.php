@@ -22,8 +22,8 @@ class RoleMiddleware
             abort(403, 'Unauthorized');
         }
 
-        // Split roles by comma
-        $rolesArray = explode(',', $roles);
+        // Accept both comma and pipe separators
+        $rolesArray = preg_split('/[,\|]/', $roles);
 
         if (! in_array($user->role->name, $rolesArray)) {
             abort(403, 'Unauthorized');
@@ -31,4 +31,5 @@ class RoleMiddleware
 
         return $next($request);
     }
+
 }

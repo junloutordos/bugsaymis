@@ -29,5 +29,8 @@ class DatabaseSeeder extends Seeder
                 'role_id' => $adminRole->id,
             ]
         );
+
+        // ✅ Call the IPCR Weight Seeder
+        $this->call(IPCRWeightSeeder::class);
     }
 }

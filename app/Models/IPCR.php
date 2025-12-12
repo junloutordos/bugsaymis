@@ -30,6 +30,7 @@ class IPCR extends Model
         'target_reviewed_at',
         'accomplishment_submitted_at',
         'accomplishment_reviewed_at',
+        'mov_link',
     ];
 
 

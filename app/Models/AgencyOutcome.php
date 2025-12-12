@@ -14,6 +14,7 @@ class AgencyOutcome extends Model
     protected $fillable = [
         'outcome',
         'sub_outcome',
+        'function_type', // ✅ new field    
     ];
     
 }

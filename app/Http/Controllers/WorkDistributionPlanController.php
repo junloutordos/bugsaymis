@@ -24,11 +24,10 @@ class WorkDistributionPlanController extends Controller
         $validated = $request->validate([
             'performance_indicator_id' => 'required|exists:performance_indicators,id',
             'success_indicator' => 'required|string',
-            'personnel_ids' => 'array',
-            'personnel_ids.*' => 'exists:users,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'office_involved' => 'nullable|string',
+            'rated_by' => 'nullable|string',
         ]);
+
 
         $plan = WorkDistributionPlan::create($validated);
         $plan->personnel()->sync($validated['personnel_ids'] ?? []);
@@ -36,22 +35,22 @@ class WorkDistributionPlanController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, WorkDistributionPlan $workDistributionPlan)
+    public function update(Request $request, $id)
     {
+        $workDistributionPlan = WorkDistributionPlan::findOrFail($id);
+
         $validated = $request->validate([
             'performance_indicator_id' => 'required|exists:performance_indicators,id',
             'success_indicator' => 'required|string',
-            'personnel_ids' => 'array',
-            'personnel_ids.*' => 'exists:users,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'office_involved' => 'nullable|string',
+            'rated_by' => 'nullable|string',
         ]);
 
         $workDistributionPlan->update($validated);
-        $workDistributionPlan->personnel()->sync($validated['personnel_ids'] ?? []);
 
         return redirect()->back();
     }
+
 
     public function destroy(WorkDistributionPlan $workDistributionPlan)
     {

@@ -70,7 +70,11 @@ class User extends Authenticatable
             ->withPivot('role_in_plan')
             ->withTimestamps();
     }
-
+    
+    public function ipcrs()
+    {
+        return $this->hasMany(IPCR::class, 'user_id');
+    }
 
 
 }

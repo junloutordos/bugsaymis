@@ -13,12 +13,15 @@ class ICTEquipmentController extends Controller
 {
     public function index()
     {
-        $equipments = ICTEquipment::with('owner')->get();
+        $equipments = ICTEquipment::with(['owner', 'pmsHistory' => function ($q) {
+            $q->orderBy('pms_date', 'desc');
+        }])->get();
+
         $users = User::all();
 
         return Inertia::render('ITJobRequests/ICTEquipments', [
             'equipments' => $equipments,
-            'users' => $users,
+            'users' => $users
         ]);
     }
 

@@ -11,6 +11,8 @@ use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
 use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\IPCRController;
+use App\Http\Controllers\EmployeeIPCRController;
+use App\Http\Controllers\DivisionChiefIPCRController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -117,7 +119,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     | Role-Based Routes
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:Administrator')->group(function () {
+    Route::middleware('role:Administrator|HR')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
@@ -148,26 +150,73 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::put('work-distributions/{id}', [WorkDistributionPlanController::class, 'update'])->name('workdistribution.update');
         Route::delete('work-distributions/{id}', [WorkDistributionPlanController::class, 'destroy'])->name('workdistribution.destroy');
 
-        Route::get('/ipcrs', [IPCRController::class, 'index'])->name('ipcr.index');
+        //New IPCR Routes
+        Route::get('/employee-ipcr', [EmployeeIPCRController::class, 'index'])->name('employee-ipcr.index');
+        Route::post('/employee-ipcr', [EmployeeIPCRController::class, 'store'])->name('employee-ipcr.store');
+        Route::put('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'update'])->name('employee-ipcr.update');
+        Route::delete('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'destroy'])->name('employee-ipcr.destroy');
+        Route::post('/employee-ipcr/{employeeIPCR}/plans', [EmployeeIPCRController::class, 'addPlans'])->name('employee-ipcr.addPlans');
+        Route::get('/employee-ipcr/{id}', [EmployeeIPCRController::class, 'show'])->name('employee-ipcr.show');
+        Route::put('employee-ipcr-plan/{ipcr}/{plan}',[EmployeeIPCRController::class, 'updateSelfRating'])->name('employee-ipcr-plan.updateSelfRating');
+        // Employee IPCR Workflow Actions
+        // Submit IPCR for review
+        Route::post('/employee-ipcr/{employeeIPCR}/submit-review', [EmployeeIPCRController::class, 'submitForReview'])
+            ->name('employee-ipcr.submitReview');
 
-        // Submit target for a plan
-        Route::post('/ipcrs/{plan}/target', [IPCRController::class, 'submitTarget'])
-            ->name('ipcr.submitTarget');
+        // Submit IPCR for rating
+        Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])
+            ->name('employee-ipcr.submitRating');
 
-        // Submit accomplishment + self-rating
-        Route::put('/ipcrs/{ipcr}/accomplishment', [IPCRController::class, 'submitAccomplishment'])
-            ->name('ipcr.submitAccomplishment');
+        // Supervisor reviews and returns IPCR
+        // View all subordinates IPCRs
+        Route::get('/division-chief/ipcrs', [DivisionChiefIPCRController::class, 'index'])
+            ->name('division-chief-ipcr.index');
 
-        // Supervisor approves target
-        Route::put('/ipcrs/{ipcr}/approve', [IPCRController::class, 'approveTarget'])
-            ->name('ipcr.approveTarget');
+        // View single IPCR with comments and plans
+        
+        Route::get('/division-chief-employee-ipcr/{id}', [DivisionChiefIPCRController::class, 'show'])->name('division-employee-ipcr.show');
+        // Approve an IPCR target
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/targetsapproval', [DivisionChiefIPCRController::class, 'approveTargets'])
+            ->name('division-chief-employee-ipcr.targetsapproval');
+        // Save supervisor ratings for an IPCR target
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])
+            ->name('division-chief-employee-ipcr.saveratings');
+        // Save division chief comments/suggestions
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])
+            ->name('division-chief-employee-ipcr.savecomments');
+        
+        // Rate accomplishments for an IPCR
+        Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/rate', [DivisionChiefIPCRController::class, 'rateIPCRPlan'])->name('division-chief-employee-ipcr-plan.rateIPCRPlan');
 
-        // Supervisor reviews accomplishment
-        Route::put('/ipcrs/{ipcr}/review', [IPCRController::class, 'reviewAccomplishment'])
-            ->name('ipcr.reviewAccomplishment');
-        Route::post('ipcrs', [IPCRController::class, 'store'])->name('ipcr.store');
-        Route::put('ipcrs/{id}', [IPCRController::class, 'update'])->name('ipcr.update');
-        Route::delete('ipcrs/{id}', [IPCRController::class, 'destroy'])->name('ipcr.destroy');
+
+
+
+        
+    });
+    Route::middleware('role:Administrator|Staff|Faculty|HR')->group(function () {
+        
+        //New IPCR Routes
+        Route::get('/employee-ipcr', [EmployeeIPCRController::class, 'index'])->name('employee-ipcr.index');
+        Route::post('/employee-ipcr', [EmployeeIPCRController::class, 'store'])->name('employee-ipcr.store');
+        Route::put('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'update'])->name('employee-ipcr.update');
+        Route::delete('/employee-ipcr/{employeeIPCR}', [EmployeeIPCRController::class, 'destroy'])->name('employee-ipcr.destroy');
+        Route::post('/employee-ipcr/{employeeIPCR}/plans', [EmployeeIPCRController::class, 'addPlans'])->name('employee-ipcr.addPlans');
+        Route::get('/employee-ipcr/{id}', [EmployeeIPCRController::class, 'show'])->name('employee-ipcr.show');
+        Route::put('employee-ipcr-plan/{ipcr}/{plan}',[EmployeeIPCRController::class, 'updateSelfRating'])->name('employee-ipcr-plan.updateSelfRating');
+        // Employee IPCR Workflow Actions
+        // Submit IPCR for review
+        Route::post('/employee-ipcr/{employeeIPCR}/submit-review', [EmployeeIPCRController::class, 'submitForReview'])
+            ->name('employee-ipcr.submitReview');
+
+        // Submit IPCR for rating
+        Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])
+            ->name('employee-ipcr.submitRating');
+
+        
+
+
+
+        
     });
 
     Route::middleware('role:Faculty')->group(function () {

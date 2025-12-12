@@ -43,4 +43,5 @@ class IctPmsHistory extends Model
     {
         return $this->belongsTo(\App\Models\User::class, 'created_by');
     }
+    
 }

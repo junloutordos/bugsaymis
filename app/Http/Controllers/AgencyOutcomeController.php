@@ -22,6 +22,7 @@ class AgencyOutcomeController extends Controller
         $data = $request->validate([
             'outcome' => 'required|string|max:255',
             'sub_outcome' => 'nullable|string|max:255',
+            'function_type' => 'required|string|max:255',
         ]);
 
         $outcome = AgencyOutcome::create($data);
@@ -34,6 +35,7 @@ class AgencyOutcomeController extends Controller
         $data = $request->validate([
             'outcome' => 'required|string|max:255',
             'sub_outcome' => 'nullable|string|max:255',
+            'function_type' => 'required|string|max:255',
         ]);
 
         $agencyOutcome->update($data);

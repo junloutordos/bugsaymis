@@ -12,9 +12,10 @@ class WorkDistributionPlan extends Model
     protected $fillable = [
         'performance_indicator_id',
         'success_indicator',
-        'start_date',
-        'end_date',
+        'office_involved',
+        'rated_by',
     ];
+
 
     // Each plan belongs to one performance indicator
     public function performanceIndicator()
@@ -40,4 +41,14 @@ class WorkDistributionPlan extends Model
     {
         return $this->hasMany(IPCR::class, 'work_distribution_plan_id');
     }
+    public function employeeipcrs()
+    {
+        return $this->belongsToMany(EmployeeIPCR::class, 'employee_ipcrs_plan', 'plan_id', 'ipcr_id');
+    }
+    public function performance_indicator()
+    {
+        return $this->belongsTo(PerformanceIndicator::class, 'performance_indicator_id')
+                    ->with('agencyOutcome');;
+    }
+
 }

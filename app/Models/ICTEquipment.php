@@ -54,5 +54,10 @@ class ICTEquipment extends Model
     {
         return $this->hasMany(\App\Models\ICTPMSHistory::class, 'equipment_id');
     }
+    public function pmsHistory()
+    {
+        return $this->hasMany(ICTPMSHistory::class, 'equipment_id');
+    }
+
 
 }

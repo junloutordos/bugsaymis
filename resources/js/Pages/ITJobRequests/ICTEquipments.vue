@@ -7,6 +7,7 @@ import {
   PrinterIcon,
   TrashIcon,
   ArrowDownTrayIcon,
+  ClockIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -16,6 +17,7 @@ const props = defineProps({
   users: Array, // ✅ Accept users from backend
 })
 
+// include ALL returned properties you use in template
 const {
   equipments,
   equipment,
@@ -35,11 +37,18 @@ const {
   sortBy,
   openModal,
   closeModal,
+  formatDate,
   submitEquipment,
   viewEquipment,
   exportCSV,
   printTable,
-} = useEquipments(props.equipments)
+  printPmsHistory,
+
+  // PMS-related (these were missing before and caused your error)
+  showPmsModal,
+  selectedPmsHistory,
+  openPmsHistory,
+} = useEquipments(props.equipments, props.users)
 
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
@@ -138,11 +147,12 @@ function printModal() {
             placeholder="Search equipment..."
             class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
+          
           <div class="flex gap-2">
-            <button @click="exportCSV">
+            <button @click="exportCSV" title="Export CSV">
               <ArrowDownTrayIcon class="w-5 h-5 text-blue-600" />
             </button>
-            <button @click="printTable">
+            <button @click="printTable" title="Print table">
               <PrinterIcon class="w-5 h-5 text-blue-600" />
             </button>
           </div>
@@ -173,13 +183,21 @@ function printModal() {
                 <td class="px-4 py-3">{{ eq.status }}</td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
-                    <button @click="viewEquipment(eq)" class="p-1 hover:bg-gray-100 rounded">
+                    <button @click="viewEquipment(eq)" class="p-1 hover:bg-gray-100 rounded" title="View">
                       <EyeIcon class="w-5 h-5 text-blue-600"/>
                     </button>
-                    <button @click="openModal('edit', eq)" class="p-1 hover:bg-gray-100 rounded">
+                    <button @click="openModal('edit', eq)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
                       <PencilSquareIcon class="w-5 h-5 text-yellow-600"/>
                     </button>
-                    <button @click="destroyEquipment(eq)" class="p-1 hover:bg-gray-100 rounded">
+                    <button
+                      @click="openPmsHistory(eq)"
+                      class="p-1 hover:bg-gray-100 rounded"
+                      title="PMS History"
+                    >
+                      <ClockIcon class="w-5 h-5 text-green-600" />
+                    </button>
+
+                    <button @click="destroyEquipment(eq)" class="p-1 hover:bg-gray-100 rounded" title="Delete">
                       <TrashIcon class="w-5 h-5 text-red-600"/>
                     </button>
                   </div>
@@ -196,9 +214,21 @@ function printModal() {
 
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <button
+            @click="currentPage = Math.max(1, currentPage - 1)"
+            :disabled="currentPage===1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <button
+            @click="currentPage = Math.min(totalPages, currentPage + 1)"
+            :disabled="currentPage===totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -244,7 +274,7 @@ function printModal() {
 
             <!-- Print button -->
             <div class="mt-4 text-right">
-              <button @click="printModal">
+              <button @click="printModal" title="Print">
                 <PrinterIcon class="w-5 h-5 text-blue-600" />
               </button>
             </div>
@@ -347,6 +377,64 @@ function printModal() {
           </form>
         </div>
       </div>
+
+      <!-- PMS HISTORY MODAL -->
+      <div
+        v-if="showPmsModal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      >
+        <div class="bg-white w-full max-w-3xl rounded-lg p-6 relative">
+
+          <!-- Close button -->
+          <button
+            @click="showPmsModal = false"
+            class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+          >
+            ✕
+          </button>
+
+          <h2 class="text-2xl font-bold mb-4">
+            PMS History for {{ selectedEquipment?.description }} / {{ selectedEquipment?.serial_no }}
+          </h2>
+
+          <div v-if="selectedPmsHistory.length === 0" class="text-center text-gray-500 p-4">
+            No PMS history found.
+          </div>
+
+          <ul v-else class="space-y-4 max-h-96 overflow-y-auto">
+            <li
+              v-for="pms in selectedPmsHistory"
+              :key="pms.id"
+              class="border p-4 rounded-lg bg-gray-50"
+            >
+              <div class="font-semibold">{{ formatDate(pms.pms_date) }}</div>
+              <div class="text-sm text-gray-700">
+                <b>Type:</b> {{ pms.type }}
+              </div>
+              <div class="text-sm text-gray-700">
+                <b>Description:</b> {{ pms.description }}
+              </div>
+              <div class="text-sm text-gray-700">
+                <b>Cost of Repair:</b> ₱{{ pms.cost_of_repair }}
+              </div>
+              <div class="text-sm text-gray-700">
+                <b>Remarks:</b> {{ pms.remarks }}
+              </div>
+              <div class="text-sm text-gray-700">
+                <b>Created By:</b> User ID {{ pms.created_by }}
+              </div>
+            </li>
+          </ul>
+          <!-- Print button -->
+          <div class="mt-4 text-right">
+            <button @click="printPmsHistory" title="Print History" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <PrinterIcon class="w-5 h-5 inline" /> Print History
+            </button>
+          </div>
+
+        </div>
+      </div>
+
     </div>
   </AdminLayout>
 </template>

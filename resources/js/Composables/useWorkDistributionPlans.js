@@ -16,9 +16,8 @@ export function useWorkDistributionPlans(props) {
     id: null,
     performance_indicator_id: "",
     success_indicator: "",
-    personnel: [],
-    start_date: "",
-    end_date: "",
+    office_involved: "",
+    rated_by: "",
   })
 
   const filteredPlans = computed(() => {
@@ -38,26 +37,24 @@ export function useWorkDistributionPlans(props) {
     showModal.value = true
 
     if ((mode === "edit" || mode === "view") && plan) {
+      selectedPlan.value = plan
       form.value = {
         id: plan.id,
         performance_indicator_id: plan.performance_indicator_id ?? "",
         success_indicator: plan.success_indicator ?? "",
-        personnel: plan.personnel ? [...plan.personnel] : [],
-        start_date: plan.start_date ?? "",
-        end_date: plan.end_date ?? "",
+        office_involved: plan.office_involved ?? "",
+        rated_by: plan.rated_by ?? "",
       }
     } else {
       form.value = {
         id: null,
         performance_indicator_id: "",
         success_indicator: "",
-        personnel: [],
-        start_date: "",
-        end_date: "",
+        office_involved: "",
+        rated_by: "",
       }
+      selectedPlan.value = null
     }
-
-    selectedPlan.value = plan
   }
 
   const closeModal = () => {
@@ -67,49 +64,46 @@ export function useWorkDistributionPlans(props) {
 
   const submitPlan = async () => {
     const url = "/work-distributions"
-    const payload = {
-      ...form.value,
-      personnel_ids: form.value.personnel.map(u => u.id),
-    }
+    const payload = { ...form.value }
 
     try {
       if (modalMode.value === "create") {
         router.post(url, payload, {
           onSuccess: async () => {
             closeModal()
-            await Swal.fire("Success", "WDP has been created", "success")
+            await Swal.fire("Success", "WDP created successfully", "success")
             window.location.reload()
           },
         })
-      } else if (modalMode.value === "edit") {
+      } else {
         router.put(`${url}/${form.value.id}`, payload, {
           onSuccess: async () => {
             closeModal()
-            await Swal.fire("Updated", "WDP has been updated", "success")
+            await Swal.fire("Updated", "WDP updated successfully", "success")
             window.location.reload()
           },
         })
       }
     } catch (err) {
       console.error(err)
-      await Swal.fire("Error", "Something went wrong", "error")
+      Swal.fire("Error", "Something went wrong", "error")
     }
   }
 
   const deletePlan = async (plan) => {
-    const result = await Swal.fire({
-      title: `Delete WDP for "${plan.success_indicator}"?`,
-      text: "This action cannot be undone!",
+    const confirm = await Swal.fire({
+      title: `Delete WDP?`,
+      text: "This action cannot be undone.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonText: "Yes, delete",
+      confirmButtonText: "Delete",
     })
 
-    if (result.isConfirmed) {
+    if (confirm.isConfirmed) {
       router.delete(`/work-distribution-plans/${plan.id}`, {
         onSuccess: async () => {
           plansList.value = plansList.value.filter((p) => p.id !== plan.id)
-          await Swal.fire("Deleted", "WDP has been deleted", "success")
+          await Swal.fire("Deleted", "WDP deleted", "success")
           window.location.reload()
         },
       })

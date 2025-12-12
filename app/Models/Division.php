@@ -28,4 +28,12 @@ class Division extends Model
     {
         return $this->status === 'active';
     }
+    public function employees()
+    {
+        return $this->hasMany(User::class, 'division_id');
+    }
+    public function ipcrWeights()
+    {
+        return $this->hasMany(IPCRWeightDistribution::class);
+    }
 }

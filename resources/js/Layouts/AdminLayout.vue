@@ -142,36 +142,45 @@ const menuItems = [
   {
     label: "Performance Mngmt",
     icon: UserGroupIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
     children: [
       {
         label: "Agency Org Outcome",
         routeName: "outcome.index",
         href: route("outcome.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator","HR"],
       },
       {
         label: "Performance Indicators",
         routeName: "performanceindicator.index",
         href: route("performanceindicator.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator","HR"],
       },
       {
         label: "Work Distribution Plan",
         routeName: "workdistribution.index",
         href: route("workdistribution.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator","HR"],
       },
       {
         label: "IPCR",
-        routeName: "ipcr.index",
-        href: route("ipcr.index"),
+        routeName: "employee-ipcr.index",
+        href: route("employee-ipcr.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Faculty", "Staff","HR"],
       },
+      
+      {
+        label: "My Division",
+        routeName: "division-chief-ipcr.index",
+        href: route("division-chief-ipcr.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "DivisionChief"],
+      },
+      
     ],
   },
   {
