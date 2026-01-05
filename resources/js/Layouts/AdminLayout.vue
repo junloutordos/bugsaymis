@@ -64,7 +64,7 @@ const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "DivisionChief", "OCD"],
   },
   {
-    label: "User Management",
+    label: "Data Management",
     icon: UsersIcon,
     roles: ["Administrator"],
     children: [
@@ -87,6 +87,13 @@ const menuItems = [
         routeName: "roles.divisions",
         href: route("roles.divisions"),
         icon: CursorArrowRippleIcon,
+        roles: ["Administrator"],
+      },
+      {
+        label: "Vehicle",
+        routeName: "vehicles.index",
+        href: route("vehicles.index"),
+        icon: ArchiveBoxIcon,
         roles: ["Administrator"],
       },
       
@@ -189,7 +196,7 @@ const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
     children: [
       {
-        label: "PDS",
+        label: "Docu Track",
         routeName: null,
         href: "#",
         icon: ClipboardDocumentListIcon,
@@ -200,16 +207,18 @@ const menuItems = [
   {
     label: "General Services",
     icon: WrenchScrewdriverIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
     children: [
       {
-        label: "PDS",
-        routeName: null,
-        href: "#",
+        label: "Vehicle Request",
+        routeName: "vehicle-requests.index",
+        href: route("vehicle-requests.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
       },
     ],
+    // Only show this section for GSU Head if that's their only role
+    showForGSUHeadOnly: true,
   },
   {
     label: "Supply & Property",
@@ -350,9 +359,13 @@ const menuItems = [
 ];
 
 // --- Filter Menu by Role ---
+
 const filterMenuByRole = (items, role) =>
   items
-    .filter((item) => item.roles.includes(role))
+    .filter((item) => {
+      if (item.showForGSUHeadOnly && role === 'GSU Head') return true;
+      return item.roles.includes(role);
+    })
     .map((item) =>
       item.children
         ? { ...item, children: filterMenuByRole(item.children, role) }

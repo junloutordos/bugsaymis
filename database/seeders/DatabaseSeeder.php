@@ -32,5 +32,7 @@ class DatabaseSeeder extends Seeder
 
         // ✅ Call the IPCR Weight Seeder
         $this->call(IPCRWeightSeeder::class);
+        // Seed sample vehicle requests (optional)
+        $this->call(\Database\Seeders\VehicleRequestSeeder::class);
     }
 }

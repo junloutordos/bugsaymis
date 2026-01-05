@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
+use App\Http\Controllers\VehicleRequestController;
 use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RolesController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 
 /*
@@ -62,6 +64,31 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/job-requests/create', [ITJobRequestController::class, 'create'])->name('jobrequests.create');
     Route::post('/job-requests', [ITJobRequestController::class, 'store'])->name('jobrequests.store');
 
+    // Vehicle Requests
+    Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
+    Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
+    // Driver assignment API
+    Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');
+    Route::post('/vehicle-requests/{vehicleRequest}/assign-driver', [\App\Http\Controllers\DriverController::class, 'assign'])->name('vehicle-requests.assign-driver');
+    // Division chief approval via signed link
+    // Signed approval link: includes the approver id so the link can be used from email
+    Route::get('/vehicle-requests/{vehicleRequest}/approve/{chief}', [VehicleRequestController::class, 'approveByDivisionChief'])
+        ->name('vehicle-requests.approve')
+        ->middleware(['signed']);
+
+    // Decline flow (signed): show decline form and submit decline
+    Route::get('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'showDeclineForm'])
+        ->name('vehicle-requests.decline')
+        ->middleware(['signed']);
+
+    Route::post('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'submitDecline'])
+        ->name('vehicle-requests.decline.submit')
+        ->middleware(['signed']);
+    Route::middleware('role:Administrator')->group(function () {
+        Route::put('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'update'])->name('vehicle-requests.update');
+        Route::delete('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'destroy'])->name('vehicle-requests.destroy');
+    });
+
     // Only Admin can assess requests
     Route::post('/job-requests/{jobRequest}/assess', [ITJobRequestController::class, 'assess'])
         ->middleware('role:Administrator')
@@ -82,6 +109,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Assign multiple equipment to PMS
     Route::post('/ict-pms/{pmsId}/assign-equipments', [PMSController::class, 'assignEquipments'])->name('ict-pms.assign-equipments');
     Route::get('/ict-pms/{pms}/equipments', [PMSController::class, 'showEquipments'])->name('ict-pms.show-equipments');
+    
+    // Administrator only: Vehicles management
+    Route::middleware('role:Administrator')->group(function () {
+        Route::get('/vehicles', [VehicleController::class, 'index'])->name('vehicles.index');
+        Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
+        Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
+        Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+    });
 
     Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');
 
@@ -244,6 +279,15 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+// Development-only: send a test email
+if (app()->environment('local')) {
+    Route::get('/dev/send-test-email', function () {
+        \Illuminate\Support\Facades\Mail::raw('Test email from BugsayMIS (dev route)', function ($m) {
+            $m->to('mikelfrancisco@gmail.com')->subject('BugsayMIS dev test');
+        });
+        return response('OK');
+    });
+}
 
 /*
 |--------------------------------------------------------------------------
