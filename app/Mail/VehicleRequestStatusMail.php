@@ -23,7 +23,8 @@ class VehicleRequestStatusMail extends Mailable
 
     public function build()
     {
-        $subject = $this->status === 'Approved' ? 'Your Vehicle Request is Approved' : 'Your Vehicle Request is Declined';
+        $isApproved = str_contains($this->status, 'Approved');
+        $subject = $isApproved ? 'Your Vehicle Request is Approved' : 'Your Vehicle Request is Declined';
         return $this->subject($subject)
             ->view('emails.vehicle_request_status')
             ->with([

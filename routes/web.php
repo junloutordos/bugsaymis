@@ -76,6 +76,19 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('vehicle-requests.approve')
         ->middleware(['signed']);
 
+    // OCD approval via signed link (sent to OCD users)
+    Route::get('/vehicle-requests/{vehicleRequest}/ocd/approve/{ocd}', [VehicleRequestController::class, 'approveByOCD'])
+        ->name('vehicle-requests.ocd.approve')
+        ->middleware(['signed']);
+
+    Route::get('/vehicle-requests/{vehicleRequest}/ocd/decline/{ocd}', [VehicleRequestController::class, 'showOcdDeclineForm'])
+        ->name('vehicle-requests.ocd.decline')
+        ->middleware(['signed']);
+
+    Route::post('/vehicle-requests/{vehicleRequest}/ocd/decline/{ocd}', [VehicleRequestController::class, 'submitOcdDecline'])
+        ->name('vehicle-requests.ocd.decline.submit')
+        ->middleware(['signed']);
+
     // Decline flow (signed): show decline form and submit decline
     Route::get('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'showDeclineForm'])
         ->name('vehicle-requests.decline')

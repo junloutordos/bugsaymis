@@ -24,7 +24,7 @@ class VehicleRequestController extends Controller
 
         $canViewAll = in_array($role, ['Administrator', 'GSU Head']);
 
-        $requests = VehicleRequest::with('user:id,name')
+        $requests = VehicleRequest::with(['user:id,name', 'driver:id,name'])
             ->when(!$canViewAll, fn($q) => $q->where('user_id', $user->id))
             ->latest()
             ->get();
@@ -145,6 +145,20 @@ class VehicleRequestController extends Controller
             }
         }
 
+        // Notify all OCD users with signed approve/decline links
+        $ocdUsers = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'OCD'); })->get();
+        foreach ($ocdUsers as $ocdUser) {
+            if ($ocdUser->email) {
+                try {
+                    $approveUrl = URL::signedRoute('vehicle-requests.ocd.approve', ['vehicleRequest' => $vehicleRequest->id, 'ocd' => $ocdUser->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('vehicle-requests.ocd.decline', ['vehicleRequest' => $vehicleRequest->id, 'ocd' => $ocdUser->id], now()->addDays(7));
+                    \Mail::to($ocdUser->email)->send(new \App\Mail\VehicleRequestOCDMail($vehicleRequest, $approveUrl, $declineUrl));
+                } catch (\Throwable $e) {
+                    \Log::error('Failed to send OCD vehicle request notification', ['error' => $e->getMessage()]);
+                }
+            }
+        }
+
         return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => false]);
     }
 
@@ -168,6 +182,74 @@ class VehicleRequestController extends Controller
             . '?' . $request->getQueryString();
 
         return view('vehicle_request_decline', ['vehicleRequest' => $vehicleRequest, 'postAction' => $postAction]);
+    }
+
+    /**
+     * OCD approve via signed link
+     */
+    public function approveByOCD(Request $request, VehicleRequest $vehicleRequest, $ocd)
+    {
+        // Signed route ensures integrity. No further role check here, as it's validated by signature.
+        if ($vehicleRequest->status === 'OCD Approved') {
+            return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => true]);
+        }
+
+        $vehicleRequest->status = 'OCD Approved';
+        $vehicleRequest->save();
+
+        // Notify requester
+        $requester = $vehicleRequest->user;
+        if ($requester && $requester->email) {
+            try {
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved'));
+            } catch (\Throwable $e) {
+                \Log::error('Failed to send vehicle request OCD approved notification', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => false]);
+    }
+
+    public function showOcdDeclineForm(Request $request, VehicleRequest $vehicleRequest, $ocd)
+    {
+        // If already approved, show approved page
+        if ($vehicleRequest->status === 'Approved' || $vehicleRequest->status === 'OCD Approved') {
+            return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => true]);
+        }
+
+        $postAction = route('vehicle-requests.ocd.decline.submit', ['vehicleRequest' => $vehicleRequest->id, 'ocd' => $ocd])
+            . '?' . $request->getQueryString();
+
+        return view('vehicle_request_decline', ['vehicleRequest' => $vehicleRequest, 'postAction' => $postAction]);
+    }
+
+    public function submitOcdDecline(Request $request, VehicleRequest $vehicleRequest, $ocd)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        if (in_array($vehicleRequest->status, ['Approved','Declined','OCD Approved'])) {
+            $reason = $vehicleRequest->decline_reason ?? '—';
+            return view('vehicle_request_declined', ['vehicleRequest' => $vehicleRequest, 'reason' => $reason]);
+        }
+
+        $vehicleRequest->status = 'Declined';
+        $vehicleRequest->decline_reason = $request->input('reason');
+        $vehicleRequest->declined_at = now();
+        $vehicleRequest->save();
+
+        // Notify requester
+        $requester = $vehicleRequest->user;
+        if ($requester && $requester->email) {
+            try {
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason));
+            } catch (\Throwable $e) {
+                \Log::error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return view('vehicle_request_declined', ['vehicleRequest' => $vehicleRequest, 'reason' => $vehicleRequest->decline_reason]);
     }
 
     /**

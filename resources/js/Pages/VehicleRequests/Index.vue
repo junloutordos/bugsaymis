@@ -239,6 +239,7 @@ const destroy = (req) => {
               <th class="px-4 py-3 text-left">ETA</th>
               <th class="px-4 py-3 text-left">Status</th>
               <th class="px-4 py-3 text-left">Submitted By</th>
+              <th class="px-4 py-3 text-left">Driver</th>
               <th class="px-4 py-3 text-center">Action</th>
             </tr>
           </thead>
@@ -267,20 +268,21 @@ const destroy = (req) => {
                 </span>
               </td>
               <td class="px-4 py-3">{{ req.user?.name ?? '—' }}</td>
+              <td class="px-4 py-3">{{ req.driver?.name ?? '—' }}</td>
               <td class="px-4 py-3 text-center">
                 <div class="flex justify-center gap-2">
                   <button v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined'" @click.prevent="openModal(req)" class="px-2 py-1 border rounded">Edit</button>
                   <button v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined'" @click.prevent="destroy(req)" class="px-2 py-1 border rounded text-red-600">Delete</button>
                   <!-- Assign Driver button for GSU Head/Admin on Approved requests -->
                   <button
-                    v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved'"
+                    v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
                     @click.prevent="openAssignDriverModal(req)"
                     class="px-2 py-1 border rounded text-blue-700 border-blue-400 hover:bg-blue-50"
                   >Assign Driver</button>
                 </div>
                   <!-- Assign Driver Modal -->
-                  <div v-if="showAssignDriverModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+                  <div v-if="showAssignDriverModal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;">
+                    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 border border-gray-300 relative">
                       <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeAssignDriverModal">✕</button>
                       <h2 class="text-xl font-semibold mb-4">Assign Driver</h2>
                       <div v-if="assignLoading" class="text-center py-4">Loading drivers...</div>
