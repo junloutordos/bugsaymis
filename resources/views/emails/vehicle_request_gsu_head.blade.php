@@ -2,24 +2,96 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>GSU Head Vehicle Request Action</title>
+  <title>Vehicle Request — GSU Head Action</title>
   <style>
-    body{background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial;color:#0f172a;margin:0;padding:24px}
-    .center{max-width:640px;margin:48px auto;text-align:center}
-    .card{background:#fff;padding:28px;border-radius:12px;box-shadow:0 6px 24px rgba(15,23,42,0.08)}
-    h1{margin:0 0 8px;font-size:20px;color:#0f172a}
-    .meta{color:#475569;font-size:14px}
-    .btn{display:inline-block;margin:8px 8px 0 0;padding:10px 16px;background:#3b82f6;color:white;border-radius:8px;text-decoration:none}
+    body { background:#f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial; color:#334155; margin:0; padding:20px; }
+    .container { max-width:640px; margin:28px auto; }
+    .card { background:#ffffff; border-radius:10px; box-shadow:0 4px 18px rgba(16,24,40,0.06); overflow:hidden; }
+    .card-header { background:linear-gradient(90deg,#6366f1,#3b82f6); padding:18px 20px; color:#fff; }
+    .card-body { padding:20px; }
+    h1 { font-size:18px; margin:0 0 6px; }
+    p.lead { margin:0 0 12px; color:#475569; }
+    .details { width:100%; border-collapse:collapse; margin:12px 0; }
+    .details td { padding:8px 6px; border-bottom:1px solid #f1f5f9; }
+    .label { color:#64748b; width:42%; font-weight:600; }
+    .value { color:#0f172a; }
+    .actions { padding:18px 20px; text-align:center; }
+    .btn { display:inline-block; background:#3b82f6; color:white; padding:12px 18px; border-radius:8px; text-decoration:none; font-weight:600; }
+    .muted { color:#94a3b8; font-size:13px; }
+    .footer { padding:14px 20px; font-size:13px; color:#94a3b8; }
+    @media (max-width:480px){ .container{padding:12px} .card-body{padding:14px} }
   </style>
 </head>
 <body>
-  <div class="center">
+  <div class="container">
     <div class="card">
-      <h1>GSU Head Action Required</h1>
-      <p class="meta">A vehicle request (ID: {{ $request->id }}) has been approved by the division chief and now requires your action.</p>
-      <p class="meta">Purpose: {{ $request->purpose }}</p>
-      <p class="meta">Destination: {{ $request->destination }}</p>
-      <p class="meta">Please log in to the system to review, assign a driver, or decline this request.</p>
+      <div class="card-header">
+        <h1>Vehicle Request — GSU Head Action</h1>
+      </div>
+      <div class="card-body">
+        <p class="lead">Hello {{ $request->gsu_head?->name ?? 'GSU Head' }},</p>
+        <p>A vehicle request has been approved by the division chief and now requires your action (assign driver / decline).</p>
+
+        <table class="details" role="presentation">
+          <tr>
+            <td class="label">Control No.</td>
+            <td class="value">{{ $request->control_number ?? $request->id }}</td>
+          </tr>
+          <tr>
+            <td class="label">Requesting Personnel</td>
+            <td class="value">{{ $request->user?->name ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="label">Vehicle Requested</td>
+            <td class="value">{{ $request->vehicle_type ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="label">Date Filed</td>
+            <td class="value">{{ optional($request->created_at)->toDateString() }}</td>
+          </tr>
+          <tr>
+            <td class="label">Date of Trip</td>
+            <td class="value">
+              @php
+                $dates = $request->date_needed_multiple ?? ($request->date_needed ? [optional($request->date_needed)->toDateString()] : []);
+              @endphp
+              @if(!empty($dates))
+                <ul style="margin:0;padding-left:16px">
+                  @foreach($dates as $d)
+                    <li>{{ \Illuminate\Support\Carbon::parse($d)->toDateString() }}</li>
+                  @endforeach
+                </ul>
+              @else
+                —
+              @endif
+            </td>
+          </tr>
+          <tr>
+            <td class="label">No. of Passengers</td>
+            <td class="value">{{ $request->passengers ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="label">Destinations</td>
+            <td class="value">{{ $request->destination ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="label">Times</td>
+            <td class="value">{{ ($request->time_of_departure ?? '—') . ' — ' . ($request->eta ?? '—') }}</td>
+          </tr>
+          <tr>
+            <td class="label">Purpose</td>
+            <td class="value">{{ $request->purpose ?? '—' }}</td>
+          </tr>
+        </table>
+
+        <div class="actions">
+          <a class="btn" href="{{ url('/vehicle-requests/'.$request->id) }}">View Request</a>
+        </div>
+
+        <p class="muted">If the button above does not work, copy and paste the following link into your browser:</p>
+        <p class="muted"><a href="{{ url('/vehicle-requests/'.$request->id) }}">{{ url('/vehicle-requests/'.$request->id) }}</a></p>
+      </div>
+      <div class="footer">If you do not have permission to act on this request, you may ignore this email.<br>Thanks — BUGSAYMIS</div>
     </div>
   </div>
 </body>

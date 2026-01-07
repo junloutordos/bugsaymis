@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\FacilityController;
 
 /*
 |--------------------------------------------------------------------------
@@ -67,6 +68,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
+    // Facility Requests
+    Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
+    Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
     // Driver assignment API
     Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');
     Route::post('/vehicle-requests/{vehicleRequest}/assign-driver', [\App\Http\Controllers\DriverController::class, 'assign'])->name('vehicle-requests.assign-driver');
@@ -89,10 +93,59 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('vehicle-requests.ocd.decline.submit')
         ->middleware(['signed']);
 
+    // Print trip ticket (only GSU Head and Administrator)
+    Route::get('/vehicle-requests/{vehicleRequest}/print', [VehicleRequestController::class, 'printTicket'])
+        ->name('vehicle-requests.print')
+        ->middleware('role:Administrator|GSU Head');
+
     // Decline flow (signed): show decline form and submit decline
     Route::get('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'showDeclineForm'])
         ->name('vehicle-requests.decline')
         ->middleware(['signed']);
+
+    // Facility Requests: Division chief approve/decline via signed links
+    Route::get('/facility-requests/{facilityRequest}/approve/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'approveByDivisionChief'])
+        ->name('facility-requests.approve')
+        ->middleware(['signed']);
+
+    Route::get('/facility-requests/{facilityRequest}/decline/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'showDeclineForm'])
+        ->name('facility-requests.decline')
+        ->middleware(['signed']);
+
+    Route::post('/facility-requests/{facilityRequest}/decline/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'submitDecline'])
+        ->name('facility-requests.decline.submit')
+        ->middleware(['signed']);
+
+    // OCD approval via signed link (sent to OCD users)
+    Route::get('/facility-requests/{facilityRequest}/ocd/approve/{ocd}', [\App\Http\Controllers\FacilityRequestController::class, 'approveByOCD'])
+        ->name('facility-requests.ocd.approve')
+        ->middleware(['signed']);
+
+    Route::get('/facility-requests/{facilityRequest}/ocd/decline/{ocd}', [\App\Http\Controllers\FacilityRequestController::class, 'showOcdDeclineForm'])
+        ->name('facility-requests.ocd.decline')
+        ->middleware(['signed']);
+
+    Route::post('/facility-requests/{facilityRequest}/ocd/decline/{ocd}', [\App\Http\Controllers\FacilityRequestController::class, 'submitOcdDecline'])
+        ->name('facility-requests.ocd.decline.submit')
+        ->middleware(['signed']);
+
+    // Messengerial: Division chief approve/decline via signed links (sent by email)
+    Route::get('/messengerial/{messengerialRequest}/approve/{chief}', [\App\Http\Controllers\MessengerialController::class, 'approveByDivisionChief'])
+        ->name('messengerial.approve')
+        ->middleware(['signed']);
+
+    Route::get('/messengerial/{messengerialRequest}/decline/{chief}', [\App\Http\Controllers\MessengerialController::class, 'showDeclineForm'])
+        ->name('messengerial.decline')
+        ->middleware(['signed']);
+
+    Route::post('/messengerial/{messengerialRequest}/decline/{chief}', [\App\Http\Controllers\MessengerialController::class, 'submitDecline'])
+        ->name('messengerial.decline.submit')
+        ->middleware(['signed']);
+
+    // Print facility request (only GSU Head and Administrator)
+    Route::get('/facility-requests/{facilityRequest}/print', [\App\Http\Controllers\FacilityRequestController::class, 'printTicket'])
+        ->name('facility-requests.print')
+        ->middleware('role:Administrator|GSU Head');
 
     Route::post('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'submitDecline'])
         ->name('vehicle-requests.decline.submit')
@@ -100,6 +153,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::middleware('role:Administrator')->group(function () {
         Route::put('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'update'])->name('vehicle-requests.update');
         Route::delete('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'destroy'])->name('vehicle-requests.destroy');
+        // Facility Requests admin actions
+        Route::put('/facility-requests/{facilityRequest}', [\App\Http\Controllers\FacilityRequestController::class, 'update'])->name('facility-requests.update');
+        Route::delete('/facility-requests/{facilityRequest}', [\App\Http\Controllers\FacilityRequestController::class, 'destroy'])->name('facility-requests.destroy');
     });
 
     // Only Admin can assess requests
@@ -129,6 +185,17 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
         Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
         Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+        // Facilities admin management
+        Route::get('/facilities', [FacilityController::class, 'index'])->name('facilities.index');
+        Route::post('/facilities', [FacilityController::class, 'store'])->name('facilities.store');
+        Route::put('/facilities/{facility}', [FacilityController::class, 'update'])->name('facilities.update');
+        Route::delete('/facilities/{facility}', [FacilityController::class, 'destroy'])->name('facilities.destroy');
+        
+        // Messengerial requests
+        Route::get('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'index'])->name('messengerial.index');
+        Route::post('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'store'])->name('messengerial.store');
+        Route::put('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'update'])->name('messengerial.update');
+        Route::delete('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'destroy'])->name('messengerial.destroy');
     });
 
     Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');

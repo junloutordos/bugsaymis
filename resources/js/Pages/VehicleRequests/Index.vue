@@ -1,6 +1,7 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive } from "vue";
+import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array, vehicles: Array, divisionChiefs: Array });
@@ -54,6 +55,16 @@ const assignDriver = async () => {
     setBanner('error', 'Failed to assign driver');
   }
   assignLoading.value = false;
+};
+
+const openPrint = (req) => {
+  let url;
+  try {
+    url = route('vehicle-requests.print', req.id);
+  } catch (e) {
+    url = `/vehicle-requests/${req.id}/print`;
+  }
+  window.open(url, '_blank');
 };
 
 const setBanner = (type, message, ms = 5000) => {
@@ -139,6 +150,8 @@ const submit = () => {
           const status = serverErr.status ?? (errs?.status ?? 'unknown');
           const data = serverErr.data ?? errs;
           setBanner('error', `Error ${status}: ${serverErr.data?.message ?? JSON.stringify(data)}`);
+          const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
+          if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
           console.log('Captured server error', serverErr);
         },
         onFinish: () => {
@@ -164,6 +177,8 @@ const submit = () => {
           const status = serverErr.status ?? (errs?.status ?? 'unknown');
           const data = serverErr.data ?? errs;
           setBanner('error', `Error ${status}: ${serverErr.data?.message ?? JSON.stringify(data)}`);
+          const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
+          if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
           console.log('Captured server error', serverErr);
         },
         onFinish: () => {
@@ -257,7 +272,7 @@ const destroy = (req) => {
               <td class="px-4 py-3">{{ req.time_of_departure ?? '—' }}</td>
               <td class="px-4 py-3">{{ req.eta ?? '—' }}</td>
               <td class="px-4 py-3">
-                <span v-if="req.status === 'Approved'" class="bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
+                <span v-if="req.status && req.status.includes('Approved')" class="bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
                   {{ req.status }}
                 </span>
                 <span v-else-if="req.status === 'Declined'" class="bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
@@ -270,15 +285,46 @@ const destroy = (req) => {
               <td class="px-4 py-3">{{ req.user?.name ?? '—' }}</td>
               <td class="px-4 py-3">{{ req.driver?.name ?? '—' }}</td>
               <td class="px-4 py-3 text-center">
-                <div class="flex justify-center gap-2">
-                  <button v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined'" @click.prevent="openModal(req)" class="px-2 py-1 border rounded">Edit</button>
-                  <button v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined'" @click.prevent="destroy(req)" class="px-2 py-1 border rounded text-red-600">Delete</button>
-                  <!-- Assign Driver button for GSU Head/Admin on Approved requests -->
+                <div class="flex items-center gap-2 justify-center">
+                  <!-- Edit (pencil) -->
+                  <button
+                    v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
+                    @click.prevent="openModal(req)"
+                    class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
+                    title="Edit"
+                  >
+                    <PencilSquareIcon class="w-5 h-5" />
+                  </button>
+
+                  <!-- Delete (trash) -->
+                  <button
+                    v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
+                    @click.prevent="destroy(req)"
+                    class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700"
+                    title="Delete"
+                  >
+                    <TrashIcon class="w-5 h-5" />
+                  </button>
+
+                  <!-- Assign Driver (user) -->
                   <button
                     v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
                     @click.prevent="openAssignDriverModal(req)"
-                    class="px-2 py-1 border rounded text-blue-700 border-blue-400 hover:bg-blue-50"
-                  >Assign Driver</button>
+                    class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
+                    title="Assign Driver"
+                  >
+                    <UserIcon class="w-5 h-5" />
+                  </button>
+
+                  <!-- Print (printer) -->
+                  <button
+                    v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                    @click.prevent="openPrint(req)"
+                    class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    title="Print"
+                  >
+                    <PrinterIcon class="w-5 h-5" />
+                  </button>
                 </div>
                   <!-- Assign Driver Modal -->
                   <div v-if="showAssignDriverModal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;">

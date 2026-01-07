@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use App\Mail\VehicleRequestCreatedMail;
 use App\Models\User;
+use Carbon\Carbon;
 
 class VehicleRequestController extends Controller
 {
@@ -72,13 +73,62 @@ class VehicleRequestController extends Controller
 
         $user = $request->user();
 
+        // prepare dates array
+        $dates = is_array($request->input('date_needed')) ? $request->input('date_needed') : ($request->input('date_needed') ? [$request->input('date_needed')] : []);
+
+        // conflict detection: ensure the requested vehicle isn't already booked for any of the requested dates/time
+        $vehicleName = $request->input('vehicle_type');
+        $timeStart = $request->input('time_of_departure');
+        $timeEnd = $request->input('eta');
+        $vehicleConflicts = [];
+        if ($vehicleName && count($dates) > 0) {
+            foreach ($dates as $d) {
+                $existing = VehicleRequest::where('vehicle_type', $vehicleName)
+                    ->where('status', '!=', 'Declined')
+                    ->where(function ($q) use ($d) {
+                        $q->whereDate('date_needed', $d)
+                          ->orWhereJsonContains('date_needed_multiple', $d);
+                    })
+                    ->get();
+
+                foreach ($existing as $ex) {
+                    // treat missing times as conflict
+                    if (empty($ex->time_of_departure) || empty($ex->eta) || empty($timeStart) || empty($timeEnd)) {
+                        $vehicleConflicts[] = $d;
+                        break;
+                    }
+
+                    // compare times (H:i)
+                    try {
+                        $exStart = Carbon::createFromFormat('H:i:s', $ex->time_of_departure)->format('H:i');
+                        $exEnd = Carbon::createFromFormat('H:i:s', $ex->eta)->format('H:i');
+                    } catch (\Throwable $e) {
+                        $exStart = substr($ex->time_of_departure,0,5);
+                        $exEnd = substr($ex->eta,0,5);
+                    }
+                    $nStart = Carbon::createFromFormat('H:i', $timeStart)->format('H:i');
+                    $nEnd = Carbon::createFromFormat('H:i', $timeEnd)->format('H:i');
+
+                    if ($nStart < $exEnd && $nEnd > $exStart) {
+                        $vehicleConflicts[] = $d;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (! empty($vehicleConflicts)) {
+            $datesStr = implode(', ', array_unique($vehicleConflicts));
+            return redirect()->back()->withInput()->withErrors(['vehicle' => "The vehicle {$vehicleName} is already booked on: {$datesStr}"]);
+        }
+
         $vr = VehicleRequest::create([
             'user_id' => $user->id,
             'purpose' => $request->input('purpose'),
             'destination' => $request->input('destination'),
             // store first date in legacy `date_needed` and full array in `date_needed_multiple`
-            'date_needed' => is_array($request->input('date_needed')) ? ($request->input('date_needed')[0] ?? null) : $request->input('date_needed'),
-            'date_needed_multiple' => $request->input('date_needed'),
+            'date_needed' => $dates[0] ?? null,
+            'date_needed_multiple' => $dates,
             'time_of_departure' => $request->input('time_of_departure'),
             'eta' => $request->input('eta'),
             'vehicle_type' => $request->input('vehicle_type'),
@@ -123,11 +173,11 @@ class VehicleRequestController extends Controller
         $vehicleRequest->status = 'Approved';
         $vehicleRequest->save();
 
-        // Notify requester via email
+        // Notify requester via email (approved by Division Chief)
         $requester = $vehicleRequest->user;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Approved'));
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Approved', null, 'Division Chief'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request approved notification', ['error' => $e->getMessage()]);
             }
@@ -201,7 +251,7 @@ class VehicleRequestController extends Controller
         $requester = $vehicleRequest->user;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved'));
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, 'Office of the Campus Director'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request OCD approved notification', ['error' => $e->getMessage()]);
             }
@@ -243,7 +293,7 @@ class VehicleRequestController extends Controller
         $requester = $vehicleRequest->user;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason));
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Office of the Campus Director'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
             }
@@ -277,11 +327,11 @@ class VehicleRequestController extends Controller
         $vehicleRequest->declined_at = now();
         $vehicleRequest->save();
 
-        // Notify requester via email
+        // Notify requester via email (declined by Division Chief)
         $requester = $vehicleRequest->user;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason));
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Division Chief'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
             }
@@ -342,5 +392,28 @@ class VehicleRequestController extends Controller
         }
         $vehicleRequest->delete();
         return redirect()->route('vehicle-requests.index');
+    }
+
+    /**
+     * Show a printable trip ticket (HTML) for a vehicle request.
+     * Only accessible to Admin and GSU Head via route middleware.
+     */
+    public function printTicket(Request $request, VehicleRequest $vehicleRequest)
+    {
+        $user = $request->user();
+        $role = $user->role->name ?? '';
+
+        if (! in_array($role, ['Administrator', 'GSU Head'])) {
+            abort(403);
+        }
+
+        // Only allow printing when OCD has approved the request
+        if ($vehicleRequest->status !== 'OCD Approved') {
+            abort(403, 'Request not ready for printing');
+        }
+
+        $vehicleRequest->load(['user','driver', 'divisionChief']);
+
+        return view('vehicle_requests.print_ticket', ['request' => $vehicleRequest]);
     }
 }

@@ -96,6 +96,13 @@ const menuItems = [
         icon: ArchiveBoxIcon,
         roles: ["Administrator"],
       },
+          {
+            label: "Facility",
+            routeName: "facilities.index",
+            href: route("facilities.index"),
+            icon: ArchiveBoxIcon,
+            roles: ["Administrator"],
+          },
       
     ],
   },
@@ -202,6 +209,13 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
       },
+      {
+        label: "Messengerial",
+        routeName: "messengerial.index",
+        href: route("messengerial.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+      },
     ],
   },
   {
@@ -216,6 +230,13 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
       },
+          {
+            label: "Facility Request",
+            routeName: "facility-requests.index",
+            href: route("facility-requests.index"),
+            icon: ClipboardDocumentListIcon,
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+          },
     ],
     // Only show this section for GSU Head if that's their only role
     showForGSUHeadOnly: true,

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
+import { PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const props = defineProps({ vehicles: Array })
@@ -78,14 +79,19 @@ const destroy = (id) => {
               <td class="px-4 py-3">{{ v.capacity ?? '—' }}</td>
               <td class="px-4 py-3">{{ v.status ?? 'Good Working' }}</td>
               <td class="px-4 py-3">
-                <div class="flex gap-2">
-                  <button @click="openEdit(v)" class="px-2 py-1 border rounded">Edit</button>
-                  <button @click="destroy(v.id)" class="px-2 py-1 border rounded text-red-600">Delete</button>
+                <div class="flex items-center gap-2 justify-center">
+                  <button @click="openEdit(v)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
+                    <PencilSquareIcon class="w-4 h-4" />
+                  </button>
+
+                  <button @click="destroy(v.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
+                    <TrashIcon class="w-4 h-4" />
+                  </button>
                 </div>
               </td>
             </tr>
             <tr v-if="props.vehicles.length===0">
-              <td colspan="4" class="px-4 py-6 text-center text-gray-500">No vehicles added.</td>
+              <td colspan="6" class="px-4 py-6 text-center text-gray-500">No vehicles added.</td>
             </tr>
           </tbody>
         </table>

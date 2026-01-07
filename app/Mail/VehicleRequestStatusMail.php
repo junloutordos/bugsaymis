@@ -13,18 +13,28 @@ class VehicleRequestStatusMail extends Mailable
     public $vehicleRequest;
     public $status;
     public $reason;
+    public $actor;
 
-    public function __construct($vehicleRequest, $status, $reason = null)
+    public function __construct($vehicleRequest, $status, $reason = null, $actor = null)
     {
         $this->vehicleRequest = $vehicleRequest;
         $this->status = $status;
         $this->reason = $reason;
+        $this->actor = $actor;
     }
 
     public function build()
     {
         $isApproved = str_contains($this->status, 'Approved');
-        $subject = $isApproved ? 'Your Vehicle Request is Approved' : 'Your Vehicle Request is Declined';
+
+        if ($this->actor === 'Division Chief') {
+            $subject = $isApproved
+                ? 'Vehicle Request has been approved by your Division Chief'
+                : 'Vehicle Request has been declined by your Division Chief';
+        } else {
+            $subject = $isApproved ? 'Your Vehicle Request is Approved' : 'Your Vehicle Request is Declined';
+        }
+
         return $this->subject($subject)
             ->view('emails.vehicle_request_status')
             ->with([

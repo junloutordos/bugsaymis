@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Vehicle Request Status</title>
+  <title>Facility Request Status</title>
   <style>
     body { background:#f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial; color:#334155; margin:0; padding:20px; }
     .container { max-width:640px; margin:28px auto; }
@@ -29,48 +29,54 @@
   <div class="container">
     <div class="card">
       <div class="card-header">
-        <h1>Vehicle Request — {{ $status }}</h1>
+        <h1>Facility Request — {{ $status }}</h1>
       </div>
       <div class="card-body">
-        <p class="lead">Hello {{ $request->user?->name ?? 'Requestor' }},</p>
+        <p class="lead">Hello {{ $request->requestor ?? 'Requestor' }},</p>
+
+        @if(!empty($approver) && str_contains(strtolower($status), 'approved'))
+          <p><strong>This request was approved by {{ $approver }}.</strong></p>
+        @elseif(!empty($approver) && str_contains(strtolower($status), 'declined'))
+          <p><strong>This request was declined by {{ $approver }}.</strong></p>
+        @endif
 
         <table class="details" role="presentation">
           <tr>
-            <td class="label">Control No.</td>
-            <td class="value">{{ $request->control_number ?? $request->id }}</td>
+            <td class="label">Request ID</td>
+            <td class="value">{{ $request->id }}</td>
           </tr>
           <tr>
             <td class="label">Requesting Personnel</td>
-            <td class="value">{{ $request->user?->name ?? '—' }}</td>
+            <td class="value">{{ $request->requestor ?? '—' }}</td>
           </tr>
           <tr>
-            <td class="label">Vehicle Requested</td>
-            <td class="value">{{ $request->vehicle_type ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Date of Trip</td>
+            <td class="label">Venue</td>
             <td class="value">
-              @php
-                $dates = $request->date_needed_multiple ?? ($request->date_needed ? [optional($request->date_needed)->toDateString()] : []);
-              @endphp
-              @if(!empty($dates))
-                <ul style="margin:0;padding-left:16px">
-                  @foreach($dates as $d)
-                    <li>{{ \Illuminate\Support\Carbon::parse($d)->toDateString() }}</li>
-                  @endforeach
-                </ul>
+              @if(is_array($request->venue))
+                {{ implode(', ', $request->venue) }}
+              @else
+                {{ $request->venue ?? '—' }}
+              @endif
+            </td>
+          </tr>
+          <tr>
+            <td class="label">Date(s)</td>
+            <td class="value">
+              @if(!empty($request->date_start))
+                {{ \Illuminate\Support\Carbon::parse($request->date_start)->toDateString() }}
+                @if(!empty($request->date_end)) — {{ \Illuminate\Support\Carbon::parse($request->date_end)->toDateString() }} @endif
               @else
                 —
               @endif
             </td>
           </tr>
           <tr>
-            <td class="label">No. of Passengers</td>
-            <td class="value">{{ $request->passengers ?? '—' }}</td>
+            <td class="label">Time(s)</td>
+            <td class="value">{{ $request->time_start ?? '—' }} {{ $request->time_end ? ' — ' . $request->time_end : '' }}</td>
           </tr>
           <tr>
-            <td class="label">Destinations</td>
-            <td class="value">{{ $request->destination ?? '—' }}</td>
+            <td class="label">Equipment</td>
+            <td class="value">@if(is_array($request->equipment)) {{ implode(', ', $request->equipment) }} @else {{ $request->equipment ?? ($request->others ?? '—') }} @endif</td>
           </tr>
           <tr>
             <td class="label">Purpose</td>

@@ -8,16 +8,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('vehicle_requests', function (Blueprint $table) {
-            $table->foreignId('driver_id')->nullable()->constrained('users')->nullOnDelete();
-        });
+        if (! Schema::hasColumn('vehicle_requests', 'driver_id')) {
+            Schema::table('vehicle_requests', function (Blueprint $table) {
+                $table->foreignId('driver_id')->nullable()->constrained('users')->nullOnDelete();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('vehicle_requests', function (Blueprint $table) {
-            $table->dropForeign(['driver_id']);
-            $table->dropColumn('driver_id');
-        });
+        if (Schema::hasColumn('vehicle_requests', 'driver_id')) {
+            Schema::table('vehicle_requests', function (Blueprint $table) {
+                $table->dropForeign(['driver_id']);
+                $table->dropColumn('driver_id');
+            });
+        }
     }
 };
