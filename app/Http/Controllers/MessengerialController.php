@@ -11,7 +11,9 @@ use App\Models\Division;
 use App\Models\User;
 use App\Mail\MessengerialRequestCreatedMail;
 use App\Mail\MessengerialRequestStatusMail;
+use App\Mail\MessengerialRequestRecordsMail;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class MessengerialController extends Controller
 {
@@ -19,7 +21,7 @@ class MessengerialController extends Controller
     {
         $user = $request->user();
         $role = $user->role->name ?? '';
-        $canViewAll = in_array($role, ['Administrator']);
+        $canViewAll = in_array($role, ['Administrator', 'Records']);
 
         $requests = MessengerialRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email))
             ->latest()
@@ -109,7 +111,7 @@ class MessengerialController extends Controller
         }
 
         if ($messengerialRequest->status === 'Approved') {
-            return view('facility_request_approved', ['facilityRequest' => $messengerialRequest, 'already' => true]);
+            return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => true]);
         }
 
         $messengerialRequest->status = 'Approved';
@@ -134,7 +136,24 @@ class MessengerialController extends Controller
             logger()->error('Failed to send messengerial request approved notification', ['error' => $e->getMessage()]);
         }
 
-        return view('facility_request_approved', ['facilityRequest' => $messengerialRequest, 'already' => false]);
+        // Notify Records users so they can process the approved request
+        try {
+            $recordsUsers = User::whereHas('role', function($q) { $q->where('name', 'Records'); })->get();
+            $processUrl = url('/messengerial');
+            foreach ($recordsUsers as $rUser) {
+                if ($rUser->email) {
+                    try {
+                        Mail::to($rUser->email)->send(new \App\Mail\MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
+                    } catch (\Throwable $ee) {
+                        logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage(), 'email' => $rUser->email]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to queue Records notifications for messengerial request', ['error' => $e->getMessage()]);
+        }
+
+        return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => false]);
     }
 
     public function showDeclineForm(Request $request, MessengerialRequest $messengerialRequest, $chief)
@@ -144,7 +163,7 @@ class MessengerialController extends Controller
         }
 
         if ($messengerialRequest->status === 'Approved') {
-            return view('facility_request_approved', ['facilityRequest' => $messengerialRequest, 'already' => true]);
+            return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => true]);
         }
 
         $postAction = route('messengerial.decline.submit', ['messengerialRequest' => $messengerialRequest->id, 'chief' => $chief])
@@ -197,8 +216,15 @@ class MessengerialController extends Controller
 
     public function update(Request $request, MessengerialRequest $messengerialRequest)
     {
-        $isAdmin = ($request->user()->role->name ?? '') === 'Administrator';
-        if (! $isAdmin) abort(403);
+        $user = $request->user();
+        $isAdmin = ($user->role->name ?? '') === 'Administrator';
+
+        // Non-admins may update only when the request is still Pending
+        if (! $isAdmin) {
+            if ($messengerialRequest->status !== 'Pending') {
+                abort(403);
+            }
+        }
 
         $messengerialRequest->update($request->all());
         return redirect()->route('messengerial.index');
@@ -206,9 +232,74 @@ class MessengerialController extends Controller
 
     public function destroy(MessengerialRequest $messengerialRequest)
     {
-        $isAdmin = (auth()->user()->role->name ?? '') === 'Administrator';
-        if (! $isAdmin) abort(403);
+        $user = auth()->user();
+        $isAdmin = ($user->role->name ?? '') === 'Administrator';
+
+        // Non-admins may delete only when the request is still Pending
+        if (! $isAdmin) {
+            if ($messengerialRequest->status !== 'Pending') {
+                abort(403);
+            }
+        }
+
         $messengerialRequest->delete();
         return redirect()->route('messengerial.index');
+    }
+
+    /**
+     * Show a printable view for a messengerial request.
+     * Only accessible to Admin and Records via route middleware.
+     */
+    public function printTicket(Request $request, MessengerialRequest $messengerialRequest)
+    {
+        $user = $request->user();
+        $role = $user->role->name ?? '';
+
+        if (! in_array($role, ['Administrator', 'Records'])) {
+            abort(403);
+        }
+
+        return view('messengerial.print_ticket', ['request' => $messengerialRequest]);
+    }
+
+    /**
+     * Upload proof of delivery (only Records and Administrator)
+     */
+    public function uploadProof(Request $request, MessengerialRequest $messengerialRequest)
+    {
+        $user = $request->user();
+        $role = $user->role->name ?? '';
+        if (! in_array($role, ['Administrator', 'Records'])) {
+            abort(403);
+        }
+
+        // Only allow upload when request is approved and not already completed
+        if ($messengerialRequest->status === 'Completed') {
+            return redirect()->back()->with('error', 'Proof already uploaded.');
+        }
+
+        $request->validate([
+            'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+        ]);
+
+        $file = $request->file('proof');
+        $path = $file->store('messengerial_proofs', 'public');
+
+        $messengerialRequest->proof_of_delivery = $path;
+        $messengerialRequest->status = 'Completed';
+        $messengerialRequest->completed_at = now();
+        $messengerialRequest->save();
+
+        // notify requester
+        try {
+            $requesterEmail = $messengerialRequest->email ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->send(new MessengerialRequestStatusMail($messengerialRequest, 'Completed', null, $user->name ?? null));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send messengerial completed notification', ['error' => $e->getMessage()]);
+        }
+
+        return redirect()->route('messengerial.index')->with('success', 'Proof uploaded and request marked completed.');
     }
 }

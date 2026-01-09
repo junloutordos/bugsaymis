@@ -142,6 +142,27 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('messengerial.decline.submit')
         ->middleware(['signed']);
 
+    // Print messengerial request (Records and Administrator)
+    Route::get('/messengerial/{messengerialRequest}/print', [\App\Http\Controllers\MessengerialController::class, 'printTicket'])
+        ->name('messengerial.print')
+        ->middleware('role:Administrator|Records');
+
+    // Upload proof of delivery (Records and Administrator)
+    Route::post('/messengerial/{messengerialRequest}/upload-proof', [\App\Http\Controllers\MessengerialController::class, 'uploadProof'])
+        ->name('messengerial.upload_proof')
+        ->middleware('role:Administrator|Records');
+
+    // Messengerial CRUD routes (any authenticated user may create; controller enforces edit/delete rules)
+    Route::get('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'index'])->name('messengerial.index');
+    Route::post('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'store'])->name('messengerial.store');
+    Route::put('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'update'])->name('messengerial.update');
+    Route::delete('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'destroy'])->name('messengerial.destroy');
+
+    // Health Services - Consultations page
+    Route::get('/consultations', [\App\Http\Controllers\ConsultationController::class, 'index'])->name('consultations.index');
+    Route::post('/consultations', [\App\Http\Controllers\ConsultationController::class, 'store'])->name('consultations.store');
+    Route::put('/consultations/{consultation}', [\App\Http\Controllers\ConsultationController::class, 'update'])->name('consultations.update');
+
     // Print facility request (only GSU Head and Administrator)
     Route::get('/facility-requests/{facilityRequest}/print', [\App\Http\Controllers\FacilityRequestController::class, 'printTicket'])
         ->name('facility-requests.print')
@@ -191,11 +212,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::put('/facilities/{facility}', [FacilityController::class, 'update'])->name('facilities.update');
         Route::delete('/facilities/{facility}', [FacilityController::class, 'destroy'])->name('facilities.destroy');
         
-        // Messengerial requests
-        Route::get('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'index'])->name('messengerial.index');
-        Route::post('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'store'])->name('messengerial.store');
-        Route::put('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'update'])->name('messengerial.update');
-        Route::delete('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'destroy'])->name('messengerial.destroy');
+        
     });
 
     Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');

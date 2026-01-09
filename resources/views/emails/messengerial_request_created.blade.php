@@ -73,10 +73,7 @@
                         <td class="label">Consignee Email</td>
                         <td class="value">{{ $request->consignee_email ?? '—' }}</td>
                     </tr>
-                    <tr>
-                        <td class="label">Date Filed</td>
-                        <td class="value">{{ !empty($request->date_filed) ? \Illuminate\Support\Carbon::parse($request->date_filed)->toDateTimeString() : '—' }}</td>
-                    </tr>
+                    {{-- Date Filed removed per request to avoid confusion --}}
                 </table>
 
                 <div class="actions">

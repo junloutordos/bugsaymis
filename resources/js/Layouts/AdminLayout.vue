@@ -200,21 +200,21 @@ const menuItems = [
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent"],
     children: [
       {
         label: "Docu Track",
         routeName: null,
         href: "#",
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent"],
       },
       {
         label: "Messengerial",
         routeName: "messengerial.index",
         href: route("messengerial.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent"],
       },
     ],
   },
@@ -302,20 +302,20 @@ const menuItems = [
     label: "Student Services",
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
   },
-  {
-    label: "Health Services",
-    icon: HeartIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
       {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
+        label: "Health Services",
+        icon: HeartIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        children: [
+          {
+            label: "Consultations",
+            routeName: "consultations.index",
+            href: route("consultations.index"),
+            icon: ChatBubbleLeftRightIcon,
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+          },
+        ],
       },
-    ],
-  },
   {
     label: "Guidance Services",
     icon: ChatBubbleLeftRightIcon,

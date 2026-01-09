@@ -25,8 +25,14 @@ class MessengerialRequestStatusMail extends Mailable
 
     public function build()
     {
-        $isApproved = str_contains(strtolower($this->status), 'approved');
-        $subject = $isApproved ? 'Your Messengerial Request is Approved' : 'Your Messengerial Request is Declined';
+        $statusLower = strtolower($this->status ?? '');
+        if (str_contains($statusLower, 'completed')) {
+            $subject = 'Your Messengerial Request is now Completed';
+        } elseif (str_contains($statusLower, 'approved')) {
+            $subject = 'Your Messengerial Request is Approved';
+        } else {
+            $subject = 'Your Messengerial Request is Declined';
+        }
 
         return $this->subject($subject)
                     ->view('emails.messengerial_request_status')
