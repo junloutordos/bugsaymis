@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { Head, usePage, router } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
+import ProfileEditModal from '@/Components/ProfileEditModal.vue';
 import {
   HomeIcon,
   UsersIcon,
@@ -44,10 +45,22 @@ const page = usePage();
 const user = page.props.auth?.user || { role: { name: "Guest" }, name: "Guest" };
 const roleName = user.role?.name || "Guest";
 
+
 // --- Helpers ---
 const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
+
+// --- Profile Modal State ---
+const showProfileModal = ref(false);
+const openProfileModal = () => {
+  console.log('AdminLayout: openProfileModal called');
+  showDropdown.value = false;
+  showProfileModal.value = true;
+};
+const closeProfileModal = () => {
+  showProfileModal.value = false;
+};
 
 // --- Menu Items ---
 const menuItems = [
@@ -87,6 +100,13 @@ const menuItems = [
         routeName: "roles.divisions",
         href: route("roles.divisions"),
         icon: CursorArrowRippleIcon,
+        roles: ["Administrator"],
+      },
+      {
+        label: "Office/Unit",
+        routeName: "offices.index",
+        href: route("offices.index"),
+        icon: HomeIcon,
         roles: ["Administrator"],
       },
       {
@@ -200,7 +220,7 @@ const menuItems = [
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
     children: [
       {
         label: "Docu Track",
@@ -214,7 +234,7 @@ const menuItems = [
         routeName: "messengerial.index",
         href: route("messengerial.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
       },
     ],
   },
@@ -302,6 +322,22 @@ const menuItems = [
     label: "Student Services",
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
   },
+  {
+    label: "Registrar",
+    icon: DocumentTextIcon,
+        routeName: "students.index",
+        href: route("students.index"),
+    roles: ["Administrator", "Registrar"],
+    children: [
+      {
+        label: "Students",
+            routeName: "students.index",
+            href: route("students.index"),
+        icon: UserGroupIcon,
+        roles: ["Administrator", "Registrar"],
+      },
+    ],
+  },
       {
         label: "Health Services",
         icon: HeartIcon,
@@ -333,15 +369,36 @@ const menuItems = [
   {
     label: "Library Services",
     icon: BookOpenIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+    roles: ["Administrator", "Librarian"],
     children: [
       {
-        label: "PDS",
-        routeName: null,
-        href: "#",
+        label: "Attendance",
+        routeName: "library.attendance.index",
+        href: route('library.attendance.index'),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Librarian"],
       },
+      {
+        label: "Collections",
+        routeName: "library.collections.index",
+        href: route('library.collections.index'),
+        icon: ArchiveBoxIcon,
+        roles: ["Administrator", "Librarian"],
+      },
+          {
+            label: "Collection Categories",
+            routeName: "library.collection-categories.index",
+            href: route('library.collection-categories.index'),
+            icon: BookOpenIcon,
+            roles: ["Administrator", "Librarian"],
+          },
+          {
+            label: "Borrowing",
+            routeName: "library.borrowings.index",
+            href: route('library.borrowings.index'),
+            icon: BookOpenIcon,
+            roles: ["Administrator", "Librarian"],
+          },
     ],
   },
   {
@@ -492,7 +549,7 @@ filteredMenu.value.forEach((item) => {
             class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100"
           >
             <img
-              src="https://i.pravatar.cc/40"
+              :src="user.profile_picture ? ('/storage/' + user.profile_picture) : 'https://i.pravatar.cc/40'"
               alt="User Avatar"
               class="w-10 h-10 rounded-full border"
             />
@@ -500,16 +557,18 @@ filteredMenu.value.forEach((item) => {
             <ChevronDownIcon class="h-5 w-5 text-gray-600" />
           </button>
 
+
           <div
             v-if="showDropdown"
             class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-50"
           >
-            <a
-              :href="route('profile.edit')"
-              class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            <button
+              type="button"
+              @click.prevent="openProfileModal"
+              class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
               Profile
-            </a>
+            </button>
             <button
               @click="logout"
               class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -525,5 +584,12 @@ filteredMenu.value.forEach((item) => {
         <slot />
       </main>
     </div>
+    <!-- Profile Edit Modal -->
+    <ProfileEditModal :show="showProfileModal" :user="user" @close="closeProfileModal" />
   </div>
 </template>
+
+
+
+
+

@@ -2,31 +2,316 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Messengerial Request #{{ $request->id }} - Print</title>
+    <title>Transmittal Slip - Print</title>
+
     <style>
-        body { font-family: Arial, sans-serif; color: #111; }
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        h1 { font-size: 18px; margin-bottom: 8px; }
-        .row { display:flex; gap:12px; margin-bottom:8px; }
-        .label { width:160px; font-weight:600; }
-        .value { flex:1; }
-        .badge { display:inline-block; padding:4px 8px; border-radius:4px; background:#eef; }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            color: #000;
+        }
+
+        .container {
+            width: 800px;
+            margin: auto;
+            padding: 20px 30px;
+        }
+
+        /* HEADER */
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .header .title {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .header .campus {
+            margin-top: 3px;
+            font-weight: bold;
+        }
+
+        .header .subtitle {
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        /* FORM ROWS */
+        .row {
+            display: flex;
+            margin-bottom: 8px;
+        }
+
+        .label {
+            width: 260px;
+            font-weight: bold;
+        }
+
+        .value {
+            flex: 1;
+            border-bottom: 1px solid #000;
+            min-height: 16px;
+            padding-left: 3px;
+        }
+
+        /* SECTION */
+        .section {
+            margin-top: 15px;
+        }
+
+        /* SIGNATURES */
+        .signature {
+            margin-top: 35px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .sig-box {
+            width: 45%;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .sig-line {
+            border-top: 1px solid #000;
+            margin-top: 35px;
+            padding-top: 4px;
+            font-weight: bold;
+        }
+
+        .sig-img {
+            max-height: 60px;
+            display: block;
+            margin: 0 auto -32px; /* lift following text so the signature sits over the name */
+            z-index: 2;
+        }
+
+        .sig-name {
+            font-weight: bold;
+            margin-top: 40px; /* provide space so name remains readable when signature absent */
+            position: relative;
+            z-index: 1;
+        }
+
+        .sig-label {
+            margin-top: 4px;
+            font-size: 11px;
+        }
+
+        /* NOTE */
+        .note {
+            margin-top: 15px;
+            font-size: 10px;
+            text-align: justify;
+        }
+
+        /* FOOTER */
+        .footer {
+            margin-top: 20px;
+            font-size: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
     </style>
 </head>
+
 <body onload="window.print()">
-    <div class="container">
-        <h1>Messengerial Request #{{ $request->id }}</h1>
-        <div class="row"><div class="label">Requestor</div><div class="value">{{ $request->requestor }}</div></div>
-        <div class="row"><div class="label">Unit</div><div class="value">{{ $request->unit ?? '—' }}</div></div>
-        <div class="row"><div class="label">Reference No.</div><div class="value">{{ $request->reference_no ?? '—' }}</div></div>
-        <div class="row"><div class="label">Purpose</div><div class="value">{{ $request->purpose ?? '—' }}</div></div>
-        <div class="row"><div class="label">Destination</div><div class="value">{{ $request->destination ?? '—' }}</div></div>
-        <div class="row"><div class="label">Delivery Methods</div><div class="value">{{ is_array($request->delivery_methods) ? implode(', ', $request->delivery_methods) : ($request->delivery_methods ?: '—') }}</div></div>
-        <div class="row"><div class="label">Kind</div><div class="value">{{ is_array($request->messengerial_kinds) ? implode(', ', $request->messengerial_kinds) : ($request->messengerial_kinds ?: '—') }}</div></div>
-        <div class="row"><div class="label">Consignee</div><div class="value">{{ $request->consignee_name ?? '—' }} {{ $request->consignee_contact ? '(' . $request->consignee_contact . ')' : '' }}</div></div>
-        <div class="row"><div class="label">Consignee Email</div><div class="value">{{ $request->consignee_email ?? '—' }}</div></div>
-        <div class="row"><div class="label">Status</div><div class="value"><span class="badge">{{ $request->status }}</span></div></div>
-        <div style="margin-top:24px; font-size:12px; color:#666;">Printed: {{ now() }}</div>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="title">PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM</div>
+        <div class="campus">
+            CAMPUS: {{ $request->campus ?? 'CARAGA REGION CAMPUS IN BUTUAN CITY' }}
+        </div>
+        <div class="subtitle">TRANSMITTAL SLIP</div>
     </div>
+
+    <!-- FORM DETAILS -->
+    <div class="section">
+
+        <div class="row">
+            <div class="label">RFSF Reference No.:</div>
+            <div class="value">{{ $request->reference_no ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Requesting Office / Origin / Unit:</div>
+            <div class="value">{{ $request->unit ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Delivery Address:</div>
+            <div class="value">{{ $request->destination ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Type of Document / Parcel:</div>
+            <div class="value">
+                {{ is_array($request->messengerial_kinds)
+                    ? implode(', ', $request->messengerial_kinds)
+                    : ($request->messengerial_kinds ?? '') }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="label">Courier Service Provider:</div>
+            <div class="value">{{ $request->courier_service_provider ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Cost:</div>
+            <div class="value">{{ $request->courier_cost ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Date Received by the Courier:</div>
+            <div class="value">{{ $request->date_received_by_courier ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Date Delivered to Addressee:</div>
+            <div class="value">{{ $request->date_delivered ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Remarks:</div>
+            <div class="value">{{ $request->proof_remarks ?? '' }}</div>
+        </div>
+
+    </div>
+
+    <!-- SIGNATURES -->
+    <div class="signature">
+        <div class="sig-box">
+            @if(!empty($requestorSignature))
+                <img src="{{ '/storage/' . $requestorSignature }}" alt="Signature" class="sig-img" />
+            @endif
+
+            <div class="sig-line"></div>
+            <div class="sig-name">{{ $request->requestor ?? '' }}</div>
+            <div class="sig-label">Requested By</div>
+        </div>
+
+        <div class="sig-box">
+            <div class="sig-line"></div>
+            Received by
+        </div>
+    </div>
+
+    <!-- NOTE -->
+    <div class="note">
+        <strong>Note:</strong> “Date Delivered to Addressee” and signature in the “Received by” portion
+        are applicable for hand-carried documents only. For delivery through courier service,
+        photocopy of official receipt shall be attached to this form.
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        PSHS-00-F-RMU-05-Ver02-Rev0-10/18/20
+    </div>
+
+</div>
+<hr>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="title">PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM</div>
+        <div class="campus">
+            CAMPUS: {{ $request->campus ?? 'CARAGA REGION CAMPUS IN BUTUAN CITY' }}
+        </div>
+        <div class="subtitle">TRANSMITTAL SLIP</div>
+    </div>
+
+    <!-- FORM DETAILS -->
+    <div class="section">
+
+        <div class="row">
+            <div class="label">RFSF Reference No.:</div>
+            <div class="value">{{ $request->reference_no ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Requesting Office / Origin / Unit:</div>
+            <div class="value">{{ $request->unit ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Delivery Address:</div>
+            <div class="value">{{ $request->destination ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Type of Document / Parcel:</div>
+            <div class="value">
+                {{ is_array($request->messengerial_kinds)
+                    ? implode(', ', $request->messengerial_kinds)
+                    : ($request->messengerial_kinds ?? '') }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="label">Courier Service Provider:</div>
+            <div class="value">{{ $request->courier_service_provider ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Cost:</div>
+            <div class="value">{{ $request->courier_cost ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Date Received by the Courier:</div>
+            <div class="value">{{ $request->date_received_by_courier ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Date Delivered to Addressee:</div>
+            <div class="value">{{ $request->date_delivered ?? '' }}</div>
+        </div>
+
+        <div class="row">
+            <div class="label">Remarks:</div>
+            <div class="value">{{ $request->proof_remarks ?? '' }}</div>
+        </div>
+
+    </div>
+
+    <!-- SIGNATURES -->
+    <div class="signature">
+        <div class="sig-box">
+            @if(!empty($requestorSignature))
+                <img src="{{ '/storage/' . $requestorSignature }}" alt="Signature" class="sig-img" />
+            @endif
+
+            <div class="sig-line"></div>
+            <div class="sig-name">{{ $request->requestor ?? '' }}</div>
+            <div class="sig-label">Requested By</div>
+        </div>
+
+        <div class="sig-box">
+            <div class="sig-line"></div>
+            Received by
+        </div>
+    </div>
+
+    <!-- NOTE -->
+    <div class="note">
+        <strong>Note:</strong> “Date Delivered to Addressee” and signature in the “Received by” portion
+        are applicable for hand-carried documents only. For delivery through courier service,
+        photocopy of official receipt shall be attached to this form.
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        PSHS-00-F-RMU-05-Ver02-Rev0-10/18/20
+    </div>
+
+</div>
 </body>
 </html>

@@ -14,6 +14,7 @@ class Division extends Model
         'division_chief_id',
         'year',
         'status',
+        'signature_path',
     ];
 
     /**

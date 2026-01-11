@@ -6,6 +6,7 @@ export function useUsers(props) {
   const usersList = ref(props.users || [])
   const rolesList = ref(props.roles || [])
   const divisionsList = ref(props.divisions || []) // ✅ make it reactive
+  const officesList = ref(props.offices || [])
 
   const showModal = ref(false)
   const modalMode = ref("create")
@@ -19,10 +20,10 @@ export function useUsers(props) {
     id: null,
     name: "",
     email: "",
-    role_id: "",
+    role_id: [],
     position: "",
     division_id: "",
-    office: "", // manual input
+    office_id: "",
   })
 
   // Filtered + paginated users
@@ -49,20 +50,24 @@ export function useUsers(props) {
         id: user.id,
         name: user.name,
         email: user.email,
-        role_id: user.role_id,
+        role_id: Array.isArray(user.role_id)
+          ? user.role_id
+          : user.role_id
+          ? user.role_id.toString().split(',').map((s) => Number(s.trim()))
+          : [],
         position: user.position ?? "",
         division_id: user.division_id ?? "",
-        office: user.office ?? "",
+        office_id: user.office_id ?? user.office?.id ?? "",
       }
     } else {
       form.value = {
         id: null,
         name: "",
         email: "",
-        role_id: "",
+        role_id: [],
         position: "",
         division_id: "",
-        office: "",
+        office_id: "",
       }
     }
     selectedUser.value = user
@@ -82,7 +87,10 @@ export function useUsers(props) {
   // Submit
   const submitUser = async () => {
     if (modalMode.value === "create") {
-      router.post("/users", form.value, {
+      const payload = { ...form.value }
+      if (Array.isArray(payload.role_id)) payload.role_id = payload.role_id.join(',')
+
+      router.post("/users", payload, {
         onSuccess: async () => {
           closeModal()
           await Swal.fire("Success", "The user has been added successfully", "success")
@@ -93,7 +101,10 @@ export function useUsers(props) {
         },
       })
     } else if (modalMode.value === "edit") {
-      router.put(`/users/${form.value.id}`, form.value, {
+      const payload = { ...form.value }
+      if (Array.isArray(payload.role_id)) payload.role_id = payload.role_id.join(',')
+
+      router.put(`/users/${form.value.id}`, payload, {
         onSuccess: async () => {
           closeModal()
           await Swal.fire("Updated", "The user has been updated successfully", "success")
@@ -134,6 +145,7 @@ export function useUsers(props) {
     usersList,
     rolesList,
     divisionsList, // ✅ return it
+    officesList,
     showModal,
     modalMode,
     selectedUser,

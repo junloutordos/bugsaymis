@@ -1,8 +1,9 @@
 <script setup>
-import { Head } from "@inertiajs/vue3"
+import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon } from "@heroicons/vue/24/outline"
+import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline"
 import { useDivisions } from "@/Composables/useDivisions.js"
+import { ref } from 'vue'
 
 // Props from backend (DivisionsController@index)
 const props = defineProps({
@@ -26,6 +27,48 @@ const {
   submitDivision,
   deleteDivision,
 } = useDivisions(props)
+
+// Upload signature modal state
+const showUploadModal = ref(false)
+const uploadDivision = ref(null)
+const uploadFile = ref(null)
+const previewUrl = ref(null)
+
+const openUploadModal = (division) => {
+  uploadDivision.value = division
+  showUploadModal.value = true
+  uploadFile.value = null
+  previewUrl.value = division.signature_path ? `/storage/${division.signature_path}` : null
+}
+
+const closeUploadModal = () => {
+  showUploadModal.value = false
+  uploadDivision.value = null
+  uploadFile.value = null
+  previewUrl.value = null
+}
+
+const onFileChange = (e) => {
+  const f = e.target.files[0]
+  if (!f) return
+  uploadFile.value = f
+  previewUrl.value = URL.createObjectURL(f)
+}
+
+const submitUpload = async () => {
+  if (!uploadFile.value || !uploadDivision.value) return
+  const fd = new FormData()
+  fd.append('signature', uploadFile.value)
+  router.post(`/users-divisions/${uploadDivision.value.id}/upload-signature`, fd, {
+    onSuccess: (page) => {
+      // update local list entry if present
+      const idx = divisionsList.value.findIndex(d => d.id === uploadDivision.value.id)
+      if (idx !== -1) divisionsList.value[idx].signature_path = page.props.divisions?.find?.(d => d.id === uploadDivision.value.id)?.signature_path ?? null
+      closeUploadModal()
+      window.location.reload()
+    }
+  })
+}
 </script>
 
 <template>
@@ -88,6 +131,9 @@ const {
                     </button>
                     <button @click="openModal('edit', division)" class="p-1 hover:bg-gray-100 rounded">
                       <PencilSquareIcon class="w-5 h-5 text-yellow-600"/>
+                    </button>
+                    <button @click="openUploadModal(division)" class="p-1 hover:bg-gray-100 rounded" title="Upload signature">
+                      <ArrowUpOnSquareIcon class="w-5 h-5 text-green-600"/>
                     </button>
                     <button @click="deleteDivision(division)" class="p-1 hover:bg-gray-100 rounded">
                       <TrashIcon class="w-5 h-5 text-red-600"/>
@@ -224,6 +270,30 @@ const {
             </div>
           </form>
 
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload Signature Modal -->
+    <div v-show="showUploadModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+        <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeUploadModal">✕</button>
+        <h3 class="text-lg font-semibold mb-4">Upload Electronic Signature</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Signature Image (PNG/JPG/SVG)</label>
+            <input type="file" accept="image/*" class="mt-2" @change="onFileChange" />
+          </div>
+
+          <div v-if="previewUrl" class="">
+            <p class="text-sm text-gray-600">Preview:</p>
+            <img :src="previewUrl" alt="preview" class="h-24 mt-2 object-contain" />
+          </div>
+
+          <div class="flex justify-end gap-3">
+            <button @click="closeUploadModal" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+            <button @click="submitUpload" class="px-4 py-2 bg-green-600 text-white rounded">Upload</button>
+          </div>
         </div>
       </div>
     </div>

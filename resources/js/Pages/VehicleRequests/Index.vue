@@ -243,123 +243,166 @@ const destroy = (req) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
-        <table class="min-w-full border border-gray-200">
-          <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
-            <tr>
-              <th class="px-4 py-3 text-left">#</th>
-              <th class="px-4 py-3 text-left">Purpose</th>
-              <th class="px-4 py-3 text-left">Vehicle</th>
-              <th class="px-4 py-3 text-left">Date Needed</th>
-              <th class="px-4 py-3 text-left">Departure</th>
-              <th class="px-4 py-3 text-left">ETA</th>
-              <th class="px-4 py-3 text-left">Status</th>
-              <th class="px-4 py-3 text-left">Submitted By</th>
-              <th class="px-4 py-3 text-left">Driver</th>
-              <th class="px-4 py-3 text-center">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="req in props.requests" :key="req.id">
-              <td class="px-4 py-3">{{ req.id }}</td>
-              <td class="px-4 py-3">{{ req.purpose }}</td>
-              <td class="px-4 py-3">{{ req.vehicle_type ?? '—' }}</td>
-              <td class="px-4 py-3"> 
-                <div v-if="req.date_needed_multiple && req.date_needed_multiple.length">
-                  <div v-for="(d, i) in req.date_needed_multiple" :key="i">{{ new Date(d).toLocaleDateString() }}</div>
-                </div>
-                <div v-else>{{ req.date_needed ? new Date(req.date_needed).toLocaleDateString() : '—' }}</div>
-              </td>
-              <td class="px-4 py-3">{{ req.time_of_departure ?? '—' }}</td>
-              <td class="px-4 py-3">{{ req.eta ?? '—' }}</td>
-              <td class="px-4 py-3">
-                <span v-if="req.status && req.status.includes('Approved')" class="bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
-                  {{ req.status }}
-                </span>
-                <span v-else-if="req.status === 'Declined'" class="bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
-                  {{ req.status }}
-                </span>
-                <span v-else>
-                  {{ req.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3">{{ req.user?.name ?? '—' }}</td>
-              <td class="px-4 py-3">{{ req.driver?.name ?? '—' }}</td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center gap-2 justify-center">
-                  <!-- Edit (pencil) -->
-                  <button
-                    v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
-                    @click.prevent="openModal(req)"
-                    class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
-                    title="Edit"
-                  >
-                    <PencilSquareIcon class="w-5 h-5" />
-                  </button>
-
-                  <!-- Delete (trash) -->
-                  <button
-                    v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
-                    @click.prevent="destroy(req)"
-                    class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700"
-                    title="Delete"
-                  >
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-
-                  <!-- Assign Driver (user) -->
-                  <button
-                    v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
-                    @click.prevent="openAssignDriverModal(req)"
-                    class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
-                    title="Assign Driver"
-                  >
-                    <UserIcon class="w-5 h-5" />
-                  </button>
-
-                  <!-- Print (printer) -->
-                  <button
-                    v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
-                    @click.prevent="openPrint(req)"
-                    class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
-                    title="Print"
-                  >
-                    <PrinterIcon class="w-5 h-5" />
-                  </button>
-                </div>
-                  <!-- Assign Driver Modal -->
-                  <div v-if="showAssignDriverModal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;">
-                    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 border border-gray-300 relative">
-                      <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeAssignDriverModal">✕</button>
-                      <h2 class="text-xl font-semibold mb-4">Assign Driver</h2>
-                      <div v-if="assignLoading" class="text-center py-4">Loading drivers...</div>
-                      <div v-else>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Driver</label>
-                        <select v-model="selectedDriverId" class="block w-full rounded border-gray-300 mb-4">
-                          <option value="">Select driver</option>
-                          <option v-for="d in drivers" :key="d.id" :value="d.id">{{ d.name }} <span v-if="d.position">({{ d.position }})</span></option>
-                        </select>
-                        <div class="flex gap-2">
-                          <button @click.prevent="assignDriver" :disabled="!selectedDriverId || assignLoading" class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60">Assign</button>
-                          <button @click.prevent="closeAssignDriverModal" class="px-4 py-2 rounded border">Cancel</button>
-                        </div>
-                      </div>
-                    </div>
+        <!-- Desktop table -->
+        <div class="hidden sm:block overflow-x-auto">
+          <table class="table-fixed w-full border border-gray-200">
+            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+              <tr>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">#</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Purpose</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Vehicle</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Date Needed</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Departure</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">ETA</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Status</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Submitted By</th>
+                <th class="px-4 py-3 text-left whitespace-normal break-words">Driver</th>
+                <th class="px-4 py-3 text-center whitespace-normal break-words">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 text-sm">
+              <tr v-for="req in props.requests" :key="req.id">
+                <td class="px-4 py-3 whitespace-normal break-words">{{ req.id }}</td>
+                <td class="px-4 py-3 whitespace-normal break-words">{{ req.purpose }}</td>
+                <td class="px-4 py-3 whitespace-normal break-words">{{ req.vehicle_type ?? '—' }}</td>
+                <td class="px-4 py-3"> 
+                  <div v-if="req.date_needed_multiple && req.date_needed_multiple.length">
+                    <div v-for="(d, i) in req.date_needed_multiple" :key="i">{{ new Date(d).toLocaleDateString() }}</div>
                   </div>
-              </td>
-            </tr>
-            <tr v-if="props.requests.length === 0">
-              <td colspan="7" class="px-4 py-6 text-center text-gray-500">No vehicle requests found.</td>
-            </tr>
-          </tbody>
-        </table>
+                  <div v-else>{{ req.date_needed ? new Date(req.date_needed).toLocaleDateString() : '—' }}</div>
+                </td>
+                <td class="px-4 py-3">{{ req.time_of_departure ?? '—' }}</td>
+                <td class="px-4 py-3">{{ req.eta ?? '—' }}</td>
+                <td class="px-4 py-3">
+                  <span v-if="req.status && req.status.includes('Approved')" class="bg-green-100 text-green-800 px-2 py-1 rounded font-semibold">
+                    {{ req.status }}
+                  </span>
+                  <span v-else-if="req.status === 'Declined'" class="bg-red-100 text-red-800 px-2 py-1 rounded font-semibold">
+                    {{ req.status }}
+                  </span>
+                  <span v-else>
+                    {{ req.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 whitespace-normal break-words">{{ req.user?.name ?? '—' }}</td>
+                <td class="px-4 py-3 whitespace-normal break-words">{{ req.driver?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-center whitespace-normal break-words">
+                  <div class="flex items-center gap-2 justify-center">
+                    <!-- Edit (pencil) -->
+                    <button
+                      v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
+                      @click.prevent="openModal(req)"
+                      class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
+                      title="Edit"
+                    >
+                      <PencilSquareIcon class="w-5 h-5" />
+                    </button>
+
+                    <!-- Delete (trash) -->
+                    <button
+                      v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
+                      @click.prevent="destroy(req)"
+                      class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700"
+                      title="Delete"
+                    >
+                      <TrashIcon class="w-5 h-5" />
+                    </button>
+
+                    <!-- Assign Driver (user) -->
+                    <button
+                      v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
+                      @click.prevent="openAssignDriverModal(req)"
+                      class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
+                      title="Assign Driver"
+                    >
+                      <UserIcon class="w-5 h-5" />
+                    </button>
+
+                    <!-- Print (printer) -->
+                    <button
+                      v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                      @click.prevent="openPrint(req)"
+                      class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      title="Print"
+                    >
+                      <PrinterIcon class="w-5 h-5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="props.requests.length === 0">
+                <td colspan="10" class="px-4 py-6 text-center text-gray-500">No vehicle requests found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="sm:hidden space-y-3">
+          <div v-for="req in props.requests" :key="req.id" class="border rounded-lg p-3 bg-white shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
+                <div class="font-semibold text-gray-800">{{ req.purpose ?? '—' }}</div>
+                <div class="text-sm text-gray-600">{{ req.vehicle_type ?? '—' }} — {{ req.user?.name ?? '—' }}</div>
+              </div>
+              <div class="text-right text-sm">
+                <div class="text-gray-600">{{ req.date_needed_multiple && req.date_needed_multiple.length ? (new Date(req.date_needed_multiple[0]).toLocaleDateString()) : (req.date_needed ? new Date(req.date_needed).toLocaleDateString() : '—') }}</div>
+                <div class="text-gray-500 text-xs">{{ req.time_of_departure ?? '—' }}</div>
+              </div>
+            </div>
+
+            <div class="mt-2 text-sm text-gray-700">
+              <div><strong>ETA:</strong> <span class="ml-1">{{ req.eta ?? '—' }}</span></div>
+              <div class="mt-1"><strong>Driver:</strong> <span class="ml-1">{{ req.driver?.name ?? '—' }}</span></div>
+              <div class="mt-1"><strong>Status:</strong> <span class="ml-1">{{ req.status }}</span></div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2">
+              <button
+                v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
+                @click.prevent="openModal(req)"
+                class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"
+              >
+                <PencilSquareIcon class="w-4 h-4" /> Edit
+              </button>
+
+              <button
+                v-if="page.props.auth?.user?.role?.name === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'"
+                @click.prevent="destroy(req)"
+                class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"
+              >
+                <TrashIcon class="w-4 h-4" />
+              </button>
+
+              <button
+                v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
+                @click.prevent="openAssignDriverModal(req)"
+                class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md"
+              >
+                <UserIcon class="w-4 h-4" /> Assign
+              </button>
+
+              <button
+                v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                @click.prevent="openPrint(req)"
+                class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md"
+              >
+                <PrinterIcon class="w-4 h-4" /> Print
+              </button>
+            </div>
+          </div>
+
+          <div v-if="props.requests.length === 0" class="text-center text-gray-500 py-6">No vehicle requests found.</div>
+        </div>
       </div>
     </div>
     <!-- Create Modal -->
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+      <div class="bg-white w-full h-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-md p-4 sm:p-6 relative overflow-auto">
         <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
         <h2 class="text-xl font-semibold mb-4">New Vehicle Request</h2>
-        <div class="space-y-4">
+        <div class="space-y-4 max-h-[90vh] overflow-auto">
           <div>
             <label class="block text-sm font-medium text-gray-700">Purpose</label>
             <input v-model="form.purpose" type="text" class="mt-1 block w-full rounded border-gray-300" />
@@ -372,7 +415,7 @@ const destroy = (req) => {
             <p v-if="form.errors.destination" class="text-red-600 text-sm mt-1">{{ form.errors.destination }}</p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700">Time of Departure</label>
               <input v-model="form.time_of_departure" type="time" class="mt-1 block w-full rounded border-gray-300" />
@@ -387,7 +430,7 @@ const destroy = (req) => {
 
           <div>
             <label class="block text-sm font-medium text-gray-700">Date(s) Needed</label>
-            <div class="mt-1 flex gap-2 items-start">
+            <div class="mt-1 flex flex-col sm:flex-row sm:items-start gap-2">
               <input v-model="dateInput" type="date" class="block rounded border-gray-300" />
               <button @click.prevent="addDate" class="px-3 py-1 bg-blue-600 text-white rounded">Add</button>
             </div>
@@ -425,9 +468,9 @@ const destroy = (req) => {
             <p v-if="form.errors.passengers" class="text-red-600 text-sm mt-1">{{ form.errors.passengers }}</p>
           </div>
 
-          <div class="flex gap-2">
-            <button @click.prevent="submit" :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60">Submit</button>
-            <button @click.prevent="closeModal" class="px-4 py-2 rounded border">Cancel</button>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button @click.prevent="submit" :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto disabled:opacity-60">Submit</button>
+            <button @click.prevent="closeModal" class="px-4 py-2 rounded border w-full sm:w-auto">Cancel</button>
           </div>
         </div>
       </div>

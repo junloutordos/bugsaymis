@@ -62,7 +62,7 @@
                         <td class="value">@if(is_array($request->delivery_methods)) {{ implode(', ', $request->delivery_methods) }} @else {{ $request->delivery_methods ?? '—' }} @endif</td>
                     </tr>
                     <tr>
-                        <td class="label">Kind</td>
+                        <td class="label">Package Type</td>
                         <td class="value">@if(is_array($request->messengerial_kinds)) {{ implode(', ', $request->messengerial_kinds) }} @else {{ $request->messengerial_kinds ?? '—' }} @endif</td>
                     </tr>
                     <tr>

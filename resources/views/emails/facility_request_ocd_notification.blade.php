@@ -37,6 +37,10 @@
             <td class="value">{{ $request->id }}</td>
           </tr>
           <tr>
+            <td class="label">Venue</td>
+            <td class="value">{{ $venueDisplay ?? (is_array($request->venue) ? implode(', ', $request->venue) : ($request->venue ?? '—')) }}</td>
+          </tr>
+          <tr>
             <td class="label">Activity / Purpose</td>
             <td class="value">{{ $request->activity }}{{ $request->purpose ? ' — ' . $request->purpose : '' }}</td>
           </tr>

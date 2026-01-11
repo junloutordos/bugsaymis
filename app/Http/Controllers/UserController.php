@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Division;
+use App\Models\Office;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,20 +13,24 @@ class UserController extends Controller
 {
     public function index()
     {
-        $users = User::with(['role', 'division.divisionchief'])
-            ->select('id', 'name', 'email', 'role_id', 'position', 'division_id', 'office', 'created_at')
+        $users = User::with(['role', 'division.divisionchief', 'office'])
+            ->select('id', 'name', 'email', 'role_id', 'position', 'division_id', 'office_id', 'created_at')
             ->get();
 
         // For dropdowns
         $roles = Role::select('id', 'name')->get();
         $divisions = Division::where('status', 'active') // 👈 only active divisions
-        ->select('id', 'division_name')     
-        ->get();
+            ->select('id', 'division_name')
+            ->get();
+
+        // Offices for dependent dropdown
+        $offices = Office::select('id', 'name', 'division_id')->get();
 
         return Inertia::render('Users/Index', [
             'users'     => $users,
             'roles'     => $roles,
             'divisions' => $divisions,
+            'offices'   => $offices,
         ]);
     }
 
@@ -34,11 +39,34 @@ class UserController extends Controller
         $data = $request->validate([
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email',
-            'role_id'     => 'required|exists:roles,id',
             'position'    => 'nullable|string|max:255',
             'division_id' => 'nullable|exists:divisions,id',
-            'office'      => 'nullable|string|max:255',
+            'office_id'   => 'nullable|exists:offices,id',
         ]);
+
+        // Normalize role_id input: accept array or comma-separated string
+        $roleInput = $request->input('role_id');
+        $roleIds = [];
+        if (is_array($roleInput)) {
+            $roleIds = array_map('intval', $roleInput);
+        } elseif (is_string($roleInput)) {
+            $roleIds = array_filter(array_map('trim', explode(',', $roleInput)), fn($v) => $v !== '');
+            $roleIds = array_map('intval', $roleIds);
+        } elseif ($roleInput !== null) {
+            $roleIds = [intval($roleInput)];
+        }
+
+        if (empty($roleIds)) {
+            return back()->withErrors(['role_id' => 'Please select at least one role.']);
+        }
+
+        // ensure all provided role ids exist
+        $count = Role::whereIn('id', $roleIds)->count();
+        if ($count !== count($roleIds)) {
+            return back()->withErrors(['role_id' => 'One or more selected roles are invalid.']);
+        }
+
+        $data['role_id'] = implode(',', $roleIds);
 
         User::create($data);
 
@@ -52,11 +80,34 @@ class UserController extends Controller
         $data = $request->validate([
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email,' . $user->id,
-            'role_id'     => 'required|exists:roles,id',
             'position'    => 'nullable|string|max:255',
             'division_id' => 'nullable|exists:divisions,id',
-            'office'      => 'nullable|string|max:255',
+            'office_id'   => 'nullable|exists:offices,id',
         ]);
+
+        // Normalize role_id input
+        $roleInput = $request->input('role_id');
+        $roleIds = [];
+        if (is_array($roleInput)) {
+            $roleIds = array_map('intval', $roleInput);
+        } elseif (is_string($roleInput)) {
+            $roleIds = array_filter(array_map('trim', explode(',', $roleInput)), fn($v) => $v !== '');
+            $roleIds = array_map('intval', $roleIds);
+        } elseif ($roleInput !== null) {
+            $roleIds = [intval($roleInput)];
+        }
+
+        if (empty($roleIds)) {
+            return back()->withErrors(['role_id' => 'Please select at least one role.']);
+        }
+
+        // ensure all provided role ids exist
+        $count = Role::whereIn('id', $roleIds)->count();
+        if ($count !== count($roleIds)) {
+            return back()->withErrors(['role_id' => 'One or more selected roles are invalid.']);
+        }
+
+        $data['role_id'] = implode(',', $roleIds);
 
         $user->update($data);
 

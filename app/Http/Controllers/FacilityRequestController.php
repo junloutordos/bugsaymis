@@ -55,10 +55,17 @@ class FacilityRequestController extends Controller
             'unit' => 'nullable|string|max:50',
             'activity' => 'nullable|string|max:100',
             'purpose' => 'nullable|string|max:255',
+            'nature' => ['nullable','in:Curricular,Co-Curricular,Others'],
+            'nature_other' => 'nullable|string|max:255',
+            'participants' => 'nullable|string|max:255',
+            'male' => 'nullable|integer|min:0',
+            'female' => 'nullable|integer|min:0',
             'venue' => 'nullable|array',
             'venue.*' => 'exists:facilities,id',
             'equipment' => 'nullable|array',
             'equipment.*' => 'in:Chairs,Tables,Microphone,Whiteboard,Projector,Electric Fans,Airconditioner,Trashbins',
+            'equipment_quantities' => 'nullable|array',
+            'equipment_quantities.*' => 'nullable|integer|min:1',
             'time_start' => 'nullable|date_format:H:i',
             'time_end' => 'nullable|date_format:H:i',
         ]);
@@ -66,7 +73,7 @@ class FacilityRequestController extends Controller
         $data = $request->only([
             'unit','activity','purpose','nature',
             'date_start','date_end','time_start','time_end',
-            'male','female','venue','chairs','tables','mic','whiteboard','projector','elecfans','aircon','trashbins','equipment',
+            'male','female','venue','chairs','tables','mic','whiteboard','projector','elecfans','aircon','trashbins','equipment','equipment_quantities',
             'others','remarks','email','participants','reference_no'
         ]);
 
@@ -86,6 +93,17 @@ class FacilityRequestController extends Controller
         // ensure venue is stored as array (casts will json encode)
         if ($request->has('venue')) {
             $data['venue'] = $request->input('venue');
+        }
+
+        // ensure equipment_quantities is stored as array when provided
+        if ($request->has('equipment_quantities')) {
+            $data['equipment_quantities'] = $request->input('equipment_quantities');
+        }
+
+        // handle nature 'Others' specification: combine into nature field if provided
+        if (($request->input('nature') ?? '') === 'Others') {
+            $other = $request->input('nature_other');
+            $data['nature'] = $other ? ('Others: ' . $other) : 'Others';
         }
 
         // conflict detection: do not allow booking if any selected facility
@@ -233,22 +251,22 @@ class FacilityRequestController extends Controller
             logger()->error('Failed to send facility request approved notification', ['error' => $e->getMessage()]);
         }
 
-        // Notify OCD users with signed approve/decline links
+        // Notify GSU Head users with signed approve/decline links (replacing previous OCD recipients)
         try {
-            $ocdUsers = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'OCD'); })->get();
-            foreach ($ocdUsers as $ocdUser) {
-                if ($ocdUser->email) {
+            $gsuUsers = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
+            foreach ($gsuUsers as $gsuUser) {
+                if ($gsuUser->email) {
                     try {
-                        $approveUrl = URL::signedRoute('facility-requests.ocd.approve', ['facilityRequest' => $facilityRequest->id, 'ocd' => $ocdUser->id], now()->addDays(7));
-                        $declineUrl = URL::signedRoute('facility-requests.ocd.decline', ['facilityRequest' => $facilityRequest->id, 'ocd' => $ocdUser->id], now()->addDays(7));
-                        \Mail::to($ocdUser->email)->send(new \App\Mail\FacilityRequestOCDMail($facilityRequest, $approveUrl, $declineUrl));
+                        $approveUrl = URL::signedRoute('facility-requests.gsu.approve', ['facilityRequest' => $facilityRequest->id, 'gsu' => $gsuUser->id], now()->addDays(7));
+                        $declineUrl = URL::signedRoute('facility-requests.gsu.decline', ['facilityRequest' => $facilityRequest->id, 'gsu' => $gsuUser->id], now()->addDays(7));
+                        \Mail::to($gsuUser->email)->send(new \App\Mail\FacilityRequestGSUMail($facilityRequest, $approveUrl, $declineUrl));
                     } catch (\Throwable $e) {
-                        logger()->error('Failed to send facility request OCD notification', ['error' => $e->getMessage(), 'email' => $ocdUser->email]);
+                        logger()->error('Failed to send facility request GSU notification', ['error' => $e->getMessage(), 'email' => $gsuUser->email]);
                     }
                 }
             }
         } catch (\Throwable $e) {
-            logger()->error('Failed to queue OCD notifications for facility request', ['error' => $e->getMessage()]);
+            logger()->error('Failed to queue GSU notifications for facility request', ['error' => $e->getMessage()]);
         }
 
         return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => false]);
@@ -343,6 +361,88 @@ class FacilityRequestController extends Controller
         }
 
         return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => false]);
+    }
+
+    /**
+     * Approve facility request by GSU Head via signed link
+     */
+    public function approveByGSU(Request $request, FacilityRequest $facilityRequest, $gsu)
+    {
+        if ($facilityRequest->status === 'OCD Approved') {
+            return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
+        }
+
+        $facilityRequest->status = 'OCD Approved';
+        $facilityRequest->save();
+
+        // Notify requester
+        try {
+            $requesterEmail = $facilityRequest->email ?? null;
+            $approverName = null;
+            if ($gsu) {
+                $u = \App\Models\User::find($gsu);
+                $approverName = $u?->name ?? 'GSU Head';
+            } else {
+                $approverName = 'GSU Head';
+            }
+
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Approved', null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send facility request GSU approved notification', ['error' => $e->getMessage()]);
+        }
+
+        return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => false]);
+    }
+
+    public function showGsuDeclineForm(Request $request, FacilityRequest $facilityRequest, $gsu)
+    {
+        if ($facilityRequest->status === 'OCD Approved') {
+            return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
+        }
+
+        $postAction = route('facility-requests.gsu.decline.submit', ['facilityRequest' => $facilityRequest->id, 'gsu' => $gsu])
+            . '?' . $request->getQueryString();
+
+        return view('facility_request_decline', ['facilityRequest' => $facilityRequest, 'postAction' => $postAction]);
+    }
+
+    public function submitGsuDecline(Request $request, FacilityRequest $facilityRequest, $gsu)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        if (in_array($facilityRequest->status, ['Approved','Declined','OCD Approved','OCD Declined'])) {
+            $reason = $facilityRequest->decline_reason ?? '—';
+            return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $reason]);
+        }
+
+        $facilityRequest->status = 'OCD Declined';
+        $facilityRequest->decline_reason = $request->input('reason');
+        $facilityRequest->declined_at = now();
+        $facilityRequest->save();
+
+        // Notify requester
+        try {
+            $requesterEmail = $facilityRequest->email ?? null;
+            $approverName = null;
+            if ($gsu) {
+                $u = \App\Models\User::find($gsu);
+                $approverName = $u?->name ?? 'GSU Head';
+            } else {
+                $approverName = 'GSU Head';
+            }
+
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send facility request GSU declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $facilityRequest->decline_reason]);
     }
 
     public function showOcdDeclineForm(Request $request, FacilityRequest $facilityRequest, $ocd)

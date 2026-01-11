@@ -39,9 +39,9 @@ class MessengerialController extends Controller
             'destination' => 'nullable|string|max:255',
             'reference_no' => 'nullable|string|max:100',
             'delivery_methods' => 'nullable|array',
-            'delivery_methods.*' => 'in:Thru Email,In-person Delivery,Courier Services',
+            'delivery_methods.*' => 'in:Hand-Carry,Courier Services',
             'messengerial_kinds' => 'nullable|array',
-            'messengerial_kinds.*' => 'in:Communication Letter,Package',
+            'messengerial_kinds.*' => 'in:Letter Envelope,Folder or Brown Envelope,Box Small,Box Medium,Box Large',
             'consignee_name' => 'nullable|string|max:255',
             'consignee_contact' => 'nullable|string|max:50',
             'consignee_email' => 'nullable|email|max:255',
@@ -169,7 +169,7 @@ class MessengerialController extends Controller
         $postAction = route('messengerial.decline.submit', ['messengerialRequest' => $messengerialRequest->id, 'chief' => $chief])
             . '?' . $request->getQueryString();
 
-        return view('facility_request_decline', ['facilityRequest' => $messengerialRequest, 'postAction' => $postAction]);
+        return view('messengerial_request_decline', ['messengerialRequest' => $messengerialRequest, 'postAction' => $postAction]);
     }
 
     public function submitDecline(Request $request, MessengerialRequest $messengerialRequest, $chief)
@@ -184,7 +184,7 @@ class MessengerialController extends Controller
 
         if (in_array($messengerialRequest->status, ['Approved','Declined'])) {
             $reason = $messengerialRequest->decline_reason ?? '—';
-            return view('facility_request_declined', ['facilityRequest' => $messengerialRequest, 'reason' => $reason]);
+            return view('messengerial_request_declined', ['messengerialRequest' => $messengerialRequest, 'reason' => $reason]);
         }
 
         $messengerialRequest->status = 'Declined';
@@ -211,7 +211,7 @@ class MessengerialController extends Controller
             logger()->error('Failed to send messengerial request declined notification', ['error' => $e->getMessage()]);
         }
 
-        return view('facility_request_declined', ['facilityRequest' => $messengerialRequest, 'reason' => $messengerialRequest->decline_reason]);
+        return view('messengerial_request_declined', ['messengerialRequest' => $messengerialRequest, 'reason' => $messengerialRequest->decline_reason]);
     }
 
     public function update(Request $request, MessengerialRequest $messengerialRequest)
@@ -255,11 +255,36 @@ class MessengerialController extends Controller
         $user = $request->user();
         $role = $user->role->name ?? '';
 
+        // Allow if Administrator or Records, otherwise allow the original requester
         if (! in_array($role, ['Administrator', 'Records'])) {
-            abort(403);
+            $userEmail = $user->email ?? null;
+            $requestorEmail = $messengerialRequest->email ?? null;
+            $requestorName = $messengerialRequest->requestor ?? null;
+
+            if (! ($userEmail && $requestorEmail && strtolower($userEmail) === strtolower($requestorEmail))
+                && ! ($requestorName && strtolower($requestorName) === strtolower($user->name ?? '')) ) {
+                abort(403);
+            }
         }
 
-        return view('messengerial.print_ticket', ['request' => $messengerialRequest]);
+        $divisionChiefName = null;
+        if ($messengerialRequest->division_chief_id) {
+            $dc = User::find($messengerialRequest->division_chief_id);
+            $divisionChiefName = $dc?->name ?? null;
+        }
+
+        // Try to find the requestor's user record (to get stored electronic signature)
+        $requestorSignature = null;
+        if (! empty($messengerialRequest->email)) {
+            $reqUser = User::where('email', $messengerialRequest->email)->first();
+            $requestorSignature = $reqUser?->electronic_signature ?? null;
+        }
+
+        return view('messengerial.print_ticket', [
+            'request' => $messengerialRequest,
+            'divisionChiefName' => $divisionChiefName,
+            'requestorSignature' => $requestorSignature,
+        ]);
     }
 
     /**
@@ -278,9 +303,26 @@ class MessengerialController extends Controller
             return redirect()->back()->with('error', 'Proof already uploaded.');
         }
 
-        $request->validate([
+        // Determine if courier fields are applicable
+        $usesCourier = is_array($messengerialRequest->delivery_methods) && in_array('Courier Services', $messengerialRequest->delivery_methods);
+
+        $rules = [
             'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-        ]);
+            'rfsf_reference_no' => 'nullable|string|max:255',
+            'date_received_by_courier' => 'nullable|date',
+            'date_delivered' => 'nullable|date',
+            'proof_remarks' => 'nullable|string|max:2000',
+        ];
+
+        if ($usesCourier) {
+            $rules['courier_service_provider'] = 'required|string|max:255';
+            $rules['courier_cost'] = 'nullable|numeric';
+        } else {
+            $rules['courier_service_provider'] = 'nullable|string|max:255';
+            $rules['courier_cost'] = 'nullable|numeric';
+        }
+
+        $validated = $request->validate($rules);
 
         $file = $request->file('proof');
         $path = $file->store('messengerial_proofs', 'public');
@@ -288,6 +330,19 @@ class MessengerialController extends Controller
         $messengerialRequest->proof_of_delivery = $path;
         $messengerialRequest->status = 'Completed';
         $messengerialRequest->completed_at = now();
+
+        // assign additional fields
+        $messengerialRequest->rfsf_reference_no = $validated['rfsf_reference_no'] ?? null;
+        $messengerialRequest->courier_service_provider = $validated['courier_service_provider'] ?? null;
+        $messengerialRequest->courier_cost = $validated['courier_cost'] ?? null;
+        if (! empty($validated['date_received_by_courier'])) {
+            $messengerialRequest->date_received_by_courier = Carbon::parse($validated['date_received_by_courier']);
+        }
+        if (! empty($validated['date_delivered'])) {
+            $messengerialRequest->date_delivered = Carbon::parse($validated['date_delivered']);
+        }
+        $messengerialRequest->proof_remarks = $validated['proof_remarks'] ?? null;
+
         $messengerialRequest->save();
 
         // notify requester

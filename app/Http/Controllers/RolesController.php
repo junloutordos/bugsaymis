@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\Division;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class RolesController extends Controller
@@ -85,7 +86,7 @@ class RolesController extends Controller
     public function showDivisions()
     {
         $divisions = Division::with('divisionchief') // load chief user
-            ->select('id', 'division_name', 'division_chief_id', 'year', 'status', 'created_at')
+            ->select('id', 'division_name', 'division_chief_id', 'year', 'status', 'signature_path', 'created_at')
             ->get();
 
         $users = User::select('id', 'name', 'email')->get();
@@ -94,6 +95,24 @@ class RolesController extends Controller
             'divisions' => $divisions,
             'users' => $users, // pass all users to frontend
         ]);
+    }
+
+    /**
+     * Upload an electronic signature for a division
+     */
+    public function uploadSignature(Request $request, Division $division)
+    {
+        $data = $request->validate([
+            'signature' => 'required|image|mimes:png,jpg,jpeg,svg|max:2048',
+        ]);
+
+        $file = $request->file('signature');
+        $path = $file->store('signatures/divisions', 'public');
+
+        $division->signature_path = $path;
+        $division->save();
+
+        return back()->with('success', 'Signature uploaded successfully');
     }
 
     /**

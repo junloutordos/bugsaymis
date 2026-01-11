@@ -8,18 +8,20 @@ import {
   PlusIcon,
 } from "@heroicons/vue/24/outline"
 import { useUsers } from "@/Composables/useUsers.js"
-import { ref, watch } from "vue"
+import { ref, watch, computed } from "vue"
 
 const props = defineProps({
   users: Array,
   roles: Array,
   divisions: Array,
+  offices: Array,
 })
 
-const {
+  const {
   usersList,
   rolesList,
-  divisionsList, // ✅ now from composable
+  divisionsList,
+  officesList,
   showModal,
   modalMode,
   selectedUser,
@@ -49,8 +51,25 @@ watch(
   }
 )
 
+  const filteredOffices = computed(() => {
+    const divId = form.value.division_id
+    if (!divId) return []
+    return officesList.value.filter((o) => o.division_id === divId)
+  })
+
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
+
+const rolesMap = computed(() => Object.fromEntries(rolesList.value.map(r => [String(r.id), r.name])))
+
+const getRoleNames = (user) => {
+  if (!user) return '—'
+  if (user.role && user.role.name) return user.role.name
+  if (user.role_id) {
+    return user.role_id.toString().split(',').map(id => rolesMap.value[id.trim()] ?? id.trim()).join(', ')
+  }
+  return '—'
+}
 </script>
 
 
@@ -103,10 +122,10 @@ const userRole = page.props.auth?.user?.role?.name ?? null
                 <td class="px-4 py-3">{{ user.id }}</td>
                 <td class="px-4 py-3">{{ user.name }}</td>
                 <td class="px-4 py-3">{{ user.email }}</td>
-                <td class="px-4 py-3">{{ user.role?.name ?? "—" }}</td>
+                <td class="px-4 py-3">{{ getRoleNames(user) }}</td>
                 <td class="px-4 py-3">{{ user.position ?? "—" }}</td>
                 <td class="px-4 py-3">{{ user.division?.division_name ?? "—" }}</td>
-                <td class="px-4 py-3">{{ user.office ?? "—" }}</td>
+                <td class="px-4 py-3">{{ user.office?.name ?? user.office ?? "—" }}</td>
                 <td class="px-4 py-3">
                   {{ new Date(user.created_at).toLocaleDateString() }}
                 </td>
@@ -196,14 +215,14 @@ const userRole = page.props.auth?.user?.role?.name ?? null
           >
             <p>Name: <strong>{{ selectedUser.name }}</strong></p>
             <p>Email: <strong>{{ selectedUser.email }}</strong></p>
-            <p>Role: <strong>{{ selectedUser.role?.name ?? "—" }}</strong></p>
+            <p>Role: <strong>{{ getRoleNames(selectedUser) }}</strong></p>
             <p>Position: <strong>{{ selectedUser.position ?? "—" }}</strong></p>
             <p>Division: <strong>{{ selectedUser.division?.name ?? "—" }}</strong></p>
             <p>
               Division Chief:
               <strong>{{ selectedUser.division?.chief?.name ?? "—" }}</strong>
             </p>
-            <p>Office: <strong>{{ selectedUser.office ?? "—" }}</strong></p>
+            <p>Office: <strong>{{ selectedUser.office?.name ?? selectedUser.office ?? "—" }}</strong></p>
             <p>
               Created At:
               <strong>{{ new Date(selectedUser.created_at).toLocaleString() }}</strong>
@@ -236,13 +255,11 @@ const userRole = page.props.auth?.user?.role?.name ?? null
               <label class="block text-sm font-medium text-gray-700">Role</label>
               <select
                 v-model="form.role_id"
+                multiple
                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
                 required
               >
-                <option value="">-- Select Role --</option>
-                <option v-for="role in rolesList" :key="role.id" :value="role.id">
-                  {{ role.name }}
-                </option>
+                <option v-for="role in rolesList" :key="role.id" :value="role.id">{{ role.name }}</option>
               </select>
             </div>
 
@@ -279,15 +296,26 @@ const userRole = page.props.auth?.user?.role?.name ?? null
               Division Chief: <strong>{{ divisionChief.name }}</strong>
             </div>
 
-            <!-- Office (manual input) -->
+            <!-- Office (select filtered by Division) -->
             <div>
               <label class="block text-sm font-medium text-gray-700">Office</label>
-              <input
-                v-model="form.office"
-                type="text"
-                placeholder="Enter office name"
+              <select
+                v-model="form.office_id"
                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
-              />
+              >
+                <option value="">-- Select Office --</option>
+                <option v-if="!form.division_id" disabled value="">Select a division first</option>
+                <option
+                  v-for="office in filteredOffices"
+                  :key="office.id"
+                  :value="office.id"
+                >
+                  {{ office.name }}
+                </option>
+                <option v-if="form.division_id && filteredOffices.length === 0" disabled>
+                  No offices for this division
+                </option>
+              </select>
             </div>
 
             <div class="flex justify-end space-x-3 pt-4">

@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,16 +29,48 @@ class ProfileController extends Controller
     /**
      * Update the user's profile information.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(ProfileUpdateRequest $request)
     {
-        $request->user()->fill($request->validated());
+        Log::info('ProfileController::update called', ['has_files' => count($request->files->all()), 'files_keys' => array_keys($request->files->all())]);
+        Log::info('Request input keys', ['keys' => array_keys($request->all())]);
+        $user = $request->user();
+        $data = $request->validated();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // Handle file uploads if present and store them on the `public` disk.
+        if ($request->hasFile('profile_picture')) {
+            $file = $request->file('profile_picture');
+            Log::info('Profile picture received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
+            $path = $file->store('profile_pictures', 'public');
+            $data['profile_picture'] = $path;
+        } else {
+            Log::info('No profile picture file received.');
         }
 
-        $request->user()->save();
+        if ($request->hasFile('electronic_signature')) {
+            $file = $request->file('electronic_signature');
+            Log::info('Electronic signature received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
+            // Store in `signatures` folder for easier access/consistency with UI expectations
+            $path = $file->store('signatures', 'public');
+            Log::info('Electronic signature stored', ['path' => $path]);
+            $data['electronic_signature'] = $path;
+        } else {
+            Log::info('No electronic signature file received.');
+        }
 
+        $user->fill($data);
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
+        // If this is a normal AJAX request (not an Inertia request), return JSON so the client can handle it.
+        if ($request->ajax() && ! $request->header('X-Inertia')) {
+            return response()->json(['message' => 'Profile updated']);
+        }
+
+        // Otherwise return a RedirectResponse (Inertia or normal form submit will follow it).
         return Redirect::route('profile.edit');
     }
 

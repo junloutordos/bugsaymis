@@ -63,11 +63,7 @@
           <tr>
             <td class="label">Venue</td>
             <td class="value">
-              @if(is_array($request->venue))
-                {{ implode(', ', $request->venue) }}
-              @else
-                {{ $request->venue ?? '—' }}
-              @endif
+              {{ $venueDisplay ?? (is_array($request->venue) ? implode(', ', $request->venue) : ($request->venue ?? '—')) }}
             </td>
           </tr>
           <tr>

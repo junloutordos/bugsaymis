@@ -3,6 +3,16 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
+
+    // Library Borrowings
+    Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
+        ->name('library.borrowings.index');
+    Route::post('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'store'])
+        ->name('library.borrowings.store');
+    Route::post('/library/borrowings/{id}/return', [\App\Http\Controllers\LibraryBorrowingsController::class, 'processReturn'])
+        ->name('library.borrowings.return');
+    Route::post('/library/borrowings/{id}/override', [\App\Http\Controllers\LibraryBorrowingsController::class, 'overrideDueDate'])
+        ->name('library.borrowings.override');
 use App\Http\Controllers\VehicleRequestController;
 use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
@@ -15,10 +25,19 @@ use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
 use Illuminate\Support\Facades\Route;
+// Data Management - Offices
+Route::middleware(['auth','role:Administrator'])->group(function(){
+    Route::get('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'index'])->name('offices.index');
+    Route::post('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'store'])->name('offices.store');
+    Route::put('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'update'])->name('offices.update');
+    Route::delete('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'destroy'])->name('offices.destroy');
+});
+
 use Inertia\Inertia;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\FacilityController;
+use App\Http\Controllers\LibraryKioskController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +62,10 @@ Route::get('/hello', function () {
         'message' => 'Welcome to BUGSAYMIS!',
     ]);
 })->name('hello');
+
+// Library kiosk (public, no login required)
+Route::get('/library/kiosk', [LibraryKioskController::class, 'index'])->name('library.kiosk');
+Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])->name('library.kiosk.scan');
 
 /*
 |--------------------------------------------------------------------------
@@ -117,16 +140,17 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['signed']);
 
     // OCD approval via signed link (sent to OCD users)
-    Route::get('/facility-requests/{facilityRequest}/ocd/approve/{ocd}', [\App\Http\Controllers\FacilityRequestController::class, 'approveByOCD'])
-        ->name('facility-requests.ocd.approve')
+    // GSU Head approval via signed link (sent to GSU Head users)
+    Route::get('/facility-requests/{facilityRequest}/gsu/approve/{gsu}', [\App\Http\Controllers\FacilityRequestController::class, 'approveByGSU'])
+        ->name('facility-requests.gsu.approve')
         ->middleware(['signed']);
 
-    Route::get('/facility-requests/{facilityRequest}/ocd/decline/{ocd}', [\App\Http\Controllers\FacilityRequestController::class, 'showOcdDeclineForm'])
-        ->name('facility-requests.ocd.decline')
+    Route::get('/facility-requests/{facilityRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\FacilityRequestController::class, 'showGsuDeclineForm'])
+        ->name('facility-requests.gsu.decline')
         ->middleware(['signed']);
 
-    Route::post('/facility-requests/{facilityRequest}/ocd/decline/{ocd}', [\App\Http\Controllers\FacilityRequestController::class, 'submitOcdDecline'])
-        ->name('facility-requests.ocd.decline.submit')
+    Route::post('/facility-requests/{facilityRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\FacilityRequestController::class, 'submitGsuDecline'])
+        ->name('facility-requests.gsu.decline.submit')
         ->middleware(['signed']);
 
     // Messengerial: Division chief approve/decline via signed links (sent by email)
@@ -142,10 +166,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('messengerial.decline.submit')
         ->middleware(['signed']);
 
-    // Print messengerial request (Records and Administrator)
+    // Print messengerial request (Administrator, Records, or the requester)
     Route::get('/messengerial/{messengerialRequest}/print', [\App\Http\Controllers\MessengerialController::class, 'printTicket'])
-        ->name('messengerial.print')
-        ->middleware('role:Administrator|Records');
+        ->name('messengerial.print');
 
     // Upload proof of delivery (Records and Administrator)
     Route::post('/messengerial/{messengerialRequest}/upload-proof', [\App\Http\Controllers\MessengerialController::class, 'uploadProof'])
@@ -266,6 +289,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/users-division', [RolesController::class, 'showDivisions'])->name('roles.divisions');
         Route::post('users-divisions', [RolesController::class, 'storeDivision'])->name('roles.divisions_store');
         Route::put('users-divisions/{id}', [RolesController::class, 'updateDivision'])->name('roles.division_update');
+        Route::post('users-divisions/{division}/upload-signature', [RolesController::class, 'uploadSignature'])->name('roles.divisions.upload_signature');
         
         Route::get('/agency-outcomes', [AgencyOutcomeController::class, 'index'])->name('outcome.index');
         Route::post('agency-outcomes', [AgencyOutcomeController::class, 'store'])->name('outcome.store');
@@ -325,6 +349,44 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         
     });
+    // Students CRUD (Registrar / public admin may use)
+    Route::get('/students', [\App\Http\Controllers\StudentController::class, 'index'])->name('students.index');
+    Route::get('/students/create', [\App\Http\Controllers\StudentController::class, 'create'])->name('students.create');
+    Route::post('/students', [\App\Http\Controllers\StudentController::class, 'store'])->name('students.store');
+    Route::get('/students/{id}/edit', [\App\Http\Controllers\StudentController::class, 'edit'])->name('students.edit');
+    Route::put('/students/{id}', [\App\Http\Controllers\StudentController::class, 'update'])->name('students.update');
+    Route::delete('/students/{id}', [\App\Http\Controllers\StudentController::class, 'destroy'])->name('students.destroy');
+    // Library attendance (authenticated view)
+    Route::get('/library/attendance', [\App\Http\Controllers\LibraryAttendanceController::class, 'index'])
+        ->name('library.attendance.index')
+        ->middleware('role:Administrator|Librarian');
+
+    // Library collections (CRUD for librarians/admins)
+    Route::get('/library/collections', [\App\Http\Controllers\LibraryCollectionsController::class, 'index'])
+        ->name('library.collections.index')
+        ->middleware('role:Administrator|Librarian');
+    Route::post('/library/collections', [\App\Http\Controllers\LibraryCollectionsController::class, 'store'])
+        ->name('library.collections.store')
+        ->middleware('role:Administrator|Librarian');
+    Route::put('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'update'])
+        ->name('library.collections.update')
+        ->middleware('role:Administrator|Librarian');
+    Route::delete('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'destroy'])
+        ->name('library.collections.destroy')
+        ->middleware('role:Administrator|Librarian');
+    // Collection Categories (CRUD for librarians/admins)
+    Route::get('/library/collection-categories', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'index'])
+        ->name('library.collection-categories.index')
+        ->middleware('role:Administrator|Librarian');
+    Route::post('/library/collection-categories', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'store'])
+        ->name('library.collection-categories.store')
+        ->middleware('role:Administrator|Librarian');
+    Route::put('/library/collection-categories/{id}', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'update'])
+        ->name('library.collection-categories.update')
+        ->middleware('role:Administrator|Librarian');
+    Route::delete('/library/collection-categories/{id}', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'destroy'])
+        ->name('library.collection-categories.destroy')
+        ->middleware('role:Administrator|Librarian');
     Route::middleware('role:Administrator|Staff|Faculty|HR')->group(function () {
         
         //New IPCR Routes

@@ -24,7 +24,9 @@ class User extends Authenticatable
         'role_id',
         'position',
         'division_id',
-        'office',
+        'office_id',
+        'profile_picture',
+        'electronic_signature',
     ];
 
     /**
@@ -60,6 +62,10 @@ class User extends Authenticatable
     public function division()
     {
         return $this->belongsTo(Division::class);
+    }
+    public function office()
+    {
+        return $this->belongsTo(\App\Models\Office::class);
     }
     
     // app/Models/User.php
