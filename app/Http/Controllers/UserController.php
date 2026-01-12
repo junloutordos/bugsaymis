@@ -13,7 +13,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with(['role', 'division.divisionchief'])
-            ->select('id', 'name', 'email', 'role_id', 'position', 'division_id', 'office', 'created_at')
+            ->select('id', 'name','sex', 'email', 'role_id', 'position', 'division_id', 'office', 'created_at')
             ->get();
 
         // For dropdowns
@@ -33,6 +33,7 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'name'        => 'required|string|max:255',
+            'sex'         => 'nullable|string|max:10',
             'email'       => 'required|email|unique:users,email',
             'role_id'     => 'required|exists:roles,id',
             'position'    => 'nullable|string|max:255',
@@ -51,6 +52,7 @@ class UserController extends Controller
 
         $data = $request->validate([
             'name'        => 'required|string|max:255',
+            'sex'         => 'nullable|string|max:10',
             'email'       => 'required|email|unique:users,email,' . $user->id,
             'role_id'     => 'required|exists:roles,id',
             'position'    => 'nullable|string|max:255',

@@ -131,7 +131,7 @@ const calendarOptions = {
           <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-xl shadow hover:shadow-lg transition text-white flex items-center space-x-3">
             <UserIcon class="h-10 w-10 opacity-90" />
             <div>
-              <p class="text-sm opacity-80">Scholars</p>
+              <p class="text-sm opacity-80">Employees</p>
               <h2 class="text-2xl font-bold">1,738</h2>
             </div>
           </div>

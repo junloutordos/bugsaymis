@@ -27,6 +27,7 @@ import {
   UserIcon,
   CursorArrowRippleIcon,
   ClockIcon,
+  CheckCircleIcon,
 } from "@heroicons/vue/24/outline";
 
 // Props
@@ -51,17 +52,18 @@ const isActive = (name) => name && route().current(name); // ✅ check via route
 
 // --- Menu Items ---
 const menuItems = [
-  {
-    type: "section",
-    label: "Administrator",
-    roles: ["Administrator"],
-  },
+  
   {
     label: "Dashboard",
     routeName: "dashboard",
     href: route("dashboard"),
     icon: HomeIcon,
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "DivisionChief", "OCD"],
+  },
+  {
+    type: "section",
+    label: "Administrator",
+    roles: ["Administrator"],
   },
   {
     label: "User Management",
@@ -181,8 +183,10 @@ const menuItems = [
         roles: ["Administrator", "DivisionChief"],
       },
       
+
     ],
   },
+  
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,

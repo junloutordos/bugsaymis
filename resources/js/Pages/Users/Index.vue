@@ -60,7 +60,7 @@ const userRole = page.props.auth?.user?.role?.name ?? null
     <div class="p-6">
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Users List</h1>
+        <h1 class="text-2xl font-bold text-gray-800">User List</h1>
         <button
           @click="openModal('create')"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
@@ -85,6 +85,7 @@ const userRole = page.props.auth?.user?.role?.name ?? null
               <tr>
                 <th class="px-4 py-3 text-left">#</th>
                 <th class="px-4 py-3 text-left">Name</th>
+                <th class="px-4 py-3 text-left">Sex</th>
                 <th class="px-4 py-3 text-left">Email</th>
                 <th class="px-4 py-3 text-left">Role</th>
                 <th class="px-4 py-3 text-left">Position</th>
@@ -102,6 +103,41 @@ const userRole = page.props.auth?.user?.role?.name ?? null
               >
                 <td class="px-4 py-3">{{ user.id }}</td>
                 <td class="px-4 py-3">{{ user.name }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <svg
+                      v-if="user.sex === 'Male'"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 64 64"
+                      class="w-5 h-5 text-blue-500"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="5"
+                    >
+                      <circle cx="26" cy="38" r="14" />
+                      <line x1="36" y1="28" x2="54" y2="10" />
+                      <line x1="42" y1="10" x2="54" y2="10" />
+                      <line x1="54" y1="10" x2="54" y2="22" />
+                    </svg>
+
+                    <svg
+                      v-else-if="user.sex === 'Female'"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 64 64"
+                      class="w-5 h-5 text-pink-500"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="5"
+                    >
+                      <circle cx="32" cy="24" r="14" />
+                      <line x1="32" y1="38" x2="32" y2="56" />
+                      <line x1="22" y1="46" x2="42" y2="46" />
+                    </svg>
+
+                    
+                  </div>
+                </td>
+
                 <td class="px-4 py-3">{{ user.email }}</td>
                 <td class="px-4 py-3">{{ user.role?.name ?? "—" }}</td>
                 <td class="px-4 py-3">{{ user.position ?? "—" }}</td>
@@ -195,6 +231,7 @@ const userRole = page.props.auth?.user?.role?.name ?? null
             class="space-y-2"
           >
             <p>Name: <strong>{{ selectedUser.name }}</strong></p>
+            <p>Sex: <strong>{{ selectedUser.sex ?? "—" }}</strong></p>
             <p>Email: <strong>{{ selectedUser.email }}</strong></p>
             <p>Role: <strong>{{ selectedUser.role?.name ?? "—" }}</strong></p>
             <p>Position: <strong>{{ selectedUser.position ?? "—" }}</strong></p>
@@ -221,7 +258,18 @@ const userRole = page.props.auth?.user?.role?.name ?? null
                 required
               />
             </div>
-
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Sex</label>
+              <select
+                v-model="form.sex"
+                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
+                required
+              >
+                <option value="">-- Select Sex --</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Email</label>
               <input

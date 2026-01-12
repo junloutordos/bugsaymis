@@ -13,6 +13,8 @@ use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
+use App\Http\Controllers\CommitteeController;
+use App\Http\Controllers\CommitteeTaskController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\GoogleAuthController;
@@ -188,7 +190,17 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         // Rate accomplishments for an IPCR
         Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/rate', [DivisionChiefIPCRController::class, 'rateIPCRPlan'])->name('division-chief-employee-ipcr-plan.rateIPCRPlan');
 
+        // Committees
+        Route::get('/committees', [CommitteeController::class, 'index'])->name('committees.index');
+        Route::post('/committees', [CommitteeController::class, 'store'])->name('committees.store');
+        Route::put('/committees/{committee}', [CommitteeController::class, 'update'])->name('committees.update');
+        Route::delete('/committees/{committee}', [CommitteeController::class, 'destroy'])->name('committees.destroy');
 
+        // Committee Tasks
+        Route::post('/committee-tasks', [CommitteeTaskController::class, 'store'])->name('committee-tasks.store');
+        Route::put('/committee-tasks/{committeeTask}', [CommitteeTaskController::class, 'update'])->name('committee-tasks.update');
+        Route::put('/committee-tasks/{committeeTask}/progress', [CommitteeTaskController::class, 'updateProgress'])->name('committee-tasks.progress');
+        Route::post('/committee-tasks/{committeeTask}/output', [CommitteeTaskController::class, 'submitOutput'])->name('committee-tasks.output');
 
 
         
@@ -218,10 +230,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         
     });
-
-    Route::middleware('role:Faculty')->group(function () {
-        Route::get('/faculty/reports', fn () => Inertia::render('Faculty/Reports'))->name('faculty.reports');
-    });
+    
 
     Route::middleware('role:Staff')->group(function () {
         Route::get('/staff/tasks', fn () => Inertia::render('Staff/Tasks'))->name('staff.tasks');

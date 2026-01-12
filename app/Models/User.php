@@ -19,6 +19,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'sex',
         'email',
         'password',
         'role_id',
@@ -74,6 +75,25 @@ class User extends Authenticatable
     public function ipcrs()
     {
         return $this->hasMany(IPCR::class, 'user_id');
+    }
+    public function headedCommittees()
+    {
+        return $this->hasMany(Committee::class, 'head_id');
+    }
+
+    public function committeeMemberships()
+    {
+        return $this->belongsToMany(
+            Committee::class,
+            'committee_members',
+            'user_id',
+            'committee_id'
+        );
+    }
+
+    public function assignedTasks()
+    {
+        return $this->hasMany(CommitteeTask::class, 'assigned_to');
     }
 
 
