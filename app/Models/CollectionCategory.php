@@ -9,5 +9,5 @@ class CollectionCategory extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'created_by'];
+    protected $fillable = ['name', 'created_by', 'student_borrowing_days', 'employee_borrowing_days'];
 }

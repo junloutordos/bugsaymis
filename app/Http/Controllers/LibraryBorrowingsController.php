@@ -36,15 +36,18 @@ class LibraryBorrowingsController extends Controller
                 $qb->where('borrower_id', 'like', "%{$q}%")
                    ->orWhereHas('collection', function ($c) use ($q) {
                        $c->where('title', 'like', "%{$q}%")
-                         ->orWhere('accession_number', 'like', "%{$q}%")
                          ->orWhere('call_number', 'like', "%{$q}%");
-                   });
+                   })
+                   ->orWhere('borrow_date', 'like', "%{$q}%")
+                   ->orWhere('due_date', 'like', "%{$q}%")
+                   ->orWhere('return_date', 'like', "%{$q}%")
+                   ->orWhere('status', 'like', "%{$q}%");
             });
 
             // additionally try to resolve student ids by pisay or name and include them
             try {
                 $cols = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
-                $pisayCandidates = ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id','pisayid'];
+                $pisayCandidates = ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id','pisayid','pisay_systemid'];
                 $pisayCol = null;
                 foreach ($pisayCandidates as $cname) { if (in_array($cname, $cols)) { $pisayCol = $cname; break; } }
 
@@ -66,6 +69,28 @@ class LibraryBorrowingsController extends Controller
                 }
             } catch (\Throwable $e) {
                 // ignore student resolution errors
+            }
+
+            // also try resolving employee/user ids by name for borrower matching
+            try {
+                $userCols = collect(DB::select("SHOW COLUMNS FROM users"))->map(fn($c) => $c->Field)->all();
+                $userQuery = DB::table('users');
+                if (in_array('name', $userCols)) {
+                    $userQuery->orWhere('name', 'like', "%{$q}%");
+                }
+                foreach (['first_name','firstname','fname','given_name','last_name','lastname','lname','surname'] as $nf) {
+                    if (in_array($nf, $userCols)) {
+                        $userQuery->orWhere($nf, 'like', "%{$q}%");
+                    }
+                }
+                $userIds = $userQuery->pluck('id')->toArray();
+                if (! empty($userIds)) {
+                    $query->orWhere(function ($qb3) use ($userIds) {
+                        $qb3->whereIn('borrower_id', $userIds)->where('borrower_type', 'employee');
+                    });
+                }
+            } catch (\Throwable $e) {
+                // ignore user resolution errors
             }
         }
 
@@ -210,14 +235,15 @@ class LibraryBorrowingsController extends Controller
 
         Log::info('Borrowing data after resolution', ['data' => $data]);
 
-        // Ensure collection is available
+        // Ensure collection is available (explicitly disallow if currently Borrowed)
         $collection = LibraryCollection::findOrFail($data['collection_id']);
-        if (($collection->status ?? 'Available') !== 'Available') {
-            Log::warning('Collection not available for borrowing', ['collection_id' => $collection->id, 'status' => $collection->status]);
+        $status = $collection->status ?? 'Available';
+        if (strcasecmp($status, 'Borrowed') === 0) {
+            Log::warning('Collection currently borrowed', ['collection_id' => $collection->id, 'status' => $collection->status]);
             if ($request->wantsJson() || $request->header('X-Inertia')) {
-                return Redirect::back()->withErrors(['collection_id' => ['Collection is not available for borrowing.']])->withInput();
+                return Redirect::back()->withErrors(['collection_id' => ['Collection is currently borrowed.']])->withInput();
             }
-            return Redirect::route('library.borrowings.index')->with('error', 'Collection is not available for borrowing.');
+            return Redirect::route('library.borrowings.index')->with('error', 'Collection is currently borrowed.');
         }
 
         // Prevent multiple active borrowings for same collection
@@ -230,11 +256,48 @@ class LibraryBorrowingsController extends Controller
             return Redirect::route('library.borrowings.index')->with('error', 'Collection already has an active borrowing.');
         }
 
-        // Calculate dates
+        // Calculate dates based on category rules (category-level limits take precedence)
         $borrowDate = Carbon::now()->toDateString();
         $borrowerType = strtolower($data['borrower_type']);
-        $days = $borrowerType === 'student' ? 7 : 30;
-        $dueDate = Carbon::now()->addDays($days)->toDateString();
+
+        // Attempt to resolve a configured category record and use its limits if present
+        $categoryName = trim((string)($collection->category ?? ''));
+        $categoryRecord = null;
+        try {
+            if ($categoryName !== '') {
+                $categoryRecord = \App\Models\CollectionCategory::where('name', $categoryName)->first();
+            }
+        } catch (\Throwable $e) {
+            // ignore lookup errors
+            $categoryRecord = null;
+        }
+
+        $dueDate = null;
+        if ($categoryRecord) {
+            if ($borrowerType === 'student' && $categoryRecord->student_borrowing_days && intval($categoryRecord->student_borrowing_days) > 0) {
+                $dueDate = Carbon::now()->addDays(intval($categoryRecord->student_borrowing_days))->toDateString();
+            } elseif ($borrowerType === 'employee' && $categoryRecord->employee_borrowing_days && intval($categoryRecord->employee_borrowing_days) > 0) {
+                $dueDate = Carbon::now()->addDays(intval($categoryRecord->employee_borrowing_days))->toDateString();
+            }
+        }
+
+        // If category-level limits didn't apply, fall back to the previous rules
+        if (! $dueDate) {
+            $category = strtolower($categoryName);
+            $nonFictionCategories = ['filipiniana','circulation','reference','research','thesis'];
+
+            if ($category === 'fiction' && $borrowerType === 'student') {
+                $dueDate = Carbon::now()->addMonth()->toDateString();
+            } elseif (in_array($category, $nonFictionCategories)) {
+                $dueDate = Carbon::now()->addDays(7)->toDateString();
+            } else {
+                if ($borrowerType === 'student') {
+                    $dueDate = Carbon::now()->addDays(7)->toDateString();
+                } else {
+                    $dueDate = Carbon::now()->addDays(30)->toDateString();
+                }
+            }
+        }
 
         $bor = Borrowing::create([
             'collection_id' => $collection->id,
@@ -284,6 +347,71 @@ class LibraryBorrowingsController extends Controller
         }
 
         return Redirect::route('library.borrowings.index')->with('success', 'Return processed.');
+    }
+
+    /**
+     * Return borrowing history for a given collection as JSON.
+     */
+    public function collectionHistory($collectionId)
+    {
+        $borrowings = Borrowing::with('collection')->where('collection_id', $collectionId)->orderBy('borrow_date', 'desc')->get();
+
+        $borrowings->transform(function ($b) {
+            // Resolve borrower name similar to index
+            $b->borrower_name = null;
+            try {
+                $type = strtolower($b->borrower_type ?? '');
+                if ($type === 'student') {
+                    $student = DB::table('students')->where('id', $b->borrower_id)->first();
+                    if ($student) {
+                        $first = null; $last = null;
+                        foreach (['first_name','firstname','fname','given_name'] as $c) if (isset($student->$c)) { $first = $student->$c; break; }
+                        foreach (['last_name','lastname','lname','surname'] as $c) if (isset($student->$c)) { $last = $student->$c; break; }
+                        if ($first || $last) $b->borrower_name = trim(($last ? $last.' ' : '').($first ?? ''));
+                        else $b->borrower_name = trim(implode(' ', array_filter((array)$student)));
+                    }
+                } elseif ($type === 'employee') {
+                    $emp = DB::table('users')->where('id', $b->borrower_id)->first();
+                    if ($emp) {
+                        if (isset($emp->name) && $emp->name) {
+                            $b->borrower_name = $emp->name;
+                        } else {
+                            $first = null; $last = null;
+                            foreach (['first_name','firstname','fname','given_name'] as $c) if (isset($emp->$c)) { $first = $emp->$c; break; }
+                            foreach (['last_name','lastname','lname','surname'] as $c) if (isset($emp->$c)) { $last = $emp->$c; break; }
+                            if ($first || $last) $b->borrower_name = trim(($last ? $last.' ' : '').($first ?? ''));
+                            else $b->borrower_name = trim(implode(' ', array_filter((array)$emp)));
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            if (! $b->borrower_name) $b->borrower_name = ($b->borrower_type ?? 'Unknown').' #'.$b->borrower_id;
+            return $b;
+        });
+
+        return response()->json($borrowings);
+    }
+
+    /**
+     * Return borrowing history for a given borrower (type + id) as JSON.
+     */
+    public function borrowerHistory($borrowerType, $borrowerId)
+    {
+        $borrowings = Borrowing::with('collection')
+            ->where('borrower_type', $borrowerType)
+            ->where('borrower_id', $borrowerId)
+            ->orderBy('borrow_date', 'desc')
+            ->get();
+
+        // enrich collection title and keep borrower name resolution simple (borrower is known)
+        $borrowings->transform(function ($b) {
+            $b->collection_title = $b->collection->title ?? null;
+            return $b;
+        });
+
+        return response()->json($borrowings);
     }
 
     public function overrideDueDate(Request $request, $id)

@@ -13,6 +13,11 @@ use App\Http\Controllers\ICTEquipmentController;
         ->name('library.borrowings.return');
     Route::post('/library/borrowings/{id}/override', [\App\Http\Controllers\LibraryBorrowingsController::class, 'overrideDueDate'])
         ->name('library.borrowings.override');
+
+    // Library Collections
+    Route::get('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'show'])->name('library.collections.show');
+    Route::get('/library/collections/{id}/history', [\App\Http\Controllers\LibraryBorrowingsController::class, 'collectionHistory'])->name('library.collections.history');
+    Route::get('/library/borrowers/{type}/{id}/history', [\App\Http\Controllers\LibraryBorrowingsController::class, 'borrowerHistory'])->name('library.borrowers.history');
 use App\Http\Controllers\VehicleRequestController;
 use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
@@ -35,6 +40,7 @@ Route::middleware(['auth','role:Administrator'])->group(function(){
 
 use Inertia\Inertia;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\LibraryKioskController;
@@ -91,6 +97,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
+    // Activity Planner
+    Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+    Route::post('/activities', [ActivityController::class, 'store'])->name('activities.store');
+    Route::put('/activities/{activity}', [ActivityController::class, 'update'])->name('activities.update');
+    Route::delete('/activities/{activity}', [ActivityController::class, 'destroy'])->name('activities.destroy');
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');

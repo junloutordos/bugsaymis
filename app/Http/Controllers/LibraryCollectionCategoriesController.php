@@ -21,6 +21,13 @@ class LibraryCollectionCategoriesController extends Controller
     {
         $data = $request->validate([
             'name' => 'required|string|max:150|unique:collection_categories,name',
+            'student_borrowing_days' => 'nullable|integer|min:1',
+            'employee_borrowing_days' => 'nullable|integer|min:1',
+        ], [
+            'student_borrowing_days.integer' => 'Student Borrowing Days must be a positive integer.',
+            'student_borrowing_days.min' => 'Student Borrowing Days must be at least 1.',
+            'employee_borrowing_days.integer' => 'Employee Borrowing Days must be a positive integer.',
+            'employee_borrowing_days.min' => 'Employee Borrowing Days must be at least 1.',
         ]);
         $data['created_by'] = Auth::id();
         $category = CollectionCategory::create($data);
@@ -37,6 +44,13 @@ class LibraryCollectionCategoriesController extends Controller
         $category = CollectionCategory::findOrFail($id);
         $data = $request->validate([
             'name' => 'required|string|max:150|unique:collection_categories,name,'.$category->id,
+            'student_borrowing_days' => 'nullable|integer|min:1',
+            'employee_borrowing_days' => 'nullable|integer|min:1',
+        ], [
+            'student_borrowing_days.integer' => 'Student Borrowing Days must be a positive integer.',
+            'student_borrowing_days.min' => 'Student Borrowing Days must be at least 1.',
+            'employee_borrowing_days.integer' => 'Employee Borrowing Days must be a positive integer.',
+            'employee_borrowing_days.min' => 'Employee Borrowing Days must be at least 1.',
         ]);
         $category->update($data);
 

@@ -12,15 +12,19 @@
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
-                <th class="px-4 py-2">#</th>
+                <th class="px-4 py-2 text-center">#</th>
                 <th class="px-4 py-2">Name</th>
+                <th class="px-4 py-2 text-center">Student Days</th>
+                <th class="px-4 py-2 text-center">Employee Days</th>
                 <th class="px-4 py-2">Actions</th>
               </tr>
             </thead>
             <tbody class="text-sm divide-y">
               <tr v-for="c in categories" :key="c.id">
-                <td class="px-4 py-2">{{ c.id }}</td>
+                <td class="px-4 py-2 text-center">{{ c.id }}</td>
                 <td class="px-4 py-2">{{ c.name }}</td>
+                <td class="px-4 py-2 text-center">{{ c.student_borrowing_days ?? '—' }}</td>
+                <td class="px-4 py-2 text-center">{{ c.employee_borrowing_days ?? '—' }}</td>
                 <td class="px-4 py-2">
                   <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit" aria-label="Edit category">
                     <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
@@ -30,7 +34,7 @@
                   </button>
                 </td>
               </tr>
-              <tr v-if="(categories || []).length === 0"><td :colspan="3" class="px-4 py-6 text-center text-gray-500">No categories</td></tr>
+              <tr v-if="(categories || []).length === 0"><td :colspan="5" class="px-4 py-6 text-center text-gray-500">No categories</td></tr>
             </tbody>
           </table>
         </div>
@@ -41,11 +45,23 @@
         <div class="bg-white rounded p-4 w-full max-w-md shadow-lg">
           <h3 class="text-lg font-semibold mb-4">{{ editing ? 'Edit Category' : 'New Category' }}</h3>
           <form @submit.prevent="submitForm">
-            <div>
-              <label class="block text-sm">Name</label>
-              <input v-model="form.name" class="w-full rounded border p-2" />
-              <div v-if="errors.name" class="text-red-600 text-sm mt-1">{{ errors.name[0] }}</div>
-            </div>
+                    <div>
+                      <label class="block text-sm">Name</label>
+                      <input v-model="form.name" class="w-full rounded border p-2" />
+                      <div v-if="errors.name" class="text-red-600 text-sm mt-1">{{ errors.name[0] }}</div>
+                    </div>
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-sm">Student Borrowing Days</label>
+                        <input v-model="form.student_borrowing_days" type="number" min="1" class="w-full rounded border p-2" />
+                        <div v-if="errors.student_borrowing_days" class="text-red-600 text-sm mt-1">{{ errors.student_borrowing_days[0] }}</div>
+                      </div>
+                      <div>
+                        <label class="block text-sm">Employee Borrowing Days</label>
+                        <input v-model="form.employee_borrowing_days" type="number" min="1" class="w-full rounded border p-2" />
+                        <div v-if="errors.employee_borrowing_days" class="text-red-600 text-sm mt-1">{{ errors.employee_borrowing_days[0] }}</div>
+                      </div>
+                    </div>
             <div class="flex justify-end mt-4 space-x-2">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
               <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
@@ -80,13 +96,13 @@ const categories = computed(() => page.props.categories || [])
 
 const showModal = ref(false)
 const editing = ref(null)
-const form = ref({ name: '' })
+const form = ref({ name: '', student_borrowing_days: '', employee_borrowing_days: '' })
 const errors = ref({})
 const showDeleteConfirm = ref(false)
 const deleting = ref(null)
 
-function openCreate(){ editing.value = null; form.value = { name: '' }; errors.value = {}; showModal.value = true }
-function openEdit(c){ editing.value = c.id; form.value = { name: c.name }; errors.value = {}; showModal.value = true }
+function openCreate(){ editing.value = null; form.value = { name: '', student_borrowing_days: '', employee_borrowing_days: '' }; errors.value = {}; showModal.value = true }
+function openEdit(c){ editing.value = c.id; form.value = { name: c.name, student_borrowing_days: c.student_borrowing_days ?? '', employee_borrowing_days: c.employee_borrowing_days ?? '' }; errors.value = {}; showModal.value = true }
 function closeModal(){ showModal.value = false; errors.value = {} }
 function confirmDelete(c){ deleting.value = c; showDeleteConfirm.value = true }
 

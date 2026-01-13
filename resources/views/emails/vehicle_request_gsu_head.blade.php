@@ -85,7 +85,7 @@
         </table>
 
         <div class="actions">
-          <a class="btn" href="{{ url('/vehicle-requests/'.$request->id) }}">View Request</a>
+          <a class="btn" href="{{ url('/') }}">View Request</a>
         </div>
 
         <p class="muted">If the button above does not work, copy and paste the following link into your browser:</p>
