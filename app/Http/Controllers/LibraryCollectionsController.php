@@ -13,7 +13,7 @@ class LibraryCollectionsController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = 25;
+        $perPage = 10;
         $q = $request->input('q');
         $sort = $request->input('sort', 'id');
         $direction = strtolower($request->input('direction', 'asc')) === 'desc' ? 'desc' : 'asc';

@@ -10,7 +10,7 @@ class StudentController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = 15;
+        $perPage = 10;
         $search = $request->input('q');
 
         $query = DB::table('students');
