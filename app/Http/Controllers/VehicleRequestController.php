@@ -195,19 +195,9 @@ class VehicleRequestController extends Controller
             }
         }
 
-        // Notify all OCD users with signed approve/decline links
-        $ocdUsers = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'OCD'); })->get();
-        foreach ($ocdUsers as $ocdUser) {
-            if ($ocdUser->email) {
-                try {
-                    $approveUrl = URL::signedRoute('vehicle-requests.ocd.approve', ['vehicleRequest' => $vehicleRequest->id, 'ocd' => $ocdUser->id], now()->addDays(7));
-                    $declineUrl = URL::signedRoute('vehicle-requests.ocd.decline', ['vehicleRequest' => $vehicleRequest->id, 'ocd' => $ocdUser->id], now()->addDays(7));
-                    \Mail::to($ocdUser->email)->send(new \App\Mail\VehicleRequestOCDMail($vehicleRequest, $approveUrl, $declineUrl));
-                } catch (\Throwable $e) {
-                    \Log::error('Failed to send OCD vehicle request notification', ['error' => $e->getMessage()]);
-                }
-            }
-        }
+        // OCD notification is sent only after GSU Head assigns a driver.
+        // Previously we notified OCD users here immediately after Division Chief approval.
+        // That behavior was changed so OCD receives notification only after driver assignment by GSU Head.
 
         return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => false]);
     }

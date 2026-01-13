@@ -218,6 +218,20 @@ const menuItems = [
     ],
   },
   {
+    label: "Planning",
+    icon: ChartBarIcon,
+    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+    children: [
+      {
+        label: "Activity Planner",
+            routeName: "activities.index",
+            href: route("activities.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+      },
+    ],
+  },
+  {
     label: "Records Management",
     icon: ArchiveBoxIcon,
     roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],

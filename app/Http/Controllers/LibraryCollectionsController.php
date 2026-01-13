@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\LibraryCollection;
 use App\Models\CollectionCategory;
+
 use Illuminate\Support\Facades\Auth;
 
 class LibraryCollectionsController extends Controller
@@ -14,37 +15,46 @@ class LibraryCollectionsController extends Controller
     {
         $perPage = 25;
         $q = $request->input('q');
-        $sort = $request->input('sort', 'title');
+        $sort = $request->input('sort', 'id');
         $direction = strtolower($request->input('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
         $filterType = $request->input('collection_type');
         $filterStatus = $request->input('status');
-        $query = LibraryCollection::query()->orderBy('title');
+        $query = LibraryCollection::query()->orderBy('id');
 
         // apply filters
         if ($filterType) {
             $query->where('collection_type', $filterType);
         }
-        if ($filterStatus) {
-            $query->where('status', $filterStatus);
+        // if a category filter is provided, use it
+        $filterCategory = $request->input('category');
+        if ($filterCategory) {
+            $query->where('category', $filterCategory);
         }
 
         // apply search
         if ($q) {
             $query->where(function($qr) use ($q) {
-                $qr->where('title', 'like', "%$q%")
-                   ->orWhere('author_publisher', 'like', "%$q%")
-                   ->orWhere('accession_number', 'like', "%$q%")
-                   ->orWhere('category', 'like', "%$q%");
+                     $qr->where('title', 'like', "%$q%")
+                         ->orWhere('author_publisher', 'like', "%$q%")
+                         ->orWhere('edition', 'like', "%$q%");
             });
         }
 
         // apply sorting if allowed
-        $allowedSorts = ['title','collection_type','accession_number','category','status','created_at'];
+        $allowedSorts = ['id','title','collection_type','edition','category','publisher','created_at'];
         if (in_array($sort, $allowedSorts)) {
             $query->orderBy($sort, $direction);
         }
 
-        $collections = $query->paginate($perPage)->appends($request->only('q','sort','direction','collection_type','status'));
+        $collections = $query->paginate($perPage)->appends($request->only('q','sort','direction','collection_type','category'));
+
+        // Prefer real `volume` column if present, otherwise alias `collection_type` for frontend
+        $collections->getCollection()->transform(function ($c) {
+            $c->volume = $c->volume ?? $c->collection_type;
+            // expose edition field for frontend
+            $c->edition = $c->edition ?? null;
+            return $c;
+        });
 
         $categories = CollectionCategory::orderBy('name')->get();
 
@@ -55,7 +65,7 @@ class LibraryCollectionsController extends Controller
             'direction' => $direction,
             'filters' => [
                 'collection_type' => $filterType,
-                'status' => $filterStatus,
+                'category' => $filterCategory,
             ],
             'categories' => $categories,
         ]);
@@ -67,11 +77,20 @@ class LibraryCollectionsController extends Controller
             'collection_type' => 'required|string|max:50',
             'title' => 'required|string|max:255',
             'author_publisher' => 'nullable|string|max:255',
-            'accession_number' => 'nullable|string|max:100|unique:library_collections,accession_number',
             'call_number' => 'nullable|string|max:100',
+            'edition' => 'nullable|string|max:255',
+            'year' => ['nullable','digits:4'],
+            'isbn' => 'nullable|string|max:50',
+            'subject' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
-            'status' => 'required|string|max:50',
+            'publisher' => 'nullable|string|max:255',
+            'status' => 'nullable|string|max:50',
         ]);
+
+        // accept `collection_type` primarily, but fall back to legacy `volume` if present
+        $data['collection_type'] = $data['collection_type'] ?? $data['volume'] ?? null;
+        // ensure status has a safe default if not provided
+        $data['status'] = $data['status'] ?? 'Available';
 
         $data['created_by'] = Auth::id();
         $collection = LibraryCollection::create($data);
@@ -91,15 +110,27 @@ class LibraryCollectionsController extends Controller
     public function update(Request $request, $id)
     {
         $collection = LibraryCollection::findOrFail($id);
-        $data = $request->validate([
-            'collection_type' => 'required|string|max:50',
-            'title' => 'required|string|max:255',
-            'author_publisher' => 'nullable|string|max:255',
-            'accession_number' => 'nullable|string|max:100|unique:library_collections,accession_number,'.$collection->id,
-            'call_number' => 'nullable|string|max:100',
-            'category' => 'nullable|string|max:255',
-            'status' => 'required|string|max:50',
-        ]);
+            $data = $request->validate([
+                'collection_type' => 'required|string|max:50',
+                'title' => 'required|string|max:255',
+                'author_publisher' => 'nullable|string|max:255',
+                'call_number' => 'nullable|string|max:100',
+                'edition' => 'nullable|string|max:255',
+                'year' => ['nullable','digits:4'],
+                'isbn' => 'nullable|string|max:50',
+                'subject' => 'nullable|string|max:255',
+                'category' => 'nullable|string|max:255',
+                'publisher' => 'nullable|string|max:255',
+                'status' => 'nullable|string|max:50',
+            ]);
+
+        // accept `collection_type` primarily, but fall back to legacy `volume` if present
+        $data['collection_type'] = $data['collection_type'] ?? $data['volume'] ?? null;
+        // keep edition column in data if present
+        if (isset($data['edition'])) {
+            $data['edition'] = $data['edition'];
+        }
+            $data['status'] = $data['status'] ?? 'Available';
 
         $collection->update($data);
 
@@ -128,5 +159,16 @@ class LibraryCollectionsController extends Controller
         }
 
         return redirect()->route('library.collections.index')->with('success', 'Collection deleted.');
+    }
+
+    /**
+     * Return a single collection as JSON (used by the edit modal to fetch fresh data).
+     */
+    public function show($id)
+    {
+        $collection = LibraryCollection::findOrFail($id);
+        // prefer volume column if present
+        $collection->volume = $collection->volume ?? $collection->collection_type;
+        return response()->json($collection);
     }
 }

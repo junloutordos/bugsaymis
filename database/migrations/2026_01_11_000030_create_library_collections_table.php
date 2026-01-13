@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('library_collections', function (Blueprint $table) {
             $table->id();
-            $table->string('collection_type')->nullable(); // Book, Magazine, Journal, Other
+            $table->string('collection_type')->nullable(); // Instructional Materials, Book, Periodical, Non-Print, Thesis
             $table->string('title');
             $table->string('author_publisher')->nullable();
             $table->string('accession_number')->nullable()->unique();

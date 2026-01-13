@@ -9,20 +9,19 @@
 
       <div class="bg-white rounded-xl shadow p-4">
           <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-3">
+              <div class="flex items-center space-x-3">
               <input v-model="q" @keydown.enter="search" type="text" placeholder="Search collections..." class="w-80 rounded-lg border-gray-300 shadow-sm p-2" />
               <select v-model="filterType" @change="applyFilters" class="rounded border p-2">
                 <option value="">All Types</option>
+                <option>Instructional Materials</option>
                 <option>Book</option>
-                <option>Magazine</option>
-                <option>Journal</option>
-                <option>Other</option>
+                <option>Periodical</option>
+                <option>Non-Print</option>
+                <option>Thesis</option>
               </select>
-              <select v-model="filterStatus" @change="applyFilters" class="rounded border p-2">
-                <option value="">Any Status</option>
-                <option>Available</option>
-                <option>Checked Out</option>
-                <option>Archived</option>
+              <select v-model="filterCategory" @change="applyFilters" class="rounded border p-2">
+                <option value="">All Categories</option>
+                <option v-for="cat in (page.props.categories || [])" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
               </select>
             </div>
             <div>
@@ -34,27 +33,33 @@
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
-                <th class="px-4 py-2">#</th>
-                <th class="px-4 py-2"><button @click.prevent="sortBy('collection_type')" class="flex items-center gap-2">TYPE <span v-if="sort==='collection_type'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
-                <th class="px-4 py-2"><button @click.prevent="sortBy('title')" class="flex items-center gap-2">TITLE <span v-if="sort==='title'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2">ACCESSION #</th>
                 <th class="px-4 py-2"><button @click.prevent="sortBy('call_number')" class="flex items-center gap-2">CALL # <span v-if="sort==='call_number'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
-                <th class="px-4 py-2">AUTHOR / PUBLISHER</th>
-                <th class="px-4 py-2"><button @click.prevent="sortBy('accession_number')" class="flex items-center gap-2">ACCESSION # <span v-if="sort==='accession_number'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
-                <th class="px-4 py-2"><button @click.prevent="sortBy('category')" class="flex items-center gap-2">CATEGORY <span v-if="sort==='category'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
-                <th class="px-4 py-2"><button @click.prevent="sortBy('status')" class="flex items-center gap-2">STATUS <span v-if="sort==='status'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2">AUTHOR</th>
+                <th class="px-4 py-2"><button @click.prevent="sortBy('title')" class="flex items-center gap-2">TITLE <span v-if="sort==='title'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2"><button @click.prevent="sortBy('collection_type')" class="flex items-center gap-2">COLLECTION TYPE <span v-if="sort==='collection_type'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2"><button @click.prevent="sortBy('edition')" class="flex items-center gap-2">EDITION <span v-if="sort==='edition'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2"><button @click.prevent="sortBy('publisher')" class="flex items-center gap-2">PUBLISHER <span v-if="sort==='publisher'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2"><button @click.prevent="sortBy('year')" class="flex items-center gap-2">YEAR <span v-if="sort==='year'">{{ direction==='asc' ? '▲' : '▼' }}</span></button></th>
+                <th class="px-4 py-2">ISBN</th>
+                <th class="px-4 py-2">SUBJECT</th>
+                <th class="px-4 py-2">CATEGORY</th>
                 <th class="px-4 py-2">ACTIONS</th>
               </tr>
             </thead>
             <tbody class="text-sm divide-y">
               <tr v-for="c in collections.data" :key="c.id">
                 <td class="px-4 py-2">{{ c.id }}</td>
-                <td class="px-4 py-2">{{ c.collection_type }}</td>
-                <td class="px-4 py-2">{{ c.title }}</td>
                 <td class="px-4 py-2">{{ c.call_number || '—' }}</td>
                 <td class="px-4 py-2">{{ c.author_publisher || '—' }}</td>
-                <td class="px-4 py-2">{{ c.accession_number || '—' }}</td>
+                <td class="px-4 py-2">{{ c.title }}</td>
+                <td class="px-4 py-2">{{ c.collection_type || c.volume }}</td>
+                <td class="px-4 py-2">{{ c.edition || '—' }}</td>
+                <td class="px-4 py-2">{{ c.publisher || '—' }}</td>
+                <td class="px-4 py-2">{{ c.year || '—' }}</td>
+                <td class="px-4 py-2">{{ c.isbn || '—' }}</td>
+                <td class="px-4 py-2">{{ c.subject || '—' }}</td>
                 <td class="px-4 py-2">{{ c.category || '—' }}</td>
-                <td class="px-4 py-2">{{ c.status }}</td>
                 <td class="px-4 py-2">
                   <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
                     <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
@@ -64,7 +69,7 @@
                   </button>
                 </td>
               </tr>
-              <tr v-if="(collections.data || []).length === 0"><td :colspan="9" class="px-4 py-6 text-center text-gray-500">No collections</td></tr>
+              <tr v-if="(collections.data || []).length === 0"><td :colspan="8" class="px-4 py-6 text-center text-gray-500">No collections</td></tr>
             </tbody>
           </table>
         </div>
@@ -86,14 +91,15 @@
 
             <div class="space-y-3">
               <div>
-                <label class="block text-sm">Type</label>
+                <label class="block text-sm">Collection Type</label>
                 <select v-model="form.collection_type" class="w-full rounded border p-2">
+                  <option>Instructional Materials</option>
                   <option>Book</option>
-                  <option>Magazine</option>
-                  <option>Journal</option>
-                  <option>Other</option>
+                  <option>Periodical</option>
+                  <option>Non-Print</option>
+                  <option>Thesis</option>
                 </select>
-                <div v-if="errors.collection_type" class="text-red-600 text-sm mt-1">{{ errors.collection_type[0] }}</div>
+                <div v-if="errors.collection_type || errors.volume" class="text-red-600 text-sm mt-1">{{ (errors.collection_type || errors.volume)[0] }}</div>
               </div>
               <div>
                 <label class="block text-sm">Title</label>
@@ -101,36 +107,45 @@
                 <div v-if="errors.title" class="text-red-600 text-sm mt-1">{{ errors.title[0] }}</div>
               </div>
               <div>
-                <label class="block text-sm">Author / Publisher</label>
+                <label class="block text-sm">Author</label>
                 <input name="author_publisher" v-model="form.author_publisher" class="w-full rounded border p-2" />
                 <div v-if="errors.author_publisher" class="text-red-600 text-sm mt-1">{{ errors.author_publisher[0] }}</div>
               </div>
-              <div>
-                <label class="block text-sm">Accession Number</label>
-                <input name="accession_number" v-model="form.accession_number" class="w-full rounded border p-2" />
-                <div v-if="errors.accession_number" class="text-red-600 text-sm mt-1">{{ errors.accession_number[0] }}</div>
-              </div>
+              
               <div>
                 <label class="block text-sm">Call Number</label>
                 <input name="call_number" v-model="form.call_number" class="w-full rounded border p-2" />
                 <div v-if="errors.call_number" class="text-red-600 text-sm mt-1">{{ errors.call_number[0] }}</div>
               </div>
               <div>
+                <label class="block text-sm">Edition</label>
+                <input name="edition" v-model="form.edition" class="w-full rounded border p-2" />
+                <div v-if="errors.edition" class="text-red-600 text-sm mt-1">{{ errors.edition[0] }}</div>
+              </div>
+              <div>
+                <label class="block text-sm">Year</label>
+                <input name="year" v-model="form.year" class="w-full rounded border p-2" />
+                <div v-if="errors.year" class="text-red-600 text-sm mt-1">{{ errors.year[0] }}</div>
+              </div>
+              <div>
+                <label class="block text-sm">ISBN</label>
+                <input name="isbn" v-model="form.isbn" class="w-full rounded border p-2" />
+                <div v-if="errors.isbn" class="text-red-600 text-sm mt-1">{{ errors.isbn[0] }}</div>
+              </div>
+              <div>
+                <label class="block text-sm">Subject</label>
+                <input name="subject" v-model="form.subject" class="w-full rounded border p-2" />
+                <div v-if="errors.subject" class="text-red-600 text-sm mt-1">{{ errors.subject[0] }}</div>
+              </div>
+              <div>
                 <label class="block text-sm">Category</label>
-                <select v-model="form.category" class="w-full rounded border p-2">
-                  <option value="">-- Select category --</option>
-                  <option v-for="cat in (page.props.categories || [])" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
-                </select>
+                <input name="category" v-model="form.category" class="w-full rounded border p-2" />
                 <div v-if="errors.category" class="text-red-600 text-sm mt-1">{{ errors.category[0] }}</div>
               </div>
               <div>
-                <label class="block text-sm">Status</label>
-                <select v-model="form.status" class="w-full rounded border p-2">
-                  <option>Available</option>
-                  <option>Checked Out</option>
-                  <option>Archived</option>
-                </select>
-                <div v-if="errors.status" class="text-red-600 text-sm mt-1">{{ errors.status[0] }}</div>
+                <label class="block text-sm">Publisher</label>
+                <input name="publisher" v-model="form.publisher" class="w-full rounded border p-2" />
+                <div v-if="errors.publisher" class="text-red-600 text-sm mt-1">{{ errors.publisher[0] }}</div>
               </div>
             </div>
 
@@ -171,23 +186,48 @@ const csrfToken = page.props.csrf_token ?? page.props.csrfToken ?? null;
 const sort = ref(page.props.sort || 'title');
 const direction = ref(page.props.direction || 'asc');
 const filterType = ref(page.props.filters?.collection_type || '');
-const filterStatus = ref(page.props.filters?.status || '');
+const filterCategory = ref(page.props.filters?.category || '');
 
 const showModal = ref(false);
 const editing = ref(null);
-const form = ref({ collection_type: 'Book', title: '', author_publisher: '', accession_number: '', call_number: '', category: '', status: 'Available' });
+const form = ref({ collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' });
 const errors = ref(page.props.errors || {});
 const showDeleteConfirm = ref(false);
 const deleting = ref(null);
 
-function openCreate() { editing.value = null; form.value = { collection_type: 'Book', title: '', author_publisher: '', accession_number: '', call_number: '', category: '', status: 'Available' }; errors.value = {}; showModal.value = true }
-function openEdit(c) { editing.value = c.id; form.value = { collection_type: c.collection_type, title: c.title, author_publisher: c.author_publisher, accession_number: c.accession_number, call_number: c.call_number ?? '', category: c.category, status: c.status }; errors.value = {}; showModal.value = true }
+function openCreate() { editing.value = null; form.value = { collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' }; errors.value = {}; showModal.value = true }
+async function openEdit(c) {
+  editing.value = c.id;
+  errors.value = {};
+  try {
+    const res = await fetch(route('library.collections.show', c.id));
+    if (!res.ok) throw new Error('Network response was not ok')
+    const data = await res.json();
+    form.value = {
+      collection_type: data.collection_type ?? data.volume,
+      title: data.title,
+      author_publisher: data.author_publisher,
+      call_number: data.call_number ?? '',
+      edition: data.edition ?? '',
+      year: data.year ?? '',
+      isbn: data.isbn ?? '',
+      subject: data.subject ?? '',
+      category: data.category ?? '',
+      publisher: data.publisher ?? ''
+    };
+  } catch (e) {
+    // fallback to passed record if fetch fails
+    form.value = { collection_type: c.collection_type ?? c.volume, title: c.title, author_publisher: c.author_publisher, call_number: c.call_number ?? '', edition: c.edition ?? '', year: c.year ?? '', isbn: c.isbn ?? '', subject: c.subject ?? '', category: c.category ?? '', publisher: c.publisher ?? '' };
+    console.error('Failed to load latest collection data:', e);
+  }
+  showModal.value = true
+}
 function closeModal(){ showModal.value = false; errors.value = {} }
 
 function confirmDelete(c){ deleting.value = c; showDeleteConfirm.value = true }
 
 function applyFilters(){
-  router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, status: filterStatus.value, sort: sort.value, direction: direction.value }, { replace: true })
+  router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true })
 }
 
 function search(){ applyFilters() }
@@ -199,22 +239,24 @@ function sortBy(col){
   } else {
     sort.value = col; direction.value = 'asc'
   }
-  router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, status: filterStatus.value, sort: sort.value, direction: direction.value }, { replace: true })
+  router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true })
 }
 
 async function submitForm(){
   errors.value = {}
   const payload = { ...form.value }
+  // keep compatibility with backend validation which still expects `volume`
+  payload.volume = payload.collection_type ?? payload.volume
   if (editing.value) {
     router.put(route('library.collections.update', editing.value), payload, {
       preserveState: true,
-      onSuccess: () => { showModal.value = false; router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, status: filterStatus.value, sort: sort.value, direction: direction.value }, { replace: true }) },
+      onSuccess: () => { showModal.value = false; router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) },
       onError: (e) => { errors.value = e }
     })
   } else {
     router.post(route('library.collections.store'), payload, {
       preserveState: true,
-      onSuccess: () => { showModal.value = false; router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, status: filterStatus.value, sort: sort.value, direction: direction.value }, { replace: true }) },
+      onSuccess: () => { showModal.value = false; router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) },
       onError: (e) => { errors.value = e }
     })
   }
@@ -231,7 +273,7 @@ function deleteCollection(){
   router.delete(route('library.collections.destroy', id), {}, {
     preserveState: true,
     onSuccess: () => {
-      router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, status: filterStatus.value, sort: sort.value, direction: direction.value }, { replace: true })
+      router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true })
     },
     onError: (e) => {
       console.error(e)

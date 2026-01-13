@@ -17,17 +17,27 @@ const showAssignDriverModal = ref(false);
 const assignDriverRequest = ref(null);
 const drivers = ref([]);
 const selectedDriverId = ref(null);
+const selectedVehicleId = ref(null);
 const assignLoading = ref(false);
 // Open assign driver modal
 const openAssignDriverModal = async (req) => {
+  console.log('openAssignDriverModal', req);
   assignDriverRequest.value = req;
   showAssignDriverModal.value = true;
-  selectedDriverId.value = req.driver_id || null;
+  selectedDriverId.value = req.driver_id ?? req.driver?.id ?? null;
+  // preselect vehicle by matching name to vehicles list
+  try {
+    const v = props.vehicles?.find(v => (v.name ?? '') === (req.vehicle_type ?? ''));
+    selectedVehicleId.value = v?.id ?? null;
+  } catch (e) {
+    selectedVehicleId.value = null;
+  }
   assignLoading.value = true;
   try {
     const res = await fetch('/api/drivers');
     drivers.value = await res.json();
   } catch (e) {
+    console.error('Failed to load drivers', e);
     setBanner('error', 'Failed to load drivers');
     drivers.value = [];
   }
@@ -42,17 +52,53 @@ const closeAssignDriverModal = () => {
 };
 
 const assignDriver = async () => {
-  if (!selectedDriverId.value || !assignDriverRequest.value) return;
+  if (!selectedDriverId.value || !assignDriverRequest.value) {
+    console.warn('assignDriver called without selection or request', { selectedDriverId: selectedDriverId.value, assignDriverRequest: assignDriverRequest.value });
+    return;
+  }
   assignLoading.value = true;
   try {
-    await window.axios.post(`/vehicle-requests/${assignDriverRequest.value.id}/assign-driver`, {
-      driver_id: selectedDriverId.value
-    });
+    const url = `/vehicle-requests/${assignDriverRequest.value.id}/assign-driver`;
+    console.log('assignDriver posting to', url, { driver_id: selectedDriverId.value, vehicle_id: selectedVehicleId.value });
+    const payload = { driver_id: selectedDriverId.value };
+    if (selectedVehicleId.value) payload.vehicle_id = selectedVehicleId.value;
+    if (window.axios && typeof window.axios.post === 'function') {
+      await window.axios.post(url, payload);
+    } else {
+      // fallback to fetch with JSON (may require CSRF token setup in browser)
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        credentials: 'same-origin'
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => null);
+        throw { response: { data, status: resp.status } };
+      }
+    }
     setBanner('success', 'Driver assigned successfully');
     closeAssignDriverModal();
     window.location.reload();
   } catch (e) {
-    setBanner('error', 'Failed to assign driver');
+    console.error('Failed to assign driver', e);
+    // Try to extract structured error info from server response
+    const srv = e?.response?.data ?? (e?.response ?? null);
+    const errMsg = e && e.message ? String(e.message) : '';
+    // If JSON parsing failed with messages like "trailing data" or unexpected token,
+    // map that to a friendly conflict message instead of exposing the raw parse error.
+    if (errMsg && (errMsg.toLowerCase().includes('trailing data') || errMsg.toLowerCase().includes('unexpected token') || errMsg.toLowerCase().includes('syntaxerror') || (e?.response?.status === 422 && !srv))) {
+      setBanner('error', sanitizeErrorMessage(errMsg));
+    } else if (srv && srv.type && srv.message) {
+      // Emphasize problem and show whether it's a vehicle or driver conflict
+      const kind = srv.type === 'vehicle' ? 'Vehicle conflict' : (srv.type === 'driver' ? 'Driver conflict' : 'Conflict');
+      const dates = Array.isArray(srv.dates) && srv.dates.length ? ` Dates: ${srv.dates.join(', ')}` : '';
+      setBanner('error', `${kind}: ${sanitizeErrorMessage(srv.message)}${dates}`);
+    } else if (srv && srv.message) {
+      setBanner('error', sanitizeErrorMessage(srv.message));
+    } else {
+      setBanner('error', sanitizeErrorMessage(errMsg) || 'Failed to assign driver');
+    }
   }
   assignLoading.value = false;
 };
@@ -72,6 +118,18 @@ const setBanner = (type, message, ms = 5000) => {
   if (ms > 0) {
     setTimeout(() => { banner.value = null; }, ms);
   }
+};
+
+// Normalize server/parse errors into friendly messages
+const sanitizeErrorMessage = (raw) => {
+  if (!raw && raw !== '') return raw;
+  const s = String(raw || '').trim();
+  const lower = s.toLowerCase();
+  if (!s) return s;
+  if (lower.includes('trailing data') || lower.includes('unexpected token') || lower.includes('syntaxerror') || lower.includes('json')) {
+    return 'Conflict Detected';
+  }
+  return s;
 };
 
 const form = useForm({
@@ -149,7 +207,7 @@ const submit = () => {
           const serverErr = window.lastVehicleRequestError ?? {};
           const status = serverErr.status ?? (errs?.status ?? 'unknown');
           const data = serverErr.data ?? errs;
-          setBanner('error', `Error ${status}: ${serverErr.data?.message ?? JSON.stringify(data)}`);
+          setBanner('error', `Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
           const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
           if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
           console.log('Captured server error', serverErr);
@@ -159,7 +217,7 @@ const submit = () => {
           if (Object.keys(form.errors).length === 0) {
             // if axios captured an error body, show it briefly then close
             if (window.lastVehicleRequestError && window.lastVehicleRequestError.data) {
-              setBanner('error', JSON.stringify(window.lastVehicleRequestError.data), 4000);
+              setBanner('error', sanitizeErrorMessage(window.lastVehicleRequestError.data), 4000);
             }
             closeModal();
           }
@@ -176,7 +234,7 @@ const submit = () => {
           const serverErr = window.lastVehicleRequestError ?? {};
           const status = serverErr.status ?? (errs?.status ?? 'unknown');
           const data = serverErr.data ?? errs;
-          setBanner('error', `Error ${status}: ${serverErr.data?.message ?? JSON.stringify(data)}`);
+          setBanner('error', `Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
           const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
           if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
           console.log('Captured server error', serverErr);
@@ -185,7 +243,7 @@ const submit = () => {
           console.log('Vehicle request create finished');
           if (Object.keys(form.errors).length === 0) {
             if (window.lastVehicleRequestError && window.lastVehicleRequestError.data) {
-              setBanner('error', JSON.stringify(window.lastVehicleRequestError.data), 4000);
+              setBanner('error', sanitizeErrorMessage(window.lastVehicleRequestError.data), 4000);
             }
             closeModal();
           }
@@ -343,7 +401,8 @@ const destroy = (req) => {
             <div class="flex items-start justify-between">
               <div>
                 <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
-                <div class="font-semibold text-gray-800">{{ req.purpose ?? '—' }}</div>
+                <!-- Assign Driver Modal removed here; using global modal to avoid duplication -->
+
                 <div class="text-sm text-gray-600">{{ req.vehicle_type ?? '—' }} — {{ req.user?.name ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
@@ -398,6 +457,38 @@ const destroy = (req) => {
       </div>
     </div>
     <!-- Create Modal -->
+    <!-- Assign Driver Modal (global) -->
+    <div v-if="showAssignDriverModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white w-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-md p-4 sm:p-6 relative overflow-auto">
+        <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeAssignDriverModal">✕</button>
+        <h2 class="text-xl font-semibold mb-4">Assign Driver</h2>
+        <div class="space-y-4 max-h-[70vh] overflow-auto">
+          <div v-if="assignLoading" class="py-8 text-center text-gray-600">Loading drivers...</div>
+          <div v-else>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Vehicle (change if needed)</label>
+              <select v-model="selectedVehicleId" class="mt-1 block w-full rounded border-gray-300">
+                <option value="">Keep requested vehicle</option>
+                <option v-for="v in props.vehicles" :key="v.id" :value="v.id">{{ v.name }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Driver</label>
+              <select v-model="selectedDriverId" class="mt-1 block w-full rounded border-gray-300">
+                <option value="">Select driver</option>
+                <option v-for="d in drivers" :key="d.id" :value="d.id">{{ d.name }}{{ d.position ? ' — ' + d.position : '' }}</option>
+              </select>
+            </div>
+
+            <div class="flex gap-2 mt-4">
+              <button @click.prevent="assignDriver" :disabled="assignLoading || !selectedDriverId" class="bg-indigo-600 text-white px-4 py-2 rounded">Assign</button>
+              <button @click.prevent="closeAssignDriverModal" class="px-4 py-2 rounded border">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div class="bg-white w-full h-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-md p-4 sm:p-6 relative overflow-auto">
         <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>

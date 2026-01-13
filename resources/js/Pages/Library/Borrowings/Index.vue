@@ -34,9 +34,13 @@
             </thead>
             <tbody class="text-sm divide-y">
               <tr v-for="b in borrowings.data" :key="b.id">
-                <td class="px-4 py-2">{{ b.id }}</td>
-                <td class="px-4 py-2">{{ b.collection?.title || '—' }}</td>
-                <td class="px-4 py-2">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</td>
+                  <td class="px-4 py-2">{{ b.id }}</td>
+                  <td class="px-4 py-2">
+                    <button @click="openCollectionHistory(b.collection?.id)" class="text-blue-600 hover:underline">{{ b.collection?.title || '—' }}</button>
+                  </td>
+                <td class="px-4 py-2">
+                  <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-blue-600 hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button>
+                </td>
                 <td class="px-4 py-2">{{ b.borrow_date }}</td>
                 <td class="px-4 py-2">{{ b.due_date }}</td>
                 <td class="px-4 py-2">{{ b.return_date || '—' }}</td>
@@ -100,6 +104,76 @@
           </form>
         </div>
       </div>
+      <!-- Collection history modal -->
+      <div v-show="showHistory" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-black bg-opacity-50 z-50">
+        <div class="bg-white rounded p-4 w-full max-w-2xl max-h-[80vh] overflow-auto shadow-lg">
+          <h3 class="text-lg font-semibold mb-4">Collection Borrowing History</h3>
+          <div v-if="historyLoading" class="text-sm text-gray-600">Loading...</div>
+          <div v-else>
+            <table class="min-w-full border text-sm">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="px-3 py-2">#</th>
+                  <th class="px-3 py-2">Borrower</th>
+                  <th class="px-3 py-2">Borrow Date</th>
+                  <th class="px-3 py-2">Due Date</th>
+                  <th class="px-3 py-2">Return Date</th>
+                  <th class="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in history" :key="h.id">
+                  <td class="px-3 py-2">{{ h.id }}</td>
+                  <td class="px-3 py-2">{{ h.borrower_name }}</td>
+                  <td class="px-3 py-2">{{ h.borrow_date }}</td>
+                  <td class="px-3 py-2">{{ h.due_date }}</td>
+                  <td class="px-3 py-2">{{ h.return_date || '—' }}</td>
+                  <td class="px-3 py-2">{{ h.status }}</td>
+                </tr>
+                <tr v-if="(history || []).length === 0"><td :colspan="6" class="px-3 py-6 text-center text-gray-500">No history</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex justify-end mt-4">
+            <button @click="closeHistory" class="px-4 py-2 bg-gray-300 rounded">Close</button>
+          </div>
+        </div>
+      </div>
+      <!-- Borrower history modal -->
+      <div v-show="showBorrowerHistory" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-black bg-opacity-50 z-50">
+        <div class="bg-white rounded p-4 w-full max-w-2xl max-h-[80vh] overflow-auto shadow-lg">
+          <h3 class="text-lg font-semibold mb-4">Borrower History</h3>
+          <div v-if="borrowerHistoryLoading" class="text-sm text-gray-600">Loading...</div>
+          <div v-else>
+            <table class="min-w-full border text-sm">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="px-3 py-2">#</th>
+                  <th class="px-3 py-2">Collection</th>
+                  <th class="px-3 py-2">Borrow Date</th>
+                  <th class="px-3 py-2">Due Date</th>
+                  <th class="px-3 py-2">Return Date</th>
+                  <th class="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="h in borrowerHistory" :key="h.id">
+                  <td class="px-3 py-2">{{ h.id }}</td>
+                  <td class="px-3 py-2">{{ h.collection_title || h.collection?.title || '—' }}</td>
+                  <td class="px-3 py-2">{{ h.borrow_date }}</td>
+                  <td class="px-3 py-2">{{ h.due_date }}</td>
+                  <td class="px-3 py-2">{{ h.return_date || '—' }}</td>
+                  <td class="px-3 py-2">{{ h.status }}</td>
+                </tr>
+                <tr v-if="(borrowerHistory || []).length === 0"><td :colspan="6" class="px-3 py-6 text-center text-gray-500">No history</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex justify-end mt-4">
+            <button @click="closeBorrowerHistory" class="px-4 py-2 bg-gray-300 rounded">Close</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Override Modal -->
       <div v-show="showOverride" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-black bg-opacity-50 z-50">
@@ -137,6 +211,12 @@ const employees = page.props.employees || []
 
 const showModal = ref(false)
 const showOverride = ref(false)
+const showHistory = ref(false)
+const history = ref([])
+const historyLoading = ref(false)
+const showBorrowerHistory = ref(false)
+const borrowerHistory = ref([])
+const borrowerHistoryLoading = ref(false)
 const form = ref({ collection_id: '', borrower_type: 'student', borrower_id: '', remarks: '' })
 const overrideForm = ref({ id: null, due_date: '', remarks: '' })
 const collectionRef = ref(null)
@@ -196,6 +276,46 @@ function submitOverride(){
     onSuccess: () => { closeOverride(); router.get(route('library.borrowings.index')) }
   })
 }
+
+async function openCollectionHistory(collectionId){
+  if (!collectionId) return;
+  showHistory.value = true
+  historyLoading.value = true
+  history.value = []
+  try {
+    const res = await fetch(route('library.collections.history', collectionId))
+    if (!res.ok) throw new Error('Failed to load history')
+    const data = await res.json()
+    history.value = data
+  } catch (e) {
+    console.error('history load error', e)
+    history.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function closeHistory(){ showHistory.value = false; history.value = []; historyLoading.value = false }
+
+async function openBorrowerHistory(borrowerType, borrowerId){
+  if (!borrowerType || !borrowerId) return;
+  showBorrowerHistory.value = true
+  borrowerHistoryLoading.value = true
+  borrowerHistory.value = []
+  try {
+    const res = await fetch(route('library.borrowers.history', { type: borrowerType, id: borrowerId }))
+    if (!res.ok) throw new Error('Failed to load borrower history')
+    const data = await res.json()
+    borrowerHistory.value = data
+  } catch (e) {
+    console.error('borrower history load error', e)
+    borrowerHistory.value = []
+  } finally {
+    borrowerHistoryLoading.value = false
+  }
+}
+
+function closeBorrowerHistory(){ showBorrowerHistory.value = false; borrowerHistory.value = []; borrowerHistoryLoading.value = false }
 
 function goTo(url){ if(!url) return; window.location.href = url }
 
