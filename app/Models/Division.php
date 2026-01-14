@@ -11,6 +11,7 @@ class Division extends Model
 
     protected $fillable = [
         'division_name',
+        'acronym',
         'division_chief_id',
         'year',
         'status',

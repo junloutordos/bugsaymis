@@ -102,6 +102,7 @@ const submitUpload = async () => {
               <tr>
                 <th class="px-4 py-3 text-left">#</th>
                 <th class="px-4 py-3 text-left">Division Name</th>
+                <th class="px-4 py-3 text-left">Acronym</th>
                 <th class="px-4 py-3 text-left">Chief</th>
                 <th class="px-4 py-3 text-left">Year Assigned</th>
                 <th class="px-4 py-3 text-left">Status</th>
@@ -113,6 +114,7 @@ const submitUpload = async () => {
               <tr v-for="division in filteredDivisions" :key="division.id" class="hover:bg-gray-50">
                 <td class="px-4 py-3">{{ division.id }}</td>
                 <td class="px-4 py-3">{{ division.division_name }}</td>
+                <td class="px-4 py-3">{{ division.acronym ?? '—' }}</td>
                 <td class="px-4 py-3">{{ division.divisionchief?.name ?? '—' }}</td>
                 <td class="px-4 py-3">{{ division.year ?? '—' }}</td>
                 <td class="px-4 py-3">
@@ -190,6 +192,7 @@ const submitUpload = async () => {
           <!-- VIEW MODE -->
           <div v-if="modalMode==='view' && selectedDivision" class="space-y-2">
             <p>Division: <strong>{{ selectedDivision.division_name }}</strong></p>
+            <p>Acronym: <strong>{{ selectedDivision.acronym ?? '—' }}</strong></p>
             <p>Chief: <strong>{{ selectedDivision.divisionchief?.name ?? '—' }}</strong></p>
             <p>Year Assigned: <strong>{{ selectedDivision.year ?? '—' }}</strong></p>
             <p>Status: 
@@ -212,6 +215,17 @@ const submitUpload = async () => {
                 type="text"
                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
                 required
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Acronym (optional)</label>
+              <input
+                v-model="form.acronym"
+                type="text"
+                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
+                placeholder="e.g. FAD"
+                maxlength="20"
               />
             </div>
 

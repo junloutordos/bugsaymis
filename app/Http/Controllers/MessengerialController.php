@@ -14,6 +14,7 @@ use App\Mail\MessengerialRequestStatusMail;
 use App\Mail\MessengerialRequestRecordsMail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class MessengerialController extends Controller
 {
@@ -37,7 +38,6 @@ class MessengerialController extends Controller
         $request->validate([
             'purpose' => 'nullable|string|max:255',
             'destination' => 'nullable|string|max:255',
-            'reference_no' => 'nullable|string|max:100',
             'delivery_methods' => 'nullable|array',
             'delivery_methods.*' => 'in:Hand-Carry,Courier Services',
             'messengerial_kinds' => 'nullable|array',
@@ -47,7 +47,8 @@ class MessengerialController extends Controller
             'consignee_email' => 'nullable|email|max:255',
         ]);
 
-        $data = $request->only(['purpose','destination','reference_no','delivery_methods','messengerial_kinds','consignee_name','consignee_contact','consignee_email']);
+        // Do not accept user-provided reference_no; we'll generate it server-side
+        $data = $request->only(['purpose','destination','delivery_methods','messengerial_kinds','consignee_name','consignee_contact','consignee_email']);
 
         $user = $request->user();
         if ($user) {
@@ -57,6 +58,75 @@ class MessengerialController extends Controller
         }
 
         $data['status'] = 'Pending';
+
+        // Determine unit/division for prefix. Prefer stored `acronym` on divisions table.
+        $userUnit = null;
+        $unitAcronym = null;
+        if ($user) {
+            $userUnit = $user->division->division_name ?? $user->office ?? null;
+            $unitAcronym = $user->division->acronym ?? null;
+        }
+        $unitName = $data['unit'] ?? $userUnit ?? '';
+
+        $prefix = 'GEN';
+        if (!empty($unitAcronym)) {
+            $prefix = strtoupper(trim($unitAcronym));
+        } else {
+            // Fallback: existing heuristic (detect FAD or build acronym from words)
+            $unitNorm = strtolower(trim($unitName));
+            if ($unitNorm !== '') {
+                if (str_contains($unitNorm, 'finance') && str_contains($unitNorm, 'administr')) {
+                    $prefix = 'FAD';
+                } elseif (strtoupper($unitName) === 'FAD') {
+                    $prefix = 'FAD';
+                } else {
+                    $words = preg_split('/\s+/', $unitName);
+                    $abbr = '';
+                    foreach ($words as $w) {
+                        if (strlen($w) > 0) $abbr .= strtoupper($w[0]);
+                    }
+                    $prefix = $abbr ?: 'GEN';
+                }
+            }
+        }
+
+        // Generate reference number in transaction-safe way
+        $referenceNo = null;
+        DB::transaction(function () use (&$referenceNo, $prefix) {
+            $year = date('Y');
+            $month = date('m');
+
+            $seq = DB::table('messengerial_sequences')
+                ->where('division_code', $prefix)
+                ->where('year', $year)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $seq) {
+                // Special starting numbers per acronym
+                $specialStarts = [
+                    'CID' => 7,
+                    'SSD' => 2,
+                    'FAD' => 6,
+                ];
+                $start = $specialStarts[$prefix] ?? 1;
+                $number = $start;
+                $id = DB::table('messengerial_sequences')->insertGetId([
+                    'division_code' => $prefix,
+                    'year' => $year,
+                    'last_number' => $number,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                $number = $seq->last_number + 1;
+                DB::table('messengerial_sequences')->where('id', $seq->id)->update(['last_number' => $number, 'updated_at' => now()]);
+            }
+
+            $referenceNo = sprintf('%s-%s-%s-%04d', $prefix, date('Y'), $month, $number);
+        });
+
+        $data['reference_no'] = $referenceNo;
 
         $mr = MessengerialRequest::create($data);
 

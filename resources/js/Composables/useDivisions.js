@@ -17,6 +17,7 @@ export function useDivisions(props) {
   const form = ref({
     id: null,
     division_name: "",
+    acronym: "",
     division_chief_id: null,
     year: "",
     status: "active",
@@ -44,6 +45,7 @@ export function useDivisions(props) {
       form.value = {
         id: division.id,
         division_name: division.division_name,
+        acronym: division.acronym ?? "",
         division_chief_id: division.division_chief_id ?? null,
         year: division.year ?? "",
         status: division.status ?? "active",
@@ -53,6 +55,7 @@ export function useDivisions(props) {
       form.value = {
         id: null,
         division_name: "",
+        acronym: "",
         division_chief_id: null,
         year: "",
         status: "active",

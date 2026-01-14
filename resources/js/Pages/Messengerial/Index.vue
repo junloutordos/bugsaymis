@@ -222,7 +222,7 @@ const submitProof = () => {
           <form @submit.prevent="submit" class="space-y-4 max-h-[90vh] overflow-auto">
             <div>
               <label class="block text-sm font-medium text-gray-700">Reference No.</label>
-              <input v-model="form.reference_no" type="text" class="mt-1 block w-full rounded border-gray-300" />
+              <input v-model="form.reference_no" type="text" class="mt-1 block w-full rounded border-gray-300" disabled readonly :placeholder="form.reference_no || 'Will be generated upon submission'" />
               <p v-if="form.errors.reference_no" class="text-red-600 text-sm mt-1">{{ form.errors.reference_no }}</p>
             </div>
 

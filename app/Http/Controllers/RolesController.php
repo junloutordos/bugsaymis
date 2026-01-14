@@ -86,7 +86,7 @@ class RolesController extends Controller
     public function showDivisions()
     {
         $divisions = Division::with('divisionchief') // load chief user
-            ->select('id', 'division_name', 'division_chief_id', 'year', 'status', 'signature_path', 'created_at')
+            ->select('id', 'division_name', 'acronym', 'division_chief_id', 'year', 'status', 'signature_path', 'created_at')
             ->get();
 
         $users = User::select('id', 'name', 'email')->get();
@@ -136,6 +136,7 @@ class RolesController extends Controller
     {
         $data = $request->validate([
             'division_name' => 'required|string|max:255|unique:divisions,division_name',
+            'acronym' => 'nullable|string|max:20',
             'division_chief_id' => 'nullable|exists:users,id',
             'year' => 'nullable|digits:4|integer',
             'status' => 'in:active,not_active',
@@ -155,6 +156,7 @@ class RolesController extends Controller
 
         $data = $request->validate([
             'division_name' => 'required|string|max:255|unique:divisions,division_name,' . $division->id,
+            'acronym' => 'nullable|string|max:20',
             'division_chief_id' => 'nullable|exists:users,id',
             'year' => 'nullable|digits:4|integer',
             'status' => 'in:active,not_active',
