@@ -14,7 +14,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name', 'email', 'role_id', 'position', 'division_id', 'office_id', 'created_at')
+            ->select('id', 'name','sex', 'email', 'role_id', 'position', 'division_id', 'office_id', 'created_at')
             ->get();
 
         // For dropdowns
