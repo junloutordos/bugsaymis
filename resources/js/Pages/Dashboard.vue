@@ -1,5 +1,10 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+const props = defineProps({
+  scholarsCount: { type: Number, default: 0 },
+  facultyCount: { type: Number, default: 0 },
+  staffCount: { type: Number, default: 0 },
+})
 
 // Chart.js + vue-chartjs
 import {
@@ -132,7 +137,7 @@ const calendarOptions = {
             <UserIcon class="h-10 w-10 opacity-90" />
             <div>
               <p class="text-sm opacity-80">Scholars</p>
-              <h2 class="text-2xl font-bold">1,738</h2>
+              <h2 class="text-2xl font-bold">{{ (props.scholarsCount || 0).toLocaleString() }}</h2>
             </div>
           </div>
 
@@ -141,7 +146,7 @@ const calendarOptions = {
             <AcademicCapIcon class="h-10 w-10 opacity-90" />
             <div>
               <p class="text-sm opacity-80">Faculty</p>
-              <h2 class="text-2xl font-bold">179</h2>
+              <h2 class="text-2xl font-bold">{{ (props.facultyCount || 0).toLocaleString() }}</h2>
             </div>
           </div>
 
@@ -150,7 +155,7 @@ const calendarOptions = {
             <BriefcaseIcon class="h-10 w-10 opacity-90" />
             <div>
               <p class="text-sm opacity-80">Staffs</p>
-              <h2 class="text-2xl font-bold">165</h2>
+              <h2 class="text-2xl font-bold">{{ (props.staffCount || 0).toLocaleString() }}</h2>
             </div>
           </div>
 

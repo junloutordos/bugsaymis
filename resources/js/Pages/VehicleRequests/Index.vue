@@ -145,6 +145,52 @@ const form = useForm({
   status: '',
 });
 
+// Client-side inline validation state
+const fieldErrors = reactive({
+  purpose: '',
+  destination: '',
+  date_needed: '',
+  time_of_departure: '',
+  eta: '',
+  vehicle_type: '',
+  division_chief_id: '',
+  passengers: '',
+});
+
+const validateField = (field) => {
+  switch (field) {
+    case 'purpose':
+      fieldErrors.purpose = form.purpose && String(form.purpose).trim() ? '' : 'Purpose is required';
+      break;
+    case 'destination':
+      fieldErrors.destination = form.destination && String(form.destination).trim() ? '' : 'Destination is required';
+      break;
+    case 'date_needed':
+      fieldErrors.date_needed = Array.isArray(form.date_needed) && form.date_needed.length > 0 ? '' : 'Add at least one date';
+      break;
+    case 'time_of_departure':
+      fieldErrors.time_of_departure = form.time_of_departure ? '' : 'Time of departure is required';
+      break;
+    case 'eta':
+      fieldErrors.eta = form.eta ? '' : 'Estimated time of arrival is required';
+      break;
+    case 'vehicle_type':
+      fieldErrors.vehicle_type = form.vehicle_type ? '' : 'Select a vehicle type';
+      break;
+    case 'division_chief_id':
+      fieldErrors.division_chief_id = form.division_chief_id ? '' : 'Select a division chief';
+      break;
+    case 'passengers':
+      fieldErrors.passengers = (form.passengers && Number(form.passengers) >= 1) ? '' : 'Passengers must be at least 1';
+      break;
+  }
+};
+
+const validateAll = () => {
+  ['purpose','destination','date_needed','time_of_departure','eta','vehicle_type','division_chief_id','passengers'].forEach(f => validateField(f));
+  return !Object.values(fieldErrors).some(v => v && v.length > 0);
+};
+
 const dateInput = ref('');
 const addDate = () => {
   if (!dateInput.value) return;
@@ -179,15 +225,20 @@ const openModal = (req = null) => {
 const closeModal = () => { showModal.value = false; editingRequest.value = null; form.reset(); };
 
 const submit = () => {
+  // Validate all fields client-side and prevent submission if invalid
+  if (!validateAll()) {
+    return;
+  }
+
   try {
     console.log('Submitting vehicle request', { editing: !!editingRequest.value, data: form.data() });
-    setBanner(null, null); // clear any existing banner
+    // clear any existing banner state (no UI banner for form submissions)
     if (editingRequest.value) {
       // resolve id from various possible shapes
       const resolvedId = editingRequest.value?.id ?? editingRequest.value?.vehicleRequest ?? editingRequest.value?.vehicle_request_id ?? editingRequest.value?.attributes?.id;
       if (!resolvedId) {
         console.error('No id found on editingRequest', editingRequest.value);
-        setBanner('error', 'Cannot determine request id for update. See console.');
+        alert('Cannot determine request id for update. See console.');
         return;
       }
 
@@ -199,15 +250,15 @@ const submit = () => {
         updateUrl = `/vehicle-requests/${resolvedId}`;
       }
       console.log('Update URL:', updateUrl);
-      setBanner(null, `Calling ${updateUrl}` , 2000);
+      // no banner shown for submit
       form.put(updateUrl, {
-        onSuccess: () => { setBanner('success', 'Vehicle request updated'); },
+        onSuccess: () => { /* success handled by Inertia/redirect */ },
         onError: (errs) => {
           console.error('Vehicle request update errors', errs);
           const serverErr = window.lastVehicleRequestError ?? {};
           const status = serverErr.status ?? (errs?.status ?? 'unknown');
           const data = serverErr.data ?? errs;
-          setBanner('error', `Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
+          console.error(`Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
           const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
           if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
           console.log('Captured server error', serverErr);
@@ -217,7 +268,7 @@ const submit = () => {
           if (Object.keys(form.errors).length === 0) {
             // if axios captured an error body, show it briefly then close
             if (window.lastVehicleRequestError && window.lastVehicleRequestError.data) {
-              setBanner('error', sanitizeErrorMessage(window.lastVehicleRequestError.data), 4000);
+              console.error('Server error on finish', window.lastVehicleRequestError.data);
             }
             closeModal();
           }
@@ -226,7 +277,7 @@ const submit = () => {
       } else {
       const storeUrl = route('vehicle-requests.store');
       console.log('Store URL:', storeUrl);
-      setBanner(null, `Calling ${storeUrl}` , 2000);
+      // no banner shown for submit
       form.post(storeUrl, {
         onSuccess: () => {},
         onError: (errs) => {
@@ -234,7 +285,7 @@ const submit = () => {
           const serverErr = window.lastVehicleRequestError ?? {};
           const status = serverErr.status ?? (errs?.status ?? 'unknown');
           const data = serverErr.data ?? errs;
-          setBanner('error', `Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
+          console.error(`Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
           const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
           if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
           console.log('Captured server error', serverErr);
@@ -243,7 +294,7 @@ const submit = () => {
           console.log('Vehicle request create finished');
           if (Object.keys(form.errors).length === 0) {
             if (window.lastVehicleRequestError && window.lastVehicleRequestError.data) {
-              setBanner('error', sanitizeErrorMessage(window.lastVehicleRequestError.data), 4000);
+              console.error('Server error on finish', window.lastVehicleRequestError.data);
             }
             closeModal();
           }
@@ -252,7 +303,7 @@ const submit = () => {
     }
   } catch (e) {
     console.error('Submit failed', e);
-    setBanner('error', 'Unexpected error. See console.');
+    alert('Unexpected error. See console.');
   }
 }
 
@@ -496,36 +547,41 @@ const destroy = (req) => {
         <div class="space-y-4 max-h-[90vh] overflow-auto">
           <div>
             <label class="block text-sm font-medium text-gray-700">Purpose</label>
-            <input v-model="form.purpose" type="text" class="mt-1 block w-full rounded border-gray-300" />
-            <p v-if="form.errors.purpose" class="text-red-600 text-sm mt-1">{{ form.errors.purpose }}</p>
+                    <input required v-model="form.purpose" @input="() => validateField('purpose')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.purpose ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']" />
+                    <p v-if="fieldErrors.purpose" class="text-red-600 text-sm mt-1">{{ fieldErrors.purpose }}</p>
+                    <p v-else-if="form.errors.purpose" class="text-red-600 text-sm mt-1">{{ form.errors.purpose }}</p>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700">Destination</label>
-            <input v-model="form.destination" type="text" class="mt-1 block w-full rounded border-gray-300" />
-            <p v-if="form.errors.destination" class="text-red-600 text-sm mt-1">{{ form.errors.destination }}</p>
+            <input required v-model="form.destination" @input="() => validateField('destination')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.destination ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']" />
+            <p v-if="fieldErrors.destination" class="text-red-600 text-sm mt-1">{{ fieldErrors.destination }}</p>
+            <p v-else-if="form.errors.destination" class="text-red-600 text-sm mt-1">{{ form.errors.destination }}</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700">Time of Departure</label>
-              <input v-model="form.time_of_departure" type="time" class="mt-1 block w-full rounded border-gray-300" />
-              <p v-if="form.errors.time_of_departure" class="text-red-600 text-sm mt-1">{{ form.errors.time_of_departure }}</p>
+              <input required v-model="form.time_of_departure" @input="() => validateField('time_of_departure')" type="time" :class="['mt-1 block w-full rounded', fieldErrors.time_of_departure ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']" />
+              <p v-if="fieldErrors.time_of_departure" class="text-red-600 text-sm mt-1">{{ fieldErrors.time_of_departure }}</p>
+              <p v-else-if="form.errors.time_of_departure" class="text-red-600 text-sm mt-1">{{ form.errors.time_of_departure }}</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Estimated Time of Arrival</label>
-              <input v-model="form.eta" type="time" class="mt-1 block w-full rounded border-gray-300" />
-              <p v-if="form.errors.eta" class="text-red-600 text-sm mt-1">{{ form.errors.eta }}</p>
+              <input required v-model="form.eta" @input="() => validateField('eta')" type="time" :class="['mt-1 block w-full rounded', fieldErrors.eta ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']" />
+              <p v-if="fieldErrors.eta" class="text-red-600 text-sm mt-1">{{ fieldErrors.eta }}</p>
+              <p v-else-if="form.errors.eta" class="text-red-600 text-sm mt-1">{{ form.errors.eta }}</p>
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700">Date(s) Needed</label>
+              <label class="block text-sm font-medium text-gray-700">Date(s) Needed</label>
             <div class="mt-1 flex flex-col sm:flex-row sm:items-start gap-2">
               <input v-model="dateInput" type="date" class="block rounded border-gray-300" />
               <button @click.prevent="addDate" class="px-3 py-1 bg-blue-600 text-white rounded">Add</button>
             </div>
-            <p v-if="form.errors['date_needed']" class="text-red-600 text-sm mt-1">{{ form.errors['date_needed'] }}</p>
+            <p v-if="fieldErrors.date_needed" class="text-red-600 text-sm mt-1">{{ fieldErrors.date_needed }}</p>
+            <p v-else-if="form.errors['date_needed']" class="text-red-600 text-sm mt-1">{{ form.errors['date_needed'] }}</p>
             <ul class="mt-2 list-disc pl-5 text-sm text-gray-700">
               <li v-for="(d, idx) in form.date_needed" :key="idx" class="flex items-center justify-between">
                 <span>{{ new Date(d).toLocaleDateString() }}</span>
@@ -537,26 +593,29 @@ const destroy = (req) => {
 
           <div>
             <label class="block text-sm font-medium text-gray-700">Vehicle Type</label>
-            <select v-model="form.vehicle_type" class="mt-1 block w-full rounded border-gray-300">
+            <select required v-model="form.vehicle_type" @change="() => validateField('vehicle_type')" :class="['mt-1 block w-full rounded', fieldErrors.vehicle_type ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']">
               <option value="">Select vehicle</option>
               <option v-for="v in props.vehicles" :key="v.id" :value="v.name">{{ v.name }}</option>
             </select>
-            <p v-if="form.errors.vehicle_type" class="text-red-600 text-sm mt-1">{{ form.errors.vehicle_type }}</p>
+            <p v-if="fieldErrors.vehicle_type" class="text-red-600 text-sm mt-1">{{ fieldErrors.vehicle_type }}</p>
+            <p v-else-if="form.errors.vehicle_type" class="text-red-600 text-sm mt-1">{{ form.errors.vehicle_type }}</p>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700">Division Chief (Approver)</label>
-            <select v-model="form.division_chief_id" class="mt-1 block w-full rounded border-gray-300">
+            <select required v-model="form.division_chief_id" @change="() => validateField('division_chief_id')" :class="['mt-1 block w-full rounded', fieldErrors.division_chief_id ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']">
               <option value="">Select division chief</option>
               <option v-for="d in props.divisionChiefs" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
-            <p v-if="form.errors.division_chief_id" class="text-red-600 text-sm mt-1">{{ form.errors.division_chief_id }}</p>
+            <p v-if="fieldErrors.division_chief_id" class="text-red-600 text-sm mt-1">{{ fieldErrors.division_chief_id }}</p>
+            <p v-else-if="form.errors.division_chief_id" class="text-red-600 text-sm mt-1">{{ form.errors.division_chief_id }}</p>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700">Passengers</label>
-            <input v-model.number="form.passengers" type="number" min="1" class="mt-1 block w-24 rounded border-gray-300" />
-            <p v-if="form.errors.passengers" class="text-red-600 text-sm mt-1">{{ form.errors.passengers }}</p>
+            <input required v-model.number="form.passengers" @input="() => validateField('passengers')" type="number" min="1" :class="['mt-1 block w-24 rounded', fieldErrors.passengers ? 'border-red-500 ring-1 ring-red-200' : 'border-gray-300']" />
+            <p v-if="fieldErrors.passengers" class="text-red-600 text-sm mt-1">{{ fieldErrors.passengers }}</p>
+            <p v-else-if="form.errors.passengers" class="text-red-600 text-sm mt-1">{{ form.errors.passengers }}</p>
           </div>
 
           <div class="flex flex-col sm:flex-row gap-2">

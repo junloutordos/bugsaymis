@@ -60,15 +60,15 @@ class VehicleRequestController extends Controller
     {
         $request->validate([
             'purpose' => 'required|string|max:255',
-            'destination' => 'nullable|string|max:255',
+                'destination' => 'required|string|max:255',
             // allow multiple dates as an array of dates
-            'date_needed' => 'nullable|array',
+                'date_needed' => 'required|array|min:1',
             'date_needed.*' => 'date',
-            'time_of_departure' => 'nullable|date_format:H:i',
-            'eta' => 'nullable|date_format:H:i',
-            'vehicle_type' => 'nullable|string|max:255',
-            'passengers' => 'nullable|integer|min:1',
-            'division_chief_id' => 'nullable|exists:users,id',
+                'time_of_departure' => 'required|date_format:H:i',
+                'eta' => 'required|date_format:H:i',
+                'vehicle_type' => 'required|string|max:255',
+                'passengers' => 'required|integer|min:1',
+                'division_chief_id' => 'required|exists:users,id',
         ]);
 
         $user = $request->user();
@@ -343,15 +343,15 @@ class VehicleRequestController extends Controller
 
         $request->validate([
             'purpose' => 'required|string|max:255',
-            'destination' => 'nullable|string|max:255',
-            'date_needed' => 'nullable|array',
+            'destination' => 'required|string|max:255',
+            'date_needed' => 'required|array|min:1',
             'date_needed.*' => 'date',
-            'time_of_departure' => 'nullable|date_format:H:i',
-            'eta' => 'nullable|date_format:H:i',
-            'vehicle_type' => 'nullable|string|max:255',
-            'passengers' => 'nullable|integer|min:1',
+            'time_of_departure' => 'required|date_format:H:i',
+            'eta' => 'required|date_format:H:i',
+            'vehicle_type' => 'required|string|max:255',
+            'passengers' => 'required|integer|min:1',
             'status' => 'nullable|string|max:255',
-            'division_chief_id' => 'nullable|exists:users,id',
+            'division_chief_id' => 'required|exists:users,id',
         ]);
 
         // Update both legacy single date and the new multiple dates json column

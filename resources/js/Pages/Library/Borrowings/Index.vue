@@ -74,22 +74,25 @@
             <div class="space-y-3">
               <div>
                 <label class="block text-sm">Collection ID</label>
-                <input ref="collectionRef" v-model="form.collection_id" @keydown.enter.prevent="onCollectionEnter" type="text" autocomplete="off" class="w-full rounded border p-2" />
+                <input ref="collectionRef" v-model="form.collection_id" @input="validateField('collection_id')" @keydown.enter.prevent="onCollectionEnter" type="text" autocomplete="off" :class="['w-full rounded p-2', fieldErrors.collection_id ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.collection_id" class="mt-1 text-xs text-red-600">{{ fieldErrors.collection_id }}</p>
               </div>
               <div>
                 <label class="block text-sm">Borrower Type</label>
-                <select v-model="form.borrower_type" class="w-full rounded border p-2">
+                <select v-model="form.borrower_type" @change="validateField('borrower_type')" :class="['w-full rounded p-2', fieldErrors.borrower_type ? 'border-red-600' : 'border-gray-300']">
                   <option value="student">Student</option>
                   <option value="employee">Employee</option>
                 </select>
+                <p v-if="fieldErrors.borrower_type" class="mt-1 text-xs text-red-600">{{ fieldErrors.borrower_type }}</p>
               </div>
               <div>
                 <label class="block text-sm">Borrower ID</label>
-                <select v-if="form.borrower_type === 'employee'" ref="borrowerRef" v-model="form.borrower_id" class="w-full rounded border p-2">
+                <select v-if="form.borrower_type === 'employee'" ref="borrowerRef" v-model="form.borrower_id" @change="validateField('borrower_id')" :class="['w-full rounded p-2', fieldErrors.borrower_id ? 'border-red-600' : 'border-gray-300']">
                   <option value="">-- Select employee --</option>
                   <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
                 </select>
-                <input v-else ref="borrowerRef" v-model="form.borrower_id" placeholder="PISAY System ID" type="text" autocomplete="off" class="w-full rounded border p-2" />
+                <input v-else ref="borrowerRef" v-model="form.borrower_id" @input="validateField('borrower_id')" placeholder="PISAY System ID" type="text" autocomplete="off" :class="['w-full rounded p-2', fieldErrors.borrower_id ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.borrower_id" class="mt-1 text-xs text-red-600">{{ fieldErrors.borrower_id }}</p>
               </div>
               <div>
                 <label class="block text-sm">Remarks</label>
@@ -201,7 +204,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, reactive } from 'vue'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
@@ -218,6 +221,12 @@ const showBorrowerHistory = ref(false)
 const borrowerHistory = ref([])
 const borrowerHistoryLoading = ref(false)
 const form = ref({ collection_id: '', borrower_type: 'student', borrower_id: '', remarks: '' })
+// Client-side inline validation state
+const fieldErrors = reactive({
+  collection_id: '',
+  borrower_type: '',
+  borrower_id: '',
+});
 const overrideForm = ref({ id: null, due_date: '', remarks: '' })
 const collectionRef = ref(null)
 const borrowerRef = ref(null)
@@ -238,10 +247,36 @@ function clearSearch() {
   router.get(route('library.borrowings.index'), { q: '' }, { replace: true, preserveState: false })
 }
 
-async function openCreate(){ showModal.value = true; await nextTick(); if (collectionRef.value && collectionRef.value.focus) collectionRef.value.focus() }
-function closeModal(){ showModal.value = false; form.value = { collection_id: '', borrower_type: 'student', borrower_id: '', remarks: '' } }
+async function openCreate(){
+  showModal.value = true;
+  // reset client-side errors and form
+  Object.keys(fieldErrors).forEach(k => fieldErrors[k] = '');
+  form.value = { collection_id: '', borrower_type: 'student', borrower_id: '', remarks: '' };
+  await nextTick();
+  if (collectionRef.value && collectionRef.value.focus) collectionRef.value.focus()
+}
+function closeModal(){ showModal.value = false; form.value = { collection_id: '', borrower_type: 'student', borrower_id: '', remarks: '' }; Object.keys(fieldErrors).forEach(k => fieldErrors[k] = '') }
 
 function onCollectionEnter(){ if (borrowerRef.value && borrowerRef.value.focus) borrowerRef.value.focus() }
+
+const validateField = (field) => {
+  switch (field) {
+    case 'collection_id':
+      fieldErrors.collection_id = form.value.collection_id && String(form.value.collection_id).trim() ? '' : 'Collection ID is required';
+      break;
+    case 'borrower_type':
+      fieldErrors.borrower_type = form.value.borrower_type ? '' : 'Select borrower type';
+      break;
+    case 'borrower_id':
+      fieldErrors.borrower_id = form.value.borrower_id && String(form.value.borrower_id).trim() ? '' : 'Borrower ID is required';
+      break;
+  }
+};
+
+const validateAll = () => {
+  ['collection_id','borrower_type','borrower_id'].forEach(f => validateField(f));
+  return !Object.values(fieldErrors).some(v => typeof v === 'string' ? v && v.length > 0 : false);
+};
 
 watch(() => form.value.borrower_type, (val) => {
   form.value.borrower_id = ''
@@ -250,6 +285,12 @@ watch(() => form.value.borrower_type, (val) => {
 })
 
 function submitForm(){
+  // client-side validation
+  if (!validateAll()) {
+    alert('Please fix the highlighted errors before processing the borrow.');
+    return;
+  }
+
   try {
     console.log('Submitting borrowing', form.value)
     router.post(route('library.borrowings.store'), form.value, {

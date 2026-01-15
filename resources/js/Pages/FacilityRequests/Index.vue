@@ -1,6 +1,6 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
-import { ref } from "vue";
+import { ref, reactive } from "vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
@@ -26,6 +26,89 @@ const form = useForm({
   male: null,
   female: null,
 });
+
+// Client-side inline validation state
+const fieldErrors = reactive({
+  activity: '',
+  purpose: '',
+  nature: '',
+  nature_other: '',
+  participants: '',
+  date_start: '',
+  date_end: '',
+  time_start: '',
+  time_end: '',
+  venue: '',
+  equipment_quantities: {},
+});
+
+const validateField = (field) => {
+  switch (field) {
+    case 'activity':
+      fieldErrors.activity = form.activity && String(form.activity).trim() ? '' : 'Activity is required';
+      break;
+    case 'purpose':
+      fieldErrors.purpose = form.purpose && String(form.purpose).trim() ? '' : 'Purpose is required';
+      break;
+    case 'nature':
+      fieldErrors.nature = form.nature ? '' : 'Nature of activity is required';
+      if (form.nature !== 'Others') fieldErrors.nature_other = '';
+      break;
+    case 'nature_other':
+      fieldErrors.nature_other = (form.nature === 'Others' && (!form.nature_other || !String(form.nature_other).trim())) ? 'Please specify nature' : '';
+      break;
+    case 'participants':
+      fieldErrors.participants = form.participants && String(form.participants).trim() ? '' : 'Participants description is required';
+      break;
+    case 'date_start':
+      fieldErrors.date_start = form.date_start ? '' : 'Start date is required';
+      if (form.date_start && form.date_end) {
+        fieldErrors.date_end = (new Date(form.date_end) < new Date(form.date_start)) ? 'End date cannot be before start date' : '';
+      }
+      break;
+    case 'date_end':
+      fieldErrors.date_end = form.date_end ? '' : 'End date is required';
+      if (form.date_start && form.date_end) {
+        fieldErrors.date_end = (new Date(form.date_end) < new Date(form.date_start)) ? 'End date cannot be before start date' : '';
+      }
+      break;
+    case 'time_start':
+      fieldErrors.time_start = form.time_start ? '' : 'Start time is required';
+      if (form.time_start && form.time_end) {
+        fieldErrors.time_end = (form.time_end <= form.time_start) ? 'End time must be after start time' : '';
+      }
+      break;
+    case 'time_end':
+      fieldErrors.time_end = form.time_end ? '' : 'End time is required';
+      if (form.time_start && form.time_end) {
+        fieldErrors.time_end = (form.time_end <= form.time_start) ? 'End time must be after start time' : '';
+      }
+      break;
+    case 'venue':
+      fieldErrors.venue = Array.isArray(form.venue) && form.venue.length > 0 ? '' : 'Select at least one venue';
+      break;
+    case 'equipment_quantities':
+      // ensure quantities for selected equipment are >=1 if provided
+      fieldErrors.equipment_quantities = {};
+      for (const eq of form.equipment || []) {
+        const q = Number(form.equipment_quantities?.[eq] ?? 0);
+        fieldErrors.equipment_quantities[eq] = q >= 1 ? '' : 'Enter quantity >= 1';
+      }
+      break;
+  }
+};
+
+const validateAll = () => {
+  ['activity','purpose','nature','nature_other','participants','date_start','date_end','time_start','time_end','venue','equipment_quantities'].forEach(f => validateField(f));
+  // check if any errors exist
+  const hasFieldErr = Object.values(fieldErrors).some(v => {
+    if (typeof v === 'string') return v && v.length > 0;
+    return false;
+  });
+  // check equipment quantities errors
+  const eqErr = Object.values(fieldErrors.equipment_quantities || {}).some(v => v && v.length > 0);
+  return !hasFieldErr && !eqErr;
+};
 
 const facilityMap = (props.facilities || []).reduce((m, f) => {
   m[f.id] = f.name;
@@ -68,12 +151,23 @@ const openModal = (req = null) => {
   } else {
     form.reset();
   }
+  // reset client-side field errors when opening modal
+  Object.keys(fieldErrors).forEach(k => {
+    if (k === 'equipment_quantities') fieldErrors[k] = {};
+    else fieldErrors[k] = '';
+  });
   showModal.value = true;
 };
 
 const closeModal = () => { showModal.value = false; form.reset(); };
 
 const submit = () => {
+  // run client-side validation first
+  if (!validateAll()) {
+    alert('Please fix the highlighted errors before submitting the form.');
+    return;
+  }
+
   form.post(route('facility-requests.store'), {
     onSuccess: () => {
       closeModal();
@@ -270,35 +364,40 @@ const openPrint = (req) => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700">Activity</label>
-                <input v-model="form.activity" type="text" class="mt-1 block w-full rounded border-gray-300" />
+                <input v-model="form.activity" @input="validateField('activity')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.activity ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.activity" class="mt-1 text-xs text-red-600">{{ fieldErrors.activity }}</p>
               </div>
 
               <div>
                 <label class="block text-sm font-medium text-gray-700">Purpose</label>
-                <input v-model="form.purpose" type="text" class="mt-1 block w-full rounded border-gray-300" />
+                <input v-model="form.purpose" @input="validateField('purpose')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.purpose ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.purpose" class="mt-1 text-xs text-red-600">{{ fieldErrors.purpose }}</p>
               </div>
             </div>
 
 
             <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Nature of Activity</label>
-              <select v-model="form.nature" class="mt-1 block w-full rounded border-gray-300">
-                <option value="">-- Select Nature --</option>
-                <option value="Curricular">Curricular</option>
-                <option value="Co-Curricular">Co-Curricular</option>
-                <option value="Others">Others (please specify)</option>
-              </select>
-            </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Nature of Activity</label>
+                <select v-model="form.nature" @change="validateField('nature')" :class="['mt-1 block w-full rounded', fieldErrors.nature ? 'border-red-600' : 'border-gray-300']">
+                  <option value="">-- Select Nature --</option>
+                  <option value="Curricular">Curricular</option>
+                  <option value="Co-Curricular">Co-Curricular</option>
+                  <option value="Others">Others (please specify)</option>
+                </select>
+                <p v-if="fieldErrors.nature" class="mt-1 text-xs text-red-600">{{ fieldErrors.nature }}</p>
+              </div>
 
             <div v-if="form.nature === 'Others'">
               <label class="block text-sm font-medium text-gray-700">Please specify</label>
-              <input v-model="form.nature_other" type="text" class="mt-1 block w-full rounded border-gray-300" />
+              <input v-model="form.nature_other" @input="validateField('nature_other')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.nature_other ? 'border-red-600' : 'border-gray-300']" />
+              <p v-if="fieldErrors.nature_other" class="mt-1 text-xs text-red-600">{{ fieldErrors.nature_other }}</p>
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700">Participants (description)</label>
-              <input v-model="form.participants" type="text" class="mt-1 block w-full rounded border-gray-300" placeholder="e.g. Students, Faculty" />
+              <input v-model="form.participants" @input="validateField('participants')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.participants ? 'border-red-600' : 'border-gray-300']" placeholder="e.g. Students, Faculty" />
+              <p v-if="fieldErrors.participants" class="mt-1 text-xs text-red-600">{{ fieldErrors.participants }}</p>
             </div>
 
             </div>
@@ -331,22 +430,26 @@ const openPrint = (req) => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700">Start Date</label>
-                <input v-model="form.date_start" type="date" class="mt-1 block w-full rounded border-gray-300" />
+                <input v-model="form.date_start" @change="validateField('date_start')" type="date" :class="['mt-1 block w-full rounded', fieldErrors.date_start ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.date_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_start }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">End Date</label>
-                <input v-model="form.date_end" type="date" class="mt-1 block w-full rounded border-gray-300" />
+                <input v-model="form.date_end" @change="validateField('date_end')" type="date" :class="['mt-1 block w-full rounded', fieldErrors.date_end ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.date_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_end }}</p>
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700">Start Time</label>
-                <input v-model="form.time_start" type="time" class="mt-1 block w-full rounded border-gray-300" />
+                <input v-model="form.time_start" @change="validateField('time_start')" type="time" :class="['mt-1 block w-full rounded', fieldErrors.time_start ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.time_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_start }}</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700">End Time</label>
-                <input v-model="form.time_end" type="time" class="mt-1 block w-full rounded border-gray-300" />
+                <input v-model="form.time_end" @change="validateField('time_end')" type="time" :class="['mt-1 block w-full rounded', fieldErrors.time_end ? 'border-red-600' : 'border-gray-300']" />
+                <p v-if="fieldErrors.time_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_end }}</p>
               </div>
             </div>
 
@@ -354,14 +457,15 @@ const openPrint = (req) => {
             <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700">Venue</label>
-              <select v-model="form.venue" multiple class="mt-1 block w-full rounded border-gray-300">
+              <select v-model="form.venue" multiple @change="validateField('venue')" :class="['mt-1 block w-full rounded', fieldErrors.venue ? 'border-red-600' : 'border-gray-300']">
                 <option v-for="f in props.facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
               </select>
+              <p v-if="fieldErrors.venue" class="mt-1 text-xs text-red-600">{{ fieldErrors.venue }}</p>
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700">Equipment Needed</label>
-              <select v-model="form.equipment" multiple class="mt-1 block w-full rounded border-gray-300">
+              <select v-model="form.equipment" multiple @change="validateField('equipment_quantities')" class="mt-1 block w-full rounded border-gray-300">
                 <option value="Chairs">Chairs</option>
                 <option value="Tables">Tables</option>
                 <option value="Microphone">Microphone</option>
@@ -399,7 +503,8 @@ const openPrint = (req) => {
               <div v-for="eq in form.equipment" :key="eq" class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                 <div class="w-full sm:w-1/2">{{ eq }}</div>
                 <div class="w-full sm:w-1/2">
-                  <input type="number" min="1" v-model.number="form.equipment_quantities[eq]" class="mt-1 block w-full rounded border-gray-300" placeholder="Quantity" />
+                  <input type="number" min="1" v-model.number="form.equipment_quantities[eq]" @input="validateField('equipment_quantities')" :class="['mt-1 block w-full rounded', fieldErrors.equipment_quantities?.[eq] ? 'border-red-600' : 'border-gray-300']" placeholder="Quantity" />
+                  <p v-if="fieldErrors.equipment_quantities?.[eq]" class="mt-1 text-xs text-red-600">{{ fieldErrors.equipment_quantities[eq] }}</p>
                 </div>
               </div>
             </div>

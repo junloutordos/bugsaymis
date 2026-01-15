@@ -6,9 +6,11 @@ import {
   PencilSquareIcon,
   TrashIcon,
   PlusIcon,
+  ArrowUpOnSquareIcon,
 } from "@heroicons/vue/24/outline"
 import { useUsers } from "@/Composables/useUsers.js"
 import { ref, watch, computed } from "vue"
+import { router } from "@inertiajs/vue3"
 
 const props = defineProps({
   users: Array,
@@ -69,6 +71,43 @@ const getRoleNames = (user) => {
     return user.role_id.toString().split(',').map(id => rolesMap.value[id.trim()] ?? id.trim()).join(', ')
   }
   return '—'
+}
+
+const handleUpload = (user, e) => {
+  const file = e.target.files && e.target.files[0] ? e.target.files[0] : null
+  if (!file) return
+
+  const fd = new FormData()
+  fd.append('electronic_signature', file)
+
+  router.post(`/users/${user.id}/upload-signature`, fd, {
+    preserveState: false,
+    onStart: () => {},
+    onSuccess: () => {
+      // reload to refresh the users list with new signature
+      window.location.reload()
+    },
+    onError: (errors) => {
+      const msg = errors && Object.values(errors).flat().join(', ')
+      alert(msg || 'Failed to upload signature')
+    }
+  })
+}
+
+const openSignaturePicker = (user) => {
+  try {
+    const id = 'sig-input-' + user.id
+    console.log('openSignaturePicker called for', id)
+    const el = document.getElementById(id)
+    if (!el) {
+      console.warn('signature input element not found', id)
+      return
+    }
+    // ensure clickable invocation from user gesture
+    el.click()
+  } catch (err) {
+    console.error('openSignaturePicker error', err)
+  }
 }
 </script>
 
@@ -178,6 +217,23 @@ const getRoleNames = (user) => {
                     >
                       <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
                     </button>
+                                <!-- Upload signature button -->
+                                <div class="relative">
+                                  <input
+                                    :id="'sig-input-' + user.id"
+                                    type="file"
+                                    accept=".png,image/png"
+                                    class="hidden"
+                                    @change="(e) => handleUpload(user, e)"
+                                  />
+                                  <button
+                                    @click.prevent="openSignaturePicker(user)"
+                                    title="Upload signature (PNG)"
+                                    class="p-1 hover:bg-gray-100 rounded"
+                                  >
+                                    <ArrowUpOnSquareIcon class="w-5 h-5 text-green-600" />
+                                  </button>
+                                </div>
                     <button
                       @click="deleteUser(user)"
                       class="p-1 hover:bg-gray-100 rounded"
@@ -248,6 +304,44 @@ const getRoleNames = (user) => {
             v-if="modalMode === 'view' && selectedUser"
             class="space-y-2"
           >
+            <div class="flex items-center gap-4">
+              <div>
+                <p class="text-sm text-gray-600">Profile Picture</p>
+                <div class="w-24 h-24 bg-gray-100 rounded overflow-hidden border">
+                  <img
+                    v-if="selectedUser.profile_picture"
+                    :src="(
+                      selectedUser.profile_picture.indexOf('http') === 0
+                        ? selectedUser.profile_picture
+                        : (selectedUser.profile_picture.startsWith('profile_pictures/')
+                            ? '/storage/' + selectedUser.profile_picture
+                            : '/storage/profile_pictures/' + selectedUser.profile_picture)
+                    )"
+                    alt="profile"
+                    class="w-full h-full object-cover"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center text-gray-400">No image</div>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-gray-600">Electronic Signature</p>
+                <div class="w-48 h-16 bg-white rounded overflow-hidden border flex items-center justify-center">
+                  <img
+                    v-if="selectedUser.electronic_signature"
+                    :src="(
+                      selectedUser.electronic_signature.indexOf('http') === 0
+                        ? selectedUser.electronic_signature
+                        : (selectedUser.electronic_signature.startsWith('signatures/')
+                            ? '/storage/' + selectedUser.electronic_signature
+                            : '/storage/signatures/' + selectedUser.electronic_signature)
+                    )"
+                    alt="signature"
+                    class="max-h-12"
+                  />
+                  <div v-else class="text-gray-400">No signature</div>
+                </div>
+              </div>
+            </div>
             <p>Name: <strong>{{ selectedUser.name }}</strong></p>
             <p>Sex: <strong>{{ selectedUser.sex }}</strong></p>
             <p>Email: <strong>{{ selectedUser.email }}</strong></p>

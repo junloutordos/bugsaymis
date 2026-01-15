@@ -22,6 +22,7 @@ use App\Http\Controllers\VehicleRequestController;
 use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RolesController;
+use App\Models\User;
 use App\Http\Controllers\PMSController;
 use App\Http\Controllers\AgencyOutcomeController;
 use App\Http\Controllers\PerformanceIndicatorController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 // Data Management - Offices
 Route::middleware(['auth','role:Administrator'])->group(function(){
     Route::get('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'index'])->name('offices.index');
@@ -82,7 +84,42 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
+        // Compute scholars count: prefer counting rows where a status-like column equals 'Enrolled'
+        $scholarsCount = 0;
+        try {
+            $cols = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
+            $statusCandidates = ['status','student_status','enrollment_status','enrolled','enrollment','status_desc'];
+            $statusField = null;
+            foreach ($statusCandidates as $cand) {
+                if (in_array($cand, $cols)) { $statusField = $cand; break; }
+            }
+
+            if ($statusField) {
+                $scholarsCount = DB::table('students')->where($statusField, 'Enrolled')->count();
+            } else {
+                $scholarsCount = DB::table('students')->count();
+            }
+        } catch (\Throwable $e) {
+            // If table doesn't exist or other DB error, fallback to zero
+            logger()->warning('Failed to compute scholars count for dashboard: '.$e->getMessage());
+            $scholarsCount = 0;
+        }
+
+        // Faculty and Staff counts based on role_id: faculty -> 3, staff -> 4
+        try {
+            $facultyCount = DB::table('users')->where('role_id', 'like', '%3%')->count();
+            $staffCount = DB::table('users')->where('role_id', 'like', '%4%')->count();
+        } catch (\Throwable $e) {
+            logger()->warning('Failed to compute faculty/staff counts: '.$e->getMessage());
+            $facultyCount = 0;
+            $staffCount = 0;
+        }
+
+        return Inertia::render('Dashboard', [
+            'scholarsCount' => $scholarsCount,
+            'facultyCount' => $facultyCount,
+            'staffCount' => $staffCount,
+        ]);
     })->middleware(['verified'])->name('dashboard');
 
     /*
@@ -105,6 +142,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
+    // Service Requests
+    Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
+    Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');
+    Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
+    Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
     // Driver assignment API
     Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');
     Route::post('/vehicle-requests/{vehicleRequest}/assign-driver', [\App\Http\Controllers\DriverController::class, 'assign'])->name('vehicle-requests.assign-driver');
@@ -155,6 +197,36 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/facility-requests/{facilityRequest}/gsu/approve/{gsu}', [\App\Http\Controllers\FacilityRequestController::class, 'approveByGSU'])
         ->name('facility-requests.gsu.approve')
         ->middleware(['signed']);
+
+    // Service Requests: Division chief approve/decline via signed links
+    Route::get('/service-requests/{serviceRequest}/approve/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByDivisionChief'])
+        ->name('service-requests.approve')
+        ->middleware(['signed']);
+
+    Route::get('/service-requests/{serviceRequest}/decline/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'showDeclineForm'])
+        ->name('service-requests.decline')
+        ->middleware(['signed']);
+
+    Route::post('/service-requests/{serviceRequest}/decline/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'submitDecline'])
+        ->name('service-requests.decline.submit')
+        ->middleware(['signed']);
+
+    Route::get('/service-requests/{serviceRequest}/gsu/approve/{gsu}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByGSU'])
+        ->name('service-requests.gsu.approve')
+        ->middleware(['signed']);
+
+    Route::get('/service-requests/{serviceRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\ServiceRequestController::class, 'showDeclineForm'])
+        ->name('service-requests.gsu.decline')
+        ->middleware(['signed']);
+
+    Route::post('/service-requests/{serviceRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\ServiceRequestController::class, 'submitDecline'])
+        ->name('service-requests.gsu.decline.submit')
+        ->middleware(['signed']);
+
+    // Print service request (only GSU Head and Administrator)
+    Route::get('/service-requests/{serviceRequest}/print', [\App\Http\Controllers\ServiceRequestController::class, 'printTicket'])
+        ->name('service-requests.print')
+        ->middleware('role:Administrator|GSU Head');
 
     Route::get('/facility-requests/{facilityRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\FacilityRequestController::class, 'showGsuDeclineForm'])
         ->name('facility-requests.gsu.decline')
@@ -290,6 +362,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{id}', [UserController::class, 'destroy'])->name('users.destroy');
+        Route::post('users/{user}/upload-signature', [UserController::class, 'uploadSignature'])->name('users.upload_signature');
         Route::get('/users-roles', [RolesController::class, 'index'])->name('roles.index');
         Route::post('users-roles', [RolesController::class, 'store'])->name('roles.store');
         Route::put('users-roles/{id}', [RolesController::class, 'update'])->name('roles.update');
