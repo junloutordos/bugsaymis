@@ -80,6 +80,41 @@ Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])->nam
 | Authenticated Routes (PSHS email only)
 |--------------------------------------------------------------------------
 */
+Route::prefix('it-job-requests')->group(function () {
+
+    // GET — Signed link to approve request
+    Route::get('dc/approve/{jobRequest}/{chief}', [ITJobRequestController::class, 'approveByDivisionChiefSigned'])
+        ->name('it-job-requests.dc.approve')
+        ->middleware('signed');
+
+    // GET — Signed link to show decline form
+    Route::get('dc/decline/{jobRequest}/{chief}', [ITJobRequestController::class, 'showDivisionChiefDeclineForm'])
+        ->name('it-job-requests.dc.decline')
+        ->middleware('signed');
+
+    // POST — submit decline (no signed middleware, CSRF only)
+    Route::post('dc/decline/{jobRequest}/{chief}', [ITJobRequestController::class, 'submitDivisionChiefDecline'])
+        ->name('it-job-requests.dc.decline.submit');
+
+
+    // OCD signed routes
+    Route::get('ocd/approve/{jobRequest}/{ocd}', [ITJobRequestController::class, 'approveByOCDSigned'])
+        ->name('it-job-requests.ocd.approve')
+        ->middleware('signed');
+
+
+    // OCD Approval Decline
+    Route::get('it-job-requests/ocd/decline/{jobRequest}/{ocd}', [ITJobRequestController::class, 'showOCDDeclineForm'])
+        ->name('it-job-requests.ocd.decline')
+        ->middleware('signed');
+
+    Route::post('it-job-requests/ocd/decline/{jobRequest}/{ocd}', [ITJobRequestController::class, 'submitOCDDecline'])
+        ->name('it-job-requests.ocd.decline.submit')
+        ->middleware('signed');
+
+
+});
+
 Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Dashboard
@@ -130,6 +165,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/job-requests', [ITJobRequestController::class, 'index'])->name('jobrequests.index');
     Route::get('/job-requests/create', [ITJobRequestController::class, 'create'])->name('jobrequests.create');
     Route::post('/job-requests', [ITJobRequestController::class, 'store'])->name('jobrequests.store');
+    Route::post('/it-job-requests/{jobRequest}/confirm',[ITJobRequestController::class, 'confirmCompletion']
+);
+
+    Route::get('/itjr/{jobRequest}/division-chief/{action}',[ITJobRequestController::class, 'approveByDivisionChief'])->name('itjr.dc.action');
+    
 
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
