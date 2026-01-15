@@ -19,8 +19,9 @@ class ITJobRequest extends Model
         'title',
         'description',
         'status',
-        'divisionchief',
+        'divisionchief_id',
         'assignedto',
+        'ict_equipment_id',
         'dc_approval_date',
         'ocd_approval_date',
         'mis_assessment',
@@ -28,7 +29,10 @@ class ITJobRequest extends Model
         'action_taken',
         'completed_at',
         'attendedby',
-        'feedback',
+        'rating',
+        'rating_remarks',
+        'rated_at'
+
     ];
 
     /**
@@ -68,5 +72,13 @@ class ITJobRequest extends Model
     {
         return $this->hasMany(ITJRTrackingLog::class, 'it_job_request_id', 'id')
                     ->orderBy('created_at', 'desc'); // timeline oldest → newest
+    }
+    public function divisionChief()
+    {
+        return $this->belongsTo(User::class, 'divisionchief_id');
+    }
+    public function equipment()
+    {
+        return $this->belongsTo(ICTEquipment::class, 'ict_equipment_id');
     }
 }

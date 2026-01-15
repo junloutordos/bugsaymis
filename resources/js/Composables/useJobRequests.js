@@ -54,12 +54,13 @@ export function useJobRequests(initialRequests = []) {
     title: "",
     category: "",
     description: "",
-    divisionchief: "",
+    divisionchief_id: "",
     assignedto: "",
     mis_assessment: "",
     expected_completion_date: "",
     action_taken: "",
     completed_at: "",
+    ict_equipment_id:"",
   })
 
   // Open modal
@@ -73,12 +74,13 @@ export function useJobRequests(initialRequests = []) {
         title: req.title || "",
         category: req.category || "",
         description: req.description || "",
-        divisionchief: req.divisionchief || "",
+        divisionchief_id: req.divisionchief_id || "",
         assignedto: req.assignedto || "",
         mis_assessment: req.mis_assessment || "",
         expected_completion_date: req.expected_completion_date || "",
         action_taken: req.action_taken || "",
         completed_at: req.completed_at || "",
+        ict_equipment_id: req.ict_equipment_id ||"",
       })
     } else {
       form.reset()
