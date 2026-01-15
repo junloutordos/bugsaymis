@@ -271,6 +271,13 @@ const menuItems = [
             icon: ClipboardDocumentListIcon,
             roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
           },
+          {
+            label: "Request for Services",
+            routeName: "service-requests.index",
+            href: route('service-requests.index'),
+            icon: ClipboardDocumentListIcon,
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+          },
     ],
     // Only show this section for GSU Head if that's their only role
     showForGSUHeadOnly: true,

@@ -92,24 +92,27 @@
             <div class="space-y-3">
               <div>
                 <label class="block text-sm">Collection Type</label>
-                <select v-model="form.collection_type" class="w-full rounded border p-2">
+                <select v-model="form.collection_type" @change="validateField('collection_type')" :class="['w-full rounded border p-2', fieldErrors.collection_type ? 'border-red-600' : 'border-gray-300']">
                   <option>Instructional Materials</option>
                   <option>Book</option>
                   <option>Periodical</option>
                   <option>Non-Print</option>
                   <option>Thesis</option>
                 </select>
-                <div v-if="errors.collection_type || errors.volume" class="text-red-600 text-sm mt-1">{{ (errors.collection_type || errors.volume)[0] }}</div>
+                <div v-if="fieldErrors.collection_type" class="text-red-600 text-sm mt-1">{{ fieldErrors.collection_type }}</div>
+                <div v-else-if="errors.collection_type || errors.volume" class="text-red-600 text-sm mt-1">{{ (errors.collection_type || errors.volume)[0] }}</div>
               </div>
               <div>
                 <label class="block text-sm">Title</label>
-                <input name="title" v-model="form.title" class="w-full rounded border p-2" />
-                <div v-if="errors.title" class="text-red-600 text-sm mt-1">{{ errors.title[0] }}</div>
+                <input name="title" v-model="form.title" @input="validateField('title')" :class="['w-full rounded p-2', fieldErrors.title ? 'border-red-600' : 'border-gray-300']" />
+                <div v-if="fieldErrors.title" class="text-red-600 text-sm mt-1">{{ fieldErrors.title }}</div>
+                <div v-else-if="errors.title" class="text-red-600 text-sm mt-1">{{ errors.title[0] }}</div>
               </div>
               <div>
                 <label class="block text-sm">Author</label>
-                <input name="author_publisher" v-model="form.author_publisher" class="w-full rounded border p-2" />
-                <div v-if="errors.author_publisher" class="text-red-600 text-sm mt-1">{{ errors.author_publisher[0] }}</div>
+                <input name="author_publisher" v-model="form.author_publisher" @input="validateField('author_publisher')" :class="['w-full rounded p-2', fieldErrors.author_publisher ? 'border-red-600' : 'border-gray-300']" />
+                <div v-if="fieldErrors.author_publisher" class="text-red-600 text-sm mt-1">{{ fieldErrors.author_publisher }}</div>
+                <div v-else-if="errors.author_publisher" class="text-red-600 text-sm mt-1">{{ errors.author_publisher[0] }}</div>
               </div>
               
               <div>
@@ -139,8 +142,9 @@
               </div>
               <div>
                 <label class="block text-sm">Category</label>
-                <input name="category" v-model="form.category" class="w-full rounded border p-2" />
-                <div v-if="errors.category" class="text-red-600 text-sm mt-1">{{ errors.category[0] }}</div>
+                <input name="category" v-model="form.category" @input="validateField('category')" :class="['w-full rounded p-2', fieldErrors.category ? 'border-red-600' : 'border-gray-300']" />
+                <div v-if="fieldErrors.category" class="text-red-600 text-sm mt-1">{{ fieldErrors.category }}</div>
+                <div v-else-if="errors.category" class="text-red-600 text-sm mt-1">{{ errors.category[0] }}</div>
               </div>
               <div>
                 <label class="block text-sm">Publisher</label>
@@ -174,7 +178,7 @@
 
 <script setup>
 
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import { usePage, router, Head } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
@@ -192,10 +196,18 @@ const showModal = ref(false);
 const editing = ref(null);
 const form = ref({ collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' });
 const errors = ref(page.props.errors || {});
+
+// Client-side inline validation state
+const fieldErrors = reactive({
+  collection_type: '',
+  title: '',
+  author_publisher: '',
+  category: '',
+});
 const showDeleteConfirm = ref(false);
 const deleting = ref(null);
 
-function openCreate() { editing.value = null; form.value = { collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' }; errors.value = {}; showModal.value = true }
+function openCreate() { editing.value = null; form.value = { collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' }; errors.value = {}; Object.keys(fieldErrors).forEach(k => fieldErrors[k] = ''); showModal.value = true }
 async function openEdit(c) {
   editing.value = c.id;
   errors.value = {};
@@ -220,9 +232,32 @@ async function openEdit(c) {
     form.value = { collection_type: c.collection_type ?? c.volume, title: c.title, author_publisher: c.author_publisher, call_number: c.call_number ?? '', edition: c.edition ?? '', year: c.year ?? '', isbn: c.isbn ?? '', subject: c.subject ?? '', category: c.category ?? '', publisher: c.publisher ?? '' };
     console.error('Failed to load latest collection data:', e);
   }
+  Object.keys(fieldErrors).forEach(k => fieldErrors[k] = '');
   showModal.value = true
 }
-function closeModal(){ showModal.value = false; errors.value = {} }
+function closeModal(){ showModal.value = false; errors.value = {}; Object.keys(fieldErrors).forEach(k => fieldErrors[k] = '') }
+
+const validateField = (field) => {
+  switch (field) {
+    case 'collection_type':
+      fieldErrors.collection_type = form.value.collection_type ? '' : 'Select a collection type';
+      break;
+    case 'title':
+      fieldErrors.title = form.value.title && String(form.value.title).trim() ? '' : 'Title is required';
+      break;
+    case 'author_publisher':
+      fieldErrors.author_publisher = form.value.author_publisher && String(form.value.author_publisher).trim() ? '' : 'Author/Publisher is required';
+      break;
+    case 'category':
+      fieldErrors.category = form.value.category && String(form.value.category).trim() ? '' : 'Category is required';
+      break;
+  }
+};
+
+const validateAll = () => {
+  ['collection_type','title','author_publisher','category'].forEach(f => validateField(f));
+  return !Object.values(fieldErrors).some(v => typeof v === 'string' ? v && v.length > 0 : false);
+};
 
 function confirmDelete(c){ deleting.value = c; showDeleteConfirm.value = true }
 
@@ -244,6 +279,11 @@ function sortBy(col){
 
 async function submitForm(){
   errors.value = {}
+  // client-side validation
+  if (!validateAll()) {
+    alert('Please fix the highlighted errors before saving the collection.');
+    return;
+  }
   const payload = { ...form.value }
   // keep compatibility with backend validation which still expects `volume`
   payload.volume = payload.collection_type ?? payload.volume
