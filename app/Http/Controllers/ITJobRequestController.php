@@ -440,4 +440,24 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
         return back()->with('success', 'Request confirmed and rated.');
     }
+    public function forApproval(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->role || $user->role->name !== 'DivisionChief') {
+            abort(403, 'Unauthorized');
+        }
+
+        $requests = ITJobRequest::with('user')
+            ->where('divisionchief_id', $user->id) // 👈 only requests assigned to this Division Chief
+            ->where('status', 'Pending Division Chief Approval')
+            ->get();
+
+        return Inertia::render('ITJobRequests/ForApprovalITJR', [
+            'requests' => $requests
+        ]);
+    }
+
+    
+    
 }
