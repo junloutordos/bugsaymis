@@ -1,59 +1,82 @@
 <script setup>
+import { ref } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
-import { auth, provider, signInWithPopup } from '@/firebase'
 import axios from 'axios'
+import { auth, provider, signInWithPopup } from '@/firebase'
 
-const officialDomain = "@crc.pshs.edu.ph"
+/* --------------------------------------------------------------------------
+ | Constants
+ * -------------------------------------------------------------------------- */
+const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
+const BG_IMAGE_URL = '/storage/bg.jpg'
 
+/* --------------------------------------------------------------------------
+ | State
+ * -------------------------------------------------------------------------- */
+const isLoading = ref(false)
+
+/* --------------------------------------------------------------------------
+ | Helpers
+ * -------------------------------------------------------------------------- */
+const showAlert = (options) => {
+  Swal.fire({
+    confirmButtonColor: '#2563eb',
+    ...options,
+  })
+}
+
+const isAuthorizedEmail = (email) =>
+  email?.toLowerCase().endsWith(OFFICIAL_DOMAIN)
+
+/* --------------------------------------------------------------------------
+ | Actions
+ * -------------------------------------------------------------------------- */
 const googleLogin = async () => {
-  try {
-    const result = await signInWithPopup(auth, provider)
-    const user = result.user
+  if (isLoading.value) return
 
-    // Restrict domain
-    if (!user.email.endsWith(officialDomain)) {
-      Swal.fire({
-        icon: "error",
-        title: "Unauthorized Email",
-        text: "Only official PSHS-CRC accounts are allowed.",
+  try {
+    isLoading.value = true
+
+    const { user } = await signInWithPopup(auth, provider)
+
+    if (!isAuthorizedEmail(user.email)) {
+      showAlert({
+        icon: 'error',
+        title: 'Unauthorized Email',
+        text: 'Only official PSHS-CRC accounts are allowed.',
       })
       return
     }
 
-    // Send user to backend
-    const response = await axios.post('/google/login', {
+    const { data } = await axios.post('/google/login', {
       email: user.email,
       name: user.displayName,
       uid: user.uid,
     })
 
-    if (response.data.success) {
-      const { redirect_to, role } = response.data
-
-      Swal.fire({
-        icon: "success",
-        title: "Login Successful",
-        text: `Welcome, ${user.displayName}! Redirecting to your ${role} portal...`,
-        timer: 1500,
-        showConfirmButton: false,
-      })
-
-      window.location.href = redirect_to
-    } else {
-      Swal.fire({
-        icon: "error",
-        title: "Login Failed",
-        text: "Could not verify your account.",
-      })
+    if (!data?.success) {
+      throw new Error('Account verification failed')
     }
+
+    showAlert({
+      icon: 'success',
+      title: 'Login Successful',
+      text: `Welcome, ${user.displayName}! Redirecting to your ${data.role} portal...`,
+      timer: 1500,
+      showConfirmButton: false,
+    })
+
+    window.location.href = data.redirect_to
   } catch (error) {
     console.error(error)
-    Swal.fire({
-      icon: "error",
-      title: "Google Login Failed",
+    showAlert({
+      icon: 'error',
+      title: 'Login Failed',
       text: error.response?.data?.message || error.message,
     })
+  } finally {
+    isLoading.value = false
   }
 }
 </script>
@@ -61,25 +84,136 @@ const googleLogin = async () => {
 <template>
   <Head title="Login" />
 
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-blue-300 to-white">
-    <div class="w-full max-w-md bg-white shadow-xl rounded-2xl p-8">
+  <div class="page-container">
+    <!-- Background -->
+    <div
+      class="absolute inset-0 bg-cover bg-center"
+      :style="{ backgroundImage: `url(${BG_IMAGE_URL})` }"
+    />
+    <div class="absolute inset-0 bg-black/30" />
 
-      <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">
-        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-32 mx-auto mb-4" />
-      <span class="text-indigo-600">BUGSAY-MIS</span>
-      </h1>
+    <!-- Decorative blobs -->
+    <div class="blob blob-pink" />
+    <div class="blob blob-blue" />
 
-      <!-- Google Login -->
-      <div class="mt-6">
+    <!-- Content Wrapper -->
+    <div class="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
+      <!-- Login Card -->
+      <div class="login-card">
+        <!-- Header -->
+        <header class="text-center mb-8">
+          <img
+            src="/images/pshslogo.png"
+            alt="PSHS-CRC Logo"
+            class="h-28 mx-auto mb-4"
+          />
+          <h1 class="text-3xl font-extrabold text-blue-600 tracking-wide">
+            BUGSAY-MIS
+          </h1>
+          <p class="mt-2 text-sm text-gray-600">
+            <strong>PHILIPPINE SCIENCE HIGH SCHOOL</strong><br />
+            <span class="text-xs">Caraga Region Campus in Butuan City</span>
+          </p>
+        </header>
+
+        <!-- Login Button -->
         <button
           @click="googleLogin"
-          type="button"
-          class="w-full flex items-center justify-center py-2 px-4 bg-red-600 text-white font-semibold rounded-lg shadow hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition"
+          :disabled="isLoading"
+          class="login-button"
         >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="h-5 w-5 mr-2" />
-          Login using PSHS-CRC Official Google Account
+          <img
+            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+            class="h-7 w-7 mr-4"
+          />
+          <span><small>
+            {{ isLoading ? 'Signing in…' : 'Login PSHS-CRC Google Account' }}
+            </small>
+          </span>
         </button>
       </div>
+
+      <!-- ✅ PAGE FOOTER (OUTSIDE CARD) -->
+      <footer class="page-footer">
+        <p class="italic">
+          Navigating Together: Centralized Management Information System of
+          Philippine Science High School – Caraga Region Campus in Butuan City
+        </p>
+        <p class="mt-1"><strong>&copy; 2026 PSHS-CRC. All Rights Reserved.</strong></p>
+      </footer>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* --------------------------------------------------
+ | Page Container
+ * -------------------------------------------------- */
+.page-container {
+  @apply relative overflow-hidden;
+}
+
+/* --------------------------------------------------
+ | Login Card
+ * -------------------------------------------------- */
+.login-card {
+  @apply w-full max-w-md bg-white rounded-3xl shadow-2xl p-10;
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+/* --------------------------------------------------
+ | Button
+ * -------------------------------------------------- */
+.login-button {
+  @apply w-full flex items-center justify-center py-3 px-4
+         bg-blue-600 text-white font-semibold rounded-xl
+         shadow-lg transition transform
+         hover:bg-blue-700 hover:-translate-y-1 hover:scale-105
+         focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2
+         disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+/* --------------------------------------------------
+ | Page Footer (Outside Card)
+ * -------------------------------------------------- */
+.page-footer {
+  @apply mt-8 text-center text-xs text-white/80 max-w-lg;
+}
+
+/* --------------------------------------------------
+ | Decorative Blobs
+ * -------------------------------------------------- */
+.blob {
+  @apply absolute rounded-full blur-3xl opacity-70;
+  animation: blob 7s infinite;
+}
+
+.blob-pink {
+  @apply top-10 left-10 w-40 h-40 bg-pink-400/20;
+}
+
+.blob-blue {
+  @apply bottom-20 right-20 w-60 h-60 bg-indigo-400/20;
+  animation-delay: 2s;
+}
+
+/* --------------------------------------------------
+ | Animations
+ * -------------------------------------------------- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(20px, -30px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+</style>
