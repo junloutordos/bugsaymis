@@ -80,24 +80,23 @@ const assignDriver = async () => {
     setBanner('success', 'Driver assigned successfully');
     closeAssignDriverModal();
     window.location.reload();
-  } catch (e) {
+    } catch (e) {
     console.error('Failed to assign driver', e);
     // Try to extract structured error info from server response
     const srv = e?.response?.data ?? (e?.response ?? null);
     const errMsg = e && e.message ? String(e.message) : '';
-    // If JSON parsing failed with messages like "trailing data" or unexpected token,
-    // map that to a friendly conflict message instead of exposing the raw parse error.
+    // For assignment errors show an alert instead of the top banner so it's immediately visible.
     if (errMsg && (errMsg.toLowerCase().includes('trailing data') || errMsg.toLowerCase().includes('unexpected token') || errMsg.toLowerCase().includes('syntaxerror') || (e?.response?.status === 422 && !srv))) {
-      setBanner('error', sanitizeErrorMessage(errMsg));
+      alert(sanitizeErrorMessage(errMsg));
     } else if (srv && srv.type && srv.message) {
       // Emphasize problem and show whether it's a vehicle or driver conflict
       const kind = srv.type === 'vehicle' ? 'Vehicle conflict' : (srv.type === 'driver' ? 'Driver conflict' : 'Conflict');
       const dates = Array.isArray(srv.dates) && srv.dates.length ? ` Dates: ${srv.dates.join(', ')}` : '';
-      setBanner('error', `${kind}: ${sanitizeErrorMessage(srv.message)}${dates}`);
+      alert(`${kind}: ${sanitizeErrorMessage(srv.message)}${dates}`);
     } else if (srv && srv.message) {
-      setBanner('error', sanitizeErrorMessage(srv.message));
+      alert(sanitizeErrorMessage(srv.message));
     } else {
-      setBanner('error', sanitizeErrorMessage(errMsg) || 'Failed to assign driver');
+      alert(sanitizeErrorMessage(errMsg) || 'Failed to assign driver');
     }
   }
   assignLoading.value = false;

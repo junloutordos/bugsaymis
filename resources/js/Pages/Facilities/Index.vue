@@ -4,7 +4,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { ref } from "vue";
 import { PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/outline";
 
-const props = defineProps({ facilities: Array });
+const props = defineProps({ facilities: Array, buildings: Array });
 const page = usePage();
 
 const form = useForm({ name: '', location: '', capacity: '', description: '' });
@@ -69,7 +69,10 @@ const destroy = (f) => {
 
             <div>
               <label class="block text-sm font-medium text-gray-700">Location</label>
-              <input v-model="form.location" class="mt-1 block w-full rounded border-gray-300" />
+              <select v-model="form.location" class="mt-1 block w-full rounded border-gray-300">
+                <option value="">Select building</option>
+                <option v-for="b in props.buildings" :key="b.id" :value="b.name">{{ b.name }}</option>
+              </select>
               <p v-if="form.errors.location" class="text-red-600 text-sm mt-1">{{ form.errors.location }}</p>
             </div>
 

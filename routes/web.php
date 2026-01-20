@@ -19,6 +19,8 @@ use App\Http\Controllers\ICTEquipmentController;
     Route::get('/library/collections/{id}/history', [\App\Http\Controllers\LibraryBorrowingsController::class, 'collectionHistory'])->name('library.collections.history');
     Route::get('/library/borrowers/{type}/{id}/history', [\App\Http\Controllers\LibraryBorrowingsController::class, 'borrowerHistory'])->name('library.borrowers.history');
 use App\Http\Controllers\VehicleRequestController;
+use App\Http\Controllers\WorkRequestController;
+use App\Http\Controllers\BuildingController;
 use App\Http\Controllers\ICTPMSHistoryController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\RolesController;
@@ -38,6 +40,16 @@ Route::middleware(['auth','role:Administrator'])->group(function(){
     Route::post('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'store'])->name('offices.store');
     Route::put('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'update'])->name('offices.update');
     Route::delete('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'destroy'])->name('offices.destroy');
+    // Buildings
+    Route::get('/data-management/buildings', [App\Http\Controllers\BuildingController::class, 'index'])->name('buildings.index');
+    Route::post('/data-management/buildings', [App\Http\Controllers\BuildingController::class, 'store'])->name('buildings.store');
+    Route::put('/data-management/buildings/{building}', [App\Http\Controllers\BuildingController::class, 'update'])->name('buildings.update');
+    Route::delete('/data-management/buildings/{building}', [App\Http\Controllers\BuildingController::class, 'destroy'])->name('buildings.destroy');
+    // Rooms
+    Route::get('/data-management/rooms', [App\Http\Controllers\RoomController::class, 'index'])->name('rooms.index');
+    Route::post('/data-management/rooms', [App\Http\Controllers\RoomController::class, 'store'])->name('rooms.store');
+    Route::put('/data-management/rooms/{room}', [App\Http\Controllers\RoomController::class, 'update'])->name('rooms.update');
+    Route::delete('/data-management/rooms/{room}', [App\Http\Controllers\RoomController::class, 'destroy'])->name('rooms.destroy');
 });
 
 use Inertia\Inertia;
@@ -182,11 +194,21 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
+    // Work Requests (General Services)
+    Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
+    Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
+    Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
+    Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
     // Service Requests
     Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
     Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');
     Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
     Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
+    // Assets (General Services)
+    Route::get('/assets', [\App\Http\Controllers\AssetController::class, 'index'])->name('assets.index');
+    Route::post('/assets', [\App\Http\Controllers\AssetController::class, 'store'])->name('assets.store');
+    Route::put('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'update'])->name('assets.update');
+    Route::delete('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'destroy'])->name('assets.destroy');
     // Driver assignment API
     Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');
     Route::post('/vehicle-requests/{vehicleRequest}/assign-driver', [\App\Http\Controllers\DriverController::class, 'assign'])->name('vehicle-requests.assign-driver');
