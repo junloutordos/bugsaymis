@@ -1,6 +1,8 @@
 <script setup>
-import { computed } from "vue"
+import { ref, computed } from "vue"
 import { Head, usePage } from "@inertiajs/vue3"
+import { router } from '@inertiajs/vue3'
+import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import {
   EyeIcon,
@@ -10,13 +12,16 @@ import {
   ArrowDownTrayIcon
 } from "@heroicons/vue/24/outline"
 import { useJobRequests } from "@/Composables/useJobRequests.js"
+import axios from "axios"
 
 // Props from backend
 const props = defineProps({ 
   requests: Array,
   categories: Array,
   divisionChiefs: Array,   
-  administrators: Array    })
+  administrators: Array,
+  ictEquipment: Array // ✅ NEW
+})
 
 // Composable: all request logic
 const {
@@ -43,20 +48,105 @@ const {
 
 // Auth info
 const page = usePage()
-const userRole = page.props.auth?.user?.role?.name ?? null
+const currentUser = page.props.auth?.user ?? null
+const userRole = currentUser?.role?.name ?? null
 
 // Open MIS Assessment modal
 function openMISAssessment(request) {
   misAssessment(request)
 }
-// Ensure frontend filtering too for administrators
+
+// Filter visible requests: admins see all, non-admins see only their own
 const visibleRequests = computed(() => {
+  if (!currentUser) return [] // fallback if user not available
   if (userRole === "Administrator") {
     return filteredRequests.value
   }
-  return filteredRequests.value.filter(req => req.user_id === user?.id)
+  return filteredRequests.value.filter(req => req.user_id === currentUser.id)
 })
+const hasPendingConfirmation = computed(() => {
+  if (!currentUser || userRole === 'Administrator') return false
+
+  return visibleRequests.value.some(req =>
+    req.user_id === currentUser.id &&
+    req.status === 'Acted by MIS'
+  )
+})
+
+/* ---------------------------------------
+   ✅ Rating Modal Logic: Confirm Completion & Rate Service
+--------------------------------------- */
+
+// State for rating modal
+const showRatingModal = ref(false)
+const requestToRate = ref(null)
+const rating = ref(0)
+const ratingRemarks = ref("")
+
+// Open rating modal
+function openRatingModal(request) {
+  requestToRate.value = request
+  rating.value = 0
+  ratingRemarks.value = ""
+  showRatingModal.value = true
+}
+
+// Submit rating and confirm completion
+const submitRating = async () => {
+  if (!requestToRate.value) return
+
+  // Prevent submitting without selecting a rating
+  if (rating.value < 1) {
+    await Swal.fire("Error", "Please select a rating before submitting.", "error")
+    return
+  }
+
+  // Use Inertia router to send POST request
+  router.post(
+    `/it-job-requests/${requestToRate.value.id}/confirm`,
+    {
+      rating: rating.value,
+      remarks: ratingRemarks.value,
+    },
+    {
+      preserveScroll: true,
+      onSuccess: async (page) => {
+        // Update local status immediately
+        requestToRate.value.status = "Request Completed"
+
+        // Reset modal state
+        showRatingModal.value = false
+        requestToRate.value = null
+        rating.value = 0
+        ratingRemarks.value = ""
+
+        await Swal.fire("Success", "Request confirmed and rated successfully!", "success")
+        // Optionally reload the page to get fresh data
+        window.location.reload()
+      },
+      onError: async (errors) => {
+        console.error(errors)
+        await Swal.fire("Error", "Failed to submit rating. Please try again.", "error")
+      },
+    }
+  )
+}
+const handleNewRequest = async () => {
+  if (hasPendingConfirmation.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You still have a request that was already acted by MIS. Please confirm completion and rate the service before creating a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+
+  openModal('create')
+}
+
 </script>
+
 
 <template>
   <Head title="IT Job Requests" />
@@ -66,11 +156,12 @@ const visibleRequests = computed(() => {
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">IT Job Requests</h1>
         <button
-          @click="openModal('create')"
+          @click="handleNewRequest"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
         >
           + New Request
         </button>
+
       </div>
 
       <!-- Search & Actions -->
@@ -122,7 +213,7 @@ const visibleRequests = computed(() => {
                       'bg-violet-100 text-violet-700': req.status==='Pending OCD Approval',
                       'bg-blue-100 text-blue-700': req.status==='In Progress',
                       'bg-green-100 text-green-700': req.status==='Acted by MIS',
-                      'bg-red-100 text-red-700': req.status==='Request Completed'
+                      'bg-green-500 text-white': req.status==='Request Completed'
                     }"
                   >
                     {{ req.status }}
@@ -133,6 +224,7 @@ const visibleRequests = computed(() => {
                     <button @click="viewRequest(req)" class="p-1 hover:bg-gray-100 rounded">
                       <EyeIcon class="w-5 h-5 text-blue-600"/>
                     </button>
+
                     <template v-if="userRole==='Administrator'">
                       <button @click="openMISAssessment(req)" class="p-1 hover:bg-gray-100 rounded">
                         <PencilSquareIcon class="w-5 h-5 text-yellow-600"/>
@@ -141,7 +233,18 @@ const visibleRequests = computed(() => {
                         <TrashIcon class="w-5 h-5 text-red-600"/>
                       </button>
                     </template>
+
+                    <!-- ✅ Confirm Completion & Rate Service button for non-admin users -->
+                    <template v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'">
+                      <button
+                        @click="openRatingModal(req)"
+                        class="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
+                      >
+                        Confirm & Rate
+                      </button>
+                    </template>
                   </div>
+
                 </td>
               </tr>
               <tr v-if="visibleRequests.length===0">
@@ -252,15 +355,20 @@ const visibleRequests = computed(() => {
               <div>
                 <label class="block text-sm font-medium text-gray-700">Division Approval</label>
                 <select
-                  v-model="form.divisionchief"
+                  v-model="form.divisionchief_id"
                   class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   required
                 >
                   <option value="">-- Select Division Chief --</option>
-                  <option v-for="chief in props.divisionChiefs" :key="chief.id" :value="chief.name">
+                  <option
+                    v-for="chief in props.divisionChiefs"
+                    :key="chief.id"
+                    :value="chief.id"
+                  >
                     {{ chief.name }}
                   </option>
                 </select>
+
               </div>
 
               <!-- Assign Personnel -->
@@ -272,7 +380,7 @@ const visibleRequests = computed(() => {
                   required
                 >
                   <option value="">-- Select MIS Personnel --</option>
-                  <option v-for="admin in props.administrators" :key="admin.id" :value="admin.name">
+                  <option v-for="admin in props.administrators" :key="admin.id" :value="admin.id">
                     {{ admin.name }}
                   </option>
                 </select>
@@ -315,6 +423,27 @@ const visibleRequests = computed(() => {
                   class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+              <!-- ✅ ICT Equipment (ONLY for Hardware Repair) -->
+              <div v-if="selectedRequest?.category?.toLowerCase().includes('hardware')">
+                <label class="block text-sm font-medium text-gray-700">
+                  Tag ICT Equipment
+                </label>
+
+                <select
+                  v-model="form.ict_equipment_id"
+                  class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">-- Select Equipment --</option>
+                  <option
+                    v-for="eq in props.ictEquipment"
+                    :key="eq.id"
+                    :value="eq.id"
+                  >
+                    {{ eq.location }} - {{ eq.description }} - ({{ eq.serial_no }})
+                  </option>
+                </select>
+              </div>
+
             </template>
 
 
@@ -326,6 +455,50 @@ const visibleRequests = computed(() => {
           </form>
         </div>
       </div>
+
+      <!-- Rating Modal -->
+    <div v-show="showRatingModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+        <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="showRatingModal = false">✕</button>
+
+        <h2 class="text-xl font-semibold mb-4">Confirm Completion & Rate Service</h2>
+
+        <p class="mb-3">Request: <strong>{{ requestToRate?.title }}</strong></p>
+
+        <!-- Star Rating -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+          <div class="flex space-x-1">
+            <template v-for="star in 5" :key="star">
+              <button
+                type="button"
+                @click="rating = star"
+                class="text-2xl focus:outline-none"
+              >
+                <span
+                  class="cursor-pointer"
+                  :class="{
+                    'text-yellow-400': star <= rating,
+                    'text-gray-300': star > rating
+                  }"
+                >★</span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Remarks (optional)</label>
+          <textarea v-model="ratingRemarks" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button @click="showRatingModal=false" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
+          <button @click="submitRating" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Submit</button>
+        </div>
+      </div>
+    </div>
+
     </div>
   </AdminLayout>
 </template>
