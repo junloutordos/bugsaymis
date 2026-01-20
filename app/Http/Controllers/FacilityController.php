@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Facility;
+use App\Models\Building;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
@@ -17,8 +18,11 @@ class FacilityController extends Controller
     {
         $facilities = Facility::orderBy('name')->get();
 
+        $buildings = Building::orderBy('name')->get();
+
         return Inertia::render('Facilities/Index', [
             'facilities' => $facilities,
+            'buildings' => $buildings,
         ]);
     }
 

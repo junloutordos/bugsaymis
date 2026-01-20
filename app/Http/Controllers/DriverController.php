@@ -56,7 +56,7 @@ class DriverController extends Controller
             foreach ($dates as $d) {
                 $existing = VehicleRequest::where('vehicle_type', $vehicleName)
                     ->where('id', '!=', $vehicleRequest->id)
-                    ->where('status', '!=', 'Declined')
+                    ->where('status', 'OCD Approved')
                     ->where(function ($q) use ($d) {
                         $q->whereDate('date_needed', $d)
                           ->orWhereJsonContains('date_needed_multiple', $d);
@@ -102,7 +102,7 @@ class DriverController extends Controller
             foreach ($dates as $d) {
                 $existing = VehicleRequest::where('driver_id', $driverId)
                     ->where('id', '!=', $vehicleRequest->id)
-                    ->where('status', '!=', 'Declined')
+                    ->where('status', 'OCD Approved')
                     ->where(function ($q) use ($d) {
                         $q->whereDate('date_needed', $d)
                           ->orWhereJsonContains('date_needed_multiple', $d);
