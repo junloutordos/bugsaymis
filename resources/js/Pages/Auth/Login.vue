@@ -62,7 +62,7 @@ const googleLogin = async () => {
     showAlert({
       icon: 'success',
       title: 'Login Successful',
-      text: `Welcome, ${user.displayName}! Redirecting to your ${data.role} portal...`,
+      text: `Welcome, ${user.displayName}! Redirecting to your portal...`,
       timer: 1500,
       showConfirmButton: false,
     })
@@ -136,10 +136,10 @@ const googleLogin = async () => {
       <!-- ✅ PAGE FOOTER (OUTSIDE CARD) -->
       <footer class="page-footer">
         <p class="italic">
-          Navigating Together: Centralized Management Information System of
+          Navigating Together: Centralized Management Information System of <br>
           Philippine Science High School – Caraga Region Campus in Butuan City
-        </p>
-        <p class="mt-1"><strong>&copy; 2026 PSHS-CRC. All Rights Reserved.</strong></p>
+        </p><br><br><br>
+        <p class="mt-1"><strong>&copy; 2026 PSHS-CRC. All Rights Reserved.<br>v 1.0.0</strong></p>
       </footer>
     </div>
   </div>
