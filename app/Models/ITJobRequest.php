@@ -81,4 +81,16 @@ class ITJobRequest extends Model
     {
         return $this->belongsTo(ICTEquipment::class, 'ict_equipment_id');
     }
+    protected $appends = ['assigned_personnel'];
+
+    public function getAssignedPersonnelAttribute()
+    {
+        return $this->assignedTo?->name; // returns name directly
+    }
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assignedto', 'id'); // ✅ THIS FIXES THE ERROR
+    }
+
+
 }

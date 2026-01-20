@@ -31,6 +31,7 @@ class ITJobRequestController extends Controller
         $requests = ITJobRequest::with([
             'user:id,name',
             'divisionChief:id,name',
+            'assignedTo:id,name',
             'trackingLogs:id,it_job_request_id,status,remarks,created_at'
         ])
         ->when(!$isAdmin, fn($q) => $q->where('user_id', $user->id))

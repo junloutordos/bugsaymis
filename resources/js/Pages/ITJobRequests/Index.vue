@@ -280,8 +280,7 @@ const handleNewRequest = async () => {
             <p>Title: <strong>{{ selectedRequest.title }}</strong></p>
             <p>Category: <strong>{{ selectedRequest.category }}</strong></p>
             <p>Description: <strong>{{ selectedRequest.description }}</strong></p>
-            <p>Division Approval:<strong>{{ selectedRequest.divisionchief }}</strong></p>
-            <p>Assign Personnel:<strong>{{ selectedRequest.assignedto }} </strong></p>
+            <p>Assign Personnel: <strong>{{ selectedRequest.assigned_personnel ?? 'Not Assigned' }}</strong></p>
             <p>Submitted By: <strong>{{ selectedRequest.user?.name ?? '—' }}</strong></p>
             <hr></hr>
             <!-- Tracking Logs -->
