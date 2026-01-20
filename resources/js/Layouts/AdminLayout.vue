@@ -190,14 +190,14 @@ const menuItems = [
         routeName: "performanceindicator.index",
         href: route("performanceindicator.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator","HR"],
+        roles: ["Administrator","HR","DivisionChief"],
       },
       {
         label: "Work Distribution Plan",
         routeName: "workdistribution.index",
         href: route("workdistribution.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator","HR"],
+        roles: ["Administrator","HR","DivisionChief"],
       },
       {
         label: "IPCR",
