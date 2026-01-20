@@ -39,17 +39,33 @@ class ITJobRequestController extends Controller
 
         return Inertia::render('ITJobRequests/Index', [
             'requests' => $requests,
-            'categories' => ITJobCategory::orderBy('name')->get(),
-            'divisionChiefs' => User::whereHas('role', fn($q) => $q->where('name', 'DivisionChief'))->select('id','name')->get(),
-            'administrators' => User::whereHas('role', fn($q) => $q->where('name', 'Administrator'))->select('id','name')->get(),
 
-            // ✅ NEW: ICT Equipment list
+            'categories' => ITJobCategory::orderBy('name')->get(),
+
+            // Division Chiefs & Information Officers
+            'divisionChiefs' => User::whereHas('role', fn ($q) =>
+                $q->whereIn('name', ['DivisionChief', 'InformationOfficer'])
+            )
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
+
+            // Administrators
+            'administrators' => User::whereHas('role', fn ($q) =>
+                $q->where('name', 'Administrator')
+            )
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get(),
+
+            // ICT Equipment list
             'ictEquipment' => ICTEquipment::orderBy('location')
                 ->orderBy('description')
                 ->get(),
 
             'isAdmin' => $isAdmin,
         ]);
+
     }
 
     private function getUserRole($user): string
@@ -440,24 +456,4 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
         return back()->with('success', 'Request confirmed and rated.');
     }
-    public function forApproval(Request $request)
-    {
-        $user = $request->user();
-
-        if (! $user->role || $user->role->name !== 'DivisionChief') {
-            abort(403, 'Unauthorized');
-        }
-
-        $requests = ITJobRequest::with('user')
-            ->where('divisionchief_id', $user->id) // 👈 only requests assigned to this Division Chief
-            ->where('status', 'Pending Division Chief Approval')
-            ->get();
-
-        return Inertia::render('ITJobRequests/ForApprovalITJR', [
-            'requests' => $requests
-        ]);
-    }
-
-    
-    
 }
