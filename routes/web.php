@@ -397,7 +397,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     | Role-Based Routes
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:Administrator|HR')->group(function () {
+    Route::middleware('role:Administrator|HR|DivisionChief')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
