@@ -129,45 +129,10 @@ Route::prefix('it-job-requests')->group(function () {
 
 Route::middleware(['auth', 'pshs.email'])->group(function () {
 
-    // Dashboard
-    Route::get('/dashboard', function () {
-        // Compute scholars count: prefer counting rows where a status-like column equals 'Enrolled'
-        $scholarsCount = 0;
-        try {
-            $cols = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
-            $statusCandidates = ['status','student_status','enrollment_status','enrolled','enrollment','status_desc'];
-            $statusField = null;
-            foreach ($statusCandidates as $cand) {
-                if (in_array($cand, $cols)) { $statusField = $cand; break; }
-            }
-
-            if ($statusField) {
-                $scholarsCount = DB::table('students')->where($statusField, 'Enrolled')->count();
-            } else {
-                $scholarsCount = DB::table('students')->count();
-            }
-        } catch (\Throwable $e) {
-            // If table doesn't exist or other DB error, fallback to zero
-            logger()->warning('Failed to compute scholars count for dashboard: '.$e->getMessage());
-            $scholarsCount = 0;
-        }
-
-        // Faculty and Staff counts based on role_id: faculty -> 3, staff -> 4
-        try {
-            $facultyCount = DB::table('users')->where('role_id', 'like', '%3%')->count();
-            $staffCount = DB::table('users')->where('role_id', 'like', '%4%')->count();
-        } catch (\Throwable $e) {
-            logger()->warning('Failed to compute faculty/staff counts: '.$e->getMessage());
-            $facultyCount = 0;
-            $staffCount = 0;
-        }
-
-        return Inertia::render('Dashboard', [
-            'scholarsCount' => $scholarsCount,
-            'facultyCount' => $facultyCount,
-            'staffCount' => $staffCount,
-        ]);
-    })->middleware(['verified'])->name('dashboard');
+    // Dashboard (handled by controller)
+    Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
+        ->middleware(['verified'])
+        ->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
@@ -199,6 +164,31 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
     Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
     Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
+
+    // Division chief approve/decline via signed links for Work Requests
+    Route::get('/work-requests/{workRequest}/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByDivisionChief'])
+        ->name('work-requests.approve')
+        ->middleware(['signed']);
+
+    Route::get('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showDeclineForm'])
+        ->name('work-requests.decline')
+        ->middleware(['signed']);
+
+    Route::post('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'submitDecline'])
+        ->name('work-requests.decline.submit')
+        ->middleware(['signed']);
+    // FAD approval signed routes
+    Route::get('/work-requests/{workRequest}/fad/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByFADChief'])
+        ->name('work-requests.fad.approve')
+        ->middleware(['signed']);
+
+    Route::get('/work-requests/{workRequest}/fad/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showFADDeclineForm'])
+        ->name('work-requests.fad.decline')
+        ->middleware(['signed']);
+
+    Route::post('/work-requests/{workRequest}/fad/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'submitFADDecline'])
+        ->name('work-requests.fad.decline.submit')
+        ->middleware(['signed']);
     // Service Requests
     Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
     Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');

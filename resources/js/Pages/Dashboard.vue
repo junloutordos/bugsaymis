@@ -4,6 +4,8 @@ const props = defineProps({
   scholarsCount: { type: Number, default: 0 },
   facultyCount: { type: Number, default: 0 },
   staffCount: { type: Number, default: 0 },
+  maleCount: { type: Number, default: 0 },
+  femaleCount: { type: Number, default: 0 },
 })
 
 // Chart.js + vue-chartjs
@@ -20,6 +22,7 @@ import {
   BarElement,
 } from 'chart.js'
 import { Pie, Bar, Doughnut, Scatter } from 'vue-chartjs'
+import { computed } from 'vue'
 
 // Calendar
 import FullCalendar from '@fullcalendar/vue3'
@@ -45,15 +48,15 @@ const chartOptions = {
 }
 
 // --- Student Dashboard Data ---
-const studentData = {
+const studentData = computed(() => ({
   labels: ['Male', 'Female'],
   datasets: [
     {
-      data: [234, 193],
-      backgroundColor: ['#3b82f6','#facc15' ],
+      data: [props.maleCount || 0, props.femaleCount || 0],
+      backgroundColor: ['#3b82f6', '#facc15'],
     },
   ],
-}
+}))
 
 const attendanceData = {
   labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],

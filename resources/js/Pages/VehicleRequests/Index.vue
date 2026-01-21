@@ -617,9 +617,18 @@ const destroy = (req) => {
             <p v-else-if="form.errors.passengers" class="text-red-600 text-sm mt-1">{{ form.errors.passengers }}</p>
           </div>
 
-          <div class="flex flex-col sm:flex-row gap-2">
-            <button @click.prevent="submit" :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto disabled:opacity-60">Submit</button>
-            <button @click.prevent="closeModal" class="px-4 py-2 rounded border w-full sm:w-auto">Cancel</button>
+          <div class="flex justify-end gap-2">
+            <button @click.prevent="submit" :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded sm:w-auto disabled:opacity-60 inline-flex items-center justify-center">
+              <span v-if="form.processing" class="inline-flex items-center">
+                <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                Submitting...
+              </span>
+              <span v-else>Submit</span>
+            </button>
+            <button @click.prevent="closeModal" class="px-4 py-2 rounded border">Cancel</button>
           </div>
         </div>
       </div>

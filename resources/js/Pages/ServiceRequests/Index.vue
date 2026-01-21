@@ -224,7 +224,16 @@ const canPrint = (r) => {
 
             <div class="flex justify-end gap-2">
               <button @click="closeModal" class="px-4 py-2 rounded border">Cancel</button>
-              <button @click="submit" class="px-4 py-2 bg-blue-600 text-white rounded">{{ editingId ? 'Update' : 'Submit' }}</button>
+              <button @click="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-60 inline-flex items-center justify-center">
+                <span v-if="form.processing" class="inline-flex items-center">
+                  <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                  </svg>
+                  Processing...
+                </span>
+                <span v-else>{{ editingId ? 'Update' : 'Submit' }}</span>
+              </button>
             </div>
           </div>
         </div>
