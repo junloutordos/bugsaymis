@@ -347,6 +347,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     Route::get('/ict-equipments', [ICTEquipmentController::class, 'index'])->name('ict-equipments.index');
     Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('ict-equipments.store');
+    Route::put('/ict-equipments/{ictEquipment}', [ICTEquipmentController::class, 'update'])
+    ->name('ict-equipments.update');
+
     Route::get('/ict-equipments/{id}', [ICTEquipmentController::class, 'show'])->name('ict-equipments.show');
     Route::get('/ict-equipment/{ictEquipment}', [ICTEquipmentController::class, 'publicShow'])->name('ict-equipments.public.show');
 

@@ -20,7 +20,7 @@ class ICTEquipment extends Model
         'date_acquired',
         'amount',
         'status',
-        'location',
+        'room_id',
         'remarks',
         'qr_code_path',
     ];

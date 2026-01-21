@@ -47,9 +47,6 @@ class ICTEquipmentController extends Controller
             // ✅ NEW
             'room_id' => 'required|exists:rooms,id',
 
-            // ❗ kept for backward compatibility
-            'location' => 'nullable|string|max:255',
-
             'remarks' => 'nullable|string',
         ]);
 
@@ -82,9 +79,6 @@ class ICTEquipmentController extends Controller
 
             // ✅ NEW
             'room_id' => 'required|exists:rooms,id',
-
-            // ❗ kept
-            'location' => 'nullable|string|max:255',
 
             'remarks' => 'nullable|string',
         ]);
