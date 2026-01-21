@@ -17,7 +17,7 @@ const props = defineProps({
         <p><strong>Date Acquired:</strong> {{ props.equipment.date_acquired }}</p>
         <p><strong>Amount:</strong> {{ props.equipment.amount }}</p>
         <p><strong>Status:</strong> {{ props.equipment.status }}</p>
-        <p><strong>Location:</strong> {{ props.equipment.location }}</p>
+        <p><strong>Room / Location:</strong> {{ props.equipment.room?.name ?? 'N/A' }}</p>
         <p><strong>Remarks:</strong> {{ props.equipment.remarks }}</p>
         <p><strong>Owner:</strong> {{ props.equipment.owner?.name }}</p>
       </div>
