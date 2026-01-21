@@ -364,14 +364,14 @@ function printModal() {
             <!-- Location / Room -->
             <div>
               <label class="block text-sm font-medium text-gray-700">
-                Room <span class="text-red-500">*</span>
+                Location<span class="text-red-500">*</span>
               </label>
               <select
                 v-model="form.room_id"
                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
                 required
               >
-                <option value="">Select Room</option>
+                <option value="">Select location</option>
                 <option v-for="room in props.rooms" :key="room.id" :value="room.id">
                   {{ room.name }}
                 </option>
