@@ -355,44 +355,130 @@ const handleNewRequest = async () => {
           </h2>
 
           <!-- VIEW MODE -->
-          <div v-if="modalMode==='view' && selectedRequest" class="space-y-2">
-            <p>Title: <strong>{{ selectedRequest.title }}</strong></p>
-            <p>Category: <strong>{{ selectedRequest.category }}</strong></p>
-            <p>Description: <strong>{{ selectedRequest.description }}</strong></p>
-            <p>Assigned Personnel: <strong>{{ selectedRequest.assigned_personnel ?? 'Not Assigned' }}</strong></p>
-            <p>Attended By: <strong>{{ selectedRequest.attendedby ?? '—' }}</strong></p>
-            <p>Submitted By: <strong>{{ selectedRequest.user?.name ?? '—' }}</strong></p>
-            <hr></hr>
-            <!-- Tracking Logs -->
-            <div v-if="selectedRequest.tracking_logs?.length" class="mt-6">
-              <h3 class="text-lg font-semibold mb-4">Progress Tracking</h3>
-              
-              <!-- Scrollable container -->
-              <div class="relative border-l border-gray-300 ml-3 max-h-80 overflow-y-auto pr-2 custom-scroll">
-                <div 
-                  v-for="log in selectedRequest.tracking_logs" 
-                  :key="log.id" 
-                  class="mb-6 ml-6"
-                >
-                  <span 
-                    class="absolute -left-1.5 flex h-3 w-3 items-center justify-center rounded-full border border-white bg-blue-500"
-                  ></span>
-                  <div class="p-4 bg-gray-50 rounded-lg shadow-sm border">
-                    <p class="text-sm font-medium text-gray-800">{{ log.status }}</p>
-                    <p class="text-sm text-gray-600 whitespace-pre-line">
-                      {{ log.remarks ?? 'No remarks' }}
-                    </p>
-                    <p class="text-xs text-gray-400 mt-1">Updated: {{ formatDate(log.created_at) }}</p>
-                  </div>
-                  <!-- ✅ Show attended_by if present -->
-                  <p v-if="log.it_job_request?.attendedby" class="text-xs text-gray-500 mt-1">
-                    Attended by: <span class="font-medium">{{ log.it_job_request.attendedby }}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
+<div
+  v-if="modalMode === 'view' && selectedRequest"
+  class="space-y-6"
+>
+  <!-- 📌 Request Summary Card -->
+  <div class="bg-white rounded-xl border shadow-sm p-6">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-800">
+          {{ selectedRequest.title }}
+        </h2>
+        <p class="text-sm text-gray-500">
+          Submitted by {{ selectedRequest.user?.name ?? '—' }}
+        </p>
+      </div>
 
+      <!-- Status Badge -->
+      <span
+        class="px-3 py-1 text-xs font-medium rounded-full"
+        :class="{
+          
+          'bg-yellow-100 text-yellow-700': selectedRequest.status==='Pending Division Chief Approval',
+          'bg-orange-100 text-orange-700': selectedRequest.status==='MIS Assessed the Request',
+          'bg-violet-100 text-violet-700': selectedRequest.status==='Pending OCD Approval',
+          'bg-blue-100 text-blue-700': selectedRequest.status==='In Progress',
+          'bg-green-100 text-green-700': selectedRequest.status==='Acted by MIS',
+          'bg-green-500 text-white': selectedRequest.status==='Request Completed'
+        }"
+      >
+        {{ selectedRequest.status ?? 'Pending' }}
+      </span>
+    </div>
+
+    <!-- 📋 Details Grid -->
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+      <div>
+        <dt class="text-gray-500">Category</dt>
+        <dd class="font-medium text-gray-800">
+          {{ selectedRequest.category }}
+        </dd>
+      </div>
+
+      <div>
+        <dt class="text-gray-500">Assigned Personnel</dt>
+        <dd class="font-medium text-gray-800">
+          {{ selectedRequest.assigned_personnel ?? 'Not Assigned' }}
+        </dd>
+      </div>
+
+      <div>
+        <dt class="text-gray-500">Attended By</dt>
+        <dd class="font-medium text-gray-800">
+          {{ selectedRequest.attendedby ?? '—' }}
+        </dd>
+      </div>
+
+      <div>
+        <dt class="text-gray-500">Date Submitted</dt>
+        <dd class="font-medium text-gray-800">
+          {{ formatDate(selectedRequest.created_at) }}
+        </dd>
+      </div>
+
+      <!-- Full-width description -->
+      <div class="sm:col-span-2">
+        <dt class="text-gray-500">Description</dt>
+        <dd class="mt-1 text-gray-700 leading-relaxed whitespace-pre-line">
+          {{ selectedRequest.description }}
+        </dd>
+      </div>
+    </dl>
+  </div>
+
+  <!-- 🧭 Progress Tracking -->
+  <div
+    v-if="selectedRequest.tracking_logs?.length"
+    class="bg-white rounded-xl border shadow-sm p-6"
+  >
+    <h3 class="text-lg font-semibold text-gray-800 mb-5">
+      Progress Tracking
+    </h3>
+
+    <!-- Timeline -->
+    <div class="relative max-h-80 overflow-y-auto pl-6 border-l border-gray-200 custom-scroll">
+      <div
+        v-for="log in selectedRequest.tracking_logs"
+        :key="log.id"
+        class="relative mb-6"
+      >
+        <!-- Timeline Dot -->
+        <span
+          class="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-blue-500 ring-4 ring-white"
+        ></span>
+
+        <!-- Log Card -->
+        <div class="bg-gray-50 rounded-lg border p-4 shadow-sm">
+          <div class="flex justify-between items-start">
+            <p class="text-sm font-semibold text-orange-600">
+              {{ log.status }}
+            </p>
+            <span class="text-xs text-gray-400">
+              {{ formatDate(log.created_at) }}
+            </span>
           </div>
+
+          <p class="mt-2 text-sm text-gray-600 whitespace-pre-line">
+            {{ log.remarks ?? 'No remarks provided.' }}
+          </p>
+
+          <p
+            v-if="log.it_job_request?.attendedby"
+            class="mt-2 text-xs text-gray-500"
+          >
+            Attended by:
+            <span class="font-medium text-gray-700">
+              {{ log.it_job_request.attendedby }}
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
           <!-- CREATE / MIS ASSESSMENT FORM -->
           <form v-else @submit.prevent="submitRequest" class="space-y-4">
