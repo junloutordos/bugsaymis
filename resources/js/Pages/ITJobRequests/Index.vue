@@ -183,79 +183,158 @@ const handleNewRequest = async () => {
           </div>
         </div>
 
-        <!-- Requests Table -->
-        <div class="overflow-x-auto">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
-              <tr>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('id')">ITJR #</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('title')">Title</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('category')">Category</th>
-                <th v-if="userRole==='Administrator'" class="px-4 py-3 text-left">Submitted By</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('created_at')">Date Filed</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                <th class="px-4 py-3 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="req in visibleRequests" :key="req.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ req.itjr_no }}</td>
-                <td class="px-4 py-3">{{ req.title }}</td>
-                <td class="px-4 py-3">{{ req.category }}</td>
-                <td v-if="userRole==='Administrator'" class="px-4 py-3">{{ req.user?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ formatDate(req.created_at) }}</td>
-                <td class="px-4 py-3">
-                  <span
-                    class="px-3 py-1 text-xs rounded-full"
-                    :class="{
-                      'bg-yellow-100 text-yellow-700': req.status==='Pending Division Chief Approval',
-                      'bg-orange-100 text-orange-700': req.status==='MIS Assessed the Request',
-                      'bg-violet-100 text-violet-700': req.status==='Pending OCD Approval',
-                      'bg-blue-100 text-blue-700': req.status==='In Progress',
-                      'bg-green-100 text-green-700': req.status==='Acted by MIS',
-                      'bg-green-500 text-white': req.status==='Request Completed'
-                    }"
-                  >
-                    {{ req.status }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex justify-center gap-1 items-center">
-                    <button @click="viewRequest(req)" class="p-1 hover:bg-gray-100 rounded">
-                      <EyeIcon class="w-5 h-5 text-blue-600"/>
-                    </button>
+        <!-- Desktop table -->
+<div class="hidden sm:block overflow-x-auto">
+  <table class="w-full table-fixed border border-gray-200">
+    <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <tr>
+        <th class="px-4 py-3 text-left">ITJR #</th>
+        <th class="px-4 py-3 text-left">Title</th>
+        <th class="px-4 py-3 text-left">Category</th>
+        <th v-if="userRole === 'Administrator'" class="px-4 py-3 text-left">Submitted By</th>
+        <th class="px-4 py-3 text-left">Date Filed</th>
+        <th class="px-4 py-3 text-left">Status</th>
+        <th class="px-4 py-3 text-center">Action</th>
+      </tr>
+    </thead>
 
-                    <template v-if="userRole==='Administrator'">
-                      <button @click="openMISAssessment(req)" class="p-1 hover:bg-gray-100 rounded">
-                        <PencilSquareIcon class="w-5 h-5 text-yellow-600"/>
-                      </button>
-                      <button @click="deleteRequest(req)" class="p-1 hover:bg-gray-100 rounded">
-                        <TrashIcon class="w-5 h-5 text-red-600"/>
-                      </button>
-                    </template>
+    <tbody class="divide-y divide-gray-200 text-sm">
+      <tr v-for="req in visibleRequests" :key="req.id">
+        <td class="px-4 py-3">{{ req.itjr_no }}</td>
+        <td class="px-4 py-3">{{ req.title }}</td>
+        <td class="px-4 py-3">{{ req.category }}</td>
 
-                    <!-- ✅ Confirm Completion & Rate Service button for non-admin users -->
-                    <template v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'">
-                      <button
-                        @click="openRatingModal(req)"
-                        class="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
-                      >
-                        Confirm & Rate
-                      </button>
-                    </template>
-                  </div>
+        <td v-if="userRole === 'Administrator'" class="px-4 py-3">
+          {{ req.user?.name ?? '—' }}
+        </td>
 
-                </td>
-              </tr>
-              <tr v-if="visibleRequests.length===0">
-                <td :colspan="userRole==='Administrator'?7:6" class="px-4 py-6 text-center text-gray-500">
-                  No requests found.
-                </td>
-              </tr>
+        <td class="px-4 py-3">{{ formatDate(req.created_at) }}</td>
 
-            </tbody>
-          </table>
-        </div>
+        <td class="px-4 py-3">
+          <span
+            class="px-3 py-1 text-xs rounded-full font-semibold"
+            :class="{
+              'bg-yellow-100 text-yellow-700': req.status==='Pending Division Chief Approval',
+              'bg-orange-100 text-orange-700': req.status==='MIS Assessed the Request',
+              'bg-violet-100 text-violet-700': req.status==='Pending OCD Approval',
+              'bg-blue-100 text-blue-700': req.status==='In Progress',
+              'bg-green-100 text-green-700': req.status==='Acted by MIS',
+              'bg-green-500 text-white': req.status==='Request Completed'
+            }"
+          >
+            {{ req.status }}
+          </span>
+        </td>
+
+        <td class="px-4 py-3 text-center">
+          <div class="flex justify-center gap-2">
+            <button @click="viewRequest(req)" class="p-2 bg-blue-100 rounded hover:bg-blue-200">
+              <EyeIcon class="w-5 h-5 text-blue-700"/>
+            </button>
+
+            <template v-if="userRole === 'Administrator'">
+              <button @click="openMISAssessment(req)" class="p-2 bg-yellow-100 rounded hover:bg-yellow-200">
+                <PencilSquareIcon class="w-5 h-5 text-yellow-700"/>
+              </button>
+              <button @click="deleteRequest(req)" class="p-2 bg-red-100 rounded hover:bg-red-200">
+                <TrashIcon class="w-5 h-5 text-red-700"/>
+              </button>
+            </template>
+
+            <button
+              v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'"
+              @click="openRatingModal(req)"
+              class="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Confirm & Rate
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      <tr v-if="visibleRequests.length === 0">
+        <td :colspan="userRole === 'Administrator' ? 7 : 6" class="px-4 py-6 text-center text-gray-500">
+          No requests found.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<!-- Mobile cards -->
+<div class="sm:hidden space-y-3">
+  <div
+    v-for="req in visibleRequests"
+    :key="req.id"
+    class="border rounded-lg p-4 bg-white shadow-sm"
+  >
+    <div class="flex justify-between items-start">
+      <div>
+        <div class="text-xs text-gray-500">ITJR #{{ req.itjr_no }}</div>
+        <div class="font-semibold text-gray-800">{{ req.title }}</div>
+        <div class="text-sm text-gray-600">{{ req.category }}</div>
+      </div>
+
+      <span
+        class="px-2 py-1 text-xs rounded-full font-semibold"
+        :class="{
+          'bg-yellow-100 text-yellow-700': req.status==='Pending Division Chief Approval',
+          'bg-orange-100 text-orange-700': req.status==='MIS Assessed the Request',
+          'bg-violet-100 text-violet-700': req.status==='Pending OCD Approval',
+          'bg-blue-100 text-blue-700': req.status==='In Progress',
+          'bg-green-100 text-green-700': req.status==='Acted by MIS',
+          'bg-green-500 text-white': req.status==='Request Completed'
+        }"
+      >
+        {{ req.status }}
+      </span>
+    </div>
+
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+      <div><strong>Date:</strong> {{ formatDate(req.created_at) }}</div>
+      <div v-if="userRole === 'Administrator'">
+        <strong>Submitted By:</strong> {{ req.user?.name ?? '—' }}
+      </div>
+    </div>
+
+    <div class="mt-3 flex gap-2 flex-wrap">
+      <button
+        @click="viewRequest(req)"
+        class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"
+      >
+        <EyeIcon class="w-4 h-4"/> View
+      </button>
+
+      <template v-if="userRole === 'Administrator'">
+        <button
+          @click="openMISAssessment(req)"
+          class="px-3 py-2 bg-yellow-100 text-yellow-700 rounded-md"
+        >
+          <PencilSquareIcon class="w-4 h-4"/>
+        </button>
+
+        <button
+          @click="deleteRequest(req)"
+          class="px-3 py-2 bg-red-100 text-red-700 rounded-md"
+        >
+          <TrashIcon class="w-4 h-4"/>
+        </button>
+      </template>
+
+      <button
+        v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'"
+        @click="openRatingModal(req)"
+        class="w-full px-3 py-2 bg-green-600 text-white rounded-md"
+      >
+        Confirm & Rate
+      </button>
+    </div>
+  </div>
+
+  <div v-if="visibleRequests.length === 0" class="text-center text-gray-500 py-6">
+    No requests found.
+  </div>
+</div>
+
 
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
