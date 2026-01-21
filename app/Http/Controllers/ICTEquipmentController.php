@@ -66,47 +66,27 @@ class ICTEquipmentController extends Controller
     }
 
     public function update(Request $request, ICTEquipment $ictEquipment)
-{
-    $data = $request->validate([
-        'category' => 'required|string|max:255',
-        'owner_id' => 'required|exists:users,id',
-        'property_no' => 'nullable|string|max:255',
-        'serial_no' => 'required|string|max:255',
-        'description' => 'required|string',
-        'date_acquired' => 'nullable|date',
-        'amount' => 'nullable|numeric',
-        'status' => 'required|string|max:255',
-        'room_id' => 'required|exists:rooms,id',
-        'remarks' => 'nullable|string',
-    ]);
+    {
+        $data = $request->validate([
+            'category' => 'required|string|max:255',
+            'owner_id' => 'required|exists:users,id',
+            'property_no' => 'nullable|string|max:255',
+            'serial_no' => 'required|string|max:255',
+            'description' => 'required|string',
+            'date_acquired' => 'nullable|date',
+            'amount' => 'nullable|numeric',
+            'status' => 'required|string|max:255',
 
-    // Update equipment data
-    $ictEquipment->update($data);
+            // ✅ NEW
+            'room_id' => 'required|exists:rooms,id',
 
-    /**
-     * 🔁 REGENERATE QR CODE
-     */
-    // Delete old QR if exists
-    if ($ictEquipment->qr_code_path) {
-        $oldPath = str_replace('storage/', '', $ictEquipment->qr_code_path);
-        Storage::disk('public')->delete($oldPath);
+            'remarks' => 'nullable|string',
+        ]);
+
+        $ictEquipment->update($data);
+
+        return redirect()->back()->with('success', 'Equipment updated successfully.');
     }
-
-    // Generate new QR
-    $url = url('/equipment/' . $ictEquipment->id);
-    $fileName = 'qrcodes/equipment_' . $ictEquipment->id . '.svg';
-
-    $qrSvg = QrCode::size(200)->generate($url);
-    Storage::disk('public')->put($fileName, $qrSvg);
-
-    // Save new QR path
-    $ictEquipment->update([
-        'qr_code_path' => 'storage/' . $fileName,
-    ]);
-
-    return redirect()->back()->with('success', 'Equipment updated and QR code regenerated.');
-}
-
     public function destroy(ICTEquipment $ictEquipment)
     {
         if ($ictEquipment->qr_code_path) {
