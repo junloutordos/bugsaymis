@@ -18,7 +18,18 @@
 <body>
   <div class="center">
     <div class="card">
-      <h2>Decline Facility Request #{{ $facilityRequest->id }}</h2>
+      @php
+        $resourceTitle = 'Facility Request';
+        try {
+            if (method_exists($facilityRequest, 'getTable') && $facilityRequest->getTable() === 'work_requests') {
+                $resourceTitle = 'Work Request';
+            }
+        } catch (\Throwable $e) {
+            // fallback: keep Facility Request
+        }
+      @endphp
+
+      <h2>Decline {{ $resourceTitle }} #{{ $facilityRequest->id }}</h2>
       <p>Please provide a reason for declining this request. The requester will be notified.</p>
 
       <form method="post" action="{{ $postAction }}">

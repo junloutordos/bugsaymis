@@ -30,6 +30,7 @@
                 <th class="px-4 py-3 text-left">Expected Completion</th>
                 <th class="px-4 py-3 text-left">Action Taken</th>
                 <th class="px-4 py-3 text-left">Date Completed</th>
+                <th class="px-4 py-3 text-left">Status</th>
                 <th class="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
@@ -43,8 +44,22 @@
                 <td class="px-4 py-3">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</td>
                 <td class="px-4 py-3">{{ wr.action_taken ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</td>
+                <td class="px-4 py-3">
+                  <span :class="statusClass(wr.status) + ' px-2 py-1 rounded-full text-xs font-medium'">
+                    {{ wr.status ?? '—' }}
+                  </span>
+                </td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex items-center gap-2 justify-center">
+                    <button
+                      v-if="wr.status === 'Division Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')"
+                      @click.prevent="openModal(wr)"
+                      class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
+                      title="Assign"
+                    >
+                      <UserPlusIcon class="w-5 h-5" />
+                    </button>
+
                     <button
                       v-if="page.props.auth?.user?.role?.name === 'Administrator'"
                       @click.prevent="openModal(wr)"
@@ -66,7 +81,7 @@
                 </td>
               </tr>
               <tr v-if="props.workRequests.length === 0">
-                <td colspan="9" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
+                <td colspan="10" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -94,6 +109,22 @@
 
             <div class="grid grid-cols-2 gap-4">
               <div>
+                <label class="block text-sm font-medium text-gray-700">Building</label>
+                <select v-model="form.location_division_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                  <option value="">Select building</option>
+                  <option v-for="d in props.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Room</label>
+                <select v-model="form.location_office_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                  <option value="">Select room</option>
+                  <option v-for="o in filteredOffices" :key="o.id" :value="o.id">{{ o.name }}</option>
+                </select>
+              </div>
+
+              <div>
                 <label class="block text-sm font-medium text-gray-700">Priority</label>
                 <select v-model="form.priority" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
                   <option>Low</option>
@@ -107,9 +138,26 @@
               </div>
             </div>
 
+            <div v-if="editingId && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" class="mt-3">
+              <label class="block text-sm font-medium text-gray-700">Assign Personnel</label>
+              <select v-model="form.assigned_user_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                <option value="">Select staff</option>
+                <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+            </div>
+
             <div class="flex justify-end space-x-3 pt-4">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 inline-flex items-center justify-center">
+                <span v-if="form.processing" class="inline-flex items-center">
+                  <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                  </svg>
+                  Saving...
+                </span>
+                <span v-else>Save</span>
+              </button>
             </div>
           </form>
         </div>
@@ -120,14 +168,15 @@
 
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
-import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, watch } from 'vue'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const props = defineProps({
   divisions: Array,
   offices: Array,
   users: Array,
+  skilledUsers: Array,
   workRequests: Array,
 })
 
@@ -143,6 +192,20 @@ const form = useForm({
   location_division_id: '',
   location_office_id: '',
   expected_completion_date: '',
+  assigned_user_id: '',
+})
+
+// Filter offices (rooms) by selected division (building)
+const filteredOffices = computed(() => {
+  if (!form.location_division_id) return props.offices || []
+  return (props.offices || []).filter(o => String(o.building_id) === String(form.location_division_id))
+})
+
+// Clear room selection if it no longer belongs to the selected building
+watch(() => form.location_division_id, (nv) => {
+  if (!nv) return
+  const ok = (props.offices || []).some(o => String(o.id) === String(form.location_office_id) && String(o.building_id) === String(nv))
+  if (!ok) form.location_office_id = ''
 })
 
 const openModal = (wr = null) => {
@@ -155,6 +218,7 @@ const openModal = (wr = null) => {
     form.location_division_id = wr.location_division_id ?? ''
     form.location_office_id = wr.location_office_id ?? ''
     form.expected_completion_date = wr.expected_completion_date ?? ''
+    form.assigned_user_id = wr.assigned_user_id ?? ''
   } else {
     form.reset()
     form.priority = 'Normal'
@@ -186,5 +250,14 @@ const destroy = (wr) => {
       onError: (e) => { alert('Failed to delete request') }
     })
   })
+}
+
+// Return CSS classes for status badges
+const statusClass = (s) => {
+  if (!s) return 'bg-gray-100 text-gray-700'
+  const st = String(s).toLowerCase()
+  if (st.includes('approve')) return 'bg-green-600 text-white'
+  if (st.includes('declin')) return 'bg-red-600 text-white'
+  return 'bg-gray-100 text-gray-700'
 }
 </script>

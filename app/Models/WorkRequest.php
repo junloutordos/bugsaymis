@@ -14,6 +14,9 @@ class WorkRequest extends Model
         'category',
         'description',
         'priority',
+        'division_chief_id', // Ensure this field is included
+        'decline_reason',
+        'declined_at',
         'location_division_id',
         'location_office_id',
         'assigned_user_id',
@@ -27,12 +30,17 @@ class WorkRequest extends Model
 
     public function division()
     {
-        return $this->belongsTo(Division::class, 'location_division_id');
+        return $this->belongsTo(\App\Models\Building::class, 'location_division_id');
+    }
+
+    public function divisionChief()
+    {
+        return $this->belongsTo(User::class, 'division_chief_id');
     }
 
     public function office()
     {
-        return $this->belongsTo(Office::class, 'location_office_id');
+        return $this->belongsTo(\App\Models\Room::class, 'location_office_id');
     }
 
     public function assignedUser()
