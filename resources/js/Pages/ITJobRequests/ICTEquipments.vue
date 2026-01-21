@@ -15,6 +15,7 @@ import useEquipments from "@/Composables/useEquipments.js"
 const props = defineProps({
   equipments: Array,
   users: Array, // ✅ Accept users from backend
+  rooms: Array, // ✅ ADD
 })
 
 // include ALL returned properties you use in template
@@ -266,7 +267,10 @@ function printModal() {
                   <p><strong>Date Acquired:</strong> {{ selectedEquipment.date_acquired }}</p>
                   <p><strong>Amount:</strong> {{ selectedEquipment.amount }}</p>
                   <p><strong>Status:</strong> {{ selectedEquipment.status }}</p>
-                  <p><strong>Location:</strong> {{ selectedEquipment.location }}</p>
+                  <p>
+                    <strong>Location:</strong>
+                    {{ selectedEquipment.room?.name || 'N/A' }}
+                  </p>
                   <p><strong>Remarks:</strong> {{ selectedEquipment.remarks }}</p>
                 </div>
               </div>
@@ -357,11 +361,23 @@ function printModal() {
               </select>
             </div>
 
-            <!-- Location -->
+            <!-- Location / Room -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">Location <span class="text-red-500">*</span></label>
-              <input v-model="form.location" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
+              <label class="block text-sm font-medium text-gray-700">
+                Room <span class="text-red-500">*</span>
+              </label>
+              <select
+                v-model="form.room_id"
+                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
+                required
+              >
+                <option value="">Select Room</option>
+                <option v-for="room in props.rooms" :key="room.id" :value="room.id">
+                  {{ room.name }}
+                </option>
+              </select>
             </div>
+
 
             <!-- Remarks -->
             <div class="col-span-2">

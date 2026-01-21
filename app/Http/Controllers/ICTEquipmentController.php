@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ICTEquipment;
 use App\Models\User;
+use App\Models\Room; // ✅ ADDED
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -13,15 +14,21 @@ class ICTEquipmentController extends Controller
 {
     public function index()
     {
-        $equipments = ICTEquipment::with(['owner', 'pmsHistory' => function ($q) {
-            $q->orderBy('pms_date', 'desc');
-        }])->get();
+        $equipments = ICTEquipment::with([
+            'owner',
+            'room', // ✅ ADDED
+            'pmsHistory' => function ($q) {
+                $q->orderBy('pms_date', 'desc');
+            }
+        ])->get();
 
         $users = User::all();
+        $rooms = Room::orderBy('name')->get(); // ✅ ADDED
 
         return Inertia::render('ITJobRequests/ICTEquipments', [
             'equipments' => $equipments,
-            'users' => $users
+            'users' => $users,
+            'rooms' => $rooms, // ✅ ADDED
         ]);
     }
 
@@ -36,13 +43,19 @@ class ICTEquipmentController extends Controller
             'date_acquired' => 'nullable|date',
             'amount' => 'nullable|numeric',
             'status' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
+
+            // ✅ NEW
+            'room_id' => 'required|exists:rooms,id',
+
+            // ❗ kept for backward compatibility
+            'location' => 'nullable|string|max:255',
+
             'remarks' => 'nullable|string',
         ]);
 
         $equipment = ICTEquipment::create($data);
 
-        // Generate QR Code with full URL
+        // QR Code (unchanged)
         $url = url('/equipment/' . $equipment->id);
         $fileName = 'qrcodes/equipment_' . $equipment->id . '.svg';
 
@@ -66,7 +79,13 @@ class ICTEquipmentController extends Controller
             'date_acquired' => 'nullable|date',
             'amount' => 'nullable|numeric',
             'status' => 'required|string|max:255',
-            'location' => 'required|string|max:255',
+
+            // ✅ NEW
+            'room_id' => 'required|exists:rooms,id',
+
+            // ❗ kept
+            'location' => 'nullable|string|max:255',
+
             'remarks' => 'nullable|string',
         ]);
 
@@ -74,7 +93,6 @@ class ICTEquipmentController extends Controller
 
         return redirect()->back()->with('success', 'Equipment updated successfully.');
     }
-
     public function destroy(ICTEquipment $ictEquipment)
     {
         if ($ictEquipment->qr_code_path) {

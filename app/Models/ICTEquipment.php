@@ -58,6 +58,10 @@ class ICTEquipment extends Model
     {
         return $this->hasMany(ICTPMSHistory::class, 'equipment_id');
     }
-
+   
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
 
 }

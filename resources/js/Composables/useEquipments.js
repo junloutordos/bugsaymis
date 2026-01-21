@@ -27,6 +27,7 @@ export default function useEquipments(initialEquipments = [], users = []) {
     date_acquired: "",
     amount: "",
     status: "",
+    room_id: "",   // ✅ ADD
     location: "",
     remarks: "",
   })
