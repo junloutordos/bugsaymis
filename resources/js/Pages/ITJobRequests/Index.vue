@@ -346,7 +346,10 @@ const handleNewRequest = async () => {
 
       <!-- Modal -->
       <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+        <div
+          class="bg-white w-full max-w-2xl rounded-xl shadow-lg
+                 max-h-[90vh] overflow-y-auto relative p-4 sm:p-6"
+        >
 
           <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
 
