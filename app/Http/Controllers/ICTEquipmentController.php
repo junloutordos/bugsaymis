@@ -122,7 +122,10 @@ class ICTEquipmentController extends Controller
     // ✅ Public view when QR code is scanned
     public function publicShow(ICTEquipment $ictEquipment)
     {
-        $ictEquipment->load('owner');
+        $ictEquipment->load([
+            'owner',
+            'room', // ✅ LOAD ROOM RELATIONSHIP
+        ]);
 
         return Inertia::render('ITJobRequests/EquipmentPublicView', [
             'equipment' => $ictEquipment,
