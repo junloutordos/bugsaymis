@@ -398,6 +398,282 @@
           </div>
         </div>
       </div>
+      
+      <!-- Attached Driver's Trip Ticket: starts on a new page -->
+      <div class="attachment-page" style="page-break-before:always;margin-top:6mm">
+        <style type="text/css">
+        .tg  {border-collapse:collapse;border-spacing:0;}
+        /* allow images to show fully and reduce heavy horizontal padding */
+        .tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+          overflow:visible;padding:4px 8px;word-break:normal;}
+        .tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+          font-weight:normal;overflow:visible;padding:4px 8px;word-break:normal;}
+        .tg .tg-i1ya{border-color:#ffffff;font-size:11px;font-weight:bold;text-align:center;vertical-align:top}
+        .tg .tg-zrzq{border-color:#ffffff;font-size:11px;font-weight:bold;text-align:left;text-decoration:underline;vertical-align:top}
+        .tg .tg-dfg1{border-color:#ffffff;font-size:11px;text-align:center;vertical-align:top}
+        .tg .tg-pmdb{border-color:#ffffff;font-size:11px;text-align:left;vertical-align:top}
+        .tg .tg-d5m0{border-color:#ffffff;font-size:11px;font-weight:bold;text-align:center;text-decoration:underline;vertical-align:top}
+        .tg .tg-igtm{border-color:#ffffff;font-size:11px;text-align:right;vertical-align:top}
+        .tg .tg-04eo{border-color:#ffffff;font-size:11px;font-weight:bold;text-align:left;vertical-align:top}
+        @media print{ .attachment-page{page-break-before:always} }
+        </style>
+
+        <table class="tg" style="table-layout: fixed; width: 692px"><colgroup>
+        <col style="width: 90px">
+        <col style="width: 283px">
+        <col style="width: 180px">
+        <col style="width: 111px">
+        <col style="width: 75px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="tg-pmdb" style="padding:4px 8px"><img src="{{ asset('images/pshslogo.png') }}" style="width:55px;height:auto;display:block;margin:0 auto;" alt="logo"/></th>
+            <th class="tg-pmdb" colspan="4">Republic of the Philippines<br>Department of Science and Technology<br><span style="font-weight:bold">PHILIPPINE SCIENCE HIGH SCHOOL</span><br>CARAGA REGION SCHOOL IN BUTUAN CITY</th>
+          </tr></thead>
+        <tbody>
+          <tr>
+            <td class="tg-dfg1" colspan="5"><span style="font-weight:bold"><br><br><br>DRIVER'S TRIP TICKET<br><br><br></span></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"></td>
+            <td class="tg-igtm"><span style="font-weight:400;font-style:normal">Locator Slip No.</span></td>
+            <td class="tg-pmdb">___________</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"></td>
+            <td class="tg-zrzq"></td>
+            <td class="tg-igtm"><span style="font-weight:400;font-style:normal">Date:</span></td>
+            <td class="tg-pmdb"><span style="font-weight:700;font-style:normal;text-decoration:underline">{{ optional($request->created_at)->format('m/d/Y') }}</span></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb" colspan="5"><span style="font-weight:bold">A. To be filled up by the Administrative Official, authorizing to travel:</span></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb" colspan="5"><span style="font-weight:bold">(Note: Item 3-6 to be filled up by the Passenger)</span></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"><span style="font-weight:400;font-style:normal">1. Name of Driver of Vehicle</span></td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ strtoupper(optional($request->driver)->name ?? '') }}</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb">2. Gov't Vehicle Used and Plate No.</td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ strtoupper($request->vehicle_type ?? '') }}</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" rowspan="3">3. Name of Authorized Passenger</td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ strtoupper($request->user->name ?? '') }}</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:400;font-style:normal">________________________________</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:400;font-style:normal">________________________________</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb">4. Destination</td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ strtoupper(is_array($request->destination) ? implode(', ', $request->destination) : ($request->destination ?? '')) }}</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb">5. Purpose</td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ strtoupper($request->purpose ?? '') }}</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb">6. Date(s) of Travel</td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ ($request->date_needed ?? '') }}{{ isset($request->date_end) ? ' to ' . $request->date_end : '' }}</span></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <!-- Recommending Approval and Approval sections -->
+          <tr>
+            <td class="tg-pmdb" colspan="5" style="padding:10px; background:#f8fafc">
+              <div style="display:flex;gap:12px;align-items:stretch">
+                <div style="flex:1;padding:8px">
+                  <div style="font-weight:bold;margin-bottom:6px">Recommending Approval</div>
+                  <div style="text-align:center">
+                    @if(!empty($fadSig))
+                      <img src="{{ asset('storage/' . $fadSig) }}" alt="FAD signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                    @else
+                      <div style="height:48px"></div>
+                    @endif
+                    <div style="font-weight:bold">{{ $fadName ?? '—' }}</div>
+                    <div>FAD Chief</div>
+                  </div>
+                </div>
+                <div style="flex:1;padding:8px">
+                  <div style="font-weight:bold;margin-bottom:6px">Approval</div>
+                  <div style="text-align:center">
+                    @if(!empty($directorSig))
+                      <img src="{{ asset('storage/' . $directorSig) }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                    @else
+                      <div style="height:48px"></div>
+                    @endif
+                    <div style="font-weight:bold">{{ $directorName ?? '—' }}</div>
+                    <div>Campus Director</div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <!-- The rest of the driver's trip ticket fields (driver to complete) -->
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="4">B. To be filled by the Driver:</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">1. Time of Departure from Office/Garage</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">a.m./p.m.</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">2. Time of Arrival at (per item no. 4 above)</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">a.m./p.m.</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">3. Time of Departure from (per item no. 4 above)</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">a.m./p.m.</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">4. Time of Arrival Back to Office/Garage</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">a.m./p.m.</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">5. Approximate Distance Travelled (to &amp; from)</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">kms./miles</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">6. GOL Issued, Purchased and Consumed:</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">a. Balance in Tank</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">b. Issued by Office from Stock</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">c. Add: Purchased during Trip</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-dfg1" colspan="2"><span style="font-weight:bold;font-style:italic">T O T A L</span></td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">d. Deduct: GOL used during the Trip (to &amp; from)</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">e. Balance in Tank at the End of Trip</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">liters</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">7. Oil issued/purchased/consumed</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">kms./miles</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">8. Speedometer readings:</td>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">At the beginning of trip</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">kms./miles</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">At the end of the trip</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">kms./miles</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="2">Distance travelled (per item no.5 above)</td>
+            <td class="tg-pmdb">_________</td>
+            <td class="tg-pmdb">kms./miles</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="4">9. R E M A R K S:</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="4">I hereby certify to the correctness of the above statement of records of travel:</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="4"></td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"></td>
+            <td class="tg-d5m0" colspan="3">{{ strtoupper(optional($request->driver)->name ?? '') }}</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb"></td>
+            <td class="tg-i1ya" colspan="3">DRIVER</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="4">I hereby certify that I/We used this vehicle on official business as stated above:</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-i1ya" colspan="4">Signature of Passenger/s</td>
+          </tr>
+          <tr>
+            <td class="tg-pmdb"></td>
+            <td class="tg-pmdb" colspan="4">______________________________________________________________________________________________</td>
+          </tr>
+        </tbody></table>
+      </div>
     </div>
   </div>
 </body>
