@@ -2,6 +2,7 @@
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
+import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array, vehicles: Array, divisionChiefs: Array });
@@ -75,6 +76,56 @@ const closeAssignDriverModal = () => {
   assignDriverRequest.value = null;
   selectedDriverId.value = null;
   drivers.value = [];
+};
+
+// Calendar modal state (vehicle bookings)
+const showCalendar = ref(false);
+const calendarMonth = ref(new Date());
+const bookings = ref([]);
+
+const monthLabel = computed(() => calendarMonth.value.toLocaleString(undefined, { month: 'long', year: 'numeric' }));
+
+const fetchBookings = async () => {
+  try {
+    const res = await fetch('/vehicle-bookings');
+    const data = await res.json();
+    bookings.value = Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error('Failed to load bookings', e);
+    bookings.value = [];
+  }
+};
+
+const openCalendar = async () => {
+  await fetchBookings();
+  showCalendar.value = true;
+};
+
+const prevMonth = () => {
+  const d = calendarMonth.value;
+  calendarMonth.value = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+};
+
+const nextMonth = () => {
+  const d = calendarMonth.value;
+  calendarMonth.value = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+};
+
+const monthDays = computed(() => {
+  const d = calendarMonth.value;
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const days = [];
+  const last = new Date(year, month + 1, 0).getDate();
+  for (let i = 1; i <= last; i++) {
+    days.push(new Date(year, month, i));
+  }
+  return days;
+});
+
+const bookingsForDate = (dt) => {
+  const key = dt.toISOString().slice(0,10);
+  return bookings.value.filter(b => (b.date || '').toString().slice(0,10) === key);
 };
 
 const assignDriver = async () => {
@@ -277,26 +328,14 @@ const submit = () => {
       console.log('Update URL:', updateUrl);
       // no banner shown for submit
       form.put(updateUrl, {
-        onSuccess: () => { /* success handled by Inertia/redirect */ },
-        onError: (errs) => {
-          console.error('Vehicle request update errors', errs);
-          const serverErr = window.lastVehicleRequestError ?? {};
-          const status = serverErr.status ?? (errs?.status ?? 'unknown');
-          const data = serverErr.data ?? errs;
-          console.error(`Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
-          const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
-          if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
-          console.log('Captured server error', serverErr);
+        onSuccess: () => {
+          closeModal()
+          Swal.fire({ icon: 'success', title: 'Request updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
         },
-        onFinish: () => {
-          console.log('Vehicle request update finished');
-          if (Object.keys(form.errors).length === 0) {
-            // if axios captured an error body, show it briefly then close
-            if (window.lastVehicleRequestError && window.lastVehicleRequestError.data) {
-              console.error('Server error on finish', window.lastVehicleRequestError.data);
-            }
-            closeModal();
-          }
+        onError: (errs) => {
+          console.error('Vehicle request update errors', errs)
+          const msg = Object.values(errs || {}).flat().join('\n') || 'Failed to update request'
+          Swal.fire({ icon: 'error', title: 'Failed to update', text: msg })
         }
       })
       } else {
@@ -304,25 +343,14 @@ const submit = () => {
       console.log('Store URL:', storeUrl);
       // no banner shown for submit
       form.post(storeUrl, {
-        onSuccess: () => {},
-        onError: (errs) => {
-          console.error('Vehicle request create errors', errs);
-          const serverErr = window.lastVehicleRequestError ?? {};
-          const status = serverErr.status ?? (errs?.status ?? 'unknown');
-          const data = serverErr.data ?? errs;
-          console.error(`Error ${status}: ${sanitizeErrorMessage(serverErr.data?.message ?? JSON.stringify(data))}`);
-          const vmsg = serverErr.data?.errors?.vehicle ?? errs?.vehicle ?? serverErr.data?.vehicle;
-          if (vmsg) { alert(Array.isArray(vmsg) ? vmsg.join('\n') : vmsg); }
-          console.log('Captured server error', serverErr);
+        onSuccess: () => {
+          closeModal()
+          Swal.fire({ icon: 'success', title: 'Request created', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
         },
-        onFinish: () => {
-          console.log('Vehicle request create finished');
-          if (Object.keys(form.errors).length === 0) {
-            if (window.lastVehicleRequestError && window.lastVehicleRequestError.data) {
-              console.error('Server error on finish', window.lastVehicleRequestError.data);
-            }
-            closeModal();
-          }
+        onError: (errs) => {
+          console.error('Vehicle request create errors', errs)
+          const msg = Object.values(errs || {}).flat().join('\n') || 'Failed to create request'
+          Swal.fire({ icon: 'error', title: 'Failed to create', text: msg })
         }
       })
     }
@@ -333,23 +361,24 @@ const submit = () => {
 }
 
 const destroy = (req) => {
-  if (!confirm('Delete this vehicle request?')) return;
+  Swal.fire({
+    title: 'Delete this vehicle request?',
+    text: 'This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, delete',
+    cancelButtonText: 'Cancel'
+  }).then((res) => {
+    if (!res.isConfirmed) return
     import('@inertiajs/vue3').then(({ router }) => {
-    console.log('Deleting vehicle request', req.id);
-    setBanner(null, null);
-    let destroyUrl;
-    try {
-      destroyUrl = route('vehicle-requests.destroy', req.id);
-    } catch (e) {
-      console.error('Ziggy route generation failed for destroy, falling back to raw URL', e);
-      destroyUrl = `/vehicle-requests/${req.id}`;
-    }
-    router.delete(destroyUrl, {
-      onSuccess: () => {},
-      onError: (e) => { console.error('Delete error', e); setBanner('error', 'Failed to delete request'); },
-      onFinish: () => console.log('Delete finished')
+      let destroyUrl
+      try { destroyUrl = route('vehicle-requests.destroy', req.id) } catch (e) { destroyUrl = `/vehicle-requests/${req.id}` }
+      router.delete(destroyUrl, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+        onError: (e) => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
+      })
     })
-  }).catch(e => { console.error('Router import failed', e); setBanner('error', 'Internal error'); })
+  })
 }
 </script>
 
@@ -367,13 +396,22 @@ const destroy = (req) => {
       </div>
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Vehicle Requests</h1>
-        <button
-          v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
-          @click.prevent="openModal()"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
-        >
-          + New Request
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
+            @click.prevent="openModal()"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
+          >
+            + New Request
+          </button>
+          <button
+            @click.prevent="openCalendar()"
+            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow"
+            title="View calendar"
+          >
+            View Calendar
+          </button>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
@@ -553,6 +591,48 @@ const destroy = (req) => {
           </div>
 
           <div v-if="filteredRequests.length === 0" class="text-center text-gray-500 py-6">No vehicle requests found.</div>
+        </div>
+      </div>
+    </div>
+    <!-- Calendar Modal -->
+    <div v-if="showCalendar" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white w-full sm:rounded-xl sm:shadow-lg sm:max-w-4xl p-4 sm:p-6 relative overflow-auto max-h-[90vh]">
+        <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click.prevent="showCalendar = false">✕</button>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <button @click.prevent="prevMonth" class="px-3 py-1 bg-gray-100 rounded">‹</button>
+            <div class="font-semibold">{{ monthLabel }}</div>
+            <button @click.prevent="nextMonth" class="px-3 py-1 bg-gray-100 rounded">›</button>
+          </div>
+          <div>
+            <button @click.prevent="fetchBookings" class="px-3 py-1 bg-blue-600 text-white rounded">Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-7 gap-2 text-sm">
+          <div class="text-center font-semibold">Sun</div>
+          <div class="text-center font-semibold">Mon</div>
+          <div class="text-center font-semibold">Tue</div>
+          <div class="text-center font-semibold">Wed</div>
+          <div class="text-center font-semibold">Thu</div>
+          <div class="text-center font-semibold">Fri</div>
+          <div class="text-center font-semibold">Sat</div>
+        </div>
+
+        <div class="grid grid-cols-7 gap-2 mt-2">
+          <template v-for="d in monthDays" :key="d.toISOString()">
+            <div class="border rounded p-2 min-h-[80px]">
+              <div class="text-xs text-gray-600 mb-1">{{ d.getDate() }}</div>
+              <div class="space-y-1 text-xs">
+                <div v-for="b in bookingsForDate(d)" :key="b.id" class="bg-gray-50 p-1 rounded border">
+                  <div class="font-medium">{{ b.vehicle_name }}{{ b.plate_no ? ' — ' + b.plate_no : '' }}</div>
+                  <div class="text-gray-600">{{ b.start_time ?? '—' }} — {{ b.end_time ?? '—' }}</div>
+                  <div class="text-gray-700 truncate">{{ b.purpose }}</div>
+                </div>
+                <div v-if="bookingsForDate(d).length === 0" class="text-gray-300 text-xs">-</div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>

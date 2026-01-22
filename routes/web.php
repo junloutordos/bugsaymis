@@ -159,6 +159,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
+    // Vehicle bookings API for calendar
+    Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Activity Planner
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
     Route::post('/activities', [ActivityController::class, 'store'])->name('activities.store');

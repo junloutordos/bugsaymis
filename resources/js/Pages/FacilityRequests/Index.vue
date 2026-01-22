@@ -2,6 +2,7 @@
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
+import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array, facilities: Array });
@@ -188,32 +189,28 @@ const openModal = (req = null) => {
 const closeModal = () => { showModal.value = false; form.reset(); };
 
 const submit = () => {
-  // run client-side validation first
-  if (!validateAll()) {
-    alert('Please fix the highlighted errors before submitting the form.');
-    return;
-  }
-
+  if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
   form.post(route('facility-requests.store'), {
-    onSuccess: () => {
-      closeModal();
-    },
+    onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
     onError: (errors) => {
       const venueErr = errors?.venue ?? page.props.errors?.venue;
-      if (venueErr) {
-        const text = Array.isArray(venueErr) ? venueErr.join(', ') : venueErr;
-        alert(text);
-      }
+      const text = venueErr ? (Array.isArray(venueErr) ? venueErr.join(', ') : venueErr) : (Object.values(errors || {}).flat().join(', ') || 'Failed to submit');
+      Swal.fire({ icon: 'error', title: 'Failed to submit', text })
     }
-  });
-};
+  })
+}
 
 const destroy = (req) => {
-  if (!confirm('Delete this facility request?')) return;
-  import('@inertiajs/vue3').then(({ router }) => {
-    router.delete(route('facility-requests.destroy', req.id));
-  });
-};
+  Swal.fire({ title: 'Delete this facility request?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
+    if (!res.isConfirmed) return
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.delete(route('facility-requests.destroy', req.id), {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
+      })
+    })
+  })
+}
 
 const openPrint = (req) => {
   let url;

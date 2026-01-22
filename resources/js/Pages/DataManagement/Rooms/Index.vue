@@ -2,9 +2,6 @@
   <Head title="Rooms" />
   <AdminLayout title="Rooms">
     <div class="p-6">
-      <div v-if="page.props.flash?.success" class="mb-4">
-        <div class="px-4 py-3 rounded bg-green-50 border border-green-100 text-green-700">{{ page.props.flash.success }}</div>
-      </div>
 
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Rooms</h1>

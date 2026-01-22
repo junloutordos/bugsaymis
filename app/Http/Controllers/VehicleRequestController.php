@@ -385,6 +385,41 @@ class VehicleRequestController extends Controller
     }
 
     /**
+     * Return JSON bookings for calendar display.
+     * Includes both 'Approved' and 'OCD Approved' requests.
+     */
+    public function bookings(Request $request)
+    {
+        $rows = VehicleRequest::whereIn('status', ['Approved', 'OCD Approved'])
+            ->with(['user'])
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $dates = [];
+            if ($r->date_needed_multiple && is_array($r->date_needed_multiple) && count($r->date_needed_multiple) > 0) {
+                $dates = $r->date_needed_multiple;
+            } elseif ($r->date_needed) {
+                $dates = [$r->date_needed];
+            }
+            foreach ($dates as $d) {
+                $out[] = [
+                    'id' => $r->id,
+                    'vehicle_name' => $r->vehicle_type,
+                    'plate_no' => optional(\App\Models\Vehicle::where('name', $r->vehicle_type)->first())->plate_no ?? null,
+                    'date' => $d,
+                    'start_time' => $r->time_of_departure,
+                    'end_time' => $r->eta,
+                    'purpose' => $r->purpose,
+                    'status' => $r->status,
+                ];
+            }
+        }
+
+        return response()->json($out);
+    }
+
+    /**
      * Show a printable trip ticket (HTML) for a vehicle request.
      * Only accessible to Admin and GSU Head via route middleware.
      */

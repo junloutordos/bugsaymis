@@ -1,6 +1,7 @@
 <script setup>
 import { Head, useForm, router, usePage } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
+import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 
@@ -102,21 +103,28 @@ const openEdit = (r) => {
 };
 
 const submit = () => {
-  if (!validateAll()) { alert('Please fix the highlighted errors before submitting.'); return; }
+  if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
   if (editingId.value) {
     form.put(route('service-requests.update', editingId.value), {
-      onSuccess: () => { closeModal(); }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errs || {}).flat().join('\n') || 'Failed to update' }) }
     });
   } else {
     form.post(route('service-requests.store'), {
-      onSuccess: () => { closeModal(); }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed to submit', text: Object.values(errs || {}).flat().join('\n') || 'Failed to submit' }) }
     });
   }
 };
 
 const remove = (id) => {
-  if (!confirm('Delete this service request?')) return;
-  router.delete(route('service-requests.destroy', id));
+  Swal.fire({ title: 'Delete this service request?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(route('service-requests.destroy', id), {
+      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errs || {}).flat().join('\n') || 'Failed to delete' }) }
+    })
+  })
 };
 
 const statusClass = (s) => {

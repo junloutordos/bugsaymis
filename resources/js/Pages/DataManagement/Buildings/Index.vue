@@ -29,6 +29,7 @@
                 <th class="px-4 py-3 text-left">Name</th>
                 <th class="px-4 py-3 text-left">Code</th>
                 <th class="px-4 py-3 text-left">No of Rooms</th>
+                <th class="px-4 py-3 text-left">No of Floors</th>
                 <th class="px-4 py-3 text-left">Occupants</th>
                 <th class="px-4 py-3 text-left">Remarks</th>
                 <th class="px-4 py-3 text-center">Action</th>
@@ -40,6 +41,7 @@
                 <td class="px-4 py-3">{{ b.name }}</td>
                 <td class="px-4 py-3">{{ b.code ?? '—' }}</td>
                 <td class="px-4 py-3">{{ b.no_of_rooms ?? '—' }}</td>
+                <td class="px-4 py-3">{{ b.number_of_floors ?? '—' }}</td>
                 <td class="px-4 py-3">{{ b.occupants_count ?? 0 }}</td>
                 <td class="px-4 py-3">{{ b.remarks ?? '—' }}</td>
                 <td class="px-4 py-3 text-center">
@@ -54,7 +56,7 @@
                 </td>
               </tr>
               <tr v-if="filteredBuildings.length === 0">
-                <td colspan="7" class="px-4 py-6 text-center text-gray-500">No buildings found.</td>
+                <td colspan="8" class="px-4 py-6 text-center text-gray-500">No buildings found.</td>
               </tr>
             </tbody>
           </table>

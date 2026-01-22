@@ -2,9 +2,6 @@
   <Head title="Work Requests" />
   <AdminLayout title="Work Requests">
     <div class="p-6">
-      <div v-if="page.props.flash?.success" class="mb-4">
-        <div class="px-4 py-3 rounded bg-green-50 border border-green-100 text-green-700">{{ page.props.flash.success }}</div>
-      </div>
 
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Work Requests</h1>
@@ -228,6 +225,7 @@ import { Head, usePage, useForm } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
 import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import Swal from 'sweetalert2'
 
 const props = defineProps({
   divisions: Array,
@@ -323,8 +321,8 @@ const closeCompleteModal = () => { showCompleteModal.value = false; completeEdit
 const submitCompletion = () => {
   if (!completeEditingId.value) return
   completeForm.post(`/work-requests/${completeEditingId.value}/complete`, {
-    onSuccess: () => { closeCompleteModal(); window.location.reload() },
-    onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+    onSuccess: () => { closeCompleteModal(); Swal.fire({ icon: 'success', title: 'Marked completed', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+    onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to save', text: Object.values(errors).flat().join('\n') || 'Failed to save' }) }
   })
 }
 
@@ -333,23 +331,25 @@ const closeModal = () => { showModal.value = false; editingId.value = null; form
 const submitForm = () => {
   if (editingId.value) {
     form.put(`/work-requests/${editingId.value}`, {
-      onSuccess: () => { closeModal(); window.location.reload() },
-      onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Work request updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errors).flat().join('\n') || 'Failed to update' }) }
     })
   } else {
     form.post('/work-requests', {
-      onSuccess: () => { closeModal(); window.location.reload() },
-      onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Work request created', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to create', text: Object.values(errors).flat().join('\n') || 'Failed to create' }) }
     })
   }
 }
 
 const destroy = (wr) => {
-  if (!confirm('Delete this work request?')) return
-  import('@inertiajs/vue3').then(({ router }) => {
-    router.delete(`/work-requests/${wr.id}`, {
-      onSuccess: () => { window.location.reload() },
-      onError: (e) => { alert('Failed to delete request') }
+  Swal.fire({ title: 'Delete this work request?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
+    if (!res.isConfirmed) return
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.delete(`/work-requests/${wr.id}`, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+        onError: (e) => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
+      })
     })
   })
 }

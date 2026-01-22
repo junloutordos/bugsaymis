@@ -4,6 +4,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { ref, computed, watch } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { PencilSquareIcon, TrashIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import Swal from 'sweetalert2'
 
 const props = defineProps({
   assets: Array,
@@ -84,13 +85,13 @@ const submitAsset = () => {
     // Use POST with method spoofing so Laravel receives the form data and files.
     fd.append('_method', 'PUT')
     router.post(`/assets/${editingId.value}`, fd, {
-      onSuccess: () => { closeModal(); window.location.reload() },
-      onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Asset updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errors).flat().join('\n') }) }
     })
   } else {
     router.post('/assets', fd, {
-      onSuccess: () => { closeModal(); window.location.reload() },
-      onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Asset added', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to add', text: Object.values(errors).flat().join('\n') }) }
     })
   }
 }
@@ -117,10 +118,12 @@ const openEdit = (asset) => {
 }
 
 const deleteAsset = (asset) => {
-  if (!confirm(`Delete asset ${asset.property_no} ?`)) return
-  router.delete(`/assets/${asset.id}`, {
-    onSuccess: () => { window.location.reload() },
-    onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+  Swal.fire({ title: `Delete asset ${asset.property_no}?`, text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
+    if (!res.isConfirmed) return
+    router.delete(`/assets/${asset.id}`, {
+      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors).flat().join('\n') || 'Failed to delete' }) }
+    })
   })
 }
 
