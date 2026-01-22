@@ -26,17 +26,23 @@ class ITJobRequestController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isAdmin = $this->getUserRole($user) === 'Administrator';
+
+        // Administrator role ID
+        $ADMIN_ROLE_ID = 1;
+
+        $isAdmin = in_array($ADMIN_ROLE_ID, explode(',', $user->roles));
 
         $requests = ITJobRequest::with([
-            'user:id,name',
-            'divisionChief:id,name',
-            'assignedTo:id,name',
-            'trackingLogs:id,it_job_request_id,status,remarks,created_at'
-        ])
-        ->when(!$isAdmin, fn($q) => $q->where('user_id', $user->id))
-        ->latest()
-        ->get();
+                'user:id,name',
+                'divisionChief:id,name',
+                'assignedTo:id,name',
+                'trackingLogs:id,it_job_request_id,status,remarks,created_at'
+            ])
+            ->when(!$isAdmin, function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->latest()
+            ->get();
 
         return Inertia::render('ITJobRequests/Index', [
             'requests' => $requests,
@@ -44,17 +50,16 @@ class ITJobRequestController extends Controller
             'categories' => ITJobCategory::orderBy('name')->get(),
 
             // Division Chiefs & Information Officers
-            'divisionChiefs' => User::whereHas('role', fn ($q) =>
-                $q->whereIn('name', ['DivisionChief', 'InformationOfficer'])
-            )
+            'divisionChiefs' => User::where(function ($q) {
+                    $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2]) // Division Chief
+                    ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]); // Information Officer
+                })
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
 
             // Administrators
-            'administrators' => User::whereHas('role', fn ($q) =>
-                $q->where('name', 'Administrator')
-            )
+            'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [$ADMIN_ROLE_ID])
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),
@@ -66,8 +71,8 @@ class ITJobRequestController extends Controller
 
             'isAdmin' => $isAdmin,
         ]);
-
     }
+
 
     private function getUserRole($user): string
     {
