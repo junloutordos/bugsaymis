@@ -1,11 +1,32 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
+import Swal from 'sweetalert2'
 import { PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const props = defineProps({ vehicles: Array })
 const page = usePage()
+
+// reactive list + pagination
+const vehiclesList = ref(props.vehicles || [])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredVehicles = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = vehiclesList.value.filter(v => (v.name || '').toLowerCase().includes(q) || (v.plate_number || '').toLowerCase().includes(q))
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(vehiclesList.value.filter(v => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return (v.name || '').toLowerCase().includes(q) || (v.plate_number || '').toLowerCase().includes(q)
+}).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
 
 const showModal = ref(false)
 const editing = ref(null)
@@ -22,9 +43,11 @@ const submit = () => {
         showModal.value = false
         editing.value = null
         form.reset()
+        Swal.fire({ icon: 'success', title: 'Vehicle updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
       },
       onError: (errors) => {
         console.error('Vehicle update errors', errors)
+        Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errors).flat().join('\n') })
       }
     })
   } else {
@@ -32,17 +55,35 @@ const submit = () => {
       onSuccess: () => {
         showModal.value = false
         form.reset()
+        Swal.fire({ icon: 'success', title: 'Vehicle added', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
       },
       onError: (errors) => {
         console.error('Vehicle create errors', errors)
+        Swal.fire({ icon: 'error', title: 'Failed to add', text: Object.values(errors).flat().join('\n') })
       }
     })
   }
 }
 
 const destroy = (id) => {
-  if (!confirm('Delete vehicle?')) return
-  router.delete(route('vehicles.destroy', id))
+  Swal.fire({
+    title: 'Delete vehicle?',
+    text: 'This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, delete',
+    cancelButtonText: 'Cancel'
+  }).then((result) => {
+    if (!result.isConfirmed) return
+    router.delete(route('vehicles.destroy', id), {
+      onSuccess: () => {
+        Swal.fire({ icon: 'success', title: 'Vehicle deleted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
+      },
+      onError: (errors) => {
+        Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors || {}).flat().join('\n') })
+      }
+    })
+  })
 }
 </script>
 
@@ -50,9 +91,6 @@ const destroy = (id) => {
   <Head title="Vehicles" />
   <AdminLayout title="Vehicles">
     <div class="p-6">
-      <div v-if="page.props.flash?.success" class="mb-4">
-        <div class="px-4 py-3 rounded bg-green-50 border border-green-100 text-green-700">{{ page.props.flash.success }}</div>
-      </div>
 
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold">Vehicles</h1>
@@ -60,6 +98,15 @@ const destroy = (id) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search vehicles..."
+            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <table class="min-w-full border border-gray-200">
           <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
             <tr>
@@ -72,7 +119,7 @@ const destroy = (id) => {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="v in props.vehicles" :key="v.id">
+            <tr v-for="v in filteredVehicles" :key="v.id">
               <td class="px-4 py-3">{{ v.id }}</td>
               <td class="px-4 py-3">{{ v.name }}</td>
               <td class="px-4 py-3">{{ v.plate_number ?? '—' }}</td>
@@ -90,11 +137,29 @@ const destroy = (id) => {
                 </div>
               </td>
             </tr>
-            <tr v-if="props.vehicles.length===0">
+            <tr v-if="filteredVehicles.length===0">
               <td colspan="6" class="px-4 py-6 text-center text-gray-500">No vehicles added.</td>
             </tr>
           </tbody>
         </table>
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
 

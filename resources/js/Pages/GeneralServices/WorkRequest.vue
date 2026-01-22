@@ -18,6 +18,10 @@
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input v-model="searchQuery" type="text" placeholder="Search work requests..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        </div>
         <div class="hidden sm:block overflow-x-auto">
           <table class="table-fixed w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
@@ -35,7 +39,7 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="wr in props.workRequests" :key="wr.id">
+              <tr v-for="wr in filteredWorkRequests" :key="wr.id">
                 <td class="px-4 py-3">{{ wr.id }}</td>
                 <td class="px-4 py-3">{{ wr.issue ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.description ?? '—' }}</td>
@@ -77,10 +81,19 @@
                     >
                       <TrashIcon class="w-5 h-5" />
                     </button>
+                    
+                    <button
+                      v-if="wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')"
+                      @click.prevent="openCompleteModal(wr)"
+                      class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
+                      title="Mark Completed"
+                    >
+                      <CheckCircleIcon class="w-5 h-5" />
+                    </button>
                   </div>
                 </td>
               </tr>
-              <tr v-if="props.workRequests.length === 0">
+              <tr v-if="filteredWorkRequests.length === 0">
                 <td colspan="10" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
               </tr>
             </tbody>
@@ -88,7 +101,13 @@
         </div>
 
         <!-- Mobile list -->
-        <div v-if="props.workRequests.length === 0" class="text-center text-gray-500 py-6">No work requests found.</div>
+        <div v-if="filteredWorkRequests.length === 0" class="text-center text-gray-500 py-6">No work requests found.</div>
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+        </div>
       </div>
 
       <!-- Modal -->
@@ -162,6 +181,44 @@
           </form>
         </div>
       </div>
+      <!-- Completion Modal -->
+      <div v-show="showCompleteModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeCompleteModal">✕</button>
+          <h2 class="text-xl font-semibold mb-4">Mark Work Request Completed</h2>
+          <form @submit.prevent="submitCompletion" class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Acted By</label>
+              <select v-model="completeForm.acted_by_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                <option value="">Select staff</option>
+                <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Action Taken</label>
+              <textarea v-model="completeForm.action_taken" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" rows="4" required></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Date Completed</label>
+              <input v-model="completeForm.date_completed" type="date" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4">
+              <button type="button" @click="closeCompleteModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
+              <button type="submit" :disabled="completeForm.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 inline-flex items-center justify-center">
+                <span v-if="completeForm.processing" class="inline-flex items-center">
+                  <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                  </svg>
+                  Saving...
+                </span>
+                <span v-else>Save</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </AdminLayout>
 </template>
@@ -169,7 +226,7 @@
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
-import { PencilSquareIcon, TrashIcon, UserPlusIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const props = defineProps({
@@ -180,10 +237,30 @@ const props = defineProps({
   workRequests: Array,
 })
 
+// client-side search + pagination for work requests
+const workRequestsList = ref(props.workRequests || [])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredWorkRequests = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = (workRequestsList.value || []).filter(wr => (wr.issue || '').toString().toLowerCase().includes(q) || (wr.description || '').toString().toLowerCase().includes(q) || (wr.id || '').toString().includes(q))
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil((workRequestsList.value || []).filter(wr => (wr.issue || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (wr.description || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (wr.id || '').toString().includes(searchQuery.value.trim())).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
+
 const page = usePage();
 
 const showModal = ref(false)
 const editingId = ref(null)
+
+const showCompleteModal = ref(false)
+const completeEditingId = ref(null)
 
 const form = useForm({
   issue: '',
@@ -193,6 +270,12 @@ const form = useForm({
   location_office_id: '',
   expected_completion_date: '',
   assigned_user_id: '',
+})
+
+const completeForm = useForm({
+  acted_by_id: '',
+  action_taken: '',
+  date_completed: '',
 })
 
 // Filter offices (rooms) by selected division (building)
@@ -224,6 +307,25 @@ const openModal = (wr = null) => {
     form.priority = 'Normal'
   }
   showModal.value = true
+}
+
+const openCompleteModal = (wr) => {
+  completeEditingId.value = wr ? wr.id : null
+  completeForm.reset()
+  completeForm.acted_by_id = wr?.acted_by_id ?? ''
+  completeForm.action_taken = wr?.action_taken ?? ''
+  completeForm.date_completed = wr?.date_completed ?? ''
+  showCompleteModal.value = true
+}
+
+const closeCompleteModal = () => { showCompleteModal.value = false; completeEditingId.value = null; completeForm.reset() }
+
+const submitCompletion = () => {
+  if (!completeEditingId.value) return
+  completeForm.post(`/work-requests/${completeEditingId.value}/complete`, {
+    onSuccess: () => { closeCompleteModal(); window.location.reload() },
+    onError: (errors) => { alert(Object.values(errors).flat().join('\n')) }
+  })
 }
 
 const closeModal = () => { showModal.value = false; editingId.value = null; form.reset() }
@@ -258,6 +360,8 @@ const statusClass = (s) => {
   const st = String(s).toLowerCase()
   if (st.includes('approve')) return 'bg-green-600 text-white'
   if (st.includes('declin')) return 'bg-red-600 text-white'
+  if (st.includes('completed')) return 'bg-blue-600 text-white'
   return 'bg-gray-100 text-gray-700'
 }
-</script>
+  </script>
+

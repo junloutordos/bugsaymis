@@ -421,7 +421,7 @@ const menuItems = [
     roles: ["Administrator", "Librarian"],
     children: [
       {
-        label: "Attendance",
+        label: "Library Attendance",
         routeName: "library.attendance.index",
         href: route('library.attendance.index'),
         icon: ClipboardDocumentListIcon,

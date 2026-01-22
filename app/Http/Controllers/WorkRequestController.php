@@ -16,6 +16,7 @@ use App\Mail\WorkRequestStatusMail;
 use App\Mail\WorkRequestForAssignmentMail;
 use App\Mail\WorkRequestAssignedMail;
 use App\Mail\WorkRequestFADApprovalMail;
+use App\Mail\WorkRequestCompletedMail;
 
 class WorkRequestController extends Controller
 {
@@ -335,5 +336,37 @@ class WorkRequestController extends Controller
     {
         $workRequest->delete();
         return redirect()->route('work-requests.index')->with('success', 'Work request deleted.');
+    }
+
+    /**
+     * Mark a work request as completed with details provided by GSU Head or Administrator.
+     */
+    public function complete(Request $request, WorkRequest $workRequest)
+    {
+        // Authorization enforced by route middleware (role:Administrator|GSU Head)
+
+        $data = $request->validate([
+            'acted_by_id' => 'nullable|exists:users,id',
+            'action_taken' => 'required|string|max:2000',
+            'date_completed' => 'required|date',
+        ]);
+
+        $workRequest->acted_by_id = $data['acted_by_id'] ?? Auth::id();
+        $workRequest->action_taken = $data['action_taken'];
+        $workRequest->date_completed = $data['date_completed'];
+        $workRequest->status = 'Completed';
+        $workRequest->save();
+
+        // Notify the requester
+        try {
+            $requesterEmail = $workRequest->requester?->email ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->send(new WorkRequestCompletedMail($workRequest));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send work request completion email', ['error' => $e->getMessage()]);
+        }
+
+        return redirect()->route('work-requests.index')->with('success', 'Work request marked as completed.');
     }
 }

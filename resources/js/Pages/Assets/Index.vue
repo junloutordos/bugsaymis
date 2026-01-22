@@ -13,6 +13,20 @@ const props = defineProps({
 })
 
 const assets = ref(props.assets || [])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredAssets = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = (assets.value || []).filter(a => (a.asset_name || '').toString().toLowerCase().includes(q) || (a.property_no || '').toString().toLowerCase().includes(q) || (a.category || '').toString().toLowerCase().includes(q))
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil((assets.value || []).filter(a => (a.asset_name || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (a.property_no || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (a.category || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase())).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
 
 const showModal = ref(false)
 const photoFile = ref(null)
@@ -162,6 +176,9 @@ const getPhotoUrl = (asset) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <div class="mb-4">
+          <input v-model="searchQuery" type="text" placeholder="Search assets..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        </div>
         <div class="overflow-x-auto">
           <table class="min-w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
@@ -178,7 +195,7 @@ const getPhotoUrl = (asset) => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="asset in assets" :key="asset.id" class="hover:bg-gray-50">
+              <tr v-for="asset in filteredAssets" :key="asset.id" class="hover:bg-gray-50">
                 <td class="px-4 py-3">{{ asset.id }}</td>
                 <td class="px-4 py-3">{{ asset.property_no }}</td>
                 <td class="px-4 py-3">{{ asset.asset_name }}</td>
@@ -201,11 +218,17 @@ const getPhotoUrl = (asset) => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="assets.length === 0">
+              <tr v-if="filteredAssets.length === 0">
                 <td colspan="9" class="px-4 py-6 text-center text-gray-500">No assets found.</td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 

@@ -14,5 +14,15 @@ class Building extends Model
         'code',
         'no_of_rooms',
         'remarks',
+        'building_use',
+        'number_of_floors',
+        'year_constructed',
+        'year_completed',
+        'amount',
+    ];
+
+    protected $casts = [
+        'building_use' => 'array',
+        'amount' => 'float',
     ];
 }

@@ -1,11 +1,37 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
-import { ref, reactive } from "vue";
+import { ref, reactive, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array, facilities: Array });
 const page = usePage();
+
+// client-side search + pagination
+const requestsList = ref(props.requests || [])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredRequests = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = (requestsList.value || []).filter(req => {
+    return (req.activity || '').toString().toLowerCase().includes(q) ||
+      (req.requestor || '').toString().toLowerCase().includes(q) ||
+      (req.unit || '').toString().toLowerCase().includes(q)
+  })
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || []).filter(req => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return (req.activity || '').toString().toLowerCase().includes(q) ||
+    (req.requestor || '').toString().toLowerCase().includes(q) ||
+    (req.unit || '').toString().toLowerCase().includes(q)
+}).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
 
 const showModal = ref(false);
 const form = useForm({
@@ -216,6 +242,15 @@ const openPrint = (req) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search facility requests..."
+            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <!-- Desktop table: allow horizontal scroll and fixed layout to avoid overlap -->
         <div class="hidden sm:block overflow-x-auto">
           <table class="table-fixed w-full border border-gray-200">
@@ -233,7 +268,7 @@ const openPrint = (req) => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="req in props.requests" :key="req.id">
+              <tr v-for="req in filteredRequests" :key="req.id">
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.id }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.requestor }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.unit ?? '—' }}</td>
@@ -290,7 +325,7 @@ const openPrint = (req) => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="props.requests.length === 0">
+              <tr v-if="filteredRequests.length === 0">
                 <td colspan="9" class="px-4 py-6 text-center text-gray-500">No facility requests found.</td>
               </tr>
             </tbody>
@@ -299,7 +334,7 @@ const openPrint = (req) => {
 
         <!-- Mobile cards -->
         <div class="sm:hidden space-y-3">
-          <div v-for="req in props.requests" :key="req.id" class="border rounded-lg p-3 bg-white shadow-sm">
+          <div v-for="req in filteredRequests" :key="req.id" class="border rounded-lg p-3 bg-white shadow-sm">
             <div class="flex items-start justify-between">
               <div>
                 <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
@@ -346,7 +381,25 @@ const openPrint = (req) => {
             </div>
           </div>
 
-          <div v-if="props.requests.length === 0" class="text-center text-gray-500 py-6">No facility requests found.</div>
+          <div v-if="filteredRequests.length === 0" class="text-center text-gray-500 py-6">No facility requests found.</div>
+        </div>
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
       </div>
 
