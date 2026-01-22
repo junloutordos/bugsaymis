@@ -61,7 +61,14 @@ public function index(Request $request)
         'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [1])
             ->select('id','name')->orderBy('name')->get(),
 
-        'ictEquipment' => ICTEquipment::orderBy('description')->get(),
+        'ictEquipment' => ICTEquipment::with([
+            'room:id,name,code',
+            'owner:id,name',
+        ])
+        ->orderBy('description')
+        ->get(),
+
+
 
         'isAdmin' => $isAdmin,
     ]);
