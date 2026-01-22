@@ -607,7 +607,7 @@ const handleNewRequest = async () => {
                     :key="eq.id"
                     :value="eq.id"
                   >
-                    {{ eq.location }} - {{ eq.description }} - ({{ eq.serial_no }})
+                    {{ eq.room?.name }} - {{ eq.owner?.name }} - {{ eq.description }} - ({{ eq.serial_no }})
                   </option>
                 </select>
               </div>

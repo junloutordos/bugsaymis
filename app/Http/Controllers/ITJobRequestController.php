@@ -23,21 +23,26 @@ class ITJobRequestController extends Controller
     /* =====================================================
      | INDEX
      |=====================================================*/
-    public function index(Request $request)
+public function index(Request $request)
 {
     $user = $request->user();
 
-    // 🔒 Match old behavior exactly
+    // 🔒 Preserve legacy role logic
     $roles = array_filter(explode(',', $user->role_id));
     $isAdmin = isset($roles[0]) && (int) $roles[0] === 1;
 
     $requests = ITJobRequest::with([
+            // Core workflow
             'user:id,name',
             'divisionChief:id,name',
             'assignedTo:id,name',
-            'trackingLogs:id,it_job_request_id,status,remarks,created_at'
+            'trackingLogs:id,it_job_request_id,status,remarks,created_at',
+
+            // 🔥 Hardware chain
+            'equipment:id,description,room_id,owner_id',
+            'equipment.room:id,name,code',
+            'equipment.owner:id,name',
         ])
-        // ✅ SAME LOGIC AS OLD
         ->when(!$isAdmin, function ($q) use ($user) {
             $q->where('user_id', $user->id);
         })
@@ -52,25 +57,30 @@ class ITJobRequestController extends Controller
         // Division Chiefs & Information Officers
         'divisionChiefs' => User::where(function ($q) {
                 $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
-                  ->orWhereRaw('FIND_IN_SET(?, role_id)', [3]);
+                  ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]);
             })
             ->select('id', 'name')
             ->orderBy('name')
             ->get(),
 
-        // Administrators (primary or secondary)
+        // Administrators
         'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [1])
             ->select('id', 'name')
             ->orderBy('name')
             ->get(),
 
-        'ictEquipment' => ICTEquipment::orderBy('id')
+        // Equipment list already hydrated with room + owner
+        'ictEquipment' => ICTEquipment::with([
+                'room:id,name,code',
+                'owner:id,name',
+            ])
             ->orderBy('description')
             ->get(),
 
         'isAdmin' => $isAdmin,
     ]);
 }
+
 
 
     private function getUserRole($user): string
