@@ -50,6 +50,14 @@ Route::middleware(['auth','role:Administrator'])->group(function(){
     Route::post('/data-management/rooms', [App\Http\Controllers\RoomController::class, 'store'])->name('rooms.store');
     Route::put('/data-management/rooms/{room}', [App\Http\Controllers\RoomController::class, 'update'])->name('rooms.update');
     Route::delete('/data-management/rooms/{room}', [App\Http\Controllers\RoomController::class, 'destroy'])->name('rooms.destroy');
+    // Sections API (used by Rooms UI to load sections for a school year)
+    Route::get('/sections', function (\Illuminate\Http\Request $request) {
+        $q = \Illuminate\Support\Facades\DB::table('sections')->select('id', 'sectionname as name', 'syid');
+        if ($request->has('syid')) {
+            $q->where('syid', $request->query('syid'));
+        }
+        return response()->json($q->get());
+    })->name('sections.index');
 });
 
 use Inertia\Inertia;
@@ -164,6 +172,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
     Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
     Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
+
+    // Completion endpoint — only GSU Head or Administrator can mark completed
+    Route::post('/work-requests/{workRequest}/complete', [WorkRequestController::class, 'complete'])
+        ->name('work-requests.complete')
+        ->middleware('role:Administrator|GSU Head');
 
     // Division chief approve/decline via signed links for Work Requests
     Route::get('/work-requests/{workRequest}/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByDivisionChief'])

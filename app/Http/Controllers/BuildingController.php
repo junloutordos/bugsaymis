@@ -26,7 +26,18 @@ class BuildingController extends Controller
             'code' => 'nullable|string|max:100',
             'no_of_rooms' => 'nullable|integer|min:0',
             'remarks' => 'nullable|string',
+            'building_use' => 'nullable|array',
+            'building_use.*' => 'in:Classrooms,Laboratories,Admin,Sports/Recreatation,Assembly,Mixed',
+            'number_of_floors' => 'nullable|integer|min:0',
+            'year_constructed' => 'nullable|integer|min:1800|max:'.(date('Y')+1),
+            'year_completed' => 'nullable|integer|min:1800|max:'.(date('Y')+1),
+            'amount' => 'nullable|numeric|min:0',
         ]);
+
+        // store building_use as JSON string if provided
+        if (! empty($data['building_use']) && is_array($data['building_use'])) {
+            $data['building_use'] = json_encode(array_values($data['building_use']));
+        }
 
         Building::create($data);
 
@@ -40,7 +51,17 @@ class BuildingController extends Controller
             'code' => 'nullable|string|max:100',
             'no_of_rooms' => 'nullable|integer|min:0',
             'remarks' => 'nullable|string',
+            'building_use' => 'nullable|array',
+            'building_use.*' => 'in:Classrooms,Laboratories,Admin,Sports/Recreatation,Assembly,Mixed',
+            'number_of_floors' => 'nullable|integer|min:0',
+            'year_constructed' => 'nullable|integer|min:1800|max:'.(date('Y')+1),
+            'year_completed' => 'nullable|integer|min:1800|max:'.(date('Y')+1),
+            'amount' => 'nullable|numeric|min:0',
         ]);
+
+        if (! empty($data['building_use']) && is_array($data['building_use'])) {
+            $data['building_use'] = json_encode(array_values($data['building_use']));
+        }
 
         $building->update($data);
 

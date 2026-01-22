@@ -6,6 +6,7 @@ const props = defineProps({
   staffCount: { type: Number, default: 0 },
   maleCount: { type: Number, default: 0 },
   femaleCount: { type: Number, default: 0 },
+  libraryAttendanceByGrade: { type: Array, default: () => [0,0,0,0,0,0] },
 })
 
 // Chart.js + vue-chartjs
@@ -58,13 +59,12 @@ const studentData = computed(() => ({
   ],
 }))
 
-const attendanceData = {
-  labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+const attendanceData = computed(() => ({
+  labels: ['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'],
   datasets: [
-    { label: 'Present', data: [70, 80, 75, 85, 90], backgroundColor: '#3b82f6' },
-    { label: 'Absent', data: [30, 20, 25, 15, 10], backgroundColor: '#facc15' },
+    { label: 'Library Entries', data: props.libraryAttendanceByGrade || [0,0,0,0,0,0], backgroundColor: '#3b82f6' },
   ],
-}
+}))
 
 // --- HR Analytics Data ---
 const salaryByAgeGender = {
@@ -184,7 +184,7 @@ const calendarOptions = {
             </div>
           </div>
           <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-lg font-semibold mb-4">Attendance</h3>
+            <h3 class="text-lg font-semibold mb-4">Library Attendance</h3>
             <div class="chart-container min-h-[300px]">
               <Bar :data="attendanceData" :options="chartOptions" />
             </div>

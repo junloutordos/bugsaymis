@@ -55,9 +55,9 @@ class FacilityController extends Controller
         return redirect()->route('facilities.index')->with('success', 'Facility updated');
     }
 
-    public function destroy(Facility $facility): Response
+    public function destroy(Facility $facility): RedirectResponse
     {
         $facility->delete();
-        return response('Deleted', 200);
+        return redirect()->route('facilities.index')->with('success', 'Facility deleted');
     }
 }
