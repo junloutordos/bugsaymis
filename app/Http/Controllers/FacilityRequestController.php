@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\URL;
 use App\Mail\FacilityRequestCreatedMail;
 use App\Models\Division;
 use App\Models\User;
+use App\Models\Facility;
 
 class FacilityRequestController extends Controller
 {
@@ -500,6 +501,61 @@ class FacilityRequestController extends Controller
         if (! $isAdmin) abort(403);
         $facilityRequest->delete();
         return redirect()->route('facility-requests.index');
+    }
+
+    /**
+     * Return JSON bookings for calendar display.
+     * Includes both 'Approved' and 'OCD Approved' requests and expands multi-day ranges.
+     */
+    public function bookings(Request $request)
+    {
+        $rows = FacilityRequest::whereIn('status', ['Approved', 'OCD Approved'])
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (! $r->date_start) continue;
+            $start = Carbon::parse($r->date_start);
+            $end = $r->date_end ? Carbon::parse($r->date_end) : Carbon::parse($r->date_start);
+
+            // normalize venues to array
+            $venues = $r->venue ?? [];
+            if (! is_array($venues)) {
+                $venues = $venues ? [$venues] : [];
+            }
+
+            for ($dt = $start->copy(); $dt->lte($end); $dt->addDay()) {
+                $dateStr = $dt->toDateString();
+                if (empty($venues)) {
+                    $out[] = [
+                        'id' => $r->id,
+                        'facility_id' => null,
+                        'facility_name' => null,
+                        'date' => $dateStr,
+                        'start_time' => $r->time_start,
+                        'end_time' => $r->time_end,
+                        'activity' => $r->activity,
+                        'status' => $r->status,
+                    ];
+                } else {
+                    foreach ($venues as $vid) {
+                        $fname = optional(Facility::find($vid))->name ?? null;
+                        $out[] = [
+                            'id' => $r->id,
+                            'facility_id' => $vid,
+                            'facility_name' => $fname,
+                            'date' => $dateStr,
+                            'start_time' => $r->time_start,
+                            'end_time' => $r->time_end,
+                            'activity' => $r->activity,
+                            'status' => $r->status,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return response()->json($out);
     }
 
     /**

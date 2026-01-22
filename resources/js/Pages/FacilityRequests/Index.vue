@@ -221,6 +221,60 @@ const openPrint = (req) => {
   }
   window.open(url, '_blank');
 };
+
+// Calendar modal state (facility bookings)
+const showCalendar = ref(false);
+const calendarMonth = ref(new Date());
+const bookings = ref([]);
+
+const monthLabel = computed(() => calendarMonth.value.toLocaleString(undefined, { month: 'long', year: 'numeric' }));
+
+const fetchBookings = async () => {
+  try {
+    const res = await fetch('/facility-bookings');
+    const data = await res.json();
+    bookings.value = Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error('Failed to load facility bookings', e);
+    bookings.value = [];
+  }
+};
+
+const openCalendar = async () => {
+  await fetchBookings();
+  showCalendar.value = true;
+};
+
+const prevMonth = () => {
+  const d = calendarMonth.value;
+  calendarMonth.value = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+};
+
+const nextMonth = () => {
+  const d = calendarMonth.value;
+  calendarMonth.value = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+};
+
+const monthDays = computed(() => {
+  const d = calendarMonth.value;
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const days = [];
+  const firstWeekday = new Date(year, month, 1).getDay();
+  for (let i = 0; i < firstWeekday; i++) days.push(null);
+  const last = new Date(year, month + 1, 0).getDate();
+  for (let i = 1; i <= last; i++) {
+    days.push(new Date(year, month, i));
+  }
+  while (days.length % 7 !== 0) days.push(null);
+  return days;
+});
+
+const bookingsForDate = (dt) => {
+  if (!dt) return [];
+  const key = dt.toISOString().slice(0,10);
+  return bookings.value.filter(b => (b.date || '').toString().slice(0,10) === key);
+};
 </script>
 
 <template>
@@ -229,13 +283,22 @@ const openPrint = (req) => {
     <div class="p-6">
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Facility Requests</h1>
-        <button
-          v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
-          @click.prevent="openModal()"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
-        >
-          + New Request
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
+            @click.prevent="openModal()"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
+          >
+            + New Request
+          </button>
+          <button
+            @click.prevent="openCalendar()"
+            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg shadow"
+            title="View calendar"
+          >
+            View Calendar
+          </button>
+        </div>
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
@@ -401,6 +464,49 @@ const openPrint = (req) => {
       </div>
 
       <!-- Create Modal -->
+      <!-- Calendar Modal -->
+      <div v-if="showCalendar" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white w-full sm:rounded-xl sm:shadow-lg sm:max-w-4xl p-4 sm:p-6 relative overflow-auto max-h-[90vh]">
+          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click.prevent="showCalendar = false">✕</button>
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <button @click.prevent="prevMonth" class="px-3 py-1 bg-gray-100 rounded">‹</button>
+              <div class="font-semibold">{{ monthLabel }}</div>
+              <button @click.prevent="nextMonth" class="px-3 py-1 bg-gray-100 rounded">›</button>
+            </div>
+            <div>
+              <button @click.prevent="fetchBookings" class="px-3 py-1 bg-blue-600 text-white rounded">Refresh</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-2 mt-2">
+            <div class="text-center font-semibold">Sun</div>
+            <div class="text-center font-semibold">Mon</div>
+            <div class="text-center font-semibold">Tue</div>
+            <div class="text-center font-semibold">Wed</div>
+            <div class="text-center font-semibold">Thu</div>
+            <div class="text-center font-semibold">Fri</div>
+            <div class="text-center font-semibold">Sat</div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-2 mt-2">
+            <template v-for="(d, idx) in monthDays" :key="d ? d.toISOString() : 'blank-' + idx">
+              <div class="border rounded p-2 min-h-[80px] bg-white">
+                <div class="text-xs text-gray-600 mb-1">{{ d ? d.getDate() : '' }}</div>
+                <div class="space-y-1 text-xs">
+                  <div v-if="d" v-for="b in bookingsForDate(d)" :key="b.id" class="bg-gray-50 p-1 rounded border">
+                    <div class="font-medium">{{ b.facility_name ?? '—' }}</div>
+                    <div class="text-gray-600">{{ b.start_time ?? '—' }} — {{ b.end_time ?? '—' }}</div>
+                    <div class="text-gray-700 truncate">{{ b.activity }}</div>
+                  </div>
+                  <div v-else class="h-4"></div>
+                  <div v-if="d && bookingsForDate(d).length === 0" class="text-gray-300 text-xs"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <!-- On small screens use full-screen panel; on larger screens use centered modal -->
         <div class="bg-white w-full h-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-lg p-4 sm:p-6 relative overflow-auto">
