@@ -1,11 +1,31 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/outline";
+import Swal from 'sweetalert2'
 
 const props = defineProps({ facilities: Array, buildings: Array });
 const page = usePage();
+
+const facilitiesList = ref(props.facilities || [])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredFacilities = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = facilitiesList.value.filter(f => (f.name || '').toLowerCase().includes(q) || (f.location || '').toLowerCase().includes(q))
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(facilitiesList.value.filter(f => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return (f.name || '').toLowerCase().includes(q) || (f.location || '').toLowerCase().includes(q)
+}).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
 
 const form = useForm({ name: '', location: '', capacity: '', description: '' });
 const showForm = ref(false);
@@ -30,20 +50,40 @@ const openEdit = (f) => {
 const submit = () => {
   if (editing.value) {
     form.put(route('facilities.update', editing.value.id), {
-      onSuccess: () => { form.reset(); showForm.value = false; editing.value = null; },
+      onSuccess: () => {
+        form.reset(); showForm.value = false; editing.value = null;
+        Swal.fire({ icon: 'success', title: 'Facility updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
+      },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errors).flat().join('\n') }) }
     });
   } else {
     form.post(route('facilities.store'), {
-      onSuccess: () => { form.reset(); showForm.value = false; },
+      onSuccess: () => {
+        form.reset(); showForm.value = false;
+        Swal.fire({ icon: 'success', title: 'Facility added', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
+      },
+      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to add', text: Object.values(errors).flat().join('\n') }) }
     });
   }
 };
 
 const destroy = (f) => {
-  if (!confirm('Delete this facility?')) return;
-  import('@inertiajs/vue3').then(({ router }) => {
-    router.delete(route('facilities.destroy', f.id));
-  });
+  Swal.fire({
+    title: 'Delete this facility?',
+    text: 'This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, delete',
+    cancelButtonText: 'Cancel'
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.delete(route('facilities.destroy', f.id), {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Facility deleted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+        onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors || {}).flat().join('\n') }) }
+      })
+    })
+  })
 };
 </script>
 
@@ -97,6 +137,15 @@ const destroy = (f) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search facilities..."
+            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <table class="min-w-full border border-gray-200">
           <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
             <tr>
@@ -109,7 +158,7 @@ const destroy = (f) => {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="f in props.facilities" :key="f.id">
+            <tr v-for="f in filteredFacilities" :key="f.id">
               <td class="px-4 py-3">{{ f.id }}</td>
               <td class="px-4 py-3">{{ f.name }}</td>
               <td class="px-4 py-3">{{ f.location ?? '—' }}</td>
@@ -126,11 +175,29 @@ const destroy = (f) => {
                 </div>
               </td>
             </tr>
-            <tr v-if="props.facilities.length === 0">
+            <tr v-if="filteredFacilities.length === 0">
               <td colspan="6" class="px-4 py-6 text-center text-gray-500">No facilities found.</td>
             </tr>
           </tbody>
         </table>
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   </AdminLayout>

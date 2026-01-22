@@ -1,11 +1,28 @@
 <script setup>
 import { Head, useForm, router, usePage } from "@inertiajs/vue3";
-import { ref, reactive, computed } from "vue";
+import { ref, reactive, computed, watch } from "vue";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 
 const props = defineProps({ requests: Object });
 const page = usePage();
+
+// client-side search + pagination (requests may be paginated server-side in props.requests.data)
+const requestsList = ref((props.requests && props.requests.data) ? props.requests.data : (props.requests || []))
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredRequests = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = (requestsList.value || []).filter(r => (r.service_type || '').toString().toLowerCase().includes(q) || (r.purposes || '').toString().toLowerCase().includes(q) || (r.id || '').toString().includes(q))
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || []).filter(r => (r.service_type || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (r.purposes || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (r.id || '').toString().includes(searchQuery.value.trim())).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
 
 const showModal = ref(false);
@@ -126,6 +143,55 @@ const canPrint = (r) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input v-model="searchQuery" type="text" placeholder="Search requests..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="sm:hidden space-y-3">
+          <div v-for="r in filteredRequests" :key="r.id" class="border rounded-lg p-3 bg-white shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-sm text-gray-500">Request #{{ r.id }}</div>
+                <div class="font-semibold text-gray-800">{{ r.service_type ?? '—' }}</div>
+                <div class="text-sm text-gray-600">{{ r.purposes ?? '—' }}</div>
+              </div>
+              <div class="text-right text-sm">
+                <div class="text-gray-600">{{ r.date_needed ?? '—' }}</div>
+                <div class="text-gray-500 text-xs">{{ r.time_needed ?? '—' }}</div>
+              </div>
+            </div>
+
+            <div class="mt-2 text-sm text-gray-700">
+              <div><strong>Purpose:</strong> <span class="ml-1">{{ r.purposes || '—' }}</span></div>
+              <div class="mt-1"><strong>Status:</strong> <span class="ml-1"><span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold', statusClass(r.status)]">{{ r.status }}</span></span></div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2">
+              <button v-if="r.status === 'Pending'" @click.prevent="openEdit(r)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"><PencilSquareIcon class="w-4 h-4"/> Edit</button>
+              <button v-if="r.status === 'Pending'" @click.prevent="remove(r.id)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"><TrashIcon class="w-4 h-4"/></button>
+              <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md"><PrinterIcon class="w-4 h-4"/></a>
+            </div>
+          </div>
+
+          <div v-if="filteredRequests.length === 0" class="text-center text-gray-500 py-6">No requests</div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >Prev</button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >Next</button>
+        </div>
         <div class="overflow-x-auto">
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
@@ -140,7 +206,7 @@ const canPrint = (r) => {
               </tr>
             </thead>
             <tbody class="text-sm divide-y">
-              <tr v-for="r in props.requests.data" :key="r.id">
+              <tr v-for="r in filteredRequests" :key="r.id">
                 <td class="px-4 py-2">{{ r.id }}</td>
                 <td class="px-4 py-2">{{ r.service_type }} <div v-if="r.service_type==='Reproduction'" class="text-xs text-gray-600">{{ r.copies }} copies × {{ r.sheets_per_set }} sheets</div></td>
                 <td class="px-4 py-2">{{ r.date_needed }}</td>
@@ -163,7 +229,7 @@ const canPrint = (r) => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="(props.requests.data || []).length === 0"><td :colspan="6" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
+              <tr v-if="filteredRequests.length === 0"><td :colspan="6" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
             </tbody>
           </table>
         </div>

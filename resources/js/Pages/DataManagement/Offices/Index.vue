@@ -1,12 +1,37 @@
 <script setup>
 import { Head, useForm } from "@inertiajs/vue3";
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
+import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
 
 const props = defineProps({ offices: Array, divisions: Array });
+const officesList = ref(props.offices || []);
 const form = useForm({ id: null, name: '', division_id: null });
 const showModal = ref(false);
+
+// Search & pagination (client-side, mirror Users template)
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredOffices = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  let results = officesList.value.filter(o =>
+    o.name?.toLowerCase().includes(q) ||
+    (o.division?.division_name || '').toLowerCase().includes(q)
+  )
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil((officesList.value.filter(o => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return o.name?.toLowerCase().includes(q) || (o.division?.division_name || '').toLowerCase().includes(q)
+}).length) / perPage)))
+
+// Reset page when search changes
+watch(searchQuery, () => { currentPage.value = 1 })
 
 const openModal = (office = null) => {
   if (office) {
@@ -24,17 +49,33 @@ const closeModal = () => { showModal.value = false; form.reset(); };
 
 const submit = () => {
   if (form.id) {
-    form.put(route('offices.update', form.id), { onSuccess: () => closeModal() });
+    form.put(route('offices.update', form.id), {
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Office updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) }
+    });
   } else {
-    form.post(route('offices.store'), { onSuccess: () => closeModal() });
+    form.post(route('offices.store'), {
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Office added', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) }
+    });
   }
 };
 
 const remove = (office) => {
-  if (!confirm('Delete this office/unit?')) return;
-  import('@inertiajs/vue3').then(({ router }) => {
-    router.delete(route('offices.destroy', office.id));
-  });
+  Swal.fire({
+    title: 'Delete this office/unit?',
+    text: 'This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, delete',
+    cancelButtonText: 'Cancel'
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.delete(route('offices.destroy', office.id), {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Office deleted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+        onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors || {}).flat().join('\n') }) }
+      })
+    })
+  })
 };
 </script>
 
@@ -48,6 +89,16 @@ const remove = (office) => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search offices..."
+            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
         <table class="w-full table-auto">
           <thead class="bg-gray-100 text-left">
             <tr>
@@ -58,7 +109,7 @@ const remove = (office) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="o in offices" :key="o.id" class="border-t">
+            <tr v-for="o in filteredOffices" :key="o.id" class="border-t">
               <td class="px-4 py-3">{{ o.id }}</td>
               <td class="px-4 py-3">{{ o.name }}</td>
               <td class="px-4 py-3">{{ o.division?.division_name ?? '—' }}</td>
@@ -71,11 +122,30 @@ const remove = (office) => {
                 </button>
               </td>
             </tr>
-            <tr v-if="offices.length === 0">
-              <td colspan="4" class="px-4 py-6 text-center text-gray-500">No offices defined.</td>
+            <tr v-if="filteredOffices.length === 0">
+              <td colspan="4" class="px-4 py-6 text-center text-gray-500">No offices found.</td>
             </tr>
           </tbody>
         </table>
+
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">

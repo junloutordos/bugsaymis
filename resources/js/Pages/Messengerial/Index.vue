@@ -1,11 +1,39 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array });
 const page = usePage();
+
+// client-side search & pagination
+const requestsList = ref(props.requests || [])
+const searchQuery = ref('')
+const currentPage = ref(1)
+const perPage = 10
+
+const filteredRequests = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  const results = requestsList.value.filter(r => {
+    return (r.purpose || '').toString().toLowerCase().includes(q) ||
+      (r.requestor || '').toString().toLowerCase().includes(q) ||
+      (r.reference_no || '').toString().toLowerCase().includes(q) ||
+      (r.destination || '').toString().toLowerCase().includes(q)
+  })
+  const start = (currentPage.value - 1) * perPage
+  return results.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(requestsList.value.filter(r => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return (r.purpose || '').toString().toLowerCase().includes(q) ||
+    (r.requestor || '').toString().toLowerCase().includes(q) ||
+    (r.reference_no || '').toString().toLowerCase().includes(q) ||
+    (r.destination || '').toString().toLowerCase().includes(q)
+}).length / perPage)))
+
+watch(searchQuery, () => { currentPage.value = 1 })
 const userRole = page.props.auth?.user?.role?.name ?? null;
 const userEmail = page.props.auth?.user?.email ?? null;
 
@@ -107,6 +135,15 @@ const submitProof = () => {
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
+        <!-- Search -->
+        <div class="mb-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search requests..."
+            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <!-- Desktop table -->
         <div class="hidden sm:block overflow-x-auto">
           <table class="table-fixed w-full border border-gray-200">
@@ -127,7 +164,7 @@ const submitProof = () => {
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="r in props.requests" :key="r.id">
+            <tr v-for="r in filteredRequests" :key="r.id">
               <td class="px-4 py-3 whitespace-normal break-words">{{ r.id }}</td>
               <td class="px-4 py-3 whitespace-normal break-words">{{ r.requestor }}</td>
               <td class="px-4 py-3 whitespace-normal break-words">{{ r.unit ?? '—' }}</td>
@@ -172,7 +209,7 @@ const submitProof = () => {
                 </div>
               </td>
             </tr>
-            <tr v-if="props.requests.length === 0">
+            <tr v-if="filteredRequests.length === 0">
               <td colspan="12" class="px-4 py-6 text-center text-gray-500">No messengerial requests found.</td>
             </tr>
           </tbody>
@@ -181,7 +218,7 @@ const submitProof = () => {
 
         <!-- Mobile cards -->
         <div class="sm:hidden space-y-3">
-          <div v-for="r in props.requests" :key="r.id" class="border rounded-lg p-3 bg-white shadow-sm">
+          <div v-for="r in filteredRequests" :key="r.id" class="border rounded-lg p-3 bg-white shadow-sm">
             <div class="flex items-start justify-between">
               <div>
                 <div class="text-sm text-gray-500">Request #{{ r.id }}</div>
@@ -210,7 +247,25 @@ const submitProof = () => {
             </div>
           </div>
 
-          <div v-if="props.requests.length === 0" class="text-center text-gray-500 py-6">No messengerial requests found.</div>
+          <div v-if="filteredRequests.length === 0" class="text-center text-gray-500 py-6">No messengerial requests found.</div>
+        </div>
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
       </div>
 

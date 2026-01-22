@@ -25,6 +25,7 @@
                 <th class="px-4 py-2">#</th>
                 <th class="px-4 py-2">Collection</th>
                 <th class="px-4 py-2">Borrower</th>
+                <th class="px-4 py-2">Section</th>
                 <th class="px-4 py-2">Borrow Date</th>
                 <th class="px-4 py-2">Due Date</th>
                 <th class="px-4 py-2">Return Date</th>
@@ -41,6 +42,7 @@
                 <td class="px-4 py-2">
                   <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-blue-600 hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button>
                 </td>
+                <td class="px-4 py-2">{{ b.section_name || '—' }}</td>
                 <td class="px-4 py-2">{{ b.borrow_date }}</td>
                 <td class="px-4 py-2">{{ b.due_date }}</td>
                 <td class="px-4 py-2">{{ b.return_date || '—' }}</td>
@@ -52,7 +54,7 @@
                   </div>
                 </td>
               </tr>
-              <tr v-if="(borrowings.data || []).length === 0"><td :colspan="8" class="px-4 py-6 text-center text-gray-500">No borrowings</td></tr>
+              <tr v-if="(borrowings.data || []).length === 0"><td :colspan="9" class="px-4 py-6 text-center text-gray-500">No borrowings</td></tr>
             </tbody>
           </table>
         </div>

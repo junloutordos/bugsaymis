@@ -131,6 +131,28 @@ class LibraryBorrowingsController extends Controller
                 // ignore resolution errors
             }
             if (! $b->borrower_name) $b->borrower_name = ($b->borrower_type ?? 'Unknown').' #'.$b->borrower_id;
+            // Also attempt to resolve student's section name (if borrower is a student)
+            $b->section_name = null;
+            try {
+                if (isset($type) && $type === 'student') {
+                    // find latest section assignment for this student (prefer by syid/id)
+                    $ss = DB::table('section_students')
+                        ->where('studentid', $b->borrower_id)
+                        ->orderByDesc('syid')
+                        ->orderByDesc('id')
+                        ->first();
+
+                    if ($ss && isset($ss->sectionid) && $ss->sectionid) {
+                        $sec = DB::table('sections')->where('id', $ss->sectionid)->first();
+                        if ($sec && isset($sec->sectionname)) {
+                            $b->section_name = $sec->sectionname;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore section resolution errors
+            }
+
             // Present borrower name in ALL CAPS for consistency in the table
             try { $b->borrower_name = strtoupper($b->borrower_name); } catch (\Throwable $e) { }
             return $b;
