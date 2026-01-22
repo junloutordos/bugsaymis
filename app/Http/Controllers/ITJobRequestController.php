@@ -24,54 +24,53 @@ class ITJobRequestController extends Controller
      | INDEX
      |=====================================================*/
     public function index(Request $request)
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        // Administrator role ID
-        $ADMIN_ROLE_ID = 1;
+    // 🔒 Match old behavior exactly
+    $roles = array_filter(explode(',', $user->role_id));
+    $isAdmin = isset($roles[0]) && (int) $roles[0] === 1;
 
-        $isAdmin = in_array($ADMIN_ROLE_ID, explode(',', $user->roles));
+    $requests = ITJobRequest::with([
+            'user:id,name',
+            'divisionChief:id,name',
+            'assignedTo:id,name',
+            'trackingLogs:id,it_job_request_id,status,remarks,created_at'
+        ])
+        // ✅ SAME LOGIC AS OLD
+        ->when(!$isAdmin, function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })
+        ->latest()
+        ->get();
 
-        $requests = ITJobRequest::with([
-                'user:id,name',
-                'divisionChief:id,name',
-                'assignedTo:id,name',
-                'trackingLogs:id,it_job_request_id,status,remarks,created_at'
-            ])
-            ->when(!$isAdmin, function ($q) use ($user) {
-                $q->where('user_id', $user->id);
+    return Inertia::render('ITJobRequests/Index', [
+        'requests' => $requests,
+
+        'categories' => ITJobCategory::orderBy('name')->get(),
+
+        // Division Chiefs & Information Officers
+        'divisionChiefs' => User::where(function ($q) {
+                $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
+                  ->orWhereRaw('FIND_IN_SET(?, role_id)', [3]);
             })
-            ->latest()
-            ->get();
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get(),
 
-        return Inertia::render('ITJobRequests/Index', [
-            'requests' => $requests,
+        // Administrators (primary or secondary)
+        'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [1])
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get(),
 
-            'categories' => ITJobCategory::orderBy('name')->get(),
+        'ictEquipment' => ICTEquipment::orderBy('id')
+            ->orderBy('description')
+            ->get(),
 
-            // Division Chiefs & Information Officers
-            'divisionChiefs' => User::where(function ($q) {
-                    $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2]) // Division Chief
-                    ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]); // Information Officer
-                })
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-
-            // Administrators
-            'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [$ADMIN_ROLE_ID])
-                ->select('id', 'name')
-                ->orderBy('name')
-                ->get(),
-
-            // ICT Equipment list
-            'ictEquipment' => ICTEquipment::orderBy('id')
-                ->orderBy('description')
-                ->get(),
-
-            'isAdmin' => $isAdmin,
-        ]);
-    }
+        'isAdmin' => $isAdmin,
+    ]);
+}
 
 
     private function getUserRole($user): string
