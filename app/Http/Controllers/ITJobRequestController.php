@@ -27,55 +27,41 @@ public function index(Request $request)
 {
     $user = $request->user();
 
-    // 🔒 Preserve legacy role logic
     $roles = array_filter(explode(',', $user->role_id));
     $isAdmin = isset($roles[0]) && (int) $roles[0] === 1;
 
     $requests = ITJobRequest::with([
-            // Core workflow
-            'user:id,name',
-            'divisionChief:id,name',
-            'assignedTo:id,name',
-            'trackingLogs:id,it_job_request_id,status,remarks,created_at',
+        'user:id,name',
+        'divisionChief:id,name',
+        'assignedTo:id,name',
+        'trackingLogs:id,it_job_request_id,status,remarks,created_at',
 
-            // 🔥 Hardware chain
-            'equipment:id,description,room_id,owner_id',
-            'equipment.room:id,name,code',
-            'equipment.owner:id,name',
-        ])
-        ->when(!$isAdmin, function ($q) use ($user) {
-            $q->where('user_id', $user->id);
-        })
-        ->latest()
-        ->get();
+        // 🔥 THIS IS THE IMPORTANT PART
+        'equipment' => function ($q) {
+            $q->select('id','description','room_id','owner_id')
+              ->with([
+                  'room:id,name,code',
+                  'owner:id,name'
+              ]);
+        }
+    ])
+    ->when(!$isAdmin, fn ($q) => $q->where('user_id', $user->id))
+    ->latest()
+    ->get();
 
     return Inertia::render('ITJobRequests/Index', [
         'requests' => $requests,
-
         'categories' => ITJobCategory::orderBy('name')->get(),
 
-        // Division Chiefs & Information Officers
         'divisionChiefs' => User::where(function ($q) {
-                $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
-                  ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]);
-            })
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get(),
+            $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
+              ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]);
+        })->select('id','name')->orderBy('name')->get(),
 
-        // Administrators
         'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [1])
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get(),
+            ->select('id','name')->orderBy('name')->get(),
 
-        // Equipment list already hydrated with room + owner
-        'ictEquipment' => ICTEquipment::with([
-                'room:id,name,code',
-                'owner:id,name',
-            ])
-            ->orderBy('description')
-            ->get(),
+        'ictEquipment' => ICTEquipment::orderBy('description')->get(),
 
         'isAdmin' => $isAdmin,
     ]);
