@@ -60,7 +60,7 @@ class ITJobRequestController extends Controller
                 ->get(),
 
             // ICT Equipment list
-            'ictEquipment' => ICTEquipment::orderBy('location')
+            'ictEquipment' => ICTEquipment::orderBy('id')
                 ->orderBy('description')
                 ->get(),
 
