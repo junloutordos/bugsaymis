@@ -59,12 +59,10 @@
           </table>
         </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <div class="text-sm text-gray-600">Page {{ borrowings.current_page }} of {{ borrowings.last_page }}</div>
-          <div class="space-x-2">
-            <button @click.prevent="goTo(borrowings.prev_page_url)" :disabled="!borrowings.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-            <button @click.prevent="goTo(borrowings.next_page_url)" :disabled="!borrowings.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
-          </div>
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button @click.prevent="goTo(borrowings.prev_page_url)" :disabled="!borrowings.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ borrowings.current_page }} of {{ borrowings.last_page }}</span>
+          <button @click.prevent="goTo(borrowings.next_page_url)" :disabled="!borrowings.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 
@@ -206,6 +204,7 @@
 </template>
 
 <script setup>
+import Swal from 'sweetalert2'
 import { ref, nextTick, watch, reactive } from 'vue'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -289,7 +288,7 @@ watch(() => form.value.borrower_type, (val) => {
 function submitForm(){
   // client-side validation
   if (!validateAll()) {
-    alert('Please fix the highlighted errors before processing the borrow.');
+    Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before processing the borrow.' });
     return;
   }
 
@@ -297,18 +296,28 @@ function submitForm(){
     console.log('Submitting borrowing', form.value)
     router.post(route('library.borrowings.store'), form.value, {
       onStart: () => console.log('borrow request started'),
-      onSuccess: () => { console.log('borrow success'); closeModal(); router.get(route('library.borrowings.index')) },
-      onError: (errors) => { console.error('borrow error', errors); alert(Object.values(errors || {}).join('\n') || 'Error processing borrowing') }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Borrowing processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index')) }) },
+      onError: (errors) => { console.error('borrow error', errors); Swal.fire({ icon: 'error', title: 'Error processing borrowing', text: Object.values(errors || {}).join('\n') || 'Error processing borrowing' }) }
     })
   } catch (e) {
     console.error('submitForm exception', e);
-    alert('Error: ' + e.message)
+    Swal.fire({ icon: 'error', title: 'Error', text: e.message })
   }
 }
 
-function processReturn(b){
+async function processReturn(b){
+  const res = await Swal.fire({
+    title: 'Mark as returned?',
+    text: 'This will mark the borrowing as returned and update the collection status to Available.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, return',
+    cancelButtonText: 'Cancel'
+  })
+  if (!res.isConfirmed) return
   router.post(route('library.borrowings.return', b.id), {}, {
-    onSuccess: () => { router.get(route('library.borrowings.index')) }
+    onSuccess: () => { Swal.fire({ icon: 'success', title: 'Return processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
+    onError: (e) => { console.error('return error', e); Swal.fire({ icon: 'error', title: 'Failed to process return' }) }
   })
 }
 
@@ -316,7 +325,8 @@ function openOverride(b){ overrideForm.value = { id: b.id, due_date: b.due_date 
 function closeOverride(){ showOverride.value = false; overrideForm.value = { id: null, due_date: '', remarks: '' } }
 function submitOverride(){
   router.post(route('library.borrowings.override', overrideForm.value.id), { due_date: overrideForm.value.due_date, remarks: overrideForm.value.remarks }, {
-    onSuccess: () => { closeOverride(); router.get(route('library.borrowings.index')) }
+    onSuccess: () => { closeOverride(); Swal.fire({ icon: 'success', title: 'Due date overridden', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
+    onError: (e) => { console.error('override error', e); Swal.fire({ icon: 'error', title: 'Failed to override due date' }) }
   })
 }
 

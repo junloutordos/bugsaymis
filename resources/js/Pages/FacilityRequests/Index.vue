@@ -5,8 +5,10 @@ import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outl
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
-const props = defineProps({ requests: Array, facilities: Array });
+const props = defineProps({ requests: Array, facilities: Array, misUsers: Array });
 const page = usePage();
+
+const usersList = ref(props.misUsers || [])
 
 // client-side search + pagination
 const requestsList = ref(props.requests || [])
@@ -39,6 +41,8 @@ const form = useForm({
   unit: '',
   activity: '',
   purpose: '',
+  requires_it_assistance: false,
+  assigned_mis_user: null,
   venue: [],
   date_start: '',
   date_end: '',
@@ -175,6 +179,7 @@ const openModal = (req = null) => {
     form.date_end = req.date_end;
     form.time_start = req.time_start ?? '';
     form.time_end = req.time_end ?? '';
+    form.assigned_mis_user = req.assigned_mis_user ?? null;
   } else {
     form.reset();
   }
@@ -270,9 +275,11 @@ const monthDays = computed(() => {
   return days;
 });
 
+const pad2 = (n) => (n < 10 ? '0' + n : String(n));
+const formatYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const bookingsForDate = (dt) => {
   if (!dt) return [];
-  const key = dt.toISOString().slice(0,10);
+  const key = formatYMD(dt);
   return bookings.value.filter(b => (b.date || '').toString().slice(0,10) === key);
 };
 </script>
@@ -529,6 +536,22 @@ const bookingsForDate = (dt) => {
                 <input v-model="form.purpose" @input="validateField('purpose')" type="text" :class="['mt-1 block w-full rounded', fieldErrors.purpose ? 'border-red-600' : 'border-gray-300']" />
                 <p v-if="fieldErrors.purpose" class="mt-1 text-xs text-red-600">{{ fieldErrors.purpose }}</p>
               </div>
+            </div>
+
+            <div class="mt-2">
+              <label class="inline-flex items-center gap-3">
+                <input type="checkbox" v-model="form.requires_it_assistance" class="h-4 w-4" />
+                <span class="text-sm text-gray-700">Requires IT Technical Assistance</span>
+              </label>
+              <p class="text-xs text-gray-500 mt-1">If enabled, an IT Job Request will be automatically created for this event.</p>
+            </div>
+
+            <div v-if="form.requires_it_assistance" class="mt-3">
+              <label class="block text-sm font-medium text-gray-700">Assign IT Personnel</label>
+              <select v-model="form.assigned_mis_user" class="mt-1 block w-full rounded border-gray-300">
+                <option :value="null">-- Assign Personnel--</option>
+                <option v-for="u in usersList" :key="u.id" :value="u.id">{{ u.name }} - {{ u.position ?? '' }}</option>
+              </select>
             </div>
 
 

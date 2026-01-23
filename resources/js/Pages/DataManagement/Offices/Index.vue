@@ -5,9 +5,10 @@ import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
 
-const props = defineProps({ offices: Array, divisions: Array });
+const props = defineProps({ offices: Array, divisions: Array, users: Array });
 const officesList = ref(props.offices || []);
-const form = useForm({ id: null, name: '', division_id: null });
+const usersList = ref(props.users || []);
+const form = useForm({ id: null, name: '', division_id: null, unit_head: null });
 const showModal = ref(false);
 
 // Search & pagination (client-side, mirror Users template)
@@ -39,6 +40,7 @@ const openModal = (office = null) => {
     form.id = office.id;
     form.name = office.name;
     form.division_id = office.division_id ?? null;
+    form.unit_head = office.unit_head ?? null;
   } else {
     form.reset();
   }
@@ -105,6 +107,7 @@ const remove = (office) => {
               <th class="px-4 py-2">#</th>
               <th class="px-4 py-2">Name</th>
               <th class="px-4 py-2">Division</th>
+              <th class="px-4 py-2">Unit Head</th>
               <th class="px-4 py-2">Actions</th>
             </tr>
           </thead>
@@ -113,6 +116,7 @@ const remove = (office) => {
               <td class="px-4 py-3">{{ o.id }}</td>
               <td class="px-4 py-3">{{ o.name }}</td>
               <td class="px-4 py-3">{{ o.division?.division_name ?? '—' }}</td>
+              <td class="px-4 py-3">{{ o.unitHeadUser?.name ?? o.unit_head_user?.name ?? '—' }}</td>
               <td class="px-4 py-3">
                 <button @click.prevent="openModal(o)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 mr-2" title="Edit">
                   <PencilSquareIcon class="w-5 h-5" />
@@ -123,7 +127,7 @@ const remove = (office) => {
               </td>
             </tr>
             <tr v-if="filteredOffices.length === 0">
-              <td colspan="4" class="px-4 py-6 text-center text-gray-500">No offices found.</td>
+              <td colspan="5" class="px-4 py-6 text-center text-gray-500">No offices found.</td>
             </tr>
           </tbody>
         </table>
@@ -165,6 +169,14 @@ const remove = (office) => {
                 <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.division_name }}</option>
               </select>
               <p v-if="form.errors.division_id" class="text-red-600 text-sm mt-1">{{ form.errors.division_id }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Unit Head</label>
+              <select v-model="form.unit_head" class="mt-1 block w-full rounded border-gray-300">
+                <option value="">-- No unit head --</option>
+                <option v-for="u in usersList" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+              <p v-if="form.errors.unit_head" class="text-red-600 text-sm mt-1">{{ form.errors.unit_head }}</p>
             </div>
             <div class="flex gap-2">
               <button :disabled="form.processing" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">{{ form.processing ? 'Saving...' : 'Save' }}</button>

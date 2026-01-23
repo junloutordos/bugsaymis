@@ -30,11 +30,7 @@ import {
   ClockIcon,
 } from "@heroicons/vue/24/outline";
 
-// Props
-defineProps({
-  title: { type: String, default: "Dashboard" },
-});
-
+// (menu insertion removed here; menu items are defined later in `menuItems`)
 // --- State ---
 const collapsed = ref(false);
 const showDropdown = ref(false);
@@ -187,6 +183,23 @@ const menuItems = [
     label: "Finance & Administration",
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
   },
+  
+  
+  {
+    label: "Human Resource",
+    icon: UserGroupIcon,
+    roles: ["Administrator", "HR"],
+    children: [
+      {
+        label: "Daily Time Record",
+        routeName: null,
+        href: '#',
+        icon: ClockIcon,
+        roles: ["Administrator", "HR"],
+      },
+    ],
+  },
+
   {
     label: "Performance Mngmt",
     icon: UserGroupIcon,

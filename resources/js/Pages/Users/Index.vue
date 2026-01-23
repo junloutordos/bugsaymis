@@ -345,6 +345,7 @@ const openSignaturePicker = (user) => {
             <p>Name: <strong>{{ selectedUser.name }}</strong></p>
             <p>Sex: <strong>{{ selectedUser.sex }}</strong></p>
             <p>Email: <strong>{{ selectedUser.email }}</strong></p>
+            <p>Biometric ID: <strong>{{ selectedUser.badge_id ?? '—' }}</strong></p>
             <p>Role: <strong>{{ getRoleNames(selectedUser) }}</strong></p>
             <p>Position: <strong>{{ selectedUser.position ?? "—" }}</strong></p>
             <p>Division: <strong>{{ selectedUser.division?.name ?? "—" }}</strong></p>
@@ -369,6 +370,17 @@ const openSignaturePicker = (user) => {
                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
                 required
               />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Biometric ID</label>
+              <input
+                v-model="form.badge_id"
+                type="text"
+                placeholder=""
+                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
+              />
+              <p class="text-xs text-gray-500 mt-1">Alphanumeric, dashes and underscores allowed.</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Sex</label>

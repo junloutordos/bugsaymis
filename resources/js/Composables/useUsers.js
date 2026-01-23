@@ -21,6 +21,7 @@ export function useUsers(props) {
     name: "",
     email: "",
     sex:"",
+    badge_id: "",
     role_id: [],
     position: "",
     division_id: "",
@@ -52,6 +53,7 @@ export function useUsers(props) {
         name: user.name,
         email: user.email,
         sex: user.sex,
+        badge_id: user.badge_id ?? "",
         role_id: Array.isArray(user.role_id)
           ? user.role_id
           : user.role_id
@@ -66,6 +68,7 @@ export function useUsers(props) {
         id: null,
         name: "",
         email: "",
+        badge_id: "",
         role_id: [],
         position: "",
         division_id: "",

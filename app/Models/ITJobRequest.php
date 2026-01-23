@@ -15,6 +15,7 @@ class ITJobRequest extends Model
     protected $fillable = [
         'itjr_no',
         'user_id',
+        'facility_request_id',
         'category',
         'title',
         'description',

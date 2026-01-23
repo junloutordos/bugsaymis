@@ -39,12 +39,10 @@
           </table>
         </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <div class="text-sm text-gray-600">Page {{ attendances.current_page }} of {{ attendances.last_page }}</div>
-          <div class="space-x-2">
-            <button @click.prevent="goTo(attendances.prev_page_url)" :disabled="!attendances.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-            <button @click.prevent="goTo(attendances.next_page_url)" :disabled="!attendances.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
-          </div>
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button @click.prevent="prev" :disabled="!attendances.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ attendances.current_page }} of {{ attendances.last_page }}</span>
+          <button @click.prevent="next" :disabled="!attendances.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
     </div>

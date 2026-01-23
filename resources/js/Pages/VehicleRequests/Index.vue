@@ -128,8 +128,11 @@ const monthDays = computed(() => {
   return days;
 });
 
+const pad2 = (n) => (n < 10 ? '0' + n : String(n));
+const formatYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const bookingsForDate = (dt) => {
-  const key = dt.toISOString().slice(0,10);
+  if (!dt) return [];
+  const key = formatYMD(dt);
   return bookings.value.filter(b => (b.date || '').toString().slice(0,10) === key);
 };
 
