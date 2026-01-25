@@ -94,7 +94,8 @@ const form = useForm({
     child_date_of_birth: normalizeDate(c.child_date_of_birth),
   })),
 
-  education: props.pds?.education ?? [{ level: '', school_name: '', year_graduated: '', degree: '', honors: '' }],
+  education: props.pds?.education ?? [{ level: '', school_name: '', from: '', to: '', highest_level: '', year_graduated: '', degree: '', honors: '' }],
+
 
   eligibility: (props.pds?.eligibility ?? [{
     eligibility: '', rating: '', exam_date: '',
@@ -124,7 +125,7 @@ const form = useForm({
   })),
 
   trainings: (props.pds?.trainings ?? [{
-    training_title: '', date_from: '', date_to: '', hours: '', conducted_by: ''
+    training_title: '', date_from: '', date_to: '', hours: '', training_type: '', conducted_by: ''
   }]).map(t => ({
     ...t,
     date_from: normalizeDate(t.date_from),
@@ -490,7 +491,7 @@ const exportPDS = (id) => {
         <div
             v-for="(edu, index) in form.education"
             :key="index"
-            class="grid grid-cols-[1fr_2fr_1fr_2fr_1fr_auto] gap-4 mb-2 items-center"
+            class="grid grid-cols-[1fr_3fr_3fr_1fr_1fr_1fr_1fr_1fr] gap-4 mb-2 items-center"
         >
             <input
             v-model="edu.level"
@@ -507,15 +508,36 @@ const exportPDS = (id) => {
             />
 
             <input
-            v-model="edu.year_graduated"
-            placeholder="Year Graduated"
+            v-model="edu.degree"
+            placeholder="Degree"
             class="input"
             :readonly="!editMode"
             />
 
             <input
-            v-model="edu.degree"
-            placeholder="Degree"
+            v-model="edu.from"
+            placeholder="From"
+            class="input"
+            :readonly="!editMode"
+            /> 
+            
+            <input
+            v-model="edu.to"
+            placeholder="To"
+            class="input"
+            :readonly="!editMode"
+            />
+
+            <input
+            v-model="edu.highest_level"
+            placeholder="Highest Level"
+            class="input"
+            :readonly="!editMode"
+            />
+
+            <input
+            v-model="edu.year_graduated"
+            placeholder="Year Graduated"
             class="input"
             :readonly="!editMode"
             />
@@ -662,17 +684,18 @@ const exportPDS = (id) => {
 
         <!-- VIII. Trainings -->
         <section>
-        <h2 class="font-semibold text-lg mb-4">VII. Trainings</h2>
+        <h2 class="font-semibold text-lg mb-4">VII. Learning & Development/Trainings</h2>
 
         <div
             v-for="(train, index) in form.trainings"
             :key="index"
-            class="grid grid-cols-[2fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center"
+            class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center"
         >
             <input v-model="train.training_title" placeholder="Title" class="input" :readonly="!editMode" />
             <input type="date" v-model="train.date_from" class="input" :readonly="!editMode" />
             <input type="date" v-model="train.date_to" class="input" :readonly="!editMode" />
             <input v-model="train.hours" placeholder="Hours" class="input" :readonly="!editMode" />
+            <input v-model="train.training_type" placeholder="L&D Type" class="input" :readonly="!editMode" />
             <input v-model="train.conducted_by" placeholder="Conducted By" class="input" :readonly="!editMode" />
 
             <button
