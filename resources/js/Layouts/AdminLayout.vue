@@ -28,6 +28,7 @@ import {
   UserIcon,
   CursorArrowRippleIcon,
   ClockIcon,
+  PrinterIcon,
 } from "@heroicons/vue/24/outline";
 
 // Props
@@ -186,6 +187,29 @@ const menuItems = [
     type: "section",
     label: "Finance & Administration",
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  },
+  {
+    label: "Human Resource",
+    icon: UserGroupIcon,
+    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
+    children: [
+      {
+        label: "All PDS",
+        routeName: "pds.index",
+        href: route("pds.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "HR"],
+      },
+      {
+        label: "My PDS",
+        routeName: "pds.my",
+        href: route("pds.my"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Faculty", "Staff", "DivisionChief", "OCD", "Administrator", "HR"],
+      },
+      
+      
+    ],
   },
   {
     label: "Performance Mngmt",

@@ -32,6 +32,7 @@ use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
+use App\Http\Controllers\PDSController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 // Data Management - Offices
@@ -135,12 +136,45 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
+Route::middleware(['auth'])->group(function () {
+    // Redirect user to their PDS (create or edit)
+    Route::get('/my-pds', [PDSController::class, 'myPds'])->name('pds.my');
+
+    // Create PDS
+    Route::get('/pds/create', [PDSController::class, 'create'])->name('pds.create');
+    Route::post('/pds', [PDSController::class, 'store'])->name('pds.store');
+
+    // Edit PDS (view/update own PDS)
+    Route::get('/pds/{pds}/edit', [PDSController::class, 'edit'])->name('pds.edit');
+    Route::put('/pds/{pds}', [PDSController::class, 'update'])->name('pds.update');
+
+    // Admin-only: list all PDS
+    Route::get('/pds', [PDSController::class, 'index'])->middleware('can:admin')->name('pds.index');
+
+    // Optional: show full PDS (for admin or owner)
+    Route::get('/pds/{pds}', [PDSController::class, 'show'])->name('pds.show');
+
+    Route::get('/pds/{pds}/export', [PDSController::class, 'exportPDS'])
+    ->name('pds.export');
+
+    // Printable HTML version (for browser print)
+    Route::get('/pds/{pds}/print', [PDSController::class, 'printPDS'])
+        ->name('pds.print');
+
+    // Save overlay coordinates for PDF stamping/overlay alignment
+    Route::post('/pds/overlay/save', [PDSController::class, 'saveOverlayCoordinates'])
+        ->name('pds.overlay.save');
+
+});
+
+
 Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Dashboard (handled by controller)
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
         ->middleware(['verified'])
         ->name('dashboard');
+  
 
     /*
     |--------------------------------------------------------------------------
