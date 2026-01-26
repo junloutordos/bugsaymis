@@ -521,7 +521,7 @@ const menuItems = [
             routeName: "consultations.log.print",
             href: route("consultations.log.print"),
             icon: DocumentTextIcon,
-            roles: ["Administrator", "Nurse", "Clinic","Nurse"],
+            roles: ["Administrator", "Nurse", "Clinic"],
             target: '_blank',
           },
           {
