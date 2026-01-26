@@ -29,7 +29,7 @@
             </div>
           </div>
 
-        <div class="overflow-x-auto">
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
@@ -72,6 +72,34 @@
               <tr v-if="(collections.data || []).length === 0"><td :colspan="8" class="px-4 py-6 text-center text-gray-500">No collections</td></tr>
             </tbody>
           </table>
+
+        </div>
+
+        <!-- Mobile cards -->
+        <div v-else class="space-y-3 sm:hidden">
+          <div v-for="c in collections.data" :key="c.id" class="bg-white rounded-lg p-3 border shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs text-gray-500">#{{ c.id }}</div>
+                <div class="font-semibold text-gray-800">{{ c.title || '—' }}</div>
+                <div class="text-sm text-gray-600">{{ c.author_publisher || '—' }}</div>
+                <div class="text-sm text-gray-500">{{ c.call_number || '—' }} • {{ c.collection_type || c.volume || '—' }}</div>
+                <div class="text-sm text-gray-500">{{ c.category || '—' }} • {{ c.year || '—' }}</div>
+              </div>
+              <div class="flex flex-col items-end space-y-2">
+                <div class="flex space-x-2">
+                  <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
+                    <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                  </button>
+                  <button @click="confirmDelete(c)" class="p-1 hover:bg-gray-100 rounded" title="Delete">
+                    <TrashIcon class="w-5 h-5 text-red-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="(collections.data || []).length === 0" class="text-center text-gray-500 py-6">No collections</div>
         </div>
 
         <div class="flex justify-center items-center gap-2 mt-4">
@@ -168,7 +196,7 @@
 <script setup>
 import Swal from 'sweetalert2'
 
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { usePage, router, Head } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
@@ -195,6 +223,14 @@ const fieldErrors = reactive({
   category: '',
 });
 const deleting = ref(null);
+
+// Responsive: track window width to toggle table vs mobile cards
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200);
+const isMobile = computed(() => windowWidth.value < 640);
+function handleResize() { windowWidth.value = window.innerWidth }
+
+onMounted(() => { window.addEventListener('resize', handleResize) });
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) });
 
 function openCreate() { editing.value = null; form.value = { collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' }; errors.value = {}; Object.keys(fieldErrors).forEach(k => fieldErrors[k] = ''); showModal.value = true }
 async function openEdit(c) {

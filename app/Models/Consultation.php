@@ -12,7 +12,11 @@ class Consultation extends Model
     protected $table = 'consultations';
 
     protected $fillable = [
-        'requestor','email','unit','reason','contact','status','nurse_id','scheduled_at','notes'
+        'requestor_id',
+        'requestor','email','unit','reason','contact','status','nurse_id','scheduled_at','notes',
+        'consultation_type','schedule_id',
+        'day','time_start','time_end',
+        'requestor_type'
     ];
 
     protected $casts = [

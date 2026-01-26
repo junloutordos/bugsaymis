@@ -17,7 +17,7 @@
           />
         </div>
 
-        <div class="overflow-x-auto">
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
@@ -39,6 +39,24 @@
           </table>
         </div>
 
+        <!-- Mobile cards -->
+        <div v-else class="space-y-3 sm:hidden">
+          <div v-for="att in attendances.data" :key="att.id" class="border rounded-lg p-3 bg-white shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-sm text-gray-500">#{{ att.id }}</div>
+                <div class="font-semibold text-gray-800">{{ (att.student_name ?? '—').toUpperCase() }}</div>
+                <div class="text-sm text-gray-600">PISAY ID: {{ att.pisay_systemid || '—' }}</div>
+              </div>
+              <div class="text-right text-sm">
+                <div class="text-gray-600">{{ formatDate(att.scanned_at) }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="(attendances.data || []).length === 0" class="text-center text-gray-500 py-6">No attendance records</div>
+        </div>
+
         <div class="flex justify-center items-center gap-2 mt-4">
           <button @click.prevent="prev" :disabled="!attendances.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
           <span>Page {{ attendances.current_page }} of {{ attendances.last_page }}</span>
@@ -50,13 +68,20 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { usePage, router, Head } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const page = usePage();
 const attendances = computed(() => page.props.attendances || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null });
 const q = ref(page.props.q || '');
+
+// responsive: track window width to switch to card layout on small screens
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 function search() {
   router.get(route('library.attendance.index'), { q: q.value }, { replace: true });

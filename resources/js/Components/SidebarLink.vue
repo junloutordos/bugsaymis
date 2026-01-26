@@ -5,6 +5,8 @@ defineProps({
   label: String,
   collapsed: Boolean,
   active: Boolean,
+  badge: { type: [Number, String], default: 0 },
+  target: { type: String, default: null },
 });
 
 </script>
@@ -12,6 +14,8 @@ defineProps({
 <template>
   <a
     :href="href"
+    :target="target"
+    :rel="target === '_blank' ? 'noopener noreferrer' : null"
     class="flex items-center px-3 py-2 rounded-md transition font-medium"
     :class="[
       active
@@ -25,6 +29,10 @@ defineProps({
       class="h-5 w-5"
       :class="[collapsed ? 'mx-auto' : 'mr-2']"
     />
-    <span v-if="!collapsed">{{ label }}</span>
+    <span v-if="!collapsed" class="flex items-center w-full">
+      <span>{{ label }}</span>
+      <span v-if="badge && !collapsed" class="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">{{ badge }}</span>
+    </span>
+    <span v-else-if="badge && collapsed" class="mx-auto inline-block h-2 w-2 rounded-full bg-red-500"></span>
   </a>
 </template>

@@ -18,8 +18,8 @@
             class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        <div class="hidden sm:block overflow-x-auto">
-          <table class="table-fixed w-full border border-gray-200">
+        <div v-if="!isMobile" class="overflow-x-auto">
+          <table class="table-fixed w-full border border-gray-200 min-w-[900px]">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
                 <th class="px-4 py-3 text-left">#</th>
@@ -65,6 +65,30 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile / small screens: card list -->
+        <div v-else class="space-y-3">
+          <div v-for="r in filteredRooms" :key="r.id" class="bg-white border rounded-lg p-4 shadow-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-sm text-gray-500">ID: {{ r.id }}</div>
+                <div class="text-lg font-semibold">{{ r.name }}</div>
+                <div class="text-sm text-gray-600">Code: {{ r.code ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Building: {{ r.building?.name ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Floor: {{ r.floor ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Section: {{ r.section_name ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Occupant: {{ r.office?.name ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Capacity: {{ r.capacity ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Type: {{ r.room_type ?? '—' }}</div>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                <button @click.prevent="openModal(r)" class="px-3 py-1 bg-blue-600 text-white rounded">Edit</button>
+                <button @click.prevent="destroy(r)" class="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="filteredRooms.length === 0" class="text-center text-gray-500 py-6">No rooms found.</div>
         </div>
       <!-- Pagination -->
       <div class="flex justify-center items-center gap-2 mt-4">
@@ -174,7 +198,7 @@
 
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
@@ -183,6 +207,12 @@ const props = defineProps({ rooms: Array, buildings: Array, offices: Array })
 const page = usePage()
 
 const roomsList = ref(props.rooms || [])
+// responsive: track window width to switch to card layout on small screens
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10

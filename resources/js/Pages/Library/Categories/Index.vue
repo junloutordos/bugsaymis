@@ -11,8 +11,8 @@
         <div class="mb-4">
           <input v-model="q" @keydown.enter="search" type="text" placeholder="Search categories..." class="w-1/3 rounded-lg border-gray-300 shadow-sm p-2" />
         </div>
-        <div class="overflow-x-auto">
-              <table class="min-w-full border">
+          <div v-if="!isMobile" class="overflow-x-auto">
+            <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
                 <th class="px-4 py-2 text-center">#</th>
@@ -40,6 +40,32 @@
               <tr v-if="(categories.data || []).length === 0"><td :colspan="5" class="px-4 py-6 text-center text-gray-500">No categories</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile cards -->
+        <div v-else class="space-y-3 sm:hidden">
+          <div v-for="c in categories.data" :key="c.id" class="bg-white rounded-lg p-3 border shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs text-gray-500">#{{ c.id }}</div>
+                <div class="font-semibold text-gray-800">{{ c.name }}</div>
+                <div class="text-sm text-gray-600">Student Days: {{ c.student_borrowing_days ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Employee Days: {{ c.employee_borrowing_days ?? '—' }}</div>
+              </div>
+              <div class="flex flex-col items-end space-y-2">
+                <div class="flex space-x-2">
+                  <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit" aria-label="Edit category">
+                    <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                  </button>
+                  <button @click="confirmDelete(c)" class="p-1 hover:bg-gray-100 rounded ml-2" title="Delete" aria-label="Delete category">
+                    <TrashIcon class="w-5 h-5 text-red-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="(categories.data || []).length === 0" class="text-center text-gray-500 py-6">No categories</div>
         </div>
         <div class="flex justify-center items-center gap-2 mt-4">
           <button @click.prevent="goTo(categories.prev_page_url)" :disabled="!categories.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
@@ -85,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import Swal from 'sweetalert2'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -101,6 +127,14 @@ const form = ref({ name: '', student_borrowing_days: '', employee_borrowing_days
 const errors = ref({})
 const showDeleteConfirm = ref(false)
 const deleting = ref(null)
+
+// Responsive: track window width to toggle table vs mobile cards
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 640)
+function handleResize() { windowWidth.value = window.innerWidth }
+
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 function openCreate(){ editing.value = null; form.value = { name: '', student_borrowing_days: '', employee_borrowing_days: '' }; errors.value = {}; showModal.value = true }
 function openEdit(c){ editing.value = c.id; form.value = { name: c.name, student_borrowing_days: c.student_borrowing_days ?? '', employee_borrowing_days: c.employee_borrowing_days ?? '' }; errors.value = {}; showModal.value = true }

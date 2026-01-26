@@ -18,11 +18,11 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="Search buildings..."
-                class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                class="w-full sm:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            <div class="hidden sm:block overflow-x-auto">
-              <table class="table-fixed w-full border border-gray-200">
+            <div class="overflow-x-auto" v-if="!isMobile">
+              <table class="table-fixed w-full border border-gray-200 min-w-[640px]">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
                 <th class="px-4 py-3 text-left">#</th>
@@ -31,7 +31,6 @@
                 <th class="px-4 py-3 text-left">No of Rooms</th>
                 <th class="px-4 py-3 text-left">No of Floors</th>
                 <th class="px-4 py-3 text-left">Occupants</th>
-                <th class="px-4 py-3 text-left">Remarks</th>
                 <th class="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
@@ -43,9 +42,11 @@
                 <td class="px-4 py-3">{{ b.no_of_rooms ?? '—' }}</td>
                 <td class="px-4 py-3">{{ b.number_of_floors ?? '—' }}</td>
                 <td class="px-4 py-3">{{ b.occupants_count ?? 0 }}</td>
-                <td class="px-4 py-3">{{ b.remarks ?? '—' }}</td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex items-center gap-2 justify-center">
+                    <button @click.prevent="viewRemarks(b)" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="View Remarks">
+                      <EyeIcon class="h-5 w-5" />
+                    </button>
                     <button @click.prevent="openModal(b)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
                       <PencilSquareIcon class="h-5 w-5" />
                     </button>
@@ -56,11 +57,45 @@
                 </td>
               </tr>
               <tr v-if="filteredBuildings.length === 0">
-                <td colspan="8" class="px-4 py-6 text-center text-gray-500">No buildings found.</td>
+                <td colspan="7" class="px-4 py-6 text-center text-gray-500">No buildings found.</td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        <!-- Mobile / small screens: card list -->
+        <div v-else class="space-y-3">
+          <div v-for="b in filteredBuildings" :key="b.id" class="bg-white border rounded-lg p-4 shadow-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-sm text-gray-500">ID: {{ b.id }}</div>
+                <div class="text-lg font-semibold">{{ b.name }}</div>
+                <div class="text-sm text-gray-600">Code: {{ b.code ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Rooms: {{ b.no_of_rooms ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Floors: {{ b.number_of_floors ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Occupants: {{ b.occupants_count ?? 0 }}</div>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                <button @click.prevent="viewRemarks(b)" class="px-3 py-1 bg-gray-200 text-gray-800 rounded">View</button>
+                <button @click.prevent="openModal(b)" class="px-3 py-1 bg-blue-600 text-white rounded">Edit</button>
+                <button @click.prevent="destroy(b)" class="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="filteredBuildings.length === 0" class="text-center text-gray-500 py-6">No buildings found.</div>
+        </div>
+        <!-- Remarks viewer modal (global) -->
+        <div v-show="showRemarksModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
+            <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeRemarks">✕</button>
+            <h3 class="text-lg font-semibold mb-3">Remarks</h3>
+            <div class="whitespace-pre-wrap text-sm text-gray-700">{{ currentRemarks }}</div>
+            <div class="flex justify-end mt-4">
+              <button @click="closeRemarks" class="px-4 py-2 bg-blue-600 text-white rounded">Close</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
           <button
@@ -144,9 +179,9 @@
 
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
 const props = defineProps({ buildings: Array })
@@ -157,6 +192,14 @@ const buildingsList = ref(props.buildings || [])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
+
+// Responsive: track window width to switch to card layout on small screens
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredBuildings = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -174,6 +217,8 @@ watch(searchQuery, () => { currentPage.value = 1 })
 
 const showModal = ref(false)
 const editingId = ref(null)
+const showRemarksModal = ref(false)
+const currentRemarks = ref('')
 
   const form = useForm({ name: '', code: '', no_of_rooms: '', remarks: '', building_use: [], number_of_floors: '', year_constructed: '', year_completed: '', amount: '' })
 
@@ -236,4 +281,11 @@ const destroy = (b) => {
     })
   })
 }
+
+const viewRemarks = (b) => {
+  currentRemarks.value = b.remarks ?? '—'
+  showRemarksModal.value = true
+}
+
+const closeRemarks = () => { showRemarksModal.value = false; currentRemarks.value = '' }
 </script>

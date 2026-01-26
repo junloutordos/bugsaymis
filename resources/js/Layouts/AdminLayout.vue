@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
+const props = defineProps({ title: { type: String, default: '' } });
+const title = props.title;
 import { Head, usePage, router } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
 import ProfileEditModal from '@/Components/ProfileEditModal.vue';
@@ -47,6 +49,34 @@ const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
+// Return numeric badge from shared Inertia props based on child routeName
+const getBadge = (child) => {
+  // Don't show any notification badges for Staff accounts
+  if (roleName === 'Staff') return 0;
+  const rn = child?.routeName || null;
+  if (!page || !page.props) return 0;
+  switch (rn) {
+    case 'consultations.index':
+      return page.props.consultationsNotificationCount || 0;
+    case 'jobrequests.index':
+      return page.props.itJobRequestsNotificationCount || 0;
+    case 'vehicle-requests.index':
+      return page.props.vehicleRequestsNotificationCount || 0;
+    case 'messengerial.index':
+      return page.props.messengerialRequestsNotificationCount || 0;
+    case 'facility-requests.index':
+      return page.props.facilityRequestsNotificationCount || 0;
+    case 'service-requests.index':
+      return page.props.serviceRequestsNotificationCount || 0;
+    case 'work-requests.index':
+      return page.props.workRequestsNotificationCount || 0;
+    case 'library.borrowings.index':
+      return page.props.borrowingsOverdueCount || 0;
+    default:
+      return 0;
+  }
+};
+
 // --- Profile Modal State ---
 const showProfileModal = ref(false);
 const openProfileModal = () => {
@@ -56,6 +86,63 @@ const openProfileModal = () => {
 };
 const closeProfileModal = () => {
   showProfileModal.value = false;
+};
+// Consultation Log modal state
+const showConsultationLogModal = ref(false);
+const consultationLogStart = ref("");
+const consultationLogEnd = ref("");
+const consultationLogRouteName = ref(null);
+const consultationLogType = ref('student');
+const openConsultationLogModal = (routeName = null) => {
+  consultationLogRouteName.value = routeName;
+  // set default type based on incoming routeName, allow user to change in modal
+  consultationLogType.value = (routeName && String(routeName).includes('employee')) ? 'employee' : 'student';
+  showConsultationLogModal.value = true;
+};
+const closeConsultationLogModal = () => {
+  showConsultationLogModal.value = false;
+  consultationLogStart.value = "";
+  consultationLogEnd.value = "";
+};
+  const generateConsultationLog = () => {
+  if (!consultationLogStart.value || !consultationLogEnd.value) {
+    alert("Please select both start and end dates.");
+    return;
+  }
+  if (consultationLogStart.value > consultationLogEnd.value) {
+    alert("Start date must be before or equal to end date.");
+    return;
+  }
+  const base = consultationLogType.value === 'employee' ? 'consultations.employee.log.print' : 'consultations.log.print';
+  const url = route(base) + `?start=${consultationLogStart.value}&end=${consultationLogEnd.value}&type=${consultationLogType.value}`;
+  window.open(url, "_blank");
+  closeConsultationLogModal();
+};
+
+// --- Library Statistics Modal State ---
+const showLibraryStatsModal = ref(false);
+const libraryStatsStart = ref("");
+const libraryStatsEnd = ref("");
+const openLibraryStatsModal = () => {
+  showLibraryStatsModal.value = true;
+};
+const closeLibraryStatsModal = () => {
+  showLibraryStatsModal.value = false;
+  libraryStatsStart.value = "";
+  libraryStatsEnd.value = "";
+};
+const generateLibraryStats = () => {
+  if (!libraryStatsStart.value || !libraryStatsEnd.value) {
+    alert("Please select both start and end dates.");
+    return;
+  }
+  if (libraryStatsStart.value > libraryStatsEnd.value) {
+    alert("Start date must be before or equal to end date.");
+    return;
+  }
+  const url = route('library.statistics.report') + `?start=${libraryStatsStart.value}&end=${libraryStatsEnd.value}`;
+  window.open(url, "_blank");
+  closeLibraryStatsModal();
 };
 
 // --- Menu Items ---
@@ -310,7 +397,7 @@ const menuItems = [
             routeName: "assets.index",
             href: route('assets.index'),
             icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+            roles: ["Administrator", "GSU Head"],
           },
           {
             label: "Work Request",
@@ -403,14 +490,29 @@ const menuItems = [
       {
         label: "Health Services",
         icon: HeartIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic"],
         children: [
           {
             label: "Consultations",
             routeName: "consultations.index",
             href: route("consultations.index"),
             icon: ChatBubbleLeftRightIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic"],
+          },
+          {
+            label: "Consultation Logs",
+            routeName: "consultations.log.print",
+            href: route("consultations.log.print"),
+            icon: DocumentTextIcon,
+            roles: ["Administrator", "Nurse", "Clinic"],
+            target: '_blank',
+          },
+          {
+            label: "Schedule",
+            routeName: "physician-schedule.index",
+            href: route("physician-schedule.index"),
+            icon: ClockIcon,
+            roles: ["Administrator","Clinic"],
           },
         ],
       },
@@ -459,6 +561,13 @@ const menuItems = [
             routeName: "library.borrowings.index",
             href: route('library.borrowings.index'),
             icon: BookOpenIcon,
+            roles: ["Administrator", "Librarian"],
+          },
+          {
+            label: "Statistics Report",
+            routeName: "library.statistics.report",
+            href: '#',
+            icon: ChartBarIcon,
             roles: ["Administrator", "Librarian"],
           },
     ],
@@ -555,6 +664,7 @@ filteredMenu.value.forEach((item) => {
           <SidebarLink
             v-else-if="!item.children"
             :href="item.href"
+            :target="item.target"
             :icon="item.icon"
             :label="item.label"
             :collapsed="collapsed"
@@ -578,15 +688,40 @@ filteredMenu.value.forEach((item) => {
             </button>
 
             <div v-show="expanded[item.label]" class="ml-6 mt-1 space-y-1">
-              <SidebarLink
-                v-for="child in item.children"
-                :key="child.label"
-                :href="child.href"
-                :label="child.label"
-                :icon="child.icon"
-                :collapsed="collapsed"
-                :active="isActive(child.routeName)"
-              />
+              <template v-for="child in item.children" :key="child.label">
+                <SidebarLink
+                  v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report'].includes(child.routeName)"
+                  :href="child.href"
+                  :target="child.target"
+                  :label="child.label"
+                  :icon="child.icon"
+                  :collapsed="collapsed"
+                  :active="isActive(child.routeName)"
+                  :badge="getBadge(child)"
+                />
+                <button
+                  v-else-if="['consultations.log.print','consultations.employee.log.print'].includes(child.routeName)"
+                  @click="openConsultationLogModal(child.routeName)"
+                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                >
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <span v-if="!collapsed" class="flex items-center w-full">
+                    <span>{{ child.label }}</span>
+                  </span>
+                  <span v-else class="mx-auto"></span>
+                </button>
+                <button
+                  v-else-if="child.routeName === 'library.statistics.report'"
+                  @click="openLibraryStatsModal"
+                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                >
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <span v-if="!collapsed" class="flex items-center w-full">
+                    <span>{{ child.label }}</span>
+                  </span>
+                  <span v-else class="mx-auto"></span>
+                </button>
+              </template>
             </div>
           </div>
         </template>
@@ -648,7 +783,72 @@ filteredMenu.value.forEach((item) => {
     </div>
     <!-- Profile Edit Modal -->
     <ProfileEditModal :show="showProfileModal" :user="user" @close="closeProfileModal" />
+  <!-- Consultation Log Date Range Modal -->
+  <div v-if="showConsultationLogModal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeConsultationLogModal"></div>
+    <div @click.stop class="bg-white rounded-lg shadow-lg z-50 w-full max-w-md mx-4">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-semibold">Consultation Log Generation</h3>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Report Type</label>
+          <div class="mt-2 flex items-center gap-4">
+            <label class="flex items-center space-x-2">
+              <input type="radio" value="student" v-model="consultationLogType" class="form-radio" />
+              <span class="text-sm">Student</span>
+            </label>
+            <label class="flex items-center space-x-2">
+              <input type="radio" value="employee" v-model="consultationLogType" class="form-radio" />
+              <span class="text-sm">Employee</span>
+            </label>
+            <label class="flex items-center space-x-2">
+              <input type="radio" value="both" v-model="consultationLogType" class="form-radio" />
+              <span class="text-sm">Both</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Start Date</label>
+          <input type="date" v-model="consultationLogStart" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">End Date</label>
+          <input type="date" v-model="consultationLogEnd" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-2">
+        <button @click="closeConsultationLogModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+        <button @click="generateConsultationLog" class="px-4 py-2 rounded bg-blue-600 text-white">Generate</button>
+      </div>
+    </div>
   </div>
+
+  <!-- Library Statistic Report Date Range Modal -->
+  <div v-if="showLibraryStatsModal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeLibraryStatsModal"></div>
+    <div @click.stop class="bg-white rounded-lg shadow-lg z-50 w-full max-w-md mx-4">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-semibold">Library Statistic Report</h3>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Start Date</label>
+          <input type="date" v-model="libraryStatsStart" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">End Date</label>
+          <input type="date" v-model="libraryStatsEnd" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-2">
+        <button @click="closeLibraryStatsModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+        <button @click="generateLibraryStats" class="px-4 py-2 rounded bg-blue-600 text-white">Generate</button>
+      </div>
+    </div>
+  </div>
+
+</div>
 </template>
 
 

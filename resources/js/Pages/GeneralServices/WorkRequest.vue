@@ -19,7 +19,7 @@
         <div class="mb-4">
           <input v-model="searchQuery" type="text" placeholder="Search work requests..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
         </div>
-        <div class="hidden sm:block overflow-x-auto">
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="table-fixed w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
@@ -98,7 +98,35 @@
         </div>
 
         <!-- Mobile list -->
-        <div v-if="filteredWorkRequests.length === 0" class="text-center text-gray-500 py-6">No work requests found.</div>
+        <div v-else class="sm:hidden space-y-3">
+          <div v-for="wr in filteredWorkRequests" :key="wr.id" class="border rounded-lg p-3 bg-white shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-sm text-gray-500">Request #{{ wr.id }}</div>
+                <div class="font-semibold text-gray-800">{{ wr.issue ?? '—' }}</div>
+                <div class="text-sm text-gray-600">{{ wr.description ?? '—' }}</div>
+              </div>
+              <div class="text-right text-sm">
+                <div class="text-gray-600">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</div>
+                <div class="text-gray-500 text-xs">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</div>
+              </div>
+            </div>
+
+            <div class="mt-2 text-sm text-gray-700">
+              <div><strong>Assigned:</strong> <span class="ml-1">{{ wr.assigned_user?.name ?? '—' }}</span></div>
+              <div class="mt-1"><strong>Status:</strong> <span class="ml-1"><span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold', statusClass(wr.status)]">{{ wr.status }}</span></span></div>
+            </div>
+
+            <div class="mt-3 flex items-center gap-2">
+              <button v-if="wr.status === 'Division Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
+              <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md">Edit</button>
+              <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="destroy(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Delete</button>
+              <button v-if="wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
+            </div>
+          </div>
+
+          <div v-if="filteredWorkRequests.length === 0" class="text-center text-gray-500 py-6">No work requests found.</div>
+        </div>
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
           <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
@@ -222,7 +250,7 @@
 
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
@@ -240,6 +268,13 @@ const workRequestsList = ref(props.workRequests || [])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
+
+// responsive: track window width to toggle between table and card layouts
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredWorkRequests = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
