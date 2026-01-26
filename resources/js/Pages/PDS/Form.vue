@@ -310,6 +310,78 @@ const submit = () => {
 }
 
 
+/* =========================
+   TRAINING ROW TEMPLATE
+========================= */
+const emptyTraining = () => ({
+  training_title: '',
+  date_from: '',
+  date_to: '',
+  hours: '',
+  training_type: '',
+  conducted_by: '',
+})
+
+/* =========================
+   CSV FILE STATE
+========================= */
+const csvFile = ref(null)
+
+/* =========================
+   HANDLE FILE SELECT
+========================= */
+const handleTrainingCSV = (event) => {
+  csvFile.value = event.target.files[0] || null
+}
+
+/* =========================
+   UPLOAD TO SERVER
+========================= */
+const uploadTrainingCSV = () => {
+  if (!csvFile.value) {
+    Swal.fire('No file selected', 'Please choose a CSV file.', 'warning')
+    return
+  }
+
+  if (!props.pds?.id) {
+    Swal.fire('Save Required', 'Please save the PDS first before uploading trainings.', 'warning')
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('file', csvFile.value)
+
+  router.post(route('pds.trainings.upload-csv', props.pds.id), formData, {
+    forceFormData: true,
+    preserveScroll: true,
+    onSuccess: (page) => {
+      // Show success message from flash
+      const successMessage = page.props?.flash?.success || 'CSV uploaded successfully!'
+      Swal.fire('Upload Complete', successMessage, 'success')
+
+      // Optionally, refresh trainings if you want to display them
+      if (page.props?.pds?.trainings) {
+        form.trainings = page.props.pds.trainings.map(t => ({
+          training_title: t.training_title || '',
+          date_from: normalizeDate(t.date_from),
+          date_to: normalizeDate(t.date_to),
+          hours: t.hours || '',
+          training_type: t.training_type || '',
+          conducted_by: t.conducted_by || '',
+        }))
+      }
+
+      csvFile.value = null
+    },
+    onError: (errors) => {
+      Swal.fire('Upload failed', errors.file ?? 'Invalid CSV file.', 'error')
+    },
+  })
+}
+
+
+
+
 
 // 🔹 Helpers
 const addRow = (section, row) => form[section].push({ ...row })
@@ -522,7 +594,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <!-- Mother -->
         <div class="grid grid-cols-3 gap-4 mt-4">
             <input v-model="form.family_background.mother_maiden_surname" placeholder="Mother's Maiden Surname" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.mother_maiden_first_name" placeholder="Mother's Maiden First Name" class="input" :readonly="!editMode" />
+            <input v-model="form.family_background.mother_maiden_first_name" placeholder="Mother's First Name" class="input" :readonly="!editMode" />
             <input v-model="form.family_background.mother_maiden_middle_name" placeholder="Mother's Maiden Middle Name" class="input" :readonly="!editMode" />
         </div>
         </section>
@@ -770,37 +842,81 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <!-- VIII. Trainings -->
         <section>
-        <h2 class="font-semibold text-lg mb-4">VII. Learning & Development/Trainings</h2>
+        <h2 class="font-semibold text-lg mb-4">
+          VII. Learning & Development / Trainings
+        </h2>
 
-        <div
-            v-for="(train, index) in form.trainings"
-            :key="index"
-            class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center"
-        >
-            <input v-model="train.training_title" placeholder="Title" class="input" :readonly="!editMode" />
-            <input type="date" v-model="train.date_from" class="input" :readonly="!editMode" />
-            <input type="date" v-model="train.date_to" class="input" :readonly="!editMode" />
-            <input v-model="train.hours" placeholder="Hours" class="input" :readonly="!editMode" />
-            <input v-model="train.training_type" placeholder="L&D Type" class="input" :readonly="!editMode" />
-            <input v-model="train.conducted_by" placeholder="Conducted By" class="input" :readonly="!editMode" />
+        <!-- CSV Upload & Download (Only in Edit Mode) -->
+        <div v-if="editMode" class="mb-6 p-4 border-2 border-dashed border-green-500 rounded-lg bg-green-50 flex flex-col md:flex-row items-center gap-4">
+          
+          <!-- File Input -->
+          <div class="flex-1">
+            <label class="block text-sm font-medium text-green-700 mb-1">Upload Trainings CSV</label>
+            <input
+              type="file"
+              accept=".csv"
+              @change="handleTrainingCSV"
+              class="block w-full text-sm text-green-900 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-white hover:file:bg-green-600"
+            />
+          </div>
 
+          <!-- Buttons -->
+          <div class="flex gap-2 mt-2 md:mt-0">
+            <!-- Upload -->
             <button
-            v-if="editMode"
-            @click="removeRow('trainings', index)"
-            class="btn-icon h-10 w-10"
+              type="button"
+              @click="uploadTrainingCSV"
+              class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded shadow"
             >
-            <TrashIcon class="h-5 w-5 text-white" />
+              Upload Trainings CSV
             </button>
+
+            <!-- Download Template -->
+            <a
+              :href="route('pds.trainings.download-template')" 
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow flex items-center gap-2"
+              download
+            >
+              Download Template
+            </a>
+          </div>
         </div>
 
-        <button
-            v-if="editMode"
-            @click="addRow('trainings', { training_title: '', date_from: '', date_to: '', hours: '', conducted_by: '' })"
-            class="btn-icon h-10 w-10 mt-2"
-        >
+        <!-- Table Header 
+        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 font-semibold text-gray-700 mb-2">
+          <div>Title</div>
+          <div>Date From</div>
+          <div>Date To</div>
+          <div>Hours</div>
+          <div>L&D Type</div>
+          <div>Conducted By</div>
+          <div v-if="editMode">Actions</div>
+        </div> -->
+
+        <!-- Training Rows -->
+        <div v-for="(train, index) in form.trainings" :key="index" class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center">
+          <input v-model="train.training_title" placeholder="Title" class="input" :readonly="!editMode" />
+          <input type="date" v-model="train.date_from" class="input" :readonly="!editMode" />
+          <input type="date" v-model="train.date_to" class="input" :readonly="!editMode" />
+          <input v-model="train.hours" placeholder="Hours" class="input" :readonly="!editMode" />
+          <input v-model="train.training_type" placeholder="L&D Type" class="input" :readonly="!editMode" />
+          <input v-model="train.conducted_by" placeholder="Conducted By" class="input" :readonly="!editMode" />
+
+          <!-- Remove Row -->
+          <button v-if="editMode" @click="removeRow('trainings', index)" class="btn-icon h-10 w-10 bg-red-500 hover:bg-red-600 rounded flex items-center justify-center">
+            <TrashIcon class="h-5 w-5 text-white" />
+          </button>
+        </div>
+
+        <!-- Add Row -->
+        <div v-if="editMode" class="mt-2">
+          <button @click="addRow('trainings', emptyTraining())" class="btn-icon h-10 w-10 bg-green-500 hover:bg-green-600 rounded flex items-center justify-center">
             <PlusIcon class="h-5 w-5 text-white" />
-        </button>
-        </section>
+          </button>
+        </div>
+      </section>
+
+
 
 
         <!-- IX. Skills / Hobbies -->

@@ -33,6 +33,7 @@ use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
 use App\Http\Controllers\PDSController;
+use App\Http\Controllers\PDSTrainingController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 // Data Management - Offices
@@ -184,6 +185,14 @@ Route::middleware(['auth'])->group(function () {
     // Create PDS (only saves user_id)
     Route::post('/pds', [PdsController::class, 'newpds'])
         ->name('pds.newpds');
+
+    Route::post(
+        '/pds/{pds}/trainings/upload-csv',
+        [PDSTrainingController::class, 'uploadCsv']
+    )->name('pds.trainings.upload-csv');
+
+    Route::get('/pds/trainings/template', [PDSTrainingController::class, 'downloadTemplate'])
+        ->name('pds.trainings.download-template');
 
 
 });

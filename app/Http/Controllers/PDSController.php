@@ -1205,4 +1205,38 @@ foreach ($questions as $q) {
     return response()->download($tempFile, "PDS_CSCForm212_{$pds->id}.pdf")
                      ->deleteFileAfterSend(true);
 }
+
+public function uploadCsv(Request $request, Pds $pds)
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:csv,txt',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        $rows = array_map('str_getcsv', file($request->file('file')->getRealPath()));
+
+        $header = array_map('trim', array_shift($rows));
+
+        foreach ($rows as $row) {
+            $data = array_combine($header, $row);
+
+            Training::create([
+                'pds_id' => $pds->id,
+                'training_title' => $data['training_title'] ?? '',
+                'date_from' => $data['date_from'] ?? null,
+                'date_to' => $data['date_to'] ?? null,
+                'hours' => $data['hours'] ?? null,
+                'training_type' => $data['training_type'] ?? '',
+                'conducted_by' => $data['conducted_by'] ?? '',
+            ]);
+        }
+
+        // 🔥 Return updated trainings to Vue
+        return back()->with([
+            'trainings' => $pds->trainings()->orderBy('date_from')->get(),
+        ]);
+    }
 }
