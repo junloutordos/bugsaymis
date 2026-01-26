@@ -507,14 +507,14 @@ const menuItems = [
       {
         label: "Health Services",
         icon: HeartIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic"],
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
         children: [
           {
             label: "Consultations",
             routeName: "consultations.index",
             href: route("consultations.index"),
             icon: ChatBubbleLeftRightIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic"],
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
           },
           {
             label: "Consultation Logs",
@@ -529,7 +529,7 @@ const menuItems = [
             routeName: "physician-schedule.index",
             href: route("physician-schedule.index"),
             icon: ClockIcon,
-            roles: ["Administrator","Clinic"],
+            roles: ["Administrator","Clinic","Nurse"],
           },
         ],
       },
