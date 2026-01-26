@@ -2,7 +2,7 @@
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { ref, computed, watch, onMounted } from 'vue'
-import { EyeIcon, PrinterIcon, ClockIcon, HeartIcon } from '@heroicons/vue/24/outline'
+import { EyeIcon, PrinterIcon, ClockIcon, HeartIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
 const props = defineProps({ consultations: Object, physicianSchedules: Array });
@@ -80,16 +80,112 @@ const openVitalsFor = (c) => {
   vitalsForm.oxygen = c.oxygen ?? c.oxygen_saturation ?? c.spo2 ?? '';
   vitalsForm.blood_pressure = c.blood_pressure ?? c.bp ?? c.bloodpressure ?? '';
   vitalsForm.medicine_given = c.medicine_given ?? c.medicines ?? '';
-  // reset structured action fields; don't attempt to parse existing action_taken
+  // reset structured action fields; keep original action text as fallback
   vitalsForm.actions = [];
   vitalsForm.head_check_reason = '';
   vitalsForm.parent_notified_at = '';
   vitalsForm.others_action = '';
   vitalsForm.action_taken = c.action_taken ?? '';
-  vitalsForm.time_start = c.time_start ?? '';
-  vitalsForm.time_out = c.time_out ?? '';
-  vitalsForm.date_attended = c.date_attended ?? '';
-  vitalsForm.disposition = c.disposition ?? '';
+
+  // helper: convert various datetime formats into `YYYY-MM-DDTHH:MM` for datetime-local inputs
+  const toDatetimeLocal = (val) => {
+    if (!val) return '';
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const mm = pad(d.getMonth() + 1);
+      const dd = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const min = pad(d.getMinutes());
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  vitalsForm.time_start = toDatetimeLocal(c.time_start ?? c.time_in ?? '');
+  vitalsForm.time_out = toDatetimeLocal(c.time_out ?? c.time_end ?? '');
+  vitalsForm.date_attended = toDatetimeLocal(c.date_attended ?? '');
+
+  // Parse structured action_taken into checkbox values when possible
+  const parseActions = (text) => {
+    if (!text) return [];
+    const parts = text.split(';').map(s => s.trim()).filter(Boolean);
+    const known = [
+      'Student laid/sat in clinic for 20 minutes or less',
+      'Student laid/sat in clinic for 20 minutes or more',
+      'Temperature Taken',
+      'Ice Pack applied to the affected Area',
+      'Affected area cleaned',
+      'Band aid applied to affected area',
+      'Head checkup',
+      'Parent/Guardian Notified',
+      'Medications Given',
+      'Others'
+    ];
+    const res = [];
+    parts.forEach(p => {
+      for (const k of known) {
+        if (p.toLowerCase().startsWith(k.toLowerCase()) || p.toLowerCase().includes(k.toLowerCase())) {
+          if (!res.includes(k)) res.push(k);
+          return;
+        }
+      }
+      if (p.toLowerCase().includes('head check')) { if (!res.includes('Head checkup')) res.push('Head checkup'); }
+      else if (p.toLowerCase().includes('parent')) { if (!res.includes('Parent/Guardian Notified')) res.push('Parent/Guardian Notified'); }
+      else if (p.toLowerCase().includes('medicat') || p.toLowerCase().includes('medic')) { if (!res.includes('Medications Given')) res.push('Medications Given'); }
+      else if (!res.includes('Others')) res.push('Others');
+    });
+    return res;
+  };
+
+  if (c.action_taken && (!openVitals.value || openVitals.value.requestor_type !== 'employee')) {
+    vitalsForm.actions = parseActions(c.action_taken);
+    const at = c.action_taken || '';
+    const headMatch = at.match(/Head checkup\s*:?\s*(.+)/i);
+    if (headMatch) vitalsForm.head_check_reason = headMatch[1].trim();
+    const parentMatch = at.match(/Parent\/Guardian Notified\s*:?\s*(.+)/i);
+    if (parentMatch) vitalsForm.parent_notified_at = parentMatch[1].trim();
+    const othersMatch = at.match(/Others\s*:?\s*(.+)/i);
+    if (othersMatch) vitalsForm.others_action = othersMatch[1].trim();
+  }
+
+  // Parse disposition into selections when possible
+  vitalsForm.dispositions = [];
+  vitalsForm.employee_disposition = '';
+  vitalsForm.others_disposition = '';
+  if (c.disposition) {
+    if (c.requestor_type === 'employee') {
+      vitalsForm.employee_disposition = c.disposition;
+    } else {
+      const dparts = String(c.disposition).split(';').map(s => s.trim()).filter(Boolean);
+      const knownD = [
+        'Returned to class, feeling better',
+        "Returned to class at parent's/guardian's request",
+        'Returned to class, unable to contact parent/guardian',
+        'Sent home',
+        'Teacher Notified',
+        'Referral was made to Health Care Provider',
+        'Transported to Hospital',
+        'Copy of clinic pass sent home',
+        'Others'
+      ];
+      dparts.forEach(dp => {
+        for (const kd of knownD) {
+          if (dp.toLowerCase().startsWith(kd.toLowerCase()) || dp.toLowerCase().includes(kd.toLowerCase())) {
+            if (!vitalsForm.dispositions.includes(kd)) vitalsForm.dispositions.push(kd);
+            return;
+          }
+        }
+        if (!vitalsForm.dispositions.includes('Others')) {
+          vitalsForm.dispositions.push('Others');
+          vitalsForm.others_disposition = dp;
+        }
+      });
+    }
+  }
 };
 const closeVitals = () => { openVitals.value = null; if (vitalsForm.reset) vitalsForm.reset(); };
 // Exclusive selection helpers: prevent selecting both 20 minutes less and more
@@ -206,6 +302,23 @@ const submitVitals = () => {
     });
   }
 };
+
+function confirmDelete(c) {
+  Swal.fire({ title: 'Delete consultation?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true }).then((r) => {
+    if (r.isConfirmed) {
+      router.delete(route('consultations.destroy', c.id), {
+        onSuccess: () => {
+          Swal.fire({ icon: 'success', title: 'Consultation deleted' }).then(() => {
+            router.get(route('consultations.index'), { q: searchQuery.value }, { replace: true })
+          })
+        },
+        onError: () => {
+          Swal.fire({ icon: 'error', title: 'Failed to delete consultation' })
+        }
+      })
+    }
+  })
+}
 const statusBadge = (s) => {
   if (!s) return 'px-2 py-1 rounded bg-gray-100 text-gray-700';
   const key = String(s).toLowerCase();
@@ -429,6 +542,12 @@ const isStaff = String(roleName).toLowerCase() === 'staff';
                     <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="p-2 bg-white text-gray-700 rounded" aria-label="Print">
                       <PrinterIcon class="h-5 w-5" />
                     </a>
+                    <button v-if="String(c.status).toLowerCase() === 'completed' && ['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name)" @click.prevent="openVitalsFor(c)" class="p-2 bg-yellow-100 text-yellow-700 rounded" aria-label="Edit Vitals">
+                      <PencilIcon class="h-5 w-5" />
+                    </button>
+                    <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" class="p-2 bg-red-100 text-red-700 rounded" aria-label="Delete">
+                      <TrashIcon class="h-5 w-5" />
+                    </button>
                     <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="p-2 bg-indigo-100 text-indigo-700 rounded" aria-label="Schedule">
                       <ClockIcon class="h-5 w-5" />
                     </button>
@@ -463,9 +582,11 @@ const isStaff = String(roleName).toLowerCase() === 'staff';
                 <div><strong>Office:</strong> <span>{{ c.requestor_data?.office || '—' }}</span></div>
                 <div class="mt-2"><span :class="statusBadge(c.status)">{{ c.status }}</span></div>
               </div>
-              <div class="mt-3 flex gap-2">
+                <div class="mt-3 flex gap-2">
                 <button @click.prevent="openView(c)" class="px-3 py-2 bg-gray-100 rounded text-sm">View</button>
                 <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="px-3 py-2 bg-white rounded text-sm">Print</a>
+                <button v-if="String(c.status).toLowerCase() === 'completed' && ['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name)" @click.prevent="openVitalsFor(c)" class="px-3 py-2 bg-yellow-100 rounded text-sm">Edit Vitals</button>
+                <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" class="px-3 py-2 bg-red-100 rounded text-sm">Delete</button>
                 <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="px-3 py-2 bg-indigo-100 rounded text-sm">Schedule</button>
                 <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && ['active','scheduled'].includes(String(c.status).toLowerCase())" @click="openVitalsFor(c)" class="px-3 py-2 bg-green-100 rounded text-sm">Record Vitals</button>
               </div>

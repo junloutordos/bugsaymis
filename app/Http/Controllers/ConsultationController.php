@@ -814,4 +814,25 @@ class ConsultationController extends Controller
 
         return view('consultations.logprint', ['consultations' => $consultations, 'type' => $type]);
     }
+
+    /**
+     * Delete a consultation. Only Administrator or Nurse may delete.
+     */
+    public function destroy(Request $request, Consultation $consultation)
+    {
+        $user = $request->user();
+        $role = $user->role->name ?? '';
+
+        if (! in_array($role, ['Administrator','Nurse'])) {
+            abort(403);
+        }
+
+        try {
+            $consultation->delete();
+            return redirect()->route('consultations.index')->with('success', 'Consultation deleted');
+        } catch (\Throwable $e) {
+            logger()->error('Failed to delete consultation id='.$consultation->id.': '.$e->getMessage());
+            return redirect()->route('consultations.index')->with('error', 'Failed to delete consultation');
+        }
+    }
 }

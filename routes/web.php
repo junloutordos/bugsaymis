@@ -398,6 +398,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/consultations', [\App\Http\Controllers\ConsultationController::class, 'store'])->name('consultations.store');
     Route::put('/consultations/{consultation}', [\App\Http\Controllers\ConsultationController::class, 'update'])->name('consultations.update');
     Route::get('/consultations/{consultation}/print', [\App\Http\Controllers\ConsultationController::class, 'print'])->name('consultations.print');
+    Route::delete('/consultations/{consultation}', [\App\Http\Controllers\ConsultationController::class, 'destroy'])->name('consultations.destroy');
 
     // Physician Schedule CRUD (Health > Schedule)
     Route::get('/physician-schedule', [\App\Http\Controllers\PhysicianScheduleController::class, 'index'])->name('physician-schedule.index');
