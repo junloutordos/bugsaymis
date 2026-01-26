@@ -2,6 +2,7 @@
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { ref, computed, watch, onMounted } from 'vue'
+import { EyeIcon, PrinterIcon, ClockIcon, HeartIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
 const props = defineProps({ consultations: Object, physicianSchedules: Array });
@@ -422,10 +423,18 @@ const isStaff = String(roleName).toLowerCase() === 'staff';
                 <td class="px-3 py-2"><span :class="statusBadge(c.status)">{{ c.status }}</span></td>
                 <td class="px-3 py-2">
                   <div class="flex gap-2">
-                    <button @click.prevent="openView(c)" class="p-2 bg-gray-100 text-gray-700 rounded" aria-label="View"> ... </button>
-                    <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="p-2 bg-white text-gray-700 rounded" aria-label="Print"> ... </a>
-                    <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="p-2 bg-indigo-100 text-indigo-700 rounded" aria-label="Schedule"> ... </button>
-                    <button type="button" v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && ['active','scheduled'].includes(String(c.status).toLowerCase())" @click="openVitalsFor(c)" class="p-2 bg-green-100 text-green-700 rounded" aria-label="Record Vitals"> ... </button>
+                    <button @click.prevent="openView(c)" class="p-2 bg-gray-100 text-gray-700 rounded" aria-label="View">
+                      <EyeIcon class="h-5 w-5" />
+                    </button>
+                    <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="p-2 bg-white text-gray-700 rounded" aria-label="Print">
+                      <PrinterIcon class="h-5 w-5" />
+                    </a>
+                    <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="p-2 bg-indigo-100 text-indigo-700 rounded" aria-label="Schedule">
+                      <ClockIcon class="h-5 w-5" />
+                    </button>
+                    <button type="button" v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && ['active','scheduled'].includes(String(c.status).toLowerCase())" @click="openVitalsFor(c)" class="p-2 bg-green-100 text-green-700 rounded" aria-label="Record Vitals">
+                      <HeartIcon class="h-5 w-5" />
+                    </button>
                   </div>
                 </td>
               </tr>
