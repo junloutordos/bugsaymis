@@ -193,13 +193,13 @@ const menuItems = [
     icon: UserGroupIcon,
     roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
     children: [
-      {
-        label: "All PDS",
-        routeName: "pds.index",
-        href: route("pds.index"),
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "HR"],
-      },
+      //{
+      //  label: "All PDS",
+      //  routeName: "pds.index",
+      //  href: route("pds.index"),
+      //  icon: ClipboardDocumentListIcon,
+      //  roles: ["Administrator", "HR"],
+      //},
       {
         label: "My PDS",
         routeName: "pds.my",

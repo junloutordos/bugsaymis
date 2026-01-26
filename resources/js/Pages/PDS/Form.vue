@@ -1,12 +1,13 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { useForm } from '@inertiajs/vue3'
+import { useForm, router} from '@inertiajs/vue3'
 import {
   PlusIcon,
   TrashIcon,
   PencilSquareIcon,
   PrinterIcon,
   DocumentTextIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/vue/24/solid'
 import { ref, watch } from 'vue'
 import Swal from 'sweetalert2'
@@ -14,7 +15,12 @@ import Swal from 'sweetalert2'
 const props = defineProps({
   pds: { type: Object, default: null },
 })
-
+function exportPDF(pdsId) {
+  router.get(`/pds/${pdsId}/export-pdf`, {}, {
+    // open in new tab
+    target: '_blank'
+  });
+}
 /* =========================
    DATE NORMALIZER (ADDED)
 ========================= */
@@ -32,10 +38,10 @@ const normalizeDate = (date) => {
 // 🔹 Tabs
 const activeTab = ref(1)
 const tabs = [
-  { id: 1, label: 'C1 – Personal Info' },
-  { id: 2, label: 'C2 – Eligibility & Work' },
-  { id: 3, label: 'C3 – Voluntary & Training' },
-  { id: 4, label: 'C4 – Questions & Others' },
+  { id: 1, label: 'C1'},
+  { id: 2, label: 'C2' },
+  { id: 3, label: 'C3' },
+  { id: 4, label: 'C4' },
 ]
 
 // 🔹 Edit mode
@@ -251,13 +257,17 @@ const exportPDS = (id) => {
             <button v-if="props.pds && !editMode" @click="editMode = true" class="btn-icon">
               <PencilSquareIcon class="h-5 w-5 text-white" />
             </button>
-
-            <button v-if="props.pds && !editMode" class="btn-icon bg-green-600">
+            <!-- 
+            <button
+              v-if="props.pds && !editMode"
+              class="btn-icon bg-green-600"
+              @click="exportPDF(props.pds.id)"
+            >
               <PrinterIcon class="h-5 w-5 text-white" />
             </button>
-
+          -->
             <button v-if="props.pds && !editMode" @click="exportPDS(props.pds.id)" class="btn-icon bg-indigo-600">
-              <DocumentTextIcon class="h-5 w-5 text-white" />
+              <DocumentArrowDownIcon class="h-5 w-5 text-white" />
             </button>
           </div>
         </div>

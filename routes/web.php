@@ -164,6 +164,9 @@ Route::middleware(['auth'])->group(function () {
     // Save overlay coordinates for PDF stamping/overlay alignment
     Route::post('/pds/overlay/save', [PDSController::class, 'saveOverlayCoordinates'])
         ->name('pds.overlay.save');
+    
+    Route::get('/pds/{pds}/export-pdf', [PdsController::class, 'exportPDSPdf'])
+     ->name('pds.export.pdf');
 
 });
 
