@@ -273,20 +273,7 @@ const menuItems = [
   },
   
   
-  {
-    label: "Human Resource",
-    icon: UserGroupIcon,
-    roles: ["Administrator", "HR"],
-    children: [
-      {
-        label: "Daily Time Record",
-        routeName: null,
-        href: '#',
-        icon: ClockIcon,
-        roles: ["Administrator", "HR"],
-      },
-    ],
-  },
+  
 
   {
     label: "Human Resource",
@@ -307,7 +294,13 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Faculty", "Staff", "DivisionChief", "OCD", "Administrator", "HR"],
       },
-      
+      {
+        label: "Daily Time Record",
+        routeName: null,
+        href: '#',
+        icon: ClockIcon,
+        roles: ["Administrator", "HR"],
+      },
       
     ],
   },

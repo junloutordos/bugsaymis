@@ -1,6 +1,6 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { useForm, router} from '@inertiajs/vue3'
+import { useForm, router } from '@inertiajs/vue3'
 import {
   PlusIcon,
   TrashIcon,
@@ -9,36 +9,31 @@ import {
   DocumentTextIcon,
   DocumentArrowDownIcon,
 } from '@heroicons/vue/24/solid'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
   pds: { type: Object, default: null },
 })
+
 function exportPDF(pdsId) {
-  router.get(`/pds/${pdsId}/export-pdf`, {}, {
-    // open in new tab
-    target: '_blank'
-  });
+  router.get(`/pds/${pdsId}/export-pdf`, {}, { target: '_blank' })
 }
+
 /* =========================
-   DATE NORMALIZER (ADDED)
+   DATE NORMALIZER
 ========================= */
 const normalizeDate = (date) => {
   if (!date) return ''
-  if (typeof date === 'string' && date.includes('T')) {
-    return date.split('T')[0]
-  }
-  if (typeof date === 'string' && date.includes(' ')) {
-    return date.split(' ')[0]
-  }
+  if (typeof date === 'string' && date.includes('T')) return date.split('T')[0]
+  if (typeof date === 'string' && date.includes(' ')) return date.split(' ')[0]
   return date
 }
 
 // 🔹 Tabs
 const activeTab = ref(1)
 const tabs = [
-  { id: 1, label: 'C1'},
+  { id: 1, label: 'C1' },
   { id: 2, label: 'C2' },
   { id: 3, label: 'C3' },
   { id: 4, label: 'C4' },
@@ -50,135 +45,167 @@ const editMode = ref(!props.pds)
 // Initialize form
 const personalInfoFromDB = props.pds?.personal_info ?? {}
 
-// Set citizenship_type for the select based on saved values
-if (personalInfoFromDB.citizenship_filipino === 'Yes') {
-  personalInfoFromDB.citizenship_type = 'Filipino'
-} else if (personalInfoFromDB.citizenship_dual === 'Yes') {
-  personalInfoFromDB.citizenship_type = 'Dual'
-} else {
-  personalInfoFromDB.citizenship_type = ''
-}
+// Set citizenship_type
+if (personalInfoFromDB.citizenship_filipino === 'Yes') personalInfoFromDB.citizenship_type = 'Filipino'
+else if (personalInfoFromDB.citizenship_dual === 'Yes') personalInfoFromDB.citizenship_type = 'Dual'
+else personalInfoFromDB.citizenship_type = ''
 
-// 🔹 Form
-const form = useForm({
-  personal_info: {
-    ...(props.pds?.personal_info ?? {
-      surname: '', first_name: '', middle_name: '', extension: '',
-      date_of_birth: '', place_of_birth: '',
-      sex_at_birth: '', civil_status: '', citizenship: '',
-      height: '', weight: '', blood_type: '',
-      umid_id_no: '', pagibig_id_no: '', philhealth_no: '',
-      philsys_no: '', tin_no: '', agency_employee_no: '',
-      mobile_no: '', telephone_no: '', email_address: '',
-      citizenship_type: '',
-      citizenship_filipino: false,
-      citizenship_dual: false,
-      citizenship_dual_type: '',
-      citizenship_dual_country: '',
-      residential_house: '',
-      residential_street: '',
-      residential_subdivision: '',
-      residential_barangay: '',
-      residential_city: '',
-      residential_province: '',
-      residential_zip_code: '',
-      permanent_house: '',
-      permanent_street: '',
-      permanent_subdivision: '',
-      permanent_barangay: '',
-      permanent_city: '',
-      permanent_province: '',
-      permanent_zip_code: '',
-    }),
-    date_of_birth: normalizeDate(props.pds?.personal_info?.date_of_birth),
+// 🔹 Form with validation
+const form = useForm(
+  {
+    personal_info: {
+      ...(props.pds?.personal_info ?? {
+        surname: '',
+        first_name: '',
+        middle_name: '',
+        extension: '',
+        date_of_birth: '',
+        place_of_birth: '',
+        sex_at_birth: '',
+        civil_status: '',
+        citizenship: '',
+        height: '',
+        weight: '',
+        blood_type: '',
+        umid_id_no: '',
+        pagibig_id_no: '',
+        philhealth_no: '',
+        philsys_no: '',
+        tin_no: '',
+        agency_employee_no: '',
+        mobile_no: '',
+        telephone_no: '',
+        email_address: '',
+        citizenship_type: '',
+        citizenship_filipino: false,
+        citizenship_dual: false,
+        citizenship_dual_type: '',
+        citizenship_dual_country: '',
+        residential_house: '',
+        residential_street: '',
+        residential_subdivision: '',
+        residential_barangay: '',
+        residential_city: '',
+        residential_province: '',
+        residential_zip_code: '',
+        permanent_house: '',
+        permanent_street: '',
+        permanent_subdivision: '',
+        permanent_barangay: '',
+        permanent_city: '',
+        permanent_province: '',
+        permanent_zip_code: '',
+      }),
+      date_of_birth: normalizeDate(props.pds?.personal_info?.date_of_birth),
+    },
+
+    family_background: props.pds?.family_background ?? {},
+
+    children: (props.pds?.children ?? [{ child_name: '', child_date_of_birth: '' }]).map((c) => ({
+      ...c,
+      child_date_of_birth: normalizeDate(c.child_date_of_birth),
+    })),
+
+    education:
+      props.pds?.education ??
+      [
+        {
+          level: '',
+          school_name: '',
+          from: '',
+          to: '',
+          highest_level: '',
+          year_graduated: '',
+          degree: '',
+          honors: '',
+        },
+      ],
+
+    eligibility: (props.pds?.eligibility ?? [
+      { eligibility: '', rating: '', exam_date: '', place_taken: '', license_number: '', license_validity: '' },
+    ]).map((e) => ({
+      ...e,
+      exam_date: normalizeDate(e.exam_date),
+      license_validity: normalizeDate(e.license_validity),
+    })),
+
+    work_experience: (props.pds?.work_experience ?? [
+      { position: '', agency: '', salary: '', salary_grade: '', appointment_status: '', government_service: '', from_date: '', to_date: '' },
+    ]).map((w) => ({
+      ...w,
+      from_date: normalizeDate(w.from_date),
+      to_date: normalizeDate(w.to_date),
+    })),
+
+    voluntary_work: (props.pds?.voluntary_work ?? [
+      { organization: '', nature_of_work: '', from_date: '', to_date: '', hours: '' },
+    ]).map((v) => ({
+      ...v,
+      from_date: normalizeDate(v.from_date),
+      to_date: normalizeDate(v.to_date),
+    })),
+
+    trainings: (props.pds?.trainings ?? [
+      { training_title: '', date_from: '', date_to: '', hours: '', training_type: '', conducted_by: '' },
+    ]).map((t) => ({
+      ...t,
+      date_from: normalizeDate(t.date_from),
+      date_to: normalizeDate(t.date_to),
+    })),
+
+    skills_hobbies: props.pds?.skills_hobbies ?? [{ skills_hobbies: '' }],
+    non_academic_recognition: props.pds?.non_academic_recognition ?? [{ recognition: '' }],
+    membership_organizations: props.pds?.membership_organizations ?? [{ organization_name: '' }],
+
+    questions: {
+      ...(props.pds?.questions ?? {}),
+      q35b_date_filed: normalizeDate(props.pds?.questions?.q35b_date_filed),
+    },
+
+    references: props.pds?.references ?? [{ name: '', office_address: '', contact_no_email: '' }],
+
+    other_info: props.pds?.other_info ?? { government_id: '', id_no: '', date_place_issuance: '', path_passport_photo: '' },
   },
-
-  family_background: props.pds?.family_background ?? {},
-
-  children: (props.pds?.children ?? [{ child_name: '', child_date_of_birth: '' }]).map(c => ({
-    ...c,
-    child_date_of_birth: normalizeDate(c.child_date_of_birth),
-  })),
-
-  education: props.pds?.education ?? [{ level: '', school_name: '', from: '', to: '', highest_level: '', year_graduated: '', degree: '', honors: '' }],
-
-
-  eligibility: (props.pds?.eligibility ?? [{
-    eligibility: '', rating: '', exam_date: '',
-    place_taken: '', license_number: '', license_validity: ''
-  }]).map(e => ({
-    ...e,
-    exam_date: normalizeDate(e.exam_date),
-    license_validity: normalizeDate(e.license_validity),
-  })),
-
-  work_experience: (props.pds?.work_experience ?? [{
-    position: '', agency: '', salary: '', salary_grade: '',
-    appointment_status: '', government_service: '',
-    from_date: '', to_date: ''
-  }]).map(w => ({
-    ...w,
-    from_date: normalizeDate(w.from_date),
-    to_date: normalizeDate(w.to_date),
-  })),
-
-  voluntary_work: (props.pds?.voluntary_work ?? [{
-    organization: '', nature_of_work: '', from_date: '', to_date: '', hours: ''
-  }]).map(v => ({
-    ...v,
-    from_date: normalizeDate(v.from_date),
-    to_date: normalizeDate(v.to_date),
-  })),
-
-  trainings: (props.pds?.trainings ?? [{
-    training_title: '', date_from: '', date_to: '', hours: '', training_type: '', conducted_by: ''
-  }]).map(t => ({
-    ...t,
-    date_from: normalizeDate(t.date_from),
-    date_to: normalizeDate(t.date_to),
-  })),
-
-  skills_hobbies: props.pds?.skills_hobbies ?? [{ skills_hobbies: '' }],
-  non_academic_recognition: props.pds?.non_academic_recognition ?? [{ recognition: '' }],
-  membership_organizations: props.pds?.membership_organizations ?? [{ organization_name: '' }],
-
-  questions: {
-    ...(props.pds?.questions ?? {}),
-    q35b_date_filed: normalizeDate(props.pds?.questions?.q35b_date_filed),
-  },
-
-  references: props.pds?.references ?? [{ name: '', office_address: '', contact_no_email: '' }],
-
-  other_info: props.pds?.other_info ?? {
-    government_id: '', id_no: '', date_place_issuance: '', path_passport_photo: ''
-  },
-})
-
-/* =========================
-   WATCHERS (UNCHANGED)
-========================= */
-watch(
-  () => form.personal_info.citizenship_type,
-  (val) => {
-    if (val === 'Filipino') {
-      form.personal_info.citizenship_filipino = true
-      form.personal_info.citizenship_dual = false
-      form.personal_info.citizenship_dual_type = ''
-      form.personal_info.citizenship_dual_country = ''
-    } else if (val === 'Dual') {
-      form.personal_info.citizenship_filipino = false
-      form.personal_info.citizenship_dual = true
-    } else {
-      form.personal_info.citizenship_filipino = false
-      form.personal_info.citizenship_dual = false
-      form.personal_info.citizenship_dual_type = ''
-      form.personal_info.citizenship_dual_country = ''
-    }
+  {
+    // 🔹 Validation rules
+    personal_info: {
+      surname: (v) => (!!v && v.length > 0) || 'Surname is required',
+      first_name: (v) => (!!v && v.length > 0) || 'First name is required',
+      date_of_birth: (v) => (!!v && /^\d{4}-\d{2}-\d{2}$/.test(v)) || 'Valid date of birth required',
+      email_address: (v) => (!v || /^\S+@\S+\.\S+$/.test(v)) || 'Email must be valid',
+      mobile_no: (v) => (!!v && /^\d{10,15}$/.test(v)) || 'Mobile number must be valid',
+      citizenship_type: (v) => (!!v && v.length > 0) || 'Select citizenship type',
+      ...(props.pds?.personal_info?.citizenship_type === 'Dual'
+        ? {
+            citizenship_dual_type: (v) => (!!v && v.length > 0) || 'Dual type required',
+            citizenship_dual_country: (v) => (!!v && v.length > 0) || 'Country required',
+          }
+        : {}),
+    },
   }
 )
 
-const sameAsResidential = ref(false)
+/* =========================
+   WATCHERS
+========================= */
+watch(() => form.personal_info.citizenship_type, (val) => {
+  if (val === 'Filipino') {
+    form.personal_info.citizenship_filipino = true
+    form.personal_info.citizenship_dual = false
+    form.personal_info.citizenship_dual_type = ''
+    form.personal_info.citizenship_dual_country = ''
+  } else if (val === 'Dual') {
+    form.personal_info.citizenship_filipino = false
+    form.personal_info.citizenship_dual = true
+  } else {
+    form.personal_info.citizenship_filipino = false
+    form.personal_info.citizenship_dual = false
+    form.personal_info.citizenship_dual_type = ''
+    form.personal_info.citizenship_dual_country = ''
+  }
+})
 
+const sameAsResidential = ref(false)
 const copyResidentialToPermanent = () => {
   form.personal_info.permanent_house = form.personal_info.residential_house
   form.personal_info.permanent_street = form.personal_info.residential_street
@@ -189,10 +216,7 @@ const copyResidentialToPermanent = () => {
   form.personal_info.permanent_zip_code = form.personal_info.residential_zip_code
 }
 
-watch(sameAsResidential, (val) => {
-  if (val) copyResidentialToPermanent()
-})
-
+watch(sameAsResidential, (val) => { if (val) copyResidentialToPermanent() })
 watch(
   () => [
     form.personal_info.residential_house,
@@ -203,15 +227,53 @@ watch(
     form.personal_info.residential_province,
     form.personal_info.residential_zip_code,
   ],
-  () => {
-    if (sameAsResidential.value) copyResidentialToPermanent()
-  }
+  () => { if (sameAsResidential.value) copyResidentialToPermanent() }
 )
 
 /* =========================
-   SUBMIT (UNCHANGED)
+   SUBMIT WITH VALIDATION
 ========================= */
+const validatePersonalInfo = () => {
+  const errors = {}
+
+  const p = form.personal_info
+
+  if (!p.surname) errors.surname = 'Surname is required'
+  if (!p.first_name) errors.first_name = 'First name is required'
+  if (!p.date_of_birth || !/^\d{4}-\d{2}-\d{2}$/.test(p.date_of_birth))
+    errors.date_of_birth = 'Valid date of birth required'
+  if (p.email_address && !/^\S+@\S+\.\S+$/.test(p.email_address))
+    errors.email_address = 'Email must be valid'
+  if (!p.mobile_no || !/^\d{10,15}$/.test(p.mobile_no))
+    errors.mobile_no = 'Mobile number must be valid'
+  if (!p.citizenship_type) errors.citizenship_type = 'Select citizenship type'
+
+  if (p.citizenship_type === 'Dual') {
+    if (!p.citizenship_dual_type) errors.citizenship_dual_type = 'Dual type required'
+    if (!p.citizenship_dual_country) errors.citizenship_dual_country = 'Country required'
+  }
+
+  return errors
+}
+
 const submit = () => {
+  const errors = validatePersonalInfo()
+
+  if (Object.keys(errors).length > 0) {
+    form.setError(errors) // sets errors in form.errors
+
+    // Combine all error messages into one string
+    const errorMessages = Object.values(errors).join('<br>')
+
+    Swal.fire({
+      icon: 'error',
+      title: 'Validation Error',
+      html: errorMessages, // display all errors in the alert
+    })
+
+    return
+  }
+
   if (props.pds) {
     form.put(route('pds.update', props.pds.id), {
       preserveScroll: true,
@@ -219,8 +281,13 @@ const submit = () => {
         editMode.value = false
         Swal.fire('Success', 'PDS updated successfully', 'success')
       },
-      onError: () => {
-        Swal.fire('Error', 'Please check the form for errors', 'error')
+      onError: (page) => {
+        const serverErrors = Object.values(page.props.errors).join('<br>')
+        Swal.fire({
+          icon: 'error',
+          title: 'Server Error',
+          html: serverErrors || 'An error occurred while updating PDS',
+        })
       },
     })
   } else {
@@ -230,19 +297,28 @@ const submit = () => {
         editMode.value = false
         Swal.fire('Success', 'PDS saved successfully', 'success')
       },
+      onError: (page) => {
+        const serverErrors = Object.values(page.props.errors).join('<br>')
+        Swal.fire({
+          icon: 'error',
+          title: 'Server Error',
+          html: serverErrors || 'An error occurred while saving PDS',
+        })
+      },
     })
   }
 }
+
+
 
 // 🔹 Helpers
 const addRow = (section, row) => form[section].push({ ...row })
 const removeRow = (section, index) => form[section].splice(index, 1)
 
 // 🔹 Export
-const exportPDS = (id) => {
-  window.location.href = `/pds/${id}/export`
-}
+const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 </script>
+
 
 <template>
   <AdminLayout title="Personal Data Sheet">

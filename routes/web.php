@@ -181,6 +181,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pds/{pds}/export-pdf', [PdsController::class, 'exportPDSPdf'])
      ->name('pds.export.pdf');
 
+    // Create PDS (only saves user_id)
+    Route::post('/pds', [PdsController::class, 'newpds'])
+        ->name('pds.newpds');
+
+
 });
 
 

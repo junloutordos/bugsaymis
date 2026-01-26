@@ -45,13 +45,31 @@ class PDSController extends Controller
      | CREATE
      ===================================================== */
     public function create()
-    {
-        $existing = Pds::where('user_id', auth()->id())->first();
+{
+    $existing = Pds::where('user_id', auth()->id())->first();
 
-        return $existing
-            ? redirect()->route('pds.edit', $existing)
-            : Inertia::render('PDS/Form');
+    if ($existing) {
+        return redirect()->route('pds.edit', $existing->id);
     }
+
+    return Inertia::render('PDS/NewPDS');
+}
+    public function newpds(Request $request)
+{
+    // Prevent duplicate PDS per user (important)
+    $existing = Pds::where('user_id', auth()->id())->first();
+
+    if ($existing) {
+        return redirect()->route('pds.edit', $existing->id);
+    }
+
+    $pds = Pds::create([
+        'user_id' => auth()->id(),
+    ]);
+
+    return redirect()->route('pds.edit', $pds->id);
+}
+
 
     /* =====================================================
      | STORE
