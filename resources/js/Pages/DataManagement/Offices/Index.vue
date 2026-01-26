@@ -1,19 +1,28 @@
 <script setup>
 import { Head, useForm } from "@inertiajs/vue3";
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
 
-const props = defineProps({ offices: Array, divisions: Array });
+const props = defineProps({ offices: Array, divisions: Array, users: Array });
 const officesList = ref(props.offices || []);
-const form = useForm({ id: null, name: '', division_id: null });
+const usersList = ref(props.users || []);
+const form = useForm({ id: null, name: '', division_id: null, unit_head: null });
 const showModal = ref(false);
 
 // Search & pagination (client-side, mirror Users template)
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
+
+// Responsive: track window width to switch to card layout on small screens
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredOffices = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -39,6 +48,7 @@ const openModal = (office = null) => {
     form.id = office.id;
     form.name = office.name;
     form.division_id = office.division_id ?? null;
+    form.unit_head = office.unit_head ?? null;
   } else {
     form.reset();
   }
@@ -95,16 +105,18 @@ const remove = (office) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search offices..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
-        <table class="w-full table-auto">
+        <div class="overflow-x-auto">
+        <table class="w-full table-auto min-w-[640px]" v-if="!isMobile">
           <thead class="bg-gray-100 text-left">
             <tr>
               <th class="px-4 py-2">#</th>
               <th class="px-4 py-2">Name</th>
               <th class="px-4 py-2">Division</th>
+              <th class="px-4 py-2">Unit Head</th>
               <th class="px-4 py-2">Actions</th>
             </tr>
           </thead>
@@ -113,6 +125,7 @@ const remove = (office) => {
               <td class="px-4 py-3">{{ o.id }}</td>
               <td class="px-4 py-3">{{ o.name }}</td>
               <td class="px-4 py-3">{{ o.division?.division_name ?? '—' }}</td>
+              <td class="px-4 py-3">{{ o.unitHeadUser?.name ?? o.unit_head_user?.name ?? '—' }}</td>
               <td class="px-4 py-3">
                 <button @click.prevent="openModal(o)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 mr-2" title="Edit">
                   <PencilSquareIcon class="w-5 h-5" />
@@ -123,10 +136,30 @@ const remove = (office) => {
               </td>
             </tr>
             <tr v-if="filteredOffices.length === 0">
-              <td colspan="4" class="px-4 py-6 text-center text-gray-500">No offices found.</td>
+              <td colspan="5" class="px-4 py-6 text-center text-gray-500">No offices found.</td>
             </tr>
           </tbody>
         </table>
+
+        <!-- Mobile / small screens: card list -->
+        <div v-else class="space-y-3">
+          <div v-for="o in filteredOffices" :key="o.id" class="bg-white border rounded-lg p-4 shadow-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-sm text-gray-500">ID: {{ o.id }}</div>
+                <div class="text-lg font-semibold">{{ o.name }}</div>
+                <div class="text-sm text-gray-600">Division: {{ o.division?.division_name ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Unit Head: {{ o.unitHeadUser?.name ?? o.unit_head_user?.name ?? '—' }}</div>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                <button @click.prevent="openModal(o)" class="px-3 py-1 bg-blue-600 text-white rounded">Edit</button>
+                <button @click.prevent="remove(o)" class="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="filteredOffices.length === 0" class="text-center text-gray-500 py-6">No offices found.</div>
+        </div>
+        </div>
 
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
@@ -165,6 +198,14 @@ const remove = (office) => {
                 <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.division_name }}</option>
               </select>
               <p v-if="form.errors.division_id" class="text-red-600 text-sm mt-1">{{ form.errors.division_id }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Unit Head</label>
+              <select v-model="form.unit_head" class="mt-1 block w-full rounded border-gray-300">
+                <option value="">-- No unit head --</option>
+                <option v-for="u in usersList" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+              <p v-if="form.errors.unit_head" class="text-red-600 text-sm mt-1">{{ form.errors.unit_head }}</p>
             </div>
             <div class="flex gap-2">
               <button :disabled="form.processing" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">{{ form.processing ? 'Saving...' : 'Save' }}</button>

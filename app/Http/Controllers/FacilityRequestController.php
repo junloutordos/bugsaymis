@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\URL;
 use App\Mail\FacilityRequestCreatedMail;
 use App\Models\Division;
 use App\Models\User;
+use App\Models\Facility;
 
 class FacilityRequestController extends Controller
 {
@@ -43,9 +44,14 @@ class FacilityRequestController extends Controller
             return $ra;
         });
 
+        // Provide MIS users for optional auto-assignment when requesting IT assistance
+        // Select users whose position contains the phrase 'MIS Staff'
+        $misUsers = User::whereRaw('position LIKE ?', ['%MIS Staff%'])->select('id','name','position')->orderBy('name')->get();
+
         return Inertia::render('FacilityRequests/Index', [
             'requests' => $requests,
             'facilities' => $facilities,
+            'misUsers' => $misUsers,
         ]);
     }
 
@@ -62,6 +68,9 @@ class FacilityRequestController extends Controller
             'female' => 'nullable|integer|min:0',
             'venue' => 'nullable|array',
             'venue.*' => 'exists:facilities,id',
+            // toggle to request IT assistance
+            'requires_it_assistance' => 'nullable|boolean',
+            'assigned_mis_user' => 'required_if:requires_it_assistance,1|nullable|exists:users,id',
             'equipment' => 'nullable|array',
             'equipment.*' => 'in:Chairs,Tables,Microphone,Whiteboard,Projector,Electric Fans,Airconditioner,Trashbins',
             'equipment_quantities' => 'nullable|array',
@@ -164,6 +173,64 @@ class FacilityRequestController extends Controller
         $data['status'] = 'Pending';
 
         $fr = FacilityRequest::create($data);
+
+        // If requester asked for IT assistance, create IT Job Request (once) inside a transaction
+        if ($request->boolean('requires_it_assistance')) {
+            try {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($fr, $user, $request) {
+                    // avoid duplicate IT job creation
+                    $exists = \App\Models\ITJobRequest::where('facility_request_id', $fr->id)->exists();
+                    if ($exists) return;
+
+                    // determine division chief id for division of requesting user
+                    $divisionChiefId = null;
+                    if ($user && method_exists($user, 'division') && $user->division && $user->division->divisionchief) {
+                        $divisionChiefId = $user->division->divisionchief->id;
+                    } else {
+                        // fallback: try Division table match
+                        $div = \App\Models\Division::where('division_name', $fr->unit)->first();
+                        if ($div && $div->division_chief_id) $divisionChiefId = $div->division_chief_id;
+                    }
+
+                    $itData = [
+                        'user_id' => $user?->id ?? null,
+                        'facility_request_id' => $fr->id,
+                        'category' => 'Technical Assistance on Events',
+                        'title' => $fr->activity ?? ('Facility Request #' . $fr->id),
+                        'description' => 'Auto-created IT job request for Facility Request #' . $fr->id,
+                        'status' => 'Pending Division Chief Approval',
+                        'divisionchief_id' => $divisionChiefId,
+                        'assignedto' => $request->input('assigned_mis_user') ?? null,
+                    ];
+
+                    $jobRequest = \App\Models\ITJobRequest::create($itData);
+
+                    // create tracking log
+                    \App\Models\ITJRTrackingLog::create([
+                        'it_job_request_id' => $jobRequest->id,
+                        'status' => 'Submitted IT Job Request',
+                        'remarks' => 'Automatically created from Facility Request #' . $fr->id,
+                        'updated_by' => $user?->id ?? null,
+                    ]);
+
+                    // Send notification to division chief if available
+                    if ($divisionChiefId) {
+                        $chief = \App\Models\User::find($divisionChiefId);
+                        if ($chief && $chief->email) {
+                            try {
+                                $approveUrl = \Illuminate\Support\Facades\URL::signedRoute('it-job-requests.dc.approve', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
+                                $declineUrl = \Illuminate\Support\Facades\URL::signedRoute('it-job-requests.dc.decline', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
+                                \Illuminate\Support\Facades\Mail::to($chief->email)->send(new \App\Mail\DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
+                            } catch (\Throwable $e) {
+                                logger()->error('Failed to send auto-created ITJR Division Chief email', ['error' => $e->getMessage()]);
+                            }
+                        }
+                    }
+                });
+            } catch (\Throwable $e) {
+                logger()->error('Failed to automatically create IT Job Request for Facility Request', ['error' => $e->getMessage(), 'facility_request_id' => $fr->id]);
+            }
+        }
 
         // try to find division chief: prefer relation from authenticated user
         $chiefEmail = null;
@@ -500,6 +567,61 @@ class FacilityRequestController extends Controller
         if (! $isAdmin) abort(403);
         $facilityRequest->delete();
         return redirect()->route('facility-requests.index');
+    }
+
+    /**
+     * Return JSON bookings for calendar display.
+     * Includes both 'Approved' and 'OCD Approved' requests and expands multi-day ranges.
+     */
+    public function bookings(Request $request)
+    {
+        $rows = FacilityRequest::whereIn('status', ['Approved', 'OCD Approved'])
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (! $r->date_start) continue;
+            $start = Carbon::parse($r->date_start);
+            $end = $r->date_end ? Carbon::parse($r->date_end) : Carbon::parse($r->date_start);
+
+            // normalize venues to array
+            $venues = $r->venue ?? [];
+            if (! is_array($venues)) {
+                $venues = $venues ? [$venues] : [];
+            }
+
+            for ($dt = $start->copy(); $dt->lte($end); $dt->addDay()) {
+                $dateStr = $dt->toDateString();
+                if (empty($venues)) {
+                    $out[] = [
+                        'id' => $r->id,
+                        'facility_id' => null,
+                        'facility_name' => null,
+                        'date' => $dateStr,
+                        'start_time' => $r->time_start,
+                        'end_time' => $r->time_end,
+                        'activity' => $r->activity,
+                        'status' => $r->status,
+                    ];
+                } else {
+                    foreach ($venues as $vid) {
+                        $fname = optional(Facility::find($vid))->name ?? null;
+                        $out[] = [
+                            'id' => $r->id,
+                            'facility_id' => $vid,
+                            'facility_name' => $fname,
+                            'date' => $dateStr,
+                            'start_time' => $r->time_start,
+                            'end_time' => $r->time_end,
+                            'activity' => $r->activity,
+                            'status' => $r->status,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return response()->json($out);
     }
 
     /**

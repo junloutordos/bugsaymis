@@ -1,6 +1,6 @@
 <script setup>
 import { Head, useForm, router, usePage } from "@inertiajs/vue3";
-import { ref, reactive, computed, watch } from "vue";
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
@@ -13,6 +13,13 @@ const requestsList = ref((props.requests && props.requests.data) ? props.request
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
+
+// responsive: track window width to toggle between table and card layouts
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredRequests = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -157,7 +164,7 @@ const canPrint = (r) => {
         </div>
 
         <!-- Mobile cards -->
-        <div class="sm:hidden space-y-3">
+        <div v-if="isMobile" class="space-y-3">
           <div v-for="r in filteredRequests" :key="r.id" class="border rounded-lg p-3 bg-white shadow-sm">
             <div class="flex items-start justify-between">
               <div>
@@ -176,9 +183,9 @@ const canPrint = (r) => {
               <div class="mt-1"><strong>Status:</strong> <span class="ml-1"><span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold', statusClass(r.status)]">{{ r.status }}</span></span></div>
             </div>
 
-            <div class="mt-3 flex items-center gap-2">
-              <button v-if="r.status === 'Pending'" @click.prevent="openEdit(r)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"><PencilSquareIcon class="w-4 h-4"/> Edit</button>
-              <button v-if="r.status === 'Pending'" @click.prevent="remove(r.id)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"><TrashIcon class="w-4 h-4"/></button>
+              <div class="mt-3 flex items-center gap-2">
+              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"><PencilSquareIcon class="w-4 h-4"/> Edit</button>
+              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"><TrashIcon class="w-4 h-4"/></button>
               <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md"><PrinterIcon class="w-4 h-4"/></a>
             </div>
           </div>
@@ -186,8 +193,8 @@ const canPrint = (r) => {
           <div v-if="filteredRequests.length === 0" class="text-center text-gray-500 py-6">No requests</div>
         </div>
 
-        <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
+        <!-- Pagination (mobile) -->
+        <div v-if="isMobile" class="flex justify-center items-center gap-2 mt-4">
           <button
             @click="currentPage--"
             :disabled="currentPage === 1"
@@ -200,7 +207,9 @@ const canPrint = (r) => {
             class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
           >Next</button>
         </div>
-        <div class="overflow-x-auto">
+
+        <!-- Pagination (moved below table for desktop) -->
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
@@ -225,10 +234,10 @@ const canPrint = (r) => {
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <button v-if="r.status === 'Pending'" @click.prevent="openEdit(r)" class="text-blue-600 hover:text-blue-800 p-1 rounded">
+                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="text-blue-600 hover:text-blue-800 p-1 rounded">
                       <PencilSquareIcon class="w-5 h-5" />
                     </button>
-                    <button v-if="r.status === 'Pending'" @click.prevent="remove(r.id)" class="text-red-600 hover:text-red-800 p-1 rounded">
+                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="text-red-600 hover:text-red-800 p-1 rounded">
                       <TrashIcon class="w-5 h-5" />
                     </button>
                     <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-2 rounded-full bg-gray-200 hover:bg-gray-200 text-green-700" title="Print">
@@ -237,9 +246,24 @@ const canPrint = (r) => {
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredRequests.length === 0"><td :colspan="6" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
+              <tr v-if="filteredRequests.length === 0"><td :colspan="7" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination (desktop) -->
+        <div v-if="!isMobile" class="flex justify-center items-center gap-2 mt-4">
+          <button
+            @click="currentPage--"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >Prev</button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button
+            @click="currentPage++"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >Next</button>
         </div>
       </div>
 

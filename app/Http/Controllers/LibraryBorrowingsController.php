@@ -94,7 +94,7 @@ class LibraryBorrowingsController extends Controller
             }
         }
 
-        $borrowings = $query->paginate(25)->appends($request->all());
+        $borrowings = $query->paginate(10)->appends($request->all());
 
         // Enrich each borrowing with a resolved borrower name for display
         $borrowings->getCollection()->transform(function ($b) {

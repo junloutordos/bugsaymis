@@ -18,7 +18,7 @@
           </div>
 
       <div class="bg-white rounded-xl shadow p-4">
-        <div class="overflow-x-auto">
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
@@ -46,11 +46,18 @@
                 <td class="px-4 py-2">{{ b.borrow_date }}</td>
                 <td class="px-4 py-2">{{ b.due_date }}</td>
                 <td class="px-4 py-2">{{ b.return_date || '—' }}</td>
-                <td class="px-4 py-2">{{ b.status }}</td>
+                <td class="px-4 py-2">
+                  <div>{{ b.status }}</div>
+                  <div v-if="isOverdue(b)" class="mt-1 inline-block px-2 py-0.5 text-xs font-semibold text-white bg-red-600 rounded">Overdue</div>
+                </td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <button v-if="!b.return_date" @click="processReturn(b)" class="px-3 py-1 bg-green-100 text-green-700 rounded">Return</button>
-                    <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded">Override Due</button>
+                    <button v-if="!b.return_date" @click="processReturn(b)" class="p-2 text-green-600 hover:bg-green-100 rounded" :title="'Return ' + (b.collection?.title || '')">
+                      <CheckCircleIcon class="h-5 w-5" />
+                    </button>
+                    <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-2 text-yellow-600 hover:bg-yellow-100 rounded" title="Override due date">
+                      <PencilSquareIcon class="h-5 w-5" />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -59,12 +66,39 @@
           </table>
         </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <div class="text-sm text-gray-600">Page {{ borrowings.current_page }} of {{ borrowings.last_page }}</div>
-          <div class="space-x-2">
-            <button @click.prevent="goTo(borrowings.prev_page_url)" :disabled="!borrowings.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-            <button @click.prevent="goTo(borrowings.next_page_url)" :disabled="!borrowings.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+        <!-- Mobile cards -->
+        <div v-else class="space-y-3 sm:hidden">
+          <div v-for="b in borrowings.data" :key="b.id" class="bg-white rounded-lg p-3 border shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs text-gray-500">#{{ b.id }}</div>
+                <div class="font-semibold text-gray-800">{{ b.collection?.title || '—' }}</div>
+                <div class="text-sm text-gray-600">Borrower: <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-blue-600 hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button></div>
+                <div class="text-sm text-gray-500">Section: {{ b.section_name || '—' }}</div>
+                <div class="text-sm text-gray-500">Borrow: {{ b.borrow_date }} • Due: {{ b.due_date }}</div>
+                <div class="text-sm text-gray-500">Return: {{ b.return_date || '—' }} • Status: {{ b.status }}</div>
+                <div v-if="isOverdue(b)" class="mt-2 inline-block px-2 py-0.5 text-xs font-semibold text-white bg-red-600 rounded">Overdue</div>
+              </div>
+              <div class="flex flex-col items-end space-y-2">
+                <div class="flex flex-col space-y-2">
+                  <button v-if="!b.return_date" @click="processReturn(b)" class="p-2 text-green-600 hover:bg-green-100 rounded" :title="'Return ' + (b.collection?.title || '')">
+                    <CheckCircleIcon class="h-5 w-5" />
+                  </button>
+                  <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-2 text-yellow-600 hover:bg-yellow-100 rounded" title="Override due date">
+                    <PencilSquareIcon class="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <div v-if="(borrowings.data || []).length === 0" class="text-center text-gray-500 py-6">No borrowings</div>
+        </div>
+
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button @click.prevent="goTo(borrowings.prev_page_url)" :disabled="!borrowings.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ borrowings.current_page }} of {{ borrowings.last_page }}</span>
+          <button @click.prevent="goTo(borrowings.next_page_url)" :disabled="!borrowings.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 
@@ -206,9 +240,11 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch, reactive } from 'vue'
+import Swal from 'sweetalert2'
+import { ref, nextTick, watch, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { CheckCircleIcon, PencilSquareIcon } from "@heroicons/vue/24/outline";
 
 const page = usePage()
 const borrowings = page.props.borrowings || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null }
@@ -235,6 +271,14 @@ const borrowerRef = ref(null)
 const employeesRef = ref(null)
 const q = ref(page.props.q || '')
 let qTimeout = null
+
+// Responsive: track window width to toggle table vs mobile cards
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 640)
+function handleResize() { windowWidth.value = window.innerWidth }
+
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 watch(q, (val) => {
   if (qTimeout) clearTimeout(qTimeout)
@@ -280,6 +324,24 @@ const validateAll = () => {
   return !Object.values(fieldErrors).some(v => typeof v === 'string' ? v && v.length > 0 : false);
 };
 
+// Return true when borrowing is overdue: has a due_date, not yet returned, and due_date is before today
+const isOverdue = (b) => {
+  try {
+    if (!b) return false
+    if (b.return_date) return false
+    if (!b.due_date) return false
+    // normalize to date only (ignore timezone) by using YYYY-MM-DD
+    const due = new Date(b.due_date)
+    const today = new Date()
+    // set time portion to 00:00:00 for comparison (consider overdue if due < today)
+    due.setHours(0,0,0,0)
+    today.setHours(0,0,0,0)
+    return due < today
+  } catch (e) {
+    return false
+  }
+}
+
 watch(() => form.value.borrower_type, (val) => {
   form.value.borrower_id = ''
   // focus borrower field when switching type
@@ -289,7 +351,7 @@ watch(() => form.value.borrower_type, (val) => {
 function submitForm(){
   // client-side validation
   if (!validateAll()) {
-    alert('Please fix the highlighted errors before processing the borrow.');
+    Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before processing the borrow.' });
     return;
   }
 
@@ -297,18 +359,28 @@ function submitForm(){
     console.log('Submitting borrowing', form.value)
     router.post(route('library.borrowings.store'), form.value, {
       onStart: () => console.log('borrow request started'),
-      onSuccess: () => { console.log('borrow success'); closeModal(); router.get(route('library.borrowings.index')) },
-      onError: (errors) => { console.error('borrow error', errors); alert(Object.values(errors || {}).join('\n') || 'Error processing borrowing') }
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Borrowing processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index')) }) },
+      onError: (errors) => { console.error('borrow error', errors); Swal.fire({ icon: 'error', title: 'Error processing borrowing', text: Object.values(errors || {}).join('\n') || 'Error processing borrowing' }) }
     })
   } catch (e) {
     console.error('submitForm exception', e);
-    alert('Error: ' + e.message)
+    Swal.fire({ icon: 'error', title: 'Error', text: e.message })
   }
 }
 
-function processReturn(b){
+async function processReturn(b){
+  const res = await Swal.fire({
+    title: 'Mark as returned?',
+    text: 'This will mark the borrowing as returned and update the collection status to Available.',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, return',
+    cancelButtonText: 'Cancel'
+  })
+  if (!res.isConfirmed) return
   router.post(route('library.borrowings.return', b.id), {}, {
-    onSuccess: () => { router.get(route('library.borrowings.index')) }
+    onSuccess: () => { Swal.fire({ icon: 'success', title: 'Return processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
+    onError: (e) => { console.error('return error', e); Swal.fire({ icon: 'error', title: 'Failed to process return' }) }
   })
 }
 
@@ -316,7 +388,8 @@ function openOverride(b){ overrideForm.value = { id: b.id, due_date: b.due_date 
 function closeOverride(){ showOverride.value = false; overrideForm.value = { id: null, due_date: '', remarks: '' } }
 function submitOverride(){
   router.post(route('library.borrowings.override', overrideForm.value.id), { due_date: overrideForm.value.due_date, remarks: overrideForm.value.remarks }, {
-    onSuccess: () => { closeOverride(); router.get(route('library.borrowings.index')) }
+    onSuccess: () => { closeOverride(); Swal.fire({ icon: 'success', title: 'Due date overridden', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
+    onError: (e) => { console.error('override error', e); Swal.fire({ icon: 'error', title: 'Failed to override due date' }) }
   })
 }
 

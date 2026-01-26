@@ -11,9 +11,19 @@ class LibraryCollectionCategoriesController extends Controller
 {
     public function index(Request $request)
     {
-        $categories = CollectionCategory::orderBy('name')->get();
+        $perPage = 10;
+
+        $q = $request->input('q');
+        $query = CollectionCategory::query()->orderBy('name');
+        if ($q) {
+            $query->where('name', 'like', "%$q%");
+        }
+
+        $categories = $query->paginate($perPage)->appends($request->all());
+
         return Inertia::render('Library/Categories/Index', [
             'categories' => $categories,
+            'q' => $q,
         ]);
     }
 

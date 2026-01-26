@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceRequest;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Mail;
@@ -16,7 +17,22 @@ class ServiceRequestController extends Controller
 {
     public function index()
     {
-        $requests = ServiceRequest::latest()->paginate(15);
+        $user = Auth::user();
+        $query = ServiceRequest::latest();
+
+        // If the logged-in user is a Staff, show only their own requests
+        try {
+            $roleName = $user?->role?->name ?? null;
+        } catch (\Throwable $e) {
+            $roleName = null;
+        }
+
+        if ($roleName === 'Staff' && $user) {
+            $query->where('requestor_id', $user->id);
+        }
+
+        $requests = $query->paginate(15);
+
         return Inertia::render('ServiceRequests/Index', [
             'requests' => $requests,
         ]);

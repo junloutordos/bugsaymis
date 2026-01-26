@@ -116,15 +116,23 @@ const monthDays = computed(() => {
   const year = d.getFullYear();
   const month = d.getMonth();
   const days = [];
+  // Determine weekday of the 1st (0=Sun..6=Sat) and pad leading blanks
+  const firstWeekday = new Date(year, month, 1).getDay();
+  for (let i = 0; i < firstWeekday; i++) days.push(null);
   const last = new Date(year, month + 1, 0).getDate();
   for (let i = 1; i <= last; i++) {
     days.push(new Date(year, month, i));
   }
+  // Append trailing blanks so the grid always fills full weeks
+  while (days.length % 7 !== 0) days.push(null);
   return days;
 });
 
+const pad2 = (n) => (n < 10 ? '0' + n : String(n));
+const formatYMD = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const bookingsForDate = (dt) => {
-  const key = dt.toISOString().slice(0,10);
+  if (!dt) return [];
+  const key = formatYMD(dt);
   return bookings.value.filter(b => (b.date || '').toString().slice(0,10) === key);
 };
 
@@ -609,7 +617,7 @@ const destroy = (req) => {
           </div>
         </div>
 
-        <div class="grid grid-cols-7 gap-2 text-sm">
+        <div class="grid grid-cols-7 gap-2 mt-2">
           <div class="text-center font-semibold">Sun</div>
           <div class="text-center font-semibold">Mon</div>
           <div class="text-center font-semibold">Tue</div>
@@ -620,16 +628,17 @@ const destroy = (req) => {
         </div>
 
         <div class="grid grid-cols-7 gap-2 mt-2">
-          <template v-for="d in monthDays" :key="d.toISOString()">
-            <div class="border rounded p-2 min-h-[80px]">
-              <div class="text-xs text-gray-600 mb-1">{{ d.getDate() }}</div>
+          <template v-for="(d, idx) in monthDays" :key="d ? d.toISOString() : 'blank-' + idx">
+            <div class="border rounded p-2 min-h-[80px] bg-white">
+              <div class="text-xs text-gray-600 mb-1">{{ d ? d.getDate() : '' }}</div>
               <div class="space-y-1 text-xs">
-                <div v-for="b in bookingsForDate(d)" :key="b.id" class="bg-gray-50 p-1 rounded border">
+                <div v-if="d" v-for="b in bookingsForDate(d)" :key="b.id" class="bg-gray-50 p-1 rounded border">
                   <div class="font-medium">{{ b.vehicle_name }}{{ b.plate_no ? ' — ' + b.plate_no : '' }}</div>
                   <div class="text-gray-600">{{ b.start_time ?? '—' }} — {{ b.end_time ?? '—' }}</div>
                   <div class="text-gray-700 truncate">{{ b.purpose }}</div>
                 </div>
-                <div v-if="bookingsForDate(d).length === 0" class="text-gray-300 text-xs">-</div>
+                <div v-else class="h-4"></div>
+                <div v-if="d && bookingsForDate(d).length === 0" class="text-gray-300 text-xs">-</div>
               </div>
             </div>
           </template>

@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage } from "@inertiajs/vue3"
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { router } from '@inertiajs/vue3'
 import { PencilSquareIcon, TrashIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
@@ -17,6 +17,13 @@ const assets = ref(props.assets || [])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
+
+// responsive: track window width to switch to card layout on small screens
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const isMobile = computed(() => windowWidth.value < 768)
+const handleResize = () => { windowWidth.value = window.innerWidth }
+onMounted(() => { window.addEventListener('resize', handleResize) })
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredAssets = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -182,7 +189,7 @@ const getPhotoUrl = (asset) => {
         <div class="mb-4">
           <input v-model="searchQuery" type="text" placeholder="Search assets..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
         </div>
-        <div class="overflow-x-auto">
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
@@ -226,6 +233,30 @@ const getPhotoUrl = (asset) => {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile / small screens: card list -->
+        <div v-else class="space-y-3">
+          <div v-for="asset in filteredAssets" :key="asset.id" class="bg-white border rounded-lg p-4 shadow-sm">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-sm text-gray-500">ID: {{ asset.id }}</div>
+                <div class="text-lg font-semibold">{{ asset.asset_name }}</div>
+                <div class="text-sm text-gray-600">Property No: {{ asset.property_no ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Category: {{ asset.category ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Condition: {{ asset.condition ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Status: {{ asset.status ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Assigned: {{ asset.assigned_user?.name ?? '—' }}</div>
+                <div class="text-sm text-gray-600">Location: {{ asset.building?.name ?? asset.room?.name ?? '—' }}</div>
+              </div>
+              <div class="flex flex-col items-end gap-2">
+                <button @click.prevent="openView(asset)" class="px-3 py-1 bg-gray-200 text-gray-800 rounded">View</button>
+                <button @click.prevent="openEdit(asset)" class="px-3 py-1 bg-yellow-500 text-white rounded">Edit</button>
+                <button @click.prevent="deleteAsset(asset)" class="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="filteredAssets.length === 0" class="text-center text-gray-500 py-6">No assets found.</div>
         </div>
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">

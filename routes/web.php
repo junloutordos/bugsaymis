@@ -96,6 +96,19 @@ Route::get('/hello', function () {
 Route::get('/library/kiosk', [LibraryKioskController::class, 'index'])->name('library.kiosk');
 Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])->name('library.kiosk.scan');
 
+// Clinic kiosk (public, no login required)
+Route::get('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'index'])->name('clinic.kiosk');
+Route::post('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'store'])->name('clinic.kiosk.store');
+
+    // Consultation log printable report (A4 landscape)
+    Route::get('/consultations/log/print', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])
+        ->name('consultations.log.print')
+        ->middleware('role:Administrator|Nurse|Clinic');
+    // Employee consultation log route (uses same controller method)
+    Route::get('/consultations/log/print/employee', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])
+        ->name('consultations.employee.log.print')
+        ->middleware('role:Administrator|Nurse|Clinic');
+
 /*
 |--------------------------------------------------------------------------
 | Authenticated Routes (PSHS email only)
@@ -198,6 +211,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
     // Vehicle bookings API for calendar
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
+    // Facility bookings API for calendar
+    Route::get('/facility-bookings', [\App\Http\Controllers\FacilityRequestController::class, 'bookings'])->name('facility-requests.bookings');
     // Activity Planner
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
     Route::post('/activities', [ActivityController::class, 'store'])->name('activities.store');
@@ -233,6 +248,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/work-requests/{workRequest}/fad/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByFADChief'])
         ->name('work-requests.fad.approve')
         ->middleware(['signed']);
+
+    // GSU Head approval routes (signed links)
+    Route::get('/work-requests/{workRequest}/gsu/approve/{gsu}', [\App\Http\Controllers\WorkRequestController::class, 'approveByGSUHead'])->name('work-requests.gsu.approve');
+    Route::get('/work-requests/{workRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\WorkRequestController::class, 'showGSUDeclineForm'])->name('work-requests.gsu.decline');
+    Route::post('/work-requests/{workRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\WorkRequestController::class, 'submitGSUDecline'])->name('work-requests.gsu.decline.submit');
 
     Route::get('/work-requests/{workRequest}/fad/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showFADDeclineForm'])
         ->name('work-requests.fad.decline')
@@ -372,6 +392,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/consultations', [\App\Http\Controllers\ConsultationController::class, 'index'])->name('consultations.index');
     Route::post('/consultations', [\App\Http\Controllers\ConsultationController::class, 'store'])->name('consultations.store');
     Route::put('/consultations/{consultation}', [\App\Http\Controllers\ConsultationController::class, 'update'])->name('consultations.update');
+    Route::get('/consultations/{consultation}/print', [\App\Http\Controllers\ConsultationController::class, 'print'])->name('consultations.print');
+
+    // Physician Schedule CRUD (Health > Schedule)
+    Route::get('/physician-schedule', [\App\Http\Controllers\PhysicianScheduleController::class, 'index'])->name('physician-schedule.index');
+    Route::post('/physician-schedule', [\App\Http\Controllers\PhysicianScheduleController::class, 'store'])->name('physician-schedule.store');
+    Route::put('/physician-schedule/{schedule}', [\App\Http\Controllers\PhysicianScheduleController::class, 'update'])->name('physician-schedule.update');
+    Route::delete('/physician-schedule/{schedule}', [\App\Http\Controllers\PhysicianScheduleController::class, 'destroy'])->name('physician-schedule.destroy');
 
     // Print facility request (only GSU Head and Administrator)
     Route::get('/facility-requests/{facilityRequest}/print', [\App\Http\Controllers\FacilityRequestController::class, 'printTicket'])
@@ -626,6 +653,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     | Profile
     |--------------------------------------------------------------------------
     */
+    // Doctor schedules removed — routes deleted
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

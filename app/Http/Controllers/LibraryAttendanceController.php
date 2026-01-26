@@ -11,7 +11,7 @@ class LibraryAttendanceController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = 25;
+        $perPage = 20;
         $query = LibraryAttendance::query()->orderBy('scanned_at', 'desc');
 
         if ($q = $request->input('q')) {

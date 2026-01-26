@@ -13,12 +13,14 @@ class WorkRequestFADApprovalMail extends Mailable
     public $workRequest;
     public $approveUrl;
     public $declineUrl;
+    public $chief;
 
-    public function __construct($workRequest, $approveUrl = null, $declineUrl = null)
+    public function __construct($workRequest, $approveUrl = null, $declineUrl = null, $chief = null)
     {
         $this->workRequest = $workRequest;
         $this->approveUrl = $approveUrl;
         $this->declineUrl = $declineUrl;
+        $this->chief = $chief;
     }
 
     public function build()
@@ -29,6 +31,7 @@ class WorkRequestFADApprovalMail extends Mailable
                         'request' => $this->workRequest,
                         'approveUrl' => $this->approveUrl,
                         'declineUrl' => $this->declineUrl,
+                        'chief' => $this->chief,
                     ]);
     }
 }

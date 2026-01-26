@@ -32,7 +32,21 @@ class WorkRequestController extends Controller
         // also expose under a clear key for the frontend
         $skilledUsers = $users;
 
-        $workRequests = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->get();
+        $user = Auth::user();
+        $query = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->orderByDesc('created_at');
+
+        // If logged-in user is Staff, show only their own work requests
+        try {
+            $roleName = $user?->role?->name ?? null;
+        } catch (\Throwable $e) {
+            $roleName = null;
+        }
+
+        if ($roleName === 'Staff' && $user) {
+            $query->where('requester_id', $user->id);
+        }
+
+        $workRequests = $query->get();
 
         return Inertia::render('GeneralServices/WorkRequest', [
             'divisions' => $divisions,
@@ -62,59 +76,23 @@ class WorkRequestController extends Controller
 
         $wr = WorkRequest::create($data);
 
-        // try to locate division chief (if building selected)
-        $chiefEmail = null;
-        $chiefUser = null;
-        if (! empty($data['location_division_id'])) {
-            // attempt to find a user who is marked as division chief for this building's division mapping
-            // fallback: look for a user whose office/room likely belongs to the building
-            $building = Building::find($data['location_division_id']);
-            if ($building) {
-                // Find office ids for rooms in this building
-                $officeIds = Room::where('building_id', $building->id)
-                                 ->whereNotNull('office_id')
-                                 ->pluck('office_id')
-                                 ->unique()
-                                 ->toArray();
+        // Instead of sending initial notification to FAD/Division Chief,
+        // send the first approval request to GSU Head(s).
+        try {
+            $gsuHeads = User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
 
-                if (! empty($officeIds)) {
-                    // find divisions for those offices
-                    $divisionIds = \App\Models\Office::whereIn('id', $officeIds)
-                                      ->whereNotNull('division_id')
-                                      ->pluck('division_id')
-                                      ->unique()
-                                      ->toArray();
-
-                    if (! empty($divisionIds)) {
-                        // find a division that has a division_chief assigned
-                        $division = \App\Models\Division::whereIn('id', $divisionIds)
-                                    ->whereNotNull('division_chief_id')
-                                    ->first();
-
-                        if ($division && $division->division_chief_id) {
-                            $chiefUser = User::find($division->division_chief_id);
-                            if ($chiefUser && $chiefUser->email) {
-                                $chiefEmail = $chiefUser->email;
-                            }
-                        }
-                    }
-                }
+            if ($gsuHeads->isEmpty()) {
+                logger()->warning('No GSU Head users found to notify for new work request', ['work_request_id' => $wr->id]);
             }
-        }
 
-        if ($chiefEmail) {
-            // persist division_chief_id on the request so signed links can validate
-            if ($chiefUser) {
-                $wr->division_chief_id = $chiefUser->id;
-                $wr->save();
+            foreach ($gsuHeads as $gsu) {
+                if (! $gsu->email) continue;
+                $approveUrl = URL::signedRoute('work-requests.gsu.approve', ['workRequest' => $wr->id, 'gsu' => $gsu->id], now()->addDays(7));
+                $declineUrl = URL::signedRoute('work-requests.gsu.decline', ['workRequest' => $wr->id, 'gsu' => $gsu->id], now()->addDays(7));
+                Mail::to($gsu->email)->send(new \App\Mail\WorkRequestCreatedMail($wr, $approveUrl, $declineUrl, $gsu->id));
             }
-            try {
-                $approveUrl = $chiefUser ? URL::signedRoute('work-requests.approve', ['workRequest' => $wr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : route('work-requests.index');
-                $declineUrl = $chiefUser ? URL::signedRoute('work-requests.decline', ['workRequest' => $wr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : null;
-                Mail::to($chiefEmail)->send(new WorkRequestCreatedMail($wr, $approveUrl, $declineUrl));
-            } catch (\Throwable $e) {
-                logger()->error('Failed to send work request email', ['error' => $e->getMessage()]);
-            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send GSU Head work request email', ['error' => $e->getMessage(), 'work_request_id' => $wr->id]);
         }
 
         return redirect()->route('work-requests.index')->with('success', 'Work request created.');
@@ -150,6 +128,103 @@ class WorkRequestController extends Controller
         return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => false]);
     }
 
+    /**
+     * Approve work request via signed link from GSU Head (first-level approver)
+     */
+    public function approveByGSUHead(Request $request, WorkRequest $workRequest, $gsu)
+    {
+        // basic check: if already acted upon, show already page
+        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Division Approved'])) {
+            return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => true]);
+        }
+
+        // if an assigned_user_id was provided in the signed link, persist it
+        $assigned = $request->query('assigned_user_id');
+        if ($assigned) {
+            $workRequest->assigned_user_id = $assigned;
+        }
+
+        // mark as GSU Approved
+        $workRequest->status = 'GSU Approved';
+        // record who acted (for audit/notifications)
+        $workRequest->acted_by_id = $gsu;
+        $workRequest->save();
+
+        logger()->info('WorkRequest approved by GSU Head', ['work_request_id' => $workRequest->id, 'gsu_id' => $gsu]);
+
+        // Notify FAD Chiefs for next-level approval
+        try {
+            $fadChiefs = User::select('id','email','position')
+                        ->where('position', 'like', '%FAD%')
+                        ->get();
+            foreach ($fadChiefs as $fad) {
+                if (! $fad->email) continue;
+                $approveUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                $declineUrl = URL::signedRoute('work-requests.fad.decline', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                Mail::to($fad->email)->send(new \App\Mail\WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify FAD Chiefs after GSU approval', ['error' => $e->getMessage(), 'work_request_id' => $workRequest->id]);
+        }
+
+        return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => false]);
+    }
+
+    /**
+     * Show decline form for GSU Head (signed link)
+     */
+    public function showGSUDeclineForm(Request $request, WorkRequest $workRequest, $gsu)
+    {
+        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Division Approved'])) {
+            return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => true]);
+        }
+
+        $postAction = route('work-requests.gsu.decline.submit', ['workRequest' => $workRequest->id, 'gsu' => $gsu])
+            . '?' . $request->getQueryString();
+
+        return view('facility_request_decline', ['facilityRequest' => $workRequest, 'postAction' => $postAction]);
+    }
+
+    /**
+     * Submit decline by GSU Head
+     */
+    public function submitGSUDecline(Request $request, WorkRequest $workRequest, $gsu)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        if (in_array($workRequest->status, ['GSU Approved','FAD Approved','Approved','Declined','Division Approved'])) {
+            $reason = $workRequest->decline_reason ?? '—';
+            return view('work_request_declined', ['facilityRequest' => $workRequest, 'reason' => $reason]);
+        }
+
+        $workRequest->status = 'Declined';
+        $workRequest->decline_reason = $request->input('reason');
+        $workRequest->declined_at = now();
+        $workRequest->acted_by_id = $gsu;
+        $workRequest->save();
+
+        logger()->info('WorkRequest declined by GSU Head', ['work_request_id' => $workRequest->id, 'gsu_id' => $gsu, 'reason' => $workRequest->decline_reason]);
+
+        // Notify requester that GSU Head declined
+        try {
+            $requesterEmail = $workRequest->requester?->email ?? null;
+            $approverName = null;
+            if ($gsu) {
+                $u = \App\Models\User::find($gsu);
+                $approverName = $u?->name ?? null;
+            }
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify requester after GSU decline', ['error' => $e->getMessage(), 'work_request_id' => $workRequest->id]);
+        }
+
+        return view('work_request_declined', ['facilityRequest' => $workRequest, 'reason' => $workRequest->decline_reason]);
+    }
+
     // FAD approval handlers (signed)
     public function approveByFADChief(Request $request, WorkRequest $workRequest, $chief)
     {
@@ -159,6 +234,8 @@ class WorkRequestController extends Controller
 
         $workRequest->status = 'FAD Approved';
         $workRequest->save();
+
+        logger()->info('WorkRequest approved by FAD Chief', ['work_request_id' => $workRequest->id, 'fad_id' => $chief]);
 
         // Notify requester about FAD approval
         try {
@@ -170,6 +247,14 @@ class WorkRequestController extends Controller
             }
             if ($requesterEmail) {
                 \Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $approverName));
+            }
+
+            // Also notify the GSU Head who acted earlier (if any)
+            if (! empty($workRequest->acted_by_id)) {
+                $gsu = \App\Models\User::find($workRequest->acted_by_id);
+                if ($gsu && $gsu->email) {
+                    \Mail::to($gsu->email)->send(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $approverName));
+                }
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send work request FAD approved notification', ['error' => $e->getMessage()]);
@@ -201,6 +286,8 @@ class WorkRequestController extends Controller
         $workRequest->declined_at = now();
         $workRequest->save();
 
+        logger()->info('WorkRequest declined by FAD Chief', ['work_request_id' => $workRequest->id, 'fad_id' => $chief, 'reason' => $workRequest->decline_reason]);
+
         // Notify requester via email (declined by FAD Chief)
         try {
             $requesterEmail = $workRequest->requester?->email ?? null;
@@ -212,6 +299,14 @@ class WorkRequestController extends Controller
 
             if ($requesterEmail) {
                 \Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+            }
+
+            // Also notify the GSU Head who acted earlier (if any)
+            if (! empty($workRequest->acted_by_id)) {
+                $gsu = \App\Models\User::find($workRequest->acted_by_id);
+                if ($gsu && $gsu->email) {
+                    \Mail::to($gsu->email)->send(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+                }
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send work request declined notification', ['error' => $e->getMessage()]);
@@ -322,7 +417,7 @@ class WorkRequestController extends Controller
                     if (! $fad->email) continue;
                     $approveUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('work-requests.fad.decline', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                    Mail::to($fad->email)->send(new WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl));
+                    Mail::to($fad->email)->send(new WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Failed during post-assignment notifications', ['error' => $e->getMessage()]);

@@ -29,7 +29,7 @@
             </div>
           </div>
 
-        <div class="overflow-x-auto">
+        <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border">
             <thead class="bg-gray-100 text-sm text-gray-700">
               <tr>
@@ -72,14 +72,40 @@
               <tr v-if="(collections.data || []).length === 0"><td :colspan="8" class="px-4 py-6 text-center text-gray-500">No collections</td></tr>
             </tbody>
           </table>
+
         </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <div class="text-sm text-gray-600">Page {{ collections.current_page }} of {{ collections.last_page }}</div>
-          <div class="space-x-2">
-            <button @click.prevent="goTo(collections.prev_page_url)" :disabled="!collections.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-            <button @click.prevent="goTo(collections.next_page_url)" :disabled="!collections.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+        <!-- Mobile cards -->
+        <div v-else class="space-y-3 sm:hidden">
+          <div v-for="c in collections.data" :key="c.id" class="bg-white rounded-lg p-3 border shadow-sm">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="text-xs text-gray-500">#{{ c.id }}</div>
+                <div class="font-semibold text-gray-800">{{ c.title || '—' }}</div>
+                <div class="text-sm text-gray-600">{{ c.author_publisher || '—' }}</div>
+                <div class="text-sm text-gray-500">{{ c.call_number || '—' }} • {{ c.collection_type || c.volume || '—' }}</div>
+                <div class="text-sm text-gray-500">{{ c.category || '—' }} • {{ c.year || '—' }}</div>
+              </div>
+              <div class="flex flex-col items-end space-y-2">
+                <div class="flex space-x-2">
+                  <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
+                    <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                  </button>
+                  <button @click="confirmDelete(c)" class="p-1 hover:bg-gray-100 rounded" title="Delete">
+                    <TrashIcon class="w-5 h-5 text-red-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <div v-if="(collections.data || []).length === 0" class="text-center text-gray-500 py-6">No collections</div>
+        </div>
+
+        <div class="flex justify-center items-center gap-2 mt-4">
+          <button @click.prevent="goTo(collections.prev_page_url)" :disabled="!collections.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ collections.current_page }} of {{ collections.last_page }}</span>
+          <button @click.prevent="goTo(collections.next_page_url)" :disabled="!collections.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 
@@ -161,24 +187,16 @@
         </div>
       </div>
 
-      <!-- Delete confirm -->
-      <div v-show="showDeleteConfirm" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-white p-4 rounded shadow">
-          <div class="mb-4">Are you sure you want to delete <strong>{{ deleting?.title }}</strong>?</div>
-          <div class="flex justify-end space-x-2">
-            <button @click="showDeleteConfirm=false" class="px-3 py-1 bg-gray-200 rounded">Cancel</button>
-            <button @click="deleteCollection" class="px-3 py-1 bg-red-500 text-white rounded">Delete</button>
-          </div>
-        </div>
-      </div>
+      <!-- Delete confirm handled via SweetAlert -->
 
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
+import Swal from 'sweetalert2'
 
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { usePage, router, Head } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
@@ -204,8 +222,15 @@ const fieldErrors = reactive({
   author_publisher: '',
   category: '',
 });
-const showDeleteConfirm = ref(false);
 const deleting = ref(null);
+
+// Responsive: track window width to toggle table vs mobile cards
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200);
+const isMobile = computed(() => windowWidth.value < 640);
+function handleResize() { windowWidth.value = window.innerWidth }
+
+onMounted(() => { window.addEventListener('resize', handleResize) });
+onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) });
 
 function openCreate() { editing.value = null; form.value = { collection_type: 'Book', title: '', author_publisher: '', call_number: '', edition: '', year: '', isbn: '', subject: '', category: '', publisher: '' }; errors.value = {}; Object.keys(fieldErrors).forEach(k => fieldErrors[k] = ''); showModal.value = true }
 async function openEdit(c) {
@@ -259,7 +284,35 @@ const validateAll = () => {
   return !Object.values(fieldErrors).some(v => typeof v === 'string' ? v && v.length > 0 : false);
 };
 
-function confirmDelete(c){ deleting.value = c; showDeleteConfirm.value = true }
+async function confirmDelete(c){
+  deleting.value = c
+  const res = await Swal.fire({
+    title: `Delete ${c.title}?`,
+    text: 'This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, delete',
+    cancelButtonText: 'Cancel'
+  })
+  if (!res.isConfirmed) { deleting.value = null; return }
+  // perform delete via Inertia
+  const id = c.id
+  const previous = deleting.value
+  deleting.value = null
+  router.delete(route('library.collections.destroy', id), {}, {
+    preserveState: true,
+    onSuccess: () => {
+      Swal.fire({ icon: 'success', title: 'Collection deleted', timer: 1000, showConfirmButton: false }).then(() => {
+        router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true })
+      })
+    },
+    onError: (e) => {
+      console.error(e)
+      deleting.value = previous
+      Swal.fire({ icon: 'error', title: 'Failed to delete' })
+    }
+  })
+}
 
 function applyFilters(){
   router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true })
@@ -281,7 +334,7 @@ async function submitForm(){
   errors.value = {}
   // client-side validation
   if (!validateAll()) {
-    alert('Please fix the highlighted errors before saving the collection.');
+    Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before saving the collection.' });
     return;
   }
   const payload = { ...form.value }
@@ -290,13 +343,13 @@ async function submitForm(){
   if (editing.value) {
     router.put(route('library.collections.update', editing.value), payload, {
       preserveState: true,
-      onSuccess: () => { showModal.value = false; router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) },
+      onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Collection updated', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) }) },
       onError: (e) => { errors.value = e }
     })
   } else {
     router.post(route('library.collections.store'), payload, {
       preserveState: true,
-      onSuccess: () => { showModal.value = false; router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) },
+      onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Collection added', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) }) },
       onError: (e) => { errors.value = e }
     })
   }
@@ -307,19 +360,19 @@ function deleteCollection(){
   const id = deleting.value.id
   // close the confirmation modal immediately for a snappier UX
   const previous = deleting.value
-  showDeleteConfirm.value = false
+  // kept for compatibility if referenced elsewhere
   deleting.value = null
 
   router.delete(route('library.collections.destroy', id), {}, {
     preserveState: true,
     onSuccess: () => {
-      router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true })
+      Swal.fire({ icon: 'success', title: 'Collection deleted', timer: 1000, showConfirmButton: false }).then(() => { router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) })
     },
     onError: (e) => {
       console.error(e)
       // restore modal / selection so user can retry or see the error
       deleting.value = previous
-      showDeleteConfirm.value = true
+      Swal.fire({ icon: 'error', title: 'Failed to delete' })
     }
   })
 }

@@ -3,6 +3,7 @@ import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import Swal from 'sweetalert2'
 
 const props = defineProps({ requests: Array });
 const page = usePage();
@@ -77,8 +78,7 @@ const submit = () => {
   form.post(route('messengerial.store'), {
     onSuccess: () => {
       closeModal();
-      alert('Request submitted. Note: This request cannot be edited after submission.');
-      window.location.reload();
+      Swal.fire({ icon: 'success', title: 'Request submitted', text: 'Note: This request cannot be edited after submission.', timer: 1500, showConfirmButton: false }).then(() => { window.location.reload() });
     },
     onError: (errors) => {
       console.warn('Validation errors:', errors);
@@ -90,9 +90,11 @@ const submit = () => {
 };
 
 const destroy = (req) => {
-  if (!confirm('Delete this messengerial request?')) return;
-  import('@inertiajs/vue3').then(({ router }) => {
-    router.delete(route('messengerial.destroy', req.id));
+  Swal.fire({ title: 'Delete this messengerial request?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete' }).then(res => {
+    if (!res.isConfirmed) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.delete(route('messengerial.destroy', req.id));
+    });
   });
 };
 

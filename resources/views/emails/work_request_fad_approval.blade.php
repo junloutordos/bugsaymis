@@ -30,7 +30,7 @@
         <h1>Work Request — FAD Approval Needed</h1>
       </div>
       <div class="card-body">
-        <p class="lead">Hello {{ $request->assignedUser?->name ?? 'FAD Chief' }},</p>
+        <p class="lead">Hello {{ $chief?->name ?? $request->divisionChief?->name ?? 'FAD Chief' }},</p>
         <p>A work request has been assigned and requires your approval.</p>
 
         <table class="details" role="presentation">

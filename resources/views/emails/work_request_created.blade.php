@@ -29,7 +29,7 @@
         <h1>Work Request — Approval Needed</h1>
       </div>
       <div class="card-body">
-        <p class="lead">Hello {{ $request->divisionChief?->name ?? 'Division Chief' }},</p>
+        <p class="lead">Hello {{ $request->gsu_head?->name ?? 'GSU Head' }},</p>
         <p>A new work request has been submitted and assigned to you for review and approval.</p>
 
         <table class="details" role="presentation">
@@ -58,11 +58,24 @@
             <td class="value">{{ $request->expected_completion_date ? \Illuminate\Support\Carbon::parse($request->expected_completion_date)->toDateString() : '—' }}</td>
           </tr>
         </table>
+        {{-- Assignment dropdown for skilled personnel (visual only in email) --}}
+        <div style="margin:12px 0;">
+          <label style="display:block;font-weight:600;color:#64748b;margin-bottom:6px;">Assign Personnel</label>
+        </div>
+
+        {{-- Quick assign & approve links (each is a signed link that sets assigned_user_id) --}}
+        @if(!empty($approveWithAssign))
+          <div style="margin:8px 0 14px;">
+            @foreach($skilledUsers as $u)
+              @php $link = $approveWithAssign[$u->id] ?? null; @endphp
+              @if($link)
+                <a href="{{ $link }}" style="display:inline-block;margin:6px 6px 0 0;padding:8px 10px;background:#eef2ff;border-radius:8px;color:#1e293b;text-decoration:none;font-size:13px;">Assign to {{ $u->name }}</a>
+              @endif
+            @endforeach
+          </div>
+        @endif
 
         <div class="actions">
-          @if(!empty($approveUrl))
-            <a class="btn" href="{{ $approveUrl }}">Approve Work Request</a>
-          @endif
           @if(!empty($declineUrl))
             <a class="btn" style="background:#ef4444;margin-left:8px;" href="{{ $declineUrl }}">Decline</a>
           @endif

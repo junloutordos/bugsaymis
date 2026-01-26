@@ -21,5 +21,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        // Ensure preload tags for CSS use the correct `as` attribute so browsers
+        // don't warn about preloaded stylesheets that are not used immediately.
+        Vite::usePreloadTagAttributes(function ($src, $url, $chunk, $manifest) {
+            if (str_ends_with($url, '.css')) {
+                return ['as' => 'style'];
+            }
+
+            return [];
+        });
     }
 }

@@ -15,7 +15,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
             ->get();
 
         // For dropdowns
@@ -41,6 +41,9 @@ class UserController extends Controller
             'sex'         => 'nullable|in:Male,Female',
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email',
+            // badge_id stores biometric ID; allow nullable for existing users
+            // require alpha-numeric, dash or underscore only for formatting
+            'badge_id'    => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
             'position'    => 'nullable|string|max:255',
             'division_id' => 'nullable|exists:divisions,id',
             'office_id'   => 'nullable|exists:offices,id',
@@ -83,6 +86,8 @@ class UserController extends Controller
             'sex'         => 'nullable|in:Male,Female',
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email,' . $user->id,
+            // allow keeping or changing badge_id; unique except for this user
+            'badge_id'    => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
             'position'    => 'nullable|string|max:255',
             'division_id' => 'nullable|exists:divisions,id',
             'office_id'   => 'nullable|exists:offices,id',
