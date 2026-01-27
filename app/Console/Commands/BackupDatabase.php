@@ -29,7 +29,9 @@ class BackupDatabase extends Command
         $filename = $backupPath . 'backup_' . now()->format('Y-m-d_H-i-s') . '.sql';
 
         // mysqldump command
-        $command = "mysqldump -h $dbHost -u $dbUser -p$dbPass $dbName > \"$filename\"";
+       $mysqldumpPath = '"C:\xampp\mysql\bin\mysqldump.exe"'; // put quotes for Windows paths with spaces
+        $command = "$mysqldumpPath -h $dbHost -u $dbUser " . ($dbPass ? "-p$dbPass" : "") . " $dbName > \"$filename\"";
+
 
         // Execute backup
         exec($command, $output, $return_var);
