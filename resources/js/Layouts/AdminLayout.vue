@@ -30,7 +30,6 @@ import {
   UserIcon,
   CursorArrowRippleIcon,
   ClockIcon,
-  PrinterIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -52,8 +51,8 @@ const isActive = (name) => name && route().current(name); // ✅ check via route
 
 // Return numeric badge from shared Inertia props based on child routeName
 const getBadge = (child) => {
-  // Don't show any notification badges for Staff accounts
-  if (roleName === 'Staff') return 0;
+  // Don't show any notification badges for Staff or Faculty accounts
+  if (roleName === 'Staff' || roleName === 'Faculty') return 0;
   const rn = child?.routeName || null;
   if (!page || !page.props) return 0;
   switch (rn) {
@@ -173,6 +172,13 @@ const menuItems = [
         roles: ["Administrator"],
       },
       {
+        label: 'DTR Upload',
+        routeName: 'data.dtr.upload',
+        href: route('data.dtr.upload'),
+        icon: DocumentTextIcon,
+        roles: ['Administrator'],
+      },
+      {
         label: "User Roles",
         routeName: "roles.index",
         href: route("roles.index"),
@@ -273,37 +279,28 @@ const menuItems = [
   },
   
   
-  
-
   {
     label: "Human Resource",
     icon: UserGroupIcon,
-    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
+    roles: ["Administrator", "HR", "Faculty", "Staff"],
     children: [
-      //{
-      //  label: "All PDS",
-      //  routeName: "pds.index",
-      //  href: route("pds.index"),
-      //  icon: ClipboardDocumentListIcon,
-      //  roles: ["Administrator", "HR"],
-      //},
       {
-        label: "My PDS",
-        routeName: "pds.my",
-        href: route("pds.my"),
-        icon: ClipboardDocumentListIcon,
-        roles: ["Faculty", "Staff", "DivisionChief", "OCD", "Administrator", "HR"],
-      },
-      {
-        label: "Daily Time Record",
-        routeName: null,
-        href: '#',
+        label: "Attendance Logs",
+        routeName: "hr.attendance.index",
+        href: route('hr.attendance.index'),
         icon: ClockIcon,
-        roles: ["Administrator", "HR"],
+        roles: ["Administrator", "HR", "Faculty", "Staff"],
       },
-      
+      {
+        label: "Schedule",
+        routeName: "schedules.index",
+        href: route("schedules.index"),
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "HR", "Faculty", "Staff"],
+      },
     ],
   },
+
   {
     label: "Performance Mngmt",
     icon: UserGroupIcon,
@@ -507,14 +504,14 @@ const menuItems = [
       {
         label: "Health Services",
         icon: HeartIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic"],
         children: [
           {
             label: "Consultations",
             routeName: "consultations.index",
             href: route("consultations.index"),
             icon: ChatBubbleLeftRightIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic"],
           },
           {
             label: "Consultation Logs",
@@ -525,11 +522,11 @@ const menuItems = [
             target: '_blank',
           },
           {
-            label: "Schedule",
+            label: "Doctor's Schedule",
             routeName: "physician-schedule.index",
             href: route("physician-schedule.index"),
             icon: ClockIcon,
-            roles: ["Administrator","Clinic","Nurse"],
+            roles: ["Administrator","Clinic"],
           },
         ],
       },

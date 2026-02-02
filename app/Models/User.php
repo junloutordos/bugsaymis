@@ -29,6 +29,7 @@ class User extends Authenticatable
         'office_id',
         'profile_picture',
         'electronic_signature',
+        'emp_category',
     ];
 
     /**

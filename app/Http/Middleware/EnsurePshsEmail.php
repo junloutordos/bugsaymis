@@ -15,7 +15,9 @@ class EnsurePshsEmail
     {
         $user = $request->user();
 
-        if ($user && !str_ends_with($user->email, '@crc.pshs.edu.ph')) {
+        // Guard against missing email property; coerce to string to avoid type errors
+        $email = $user->email ?? '';
+        if ($user && !str_ends_with((string) $email, '@crc.pshs.edu.ph')) {
             // Logout and redirect if email domain is not allowed
             auth()->logout();
 
