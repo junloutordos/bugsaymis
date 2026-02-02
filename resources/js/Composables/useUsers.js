@@ -26,6 +26,7 @@ export function useUsers(props) {
     position: "",
     division_id: "",
     office_id: "",
+    emp_category: '',
   })
 
   // Filtered + paginated users
@@ -62,6 +63,7 @@ export function useUsers(props) {
         position: user.position ?? "",
         division_id: user.division_id ?? "",
         office_id: user.office_id ?? user.office?.id ?? "",
+        emp_category: user.emp_category ?? user.emp_category ?? '' ,
       }
     } else {
       form.value = {
@@ -73,6 +75,7 @@ export function useUsers(props) {
         position: "",
         division_id: "",
         office_id: "",
+        emp_category: '',
       }
     }
     selectedUser.value = user

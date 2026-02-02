@@ -45,6 +45,10 @@ const appointmentForm = useForm({
   reason: '',
   requestor_id: null,
   requestor_type: '',
+  patient_type: 'student',
+  pisay: '',
+  employee_id: null,
+  requestor: '',
 });
 const viewConsultation = ref(null);
 const openVitals = ref(null);
@@ -328,7 +332,25 @@ const statusBadge = (s) => {
   return 'px-2 py-1 bg-red-100 text-red-700 rounded';
 };
 const openFor = (c) => { openSchedule.value = c; if (scheduleForm.reset) scheduleForm.reset(); };
-const openAppointmentFor = (c = null) => { openAppointment.value = c || true; if (appointmentForm.reset) appointmentForm.reset(); };
+const openAppointmentFor = (c = null) => { openAppointment.value = c || true; if (appointmentForm.reset) appointmentForm.reset(); if (['Nurse','Administrator'].includes(roleName) && appointmentForm.patient_type === 'employee') fetchEmployees(); };
+
+const employees = ref([]);
+const loadingEmployees = ref(false);
+const fetchEmployees = async () => {
+  if (loadingEmployees.value) return;
+  loadingEmployees.value = true;
+  try {
+    const res = await fetch(route('users.select'), { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('Failed to load users');
+    const data = await res.json();
+    // handle both paginated ({data: [...]}) and array responses
+    employees.value = data.data || data || [];
+  } catch (e) {
+    employees.value = [];
+  } finally {
+    loadingEmployees.value = false;
+  }
+};
 const submitAppointment = () => {
   // assemble concern string from selected checkboxes similar to kiosk
   const assembled = (appointmentForm.concerns || []).map(c => {
@@ -340,11 +362,21 @@ const submitAppointment = () => {
   // backend expects `reason` — set it as well
   appointmentForm.reason = assembled
 
-  // If the logged-in user is Staff, set requestor to the staff user (employee)
+  // Determine requestor based on role and selected patient type
   const _role = String(page.props.auth?.user?.role?.name || '').toLowerCase();
   if (_role === 'staff') {
     appointmentForm.requestor_id = page.props.auth?.user?.id;
     appointmentForm.requestor_type = 'employee';
+  } else if (['nurse', 'administrator'].includes(_role)) {
+    if (appointmentForm.patient_type === 'student') {
+      appointmentForm.requestor_type = 'student';
+      appointmentForm.requestor_id = null;
+      appointmentForm.requestor = appointmentForm.pisay || '';
+    } else {
+      appointmentForm.requestor_type = 'employee';
+      appointmentForm.requestor_id = appointmentForm.employee_id || null;
+      appointmentForm.requestor = '';
+    }
   }
 
   appointmentForm.post(route('consultations.store'), {
@@ -424,7 +456,28 @@ const isStaff = String(roleName).toLowerCase() === 'staff';
               <button class="absolute top-3 right-3" @click="openAppointment = null">✕</button>
               <h3 class="text-lg font-semibold mb-3">New Appointment</h3>
               <form @submit.prevent="submitAppointment" class="space-y-3">
-                <!-- PISAY ID removed per request -->
+                <!-- Patient selection: only visible to Nurse or Administrator -->
+                <div v-if="['Nurse','Administrator'].includes(roleName)">
+                  <label class="block text-sm font-medium">Patient</label>
+                  <div class="mt-1 flex gap-2">
+                    <select v-model="appointmentForm.patient_type" class="rounded border-gray-300 p-2" @change="() => { if (appointmentForm.patient_type === 'employee') fetchEmployees(); }">
+                      <option value="student">Student</option>
+                      <option value="employee">Employee</option>
+                    </select>
+                    <div v-if="appointmentForm.patient_type === 'student'" class="flex-1">
+                      <input v-model="appointmentForm.pisay" type="text" placeholder="PISAY ID" class="w-full rounded border-gray-300 p-2" />
+                    </div>
+                    <div v-else class="flex-1">
+                      <select v-model="appointmentForm.employee_id" class="w-full rounded border-gray-300 p-2">
+                        <option value="" disabled>Select employee</option>
+                        <option v-for="u in employees" :key="u.id" :value="u.id">{{ u.name }} — {{ u.office || '' }}</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div v-else>
+                  <!-- For non-nurse/admin users, treat requestor as the logged-in user (handled on submit) -->
+                </div>
 
                 <div>
                   <label class="block text-sm font-medium">Consultation Type</label>

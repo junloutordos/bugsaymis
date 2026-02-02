@@ -35,12 +35,44 @@ class UserController extends Controller
         ]);
     }
 
+    /**
+     * Return a lightweight JSON list of users for select/dropdowns.
+     * Accessible to authenticated users.
+     */
+    public function selectList(Request $request)
+    {
+        $query = User::query()->select('id', 'name', 'badge_id', 'office_id');
+
+        // optional filter by emp_category or search
+        if ($request->filled('emp_category')) {
+            $query->where('emp_category', $request->input('emp_category'));
+        }
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(function ($w) use ($q) {
+                $w->where('name', 'like', "%{$q}%")->orWhere('badge_id', 'like', "%{$q}%");
+            });
+        }
+
+        $users = $query->orderBy('name')->get()->map(function ($u) {
+            return [
+                'id' => $u->id,
+                'name' => $u->name,
+                'badge_id' => $u->badge_id,
+                'office_id' => $u->office_id,
+            ];
+        });
+
+        return response()->json($users);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
             'sex'         => 'nullable|in:Male,Female',
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email',
+            'emp_category' => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
             // badge_id stores biometric ID; allow nullable for existing users
             // require alpha-numeric, dash or underscore only for formatting
             'badge_id'    => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
@@ -86,6 +118,7 @@ class UserController extends Controller
             'sex'         => 'nullable|in:Male,Female',
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email,' . $user->id,
+            'emp_category' => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
             // allow keeping or changing badge_id; unique except for this user
             'badge_id'    => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
             'position'    => 'nullable|string|max:255',
