@@ -27,7 +27,7 @@ class ServiceRequestController extends Controller
             $roleName = null;
         }
 
-        if ($roleName === 'Staff' && $user) {
+        if (in_array($roleName, ['Staff', 'Faculty']) && $user) {
             $query->where('requestor_id', $user->id);
         }
 

@@ -353,7 +353,45 @@ class ConsultationController extends Controller
         if ($request->filled('requestor_id')) {
             $data['requestor_id'] = $request->input('requestor_id');
             $data['requestor_type'] = $request->input('requestor_type') ?? '';
-        } elseif ($user) {
+        }
+        // Support nurse/admin creating a student appointment: frontend may send `requestor_type=student` and
+        // `requestor` (PISAY) or `pisay`. Try to resolve to a student record; if found, set requestor_id to the student id.
+        elseif ($request->filled('requestor_type') && $request->input('requestor_type') === 'student') {
+            $pisay = $request->input('requestor') ?? $request->input('pisay') ?? null;
+            $foundStudent = null;
+            if ($pisay) {
+                $studentQuery = DB::table('students');
+                // check common pisay column names
+                $pisayCols = ['pisaysystemid','pisay_id','pisay_system_id'];
+                $first = true;
+                foreach ($pisayCols as $c) {
+                    if (Schema::hasColumn('students', $c)) {
+                        if ($first) { $studentQuery->where($c, $pisay); $first = false; }
+                        else { $studentQuery->orWhere($c, $pisay); }
+                    }
+                }
+                if (! $first) {
+                    $foundStudent = $studentQuery->first();
+                }
+            }
+
+            if ($foundStudent) {
+                $data['requestor_id'] = $foundStudent->id;
+                $data['requestor_type'] = 'student';
+                // clear free-text requestor field to avoid confusion if column exists
+                if (Schema::hasColumn('consultations', 'requestor')) {
+                    $data['requestor'] = null;
+                }
+            } else {
+                // no matching student record — store the provided PISAY in the `requestor` string field (if column exists)
+                if (Schema::hasColumn('consultations', 'requestor')) {
+                    $data['requestor'] = $pisay ?? $request->input('requestor') ?? '';
+                }
+                $data['requestor_id'] = null;
+                $data['requestor_type'] = 'student';
+            }
+        }
+        elseif ($user) {
             // For authenticated users, store the user's id as requestor_id and mark as employee
             $data['requestor_id'] = $user->id;
             $data['requestor_type'] = 'employee';
