@@ -101,6 +101,16 @@ Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])->nam
 Route::get('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'index'])->name('clinic.kiosk');
 Route::post('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'store'])->name('clinic.kiosk.store');
 
+// DTR Upload (Data Management) - front-end page
+Route::get('/data-management/dtr-upload', function () {
+    return Inertia::render('DataManagement/DTRUpload');
+})->name('data.dtr.upload')->middleware(['auth','role:Administrator']);
+
+// Endpoint to accept uploaded .dat file and insert attendance rows
+Route::post('/data-management/dtr-upload', [\App\Http\Controllers\DataManagement\DTRUploadController::class, 'store'])
+    ->name('data.dtr.upload.store')
+    ->middleware(['auth','role:Administrator']);
+
     // Consultation log printable report (A4 landscape)
     Route::get('/consultations/log/print', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])
         ->name('consultations.log.print')
@@ -204,6 +214,16 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
         ->middleware(['verified'])
         ->name('dashboard');
+
+    // Schedule (Human Resource)
+    Route::get('/schedules', [\App\Http\Controllers\HumanResource\ScheduleController::class, 'index'])
+        ->name('schedules.index');
+    Route::post('/schedules', [\App\Http\Controllers\HumanResource\ScheduleController::class, 'store'])
+        ->name('schedules.store');
+    Route::put('/schedules/{id}', [\App\Http\Controllers\HumanResource\ScheduleController::class, 'update'])
+        ->name('schedules.update');
+    Route::delete('/schedules/{id}', [\App\Http\Controllers\HumanResource\ScheduleController::class, 'destroy'])
+        ->name('schedules.destroy');
   
 
     /*
@@ -583,6 +603,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         
     });
+
+// Lightweight users JSON endpoint for dropdowns (authenticated)
+Route::middleware('auth')->get('/api/users/select', [UserController::class, 'selectList'])->name('users.select');
+
+    // Human Resource attendance viewer (scoped for Staff/Faculty)
+    Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
     // Students CRUD (Registrar / public admin may use)
     Route::get('/students', [\App\Http\Controllers\StudentController::class, 'index'])->name('students.index');
     Route::get('/students/create', [\App\Http\Controllers\StudentController::class, 'create'])->name('students.create');

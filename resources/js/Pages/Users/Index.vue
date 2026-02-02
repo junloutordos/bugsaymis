@@ -471,6 +471,18 @@ const openSignaturePicker = (user) => {
               </select>
             </div>
 
+            <!-- Employee Category -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Employee Category</label>
+              <select v-model="form.emp_category" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                <option value="">-- Select Category --</option>
+                <option value="Plantilla Teaching">Plantilla Teaching</option>
+                <option value="Plantilla Non-Teaching">Plantilla Non-Teaching</option>
+                <option value="COS Teaching">COS Teaching</option>
+                <option value="COS Non Teaching">COS Non Teaching</option>
+              </select>
+            </div>
+
             <div class="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
