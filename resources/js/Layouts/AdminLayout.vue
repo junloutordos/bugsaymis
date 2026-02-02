@@ -285,6 +285,13 @@ const menuItems = [
     roles: ["Administrator", "HR", "Faculty", "Staff"],
     children: [
       {
+        label: "My PDS",
+        routeName: "pds.my",
+        href: route("pds.my"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Faculty", "Staff", "DivisionChief", "OCD", "Administrator", "HR"],
+      },
+      {
         label: "Attendance Logs",
         routeName: "hr.attendance.index",
         href: route('hr.attendance.index'),
