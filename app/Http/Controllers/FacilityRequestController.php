@@ -192,11 +192,45 @@ class FacilityRequestController extends Controller
                         if ($div && $div->division_chief_id) $divisionChiefId = $div->division_chief_id;
                     }
 
+                    // Build a clearer title combining activity, date(s) and time(s)
+                    $titleParts = [];
+                    if (! empty($fr->activity)) {
+                        $titleParts[] = $fr->activity;
+                    }
+
+                    $dateStart = $fr->date_start ? Carbon::parse($fr->date_start)->format('Y-m-d') : null;
+                    $dateEnd = $fr->date_end ? Carbon::parse($fr->date_end)->format('Y-m-d') : null;
+                    if ($dateStart && $dateEnd) {
+                        $dateRange = ($dateStart === $dateEnd) ? $dateStart : ($dateStart . ' to ' . $dateEnd);
+                        $titleParts[] = $dateRange;
+                    } elseif ($dateStart) {
+                        $titleParts[] = $dateStart;
+                    }
+
+                    $timeStart = $fr->time_start ? Carbon::parse($fr->time_start)->format('H:i') : null;
+                    $timeEnd = $fr->time_end ? Carbon::parse($fr->time_end)->format('H:i') : null;
+                    if ($timeStart && $timeEnd) {
+                        $titleParts[] = $timeStart . '-' . $timeEnd;
+                    } elseif ($timeStart) {
+                        $titleParts[] = $timeStart;
+                    }
+
+                    // Append venue names if available to provide clearer context
+                    if (! empty($fr->venue)) {
+                        $venueIds = is_array($fr->venue) ? $fr->venue : [$fr->venue];
+                        $venueNames = \App\Models\Facility::whereIn('id', $venueIds)->pluck('name')->toArray();
+                        if (! empty($venueNames)) {
+                            $titleParts[] = implode('; ', $venueNames);
+                        }
+                    }
+
+                    $title = ! empty($titleParts) ? implode(', ', $titleParts) : ('Facility Request #' . $fr->id);
+
                     $itData = [
                         'user_id' => $user?->id ?? null,
                         'facility_request_id' => $fr->id,
                         'category' => 'Technical Assistance on Events',
-                        'title' => $fr->activity ?? ('Facility Request #' . $fr->id),
+                        'title' => $title,
                         'description' => 'Auto-created IT job request for Facility Request #' . $fr->id,
                         'status' => 'Pending Division Chief Approval',
                         'divisionchief_id' => $divisionChiefId,
