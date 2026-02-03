@@ -71,8 +71,8 @@ use App\Http\Controllers\LibraryKioskController;
 
 /*
 |--------------------------------------------------------------------------
-| Google OAuth (Stage 4)
-|--------------------------------------------------------------------------
+                        routeName: "library.statistics.report",
+                        href: '#',
 | Google login route that accepts Firebase-authenticated users.
 | Email domain is enforced via middleware (pshs.email).
 */
@@ -609,6 +609,9 @@ Route::middleware('auth')->get('/api/users/select', [UserController::class, 'sel
 
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
+
+// Library statistics printable report
+Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controllers\LibraryAttendanceController::class, 'report'])->name('library.statistics.report');
     // Students CRUD (Registrar / public admin may use)
     Route::get('/students', [\App\Http\Controllers\StudentController::class, 'index'])->name('students.index');
     Route::get('/students/create', [\App\Http\Controllers\StudentController::class, 'create'])->name('students.create');
