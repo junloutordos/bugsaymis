@@ -224,6 +224,26 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('schedules.update');
     Route::delete('/schedules/{id}', [\App\Http\Controllers\HumanResource\ScheduleController::class, 'destroy'])
         ->name('schedules.destroy');
+    
+    // Date Parameters (Human Resource)
+    Route::get('/hr/date-parameters', [\App\Http\Controllers\HumanResource\DateParametersController::class, 'index'])
+        ->name('hr.date-parameters.index');
+    Route::post('/hr/date-parameters', [\App\Http\Controllers\HumanResource\DateParametersController::class, 'store'])
+        ->name('hr.date-parameters.store');
+    Route::put('/hr/date-parameters/{id}', [\App\Http\Controllers\HumanResource\DateParametersController::class, 'update'])
+        ->name('hr.date-parameters.update');
+    Route::delete('/hr/date-parameters/{id}', [\App\Http\Controllers\HumanResource\DateParametersController::class, 'destroy'])
+        ->name('hr.date-parameters.destroy');
+
+    // Gate Pass (Human Resource)
+    Route::get('/hr/gatepass', [\App\Http\Controllers\HumanResource\GatePassController::class, 'index'])
+        ->name('gatepass.index');
+    Route::post('/hr/gatepass', [\App\Http\Controllers\HumanResource\GatePassController::class, 'store'])
+        ->name('gatepass.store');
+    Route::put('/hr/gatepass/{id}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'update'])
+        ->name('gatepass.update');
+    Route::delete('/hr/gatepass/{id}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'destroy'])
+        ->name('gatepass.destroy');
   
 
     /*
@@ -243,6 +263,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
+    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('role:DivisionChief');
+    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('role:DivisionChief');
     // Vehicle bookings API for calendar
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Facility bookings API for calendar
@@ -255,11 +277,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
+    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('role:DivisionChief');
+    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('role:DivisionChief');
     // Work Requests (General Services)
-    Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
-    Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
-    Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
-    Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head');
+    Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
+    Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
+    Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
+    Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
 
     // Completion endpoint — only GSU Head or Administrator can mark completed
     Route::post('/work-requests/{workRequest}/complete', [WorkRequestController::class, 'complete'])
@@ -270,6 +294,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/work-requests/{workRequest}/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByDivisionChief'])
         ->name('work-requests.approve')
         ->middleware(['signed']);
+
+    // Authenticated in-app approve/decline for DivisionChief
+    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('role:DivisionChief');
+    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('role:DivisionChief');
 
     Route::get('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showDeclineForm'])
         ->name('work-requests.decline')
@@ -298,6 +326,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Service Requests
     Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
     Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');
+    // In-app approval endpoints for Division Chief (named .inapp to avoid collision with signed email routes)
+    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('role:DivisionChief');
+    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('role:DivisionChief');
     Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
     Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
     // Assets (General Services)
@@ -356,6 +387,19 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('facility-requests.gsu.approve')
         ->middleware(['signed']);
 
+    // FAD approval signed routes (sent to FAD Chief users after Division Chief approval)
+    Route::get('/facility-requests/{facilityRequest}/fad/approve/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'approveByFAD'])
+        ->name('facility-requests.fad.approve')
+        ->middleware(['signed']);
+
+    Route::get('/facility-requests/{facilityRequest}/fad/decline/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'showFadDeclineForm'])
+        ->name('facility-requests.fad.decline')
+        ->middleware(['signed']);
+
+    Route::post('/facility-requests/{facilityRequest}/fad/decline/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'submitFadDecline'])
+        ->name('facility-requests.fad.decline.submit')
+        ->middleware(['signed']);
+
     // Service Requests: Division chief approve/decline via signed links
     Route::get('/service-requests/{serviceRequest}/approve/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByDivisionChief'])
         ->name('service-requests.approve')
@@ -371,6 +415,19 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     Route::get('/service-requests/{serviceRequest}/gsu/approve/{gsu}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByGSU'])
         ->name('service-requests.gsu.approve')
+        ->middleware(['signed']);
+
+    // FAD approval signed routes (sent to FAD Chief users after Division Chief approval)
+    Route::get('/service-requests/{serviceRequest}/fad/approve/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByFAD'])
+        ->name('service-requests.fad.approve')
+        ->middleware(['signed']);
+
+    Route::get('/service-requests/{serviceRequest}/fad/decline/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'showFadDeclineForm'])
+        ->name('service-requests.fad.decline')
+        ->middleware(['signed']);
+
+    Route::post('/service-requests/{serviceRequest}/fad/decline/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'submitFadDecline'])
+        ->name('service-requests.fad.decline.submit')
         ->middleware(['signed']);
 
     Route::get('/service-requests/{serviceRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\ServiceRequestController::class, 'showDeclineForm'])

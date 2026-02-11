@@ -25,10 +25,21 @@ class VehicleRequestController extends Controller
 
         $canViewAll = in_array($role, ['Administrator', 'GSU Head']);
 
-        $requests = VehicleRequest::with(['user:id,name', 'driver:id,name'])
-            ->when(!$canViewAll, fn($q) => $q->where('user_id', $user->id))
-            ->latest()
-            ->get();
+        $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
+
+        if ($role === 'DivisionChief') {
+            // Only include requests where the requester's division is led by this Division Chief.
+            // Use whereHas to perform the join in a single query and avoid stale ID lists.
+            $requests->whereHas('user', function ($q) use ($user) {
+                $q->whereHas('division', function ($q2) use ($user) {
+                    $q2->where('division_chief_id', $user->id);
+                });
+            });
+        } elseif (! $canViewAll) {
+            $requests->where('requestor_id', $user->id);
+        }
+
+        $requests = $requests->get();
 
         // also fetch vehicles for dropdown (only available vehicles)
         $vehicles = \App\Models\Vehicle::where('status','!=','Under Repair')->orderBy('name')->get();
@@ -38,10 +49,13 @@ class VehicleRequestController extends Controller
             ->orderBy('name')
             ->get(['id','name']);
 
+        $isDivisionChief = ($role === 'DivisionChief');
+
         return Inertia::render('VehicleRequests/Index', [
             'requests' => $requests,
             'vehicles' => $vehicles,
             'divisionChiefs' => $divisionChiefs,
+            'isDivisionChief' => $isDivisionChief,
         ]);
     }
 
@@ -123,7 +137,7 @@ class VehicleRequestController extends Controller
         }
 
         $vr = VehicleRequest::create([
-            'user_id' => $user->id,
+            'requestor_id' => $user->id,
             'purpose' => $request->input('purpose'),
             'destination' => $request->input('destination'),
             // store first date in legacy `date_needed` and full array in `date_needed_multiple`
@@ -155,6 +169,110 @@ class VehicleRequestController extends Controller
         return redirect()->route('vehicle-requests.index');
     }
 
+    // Authenticated in-app approval by logged-in Division Chief
+    public function approveInApp(Request $request, VehicleRequest $vehicleRequest)
+    {
+        $user = $request->user();
+        logger()->info('approveInApp called', ['user_id' => $user->id ?? null, 'role' => $user->role->name ?? null, 'vehicle_request_id' => $vehicleRequest->id]);
+
+        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') {
+            logger()->warning('approveInApp forbidden - not division chief', ['user_id' => $user->id ?? null]);
+            return back()->with('error', 'You are not authorized to approve this request.');
+        }
+
+        // Allow if assigned chief OR if the acting user is the chief of the requester's division
+        $canAct = false;
+        if ($vehicleRequest->division_chief_id && (int) $vehicleRequest->division_chief_id === (int) $user->id) {
+            $canAct = true;
+        } else {
+            $requester = $vehicleRequest->requester;
+            if ($requester && $requester->division_id) {
+                $isChiefOfRequesterDivision = \App\Models\Division::where('id', $requester->division_id)
+                    ->where('division_chief_id', $user->id)
+                    ->exists();
+                if ($isChiefOfRequesterDivision) $canAct = true;
+            }
+        }
+
+        if (! $canAct) {
+            logger()->warning('approveInApp forbidden - not assigned nor chief of requester division', ['vehicle_request_id' => $vehicleRequest->id, 'assigned_chief' => $vehicleRequest->division_chief_id ?? null, 'user_id' => $user->id]);
+            return back()->with('error', 'You are not authorized to approve this request.');
+        }
+
+        if ($vehicleRequest->status === 'Approved') return back()->with('success', 'Already approved');
+
+        $vehicleRequest->status = 'Approved';
+        $vehicleRequest->save();
+
+        try {
+            // Notify all GSU Head users (so GSU handles driver assignment)
+            $gsuHeads = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
+            foreach ($gsuHeads as $gsuHead) {
+                if ($gsuHead->email) {
+                    try {
+                        Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
+                    } catch (\Throwable $e) {
+                        logger()->error('Failed to send GSU Head vehicle request notification (in-app)', ['error' => $e->getMessage(), 'gsu_id' => $gsuHead->id]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify GSU Head users after in-app approval', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Vehicle request approved.');
+    }
+
+    public function declineInApp(Request $request, VehicleRequest $vehicleRequest)
+    {
+        $user = $request->user();
+        logger()->info('declineInApp called', ['user_id' => $user->id ?? null, 'role' => $user->role->name ?? null, 'vehicle_request_id' => $vehicleRequest->id]);
+
+        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') {
+            logger()->warning('declineInApp forbidden - not division chief', ['user_id' => $user->id ?? null]);
+            return back()->with('error', 'You are not authorized to decline this request.');
+        }
+
+        $canAct = false;
+        if ($vehicleRequest->division_chief_id && (int) $vehicleRequest->division_chief_id === (int) $user->id) {
+            $canAct = true;
+        } else {
+            $requester = $vehicleRequest->requester;
+            if ($requester && $requester->division_id) {
+                $isChiefOfRequesterDivision = \App\Models\Division::where('id', $requester->division_id)
+                    ->where('division_chief_id', $user->id)
+                    ->exists();
+                if ($isChiefOfRequesterDivision) $canAct = true;
+            }
+        }
+
+        if (! $canAct) {
+            logger()->warning('declineInApp forbidden - not assigned nor chief of requester division', ['vehicle_request_id' => $vehicleRequest->id, 'assigned_chief' => $vehicleRequest->division_chief_id ?? null, 'user_id' => $user->id]);
+            return back()->with('error', 'You are not authorized to decline this request.');
+        }
+
+        $data = $request->validate(['reason' => 'required|string|max:1000']);
+
+        if (in_array($vehicleRequest->status, ['Approved','Declined'])) return back()->with('success', 'Already processed');
+
+        $vehicleRequest->status = 'Declined';
+        $vehicleRequest->decline_reason = $data['reason'];
+        $vehicleRequest->declined_at = now();
+        $vehicleRequest->save();
+
+        try {
+                $requester = $vehicleRequest->requester;
+            $requesterEmail = $requester?->email ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason ?? null));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Vehicle request declined.');
+    }
+
     /**
      * Approve vehicle request by Division Chief via signed link
      */
@@ -173,17 +291,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->status = 'Approved';
         $vehicleRequest->save();
 
-        // Notify requester via email (approved by Division Chief)
-        $requester = $vehicleRequest->user;
-        if ($requester && $requester->email) {
-            try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Approved', null, 'Division Chief'));
-            } catch (\Throwable $e) {
-                \Log::error('Failed to send vehicle request approved notification', ['error' => $e->getMessage()]);
-            }
-        }
-
-        // Notify all GSU Head users
+        // Notify all GSU Head users (Division Chief approved -> GSU assigns driver)
         $gsuHeads = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
         foreach ($gsuHeads as $gsuHead) {
             if ($gsuHead->email) {
@@ -238,7 +346,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->save();
 
         // Notify requester
-        $requester = $vehicleRequest->user;
+        $requester = $vehicleRequest->requester;
         if ($requester && $requester->email) {
             try {
                 \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, 'Office of the Campus Director'));
@@ -280,7 +388,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->save();
 
         // Notify requester
-        $requester = $vehicleRequest->user;
+        $requester = $vehicleRequest->requester;
         if ($requester && $requester->email) {
             try {
                 \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Office of the Campus Director'));
@@ -318,7 +426,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->save();
 
         // Notify requester via email (declined by Division Chief)
-        $requester = $vehicleRequest->user;
+        $requester = $vehicleRequest->requester;
         if ($requester && $requester->email) {
             try {
                 \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Division Chief'));
@@ -437,7 +545,7 @@ class VehicleRequestController extends Controller
             abort(403, 'Request not ready for printing');
         }
 
-        $vehicleRequest->load(['user','driver', 'divisionChief']);
+        $vehicleRequest->load(['requester','driver', 'divisionChief']);
 
         return view('vehicle_requests.print_ticket', ['request' => $vehicleRequest]);
     }

@@ -25,6 +25,7 @@
               <tr>
                 <th class="px-4 py-3 text-left">#</th>
                 <th class="px-4 py-3 text-left">Issue</th>
+                <th v-if="['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left">Requestor</th>
                 <th class="px-4 py-3 text-left">Description</th>
                 <th class="px-4 py-3 text-left">Assigned Personnel</th>
                 <th class="px-4 py-3 text-left">Acted By</th>
@@ -39,6 +40,7 @@
               <tr v-for="wr in filteredWorkRequests" :key="wr.id">
                 <td class="px-4 py-3">{{ wr.id }}</td>
                 <td class="px-4 py-3">{{ wr.issue ?? '—' }}</td>
+                <td v-if="['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3">{{ wr.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.description ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.assigned_user?.name ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.actedBy?.name ?? '—' }}</td>
@@ -87,11 +89,13 @@
                     >
                       <CheckCircleIcon class="w-5 h-5" />
                     </button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="approveRequest(wr)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="declineRequest(wr)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredWorkRequests.length === 0">
-                <td colspan="10" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
+                <td :colspan="(['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name) ? 11 : 10)" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -104,6 +108,7 @@
               <div>
                 <div class="text-sm text-gray-500">Request #{{ wr.id }}</div>
                 <div class="font-semibold text-gray-800">{{ wr.issue ?? '—' }}</div>
+                <div v-if="['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="text-sm text-gray-600">Requestor: {{ wr.requester?.name ?? '—' }}</div>
                 <div class="text-sm text-gray-600">{{ wr.description ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
@@ -118,10 +123,12 @@
             </div>
 
             <div class="mt-3 flex items-center gap-2">
-              <button v-if="wr.status === 'Division Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
+                <button v-if="wr.status === 'Division Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
               <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md">Edit</button>
               <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="destroy(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Delete</button>
               <button v-if="wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
+                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md">Approve</button>
+                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Decline</button>
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
-import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
@@ -19,7 +19,7 @@ const filteredRequests = computed(() => {
   const results = (requestsList.value || []).filter(req => {
     return (req.purpose || '').toString().toLowerCase().includes(q) ||
       (req.vehicle_type || '').toString().toLowerCase().includes(q) ||
-      (req.user?.name || '').toString().toLowerCase().includes(q)
+      (req.requester?.name || '').toString().toLowerCase().includes(q)
   })
   const start = (currentPage.value - 1) * perPage
   return results.slice(start, start + perPage)
@@ -29,7 +29,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || [
   const q = searchQuery.value.trim().toLowerCase()
   return (req.purpose || '').toString().toLowerCase().includes(q) ||
     (req.vehicle_type || '').toString().toLowerCase().includes(q) ||
-    (req.user?.name || '').toString().toLowerCase().includes(q)
+    (req.requester?.name || '').toString().toLowerCase().includes(q)
 }).length / perPage)))
 
 watch(searchQuery, () => { currentPage.value = 1 })
@@ -196,6 +196,32 @@ const openPrint = (req) => {
   }
   window.open(url, '_blank');
 };
+
+const approveRequest = (req) => {
+  Swal.fire({ title: 'Approve this vehicle request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
+    if (!res.isConfirmed) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      const url = (() => { try { return route('vehicle-requests.approve.inapp', req.id) } catch (e) { return `/vehicle-requests/${req.id}/approve` } })()
+      router.post(url, {}, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to approve' }) }
+      })
+    })
+  })
+}
+
+const declineRequest = (req) => {
+  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
+    if (!res.isConfirmed || !res.value) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      const url = (() => { try { return route('vehicle-requests.decline.inapp', req.id) } catch (e) { return `/vehicle-requests/${req.id}/decline` } })()
+      router.post(url, { reason: res.value }, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to decline' }) }
+      })
+    })
+  })
+}
 
 const setBanner = (type, message, ms = 5000) => {
   banner.value = { type, message };
@@ -438,13 +464,13 @@ const destroy = (req) => {
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">#</th>
+                <th v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left whitespace-normal break-words">{{ page.props.auth?.user?.role?.name === 'GSU Head' ? 'Requestor' : 'Submitted By' }}</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Purpose</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Vehicle</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Date Needed</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Departure</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">ETA</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Status</th>
-                <th class="px-4 py-3 text-left whitespace-normal break-words">Submitted By</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Driver</th>
                 <th class="px-4 py-3 text-center whitespace-normal break-words">Action</th>
               </tr>
@@ -452,6 +478,7 @@ const destroy = (req) => {
             <tbody class="divide-y divide-gray-200 text-sm">
               <tr v-for="req in filteredRequests" :key="req.id">
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.id }}</td>
+                <td v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.purpose }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.vehicle_type ?? '—' }}</td>
                 <td class="px-4 py-3"> 
@@ -473,7 +500,6 @@ const destroy = (req) => {
                     {{ req.status }}
                   </span>
                 </td>
-                <td class="px-4 py-3 whitespace-normal break-words">{{ req.user?.name ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.driver?.name ?? '—' }}</td>
                 <td class="px-4 py-3 text-center whitespace-normal break-words">
                   <div class="flex items-center gap-2 justify-center">
@@ -516,11 +542,13 @@ const destroy = (req) => {
                     >
                       <PrinterIcon class="w-5 h-5" />
                     </button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="approveRequest(req)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="declineRequest(req)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredRequests.length === 0">
-                <td colspan="10" class="px-4 py-6 text-center text-gray-500">No vehicle requests found.</td>
+                <td :colspan="(['Staff','Faculty'].includes(page.props.auth?.user?.role?.name) ? 9 : 10)" class="px-4 py-6 text-center text-gray-500">No vehicle requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -549,7 +577,7 @@ const destroy = (req) => {
                 <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
                 <!-- Assign Driver Modal removed here; using global modal to avoid duplication -->
 
-                <div class="text-sm text-gray-600">{{ req.vehicle_type ?? '—' }} — {{ req.user?.name ?? '—' }}</div>
+                <div class="text-sm text-gray-600"><span v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)">{{ req.requester?.name ?? '—' }} — </span>{{ req.vehicle_type ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
                 <div class="text-gray-600">{{ req.date_needed_multiple && req.date_needed_multiple.length ? (new Date(req.date_needed_multiple[0]).toLocaleDateString()) : (req.date_needed ? new Date(req.date_needed).toLocaleDateString() : '—') }}</div>

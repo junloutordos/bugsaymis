@@ -13,7 +13,8 @@
                   </svg>
                 </button>
               </div>
-              <button @click="openCreate" class="px-4 py-2 bg-blue-600 text-white rounded">New Borrowing</button>
+              <button @click="openCreate" class="px-4 py-2 bg-blue-600 text-white rounded">
+                New Borrowing</button>
             </div>
           </div>
 
@@ -52,10 +53,10 @@
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <button v-if="!b.return_date" @click="processReturn(b)" class="p-2 text-green-600 hover:bg-green-100 rounded" :title="'Return ' + (b.collection?.title || '')">
+                    <button v-if="!b.return_date" @click="processReturn(b)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" :title="'Return ' + (b.collection?.title || '')">
                       <CheckCircleIcon class="h-5 w-5" />
                     </button>
-                    <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-2 text-yellow-600 hover:bg-yellow-100 rounded" title="Override due date">
+                    <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700" title="Override due date">
                       <PencilSquareIcon class="h-5 w-5" />
                     </button>
                   </div>

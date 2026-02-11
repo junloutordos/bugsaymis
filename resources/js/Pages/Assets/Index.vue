@@ -216,14 +216,14 @@ const getPhotoUrl = (asset) => {
                 <td class="px-4 py-3">{{ asset.building?.name ?? asset.room?.name ?? '—' }}</td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
-                    <button @click="openView(asset)" class="p-1 hover:bg-gray-100 rounded" title="View">
-                      <EyeIcon class="w-5 h-5 text-blue-600" />
+                    <button @click="openView(asset)" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="View">
+                      <EyeIcon class="w-5 h-5" />
                     </button>
-                    <button @click="openEdit(asset)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
-                      <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                    <button @click="openEdit(asset)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
+                      <PencilSquareIcon class="w-5 h-5" />
                     </button>
-                    <button @click="deleteAsset(asset)" class="p-1 hover:bg-gray-100 rounded" title="Delete">
-                      <TrashIcon class="w-5 h-5 text-red-600" />
+                    <button @click="deleteAsset(asset)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
+                      <TrashIcon class="w-5 h-5" />
                     </button>
                   </div>
                 </td>

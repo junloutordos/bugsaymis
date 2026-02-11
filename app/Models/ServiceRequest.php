@@ -10,10 +10,14 @@ class ServiceRequest extends Model
     use HasFactory;
 
     protected $fillable = [
-        'service_type', 'copies', 'sheets_per_set', 'date_needed', 'time_needed', 'purposes', 'details', 'status', 'requestor_id', 'unit', 'division_chief_id', 'decline_reason', 'declined_at'
+        'service_type', 'copies', 'sheets_per_set', 'date_needed', 'time_needed', 'purposes', 'details', 'status', 'requestor_id', 'decline_reason', 'declined_at'
     ];
 
     protected $casts = [
         'declined_at' => 'datetime',
     ];
+    
+        public function requester() {
+            return $this->belongsTo(User::class, 'requestor_id');
+        }
 }

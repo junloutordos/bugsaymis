@@ -29,7 +29,7 @@
         <h1>Service Request — Approval Needed</h1>
       </div>
       <div class="card-body">
-        <p class="lead">Hello {{ $request->unit ?? 'Division Chief' }},</p>
+        <p class="lead">Hello {{ $request->requester?->division?->division_name ?? $request->unit ?? 'Division Chief' }},</p>
         <p>A new service request has been submitted and assigned to you for review and approval.</p>
 
         <table class="details" role="presentation">
@@ -39,7 +39,7 @@
           </tr>
           <tr>
             <td class="label">Requestor</td>
-            <td class="value">{{ $requestor ?? ($request->requestor ?? '—') }}</td>
+            <td class="value">{{ $requestor ?? $request->requester?->name ?? $request->requestor ?? '—' }}</td>
           </tr>
           <tr>
             <td class="label">Service</td>

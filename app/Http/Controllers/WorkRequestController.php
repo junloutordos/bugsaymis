@@ -42,11 +42,17 @@ class WorkRequestController extends Controller
             $roleName = null;
         }
 
-        if (in_array($roleName, ['Staff', 'Faculty']) && $user) {
+        if ($roleName === 'DivisionChief' && $user) {
+            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+            $userIds = User::whereIn('division_id', $divisionIds)->pluck('id');
+            $query->whereIn('requester_id', $userIds);
+        } elseif (in_array($roleName, ['Staff', 'Faculty']) && $user) {
             $query->where('requester_id', $user->id);
         }
 
         $workRequests = $query->get();
+
+        $isDivisionChief = ($roleName === 'DivisionChief');
 
         return Inertia::render('GeneralServices/WorkRequest', [
             'divisions' => $divisions,
@@ -54,6 +60,7 @@ class WorkRequestController extends Controller
             'users' => $users,
             'skilledUsers' => $skilledUsers,
             'workRequests' => $workRequests,
+            'isDivisionChief' => $isDivisionChief,
         ]);
     }
 
@@ -126,6 +133,59 @@ class WorkRequestController extends Controller
         }
 
         return view('work_request_approved', ['facilityRequest' => $workRequest, 'already' => false]);
+    }
+
+    // Authenticated in-app approval by logged-in Division Chief
+    public function approveInApp(Request $request, WorkRequest $workRequest)
+    {
+        $user = $request->user();
+        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+
+        if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
+        if (in_array($workRequest->status, ['Approved','Division Approved'])) return back()->with('success', 'Already processed');
+
+        $workRequest->status = 'Division Approved';
+        $workRequest->save();
+
+        try {
+            $gsuHeads = User::whereHas('role', function($q){ $q->where('name', 'like', '%GSU Head%'); })->get();
+            foreach ($gsuHeads as $gsu) {
+                if ($gsu->email) {
+                    Mail::to($gsu->email)->send(new WorkRequestForAssignmentMail($workRequest, $user->id));
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send GSU Head notification', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Work request approved for assignment.');
+    }
+
+    public function declineInApp(Request $request, WorkRequest $workRequest)
+    {
+        $user = $request->user();
+        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+        if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
+
+        $data = $request->validate(['reason' => 'required|string|max:1000']);
+
+        if (in_array($workRequest->status, ['Approved','Declined'])) return back()->with('success', 'Already processed');
+
+        $workRequest->status = 'Declined';
+        $workRequest->decline_reason = $data['reason'] ?? null;
+        $workRequest->declined_at = now();
+        $workRequest->save();
+
+        try {
+            $requester = $workRequest->requester;
+            if ($requester && $requester->email) {
+                Mail::to($requester->email)->send(new WorkRequestStatusMail($workRequest, 'Declined'));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send work request declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Work request declined.');
     }
 
     /**

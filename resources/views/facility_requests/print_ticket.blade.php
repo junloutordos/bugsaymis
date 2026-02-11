@@ -93,11 +93,11 @@
     <div class="section">
         <div class="row">
             <div class="label">Name of Requestor</div>
-            <div class="value">{{ $request->requestor }}</div>
+            <div class="value">{{ $request->requester?->name ?? $request->requestor ?? '—' }}</div>
         </div>
         <div class="row">
             <div class="label">Club / Organization / Division / Unit</div>
-            <div class="value">{{ $request->unit ?? '—' }}</div>
+            <div class="value">{{ $request->requester?->division?->division_name ?? $request->unit ?? '—' }}</div>
         </div>
         <div class="row">
             <div class="label">Activity</div>
@@ -209,10 +209,10 @@
 
     <div class="signatures">
         @php
-            // Requestor signature: try to find a user with same name and use their electronic_signature if available
+            // Requestor signature: prefer requester relation electronic_signature, fallback to matching user by name
             $reqSig = null;
             try {
-                $reqUser = \App\Models\User::where('name', $request->requestor)->first();
+                $reqUser = $request->requester ?? \App\Models\User::where('name', $request->requestor)->first();
                 if ($reqUser && !empty($reqUser->electronic_signature)) {
                     $reqSig = $reqUser->electronic_signature;
                 }
@@ -220,21 +220,18 @@
                 $reqSig = null;
             }
 
-            // Division chief signature: prefer user electronic_signature, then Division.signature_path (by chief id or by unit name)
+            // Division chief signature: resolve via requester->division, or fallback to matching unit name
             $dcName = null;
             $dcSig = null;
             try {
-                if (!empty($request->division_chief_id)) {
-                    $dc = \App\Models\User::find($request->division_chief_id);
-                    $dcName = $dc->name ?? null;
+                $reqDiv = $request->requester?->division ?? null;
+                if ($reqDiv) {
+                    $dc = $reqDiv->divisionchief ?? null;
+                    $dcName = $dc->name ?? $reqDiv->division_name ?? null;
                     if ($dc && !empty($dc->electronic_signature)) {
                         $dcSig = $dc->electronic_signature;
-                    } else {
-                        // try to find Division record for this chief
-                        $divByChief = \App\Models\Division::where('division_chief_id', $request->division_chief_id)->first();
-                        if ($divByChief && !empty($divByChief->signature_path)) {
-                            $dcSig = $divByChief->signature_path;
-                        }
+                    } elseif (!empty($reqDiv->signature_path)) {
+                        $dcSig = $reqDiv->signature_path;
                     }
                 } elseif (!empty($request->unit)) {
                     // fallback: try to match request unit to Division and use its signature
@@ -287,7 +284,7 @@
             @endif
             <div class="line"></div>
 
-            <div class="small"><strong>{{ $request->requestor ?? '—' }}</strong></div>
+            <div class="small"><strong>{{ $request->requester?->name ?? $request->requestor ?? '—' }}</strong></div>
             Requestor
         </div>
 

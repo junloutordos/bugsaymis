@@ -589,22 +589,22 @@ const isStaff = String(roleName).toLowerCase() === 'staff';
                 <td class="px-3 py-2"><span :class="statusBadge(c.status)">{{ c.status }}</span></td>
                 <td class="px-3 py-2">
                   <div class="flex gap-2">
-                    <button @click.prevent="openView(c)" class="p-2 bg-gray-100 text-gray-700 rounded" aria-label="View">
+                    <button @click.prevent="openView(c)" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" aria-label="View">
                       <EyeIcon class="h-5 w-5" />
                     </button>
-                    <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="p-2 bg-white text-gray-700 rounded" aria-label="Print">
+                    <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="p-2 rounded-full bg-white text-gray-700" aria-label="Print">
                       <PrinterIcon class="h-5 w-5" />
                     </a>
-                    <button v-if="String(c.status).toLowerCase() === 'completed' && ['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name)" @click.prevent="openVitalsFor(c)" class="p-2 bg-yellow-100 text-yellow-700 rounded" aria-label="Edit Vitals">
+                    <button v-if="String(c.status).toLowerCase() === 'completed' && ['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name)" @click.prevent="openVitalsFor(c)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700" aria-label="Edit Vitals">
                       <PencilIcon class="h-5 w-5" />
                     </button>
-                    <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" class="p-2 bg-red-100 text-red-700 rounded" aria-label="Delete">
+                    <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" aria-label="Delete">
                       <TrashIcon class="h-5 w-5" />
                     </button>
-                    <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="p-2 bg-indigo-100 text-indigo-700 rounded" aria-label="Schedule">
+                    <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" aria-label="Schedule">
                       <ClockIcon class="h-5 w-5" />
                     </button>
-                    <button type="button" v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && ['active','scheduled'].includes(String(c.status).toLowerCase())" @click="openVitalsFor(c)" class="p-2 bg-green-100 text-green-700 rounded" aria-label="Record Vitals">
+                    <button type="button" v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && ['active','scheduled'].includes(String(c.status).toLowerCase())" @click="openVitalsFor(c)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" aria-label="Record Vitals">
                       <HeartIcon class="h-5 w-5" />
                     </button>
                   </div>

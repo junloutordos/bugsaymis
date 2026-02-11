@@ -159,8 +159,8 @@
                 @php
                     $reqSig = null;
                     try {
-                        $reqUser = null;
-                        if (!empty($request->requestor_id)) {
+                        $reqUser = $request->requester ?? null;
+                        if (! $reqUser && !empty($request->requestor_id)) {
                             $reqUser = \App\Models\User::find($request->requestor_id);
                         }
                         if (! $reqUser && ! empty($request->requestor)) {
@@ -176,7 +176,7 @@
                 @else
                     <div class="line mt-30"></div>
                 @endif
-                <div class="mt-10"><strong>{{ $request->requestor ?? ($request->requestor_id ? optional(\App\Models\User::find($request->requestor_id))->name : '—') }}</strong></div>
+                <div class="mt-10"><strong>{{ $request->requester?->name ?? $request->requestor ?? ($request->requestor_id ? optional(\App\Models\User::find($request->requestor_id))->name : '—') }}</strong></div>
             <div class="mt-10">Name & Signature of Requisitioner</div>
             <div class="mt-10">
                 Position: <span class="line">{{ $reqUser->position }}</span>
@@ -190,7 +190,10 @@
                 $dcName = null;
                 try {
                     $dcUser = null;
-                    if (!empty($request->division_chief_id)) {
+                    if (!empty($request->requester) && $request->requester->division && $request->requester->division->divisionchief) {
+                        $dcUser = $request->requester->division->divisionchief;
+                    }
+                    if (! $dcUser && !empty($request->division_chief_id)) {
                         $dcUser = \App\Models\User::find($request->division_chief_id);
                     }
                     if (! $dcUser && ! empty($request->unit)) {

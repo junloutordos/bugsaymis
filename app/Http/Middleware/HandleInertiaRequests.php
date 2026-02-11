@@ -62,15 +62,60 @@ class HandleInertiaRequests extends Middleware
             // Number of IT job requests with status containing 'Pending'
             'itJobRequestsNotificationCount' => fn () => ITJobRequest::where('status', 'like', '%Pending%')->count(),
             // Number of vehicle requests with status = 'Pending'
-            'vehicleRequestsNotificationCount' => fn () => VehicleRequest::where('status', 'Pending')->count(),
+            'vehicleRequestsNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                $role = $user?->role->name ?? '';
+                // DivisionChief: pending requests in their division
+                if ($user && $role === 'DivisionChief') {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                    return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                }
+                // GSU Head: show count of approved vehicle requests
+                if ($user && $role === 'GSU Head') {
+                    return VehicleRequest::where('status', 'Approved')->count();
+                }
+                // default: pending requests
+                return VehicleRequest::where('status', 'Pending')->count();
+            },
             // Number of messengerial requests with status = 'Pending'
             'messengerialRequestsNotificationCount' => fn () => MessengerialRequest::where('status', 'Pending')->count(),
             // Number of facility requests with status = 'Pending'
-            'facilityRequestsNotificationCount' => fn () => FacilityRequest::where('status', 'Pending')->count(),
+            'facilityRequestsNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
+                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
+                    return FacilityRequest::where('status', 'Pending')
+                        ->where(function($q) use ($userIds, $divisionIds) {
+                            $q->whereIn('requestor_id', $userIds)
+                              ->orWhereHas('requester', function($q2) use ($divisionIds) {
+                                  $q2->whereIn('division_id', $divisionIds);
+                              });
+                        })->count();
+                }
+                return FacilityRequest::where('status', 'Pending')->count();
+            },
             // Number of service requests with status = 'Pending'
-            'serviceRequestsNotificationCount' => fn () => ServiceRequest::where('status', 'Pending')->count(),
+            'serviceRequestsNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                    return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                }
+                return ServiceRequest::where('status', 'Pending')->count();
+            },
             // Number of work requests with status = 'Pending'
-            'workRequestsNotificationCount' => fn () => WorkRequest::where('status', 'Pending')->count(),
+            'workRequestsNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                    return WorkRequest::where('status', 'Pending')->whereIn('requester_id', $userIds)->count();
+                }
+                return WorkRequest::where('status', 'Pending')->count();
+            },
             // Number of borrowings that are overdue (due_date before today and not yet returned)
             'borrowingsOverdueCount' => fn () => Borrowing::whereNull('return_date')->whereNotNull('due_date')->whereDate('due_date', '<', Carbon::today())->count(),
         ]);

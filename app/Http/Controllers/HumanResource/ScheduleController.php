@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Schedule;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class ScheduleController extends Controller
 {
@@ -56,6 +57,11 @@ class ScheduleController extends Controller
         ]);
 
         $data['badgeNumber'] = $user->badge_id ?? null;
+
+        // prevent multiple schedules for the same badgeNumber
+        if ($data['badgeNumber'] && Schedule::where('badgeNumber', $data['badgeNumber'])->exists()) {
+            throw ValidationException::withMessages(['badgeNumber' => ['A schedule for this badge number already exists.']]);
+        }
 
         Schedule::create($data);
 

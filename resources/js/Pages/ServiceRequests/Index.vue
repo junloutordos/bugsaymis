@@ -3,7 +3,7 @@ import { Head, useForm, router, usePage } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 
 const props = defineProps({ requests: Object });
 const page = usePage();
@@ -134,6 +134,26 @@ const remove = (id) => {
   })
 };
 
+const approveRequest = (r) => {
+  Swal.fire({ title: 'Approve this request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
+    if (!res.isConfirmed) return;
+    router.post(route('service-requests.approve.inapp', r.id), {}, {
+      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to approve' }) }
+    })
+  })
+}
+
+const declineRequest = (r) => {
+  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
+    if (!res.isConfirmed || !res.value) return;
+    router.post(route('service-requests.decline.inapp', r.id), { reason: res.value }, {
+      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to decline' }) }
+    })
+  })
+}
+
 const statusClass = (s) => {
   if (!s) return 'bg-gray-100 text-gray-800';
   const st = String(s).toLowerCase();
@@ -170,6 +190,7 @@ const canPrint = (r) => {
               <div>
                 <div class="text-sm text-gray-500">Request #{{ r.id }}</div>
                 <div class="font-semibold text-gray-800">{{ r.service_type ?? '—' }}</div>
+                <div v-if="['Administrator','GSU Head','DivisionChief'].includes(roleName)" class="text-sm text-gray-600">Requestor: {{ r.requester?.name ?? '—' }}</div>
                 <div class="text-sm text-gray-600">{{ r.purposes ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
@@ -184,9 +205,11 @@ const canPrint = (r) => {
             </div>
 
               <div class="mt-3 flex items-center gap-2">
-              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"><PencilSquareIcon class="w-4 h-4"/> Edit</button>
-              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"><TrashIcon class="w-4 h-4"/></button>
-              <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md"><PrinterIcon class="w-4 h-4"/></a>
+              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 inline-flex items-center justify-center gap-2"><PencilSquareIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 inline-flex items-center gap-2"><TrashIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="approveRequest(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700 inline-flex items-center gap-2" title="Approve"><CheckIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="declineRequest(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 inline-flex items-center gap-2" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
+              <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-green-700 inline-flex items-center gap-2" title="Print"><PrinterIcon class="w-4 h-4"/></a>
             </div>
           </div>
 
@@ -215,6 +238,7 @@ const canPrint = (r) => {
               <tr>
                 <th class="px-4 py-2">#</th>
                 <th class="px-4 py-2">Service</th>
+                <th v-if="['Administrator','GSU Head','DivisionChief'].includes(roleName)" class="px-4 py-2">Requestor</th>
                 <th class="px-4 py-2">Date Needed</th>
                 <th class="px-4 py-2">Time Needed</th>
                 <th class="px-4 py-2">Purpose(s)</th>
@@ -226,6 +250,7 @@ const canPrint = (r) => {
               <tr v-for="r in filteredRequests" :key="r.id">
                 <td class="px-4 py-2">{{ r.id }}</td>
                 <td class="px-4 py-2">{{ r.service_type }} <div v-if="r.service_type==='Reproduction'" class="text-xs text-gray-600">{{ r.copies }} copies × {{ r.sheets_per_set }} sheets</div></td>
+                <td v-if="['Administrator','GSU Head','DivisionChief'].includes(roleName)" class="px-4 py-2">{{ r.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-2">{{ r.date_needed }}</td>
                 <td class="px-4 py-2">{{ r.time_needed || '—' }}</td>
                 <td class="px-4 py-2">{{ r.purposes || '—' }}</td>
@@ -234,19 +259,21 @@ const canPrint = (r) => {
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="text-blue-600 hover:text-blue-800 p-1 rounded">
+                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
                       <PencilSquareIcon class="w-5 h-5" />
                     </button>
-                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="text-red-600 hover:text-red-800 p-1 rounded">
+                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
                       <TrashIcon class="w-5 h-5" />
                     </button>
-                    <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-2 rounded-full bg-gray-200 hover:bg-gray-200 text-green-700" title="Print">
+                    <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="approveRequest(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="declineRequest(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
+                    <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="Print">
                       <PrinterIcon class="w-5 h-5" />
                     </a>
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredRequests.length === 0"><td :colspan="7" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
+              <tr v-if="filteredRequests.length === 0"><td :colspan="(['Administrator','GSU Head','DivisionChief'].includes(roleName) ? 8 : 7)" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
             </tbody>
           </table>
         </div>

@@ -26,10 +26,10 @@
                   <td class="px-3 py-2">{{ s.time_end }}</td>
                   <td class="px-3 py-2">
                     <div class="flex gap-2">
-                      <button @click.prevent="openEdit(s)" class="p-2 bg-indigo-100 text-indigo-700 rounded" aria-label="Edit" title="Edit">
+                      <button @click.prevent="openEdit(s)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" aria-label="Edit" title="Edit">
                         <PencilSquareIcon class="h-4 w-4" />
                       </button>
-                      <button @click.prevent="confirmDelete(s)" class="p-2 bg-red-100 text-red-700 rounded" aria-label="Delete" title="Delete">
+                      <button @click.prevent="confirmDelete(s)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" aria-label="Delete" title="Delete">
                         <TrashIcon class="h-4 w-4" />
                       </button>
                     </div>

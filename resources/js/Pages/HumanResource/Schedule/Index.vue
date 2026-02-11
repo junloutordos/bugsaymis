@@ -5,7 +5,9 @@
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold">Schedule</h1>
         <div class="flex items-center gap-2">
-          <button v-if="canCreate" @click="openCreate" class="bg-blue-600 text-white px-4 py-2 rounded">New</button>
+          <button v-if="canCreate" @click="openCreate" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center">
+            <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Schedule
+          </button>
         </div>
       </div>
 
@@ -41,10 +43,14 @@
                   <td class="px-3 py-2">{{ displayDay(s.sat_timein, s.sat_timeout) }}</td>
                   <td class="px-3 py-2">{{ displayDay(s.sun_timein, s.sun_timeout) }}</td>
                   <td class="px-3 py-2">
-                    <div class="flex gap-2">
-                      <button v-if="isAdmin" @click.prevent="openEdit(s)" class="p-2 bg-indigo-100 text-indigo-700 rounded" aria-label="Edit" title="Edit">Edit</button>
-                      <button v-if="isAdmin" @click.prevent="confirmDelete(s)" class="p-2 bg-red-100 text-red-700 rounded" aria-label="Delete" title="Delete">Delete</button>
-                    </div>
+                      <div class="flex gap-2">
+                        <button v-if="isAdmin" @click.prevent="openEdit(s)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" aria-label="Edit" title="Edit">
+                          <PencilSquareIcon class="w-5 h-5" />
+                        </button>
+                        <button v-if="isAdmin" @click.prevent="confirmDelete(s)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" aria-label="Delete" title="Delete">
+                          <TrashIcon class="w-5 h-5" />
+                        </button>
+                      </div>
                   </td>
                 </tr>
                 <tr v-if="(schedules.data || []).length === 0"><td colspan="10" class="px-3 py-6 text-center text-gray-500">No schedules found.</td></tr>
@@ -143,6 +149,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { Head, useForm, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
+import { PencilSquareIcon, TrashIcon, PlusIcon } from '@heroicons/vue/24/outline'
 
 const page = usePage()
 const props = defineProps({ schedules: Object, q: String })
@@ -190,11 +197,21 @@ function closeModal() { showModal.value = false }
 function submit() {
   if (editing.value && current.value) {
     form.put(route('schedules.update', current.value.id), {
-      onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Schedule updated' }).then(()=>{ router.get(route('schedules.index'), { q: q.value }, { replace: true }) }) }
+      onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Schedule updated' }).then(()=>{ router.get(route('schedules.index'), { q: q.value }, { replace: true }) }) },
+      onError: (errors) => {
+        let text = Object.values(errors || {}).flat().join('\n')
+        if (errors && errors.badgeNumber) text = (Array.isArray(errors.badgeNumber) ? errors.badgeNumber.join('\n') : errors.badgeNumber)
+        Swal.fire({ icon: 'error', title: 'Failed to update', text })
+      }
     })
   } else {
     form.post(route('schedules.store'), {
-      onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Schedule created' }).then(()=>{ router.get(route('schedules.index'), { q: q.value }, { replace: true }) }) }
+      onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Schedule created' }).then(()=>{ router.get(route('schedules.index'), { q: q.value }, { replace: true }) }) },
+      onError: (errors) => {
+        let text = Object.values(errors || {}).flat().join('\n')
+        if (errors && errors.badgeNumber) text = (Array.isArray(errors.badgeNumber) ? errors.badgeNumber.join('\n') : errors.badgeNumber)
+        Swal.fire({ icon: 'error', title: 'Failed to create', text })
+      }
     })
   }
 }

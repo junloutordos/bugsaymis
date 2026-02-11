@@ -29,11 +29,11 @@
                 <td class="px-4 py-2 text-center">{{ c.student_borrowing_days ?? '—' }}</td>
                 <td class="px-4 py-2 text-center">{{ c.employee_borrowing_days ?? '—' }}</td>
                 <td class="px-4 py-2">
-                  <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit" aria-label="Edit category">
-                    <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                  <button @click="openEdit(c)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit" aria-label="Edit category">
+                    <PencilSquareIcon class="w-5 h-5" />
                   </button>
-                  <button @click="confirmDelete(c)" class="p-1 hover:bg-gray-100 rounded ml-2" title="Delete" aria-label="Delete category">
-                    <TrashIcon class="w-5 h-5 text-red-600" />
+                  <button @click="confirmDelete(c)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 ml-2" title="Delete" aria-label="Delete category">
+                    <TrashIcon class="w-5 h-5" />
                   </button>
                 </td>
               </tr>
