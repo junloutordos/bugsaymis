@@ -20,16 +20,28 @@ class FacilityRequestController extends Controller
     {
         $user = $request->user();
         $role = $user->role->name ?? '';
+
         $canViewAll = in_array($role, ['Administrator', 'GSU Head']);
 
-        $requests = FacilityRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email))
-            ->latest()
-            ->get();
+        $requestsQuery = FacilityRequest::latest();
+
+        if ($role === 'DivisionChief') {
+            // Only include requests where the requester's division is led by this Division Chief.
+            // FacilityRequest stores requester `email`, so use the `requester` relation then join to `division`.
+            $requestsQuery->whereHas('requester', function ($q) use ($user) {
+                $q->whereHas('division', function ($q2) use ($user) {
+                    $q2->where('division_chief_id', $user->id);
+                });
+            });
+        } elseif (! $canViewAll) {
+            $requestsQuery->where('requestor_id', $user->id);
+        }
+
+        // eager-load requester and its division so frontend can display requestor name/unit
+        $requests = $requestsQuery->with('requester.division')->get();
 
         // also provide facilities list for venue selection
         $facilities = \App\Models\Facility::orderBy('name')->get(['id','name']);
-
-        // map venue IDs to facility names for display
         $facilityMap = $facilities->pluck('name', 'id')->toArray();
         $requests = $requests->map(function ($r) use ($facilityMap) {
             $arr = $r->venue ?? [];
@@ -48,10 +60,13 @@ class FacilityRequestController extends Controller
         // Select users whose position contains the phrase 'MIS Staff'
         $misUsers = User::whereRaw('position LIKE ?', ['%MIS Staff%'])->select('id','name','position')->orderBy('name')->get();
 
+        $isDivisionChief = ($role === 'DivisionChief');
+
         return Inertia::render('FacilityRequests/Index', [
             'requests' => $requests,
             'facilities' => $facilities,
             'misUsers' => $misUsers,
+            'isDivisionChief' => $isDivisionChief,
         ]);
     }
 
@@ -80,22 +95,22 @@ class FacilityRequestController extends Controller
         ]);
 
         $data = $request->only([
-            'unit','activity','purpose','nature',
+            'activity','purpose','nature',
             'date_start','date_end','time_start','time_end',
             'male','female','venue','chairs','tables','mic','whiteboard','projector','elecfans','aircon','trashbins','equipment','equipment_quantities',
-            'others','remarks','email','participants','reference_no'
+            'others','remarks','participants','reference_no'
         ]);
 
-        // set requestor and email from authenticated user
+        // set requestor and email from authenticated user (do not persist legacy `unit` column)
         $user = $request->user();
+        $unit = null;
         if ($user) {
-            $data['requestor'] = $user->name;
-            $data['email'] = $user->email;
-            // set unit from user's division name if available
+            $data['requestor_id'] = $user->id;
+            // resolve unit from user's division name if available (used only for fallback)
             if (method_exists($user, 'division') && $user->division) {
-                $data['unit'] = $user->division->division_name ?? $user->office ?? null;
+                $unit = $user->division->division_name ?? $user->office ?? null;
             } else {
-                $data['unit'] = $user->office ?? null;
+                $unit = $user->office ?? null;
             }
         }
 
@@ -188,7 +203,8 @@ class FacilityRequestController extends Controller
                         $divisionChiefId = $user->division->divisionchief->id;
                     } else {
                         // fallback: try Division table match
-                        $div = \App\Models\Division::where('division_name', $fr->unit)->first();
+                        $reqUnit = $fr->requester?->division?->division_name ?? $fr->unit ?? null;
+                        $div = $reqUnit ? \App\Models\Division::where('division_name', $reqUnit)->first() : null;
                         if ($div && $div->division_chief_id) $divisionChiefId = $div->division_chief_id;
                     }
 
@@ -278,8 +294,8 @@ class FacilityRequestController extends Controller
         }
 
         // fallback: try to find by matching unit name to divisions table
-        if (! $chiefEmail && ! empty($data['unit'])) {
-            $div = Division::where('division_name', $data['unit'])->first();
+        if (! $chiefEmail && ! empty($unit)) {
+            $div = Division::where('division_name', $unit)->first();
             if ($div && $div->division_chief_id) {
                 $dcUser = User::find($div->division_chief_id);
                 if ($dcUser && $dcUser->email) {
@@ -290,11 +306,7 @@ class FacilityRequestController extends Controller
         }
 
         if ($chiefEmail) {
-            // persist division_chief_id on the request so signed links can validate
-            if ($chiefUser) {
-                $fr->division_chief_id = $chiefUser->id;
-                $fr->save();
-            }
+            // Do not persist division_chief_id on the request; it can be resolved via requester->division
             try {
                 // create signed approve/decline links (valid 7 days)
                 $approveUrl = $chiefUser ? URL::signedRoute('facility-requests.approve', ['facilityRequest' => $fr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : route('facility-requests.index');
@@ -323,7 +335,8 @@ class FacilityRequestController extends Controller
     public function approveByDivisionChief(Request $request, FacilityRequest $facilityRequest, $chief)
     {
         // Signed middleware ensures URL integrity. Verify the chief in the link matches the assigned approver when present.
-        if ($facilityRequest->division_chief_id && (int) $facilityRequest->division_chief_id !== (int) $chief) {
+        $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
         if ($facilityRequest->status === 'Approved') {
@@ -335,13 +348,13 @@ class FacilityRequestController extends Controller
 
         // Notify requester via email (approved by Division Chief)
         try {
-            $requesterEmail = $facilityRequest->email ?? null;
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = null;
             if ($chief) {
                 $u = \App\Models\User::find($chief);
                 $approverName = $u?->name ?? null;
-            } elseif ($facilityRequest->division_chief_id) {
-                $u = \App\Models\User::find($facilityRequest->division_chief_id);
+            } elseif ($assignedChiefId) {
+                $u = \App\Models\User::find($assignedChiefId);
                 $approverName = $u?->name ?? null;
             }
 
@@ -352,30 +365,143 @@ class FacilityRequestController extends Controller
             logger()->error('Failed to send facility request approved notification', ['error' => $e->getMessage()]);
         }
 
-        // Notify GSU Head users with signed approve/decline links (replacing previous OCD recipients)
+        // Notify FAD Chief users with signed approve/decline links (Division Chief approved -> FAD reviews)
         try {
-            $gsuUsers = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
-            foreach ($gsuUsers as $gsuUser) {
-                if ($gsuUser->email) {
-                    try {
-                        $approveUrl = URL::signedRoute('facility-requests.gsu.approve', ['facilityRequest' => $facilityRequest->id, 'gsu' => $gsuUser->id], now()->addDays(7));
-                        $declineUrl = URL::signedRoute('facility-requests.gsu.decline', ['facilityRequest' => $facilityRequest->id, 'gsu' => $gsuUser->id], now()->addDays(7));
-                        \Mail::to($gsuUser->email)->send(new \App\Mail\FacilityRequestGSUMail($facilityRequest, $approveUrl, $declineUrl));
-                    } catch (\Throwable $e) {
-                        logger()->error('Failed to send facility request GSU notification', ['error' => $e->getMessage(), 'email' => $gsuUser->email]);
-                    }
+            $fadUsers = \App\Models\User::select('id','email','position')
+                        ->where('position', 'like', '%FAD%')
+                        ->get();
+            foreach ($fadUsers as $fad) {
+                if (! $fad->email) continue;
+                try {
+                    $approveUrl = URL::signedRoute('facility-requests.fad.approve', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('facility-requests.fad.decline', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    \Mail::to($fad->email)->send(new \App\Mail\FacilityRequestFADMail($facilityRequest, $approveUrl, $declineUrl));
+                } catch (\Throwable $e) {
+                    logger()->error('Failed to send facility request FAD notification', ['error' => $e->getMessage(), 'email' => $fad->email]);
                 }
             }
         } catch (\Throwable $e) {
-            logger()->error('Failed to queue GSU notifications for facility request', ['error' => $e->getMessage()]);
+            logger()->error('Failed to queue FAD notifications for facility request', ['error' => $e->getMessage()]);
         }
 
         return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => false]);
     }
 
+    // Authenticated in-app approval by logged-in Division Chief
+    public function approveInApp(Request $request, FacilityRequest $facilityRequest)
+    {
+        $user = $request->user();
+        $roleName = strtolower($user->role->name ?? '');
+        $isDivisionChiefRole = in_array($roleName, ['divisionchief', 'division chief']) || (str_contains($roleName, 'division') && str_contains($roleName, 'chief'));
+        if (! $user || ! $isDivisionChiefRole) {
+            logger()->warning('Blocked facility approve in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->role->name ?? null, 'facility_request_id' => $facilityRequest->id]);
+            abort(403);
+        }
+
+        $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $user->id) {
+            // allow if user is division chief for the unit of the request (by division name or by membership)
+            $myDivisionNames = Division::where('division_chief_id', $user->id)->pluck('division_name')->map(fn($n) => (string)$n)->toArray();
+            $myDivisionIds = Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
+            $myDivisionEmails = User::whereIn('division_id', $myDivisionIds)->pluck('email')->toArray();
+
+            $frUnit = $facilityRequest->requester?->division?->division_name ?? $facilityRequest->unit ?? null;
+            $unitMatches = $frUnit && in_array($frUnit, $myDivisionNames);
+            $emailMatches = $facilityRequest->requester?->email && in_array($facilityRequest->requester?->email, $myDivisionEmails);
+
+            if (! $unitMatches && ! $emailMatches) {
+                logger()->warning('Blocked facility approve in-app: division chief id mismatch', ['user_id' => $user->id, 'assigned_division_chief_id' => $assignedChiefId, 'facility_request_unit' => $frUnit ?? $facilityRequest->unit, 'facility_request_email' => $facilityRequest->requester?->email, 'facility_request_id' => $facilityRequest->id]);
+                abort(403);
+            }
+        }
+        if ($facilityRequest->status === 'Approved') return back()->with('success', 'Already approved');
+
+        $facilityRequest->status = 'Approved';
+        $facilityRequest->save();
+
+        try {
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
+            $approverName = $user->name ?? null;
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send facility request approved notification', ['error' => $e->getMessage()]);
+        }
+
+        // Notify FAD Chief users for next-level approval/decline
+        try {
+            $fadUsers = \App\Models\User::select('id','email','position')
+                        ->where('position', 'like', '%FAD%')
+                        ->get();
+            foreach ($fadUsers as $fad) {
+                if (! $fad->email) continue;
+                try {
+                    $approveUrl = URL::signedRoute('facility-requests.fad.approve', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('facility-requests.fad.decline', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    \Mail::to($fad->email)->send(new \App\Mail\FacilityRequestFADMail($facilityRequest, $approveUrl, $declineUrl));
+                } catch (\Throwable $e) {
+                    logger()->error('Failed to send facility request FAD notification (in-app)', ['error' => $e->getMessage(), 'email' => $fad->email]);
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to queue FAD notifications for facility request (in-app)', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Facility request approved. FAD has been notified.');
+    }
+
+    public function declineInApp(Request $request, FacilityRequest $facilityRequest)
+    {
+        $user = $request->user();
+        $roleName = strtolower($user->role->name ?? '');
+        $isDivisionChiefRole = in_array($roleName, ['divisionchief', 'division chief']) || (str_contains($roleName, 'division') && str_contains($roleName, 'chief'));
+        if (! $user || ! $isDivisionChiefRole) {
+            logger()->warning('Blocked facility decline in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->role->name ?? null, 'facility_request_id' => $facilityRequest->id]);
+            abort(403);
+        }
+        $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $user->id) {
+            $myDivisionNames = Division::where('division_chief_id', $user->id)->pluck('division_name')->map(fn($n) => (string)$n)->toArray();
+            $myDivisionIds = Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
+            $myDivisionEmails = User::whereIn('division_id', $myDivisionIds)->pluck('email')->toArray();
+
+            $frUnit = $facilityRequest->requester?->division?->division_name ?? $facilityRequest->unit ?? null;
+            $unitMatches = $frUnit && in_array($frUnit, $myDivisionNames);
+            $emailMatches = $facilityRequest->requester?->email && in_array($facilityRequest->requester?->email, $myDivisionEmails);
+
+            if (! $unitMatches && ! $emailMatches) {
+                logger()->warning('Blocked facility decline in-app: division chief id mismatch', ['user_id' => $user->id, 'assigned_division_chief_id' => $assignedChiefId, 'facility_request_unit' => $frUnit ?? $facilityRequest->unit, 'facility_request_email' => $facilityRequest->requester?->email, 'facility_request_id' => $facilityRequest->id]);
+                abort(403);
+            }
+        }
+
+        $data = $request->validate(['reason' => 'required|string|max:1000']);
+
+        if (in_array($facilityRequest->status, ['Approved','Declined'])) return back()->with('success', 'Already processed');
+
+        $facilityRequest->status = 'Declined';
+        $facilityRequest->decline_reason = $data['reason'];
+        $facilityRequest->declined_at = now();
+        $facilityRequest->save();
+
+        try {
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
+            $approverName = $user->name ?? null;
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send facility request declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Facility request declined.');
+    }
+
     public function showDeclineForm(Request $request, FacilityRequest $facilityRequest, $chief)
     {
-        if ($facilityRequest->division_chief_id && (int) $facilityRequest->division_chief_id !== (int) $chief) {
+        $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
 
@@ -391,7 +517,8 @@ class FacilityRequestController extends Controller
 
     public function submitDecline(Request $request, FacilityRequest $facilityRequest, $chief)
     {
-        if ($facilityRequest->division_chief_id && (int) $facilityRequest->division_chief_id !== (int) $chief) {
+        $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
 
@@ -411,13 +538,13 @@ class FacilityRequestController extends Controller
 
         // Notify requester via email (declined by Division Chief)
         try {
-            $requesterEmail = $facilityRequest->email ?? null;
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = null;
             if ($chief) {
                 $u = \App\Models\User::find($chief);
                 $approverName = $u?->name ?? null;
-            } elseif ($facilityRequest->division_chief_id) {
-                $u = \App\Models\User::find($facilityRequest->division_chief_id);
+            } elseif ($facilityRequest->requester?->division?->division_chief_id) {
+                $u = \App\Models\User::find($facilityRequest->requester?->division?->division_chief_id);
                 $approverName = $u?->name ?? null;
             }
 
@@ -445,7 +572,7 @@ class FacilityRequestController extends Controller
 
         // Notify requester
         try {
-            $requesterEmail = $facilityRequest->email ?? null;
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = null;
             if ($ocd) {
                 $u = \App\Models\User::find($ocd);
@@ -478,7 +605,7 @@ class FacilityRequestController extends Controller
 
         // Notify requester
         try {
-            $requesterEmail = $facilityRequest->email ?? null;
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = null;
             if ($gsu) {
                 $u = \App\Models\User::find($gsu);
@@ -527,7 +654,7 @@ class FacilityRequestController extends Controller
 
         // Notify requester
         try {
-            $requesterEmail = $facilityRequest->email ?? null;
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = null;
             if ($gsu) {
                 $u = \App\Models\User::find($gsu);
@@ -541,6 +668,87 @@ class FacilityRequestController extends Controller
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request GSU declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $facilityRequest->decline_reason]);
+    }
+
+    /**
+     * Approve facility request by FAD Chief via signed link
+     */
+    public function approveByFAD(Request $request, FacilityRequest $facilityRequest, $chief)
+    {
+        if ($facilityRequest->status === 'FAD Approved') {
+            return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
+        }
+
+        $facilityRequest->status = 'FAD Approved';
+        $facilityRequest->save();
+
+        // Notify requester that FAD approved
+        try {
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
+            $approverName = null;
+            if ($chief) {
+                $u = \App\Models\User::find($chief);
+                $approverName = $u?->name ?? 'FAD Chief';
+            } else {
+                $approverName = 'FAD Chief';
+            }
+
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'FAD Approved', null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send facility request FAD approved notification', ['error' => $e->getMessage()]);
+        }
+
+        return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => false]);
+    }
+
+    public function showFadDeclineForm(Request $request, FacilityRequest $facilityRequest, $chief)
+    {
+        if ($facilityRequest->status === 'FAD Approved') {
+            return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
+        }
+
+        $postAction = route('facility-requests.fad.decline.submit', ['facilityRequest' => $facilityRequest->id, 'chief' => $chief])
+            . '?' . $request->getQueryString();
+
+        return view('facility_request_decline', ['facilityRequest' => $facilityRequest, 'postAction' => $postAction]);
+    }
+
+    public function submitFadDecline(Request $request, FacilityRequest $facilityRequest, $chief)
+    {
+        $request->validate([
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        if (in_array($facilityRequest->status, ['Approved','Declined','FAD Approved','FAD Declined'])) {
+            $reason = $facilityRequest->decline_reason ?? '—';
+            return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $reason]);
+        }
+
+        $facilityRequest->status = 'FAD Declined';
+        $facilityRequest->decline_reason = $request->input('reason');
+        $facilityRequest->declined_at = now();
+        $facilityRequest->save();
+
+        try {
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
+            $approverName = null;
+            if ($chief) {
+                $u = \App\Models\User::find($chief);
+                $approverName = $u?->name ?? 'FAD Chief';
+            } else {
+                $approverName = 'FAD Chief';
+            }
+
+            if ($requesterEmail) {
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send facility request FAD declined notification', ['error' => $e->getMessage()]);
         }
 
         return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $facilityRequest->decline_reason]);
@@ -576,7 +784,7 @@ class FacilityRequestController extends Controller
 
         // Notify requester
         try {
-            $requesterEmail = $facilityRequest->email ?? null;
+            $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = null;
             if ($ocd) {
                 $u = \App\Models\User::find($ocd);
@@ -671,7 +879,8 @@ class FacilityRequestController extends Controller
             abort(403);
         }
 
-        if ($facilityRequest->status !== 'OCD Approved') {
+        // Allow printing when OCD has approved or when FAD has approved
+        if (! in_array($facilityRequest->status, ['OCD Approved', 'FAD Approved'])) {
             abort(403, 'Request not ready for printing');
         }
 

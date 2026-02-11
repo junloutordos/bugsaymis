@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
-import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 
@@ -20,7 +20,7 @@ const filteredRequests = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   const results = (requestsList.value || []).filter(req => {
     return (req.activity || '').toString().toLowerCase().includes(q) ||
-      (req.requestor || '').toString().toLowerCase().includes(q) ||
+      ((req.requester?.name ?? req.requestor) || '').toString().toLowerCase().includes(q) ||
       (req.unit || '').toString().toLowerCase().includes(q)
   })
   const start = (currentPage.value - 1) * perPage
@@ -30,7 +30,7 @@ const filteredRequests = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || []).filter(req => {
   const q = searchQuery.value.trim().toLowerCase()
   return (req.activity || '').toString().toLowerCase().includes(q) ||
-    (req.requestor || '').toString().toLowerCase().includes(q) ||
+    ((req.requester?.name ?? req.requestor) || '').toString().toLowerCase().includes(q) ||
     (req.unit || '').toString().toLowerCase().includes(q)
 }).length / perPage)))
 
@@ -156,8 +156,8 @@ const venueDisplay = (venue) => {
 const openModal = (req = null) => {
   if (req) {
     form.reset();
-    form.requestor = req.requestor;
-    form.unit = req.unit;
+    form.requestor = req.requester?.name ?? req.requestor;
+    form.unit = req.requester?.division?.division_name ?? req.unit;
     form.activity = req.activity;
     form.purpose = req.purpose;
     // parse stored nature: may contain "Others: detail"
@@ -212,6 +212,30 @@ const destroy = (req) => {
       router.delete(route('facility-requests.destroy', req.id), {
         onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
         onError: () => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
+      })
+    })
+  })
+}
+
+const approveRequest = (req) => {
+  Swal.fire({ title: 'Approve this facility request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
+    if (!res.isConfirmed) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.post(route('facility-requests.approve.inapp', req.id), {}, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to approve' }) }
+      })
+    })
+  })
+}
+
+const declineRequest = (req) => {
+  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
+    if (!res.isConfirmed || !res.value) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.post(route('facility-requests.decline.inapp', req.id), { reason: res.value }, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to decline' }) }
       })
     })
   })
@@ -324,8 +348,8 @@ const bookingsForDate = (dt) => {
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">#</th>
-                <th class="px-4 py-3 text-left whitespace-normal break-words">Requestor</th>
-                <th class="px-4 py-3 text-left whitespace-normal break-words">Unit</th>
+                <th v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left whitespace-normal break-words">Requestor</th>
+                <th v-if="!['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left whitespace-normal break-words">Unit</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Activity</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Date(s)</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Time(s)</th>
@@ -337,8 +361,8 @@ const bookingsForDate = (dt) => {
             <tbody class="divide-y divide-gray-200 text-sm">
               <tr v-for="req in filteredRequests" :key="req.id">
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.id }}</td>
-                <td class="px-4 py-3 whitespace-normal break-words">{{ req.requestor }}</td>
-                <td class="px-4 py-3 whitespace-normal break-words">{{ req.unit ?? '—' }}</td>
+                <td v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.name ?? req.requestor ?? '—' }}</td>
+                <td v-if="!['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.activity ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.date_start ? new Date(req.date_start).toLocaleDateString() : '—' }}
                   <span v-if="req.date_end"> — {{ new Date(req.date_end).toLocaleDateString() }}</span>
@@ -382,18 +406,20 @@ const bookingsForDate = (dt) => {
                     
                     <!-- Print button shown when OCD Approved for Admin or GSU Head -->
                     <button
-                      v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                      v-if="(page.props.auth?.user?.role?.name === 'Administrator' && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (page.props.auth?.user?.role?.name === 'GSU Head' && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
                       @click.prevent="openPrint(req)"
                       class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
                       title="Print"
                     >
                       <PrinterIcon class="w-5 h-5" />
                     </button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="approveRequest(req)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="declineRequest(req)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredRequests.length === 0">
-                <td colspan="9" class="px-4 py-6 text-center text-gray-500">No facility requests found.</td>
+                <tr v-if="filteredRequests.length === 0">
+                <td :colspan="(['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name) ? 8 : 9)" class="px-4 py-6 text-center text-gray-500">No facility requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -406,7 +432,7 @@ const bookingsForDate = (dt) => {
               <div>
                 <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
                 <div class="font-semibold text-gray-800">{{ req.activity ?? '—' }}</div>
-                <div class="text-sm text-gray-600">{{ req.requestor }} — {{ req.unit ?? '—' }}</div>
+                <div class="text-sm text-gray-600"><span v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)">{{ req.requester?.name ?? req.requestor ?? '—' }} — </span><span v-if="!['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name)">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</span></div>
               </div>
               <div class="text-right text-sm">
                 <div class="text-gray-600">{{ req.date_start ? new Date(req.date_start).toLocaleDateString() : '—' }}
@@ -439,12 +465,14 @@ const bookingsForDate = (dt) => {
               </button>
 
               <button
-                v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                v-if="(page.props.auth?.user?.role?.name === 'Administrator' && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (page.props.auth?.user?.role?.name === 'GSU Head' && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
                 @click.prevent="openPrint(req)"
                 class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md"
               >
                 <PrinterIcon class="w-4 h-4" /> Print
               </button>
+              <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="approveRequest(req)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md"><CheckIcon class="w-4 h-4"/> Approve</button>
+              <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="declineRequest(req)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"><XMarkIcon class="w-4 h-4"/> Decline</button>
             </div>
           </div>
 

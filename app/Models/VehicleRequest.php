@@ -10,7 +10,7 @@ class VehicleRequest extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
+        'requestor_id',
         'purpose',
         'destination',
         'date_needed',
@@ -37,7 +37,12 @@ class VehicleRequest extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'requestor_id');
+    }
+
+    public function requester()
+    {
+        return $this->belongsTo(User::class, 'requestor_id');
     }
 
     public function divisionChief()

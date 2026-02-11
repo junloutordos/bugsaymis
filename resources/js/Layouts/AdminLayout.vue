@@ -119,6 +119,32 @@ const closeConsultationLogModal = () => {
   closeConsultationLogModal();
 };
 
+// --- Attendance Logs Modal State ---
+const showAttendanceModal = ref(false);
+const attendanceStart = ref("");
+const attendanceEnd = ref("");
+const openAttendanceModal = () => {
+  showAttendanceModal.value = true;
+};
+const closeAttendanceModal = () => {
+  showAttendanceModal.value = false;
+  attendanceStart.value = "";
+  attendanceEnd.value = "";
+};
+const generateAttendanceReport = () => {
+  if (!attendanceStart.value || !attendanceEnd.value) {
+    alert('Please select both start and end dates.');
+    return;
+  }
+  if (attendanceStart.value > attendanceEnd.value) {
+    alert('Start date must be before or equal to end date.');
+    return;
+  }
+  // Navigate to attendance index with query params
+  router.get(route('hr.attendance.index'), { start: attendanceStart.value, end: attendanceEnd.value });
+  closeAttendanceModal();
+};
+
 // --- Library Statistics Modal State ---
 const showLibraryStatsModal = ref(false);
 const libraryStatsStart = ref("");
@@ -305,6 +331,20 @@ const menuItems = [
         icon: DocumentTextIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff"],
       },
+      {
+        label: "Date Parameters",
+        routeName: "hr.date-parameters.index",
+        href: route('hr.date-parameters.index'),
+        icon: ClockIcon,
+        roles: ["Administrator", "HR"],
+      },
+      {
+        label: "Gate Pass",
+        routeName: "gatepass.index",
+        href: route('gatepass.index'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "HR", "Faculty", "Staff"],
+      },
     ],
   },
 
@@ -390,28 +430,28 @@ const menuItems = [
   {
     label: "General Services",
     icon: WrenchScrewdriverIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
     children: [
       {
         label: "Vehicle Request",
         routeName: "vehicle-requests.index",
         href: route("vehicle-requests.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
       },
           {
             label: "Facility Request",
             routeName: "facility-requests.index",
             href: route("facility-requests.index"),
             icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
           },
           {
             label: "Request for Services",
             routeName: "service-requests.index",
             href: route('service-requests.index'),
             icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
           },
           {
             label: "Assets",
@@ -425,7 +465,7 @@ const menuItems = [
             routeName: "work-requests.index",
             href: route('work-requests.index'),
             icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head"],
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
           },
     ],
     // Only show this section for GSU Head if that's their only role
@@ -711,7 +751,7 @@ filteredMenu.value.forEach((item) => {
             <div v-show="expanded[item.label]" class="ml-6 mt-1 space-y-1">
               <template v-for="child in item.children" :key="child.label">
                 <SidebarLink
-                  v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report'].includes(child.routeName)"
+                  v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report','hr.attendance.index'].includes(child.routeName)"
                   :href="child.href"
                   :target="child.target"
                   :label="child.label"
@@ -734,6 +774,17 @@ filteredMenu.value.forEach((item) => {
                 <button
                   v-else-if="child.routeName === 'library.statistics.report'"
                   @click="openLibraryStatsModal"
+                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                >
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <span v-if="!collapsed" class="flex items-center w-full">
+                    <span>{{ child.label }}</span>
+                  </span>
+                  <span v-else class="mx-auto"></span>
+                </button>
+                <button
+                  v-else-if="child.routeName === 'hr.attendance.index'"
+                  @click="openAttendanceModal"
                   class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
                 >
                   <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
@@ -865,6 +916,30 @@ filteredMenu.value.forEach((item) => {
       <div class="px-6 py-4 border-t flex justify-end gap-2">
         <button @click="closeLibraryStatsModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
         <button @click="generateLibraryStats" class="px-4 py-2 rounded bg-blue-600 text-white">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Logs Date Range Modal -->
+  <div v-if="showAttendanceModal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeAttendanceModal"></div>
+    <div @click.stop class="bg-white rounded-lg shadow-lg z-50 w-full max-w-md mx-4">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-semibold">Attendance Logs</h3>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Start Date</label>
+          <input type="date" v-model="attendanceStart" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">End Date</label>
+          <input type="date" v-model="attendanceEnd" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-2">
+        <button @click="closeAttendanceModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+        <button @click="generateAttendanceReport" class="px-4 py-2 rounded bg-blue-600 text-white">View</button>
       </div>
     </div>
   </div>

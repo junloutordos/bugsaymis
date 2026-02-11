@@ -18,7 +18,8 @@ class ServiceRequestController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $query = ServiceRequest::latest();
+        // eager-load requester so frontend can display requester name
+        $query = ServiceRequest::with('requester')->latest();
 
         // If the logged-in user is a Staff, show only their own requests
         try {
@@ -27,14 +28,22 @@ class ServiceRequestController extends Controller
             $roleName = null;
         }
 
-        if (in_array($roleName, ['Staff', 'Faculty']) && $user) {
+        if ($roleName === 'DivisionChief' && $user) {
+            $divisionIds = Division::where('division_chief_id', $user->id)->pluck('id');
+            $userIds = User::whereIn('division_id', $divisionIds)->pluck('id');
+            $query->whereIn('requestor_id', $userIds);
+        } elseif (in_array($roleName, ['Staff', 'Faculty']) && $user) {
             $query->where('requestor_id', $user->id);
         }
 
         $requests = $query->paginate(15);
 
+        // Pass division chief flag to frontend for approve action
+        $isDivisionChief = ($roleName === 'DivisionChief');
+
         return Inertia::render('ServiceRequests/Index', [
             'requests' => $requests,
+            'isDivisionChief' => $isDivisionChief,
         ]);
     }
 
@@ -58,12 +67,13 @@ class ServiceRequestController extends Controller
 
         $user = $request->user();
         $data['requestor_id'] = $user->id ?? null;
-        $data['unit'] = $user?->division?->division_name ?? $user?->office ?? null;
+        // do not persist unit on service requests anymore; derive from requester when needed
 
         // set additional metadata
         $data['status'] = 'Pending';
 
         $sr = ServiceRequest::create($data);
+        $unitLocal = $user?->division?->division_name ?? $user?->office ?? null;
         $requestorName = $user?->name;
         $requestorEmail = $user?->email;
 
@@ -90,10 +100,6 @@ class ServiceRequestController extends Controller
         }
 
         if ($chiefEmail) {
-            if ($chiefUser) {
-                $sr->division_chief_id = $chiefUser->id;
-                $sr->save();
-            }
             try {
                 $approveUrl = $chiefUser ? URL::signedRoute('service-requests.approve', ['serviceRequest' => $sr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : route('service-requests.index');
                 $declineUrl = $chiefUser ? URL::signedRoute('service-requests.decline', ['serviceRequest' => $sr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : null;
@@ -137,7 +143,8 @@ class ServiceRequestController extends Controller
 
     public function approveByDivisionChief(Request $request, ServiceRequest $serviceRequest, $chief)
     {
-        if ($serviceRequest->division_chief_id && (int) $serviceRequest->division_chief_id !== (int) $chief) {
+        $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
         if ($serviceRequest->status === 'Approved') {
@@ -149,14 +156,14 @@ class ServiceRequestController extends Controller
 
         // Notify requester via email
         try {
-            $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
+            $requester = $serviceRequest->requester ?? ($serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null);
             $requesterEmail = $requester?->email ?? null;
             $approverName = null;
             if ($chief) {
                 $u = User::find($chief);
                 $approverName = $u?->name ?? null;
-            } elseif ($serviceRequest->division_chief_id) {
-                $u = User::find($serviceRequest->division_chief_id);
+            } elseif ($assignedChiefId) {
+                $u = User::find($assignedChiefId);
                 $approverName = $u?->name ?? null;
             }
 
@@ -191,12 +198,118 @@ class ServiceRequestController extends Controller
             logger()->error('Failed to queue GSU notifications for service request', ['error' => $e->getMessage()]);
         }
 
+        // Notify FAD Chief users for next-level approval/decline
+        try {
+            $fadUsers = User::select('id','email','position')
+                        ->where('position', 'like', '%FAD%')
+                        ->get();
+            foreach ($fadUsers as $fad) {
+                if (! $fad->email) continue;
+                try {
+                    $approveUrl = URL::signedRoute('service-requests.fad.approve', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('service-requests.fad.decline', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    Mail::to($fad->email)->send(new \App\Mail\ServiceRequestFADMail($serviceRequest, $approveUrl, $declineUrl));
+                } catch (\Throwable $e) {
+                    logger()->error('Failed to send service request FAD notification', ['error' => $e->getMessage(), 'email' => $fad->email]);
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to queue FAD notifications for service request', ['error' => $e->getMessage()]);
+        }
+
         return view('service_request_approved', ['serviceRequest' => $serviceRequest, 'already' => false]);
+    }
+
+    // Authenticated in-app approval by logged-in Division Chief
+    public function approveInApp(Request $request, ServiceRequest $serviceRequest)
+    {
+        $user = $request->user();
+        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+
+        // Validate that the division chief is responsible for this request
+        $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $user->id) {
+            abort(403);
+        }
+        if ($serviceRequest->status === 'Approved') {
+            return back()->with('success', 'Already approved');
+        }
+
+        $serviceRequest->status = 'Approved';
+        $serviceRequest->save();
+
+        // Notify requester via email (reuse existing logic)
+        try {
+            $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
+            $requesterEmail = $requester?->email ?? null;
+            $approverName = $user->name ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Approved', null, $approverName, $requester?->name ?? null, $requesterEmail));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send service request approved notification', ['error' => $e->getMessage()]);
+        }
+
+        // Notify FAD Chief users for next-level approval/decline
+        try {
+            $fadUsers = User::select('id','email','position')
+                        ->where('position', 'like', '%FAD%')
+                        ->get();
+            foreach ($fadUsers as $fad) {
+                if (! $fad->email) continue;
+                try {
+                    $approveUrl = URL::signedRoute('service-requests.fad.approve', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('service-requests.fad.decline', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
+                    Mail::to($fad->email)->send(new \App\Mail\ServiceRequestFADMail($serviceRequest, $approveUrl, $declineUrl));
+                } catch (\Throwable $e) {
+                    logger()->error('Failed to send service request FAD notification (in-app)', ['error' => $e->getMessage(), 'email' => $fad->email]);
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to queue FAD notifications for service request (in-app)', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Service request approved.');
+    }
+
+    public function declineInApp(Request $request, ServiceRequest $serviceRequest)
+    {
+        $user = $request->user();
+        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+        $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $user->id) {
+            abort(403);
+        }
+
+        $data = $request->validate(['reason' => 'required|string|max:1000']);
+
+        if (in_array($serviceRequest->status, ['Approved','Declined'])) {
+            return back()->with('success', 'Already processed');
+        }
+
+        $serviceRequest->status = 'Declined';
+        $serviceRequest->decline_reason = $data['reason'];
+        $serviceRequest->declined_at = now();
+        $serviceRequest->save();
+
+        try {
+            $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
+            $requesterEmail = $requester?->email ?? null;
+            $approverName = $user->name ?? null;
+            if ($requesterEmail) {
+                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName, $requester?->name ?? null, $requesterEmail));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send service request declined notification', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Service request declined.');
     }
 
     public function showDeclineForm(Request $request, ServiceRequest $serviceRequest, $chief)
     {
-        if ($serviceRequest->division_chief_id && (int) $serviceRequest->division_chief_id !== (int) $chief) {
+        $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
 
@@ -212,7 +325,8 @@ class ServiceRequestController extends Controller
 
     public function submitDecline(Request $request, ServiceRequest $serviceRequest, $chief)
     {
-        if ($serviceRequest->division_chief_id && (int) $serviceRequest->division_chief_id !== (int) $chief) {
+        $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
+        if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
 
@@ -232,14 +346,14 @@ class ServiceRequestController extends Controller
 
         // Notify requester via email
         try {
-            $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
+            $requester = $serviceRequest->requester ?? ($serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null);
             $requesterEmail = $requester?->email ?? null;
             $approverName = null;
             if ($chief) {
                 $u = User::find($chief);
                 $approverName = $u?->name ?? null;
-            } elseif ($serviceRequest->division_chief_id) {
-                $u = User::find($serviceRequest->division_chief_id);
+            } elseif ($assignedChiefId) {
+                $u = User::find($assignedChiefId);
                 $approverName = $u?->name ?? null;
             }
 
@@ -254,6 +368,87 @@ class ServiceRequestController extends Controller
 
         return view('service_request_declined', ['serviceRequest' => $serviceRequest, 'reason' => $serviceRequest->decline_reason]);
     }
+
+        /**
+         * Approve service request by FAD Chief via signed link
+         */
+        public function approveByFAD(Request $request, ServiceRequest $serviceRequest, $chief)
+        {
+            if ($serviceRequest->status === 'FAD Approved') {
+                return view('service_request_approved', ['serviceRequest' => $serviceRequest, 'already' => true]);
+            }
+
+            $serviceRequest->status = 'FAD Approved';
+            $serviceRequest->save();
+
+            // Notify requester that FAD approved
+            try {
+                $requesterEmail = $serviceRequest->requester?->email ?? null;
+                $approverName = null;
+                if ($chief) {
+                    $u = User::find($chief);
+                    $approverName = $u?->name ?? 'FAD Chief';
+                } else {
+                    $approverName = 'FAD Chief';
+                }
+
+                if ($requesterEmail) {
+                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'FAD Approved', null, $approverName));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Failed to send service request FAD approved notification', ['error' => $e->getMessage()]);
+            }
+
+            return view('service_request_approved', ['serviceRequest' => $serviceRequest, 'already' => false]);
+        }
+
+        public function showFadDeclineForm(Request $request, ServiceRequest $serviceRequest, $chief)
+        {
+            if ($serviceRequest->status === 'FAD Approved') {
+                return view('service_request_approved', ['serviceRequest' => $serviceRequest, 'already' => true]);
+            }
+
+            $postAction = route('service-requests.fad.decline.submit', ['serviceRequest' => $serviceRequest->id, 'chief' => $chief])
+                . '?' . $request->getQueryString();
+
+            return view('service_request_decline', ['serviceRequest' => $serviceRequest, 'postAction' => $postAction]);
+        }
+
+        public function submitFadDecline(Request $request, ServiceRequest $serviceRequest, $chief)
+        {
+            $request->validate([
+                'reason' => 'required|string|max:1000',
+            ]);
+
+            if (in_array($serviceRequest->status, ['Approved','Declined','FAD Approved','FAD Declined'])) {
+                $reason = $serviceRequest->decline_reason ?? '—';
+                return view('service_request_declined', ['serviceRequest' => $serviceRequest, 'reason' => $reason]);
+            }
+
+            $serviceRequest->status = 'FAD Declined';
+            $serviceRequest->decline_reason = $request->input('reason');
+            $serviceRequest->declined_at = now();
+            $serviceRequest->save();
+
+            try {
+                $requesterEmail = $serviceRequest->requester?->email ?? null;
+                $approverName = null;
+                if ($chief) {
+                    $u = User::find($chief);
+                    $approverName = $u?->name ?? 'FAD Chief';
+                } else {
+                    $approverName = 'FAD Chief';
+                }
+
+                if ($requesterEmail) {
+                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Failed to send service request FAD declined notification', ['error' => $e->getMessage()]);
+            }
+
+            return view('service_request_declined', ['serviceRequest' => $serviceRequest, 'reason' => $serviceRequest->decline_reason]);
+        }
 
     public function approveByGSU(Request $request, ServiceRequest $serviceRequest, $gsu)
     {
@@ -303,5 +498,15 @@ class ServiceRequestController extends Controller
         }
 
         return view('service_requests.print_ticket', ['request' => $serviceRequest]);
+    }
+
+    protected function resolveDivisionChiefId(ServiceRequest $serviceRequest)
+    {
+        $assigned = $serviceRequest->requester?->division?->division_chief_id ?? null;
+        if (! $assigned && ! empty($serviceRequest->unit)) {
+            $div = Division::where('division_name', $serviceRequest->unit)->first();
+            if ($div && $div->division_chief_id) $assigned = $div->division_chief_id;
+        }
+        return $assigned;
     }
 }

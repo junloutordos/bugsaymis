@@ -9,20 +9,23 @@ const endDate = ref('')
 const category = ref('All Category')
 
 async function onFileChange(e) {
-  const f = e.target.files && e.target.files[0]
-  if (!f) return
+  const files = e.target.files
+  if (!files || files.length === 0) return
 
-  // display preview immediately
+  // display preview of first file immediately
+  const first = files[0]
   const reader = new FileReader()
   reader.onload = (ev) => {
     fileContent.value = ev.target.result
   }
-  reader.readAsText(f)
+  reader.readAsText(first)
 
-  // upload file to server for parsing and insertion
+  // upload files to server for parsing and insertion
   try {
     const form = new FormData()
-    form.append('file', f)
+    for (let i = 0; i < files.length; i++) {
+      form.append('files[]', files[i])
+    }
     if (startDate.value) form.append('start_date', startDate.value)
     if (endDate.value) form.append('end_date', endDate.value)
     if (category.value) form.append('category', category.value)
@@ -85,8 +88,8 @@ async function onFileChange(e) {
             </select>
           </div>
         </div>
-        <label class="block text-sm font-medium mb-2">Select .dat file</label>
-        <input type="file" accept=".dat" @change="onFileChange" />
+        <label class="block text-sm font-medium mb-2">Select .dat file(s)</label>
+        <input type="file" accept=".dat" multiple @change="onFileChange" />
         <!-- Preview removed; success/failure reported via SweetAlert -->
       </div>
     </div>
