@@ -46,7 +46,7 @@ class BackupDatabase extends Command
 
         // Keep only last 7 backups
         $files = glob($backupPath . 'backup_*.sql');
-        if (count($files) > 7) {
+        if (count($files) > 49) {
             usort($files, fn($a, $b) => filemtime($a) - filemtime($b));
             $oldFiles = array_slice($files, 0, count($files) - 7);
             foreach ($oldFiles as $file) {
