@@ -51,6 +51,91 @@ const {
   openPmsHistory,
 } = useEquipments(props.equipments, props.users)
 
+// Barcode scanner state
+import { ref as vueRef, onBeforeUnmount } from 'vue'
+const scanning = vueRef(false)
+const videoRef = vueRef(null)
+const canvasRef = vueRef(null)
+const scanError = vueRef(null)
+let _stream = null
+let _scanLoopId = null
+
+const isBarcodeDetectorSupported = () => {
+  return typeof window.BarcodeDetector === 'function'
+}
+
+const openScanner = async () => {
+  scanError.value = null
+  if (!isBarcodeDetectorSupported()) {
+    scanError.value = 'BarcodeDetector not supported in this browser.'
+    scanning.value = true
+    return
+  }
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    if (videoRef.value) videoRef.value.srcObject = _stream
+    scanning.value = true
+    requestAnimationFrame(scanLoop)
+  } catch (err) {
+    scanError.value = err.message || String(err)
+    scanning.value = true
+  }
+}
+
+const stopScanner = async () => {
+  scanning.value = false
+  if (_stream) {
+    _stream.getTracks().forEach(t => t.stop())
+    _stream = null
+  }
+  if (videoRef.value) videoRef.value.srcObject = null
+  if (_scanLoopId) { cancelAnimationFrame(_scanLoopId); _scanLoopId = null }
+}
+
+const scanLoop = async () => {
+  if (!scanning.value) return
+  try {
+    const detector = new window.BarcodeDetector({ formats: ['code_128','code_39','qr_code','ean_13'] })
+    if (videoRef.value && videoRef.value.readyState === HTMLMediaElement.HAVE_ENOUGH_DATA) {
+      const w = videoRef.value.videoWidth
+      const h = videoRef.value.videoHeight
+      if (w && h) {
+        if (!canvasRef.value) {
+          // create a hidden canvas if not present
+          const c = document.createElement('canvas')
+          c.width = w
+          c.height = h
+          canvasRef.value = c
+        }
+        const ctx = canvasRef.value.getContext('2d')
+        ctx.drawImage(videoRef.value, 0, 0, canvasRef.value.width, canvasRef.value.height)
+        try {
+          const bitmap = await createImageBitmap(canvasRef.value)
+          const barcodes = await detector.detect(bitmap)
+          bitmap.close()
+          if (barcodes && barcodes.length) {
+            const code = barcodes[0].rawValue || barcodes[0].raw_data || null
+            if (code) {
+              form.serial_no = code
+              await stopScanner()
+              return
+            }
+          }
+        } catch (e) {
+          // ignore detection errors and continue
+        }
+      }
+    }
+  } catch (e) {
+    scanError.value = e?.message || String(e)
+  }
+  _scanLoopId = requestAnimationFrame(scanLoop)
+}
+
+onBeforeUnmount(() => {
+  stopScanner()
+})
+
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
 
@@ -137,6 +222,22 @@ function printModal() {
         >
           + Add Equipment
         </button>
+      </div>
+      <!-- SCANNER MODAL -->
+      <div v-if="scanning" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-4 w-full max-w-xl">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="font-semibold">Scan Barcode</h3>
+            <button @click="stopScanner" class="text-sm text-gray-600">Cancel</button>
+          </div>
+          <div class="border rounded overflow-hidden">
+            <video autoplay playsinline ref="videoRef" class="w-full h-64 bg-black"></video>
+            <div class="p-2">
+              <p v-if="scanError" class="text-sm text-red-600">{{ scanError }}</p>
+              <p v-else class="text-sm text-gray-700">Point your camera at the device barcode. Supported formats: Code128, Code39, EAN-13, QR.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Search & Actions -->
@@ -329,7 +430,11 @@ function printModal() {
             <!-- Serial No -->
             <div class="col-span-2">
               <label class="block text-sm font-medium text-gray-700">Serial No <span class="text-red-500">*</span></label>
-              <input v-model="form.serial_no" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
+              <div class="mt-1 flex gap-2">
+                <input v-model="form.serial_no" type="text" class="block w-full rounded-lg border-gray-300 shadow-sm" required />
+                <button type="button" @click="openScanner" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700">Scan</button>
+              </div>
+              <p v-if="scanError" class="text-xs text-red-600 mt-1">{{ scanError }}</p>
             </div>
 
             <!-- Device Description -->
