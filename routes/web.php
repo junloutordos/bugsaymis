@@ -15,7 +15,7 @@ use App\Http\Controllers\ICTEquipmentController;
         ->name('library.borrowings.override');
 
     // Library Collections
-    Route::get('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'show'])->name('library.collections.show');
+    Route::get('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'show'])->where('id', '[0-9]+')->name('library.collections.show');
     Route::get('/library/collections/{id}/history', [\App\Http\Controllers\LibraryBorrowingsController::class, 'collectionHistory'])->name('library.collections.history');
     Route::get('/library/borrowers/{type}/{id}/history', [\App\Http\Controllers\LibraryBorrowingsController::class, 'borrowerHistory'])->name('library.borrowers.history');
 use App\Http\Controllers\VehicleRequestController;
@@ -96,6 +96,10 @@ Route::get('/hello', function () {
 // Library kiosk (public, no login required)
 Route::get('/library/kiosk', [LibraryKioskController::class, 'index'])->name('library.kiosk');
 Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])->name('library.kiosk.scan');
+
+// Public library collections kiosk (search collections without login)
+Route::get('/library/collections/kiosk', [App\Http\Controllers\LibraryCollectionsController::class, 'kiosk'])->name('library.collections.kiosk');
+Route::get('/library/collections/kiosk/search', [App\Http\Controllers\LibraryCollectionsController::class, 'publicSearch'])->name('library.collections.kiosk.search');
 
 // Clinic kiosk (public, no login required)
 Route::get('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'index'])->name('clinic.kiosk');

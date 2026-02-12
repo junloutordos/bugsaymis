@@ -12,13 +12,23 @@ use Illuminate\Http\Response;
 
 class RoomController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $rooms = Room::leftJoin('sections', 'rooms.section_id', '=', 'sections.id')
+        $q = Room::leftJoin('sections', 'rooms.section_id', '=', 'sections.id')
             ->select('rooms.*', 'sections.sectionname as section_name')
             ->with(['building','office'])
-            ->orderBy('rooms.name')
-            ->get();
+            ->orderBy('rooms.name');
+
+        if ($request->has('building_id') && $request->query('building_id')) {
+            $q->where('rooms.building_id', $request->query('building_id'));
+        }
+
+        $rooms = $q->get();
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json($rooms);
+        }
+
         $buildings = Building::orderBy('name')->get();
         $offices = Office::orderBy('name')->select('id','name')->get();
 
