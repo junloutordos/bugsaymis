@@ -10,7 +10,7 @@
     .wrap{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:40px}
     .card{background:rgba(255,255,255,0.03);padding:20px;border-radius:12px;min-width:320px;max-width:980px}
     .title{font-size:22px;margin-bottom:6px}
-    .sub{font-size:13px;color:#94a3b8;margin-bottom:12px}
+    .sub{font-size:13px;color:#ffffff;margin-bottom:12px}
     input.search{font-size:18px;padding:12px 14px;border-radius:8px;border:0;outline:none;width:100%;box-sizing:border-box;background:#071233;color:#e6eef8}
     .results{margin-top:16px}
     .item{padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);margin-bottom:8px}
@@ -53,6 +53,11 @@
             <tbody id="results-body"></tbody>
           </table>
         </div>
+        <div id="pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;padding:12px;background:transparent">
+          <button id="page-prev" style="padding:8px 12px;border-radius:6px;border:1px solid #e6e9ef;background:#fff;color:#0f172a;">Prev</button>
+          <span id="page-info" style="color:#0f172a">Page 1 of 1</span>
+          <button id="page-next" style="padding:8px 12px;border-radius:6px;border:1px solid #e6e9ef;background:#fff;color:#0f172a;">Next</button>
+        </div>
       </div>
     </div>
   </div>
@@ -66,6 +71,9 @@
       const catSel = document.getElementById('category');
       let timer = null;
       let latestData = [];
+      let currentPage = 1;
+      const perPage = 20;
+      let currentFiltered = [];
 
       function escapeHtml(s){ if (!s) return ''; return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]; }); }
 
@@ -109,11 +117,35 @@
         Array.from(cats).sort().forEach(c => { if (!preferredCats.includes(c)) { const o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o); } });
       }
 
+      function updatePaginationInfo(){
+        const info = document.getElementById('page-info');
+        const prev = document.getElementById('page-prev');
+        const next = document.getElementById('page-next');
+        const totalPages = Math.max(1, Math.ceil(currentFiltered.length / perPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+        info.textContent = `Page ${currentPage} of ${totalPages}`;
+        prev.disabled = currentPage === 1;
+        next.disabled = currentPage === totalPages;
+      }
+
+      function goPage(delta){
+        const totalPages = Math.max(1, Math.ceil(currentFiltered.length / perPage));
+        currentPage = Math.min(Math.max(1, currentPage + delta), totalPages);
+        renderCurrentPage();
+        updatePaginationInfo();
+      }
+
+      function renderCurrentPage(){
+        const start = (currentPage - 1) * perPage;
+        const slice = currentFiltered.slice(start, start + perPage);
+        renderTable(slice);
+      }
+
       function applyClientFilters(){
         const t = typeSel.value;
         const c = catSel.value;
         const q = qel.value.trim().toLowerCase();
-        let out = latestData.filter(it => {
+        currentFiltered = latestData.filter(it => {
           if (t && it.collection_type !== t) return false;
           if (c && (it.category || '') !== c) return false;
           if (q) {
@@ -122,8 +154,10 @@
           }
           return true;
         });
-        renderTable(out);
-        msg.textContent = `Found ${out.length} result${out.length === 1 ? '' : 's'}`;
+        currentPage = 1;
+        updatePaginationInfo();
+        renderCurrentPage();
+        msg.textContent = `Found ${currentFiltered.length} result${currentFiltered.length === 1 ? '' : 's'}`;
       }
 
       async function fetchSearch(q){
@@ -147,6 +181,12 @@
       });
       typeSel.addEventListener('change', applyClientFilters);
       catSel.addEventListener('change', applyClientFilters);
+
+      // pagination buttons
+      document.addEventListener('click', function(e){
+        if (e.target && e.target.id === 'page-prev') { e.preventDefault(); goPage(-1); }
+        if (e.target && e.target.id === 'page-next') { e.preventDefault(); goPage(1); }
+      });
 
       window.addEventListener('load', ()=>{ fetchSearch(''); qel.focus(); });
     })();

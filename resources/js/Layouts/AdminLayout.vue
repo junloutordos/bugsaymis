@@ -171,6 +171,38 @@ const generateLibraryStats = () => {
   closeLibraryStatsModal();
 };
 
+// --- Health Statistics Modal ---
+const showHealthStatsModal = ref(false);
+const healthStatsStart = ref("");
+const healthStatsEnd = ref("");
+const openHealthStatsModal = () => {
+  showHealthStatsModal.value = true;
+};
+const closeHealthStatsModal = () => {
+  showHealthStatsModal.value = false;
+  healthStatsStart.value = "";
+  healthStatsEnd.value = "";
+};
+const generateHealthStats = () => {
+  if (!healthStatsStart.value || !healthStatsEnd.value) {
+    alert("Please select both start and end dates.");
+    return;
+  }
+  if (healthStatsStart.value > healthStatsEnd.value) {
+    alert("Start date must be before or equal to end date.");
+    return;
+  }
+  // Open a report route if available (may be added later).
+  try {
+    const url = route('health.statistics.report') + `?start=${healthStatsStart.value}&end=${healthStatsEnd.value}&autoprint=1`;
+    window.open(url, "_blank");
+  } catch (e) {
+    // If route helper is not available for this route yet, just close the modal.
+    console.warn('health.statistics.report route not defined yet');
+  }
+  closeHealthStatsModal();
+};
+
 // --- Menu Items ---
 const menuItems = [
   {
@@ -569,6 +601,13 @@ const menuItems = [
             target: '_blank',
           },
           {
+            label: "Statistics Report",
+            routeName: 'health.statistics.report',
+            href: "#",
+            icon: ChartBarIcon,
+            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
+          },
+          {
             label: "Doctor's Schedule",
             routeName: "physician-schedule.index",
             href: route("physician-schedule.index"),
@@ -751,7 +790,7 @@ filteredMenu.value.forEach((item) => {
             <div v-show="expanded[item.label]" class="ml-6 mt-1 space-y-1">
               <template v-for="child in item.children" :key="child.label">
                 <SidebarLink
-                  v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report','hr.attendance.index'].includes(child.routeName)"
+                  v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report','health.statistics.report','hr.attendance.index'].includes(child.routeName)"
                   :href="child.href"
                   :target="child.target"
                   :label="child.label"
@@ -774,6 +813,17 @@ filteredMenu.value.forEach((item) => {
                 <button
                   v-else-if="child.routeName === 'library.statistics.report'"
                   @click="openLibraryStatsModal"
+                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                >
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <span v-if="!collapsed" class="flex items-center w-full">
+                    <span>{{ child.label }}</span>
+                  </span>
+                  <span v-else class="mx-auto"></span>
+                </button>
+                <button
+                  v-else-if="child.routeName === 'health.statistics.report'"
+                  @click="openHealthStatsModal"
                   class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
                 >
                   <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
@@ -916,6 +966,30 @@ filteredMenu.value.forEach((item) => {
       <div class="px-6 py-4 border-t flex justify-end gap-2">
         <button @click="closeLibraryStatsModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
         <button @click="generateLibraryStats" class="px-4 py-2 rounded bg-blue-600 text-white">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Health Statistics Date Range Modal -->
+  <div v-if="showHealthStatsModal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeHealthStatsModal"></div>
+    <div @click.stop class="bg-white rounded-lg shadow-lg z-50 w-full max-w-md mx-4">
+      <div class="px-6 py-4 border-b">
+        <h3 class="text-lg font-semibold">Statistics Report</h3>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Start Date</label>
+          <input type="date" v-model="healthStatsStart" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">End Date</label>
+          <input type="date" v-model="healthStatsEnd" class="mt-1 block w-full border rounded px-3 py-2" />
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-2">
+        <button @click="closeHealthStatsModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
+        <button @click="generateHealthStats" class="px-4 py-2 rounded bg-blue-600 text-white">Generate</button>
       </div>
     </div>
   </div>
