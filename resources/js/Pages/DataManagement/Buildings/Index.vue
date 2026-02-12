@@ -47,6 +47,9 @@
                     <button @click.prevent="viewRemarks(b)" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="View Remarks">
                       <EyeIcon class="h-5 w-5" />
                     </button>
+                    <button @click.prevent="openRooms(b)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" title="Rooms">
+                      <Squares2X2Icon class="h-5 w-5" />
+                    </button>
                     <button @click.prevent="openModal(b)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
                       <PencilSquareIcon class="h-5 w-5" />
                     </button>
@@ -92,6 +95,30 @@
             <div class="whitespace-pre-wrap text-sm text-gray-700">{{ currentRemarks }}</div>
             <div class="flex justify-end mt-4">
               <button @click="closeRemarks" class="px-4 py-2 bg-blue-600 text-white rounded">Close</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rooms modal -->
+        <div v-show="showRoomsModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative max-h-[80vh] overflow-y-auto">
+            <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeRooms">✕</button>
+            <h3 class="text-lg font-semibold mb-3">Rooms — {{ currentBuildingName }}</h3>
+            <div v-if="currentRooms.length === 0" class="text-sm text-gray-500">No rooms found for this building.</div>
+            <div v-else class="space-y-2">
+              <div v-for="r in currentRooms" :key="r.id" class="border rounded p-3">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <div class="font-medium">{{ r.name }}</div>
+                    <div class="text-sm text-gray-600">Code: {{ r.code ?? '—' }} · Floor: {{ r.floor ?? '—' }}</div>
+                  </div>
+                  <div class="text-sm text-gray-600">Office: {{ r.office?.name ?? '—' }}</div>
+                </div>
+                <div class="text-sm text-gray-600 mt-2">Capacity: {{ r.capacity ?? '—' }} · Section: {{ r.section_name ?? '—' }}</div>
+              </div>
+            </div>
+            <div class="flex justify-end mt-4">
+              <button @click="closeRooms" class="px-4 py-2 bg-blue-600 text-white rounded">Close</button>
             </div>
           </div>
         </div>
@@ -181,7 +208,7 @@
 import { Head, usePage, useForm } from '@inertiajs/vue3'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PencilSquareIcon, TrashIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, EyeIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
 const props = defineProps({ buildings: Array })
@@ -219,6 +246,9 @@ const showModal = ref(false)
 const editingId = ref(null)
 const showRemarksModal = ref(false)
 const currentRemarks = ref('')
+const showRoomsModal = ref(false)
+const currentRooms = ref([])
+const currentBuildingName = ref('')
 
   const form = useForm({ name: '', code: '', no_of_rooms: '', remarks: '', building_use: [], number_of_floors: '', year_constructed: '', year_completed: '', amount: '' })
 
@@ -288,4 +318,21 @@ const viewRemarks = (b) => {
 }
 
 const closeRemarks = () => { showRemarksModal.value = false; currentRemarks.value = '' }
+
+const openRooms = async (b) => {
+  currentBuildingName.value = b.name
+  try {
+    const res = await fetch(`/data-management/rooms?building_id=${b.id}`, { headers: { 'Accept': 'application/json' } })
+    if (!res.ok) throw new Error('Failed to load rooms')
+    const json = await res.json()
+    // RoomController returns a collection of rooms; when using Inertia it returns full page HTML,
+    // but our rooms route here returns JSON when requested via fetch. If not, fallback to empty list.
+    currentRooms.value = Array.isArray(json) ? json : json.data || []
+    showRoomsModal.value = true
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'Failed to load rooms', text: e.message })
+  }
+}
+
+const closeRooms = () => { showRoomsModal.value = false; currentRooms.value = []; currentBuildingName.value = '' }
 </script>

@@ -171,4 +171,40 @@ class LibraryCollectionsController extends Controller
         $collection->volume = $collection->volume ?? $collection->collection_type;
         return response()->json($collection);
     }
+
+    /**
+     * Public kiosk view for visitors to search collections (no auth required).
+     */
+    public function kiosk()
+    {
+        return view('library.collections_kiosk');
+    }
+
+    /**
+     * Public JSON search endpoint used by the kiosk page.
+     */
+    public function publicSearch(Request $request)
+    {
+        $q = $request->input('q');
+        $query = LibraryCollection::query();
+
+        if ($q) {
+            $query->where(function($qr) use ($q) {
+                $qr->where('title', 'like', "%{$q}%")
+                   ->orWhere('author_publisher', 'like', "%{$q}%")
+                   ->orWhere('call_number', 'like', "%{$q}%")
+                   ->orWhere('isbn', 'like', "%{$q}%");
+            });
+        }
+
+        $results = $query->orderBy('title')->limit(100)->get();
+
+        // annotate each result with a simple borrowed flag
+        $results->transform(function ($c) {
+            $c->is_borrowed = \App\Models\Borrowing::where('collection_id', $c->id)->whereNull('return_date')->where('status', 'Borrowed')->exists();
+            return $c;
+        });
+
+        return response()->json($results);
+    }
 }
