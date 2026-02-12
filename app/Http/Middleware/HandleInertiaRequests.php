@@ -106,14 +106,16 @@ class HandleInertiaRequests extends Middleware
                 }
                 return ServiceRequest::where('status', 'Pending')->count();
             },
-            // Number of work requests with status = 'Pending'
+            // Number of work requests for the sidebar badge
             'workRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
+                // For DivisionChief, show requests waiting for their DivisionChief approval step (Pending FAD Approval)
                 if ($user && ($user->role->name ?? '') === 'DivisionChief') {
                     $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
                     $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                    return WorkRequest::where('status', 'Pending')->whereIn('requester_id', $userIds)->count();
+                    return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
                 }
+                // Default behavior: count generic Pending work requests
                 return WorkRequest::where('status', 'Pending')->count();
             },
             // Number of borrowings that are overdue (due_date before today and not yet returned)

@@ -290,6 +290,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('work-requests.complete')
         ->middleware('role:Administrator|GSU Head');
 
+    // Print view for a single work request (printable slip)
+    Route::get('/work-requests/{workRequest}/print', [WorkRequestController::class, 'print'])
+        ->name('work-requests.print')
+        ->middleware('role:Administrator|GSU Head');
+
     // Division chief approve/decline via signed links for Work Requests
     Route::get('/work-requests/{workRequest}/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByDivisionChief'])
         ->name('work-requests.approve')

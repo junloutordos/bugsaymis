@@ -220,12 +220,52 @@
         </div>
     </div>
 
+    @php
+        $st = strtolower($request->status ?? '');
+        // Resolve FAD chief / division signature similar to facility logic
+        $fadName = null;
+        $fadSig = null;
+        try {
+            $div = \App\Models\Division::where('division_name', 'Finance and Administrative Division')->first();
+            if (! $div) {
+                $div = \App\Models\Division::where('division_name', 'Finance & Administrative Division')->first();
+            }
+            if (! $div) {
+                $div = \App\Models\Division::whereRaw('lower(division_name) like ?', ['%finance%'])
+                    ->where(function($q){
+                        $q->whereRaw('lower(division_name) like ?', ['%administrative%'])
+                          ->orWhereRaw('lower(division_name) like ?', ['%admin%']);
+                    })->first();
+            }
+            if ($div) {
+                $chief = $div->divisionchief;
+                $fadName = $chief->name ?? $div->division_name ?? null;
+                if (!empty($div->signature_path)) {
+                    $fadSig = $div->signature_path;
+                } elseif ($chief && !empty($chief->electronic_signature)) {
+                    $fadSig = $chief->electronic_signature;
+                }
+            }
+        } catch (\Throwable $e) {
+            $fadName = null; $fadSig = null;
+        }
+    @endphp
+
     <div class="mt-20">
-        _____ Approved &nbsp;&nbsp;&nbsp; _____ Disapproved
+        <span class="checkbox {{ str_contains($st, 'approved') ? 'checked' : '' }}"></span> Approved &nbsp;&nbsp;&nbsp; 
+        <span class="checkbox {{ str_contains($st, 'decline') ? 'checked' : '' }}"></span> Disapproved
     </div>
 
     <div class="mt-30">
-        FAD Chief
+        <div style="text-align:left;">
+            @if($fadSig)
+                <img src="{{ asset('storage/' . $fadSig) }}" alt="fad signature" style="max-height:70px; display:block; margin:0 0 6px 0;" />
+            @else
+                <div class="line mt-30" style="margin:0 0 0 0;"></div>
+            @endif
+            <div class="mt-10"><strong>{{ $fadName ?? '—' }}</strong></div>
+            <div class="mt-6">FAD Chief</div>
+        </div>
     </div>
 
     <!-- FOOTER -->
