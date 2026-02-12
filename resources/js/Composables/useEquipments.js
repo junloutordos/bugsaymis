@@ -144,7 +144,8 @@ export default function useEquipments(initialEquipments = [], users = []) {
     })
   }
 
-  const destroyEquipment = async (id) => {
+  const destroyEquipment = async (idOrObj) => {
+    const id = (typeof idOrObj === 'object' && idOrObj !== null) ? idOrObj.id : idOrObj
     Swal.fire({
       title: "Are you sure?",
       text: "This equipment will be permanently deleted!",
@@ -155,6 +156,11 @@ export default function useEquipments(initialEquipments = [], users = []) {
       confirmButtonText: "Yes, delete it!",
     }).then(result => {
       if (!result.isConfirmed) return
+
+      if (!id) {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Invalid equipment id.' })
+        return
+      }
 
       router.delete(route("ict-equipments.destroy", id), {
         onSuccess: () => {

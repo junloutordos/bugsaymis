@@ -495,6 +495,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/consultations/{consultation}/print', [\App\Http\Controllers\ConsultationController::class, 'print'])->name('consultations.print');
     Route::delete('/consultations/{consultation}', [\App\Http\Controllers\ConsultationController::class, 'destroy'])->name('consultations.destroy');
 
+    // Health statistics report (date range -> bar chart by reason split by sex)
+    Route::get('/health/statistics', [\App\Http\Controllers\HealthStatisticsController::class, 'report'])->name('health.statistics.report');
+
     // Physician Schedule CRUD (Health > Schedule)
     Route::get('/physician-schedule', [\App\Http\Controllers\PhysicianScheduleController::class, 'index'])->name('physician-schedule.index');
     Route::post('/physician-schedule', [\App\Http\Controllers\PhysicianScheduleController::class, 'store'])->name('physician-schedule.store');
@@ -529,6 +532,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('ict-equipments.store');
     Route::put('/ict-equipments/{ictEquipment}', [ICTEquipmentController::class, 'update'])
     ->name('ict-equipments.update');
+
+    // Delete ICT Equipment
+    Route::delete('/ict-equipments/{ictEquipment}', [ICTEquipmentController::class, 'destroy'])
+        ->name('ict-equipments.destroy');
 
     Route::get('/ict-equipments/{id}', [ICTEquipmentController::class, 'show'])->name('ict-equipments.show');
     Route::get('/equipment/{ictEquipment}', [ICTEquipmentController::class, 'publicShow'])
