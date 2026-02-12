@@ -524,4 +524,13 @@ class WorkRequestController extends Controller
 
         return redirect()->route('work-requests.index')->with('success', 'Work request marked as completed.');
     }
+
+    /**
+     * Printable slip for a work request.
+     */
+    public function print(WorkRequest $workRequest)
+    {
+        $workRequest->load(['division', 'office', 'assignedUser', 'requester', 'actedBy']);
+        return view('work_requests.print_ticket', ['workRequest' => $workRequest]);
+    }
 }

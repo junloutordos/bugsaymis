@@ -55,7 +55,7 @@
                 <td class="px-4 py-3 text-center">
                   <div class="flex items-center gap-2 justify-center">
                     <button
-                      v-if="wr.status === 'Division Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')"
+                      v-if="((wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'Administrator') || (wr.status === 'Pending' && page.props.auth?.user?.role?.name === 'GSU Head'))"
                       @click.prevent="openModal(wr)"
                       class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
                       title="Assign"
@@ -82,15 +82,24 @@
                     </button>
                     
                     <button
-                      v-if="wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')"
+                      v-if="((wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')) || (wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'GSU Head'))"
                       @click.prevent="openCompleteModal(wr)"
                       class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
                       title="Mark Completed"
                     >
                       <CheckCircleIcon class="w-5 h-5" />
                     </button>
-                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="approveRequest(wr)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
-                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="declineRequest(wr)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
+                    <a
+                      v-if="(wr.status === 'Completed') && (['GSU Head','Administrator'].includes(page.props.auth?.user?.role?.name))"
+                      :href="`/work-requests/${wr.id}/print`"
+                      target="_blank"
+                      class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      title="Print"
+                    >
+                      <PrinterIcon class="w-5 h-5" />
+                    </a>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
                   </div>
                 </td>
               </tr>
@@ -123,12 +132,13 @@
             </div>
 
             <div class="mt-3 flex items-center gap-2">
-                <button v-if="wr.status === 'Division Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
+                <button v-if="((wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'Administrator') || (wr.status === 'Pending' && page.props.auth?.user?.role?.name === 'GSU Head'))" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
               <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md">Edit</button>
               <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="destroy(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Delete</button>
-              <button v-if="wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
-                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md">Approve</button>
-                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Decline</button>
+              <button v-if="((wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')) || (wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'GSU Head'))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
+              <a v-if="(wr.status === 'Completed') && (['GSU Head','Administrator'].includes(page.props.auth?.user?.role?.name))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md">Print</a>
+                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md">Approve</button>
+                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Decline</button>
             </div>
           </div>
 
@@ -258,7 +268,7 @@
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, CheckIcon, XMarkIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 
@@ -391,6 +401,30 @@ const destroy = (wr) => {
       router.delete(`/work-requests/${wr.id}`, {
         onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
         onError: (e) => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
+      })
+    })
+  })
+}
+
+const approveRequest = (wr) => {
+  Swal.fire({ title: 'Approve this work request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
+    if (!res.isConfirmed) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.post(route('work-requests.approve.inapp', wr.id), {}, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+        onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to approve' }) }
+      })
+    })
+  })
+}
+
+const declineRequest = (wr) => {
+  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
+    if (!res.isConfirmed || !res.value) return;
+    import('@inertiajs/vue3').then(({ router }) => {
+      router.post(route('work-requests.decline.inapp', wr.id), { reason: res.value }, {
+        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
+        onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to decline' }) }
       })
     })
   })
