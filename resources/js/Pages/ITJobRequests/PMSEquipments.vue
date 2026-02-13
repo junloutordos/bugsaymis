@@ -300,33 +300,37 @@ const equipmentHistoryMap = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(eq, i) in equipments" :key="eq.id">
-                <td class="border border-black p-1">{{ i+1 }}</td>
-                <td class="border border-black p-1">{{ eq.description }}</td>
-                <td class="border border-black p-1">{{ eq.location ?? '-' }}</td>
-                <td class="border border-black p-1">{{ pms.frequency }}</td>
+            <tr v-for="(eq, i) in equipments" :key="eq.id">
+              <td class="border border-black p-1">{{ i + 1 }}</td>
+              <td class="border border-black p-1">{{ eq.description }}</td>
+              <td class="border border-black p-1">{{ eq.room || '-' }}</td> <!-- updated -->
+              <td class="border border-black p-1">{{ pms.frequency }}</td>
 
-                <!-- Refactored cell -->
-                <td v-for="(m, idx) in months" :key="m" class="border border-black p-1">
-                  <!-- PMS History always wins -->
-                  <span v-if="equipmentHistoryMap[eq.id]?.includes(idx)" class="text-blue-600 text-2xl font-bold">*</span>
+              <!-- PMS history per month -->
+              <td v-for="(m, idx) in months" :key="m" class="border border-black p-1 text-center">
+                <!-- PMS history exists -->
+                <span 
+                  v-if="equipmentHistoryMap[eq.id]?.includes(idx)" 
+                  class="text-blue-600 text-2xl font-bold"
+                >*</span>
 
-                  <!-- Scheduled but no history yet -->
-                  <span 
-                    v-else-if="monthStatusMap[idx]" 
-                    class="text-green-600 text-2xl font-bold cursor-pointer" 
-                    @click="openModal(eq, idx)"
-                  >
-                    ✓
-                  </span>
-                </td>
-              </tr>
-              <tr v-if="equipments.length === 0">
-                <td :colspan="months.length + 4" class="border border-black p-1 text-gray-500">
-                  No equipments assigned.
-                </td>
-              </tr>
-            </tbody>
+                <!-- Scheduled but not yet done -->
+                <span 
+                  v-else-if="monthStatusMap[idx]" 
+                  class="text-green-600 text-2xl font-bold cursor-pointer" 
+                  @click="openModal(eq, idx)"
+                >✓</span>
+              </td>
+            </tr>
+
+            <!-- No equipments fallback -->
+            <tr v-if="equipments.length === 0">
+              <td :colspan="months.length + 4" class="border border-black p-1 text-gray-500 text-center">
+                No equipments assigned.
+              </td>
+            </tr>
+          </tbody>
+
           </table>
         </div>
 
