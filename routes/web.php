@@ -611,6 +611,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::put('users-roles/{id}', [RolesController::class, 'update'])->name('roles.update');
         Route::delete('users-roles/{id}', [RolesController::class, 'destroy'])->name('roles.destroy');
         Route::get('/reports', fn () => Inertia::render('Reports/Index'))->name('reports.index');
+        Route::get('/reports/audit-logs', [\App\Http\Controllers\Reports\AuditLogController::class, 'index'])->name('reports.audit_logs')->middleware('role:Administrator');
         Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
 
         Route::get('/users-division', [RolesController::class, 'showDivisions'])->name('roles.divisions');

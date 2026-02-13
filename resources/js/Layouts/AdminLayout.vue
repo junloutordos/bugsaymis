@@ -328,6 +328,7 @@ const menuItems = [
         icon: ClockIcon,
         roles: ["Administrator", "OCD"],
       },
+
     ],
   },
   {
@@ -703,6 +704,13 @@ const menuItems = [
         icon: ChartBarIcon,
         roles: ["Administrator", "Faculty", "Staff"],
       },
+          {
+            label: "Audit Logs",
+            routeName: "reports.audit_logs",
+            href: route("reports.audit_logs"),
+            icon: DocumentTextIcon,
+            roles: ["Administrator"],
+          },
     ],
   },
 ];

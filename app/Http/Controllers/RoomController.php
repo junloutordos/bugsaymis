@@ -25,7 +25,11 @@ class RoomController extends Controller
 
         $rooms = $q->get();
 
-        if ($request->ajax() || $request->wantsJson()) {
+        // If this is a non-Inertia AJAX / API request, return JSON.
+        // But do not return plain JSON for Inertia requests — Inertia expects
+        // an Inertia response, otherwise the client will show a raw JSON error.
+        $isInertia = $request->header('X-Inertia');
+        if (($request->ajax() || $request->wantsJson()) && !$isInertia) {
             return response()->json($rooms);
         }
 

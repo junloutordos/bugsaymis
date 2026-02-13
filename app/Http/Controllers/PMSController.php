@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PMS;
 use App\Models\User;
+use App\Models\ICTEquipment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -11,17 +12,41 @@ use Inertia\Inertia;
 class PMSController extends Controller
 {
     public function index()
-    {
-        $pmsSchedules = PMS::with(['performedBy', 'equipments', 'dates'])->get();
-        $users = User::all();
-        $equipments = \App\Models\ICTEquipment::all();
+{
+    $pmsSchedules = PMS::with([
+        'performedBy:id,name',
+        'equipments' => function ($q) {
+            $q->select(
+                'ict_equipments.id',   // equipment id
+                'description',
+                'room_id',
+                'owner_id',
+                'serial_no',
+                'category'
+            )
+            ->with([
+                'room:id,name,code',   // room for location
+                'owner:id,name',       // owner
+            ]);
+        },
+        'dates',
+    ])->get();
 
-        return Inertia::render('ITJobRequests/PMS', [
-            'pmsSchedules' => $pmsSchedules,
-            'users'        => $users,
-            'equipments'   => $equipments,
-        ]);
-    }
+    $users = User::select('id','name')->orderBy('name')->get();
+
+    $equipments = ICTEquipment::with([
+        'room:id,name,code',
+        'owner:id,name',
+    ])->orderBy('description')->get();
+
+    return Inertia::render('ITJobRequests/PMS', [
+        'pmsSchedules' => $pmsSchedules,
+        'users'        => $users,
+        'equipments'   => $equipments,
+    ]);
+}
+
+
 
     public function store(Request $request)
     {
@@ -113,19 +138,31 @@ class PMSController extends Controller
 
     public function showEquipments(PMS $pms)
     {
-        $pms->load(['equipments.histories', 'dates']); 
-        // make sure ICTEquipment has `histories()` relation to ICTPMSHistory
+        // Load equipments with histories and related room + owner, also PMS dates
+        $pms->load([
+            'equipments.histories', 
+            'equipments.room:id,name,code',   // room for location
+            'equipments.owner:id,name',       // optional, if needed
+            'dates',
+        ]);
 
-        // keep schedule dates
+        // Map schedule dates
         $pms->schedule_dates = $pms->dates->map(fn($d) => [
             'schedule_date' => $d->schedule_date,
             'status'        => $d->status,
         ]);
 
-        // attach histories per equipment
+        // Map equipments with histories and room location
         $equipments = $pms->equipments->map(function ($eq) {
-            $eq->history_dates = $eq->histories->pluck('pms_date');
-            return $eq;
+            return [
+                'id'            => $eq->id,
+                'description'   => $eq->description,
+                'serial_no'     => $eq->serial_no,
+                'category'      => $eq->category,
+                'room'          => $eq->room ? $eq->room->code : 'No Location',
+                'owner'         => $eq->owner ? $eq->owner->name : 'No Owner',
+                'history_dates' => $eq->histories->pluck('pms_date'),
+            ];
         });
 
         return Inertia::render('ITJobRequests/PMSEquipments', [
@@ -133,6 +170,7 @@ class PMSController extends Controller
             'equipments' => $equipments,
         ]);
     }
+
 
 
 
