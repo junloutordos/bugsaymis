@@ -131,6 +131,11 @@ Route::post('/data-management/dtr-upload', [\App\Http\Controllers\DataManagement
 */
 Route::prefix('it-job-requests')->group(function () {
 
+    // GET — For Approval (Division Chief view)
+    Route::get('/for-approval', [ITJobRequestController::class, 'forApproval'])
+        ->name('job-requests.for-approval')
+        ->middleware(['auth', 'role:DivisionChief']);
+
     // GET — Signed link to approve request
     Route::get('dc/approve/{jobRequest}/{chief}', [ITJobRequestController::class, 'approveByDivisionChiefSigned'])
         ->name('it-job-requests.dc.approve')
