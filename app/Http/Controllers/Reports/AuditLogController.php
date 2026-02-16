@@ -17,15 +17,34 @@ class AuditLogController extends Controller
     {
         $query = AuditLog::with('user')->orderBy('created_at', 'desc');
 
-        if ($request->has('user_id') && $request->query('user_id')) {
+        if ($request->filled('user_id')) {
             $query->where('user_id', $request->query('user_id'));
         }
 
-        if ($request->has('action') && $request->query('action')) {
+        if ($request->filled('action')) {
             $query->where('action', $request->query('action'));
         }
 
-        $auditLogs = $query->paginate(25)->withQueryString();
+        // Simple search across user name, action, auditable_type, auditable_id and ip
+        if ($request->filled('q')) {
+            $q = $request->query('q');
+            $query->where(function ($sub) use ($q) {
+                $sub->where('action', 'like', "%{$q}%")
+                    ->orWhere('auditable_type', 'like', "%{$q}%")
+                    ->orWhere('auditable_id', 'like', "%{$q}%")
+                    ->orWhere('ip_address', 'like', "%{$q}%")
+                    ->orWhere('url', 'like', "%{$q}%")
+                    ->orWhereJsonContains('old_values', $q)
+                    ->orWhereJsonContains('new_values', $q);
+
+                // match user name
+                $sub->orWhereHas('user', function ($u) use ($q) {
+                    $u->where('name', 'like', "%{$q}%");
+                });
+            });
+        }
+
+        $auditLogs = $query->paginate(10)->withQueryString();
 
         return Inertia::render('Reports/AuditLogs/Index', [
             'auditLogs' => $auditLogs,

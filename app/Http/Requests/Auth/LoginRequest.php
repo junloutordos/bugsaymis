@@ -41,6 +41,16 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
+        // Prevent login for users whose status is not active
+        $email = $this->input('email');
+        $userModel = '\\App\\Models\\User';
+        $user = $userModel::where('email', $email)->first();
+        if ($user && isset($user->status) && $user->status !== 'active') {
+            throw ValidationException::withMessages([
+                'email' => 'Your account is inactive. Please contact the system administrator.',
+            ]);
+        }
+
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 

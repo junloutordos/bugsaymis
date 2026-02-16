@@ -36,6 +36,63 @@ class UserController extends Controller
     }
 
     /**
+     * Show the employees list page (same data as users.index but labelled for HR/Employees).
+     * Accessible to administrators only.
+     */
+    public function employeesIndex()
+    {
+        $users = User::with(['role', 'division.divisionchief', 'office'])
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->get();
+
+        $roles = Role::select('id', 'name')->get();
+        $divisions = Division::where('status', 'active')
+            ->select('id', 'division_name')
+            ->get();
+        $offices = Office::select('id', 'name', 'division_id')->get();
+
+        return Inertia::render('Users/Index', [
+            'users'     => $users,
+            'roles'     => $roles,
+            'divisions' => $divisions,
+            'offices'   => $offices,
+            // pageTitle/headerTitle used by the Vue page to display custom labels
+            'pageTitle' => 'List of Employees',
+            'headerTitle' => 'List of Employees',
+        ]);
+    }
+
+    /**
+     * Store a new employee created by HR (minimal fields).
+     * Allows HR to add employee records without assigning system credentials/roles.
+     */
+    public function employeesStore(Request $request)
+    {
+        $data = $request->validate([
+            'name'        => 'required|string|max:255',
+            'sex'         => 'nullable|in:Male,Female',
+            'position'    => 'nullable|string|max:255',
+            'division_id' => 'nullable|exists:divisions,id',
+            'office_id'   => 'nullable|exists:offices,id',
+            'emp_category' => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
+        ]);
+
+        // Generate a placeholder email and password so the user record satisfies existing schema
+        $placeholder = 'employee+' . time() . '+' . bin2hex(random_bytes(4)) . '@local';
+        $data['email'] = $placeholder;
+        // Assign a random password; model will hash via cast
+        $data['password'] = bin2hex(random_bytes(10));
+
+        // role_id and badge_id are intentionally left null; System Administrator will assign them later
+        $data['role_id'] = null;
+        $data['badge_id'] = null;
+
+        $user = User::create($data);
+
+        return redirect()->route('hr.employees.index')->with('success', 'Employee record created. Please ask System Administrator to assign system credentials.');
+    }
+
+    /**
      * Return a lightweight JSON list of users for select/dropdowns.
      * Accessible to authenticated users.
      */
@@ -158,9 +215,11 @@ class UserController extends Controller
     public function destroy($id)
     {
         $user = User::findOrFail($id);
-        $user->delete();
+        // soft-delete by setting status to inactive so record is preserved
+        $user->status = 'inactive';
+        $user->save();
 
-        return back()->with('success', 'User deleted successfully.');
+        return back()->with('success', 'User marked as inactive.');
     }
 
     public function uploadSignature(Request $request, User $user)

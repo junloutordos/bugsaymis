@@ -681,6 +681,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 // Lightweight users JSON endpoint for dropdowns (authenticated)
 Route::middleware('auth')->get('/api/users/select', [UserController::class, 'selectList'])->name('users.select');
 
+// HR Employees page (admin-only) — renders the same Users page but labelled as Employees
+Route::middleware(['auth','role:Administrator'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
+Route::middleware(['auth','role:Administrator|HR'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
+
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
 
