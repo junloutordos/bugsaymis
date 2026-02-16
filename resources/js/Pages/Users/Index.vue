@@ -17,6 +17,8 @@ const props = defineProps({
   roles: Array,
   divisions: Array,
   offices: Array,
+  pageTitle: { type: String, default: 'Users' },
+  headerTitle: { type: String, default: 'Users List' },
 })
 
   const {
@@ -37,6 +39,7 @@ const props = defineProps({
   submitUser,
   viewUser,
   deleteUser,
+  isEmployeesPage,
 } = useUsers(props)
 
 // Division chief watcher
@@ -113,17 +116,18 @@ const openSignaturePicker = (user) => {
 
 
 <template>
-  <Head title="Users" />
-  <AdminLayout title="Users">
+    <Head :title="props.pageTitle || 'Users'" />
+    <AdminLayout :title="props.pageTitle || 'Users'">
     <div class="p-6">
       <!-- Header -->
       <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Users List</h1>
+        <h1 class="text-2xl font-bold text-gray-800">{{ props.headerTitle || 'Users List' }}</h1>
         <button
           @click="openModal('create')"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          <PlusIcon class="w-5 h-5 inline-block mr-1" /> New User
+          <PlusIcon class="w-5 h-5 inline-block mr-1" />
+          {{ (props.headerTitle && String(props.headerTitle).toLowerCase().includes('employee')) ? 'New Employee' : 'New User' }}
         </button>
       </div>
 
@@ -144,8 +148,8 @@ const openSignaturePicker = (user) => {
                 <th class="px-4 py-3 text-left">#</th>
                 <th class="px-4 py-3 text-left">Name</th>
                 <th class="px-4 py-3 text-left">Sex</th>
-                <th class="px-4 py-3 text-left">Email</th>
-                <th class="px-4 py-3 text-left">Role</th>
+                <th v-if="!isEmployeesPage" class="px-4 py-3 text-left">Email</th>
+                <th v-if="!isEmployeesPage" class="px-4 py-3 text-left">Role</th>
                 <th class="px-4 py-3 text-left">Position</th>
                 <th class="px-4 py-3 text-left">Division</th>
                 <th class="px-4 py-3 text-left">Office</th>
@@ -195,8 +199,8 @@ const openSignaturePicker = (user) => {
                     
                   </div>
                 </td>
-                <td class="px-4 py-3">{{ user.email }}</td>
-                <td class="px-4 py-3">{{ getRoleNames(user) }}</td>
+                <td v-if="!isEmployeesPage" class="px-4 py-3">{{ user.email }}</td>
+                <td v-if="!isEmployeesPage" class="px-4 py-3">{{ getRoleNames(user) }}</td>
                 <td class="px-4 py-3">{{ user.position ?? "—" }}</td>
                 <td class="px-4 py-3">{{ user.division?.division_name ?? "—" }}</td>
                 <td class="px-4 py-3">{{ user.office?.name ?? user.office ?? "—" }}</td>
@@ -245,7 +249,7 @@ const openSignaturePicker = (user) => {
               </tr>
               <tr v-if="filteredUsers.length === 0">
                 <td
-                  colspan="9"
+                  :colspan="isEmployeesPage ? 8 : 10"
                   class="px-4 py-6 text-center text-gray-500"
                 >
                   No users found.
@@ -278,10 +282,10 @@ const openSignaturePicker = (user) => {
       <!-- Modal -->
       <div
         v-show="showModal"
-        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity"
+        class="fixed inset-0 flex items-start sm:items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity p-4 sm:p-0"
       >
         <div
-          class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative"
+          class="bg-white rounded-xl shadow-lg w-full max-w-3xl sm:max-w-md p-4 sm:p-6 relative max-h-[90vh] overflow-auto"
         >
           <button
             class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
@@ -292,7 +296,7 @@ const openSignaturePicker = (user) => {
           <h2 class="text-xl font-semibold mb-4">
             {{
               modalMode === "create"
-                ? "New User"
+                ? ((props.headerTitle && String(props.headerTitle).toLowerCase().includes('employee')) ? 'New Employee' : 'New User')
                 : modalMode === "edit"
                 ? "Edit User"
                 : "View User"
@@ -361,7 +365,7 @@ const openSignaturePicker = (user) => {
           </div>
 
           <!-- CREATE / EDIT FORM -->
-          <form v-else @submit.prevent="submitUser" class="space-y-4">
+          <form v-else @submit.prevent="submitUser" class="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700">Name</label>
               <input
@@ -372,7 +376,7 @@ const openSignaturePicker = (user) => {
               />
             </div>
 
-            <div>
+            <div v-if="!isEmployeesPage">
               <label class="block text-sm font-medium text-gray-700">Biometric ID</label>
               <input
                 v-model="form.badge_id"
@@ -394,7 +398,7 @@ const openSignaturePicker = (user) => {
                 <option value="Female">Female</option>
               </select>
             </div>
-            <div>
+            <div class="sm:col-span-2" v-if="!isEmployeesPage">
               <label class="block text-sm font-medium text-gray-700">Email</label>
               <input
                 v-model="form.email"
@@ -404,7 +408,7 @@ const openSignaturePicker = (user) => {
               />
             </div>
 
-            <div>
+            <div class="sm:col-span-2" v-if="!isEmployeesPage">
               <label class="block text-sm font-medium text-gray-700">Role</label>
               <select
                 v-model="form.role_id"
@@ -445,7 +449,7 @@ const openSignaturePicker = (user) => {
             </div>
 
             <!-- Auto-display Division Chief -->
-            <div v-if="divisionChief" class="text-sm text-gray-600">
+            <div v-if="divisionChief" class="text-sm text-gray-600 sm:col-span-2">
               Division Chief: <strong>{{ divisionChief.name }}</strong>
             </div>
 
@@ -483,7 +487,7 @@ const openSignaturePicker = (user) => {
               </select>
             </div>
 
-            <div class="flex justify-end space-x-3 pt-4">
+            <div class="flex justify-end space-x-3 pt-4 sm:col-span-2">
               <button
                 type="button"
                 @click="closeModal"
