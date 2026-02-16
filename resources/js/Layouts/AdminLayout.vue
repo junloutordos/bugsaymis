@@ -351,6 +351,13 @@ const menuItems = [
         roles: ["Faculty", "Staff", "DivisionChief", "OCD", "Administrator", "HR"],
       },
       {
+        label: "Employees",
+        routeName: "hr.employees.index",
+        href: route('hr.employees.index'),
+        icon: UserIcon,
+        roles: ["Administrator"],
+      },
+      {
         label: "Attendance Logs",
         routeName: "hr.attendance.index",
         href: route('hr.attendance.index'),

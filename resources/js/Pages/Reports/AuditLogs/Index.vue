@@ -7,6 +7,12 @@
       </div>
 
       <div class="bg-white rounded-xl shadow p-4 mb-4">
+        <!-- Search -->
+        <div class="flex items-center gap-2">
+          <input v-model="search" type="text" placeholder="Search audit logs..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <button v-if="search" @click="clearSearch" class="ml-2 px-3 py-1 rounded border">Clear</button>
+        </div>
+
         <div class="overflow-x-auto mt-4">
           <table class="min-w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
@@ -42,9 +48,11 @@
         </div>
 
         <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button v-if="auditLogs.prev_page_url" @click="goto(auditLogs.prev_page_url)" class="bg-blue-600 text-white px-4 py-2 rounded">Previous</button>
-          <button v-if="auditLogs.next_page_url" @click="goto(auditLogs.next_page_url)" class="bg-blue-600 text-white px-4 py-2 rounded">Next</button>
+        <div class="mt-4">
+          <div class="flex justify-center items-center gap-2">
+            <button v-if="auditLogs.prev_page_url" @click="goto(auditLogs.prev_page_url)" class="bg-blue-600 text-white px-4 py-2 rounded">Previous</button>
+            <button v-if="auditLogs.next_page_url" @click="goto(auditLogs.next_page_url)" class="bg-blue-600 text-white px-4 py-2 rounded">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -54,10 +62,40 @@
 <script setup>
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps({ auditLogs: Object });
 const auditLogs = props.auditLogs;
+const urlParams = new URLSearchParams(window.location.search);
+const searchInit = urlParams.get('q') || '';
+const search = ref(searchInit);
+let debounceTimer = null;
+
+watch(search, (val) => {
+  clearTimeout(debounceTimer);
+  // do not trigger if identical to initial value on load
+  debounceTimer = setTimeout(() => {
+    doSearch();
+  }, 500);
+});
+
+onBeforeUnmount(() => clearTimeout(debounceTimer));
+
 function goto(url) { window.location.href = url; }
+
+function doSearch() {
+  const q = String(search.value || '');
+  const base = window.location.pathname;
+  const qs = new URLSearchParams(window.location.search);
+  if (q) qs.set('q', q); else qs.delete('q');
+  const target = base + (qs.toString() ? ('?' + qs.toString()) : '');
+  window.location.href = target;
+}
+
+function clearSearch() {
+  search.value = '';
+  doSearch();
+}
 </script>
 
 <style scoped>

@@ -29,6 +29,8 @@ export function useUsers(props) {
     emp_category: '',
   })
 
+  const isEmployeesPage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('employee'))
+
   // Filtered + paginated users
   const filteredUsers = computed(() => {
     let results = usersList.value.filter(
@@ -97,6 +99,25 @@ export function useUsers(props) {
     if (modalMode.value === "create") {
       const payload = { ...form.value }
       if (Array.isArray(payload.role_id)) payload.role_id = payload.role_id.join(',')
+
+      // If this is the HR Employees page, send to the HR endpoint and strip admin-only fields
+      if (isEmployeesPage) {
+        // remove admin-only fields
+        delete payload.email
+        delete payload.badge_id
+        delete payload.role_id
+        router.post("/hr/employees", payload, {
+          onSuccess: async () => {
+            closeModal()
+            await Swal.fire("Success", "The employee has been added successfully", "success")
+            window.location.reload()
+          },
+          onError: async (errors) => {
+            await Swal.fire("Error", Object.values(errors).flat().join(", "), "error")
+          },
+        })
+        return
+      }
 
       router.post("/users", payload, {
         onSuccess: async () => {
@@ -167,5 +188,6 @@ export function useUsers(props) {
     submitUser,
     viewUser,
     deleteUser,
+    isEmployeesPage,
   }
 }
