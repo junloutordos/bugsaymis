@@ -1,6 +1,7 @@
 <script setup>
-import { Head, usePage } from "@inertiajs/vue3"
+import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import { ref } from "vue"
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -8,6 +9,7 @@ import {
   TrashIcon,
   ArrowDownTrayIcon,
   ClockIcon,
+  ChartBarIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -53,6 +55,58 @@ const {
 
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
+const csrfToken = page.props.csrf_token || document.querySelector('meta[name="csrf-token"]')?.content || ''
+
+// Report state
+const showReportModal = ref(false)
+const reportGroupBy = ref('category') // 'category' or 'location'
+
+// Generate report grouped by category or location
+function generateReport() {
+  // Show loading indicator
+  const isLoading = ref(true)
+  
+  try {
+    // Use fetch for file download
+    fetch(route('ict-equipments.report.generate'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+      },
+      body: JSON.stringify({
+        groupBy: reportGroupBy.value,
+      }),
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to generate report')
+      }
+      return response.blob()
+    })
+    .then(blob => {
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `ict-equipment-report-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    })
+    .catch(error => {
+      console.error('Error generating report:', error)
+      alert('Error generating report. Please try again.')
+    })
+    .finally(() => {
+      isLoading.value = false
+    })
+  } catch (error) {
+    console.error('Error:', error)
+    alert('An error occurred. Please try again.')
+  }
+}
 
 // ✅ Print Modal Content
 function printModal() {
@@ -155,6 +209,9 @@ function printModal() {
             </button>
             <button @click="printTable" title="Print table">
               <PrinterIcon class="w-5 h-5 text-blue-600" />
+            </button>
+            <button @click="showReportModal = true" title="Generate Report">
+              <ChartBarIcon class="w-5 h-5 text-blue-600" />
             </button>
           </div>
         </div>
@@ -448,6 +505,64 @@ function printModal() {
             </button>
           </div>
 
+        </div>
+      </div>
+
+      <!-- REPORT MODAL -->
+      <div
+        v-if="showReportModal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      >
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+          <button
+            @click="showReportModal = false"
+            class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+          >
+            ✕
+          </button>
+
+          <h2 class="text-2xl font-bold mb-6">Generate Equipment Report</h2>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Group By:</label>
+              <div class="space-y-2">
+                <label class="flex items-center">
+                  <input
+                    type="radio"
+                    v-model="reportGroupBy"
+                    value="category"
+                    class="mr-2"
+                  />
+                  <span>Category</span>
+                </label>
+                <label class="flex items-center">
+                  <input
+                    type="radio"
+                    v-model="reportGroupBy"
+                    value="location"
+                    class="mr-2"
+                  />
+                  <span>Location / Room</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="flex gap-2 justify-end pt-4">
+              <button
+                @click="showReportModal = false"
+                class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                @click="generateReport(); showReportModal = false"
+                class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Generate & Print
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

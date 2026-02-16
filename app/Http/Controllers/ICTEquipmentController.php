@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\ICTEquipment;
 use App\Models\User;
-use App\Models\Room; // ✅ ADDED
+use App\Models\Room;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
+use Mpdf\Mpdf;
 
 class ICTEquipmentController extends Controller
 {
@@ -130,5 +131,81 @@ class ICTEquipmentController extends Controller
         return Inertia::render('ITJobRequests/EquipmentPublicView', [
             'equipment' => $ictEquipment,
         ]);
+    }
+
+    public function generateReport(Request $request)
+    {
+        $request->validate([
+            'groupBy' => 'required|in:category,location',
+        ]);
+
+        $groupBy = $request->input('groupBy');
+        $equipments = ICTEquipment::with(['owner', 'room'])->get();
+        $groupedData = [];
+
+        if ($groupBy === 'category') {
+            foreach ($equipments as $eq) {
+                $category = $eq->category ?? 'Uncategorized';
+                if (!isset($groupedData[$category])) {
+                    $groupedData[$category] = [];
+                }
+                $groupedData[$category][] = $eq;
+            }
+        } else {
+            foreach ($equipments as $eq) {
+                $roomName = $eq->room?->name ?? 'No Location';
+                if (!isset($groupedData[$roomName])) {
+                    $groupedData[$roomName] = [];
+                }
+                $groupedData[$roomName][] = $eq;
+            }
+        }
+
+        // Sort groups alphabetically
+        ksort($groupedData);
+
+        $reportTitle = $groupBy === 'category' 
+            ? 'LIST OF ICT EQUIPMENT REPORT BY CATEGORY' 
+            : 'LIST OF ICT EQUIPMENT REPORT BY LOCATION';
+
+        $html = view('reports.ict-equipment-report', [
+            'groupedData' => $groupedData,
+            'reportTitle' => $reportTitle,
+            'groupBy' => $groupBy,
+            'generatedDate' => now()->format('F d, Y'),
+        ])->render();
+
+        try {
+            $mpdf = new Mpdf([
+                'mode' => 'utf-8',
+                'format' => 'A4',
+                'orientation' => 'P',
+                'margin_left' => 15,
+                'margin_right' => 15,
+                'margin_top' => 15,
+                'margin_bottom' => 15,
+                'margin_footer' => 10,
+                'default_font' => 'Arial',
+            ]);
+
+            $mpdf->WriteHTML($html);
+            
+            $filename = 'ict-equipment-report-' . date('Y-m-d-His') . '.pdf';
+            
+            // Get the PDF content as binary string
+            $pdfContent = $mpdf->Output('', 'S');
+            
+            // Return as a download response
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]);
+        } catch (\Exception $e) {
+            logger()->error('PDF generation error', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Error generating PDF: ' . $e->getMessage());
+        }
     }
 }
