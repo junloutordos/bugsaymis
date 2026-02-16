@@ -207,10 +207,11 @@
             </td>
             <td class="col-right">
                 <div class="agency-dept">Republic of the Philippines</div>
-                <div class="agency-name">Philippine Science High School</div>
+                <div class="system-label">Department of Science and Technology</div>
+                <div class="agency-name">PHILIPPINE SCIENCE HIGH SCHOOL</div>
                 <div class="agency-name-pisay">Caraga Region Campus in Butuan City</div>
                 <div class="agency-dept">Ampayon, Butuan City, Agusan del Norte</div>
-                <div class="system-label">BUGSAYMIS — ICT Equipment Inventory</div>
+                
             </td>
         </tr>
     </table>
