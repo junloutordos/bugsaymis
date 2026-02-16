@@ -464,4 +464,109 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
         return back()->with('success', 'Request confirmed and rated.');
     }
+
+    public function forApproval(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->role || $user->role->name !== 'DivisionChief') {
+            abort(403, 'Unauthorized');
+        }
+
+        $requests = ITJobRequest::with('user')
+            ->where('divisionchief_id', $user->id)
+            ->where('status', 'Pending Division Chief Approval')
+            ->get();
+
+        return Inertia::render('ITJobRequests/ForApprovalITJR', [
+            'requests' => $requests
+        ]);
+    }
+
+    public function approveByDivisionChief(Request $request, ITJobRequest $jobRequest)
+    {
+        $request->validate([
+            'action' => 'required|in:approve,reject',
+        ]);
+
+        if ($request->action === 'approve') {
+            $jobRequest->update([
+                'division_chief_approval' => true,
+                'dc_approval_date' => now(),
+                'status' => 'Pending OCD Approval',
+            ]);
+
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'Division Chief Approved',
+                'remarks' => 'Approved by Division Chief.',
+                'updated_by' => $request->user()->id,
+            ]);
+        } else {
+            $jobRequest->update([
+                'status' => 'Rejected by Division Chief',
+            ]);
+
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'Division Chief Rejected',
+                'remarks' => 'Rejected by Division Chief.',
+                'updated_by' => $request->user()->id,
+            ]);
+        }
+
+        return back()->with('success', 'Division Chief action recorded!');
+    }
+
+    public function ocdApproval(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user->role || $user->role->name !== 'OCD') {
+            abort(403, 'Unauthorized');
+        }
+
+        $requests = ITJobRequest::with('user')
+            ->where('status', 'Pending OCD Approval')
+            ->get();
+
+        return Inertia::render('ITJobRequests/OCDApprovalITJR', [
+            'requests' => $requests
+        ]);
+    }
+
+    public function approveByOCD(Request $request, ITJobRequest $jobRequest)
+    {
+        $request->validate([
+            'action' => 'required|in:approve,reject',
+        ]);
+
+        if ($request->action === 'approve') {
+            $jobRequest->update([
+                'ocd_approval' => true,
+                'ocd_approval_date' => now(),
+                'status' => 'In Progress',
+            ]);
+
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'OCD Approved',
+                'remarks' => 'Request Approved by OCD.',
+                'updated_by' => $request->user()->id,
+            ]);
+        } else {
+            $jobRequest->update([
+                'status' => 'Rejected by OCD',
+            ]);
+
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'OCD Rejected',
+                'remarks' => 'Rejected by OCD.',
+                'updated_by' => $request->user()->id,
+            ]);
+        }
+
+        return back()->with('success', 'OCD action recorded!');
+    }
 }
