@@ -106,6 +106,19 @@ class HandleInertiaRequests extends Middleware
                 }
                 return ServiceRequest::where('status', 'Pending')->count();
             },
+            // Number of gatepasses pending. For DivisionChiefs show only gatepasses
+            // requested by employees in their division(s).
+            'gatepassNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                $db = \Illuminate\Support\Facades\DB::table('gatepass');
+                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                    $badgeNumbers = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('badge_id')->filter()->toArray();
+                    if (empty($badgeNumbers)) return 0;
+                    return $db->where('status', 'Pending')->whereIn('badgeNumber', $badgeNumbers)->count();
+                }
+                return $db->where('status', 'Pending')->count();
+            },
             // Number of work requests for the sidebar badge
             'workRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();

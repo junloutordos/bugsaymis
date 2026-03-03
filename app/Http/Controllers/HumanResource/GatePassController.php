@@ -5,13 +5,68 @@ namespace App\Http\Controllers\HumanResource;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
+use App\Mail\GatePassCreatedMail;
+use App\Mail\GatePassDeclinedMail;
+use App\Mail\GatePassStatusMail;
 use Inertia\Inertia;
 
 class GatePassController extends Controller
 {
     public function index(Request $request)
     {
-        $rows = DB::table('gatepass')->orderByDesc('id')->get();
+        // If current user is the chief of a division, show only pending gatepasses
+        // for employees in that division. If user is Staff or Faculty, show only
+        // gatepasses created by that user. Otherwise show all gatepasses.
+        $rows = null;
+        $chiefDivision = null;
+        $user = $request->user();
+        $role = $user?->role->name ?? '';
+
+        if ($user) {
+            $chiefDivision = DB::table('divisions')->where('division_chief_id', $user->id)->first();
+        }
+
+        if ($chiefDivision) {
+            $rows = DB::table('gatepass')
+                ->join('users', 'users.badge_id', '=', 'gatepass.badgeNumber')
+                ->where('users.division_id', $chiefDivision->id)
+                ->where('gatepass.status', 'Pending')
+                ->select('gatepass.*', 'users.name as name', 'users.position as position')
+                ->orderByDesc('gatepass.id')
+                ->get();
+        } elseif ($user && in_array($role, ['Staff', 'Faculty'])) {
+            // Gatepass table stores the user's badge as `badgeNumber` (unsignedInteger).
+            // Use the user's `badge_id` (from users table) to filter and include
+            // the user's name/position by joining the users table so the Name and
+            // Status columns are present in the returned rows.
+            $badge = $user->badge_id ?? null;
+            if ($badge !== null) {
+                // Use CAST to CHAR to avoid type-mismatch issues between stored badge
+                // types. This ensures matching works whether `users.badge_id` is
+                // stored as string or integer.
+                $rows = DB::table('gatepass')
+                    ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+                    ->whereRaw("CAST(gatepass.badgeNumber AS CHAR) = ?", [(string) $badge])
+                    ->select('gatepass.*', 'users.name as name', 'users.position as position')
+                    ->orderByDesc('gatepass.id')
+                    ->get();
+            } else {
+                // No badge associated with user; don't return any rows.
+                $rows = collect([]);
+            }
+        } else {
+            // For administrators and other roles, include the requestor's name/position
+            // by left-joining the users table on badge id -> badgeNumber. Use CAST to
+            // char to avoid type mismatch between stored badge types.
+            $rows = DB::table('gatepass')
+                ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+                ->select('gatepass.*', 'users.name as name', 'users.position as position')
+                ->orderByDesc('gatepass.id')
+                ->get();
+        }
 
         $divisionChief = null;
         if ($request->user() && $request->user()->division_id) {
@@ -52,11 +107,12 @@ class GatePassController extends Controller
     public function store(Request $request)
     {
         $input = $request->only([
-            'controlno','badgeID','gatepass_type','gatepass_timeout','gatepass_timein','gatepass_date','gatepass_datefiled','destination','purpose','date_time_approved','actual_timeout','actual_timein','time_consumed','status'
+            'controlno','badgeNumber','badgeID','gatepass_type','gatepass_timeout','gatepass_timein','gatepass_date','gatepass_datefiled','destination','purpose','date_time_approved','actual_timeout','actual_timein','time_consumed','status'
         ]);
 
         $validator = \Illuminate\Support\Facades\Validator::make($input, [
             'controlno' => 'nullable|string|max:50',
+            'badgeNumber' => 'nullable|integer',
             'badgeID' => 'nullable|integer',
             'gatepass_type' => 'nullable|string|max:100',
             'gatepass_timeout' => 'nullable|string|max:50',
@@ -137,14 +193,39 @@ class GatePassController extends Controller
         $insert['status'] = !empty($data['status']) ? $data['status'] : 'Pending';
 
         $id = DB::table('gatepass')->insertGetId(array_merge($insert, ['created_at' => now(), 'updated_at' => now()]));
-        $row = DB::table('gatepass')->where('id', $id)->first();
+
+        // Fetch the created gatepass and include the requestor's name (if available)
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+
+        // Notify the division chief of the requestor (if any) using signed links similar
+        // to vehicle request logic so the chief can approve/decline from email.
+        try {
+            if ($request->user() && $request->user()->division_id) {
+                $division = DB::table('divisions')->where('id', $request->user()->division_id)->first();
+                if ($division && !empty($division->division_chief_id)) {
+                    $chief = DB::table('users')->where('id', $division->division_chief_id)->first();
+                    if ($chief && !empty($chief->email)) {
+                        $approveUrl = URL::signedRoute('gatepass.approve', ['id' => $id, 'chief' => $chief->id], now()->addDays(7));
+                        $declineUrl = URL::signedRoute('gatepass.decline', ['id' => $id, 'chief' => $chief->id], now()->addDays(7));
+                        Mail::to($chief->email)->send(new GatePassCreatedMail($row, $approveUrl, $declineUrl));
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send gatepass notification', ['error' => $e->getMessage()]);
+        }
+
         return response()->json(['row' => $row], 201);
     }
 
     public function update(Request $request, $id)
     {
         $input = $request->only([
-            'controlno','badgeID','gatepass_type','gatepass_timeout','gatepass_timein','gatepass_date','gatepass_datefiled','destination','purpose','date_time_approved','actual_timeout','actual_timein','time_consumed','status'
+            'controlno','badgeID','gatepass_type','gatepass_timeout','gatepass_timein','gatepass_date','gatepass_datefiled','destination','purpose','date_time_approved','actual_timeout','actual_timein','time_consumed','status','decline_reason','date_time_declined'
         ]);
 
         $validator = \Illuminate\Support\Facades\Validator::make($input, [
@@ -158,6 +239,8 @@ class GatePassController extends Controller
             'destination' => 'nullable|string|max:255',
             'purpose' => 'nullable|string|max:1000',
             'date_time_approved' => 'nullable|string|max:100',
+            'date_time_declined' => 'nullable|string|max:100',
+            'decline_reason' => 'nullable|string|max:1000',
             'actual_timeout' => 'nullable|string|max:100',
             'actual_timein' => 'nullable|string|max:100',
             'time_consumed' => 'nullable|string|max:50',
@@ -170,15 +253,92 @@ class GatePassController extends Controller
 
         $data = $validator->validated();
 
-        // Force badgeNumber to authenticated user's badge_id (do not allow changing badge via request)
-        if ($request->user()) {
-            $data['badgeNumber'] = $request->user()->badge_id ?? $request->user()->badgeNumber ?? $request->user()->badgeID ?? null;
+        // Prevent DivisionChief (or other approvers) from changing the requestor's badgeNumber.
+        // Fetch existing row to preserve fields not provided.
+        $existing = DB::table('gatepass')->where('id', $id)->first();
+        if (!$existing) {
+            return response()->json(['message' => 'Not found'], 404);
         }
+
+        // If the authenticated user is a DivisionChief, enforce approval/decline
+        // behavior and do not allow changing the requestor's badgeNumber.
+        $role = $request->user()?->role->name ?? '';
+        if ($role === 'DivisionChief') {
+            // If the Division Chief intentionally set the status to 'Division Declined',
+            // preserve that; otherwise treat the action as approval and set to
+            // 'Division Approved'. This prevents client-side tampering with badgeNumber
+            // while allowing the chief to explicitly decline with a reason.
+            if (isset($data['status']) && $data['status'] === 'Division Declined') {
+                $data['status'] = 'Division Declined';
+            } else {
+                $data['status'] = 'Division Approved';
+            }
+            if (isset($data['badgeNumber'])) {
+                unset($data['badgeNumber']);
+            }
+        }
+
+        // If the Division Chief provided a decline reason, save it in the
+        // `remarks` column so the reason is preserved on the record.
+        if (isset($data['status']) && $data['status'] === 'Division Declined') {
+            if (!empty($data['decline_reason'])) {
+                $data['remarks'] = $data['decline_reason'];
+            }
+        }
+        if (isset($data['decline_reason'])) unset($data['decline_reason']);
+
         // remove any incoming badgeID to avoid attempting to update a non-existent column
         if (isset($data['badgeID'])) unset($data['badgeID']);
 
-        DB::table('gatepass')->where('id', $id)->update(array_merge($data, ['updated_at' => now()]));
-        $row = DB::table('gatepass')->where('id', $id)->first();
+        // Only keep keys that correspond to actual DB columns to avoid SQL errors
+        // when migrations (e.g., adding `remarks`) haven't been applied yet.
+        $availableColumns = Schema::getColumnListing('gatepass');
+        $filteredData = array_intersect_key($data, array_flip($availableColumns));
+
+        // Only update columns provided in $filteredData; preserve others by merging with existing values.
+        $update = array_merge((array) $existing, $filteredData, ['updated_at' => now()]);
+        // Remove id from update payload if present
+        if (isset($update['id'])) unset($update['id']);
+
+        DB::table('gatepass')->where('id', $id)->update($update);
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+
+        // If Division Chief declined via in-app update, notify requester by email
+        try {
+            if (isset($data['status']) && $data['status'] === 'Division Declined') {
+                $requester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
+                $reason = $update['remarks'] ?? $row->remarks ?? null;
+                if ($requester && ! empty($requester->email)) {
+                    Mail::to($requester->email)->send(new GatePassDeclinedMail($row, $reason));
+                }
+            }
+            // If Division Chief approved via in-app update, notify role_id=7 users
+            if (isset($data['status']) && $data['status'] === 'Division Approved') {
+                try {
+                    $notifyUsers = DB::table('users')->where('role_id', 7)->get();
+                    foreach ($notifyUsers as $u) {
+                        if (!empty($u->email)) {
+                            try {
+                                $approveUrl = URL::signedRoute('gatepass.ocd.approve', ['id' => $id, 'ocd' => $u->id], now()->addDays(7));
+                                $declineUrl = URL::signedRoute('gatepass.ocd.decline', ['id' => $id, 'ocd' => $u->id], now()->addDays(7));
+                                Mail::to($u->email)->send(new GatePassStatusMail($row, 'Division Approved', null, 'Division Chief', $approveUrl, $declineUrl));
+                            } catch (\Throwable $e) {
+                                logger()->error('Failed to send gatepass notification to role_id=7 (in-app)', ['error' => $e->getMessage(), 'user_id' => $u->id]);
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    logger()->error('Failed to notify role_id=7 users after division approval (in-app)', ['error' => $e->getMessage()]);
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send gatepass declined notification (in-app)', ['error' => $e->getMessage(), 'id' => $id]);
+        }
+
         return response()->json(['row' => $row]);
     }
 
@@ -186,5 +346,260 @@ class GatePassController extends Controller
     {
         DB::table('gatepass')->where('id', $id)->delete();
         return response()->json(['deleted' => true]);
+    }
+
+    /**
+     * Render a printable gate pass as a Blade view.
+     */
+    public function printView(Request $request, $id)
+    {
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+
+        if (!$row) {
+            abort(404);
+        }
+
+        // resolve division chief (if any) for signature
+        $divisionChief = null;
+        if ($request->user() && $request->user()->division_id) {
+            $division = DB::table('divisions')->where('id', $request->user()->division_id)->first();
+            if ($division && !empty($division->division_chief_id)) {
+                $chief = DB::table('users')->where('id', $division->division_chief_id)->first();
+                if ($chief) {
+                    $divisionChief = [
+                        'id' => $chief->id,
+                        'name' => $chief->name,
+                        'position' => $chief->position ?? 'Division Chief',
+                    ];
+                }
+            }
+        }
+
+        // campus director
+        $director = null;
+        $officeDivision = DB::table('divisions')->where('division_name', 'Office of the Campus Director')->first();
+        if ($officeDivision && !empty($officeDivision->division_chief_id)) {
+            $d = DB::table('users')->where('id', $officeDivision->division_chief_id)->first();
+            if ($d) {
+                $director = [
+                    'id' => $d->id,
+                    'name' => $d->name,
+                    'position' => $d->position ?? 'Director',
+                ];
+            }
+        }
+
+        return view('hr.print_gatepass', [
+            'row' => $row,
+            'divisionChief' => $divisionChief,
+            'director' => $director,
+        ]);
+    }
+
+    /**
+     * Approve gatepass by Division Chief via signed link
+     */
+    public function approveByDivisionChief(Request $request, $id, $chief)
+    {
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+        if (! $row) abort(404);
+
+        // verify chief matches requester's division chief if available
+        $requester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
+        if ($requester && $requester->division_id) {
+            $division = DB::table('divisions')->where('id', $requester->division_id)->first();
+            if ($division && ! empty($division->division_chief_id) && (int) $division->division_chief_id !== (int) $chief) {
+                abort(403);
+            }
+        }
+
+        if ($row->status === 'Division Approved') {
+            return view('gatepass_approved', ['gatepass' => $row, 'already' => true]);
+        }
+
+        DB::table('gatepass')->where('id', $id)->update(['status' => 'Division Approved', 'date_time_approved' => now(), 'updated_at' => now()]);
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+
+        // Notify users with role_id = 7 (e.g., GSU Head) about the approved gatepass
+        try {
+            $notifyUsers = DB::table('users')->where('role_id', 7)->get();
+            foreach ($notifyUsers as $u) {
+                if (!empty($u->email)) {
+                    try {
+                        $approveUrl = URL::signedRoute('gatepass.ocd.approve', ['id' => $id, 'ocd' => $u->id], now()->addDays(7));
+                        $declineUrl = URL::signedRoute('gatepass.ocd.decline', ['id' => $id, 'ocd' => $u->id], now()->addDays(7));
+                        Mail::to($u->email)->send(new GatePassStatusMail($row, 'Division Approved', null, 'Division Chief', $approveUrl, $declineUrl));
+                    } catch (\Throwable $e) {
+                        logger()->error('Failed to send gatepass notification to role_id=7', ['error' => $e->getMessage(), 'user_id' => $u->id]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify role_id=7 users after division approval', ['error' => $e->getMessage()]);
+        }
+
+        return view('gatepass_approved', ['gatepass' => $row, 'already' => false]);
+    }
+
+    /**
+     * Show decline form for signed decline link
+     */
+    public function showDeclineForm(Request $request, $id, $chief)
+    {
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+        if (! $row) abort(404);
+
+        if ($row->status === 'Division Approved') {
+            return view('gatepass_approved', ['gatepass' => $row, 'already' => true]);
+        }
+
+        $postAction = route('gatepass.decline.submit', ['id' => $id, 'chief' => $chief])
+            . '?' . $request->getQueryString();
+
+        return view('gatepass_decline', ['gatepass' => $row, 'postAction' => $postAction]);
+    }
+
+    /**
+     * Handle decline submitted from signed decline form
+     */
+    public function submitDecline(Request $request, $id, $chief)
+    {
+        $request->validate(['reason' => 'required|string|max:1000']);
+
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+        if (! $row) abort(404);
+
+        if (in_array($row->status, ['Division Approved','Division Declined'])) {
+            $reason = $row->remarks ?? '—';
+            return view('gatepass_declined', ['gatepass' => $row, 'reason' => $reason]);
+        }
+
+        $updatePayload = [
+            'status' => 'Division Declined',
+            'remarks' => $request->input('reason'),
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('gatepass', 'date_time_declined')) {
+            $updatePayload['date_time_declined'] = now();
+        }
+
+        DB::table('gatepass')->where('id', $id)->update($updatePayload);
+
+        $row = DB::table('gatepass')->where('id', $id)->first();
+
+        // Attempt to notify requester by email (best-effort) using a Mailable
+        try {
+            $requester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
+            if ($requester && ! empty($requester->email)) {
+                Mail::to($requester->email)->send(new GatePassDeclinedMail($row, $request->input('reason')));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify gatepass requester after decline', ['error' => $e->getMessage(), 'id' => $id]);
+        }
+
+        return view('gatepass_declined', ['gatepass' => $row, 'reason' => $request->input('reason')]);
+    }
+
+    /**
+     * OCD approve via signed link
+     */
+    public function approveByOCD(Request $request, $id, $ocd)
+    {
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+        if (! $row) abort(404);
+
+        if ($row->status === 'OCD Approved') {
+            return view('gatepass_approved', ['gatepass' => $row, 'already' => true]);
+        }
+
+        DB::table('gatepass')->where('id', $id)->update(['status' => 'OCD Approved', 'updated_at' => now()]);
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+
+        try {
+            $requester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
+            if ($requester && !empty($requester->email)) {
+                Mail::to($requester->email)->send(new GatePassStatusMail($row, 'OCD Approved', null, 'Office of the Campus Director'));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send OCD-approved notification to requester', ['error' => $e->getMessage(), 'id' => $id]);
+        }
+
+        return view('gatepass_approved', ['gatepass' => $row, 'already' => false]);
+    }
+
+    public function showOcdDeclineForm(Request $request, $id, $ocd)
+    {
+        $row = DB::table('gatepass')->where('id', $id)->first();
+        if (! $row) abort(404);
+
+        if ($row->status === 'OCD Approved') {
+            return view('gatepass_approved', ['gatepass' => $row, 'already' => true]);
+        }
+
+        $postAction = route('gatepass.ocd.decline.submit', ['id' => $id, 'ocd' => $ocd]) . '?' . $request->getQueryString();
+        return view('gatepass_decline', ['gatepass' => $row, 'postAction' => $postAction]);
+    }
+
+    public function submitOcdDecline(Request $request, $id, $ocd)
+    {
+        $request->validate(['reason' => 'required|string|max:1000']);
+
+        $row = DB::table('gatepass')->where('id', $id)->first();
+        if (! $row) abort(404);
+
+        if (in_array($row->status, ['OCD Approved','OCD Declined'])) {
+            $reason = $row->remarks ?? '—';
+            return view('gatepass_declined', ['gatepass' => $row, 'reason' => $reason]);
+        }
+
+        $updatePayload = ['status' => 'OCD Declined', 'remarks' => $request->input('reason'), 'updated_at' => now()];
+        if (Schema::hasColumn('gatepass', 'date_time_declined')) $updatePayload['date_time_declined'] = now();
+        DB::table('gatepass')->where('id', $id)->update($updatePayload);
+
+        $row = DB::table('gatepass')
+            ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+            ->select('gatepass.*', 'users.name as name', 'users.position as position')
+            ->where('gatepass.id', $id)
+            ->first();
+
+        try {
+            $requester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
+            if ($requester && !empty($requester->email)) {
+                Mail::to($requester->email)->send(new GatePassStatusMail($row, 'OCD Declined', $request->input('reason'), 'Office of the Campus Director'));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify requester after OCD decline', ['error' => $e->getMessage(), 'id' => $id]);
+        }
+
+        return view('gatepass_declined', ['gatepass' => $row, 'reason' => $request->input('reason')]);
     }
 }

@@ -75,10 +75,33 @@
             ->first();
         if ($divDirector && $divDirector->divisionchief) {
           $directorName = $divDirector->divisionchief->name;
+          // Prefer a division-level signature_path
           if (!empty($divDirector->signature_path)) {
             $directorSig = $divDirector->signature_path;
-          } elseif (!empty($divDirector->divisionchief->electronic_signature)) {
-            $directorSig = $divDirector->divisionchief->electronic_signature;
+          } else {
+            // If the division record has an OCD-assigned user id, prefer that user's signature
+            $ocdUserId = null;
+            if (!empty($divDirector->ocd_id)) {
+                $ocdUserId = $divDirector->ocd_id;
+            } elseif (!empty($divDirector->ocd)) {
+                $ocdUserId = $divDirector->ocd;
+            } elseif (!empty($divDirector->ocd_user_id)) {
+                $ocdUserId = $divDirector->ocd_user_id;
+            }
+            if ($ocdUserId) {
+                try {
+                    $ocdUser = \App\Models\User::find($ocdUserId);
+                    if ($ocdUser && !empty($ocdUser->electronic_signature)) {
+                        $directorSig = $ocdUser->electronic_signature;
+                    }
+                } catch (\Throwable $e) {
+                    // ignore and fallback
+                }
+            }
+            // fallback to divisionchief's electronic signature if still empty
+            if (empty($directorSig) && !empty($divDirector->divisionchief->electronic_signature)) {
+                $directorSig = $divDirector->divisionchief->electronic_signature;
+            }
           }
         } else {
           $director = \App\Models\User::where('position', 'like', '%Campus Director%')->first();

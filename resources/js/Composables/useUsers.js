@@ -30,21 +30,35 @@ export function useUsers(props) {
   })
 
   const isEmployeesPage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('employee'))
+  const isInactivePage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('inactive'))
 
   // Filtered + paginated users
   const filteredUsers = computed(() => {
-    let results = usersList.value.filter(
+    const list = usersList.value || []
+    // If we're on the Inactive Users page, show only inactive users
+    const matched = list.filter(u => {
+      const status = (u.status || '').toLowerCase()
+      if (isInactivePage) return status === 'inactive'
+      return status !== 'inactive'
+    })
+
+    let results = matched.filter(
       (u) =>
-        u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
+        (u.name || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(searchQuery.value.toLowerCase())
     )
     const start = (currentPage.value - 1) * perPage
     return results.slice(start, start + perPage)
   })
 
-  const totalPages = computed(() =>
-    Math.ceil(usersList.value.length / perPage)
-  )
+  const totalPages = computed(() => {
+    const list = usersList.value || []
+    const count = list.filter(u => {
+      const status = (u.status || '').toLowerCase()
+      return isInactivePage ? status === 'inactive' : status !== 'inactive'
+    }).length
+    return Math.max(1, Math.ceil(count / perPage))
+  })
 
   // Modal logic
   const openModal = (mode, user = null) => {
@@ -170,6 +184,29 @@ export function useUsers(props) {
     }
   }
 
+  // Activate (reactivate) user
+  const activateUser = async (user) => {
+    const result = await Swal.fire({
+      title: `Activate ${user.name}?`,
+      text: 'This will return the user to active status.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, activate',
+      cancelButtonText: 'Cancel',
+    })
+    if (result.isConfirmed) {
+      router.post(`/users/${user.id}/activate`, null, {
+        onSuccess: async () => {
+          usersList.value = usersList.value.filter((u) => u.id !== user.id)
+          await Swal.fire('Activated', 'User has been reactivated', 'success')
+        },
+        onError: async (errors) => {
+          await Swal.fire('Error', Object.values(errors).flat().join(', '), 'error')
+        }
+      })
+    }
+  }
+
   return {
     usersList,
     rolesList,
@@ -188,6 +225,8 @@ export function useUsers(props) {
     submitUser,
     viewUser,
     deleteUser,
+    activateUser,
     isEmployeesPage,
+    isInactivePage,
   }
 }

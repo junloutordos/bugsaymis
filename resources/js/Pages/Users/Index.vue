@@ -39,7 +39,9 @@ const props = defineProps({
   submitUser,
   viewUser,
   deleteUser,
+  activateUser,
   isEmployeesPage,
+  isInactivePage,
 } = useUsers(props)
 
 // Division chief watcher
@@ -123,6 +125,7 @@ const openSignaturePicker = (user) => {
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">{{ props.headerTitle || 'Users List' }}</h1>
         <button
+          v-if="!isInactivePage"
           @click="openModal('create')"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
         >
@@ -209,41 +212,54 @@ const openSignaturePicker = (user) => {
                 </td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
-                    <button
-                      @click="viewUser(user)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <EyeIcon class="w-5 h-5 text-blue-600" />
-                    </button>
-                    <button
-                      @click="openModal('edit', user)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
-                    </button>
-                                <!-- Upload signature button -->
-                                <div class="relative">
-                                  <input
-                                    :id="'sig-input-' + user.id"
-                                    type="file"
-                                    accept=".png,image/png"
-                                    class="hidden"
-                                    @change="(e) => handleUpload(user, e)"
-                                  />
-                                  <button
-                                    @click.prevent="openSignaturePicker(user)"
-                                    title="Upload signature (PNG)"
-                                    class="p-1 hover:bg-gray-100 rounded"
-                                  >
-                                    <ArrowUpOnSquareIcon class="w-5 h-5 text-green-600" />
-                                  </button>
-                                </div>
-                    <button
-                      @click="deleteUser(user)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <TrashIcon class="w-5 h-5 text-red-600" />
-                    </button>
+                    <template v-if="!isInactivePage">
+                      <button
+                        @click="viewUser(user)"
+                        class="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <EyeIcon class="w-5 h-5 text-blue-600" />
+                      </button>
+                      <button
+                        @click="openModal('edit', user)"
+                        class="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                      </button>
+                      <!-- Upload signature button -->
+                      <div class="relative">
+                        <input
+                          :id="'sig-input-' + user.id"
+                          type="file"
+                          accept=".png,image/png"
+                          class="hidden"
+                          @change="(e) => handleUpload(user, e)"
+                        />
+                        <button
+                          @click.prevent="openSignaturePicker(user)"
+                          title="Upload signature (PNG)"
+                          class="p-1 hover:bg-gray-100 rounded"
+                        >
+                          <ArrowUpOnSquareIcon class="w-5 h-5 text-green-600" />
+                        </button>
+                      </div>
+                    </template>
+                    <template v-if="isInactivePage">
+                      <button
+                        @click="activateUser(user)"
+                        class="p-1 hover:bg-gray-100 rounded"
+                        title="Activate user"
+                      >
+                        <PlusIcon class="w-5 h-5 text-green-600" />
+                      </button>
+                    </template>
+                    <template v-else>
+                      <button
+                        @click="deleteUser(user)"
+                        class="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <TrashIcon class="w-5 h-5 text-red-600" />
+                      </button>
+                    </template>
                   </div>
                 </td>
               </tr>

@@ -867,6 +867,60 @@ class FacilityRequestController extends Controller
     }
 
     /**
+     * Return facility requests for a specific date (any status).
+     * Includes whether an associated IT Job Request exists and its status.
+     */
+    public function byDate(Request $request)
+    {
+        $request->validate(['date' => 'required|date']);
+        $date = $request->input('date');
+
+        $rows = FacilityRequest::with('requester.division')
+            ->where(function ($q) use ($date) {
+                $q->where('date_start', '<=', $date)
+                  ->where(function ($q2) use ($date) {
+                      $q2->where('date_end', '>=', $date)
+                         ->orWhereNull('date_end');
+                  });
+            })
+            ->get();
+
+        $out = $rows->map(function ($r) {
+            $venues = $r->venue ?? [];
+            if (! is_array($venues)) {
+                $venues = $venues ? [$venues] : [];
+            }
+
+            $facilityNames = [];
+            if (! empty($venues)) {
+                $facilityNames = \App\Models\Facility::whereIn('id', $venues)->pluck('name')->toArray();
+            }
+
+            $itjr = \App\Models\ITJobRequest::where('facility_request_id', $r->id)
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+
+            return [
+                'id' => $r->id,
+                'activity' => $r->activity,
+                'venue' => $facilityNames,
+                'requester_name' => $r->requester?->name ?? null,
+                'requester_unit' => $r->requester?->division?->division_name ?? $r->unit ?? null,
+                'date_start' => $r->date_start,
+                'date_end' => $r->date_end,
+                'time_start' => $r->time_start,
+                'time_end' => $r->time_end,
+                'status' => $r->status,
+                'has_it_job' => (bool) $itjr,
+                'it_job_status' => $itjr?->status ?? null,
+                'it_job_id' => $itjr?->id ?? null,
+            ];
+        })->values();
+
+        return response()->json($out);
+    }
+
+    /**
      * Show a printable view for a facility request.
      * Only accessible to Admin and GSU Head via route middleware.
      */

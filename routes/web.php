@@ -244,6 +244,34 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('gatepass.index');
     Route::post('/hr/gatepass', [\App\Http\Controllers\HumanResource\GatePassController::class, 'store'])
         ->name('gatepass.store');
+    // Division chief approve/decline via signed links (email)
+    Route::get('/hr/gatepass/{id}/approve/{chief}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'approveByDivisionChief'])
+        ->name('gatepass.approve')
+        ->middleware(['signed']);
+
+    Route::get('/hr/gatepass/{id}/decline/{chief}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'showDeclineForm'])
+        ->name('gatepass.decline')
+        ->middleware(['signed']);
+
+    Route::post('/hr/gatepass/{id}/decline/{chief}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'submitDecline'])
+        ->name('gatepass.decline.submit')
+        ->middleware(['signed']);
+
+    // OCD signed routes for gatepass (Office of the Campus Director)
+    Route::get('/hr/gatepass/{id}/ocd/approve/{ocd}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'approveByOCD'])
+        ->name('gatepass.ocd.approve')
+        ->middleware(['signed']);
+
+    Route::get('/hr/gatepass/{id}/ocd/decline/{ocd}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'showOcdDeclineForm'])
+        ->name('gatepass.ocd.decline')
+        ->middleware(['signed']);
+
+    Route::post('/hr/gatepass/{id}/ocd/decline/{ocd}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'submitOcdDecline'])
+        ->name('gatepass.ocd.decline.submit')
+        ->middleware(['signed']);
+    Route::get('/hr/gatepass/{id}/print', [\App\Http\Controllers\HumanResource\GatePassController::class, 'printView'])
+        ->name('gatepass.print')
+        ->middleware('auth');
     Route::put('/hr/gatepass/{id}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'update'])
         ->name('gatepass.update');
     Route::delete('/hr/gatepass/{id}', [\App\Http\Controllers\HumanResource\GatePassController::class, 'destroy'])
@@ -273,6 +301,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Facility bookings API for calendar
     Route::get('/facility-bookings', [\App\Http\Controllers\FacilityRequestController::class, 'bookings'])->name('facility-requests.bookings');
+    // Facility requests for a specific date (used by dashboard date modal)
+    Route::get('/facility-requests/by-date', [\App\Http\Controllers\FacilityRequestController::class, 'byDate'])->name('facility-requests.byDate');
     // Activity Planner
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
     Route::post('/activities', [ActivityController::class, 'store'])->name('activities.store');
@@ -345,6 +375,26 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/assets', [\App\Http\Controllers\AssetController::class, 'store'])->name('assets.store');
     Route::put('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'update'])->name('assets.update');
     Route::delete('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'destroy'])->name('assets.destroy');
+
+    // Procurement
+    Route::get('/procurements', [\App\Http\Controllers\ProcurementController::class, 'index'])->name('procurements.index');
+    Route::post('/procurements', [\App\Http\Controllers\ProcurementController::class, 'store'])->name('procurements.store');
+    Route::put('/procurements/{procurement}', [\App\Http\Controllers\ProcurementController::class, 'update'])->name('procurements.update');
+    Route::delete('/procurements/{procurement}', [\App\Http\Controllers\ProcurementController::class, 'destroy'])->name('procurements.destroy');
+    Route::post('/procurements/{procurement}/items', [\App\Http\Controllers\ProcurementController::class, 'storeItem'])->name('procurements.items.store');
+    Route::delete('/procurements/{procurement}/items/{item}', [\App\Http\Controllers\ProcurementController::class, 'destroyItem'])->name('procurements.items.destroy');
+    // Send procurement for approval (notifies Budget Officers)
+    Route::post('/procurements/{procurement}/send-for-approval', [\App\Http\Controllers\ProcurementController::class, 'sendForApproval'])->name('procurements.sendForApproval');
+    // Signed approval/decline links for Budget Officer
+    Route::get('/procurements/{procurement}/approve/{approver}', [\App\Http\Controllers\ProcurementController::class, 'approveByBudgetOfficer'])
+        ->name('procurements.approve')
+        ->middleware(['signed']);
+    Route::get('/procurements/{procurement}/decline/{approver}', [\App\Http\Controllers\ProcurementController::class, 'showBudgetOfficerDeclineForm'])
+        ->name('procurements.decline')
+        ->middleware(['signed']);
+    Route::post('/procurements/{procurement}/decline/{approver}', [\App\Http\Controllers\ProcurementController::class, 'submitBudgetOfficerDecline'])
+        ->name('procurements.decline.submit')
+        ->middleware(['signed']);
     // Driver assignment API
     Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');
     Route::post('/vehicle-requests/{vehicleRequest}/assign-driver', [\App\Http\Controllers\DriverController::class, 'assign'])->name('vehicle-requests.assign-driver');
@@ -606,6 +656,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{id}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::post('users/{user}/upload-signature', [UserController::class, 'uploadSignature'])->name('users.upload_signature');
+        Route::get('/users/inactive', [UserController::class, 'inactiveIndex'])->name('users.inactive')->middleware('role:Administrator');
+        Route::post('/users/{id}/activate', [UserController::class, 'activate'])->name('users.activate')->middleware('role:Administrator');
         Route::get('/users-roles', [RolesController::class, 'index'])->name('roles.index');
         Route::post('users-roles', [RolesController::class, 'store'])->name('roles.store');
         Route::put('users-roles/{id}', [RolesController::class, 'update'])->name('roles.update');
