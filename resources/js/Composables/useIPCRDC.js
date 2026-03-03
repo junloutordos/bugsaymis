@@ -147,7 +147,8 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
       case 'Targets Approved': return 'bg-green-100 text-green-700'
       case 'Submitted for Rating': return 'bg-orange-100 text-orange-700'
       case 'Rated & For PMT Review': return 'bg-violet-100 text-violet-700'
-      case 'Rejected': return 'bg-red-100 text-red-700'
+      case 'Returned for Revision': return 'bg-red-100 text-red-700'
+      case 'Rejected': return 'bg-red-200 text-red-800'
       default: return 'bg-gray-100 text-gray-700'
     }
   }

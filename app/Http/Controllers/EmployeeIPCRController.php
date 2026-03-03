@@ -125,11 +125,16 @@ class EmployeeIPCRController extends Controller
             'plans.performance_indicator.agencyOutcome'
         ])->findOrFail($id);
 
+        $workPlans = WorkDistributionPlan::with(['performance_indicator'])
+            ->orderBy('id', 'asc')
+            ->get();
+
         return Inertia::render('PerformanceManagement/EmployeeIPCRShow', [
             'ipcr'       => $ipcr,
-            'employee'   => $ipcr->user,                              // employee
-            'supervisor' => $ipcr->user->division->divisionchief,     // division chief
+            'employee'   => $ipcr->user,
+            'supervisor' => $ipcr->user->division->divisionchief,
             'plans'      => $ipcr->plans,
+            'workPlans'  => $workPlans,
         ]);
     }
 
@@ -200,6 +205,43 @@ class EmployeeIPCRController extends Controller
             ->with('success', 'IPCR submitted for rating successfully.');
     }
 
+    /**
+     * Remove a plan from an IPCR (only allowed when returned for revision).
+     */
+    public function removePlan(EmployeeIPCR $employeeIPCR, $planId)
+    {
+        if ($employeeIPCR->user_id !== auth()->id()) {
+            abort(403);
+        }
 
+        if ($employeeIPCR->status !== 'Returned for Revision') {
+            abort(403, 'Plans can only be removed when the IPCR is returned for revision.');
+        }
 
+        $employeeIPCR->plans()->detach($planId);
+
+        return redirect()->back()->with('success', 'Plan removed successfully.');
+    }
+
+    /**
+     * Resubmit an IPCR for review after revision (only from Returned for Revision).
+     */
+    public function resubmit(EmployeeIPCR $employeeIPCR)
+    {
+        if ($employeeIPCR->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($employeeIPCR->status !== 'Returned for Revision') {
+            abort(403, 'Only IPCRs returned for revision can be resubmitted.');
+        }
+
+        $employeeIPCR->update([
+            'status' => 'For Review',
+            'submitted_for_review_at' => now(),
+        ]);
+
+        return to_route('employee-ipcr.show', $employeeIPCR->id)
+            ->with('success', 'IPCR resubmitted for review.');
+    }
 }

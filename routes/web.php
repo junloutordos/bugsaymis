@@ -668,15 +668,26 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         // Approve an IPCR target
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/targetsapproval', [DivisionChiefIPCRController::class, 'approveTargets'])
             ->name('division-chief-employee-ipcr.targetsapproval');
+        // Disapprove IPCR targets (return for revision)
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/disapprove', [DivisionChiefIPCRController::class, 'disapproveTargets'])
+            ->name('division-chief-employee-ipcr.disapprove');
+        // Save per-plan remark during review
+        Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/remark', [DivisionChiefIPCRController::class, 'savePlanRemark'])
+            ->name('division-chief-employee-ipcr-plan.remark');
         // Save supervisor ratings for an IPCR target
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/saveratings', [DivisionChiefIPCRController::class, 'saveRatings'])
             ->name('division-chief-employee-ipcr.saveratings');
         // Save division chief comments/suggestions
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])
             ->name('division-chief-employee-ipcr.savecomments');
-        
+
         // Rate accomplishments for an IPCR
         Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/rate', [DivisionChiefIPCRController::class, 'rateIPCRPlan'])->name('division-chief-employee-ipcr-plan.rateIPCRPlan');
+        // Employee plan management (also accessible here for admins)
+        Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])
+            ->name('employee-ipcr.removePlan');
+        Route::post('/employee-ipcr/{employeeIPCR}/resubmit', [EmployeeIPCRController::class, 'resubmit'])
+            ->name('employee-ipcr.resubmit');
 
 
 
@@ -753,7 +764,13 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])
             ->name('employee-ipcr.submitRating');
 
-        
+        // Remove a plan from an IPCR (when returned for revision)
+        Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])
+            ->name('employee-ipcr.removePlan');
+        // Resubmit IPCR after revision
+        Route::post('/employee-ipcr/{employeeIPCR}/resubmit', [EmployeeIPCRController::class, 'resubmit'])
+            ->name('employee-ipcr.resubmit');
+
 
 
 
