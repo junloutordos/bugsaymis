@@ -51,7 +51,7 @@ const props = defineProps({
   recentIPCRs:   { type: Array,  default: () => [] },
 
   // IT Job Requests
-  itjrByCategory: { type: Array, default: () => [] },
+  itjrByCategory:  { type: Array, default: () => [] },
 
   // Requests
   requestOverview:      { type: Array,  default: () => [] },
@@ -95,15 +95,23 @@ const barOptions = {
 
 // ── Chart Data ──────────────────────────────────────────────────────────────
 const moduleColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316']
+const moduleColorsLight = moduleColors.map(c => c + '80')
 const chartPalette = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#a3e635']
 
 const requestOverviewData = computed(() => ({
   labels: props.requestOverview.map(r => r.label),
-  datasets: [{
-    label: 'Active / Pending',
-    data: props.requestOverview.map(r => r.pending),
-    backgroundColor: moduleColors,
-  }],
+  datasets: [
+    {
+      label: 'Pending / In Progress',
+      data: props.requestOverview.map(r => r.pending),
+      backgroundColor: moduleColors,
+    },
+    {
+      label: 'Completed',
+      data: props.requestOverview.map(r => r.completed ?? 0),
+      backgroundColor: moduleColorsLight,
+    },
+  ],
 }))
 
 const monthlyTrendsData = computed(() => ({
@@ -131,6 +139,15 @@ const itjrCategoryData = computed(() => ({
     backgroundColor: chartPalette,
   }],
 }))
+
+const gsModules = ['Vehicle Requests', 'Facility Requests', 'Service Requests', 'Work Requests']
+const generalServicesData = computed(() => {
+  const rows = props.requestOverview.filter(r => gsModules.includes(r.label))
+  return {
+    labels: rows.map(r => r.label),
+    datasets: [{ data: rows.map(r => r.total), backgroundColor: chartPalette }],
+  }
+})
 
 const employeesByDivisionData = computed(() => ({
   labels: props.employeesByDivision.map(d => d.division),
@@ -342,7 +359,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- IT Job by Category + Employee Gender -->
+        <!-- IT Job by Category + General Services -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-6 rounded-xl shadow">
             <h3 class="text-lg font-semibold mb-1">IT Job Requests by Category</h3>
@@ -354,9 +371,29 @@ onMounted(() => {
           </div>
 
           <div class="bg-white p-6 rounded-xl shadow">
+            <h3 class="text-lg font-semibold mb-1">General Services All Time Breakdown</h3>
+            <p class="text-xs text-gray-400 mb-4">All-time breakdown</p>
+            <div class="min-h-[220px]">
+              <Pie v-if="generalServicesData.datasets[0].data.some(v => v > 0)" :data="generalServicesData" :options="pieOptions" />
+              <p v-else class="text-sm text-gray-400 text-center pt-10">No General Services data</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Employees by Division + Employee Gender -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div v-if="employeesByDivision.length" class="bg-white p-6 rounded-xl shadow">
+            <h3 class="text-lg font-semibold mb-1">Employees by Division</h3>
+            <p class="text-xs text-gray-400 mb-4">Top 10 divisions by headcount</p>
+            <div class="min-h-[240px]">
+              <Bar :data="employeesByDivisionData" :options="hBarOptions" />
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow">
             <h3 class="text-lg font-semibold mb-1">Employee Gender</h3>
             <p class="text-xs text-gray-400 mb-4">{{ totalEmployees }} total employees</p>
-            <div class="min-h-[220px]">
+            <div class="min-h-[240px]">
               <Pie
                 v-if="employeeMaleCount + employeeFemaleCount > 0"
                 :data="employeeGenderData"
@@ -364,15 +401,6 @@ onMounted(() => {
               />
               <p v-else class="text-sm text-gray-400 text-center pt-10">No employee gender data</p>
             </div>
-          </div>
-        </div>
-
-        <!-- Employees by Division -->
-        <div v-if="employeesByDivision.length" class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-lg font-semibold mb-1">Employees by Division</h3>
-          <p class="text-xs text-gray-400 mb-4">Top 10 divisions by headcount</p>
-          <div class="min-h-[240px]">
-            <Bar :data="employeesByDivisionData" :options="hBarOptions" />
           </div>
         </div>
 
