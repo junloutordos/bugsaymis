@@ -150,25 +150,25 @@ class DashboardController extends Controller
                 [
                     'label'     => 'IT Job Requests',
                     'pending'   => ITJobRequest::where('status', 'In Progress')->count(),
-                    'completed' => ITJobRequest::where('status', 'Acted by MIS')->count(),
+                    'completed' => ITJobRequest::whereIn('status', ['Acted by MIS', 'Request Completed'])->count(),
                     'total'     => ITJobRequest::count(),
                 ],
                 [
                     'label'     => 'Vehicle Requests',
                     'pending'   => VehicleRequest::where('status', 'Pending')->count(),
-                    'completed' => VehicleRequest::where('status', 'Completed')->count(),
+                    'completed' => VehicleRequest::where('status', 'OCD Approved')->count(),
                     'total'     => VehicleRequest::count(),
                 ],
                 [
                     'label'     => 'Facility Requests',
                     'pending'   => FacilityRequest::where('status', 'Pending')->count(),
-                    'completed' => FacilityRequest::where('status', 'Completed')->count(),
+                    'completed' => FacilityRequest::where('status', 'FAD Approved')->count(),
                     'total'     => FacilityRequest::count(),
                 ],
                 [
                     'label'     => 'Service Requests',
                     'pending'   => ServiceRequest::where('status', 'Pending')->count(),
-                    'completed' => ServiceRequest::where('status', 'Completed')->count(),
+                    'completed' => ServiceRequest::where('status', 'FAD Approved')->count(),
                     'total'     => ServiceRequest::count(),
                 ],
                 [

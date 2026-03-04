@@ -104,12 +104,12 @@ const requestOverviewData = computed(() => ({
     {
       label: 'Pending / In Progress',
       data: props.requestOverview.map(r => r.pending),
-      backgroundColor: moduleColors,
+      backgroundColor: moduleColorsLight,
     },
     {
       label: 'Completed',
       data: props.requestOverview.map(r => r.completed ?? 0),
-      backgroundColor: moduleColorsLight,
+      backgroundColor: moduleColors,
     },
   ],
 }))
