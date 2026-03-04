@@ -173,7 +173,7 @@ class DashboardController extends Controller
                 ],
                 [
                     'label'     => 'Work Requests',
-                    'pending'   => WorkRequest::where('status', 'Pending')->count(),
+                    'pending'   => WorkRequest::whereIn('status', ['Pending', 'GSU Approved', 'FAD Approved'])->count(),
                     'completed' => WorkRequest::where('status', 'Completed')->count(),
                     'total'     => WorkRequest::count(),
                 ],
