@@ -47,7 +47,7 @@ class VehicleRequestController extends Controller
             ->orderBy('name')
             ->get(['id','name']);
 
-        $isDivisionChief = ($role === 'DivisionChief');
+        $isDivisionChief = $user->hasRole('DivisionChief');
 
         return Inertia::render('VehicleRequests/Index', [
             'requests' => $requests,

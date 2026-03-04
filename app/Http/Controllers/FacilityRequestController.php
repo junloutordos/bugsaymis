@@ -58,7 +58,7 @@ class FacilityRequestController extends Controller
         // Select users whose position contains the phrase 'MIS Staff'
         $misUsers = User::whereRaw('position LIKE ?', ['%MIS Staff%'])->select('id','name','position')->orderBy('name')->get();
 
-        $isDivisionChief = ($role === 'DivisionChief');
+        $isDivisionChief = $user->hasRole('DivisionChief');
 
         return Inertia::render('FacilityRequests/Index', [
             'requests' => $requests,
