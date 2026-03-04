@@ -1,6 +1,7 @@
 #!/bin/bash
-# Usage: ./bump-version.sh <new-version> "<remarks>"
-# Example: ./bump-version.sh 1.1.0 "Added Document Tracking module and Dashboard pie charts."
+# Usage:
+#   Manual:    ./bump-version.sh 1.2.0 "Added new feature XYZ."
+#   Auto-patch: ./bump-version.sh auto "Remarks here."
 
 set -e
 
@@ -10,12 +11,22 @@ REMARKS="$2"
 DATE=$(date +%Y-%m-%d)
 
 if [ -z "$NEW_VERSION" ] || [ -z "$REMARKS" ]; then
-  echo "Usage: ./bump-version.sh <version> \"<remarks>\""
-  echo "Example: ./bump-version.sh 1.1.0 \"Added Document Tracking and Dashboard improvements.\""
+  echo "Usage: ./bump-version.sh <version|auto> \"<remarks>\""
+  echo "Example: ./bump-version.sh 1.1.0 \"Added Document Tracking.\""
+  echo "Example: ./bump-version.sh auto \"Auto-patch bump.\""
   exit 1
 fi
 
-# Read current history and prepend new entry using PHP (already available in Laravel projects)
+# If version is "auto", read current and increment patch
+if [ "$NEW_VERSION" = "auto" ]; then
+  CURRENT=$(php -r "echo json_decode(file_get_contents('$VERSION_FILE'), true)['version'] ?? '1.0.0';")
+  IFS='.' read -ra PARTS <<< "$CURRENT"
+  MAJOR=${PARTS[0]:-1}
+  MINOR=${PARTS[1]:-0}
+  PATCH=$(( ${PARTS[2]:-0} + 1 ))
+  NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+fi
+
 php - <<EOF
 <?php
 \$file = '$VERSION_FILE';
@@ -27,7 +38,6 @@ php - <<EOF
     'remarks' => '$REMARKS',
 ];
 
-// Add new entry to history
 \$data['history'][] = \$newEntry;
 \$data['version'] = '$NEW_VERSION';
 
