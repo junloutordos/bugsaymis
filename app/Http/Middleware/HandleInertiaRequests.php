@@ -65,8 +65,8 @@ class HandleInertiaRequests extends Middleware
             ],
             // Number of consultations that are pending or active (for sidebar badge)
             'consultationsNotificationCount' => fn () => Consultation::whereIn('status', ['Pending', 'Active'])->count(),
-            // Number of IT job requests with status containing 'Pending'
-            'itJobRequestsNotificationCount' => fn () => ITJobRequest::where('status', 'like', '%Pending%')->count(),
+            // Number of IT job requests with status 'In Progress'
+            'itJobRequestsNotificationCount' => fn () => ITJobRequest::where('status', 'In Progress')->count(),
             // Number of vehicle requests with status = 'Pending'
             'vehicleRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
@@ -76,9 +76,9 @@ class HandleInertiaRequests extends Middleware
                     $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
                     return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
                 }
-                // GSU Head: show count of approved vehicle requests
+                // GSU Head: show count of pending vehicle requests
                 if ($user && $user->hasRole('GSU Head')) {
-                    return VehicleRequest::where('status', 'Approved')->count();
+                    return VehicleRequest::where('status', 'Pending')->count();
                 }
                 // default: pending requests
                 return VehicleRequest::where('status', 'Pending')->count();

@@ -149,7 +149,7 @@ class DashboardController extends Controller
             $requestOverview = [
                 [
                     'label'   => 'IT Job Requests',
-                    'pending' => ITJobRequest::whereNotIn('status', $terminalStatuses)->count(),
+                    'pending' => ITJobRequest::where('status', 'In Progress')->count(),
                     'total'   => ITJobRequest::count(),
                 ],
                 [
@@ -169,7 +169,7 @@ class DashboardController extends Controller
                 ],
                 [
                     'label'   => 'Work Requests',
-                    'pending' => WorkRequest::whereNotIn('status', $terminalStatuses)->count(),
+                    'pending' => WorkRequest::where('status', 'Pending')->count(),
                     'total'   => WorkRequest::count(),
                 ],
                 [
