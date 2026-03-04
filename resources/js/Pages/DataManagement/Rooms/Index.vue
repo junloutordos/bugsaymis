@@ -1,10 +1,10 @@
 <template>
   <Head title="Rooms" />
   <AdminLayout title="Rooms">
-    <div class="p-6">
+    <div>
 
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Rooms</h1>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Rooms</h1>
         <button @click.prevent="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">+ New Room</button>
       </div>
 
@@ -15,7 +15,7 @@
             v-model="searchQuery"
             type="text"
             placeholder="Search rooms..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <div v-if="!isMobile" class="overflow-x-auto">

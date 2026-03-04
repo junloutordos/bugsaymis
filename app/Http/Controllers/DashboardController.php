@@ -5,6 +5,18 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Models\Role;
+use App\Models\User;
+use App\Models\Division;
+use App\Models\EmployeeIPCR;
+use App\Models\ITJobRequest;
+use App\Models\VehicleRequest;
+use App\Models\FacilityRequest;
+use App\Models\ServiceRequest;
+use App\Models\WorkRequest;
+use App\Models\MessengerialRequest;
+use App\Models\Consultation;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -22,45 +34,202 @@ class DashboardController extends Controller
                 ->toArray();
 
             $statusCandidates = [
-                'status',
-                'student_status',
-                'enrollment_status',
-                'enrolled',
-                'enrollment',
-                'status_desc'
+                'status', 'student_status', 'enrollment_status',
+                'enrolled', 'enrollment', 'status_desc',
             ];
+            $statusField = collect($statusCandidates)->first(fn ($f) => in_array($f, $columns));
 
-            $statusField = collect($statusCandidates)
-                ->first(fn ($f) => in_array($f, $columns));
-
-            if ($statusField) {
-                $scholarsCount = DB::table('students')
-                    ->whereRaw("LOWER(TRIM(`{$statusField}`)) = ?", ['enrolled'])
-                    ->count();
-            } else {
-                $scholarsCount = DB::table('students')->count();
-            }
+            $scholarsCount = $statusField
+                ? DB::table('students')->whereRaw("LOWER(TRIM(`{$statusField}`)) = ?", ['enrolled'])->count()
+                : DB::table('students')->count();
         } catch (\Throwable $e) {
             logger()->warning('Scholars count error: ' . $e->getMessage());
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Faculty & Staff Count
+        | Employee Counts (Faculty, Staff, Total)
         |--------------------------------------------------------------------------
         */
-        $facultyCount = 0;
-        $staffCount   = 0;
-        try {
-            $facultyCount = DB::table('users')
-                ->where('role_id', 'like', '%3%')
-                ->count();
+        $totalEmployees      = 0;
+        $facultyCount        = 0;
+        $staffCount          = 0;
+        $activeDivisions     = 0;
+        $employeeMaleCount   = 0;
+        $employeeFemaleCount = 0;
+        $employeesByDivision = [];
 
-            $staffCount = DB::table('users')
-                ->where('role_id', 'like', '%4%')
-                ->count();
+        try {
+            $totalEmployees = User::count();
+
+            $facultyRole = Role::where('name', 'Faculty')->first();
+            $staffRole   = Role::where('name', 'Staff')->first();
+            if ($facultyRole) {
+                $facultyCount = User::whereRaw('FIND_IN_SET(?, role_id)', [$facultyRole->id])->count();
+            }
+            if ($staffRole) {
+                $staffCount = User::whereRaw('FIND_IN_SET(?, role_id)', [$staffRole->id])->count();
+            }
+
+            $activeDivisions     = Division::where('status', 'active')->count();
+            $employeeMaleCount   = User::whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $employeeFemaleCount = User::whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+
+            $divs = Division::withCount('employees')->orderByDesc('employees_count')->take(10)->get();
+            $employeesByDivision = $divs->map(fn ($d) => [
+                'division' => $d->acronym ?: $d->division_name,
+                'count'    => $d->employees_count,
+            ])->values()->toArray();
         } catch (\Throwable $e) {
-            logger()->warning('Faculty/Staff count error: ' . $e->getMessage());
+            logger()->warning('Employee analytics error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | IPCR Analytics
+        |--------------------------------------------------------------------------
+        */
+        $ipcrByStatus  = [];
+        $ipcrForReview = 0;
+        $recentIPCRs   = [];
+
+        try {
+            $ipcrRows = EmployeeIPCR::select('status', DB::raw('COUNT(*) as total'))
+                ->groupBy('status')
+                ->get();
+
+            $ipcrByStatus  = $ipcrRows->map(fn ($r) => ['status' => $r->status, 'total' => (int) $r->total])->values()->toArray();
+            $ipcrForReview = (int) ($ipcrRows->firstWhere('status', 'For Review')?->total ?? 0);
+
+            $recentIPCRs = EmployeeIPCR::with('user:id,name')
+                ->latest()
+                ->take(6)
+                ->get()
+                ->map(fn ($i) => [
+                    'id'            => $i->id,
+                    'user'          => $i->user?->name ?? 'Unknown',
+                    'rating_period' => $i->rating_period,
+                    'status'        => $i->status,
+                    'updated_at'    => $i->updated_at?->diffForHumans() ?? '',
+                ])
+                ->toArray();
+        } catch (\Throwable $e) {
+            logger()->warning('IPCR analytics error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | IT Job Requests by Category
+        |--------------------------------------------------------------------------
+        */
+        $itjrByCategory = [];
+        try {
+            $itjrByCategory = ITJobRequest::select('category', DB::raw('COUNT(*) as total'))
+                ->whereNotNull('category')
+                ->where('category', '!=', '')
+                ->groupBy('category')
+                ->get()
+                ->map(fn ($r) => ['category' => $r->category, 'total' => (int) $r->total])
+                ->values()
+                ->toArray();
+        } catch (\Throwable $e) {
+            logger()->warning('ITJR by category error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Request Overview (Active / Pending Counts per Module)
+        |--------------------------------------------------------------------------
+        */
+        $terminalStatuses     = ['Completed', 'Declined', 'Rejected', 'Cancelled'];
+        $requestOverview      = [];
+        $totalPendingRequests = 0;
+
+        try {
+            $requestOverview = [
+                [
+                    'label'   => 'IT Job Requests',
+                    'pending' => ITJobRequest::whereNotIn('status', $terminalStatuses)->count(),
+                    'total'   => ITJobRequest::count(),
+                ],
+                [
+                    'label'   => 'Vehicle Requests',
+                    'pending' => VehicleRequest::where('status', 'Pending')->count(),
+                    'total'   => VehicleRequest::count(),
+                ],
+                [
+                    'label'   => 'Facility Requests',
+                    'pending' => FacilityRequest::where('status', 'Pending')->count(),
+                    'total'   => FacilityRequest::count(),
+                ],
+                [
+                    'label'   => 'Service Requests',
+                    'pending' => ServiceRequest::where('status', 'Pending')->count(),
+                    'total'   => ServiceRequest::count(),
+                ],
+                [
+                    'label'   => 'Work Requests',
+                    'pending' => WorkRequest::whereNotIn('status', $terminalStatuses)->count(),
+                    'total'   => WorkRequest::count(),
+                ],
+                [
+                    'label'   => 'Messengerial',
+                    'pending' => MessengerialRequest::where('status', 'Pending')->count(),
+                    'total'   => MessengerialRequest::count(),
+                ],
+                [
+                    'label'   => 'Consultations',
+                    'pending' => Consultation::whereIn('status', ['Pending', 'Active'])->count(),
+                    'total'   => Consultation::count(),
+                ],
+            ];
+            $totalPendingRequests = (int) collect($requestOverview)->sum('pending');
+        } catch (\Throwable $e) {
+            logger()->warning('Request overview error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Monthly Request Trends (Last 6 Months)
+        |--------------------------------------------------------------------------
+        */
+        $monthlyTrends = ['labels' => [], 'datasets' => []];
+        try {
+            $months = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $months[] = Carbon::now()->startOfMonth()->subMonths($i);
+            }
+
+            $monthLabels = array_map(fn ($m) => $m->format('M Y'), $months);
+            $colors      = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+
+            $modules = [
+                ['label' => 'IT Job Requests',   'model' => ITJobRequest::class],
+                ['label' => 'Vehicle Requests',  'model' => VehicleRequest::class],
+                ['label' => 'Facility Requests', 'model' => FacilityRequest::class],
+                ['label' => 'Service Requests',  'model' => ServiceRequest::class],
+                ['label' => 'Work Requests',     'model' => WorkRequest::class],
+                ['label' => 'Consultations',     'model' => Consultation::class],
+            ];
+
+            $datasets = [];
+            foreach ($modules as $ci => $module) {
+                $data = array_map(
+                    fn ($m) => $module['model']::whereMonth('created_at', $m->month)
+                        ->whereYear('created_at', $m->year)
+                        ->count(),
+                    $months
+                );
+                $datasets[] = [
+                    'label' => $module['label'],
+                    'data'  => $data,
+                    'color' => $colors[$ci],
+                ];
+            }
+
+            $monthlyTrends = ['labels' => $monthLabels, 'datasets' => $datasets];
+        } catch (\Throwable $e) {
+            logger()->warning('Monthly trends error: ' . $e->getMessage());
         }
 
         /*
@@ -70,26 +239,17 @@ class DashboardController extends Controller
         */
         $maleCount   = 0;
         $femaleCount = 0;
-
         try {
-            $tables = ['students', 'student'];
+            $tables      = ['students', 'student'];
             $genderField = null;
             $tableUsed   = null;
             $columns     = [];
 
             foreach ($tables as $table) {
                 try {
-                    $columns = collect(DB::select("SHOW COLUMNS FROM {$table}"))
-                        ->pluck('Field')
-                        ->toArray();
-
-                    $genderCandidates = ['sex', 'gender', 'gender_identity', 'sex_at_birth'];
-                    foreach ($genderCandidates as $g) {
-                        if (in_array($g, $columns)) {
-                            $genderField = $g;
-                            $tableUsed   = $table;
-                            break 2;
-                        }
+                    $columns = collect(DB::select("SHOW COLUMNS FROM {$table}"))->pluck('Field')->toArray();
+                    foreach (['sex', 'gender', 'gender_identity', 'sex_at_birth'] as $g) {
+                        if (in_array($g, $columns)) { $genderField = $g; $tableUsed = $table; break 2; }
                     }
                 } catch (\Throwable $e) {
                     continue;
@@ -97,27 +257,14 @@ class DashboardController extends Controller
             }
 
             if ($genderField && $tableUsed) {
-                // Determine status field in the same table so we can filter to enrolled students
-                $statusCandidates = [
-                    'status',
-                    'student_status',
-                    'enrollment_status',
-                    'enrolled',
-                    'enrollment',
-                    'status_desc'
-                ];
+                $statusCandidates = ['status', 'student_status', 'enrollment_status', 'enrolled', 'enrollment', 'status_desc'];
+                $statusField      = collect($statusCandidates)->first(fn ($f) => in_array($f, $columns));
 
-                $statusField = collect($statusCandidates)
-                    ->first(fn ($f) => in_array($f, $columns));
-
-                $baseMale = DB::table($tableUsed)
-                    ->whereRaw("LOWER(TRIM(`{$genderField}`)) IN ('male','m')");
-
-                $baseFemale = DB::table($tableUsed)
-                    ->whereRaw("LOWER(TRIM(`{$genderField}`)) IN ('female','f')");
+                $baseMale   = DB::table($tableUsed)->whereRaw("LOWER(TRIM(`{$genderField}`)) IN ('male','m')");
+                $baseFemale = DB::table($tableUsed)->whereRaw("LOWER(TRIM(`{$genderField}`)) IN ('female','f')");
 
                 if ($statusField) {
-                    $baseMale = $baseMale->whereRaw("LOWER(TRIM(`{$statusField}`)) = ?", ['enrolled']);
+                    $baseMale   = $baseMale->whereRaw("LOWER(TRIM(`{$statusField}`)) = ?", ['enrolled']);
                     $baseFemale = $baseFemale->whereRaw("LOWER(TRIM(`{$statusField}`)) = ?", ['enrolled']);
                 }
 
@@ -125,7 +272,7 @@ class DashboardController extends Controller
                 $femaleCount = $baseFemale->count();
             }
         } catch (\Throwable $e) {
-            logger()->warning('Gender count error: ' . $e->getMessage());
+            logger()->warning('Student gender count error: ' . $e->getMessage());
         }
 
         /*
@@ -133,35 +280,15 @@ class DashboardController extends Controller
         | Library Attendance by Grade (Current Month)
         |--------------------------------------------------------------------------
         */
-        $gradeLabels = [
-            'Grade 7',
-            'Grade 8',
-            'Grade 9',
-            'Grade 10',
-            'Grade 11',
-            'Grade 12',
-        ];
-
-        $attendanceByLevel = [
-            7 => 0,
-            8 => 0,
-            9 => 0,
-            10 => 0,
-            11 => 0,
-            12 => 0,
-        ];
-
-        // prepare male/female per-grade arrays
-        $attendanceMaleByLevel = $attendanceByLevel;
+        $attendanceByLevel       = [7 => 0, 8 => 0, 9 => 0, 10 => 0, 11 => 0, 12 => 0];
+        $attendanceMaleByLevel   = $attendanceByLevel;
         $attendanceFemaleByLevel = $attendanceByLevel;
 
         try {
-            // detect gender field in students table
             $genderField = null;
             try {
                 $cols = collect(DB::select("SHOW COLUMNS FROM students"))->pluck('Field')->toArray();
-                $candidates = ['sex', 'gender', 'gender_identity', 'sex_at_birth'];
-                foreach ($candidates as $c) {
+                foreach (['sex', 'gender', 'gender_identity', 'sex_at_birth'] as $c) {
                     if (in_array($c, $cols)) { $genderField = $c; break; }
                 }
             } catch (\Throwable $e) {
@@ -169,7 +296,6 @@ class DashboardController extends Controller
             }
 
             if ($genderField) {
-                // group by level and gender
                 $attendanceRows = DB::table('library_attendances as la')
                     ->join('section_students as s', 'la.student_id', '=', 's.studentid')
                     ->leftJoin('students as st', 's.studentid', '=', 'st.id')
@@ -182,30 +308,24 @@ class DashboardController extends Controller
                     ->get();
 
                 foreach ($attendanceRows as $row) {
-                    $lvl = (int)$row->levelid;
-                    $cnt = (int)$row->attendance_count;
-                    $g = trim(strtolower((string)$row->gender));
-                    if (in_array($g, ['male','m'])) {
+                    $lvl = (int) $row->levelid;
+                    $cnt = (int) $row->attendance_count;
+                    $g   = trim(strtolower((string) $row->gender));
+                    if (in_array($g, ['male', 'm'])) {
                         $attendanceMaleByLevel[$lvl] = $cnt;
-                    } elseif (in_array($g, ['female','f'])) {
+                    } elseif (in_array($g, ['female', 'f'])) {
                         $attendanceFemaleByLevel[$lvl] = $cnt;
                     } else {
-                        // unknown gender counts go into total (fallback)
                         $attendanceByLevel[$lvl] += $cnt;
                     }
                 }
-                // ensure combined total is populated for backward compatibility
                 foreach ($attendanceByLevel as $k => $_) {
                     $attendanceByLevel[$k] = ($attendanceMaleByLevel[$k] ?? 0) + ($attendanceFemaleByLevel[$k] ?? 0) + ($attendanceByLevel[$k] ?? 0);
                 }
             } else {
-                // fallback to previous single-series count when gender field not available
                 $attendanceRows = DB::table('library_attendances as la')
                     ->join('section_students as s', 'la.student_id', '=', 's.studentid')
-                    ->select(
-                        's.levelid',
-                        DB::raw('COUNT(la.student_id) AS attendance_count')
-                    )
+                    ->select('s.levelid', DB::raw('COUNT(la.student_id) AS attendance_count'))
                     ->where('s.syid', 12)
                     ->whereBetween('s.levelid', [7, 12])
                     ->whereMonth('la.created_at', now()->month)
@@ -215,7 +335,7 @@ class DashboardController extends Controller
                     ->get();
 
                 foreach ($attendanceRows as $row) {
-                    $attendanceByLevel[(int)$row->levelid] = (int)$row->attendance_count;
+                    $attendanceByLevel[(int) $row->levelid] = (int) $row->attendance_count;
                 }
             }
         } catch (\Throwable $e) {
@@ -228,16 +348,39 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         */
         return Inertia::render('Dashboard', [
+            // Employee stats
+            'totalEmployees'      => $totalEmployees,
+            'facultyCount'        => $facultyCount,
+            'staffCount'          => $staffCount,
+            'employeeMaleCount'   => $employeeMaleCount,
+            'employeeFemaleCount' => $employeeFemaleCount,
+            'activeDivisions'     => $activeDivisions,
+            'employeesByDivision' => $employeesByDivision,
+
+            // Scholar stats
             'scholarsCount' => $scholarsCount,
-            'facultyCount'  => $facultyCount,
-            'staffCount'    => $staffCount,
             'maleCount'     => $maleCount,
             'femaleCount'   => $femaleCount,
 
-            // Bar graph data (counts per grade for current month)
-            'libraryAttendanceByGrade' => array_values($attendanceByLevel),
-            'libraryAttendanceMaleByGrade' => array_values($attendanceMaleByLevel),
+            // Library attendance
+            'libraryAttendanceByGrade'       => array_values($attendanceByLevel),
+            'libraryAttendanceMaleByGrade'   => array_values($attendanceMaleByLevel),
             'libraryAttendanceFemaleByGrade' => array_values($attendanceFemaleByLevel),
+
+            // IPCR
+            'ipcrByStatus'  => $ipcrByStatus,
+            'ipcrForReview' => $ipcrForReview,
+            'recentIPCRs'   => $recentIPCRs,
+
+            // IT Job Requests
+            'itjrByCategory' => $itjrByCategory,
+
+            // Request overview
+            'requestOverview'      => $requestOverview,
+            'totalPendingRequests' => $totalPendingRequests,
+
+            // Monthly trends
+            'monthlyTrends' => $monthlyTrends,
         ]);
     }
 }

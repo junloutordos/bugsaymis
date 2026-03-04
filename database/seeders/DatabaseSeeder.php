@@ -34,5 +34,7 @@ class DatabaseSeeder extends Seeder
         $this->call(IPCRWeightSeeder::class);
         // Seed sample vehicle requests (optional)
         $this->call(\Database\Seeders\VehicleRequestSeeder::class);
+        // Seed document types (ARTA/CSC-based)
+        $this->call(DocumentTypeSeeder::class);
     }
 }

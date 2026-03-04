@@ -21,8 +21,7 @@ class MessengerialController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
-        $canViewAll = in_array($role, ['Administrator', 'Records']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'Records']);
 
         $requests = MessengerialRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email))
             ->latest()
@@ -208,7 +207,7 @@ class MessengerialController extends Controller
 
         // Notify Records users so they can process the approved request
         try {
-            $recordsUsers = User::whereHas('role', function($q) { $q->where('name', 'Records'); })->get();
+            $recordsUsers = User::havingRole('Records')->get();
             $processUrl = url('/messengerial');
             foreach ($recordsUsers as $rUser) {
                 if ($rUser->email) {
@@ -287,7 +286,7 @@ class MessengerialController extends Controller
     public function update(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        $isAdmin = ($user->role->name ?? '') === 'Administrator';
+        $isAdmin = $user->hasRole('Administrator');
 
         // Non-admins may update only when the request is still Pending
         if (! $isAdmin) {
@@ -303,7 +302,7 @@ class MessengerialController extends Controller
     public function destroy(MessengerialRequest $messengerialRequest)
     {
         $user = auth()->user();
-        $isAdmin = ($user->role->name ?? '') === 'Administrator';
+        $isAdmin = $user->hasRole('Administrator');
 
         // Non-admins may delete only when the request is still Pending
         if (! $isAdmin) {
@@ -323,10 +322,9 @@ class MessengerialController extends Controller
     public function printTicket(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
         // Allow if Administrator or Records, otherwise allow the original requester
-        if (! in_array($role, ['Administrator', 'Records'])) {
+        if (! $user->hasAnyRole(['Administrator', 'Records'])) {
             $userEmail = $user->email ?? null;
             $requestorEmail = $messengerialRequest->email ?? null;
             $requestorName = $messengerialRequest->requestor ?? null;
@@ -363,8 +361,7 @@ class MessengerialController extends Controller
     public function uploadProof(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
-        if (! in_array($role, ['Administrator', 'Records'])) {
+        if (! $user->hasAnyRole(['Administrator', 'Records'])) {
             abort(403);
         }
 

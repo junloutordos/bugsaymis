@@ -196,9 +196,10 @@ class ClinicKioskController extends Controller
                     $dateScheduled = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
                 }
 
-                $nurseRecipients = User::where(function($q){
-                    $q->whereHas('role', function($q2){ $q2->whereRaw('LOWER(name) = ?', ['nurse']); })
-                      ->orWhereRaw('LOWER(position) LIKE ?', ['%nurse%']);
+                $nurseRole = \App\Models\Role::whereRaw('LOWER(name) = ?', ['nurse'])->first();
+                $nurseRecipients = User::where(function($q) use ($nurseRole) {
+                    if ($nurseRole) $q->whereRaw('FIND_IN_SET(?, role_id)', [$nurseRole->id]);
+                    $q->orWhereRaw('LOWER(position) LIKE ?', ['%nurse%']);
                 })->pluck('email')->filter()->unique();
 
                 foreach ($nurseRecipients as $email) {

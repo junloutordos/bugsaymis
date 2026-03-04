@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router } from "@inertiajs/vue3";
@@ -30,18 +30,31 @@ import {
   UserIcon,
   CursorArrowRippleIcon,
   ClockIcon,
+  XMarkIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
 // --- State ---
 const collapsed = ref(false);
+const mobileOpen = ref(false);
 const showDropdown = ref(false);
 const expanded = ref({});
+
+// Close mobile sidebar on Inertia navigation
+let removeNavListener;
+onMounted(() => {
+  removeNavListener = router.on('navigate', () => { mobileOpen.value = false; });
+});
+onUnmounted(() => {
+  if (removeNavListener) removeNavListener();
+});
 
 // --- Page + Auth ---
 const page = usePage();
 const user = page.props.auth?.user || { role: { name: "Guest" }, name: "Guest" };
 const roleName = user.role?.name || "Guest";
+// Support multiple roles: array of role name strings
+const roleNames = user.roleNames?.length ? user.roleNames : (roleName !== "Guest" ? [roleName] : []);
 
 
 // --- Helpers ---
@@ -51,8 +64,8 @@ const isActive = (name) => name && route().current(name); // ✅ check via route
 
 // Return numeric badge from shared Inertia props based on child routeName
 const getBadge = (child) => {
-  // Don't show any notification badges for Staff or Faculty accounts
-  if (roleName === 'Staff' || roleName === 'Faculty') return 0;
+  // Suppress badges only if the user has no roles beyond Staff/Faculty
+  if (roleNames.length > 0 && roleNames.every(r => r === 'Staff' || r === 'Faculty')) return 0;
   const rn = child?.routeName || null;
   if (!page || !page.props) return 0;
   switch (rn) {
@@ -72,6 +85,8 @@ const getBadge = (child) => {
       return page.props.workRequestsNotificationCount || 0;
     case 'library.borrowings.index':
       return page.props.borrowingsOverdueCount || 0;
+    case 'document-tracking.index':
+      return page.props.documentTrackingNotificationCount || 0;
     default:
       return 0;
   }
@@ -453,10 +468,10 @@ const menuItems = [
     children: [
       {
         label: "Docu Track",
-        routeName: null,
-        href: "#",
+        routeName: "document-tracking.index",
+        href: route("document-tracking.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent"],
+        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
       },
       {
         label: "Messengerial",
@@ -724,19 +739,19 @@ const menuItems = [
 
 // --- Filter Menu by Role ---
 
-const filterMenuByRole = (items, role) =>
+const filterMenuByRole = (items, userRoleNames) =>
   items
     .filter((item) => {
-      if (item.showForGSUHeadOnly && role === 'GSU Head') return true;
-      return item.roles.includes(role);
+      if (item.showForGSUHeadOnly && userRoleNames.includes('GSU Head')) return true;
+      return item.roles.some(r => userRoleNames.includes(r));
     })
     .map((item) =>
       item.children
-        ? { ...item, children: filterMenuByRole(item.children, role) }
+        ? { ...item, children: filterMenuByRole(item.children, userRoleNames) }
         : item
     );
 
-const filteredMenu = computed(() => filterMenuByRole(menuItems, roleName));
+const filteredMenu = computed(() => filterMenuByRole(menuItems, roleNames));
 
 // --- Expand logic ---
 const toggleExpand = (label) => (expanded.value[label] = !expanded.value[label]);
@@ -752,20 +767,40 @@ filteredMenu.value.forEach((item) => {
   <Head :title="title" />
 
   <div class="min-h-screen flex bg-gray-100">
+    <!-- Mobile backdrop -->
+    <div
+      v-if="mobileOpen"
+      @click="mobileOpen = false"
+      class="fixed inset-0 bg-black/40 z-30 md:hidden"
+    />
+
     <!-- Sidebar -->
     <aside
-      :class="[collapsed ? 'w-20' : 'w-64', 'bg-white shadow-lg transition-all duration-300']"
+      :class="[
+        'bg-white shadow-lg transition-all duration-300 z-40 flex-shrink-0 flex flex-col',
+        'fixed inset-y-0 left-0 md:static md:inset-auto',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        collapsed ? 'w-72 md:w-20' : 'w-72 md:w-64',
+      ]"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center justify-center border-b px-4">
-        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-10" />
-        <span v-if="!collapsed" class="ml-3 text-xl font-bold text-gray-800">
+      <div class="h-16 flex items-center border-b px-4">
+        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-10 shrink-0" />
+        <span v-if="!collapsed" class="ml-3 text-xl font-bold text-gray-800 truncate">
           BugsayMIS
         </span>
+        <!-- Close button (mobile only) -->
+        <button
+          @click="mobileOpen = false"
+          class="ml-auto p-1 rounded hover:bg-gray-100 md:hidden shrink-0"
+          aria-label="Close sidebar"
+        >
+          <XMarkIcon class="h-5 w-5 text-gray-500" />
+        </button>
       </div>
 
       <!-- Navigation -->
-      <nav class="mt-6 px-2 space-y-1">
+      <nav class="mt-2 px-2 space-y-1 overflow-y-auto flex-1 pb-6">
         <template v-for="item in filteredMenu" :key="item.label">
           <!-- Section label -->
           <div
@@ -866,12 +901,22 @@ filteredMenu.value.forEach((item) => {
     </aside>
 
     <!-- Main -->
-    <div class="flex-1 flex flex-col">
+    <div class="flex-1 flex flex-col min-w-0">
       <!-- Navbar -->
-      <header class="h-16 bg-white shadow flex items-center justify-between px-6">
+      <header class="h-16 bg-white shadow flex items-center justify-between px-4 md:px-6">
+        <!-- Mobile hamburger -->
+        <button
+          @click="mobileOpen = !mobileOpen"
+          class="p-2 rounded-md hover:bg-gray-100 md:hidden"
+          aria-label="Open sidebar"
+        >
+          <Bars3Icon class="h-6 w-6 text-gray-600" />
+        </button>
+        <!-- Desktop hamburger -->
         <button
           @click="collapsed = !collapsed"
-          class="p-2 rounded-md hover:bg-gray-100"
+          class="hidden md:block p-2 rounded-md hover:bg-gray-100"
+          aria-label="Toggle sidebar"
         >
           <Bars3Icon class="h-6 w-6 text-gray-600" />
         </button>
@@ -914,7 +959,7 @@ filteredMenu.value.forEach((item) => {
       </header>
 
       <!-- Page Content -->
-      <main class="p-6 flex-1">
+      <main class="p-4 md:p-6 flex-1 min-w-0">
         <slot />
       </main>
     </div>

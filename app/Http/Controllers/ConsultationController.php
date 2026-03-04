@@ -19,9 +19,8 @@ class ConsultationController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
         // Build base query; Nurses and admins see all; others only their own
-        if ($role === 'Administrator' || $role === 'Nurse' || $role === 'Clinic') {
+        if ($user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
             $query = Consultation::query();
         } else {
             // Prefer requestor_id (added by migrations). Fall back to old `requestor` string column if necessary.
@@ -477,9 +476,10 @@ class ConsultationController extends Controller
                 $dateScheduled = Carbon::parse($consult->scheduled_at)->toDayDateTimeString();
             }
 
-            $nurseRecipients = User::where(function($q){
-                $q->whereHas('role', function($q2){ $q2->whereRaw('LOWER(name) = ?', ['nurse']); })
-                  ->orWhereRaw('LOWER(position) LIKE ?', ['%nurse%']);
+            $nurseRole = \App\Models\Role::whereRaw('LOWER(name) = ?', ['nurse'])->first();
+            $nurseRecipients = User::where(function($q) use ($nurseRole) {
+                if ($nurseRole) $q->whereRaw('FIND_IN_SET(?, role_id)', [$nurseRole->id]);
+                $q->orWhereRaw('LOWER(position) LIKE ?', ['%nurse%']);
             })->pluck('email')->filter()->unique();
 
             foreach ($nurseRecipients as $email) {
@@ -501,10 +501,9 @@ class ConsultationController extends Controller
     public function update(Request $request, Consultation $consultation)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
         // Only Nurse, Clinic, or Admin can schedule
-        if (! in_array($role, ['Administrator','Nurse','Clinic'])) {
+        if (! $user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
             abort(403);
         }
 
@@ -707,10 +706,9 @@ class ConsultationController extends Controller
     public function logPrint(Request $request)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
         // Only allow clinic/nurse/admin per route middleware but double-check here
-        if (! in_array($role, ['Administrator','Nurse','Clinic'])) {
+        if (! $user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
             abort(403);
         }
 
@@ -859,9 +857,8 @@ class ConsultationController extends Controller
     public function destroy(Request $request, Consultation $consultation)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
-        if (! in_array($role, ['Administrator','Nurse'])) {
+        if (! $user->hasAnyRole(['Administrator', 'Nurse'])) {
             abort(403);
         }
 

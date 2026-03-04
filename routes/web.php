@@ -487,6 +487,16 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('messengerial.upload_proof')
         ->middleware('role:Administrator|Records');
 
+    // Document Tracking
+    Route::get('/document-tracking', [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('document-tracking.index');
+    Route::post('/document-tracking', [\App\Http\Controllers\DocumentTrackingController::class, 'store'])->name('document-tracking.store');
+    Route::get('/document-tracking/attachments/{attachment}/download', [\App\Http\Controllers\DocumentTrackingController::class, 'download'])->name('document-tracking.download');
+    Route::get('/document-tracking/{document}', [\App\Http\Controllers\DocumentTrackingController::class, 'show'])->name('document-tracking.show');
+    Route::post('/document-tracking/routings/{routing}/receive', [\App\Http\Controllers\DocumentTrackingController::class, 'receive'])->name('document-tracking.receive');
+    Route::post('/document-tracking/routings/{routing}/action', [\App\Http\Controllers\DocumentTrackingController::class, 'action'])->name('document-tracking.action');
+    Route::post('/document-tracking/routings/{routing}/forward', [\App\Http\Controllers\DocumentTrackingController::class, 'forward'])->name('document-tracking.forward');
+    Route::post('/document-tracking/routings/{routing}/complete', [\App\Http\Controllers\DocumentTrackingController::class, 'complete'])->name('document-tracking.complete');
+
     // Messengerial CRUD routes (any authenticated user may create; controller enforces edit/delete rules)
     Route::get('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'index'])->name('messengerial.index');
     Route::post('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'store'])->name('messengerial.store');

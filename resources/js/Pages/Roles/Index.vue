@@ -30,10 +30,10 @@ const {
 <template>
   <Head title="Roles" />
   <AdminLayout title="Roles Management">
-    <div class="p-6">
+    <div>
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Roles List</h1>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Roles List</h1>
         <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">
           <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Role
         </button>
@@ -41,7 +41,7 @@ const {
 
       <!-- Search -->
       <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <input v-model="searchQuery" type="text" placeholder="Search roles..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        <input v-model="searchQuery" type="text" placeholder="Search roles..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
 
         <!-- Roles Table -->
         <div class="overflow-x-auto mt-4">

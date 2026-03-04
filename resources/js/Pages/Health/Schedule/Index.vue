@@ -1,7 +1,7 @@
 <template>
   <Head title="Schedule" />
   <AdminLayout title="Schedule">
-    <div class="p-6">
+    <div>
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold">Physician Schedule</h1>
           <div class="flex items-center gap-2">
@@ -11,7 +11,7 @@
 
       <div class="bg-white rounded-xl shadow p-4">
         <div class="mb-4">
-          <input v-model="q" @keydown.enter="search" placeholder="Search by day or time" class="w-1/3 rounded border-gray-300 px-3 py-2" />
+          <input v-model="q" @keydown.enter="search" placeholder="Search by day or time" class="w-full sm:w-1/3 rounded border-gray-300 px-3 py-2" />
         </div>
         <div class="overflow-x-auto">
           <!-- Desktop / larger screens: table -->

@@ -65,7 +65,7 @@ async function onFileChange(e) {
 
 <template>
   <AdminLayout title="DTR Upload">
-    <div class="p-6">
+    <div>
       <h1 class="text-2xl font-bold mb-4">DTR Upload</h1>
       <div class="bg-white rounded-xl shadow p-6">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">

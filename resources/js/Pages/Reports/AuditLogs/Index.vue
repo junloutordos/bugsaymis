@@ -1,15 +1,15 @@
 <template>
   <Head title="Audit Logs" />
   <AdminLayout title="Audit Logs">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Audit Logs</h1>
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Audit Logs</h1>
       </div>
 
       <div class="bg-white rounded-xl shadow p-4 mb-4">
         <!-- Search -->
         <div class="flex items-center gap-2">
-          <input v-model="search" type="text" placeholder="Search audit logs..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <input v-model="search" type="text" placeholder="Search audit logs..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
           <button v-if="search" @click="clearSearch" class="ml-2 px-3 py-1 rounded border">Clear</button>
         </div>
 

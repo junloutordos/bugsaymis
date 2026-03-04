@@ -1,15 +1,15 @@
 <template>
   <Head title="Collection Categories" />
   <AdminLayout title="Collection Categories">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-2xl font-bold">Collection Categories</h1>
         <button @click="openCreate" class="px-4 py-2 bg-blue-600 text-white rounded">New Category</button>
       </div>
 
       <div class="bg-white rounded-xl shadow p-4">
         <div class="mb-4">
-          <input v-model="q" @keydown.enter="search" type="text" placeholder="Search categories..." class="w-1/3 rounded-lg border-gray-300 shadow-sm p-2" />
+          <input v-model="q" @keydown.enter="search" type="text" placeholder="Search categories..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm p-2" />
         </div>
           <div v-if="!isMobile" class="overflow-x-auto">
             <table class="min-w-full border">

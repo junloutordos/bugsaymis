@@ -17,8 +17,7 @@ class LibraryBorrowingsController extends Controller
     protected function checkAccess()
     {
         $user = Auth::user();
-        $role = $user->role->name ?? null;
-        return in_array($role, ['Administrator', 'Librarian']);
+        return $user && $user->hasAnyRole(['Administrator', 'Librarian']);
     }
 
     public function index(Request $request)

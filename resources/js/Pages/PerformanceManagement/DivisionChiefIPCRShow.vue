@@ -275,7 +275,7 @@ const approveTargets = () => {
   <Head :title="`IPCR #${ipcr.id} Plans`" />
 
   <AdminLayout :title="`IPCR: ${ipcr.title}`">
-    <div class="p-6">
+    <div>
 
       <!-- Back Button -->
       <button

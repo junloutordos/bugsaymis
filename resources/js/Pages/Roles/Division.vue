@@ -74,10 +74,10 @@ const submitUpload = async () => {
 <template>
   <Head title="Divisions" />
   <AdminLayout title="Divisions Management">
-    <div class="p-6">
+    <div>
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Divisions List</h1>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Divisions List</h1>
         <button
           @click="openModal('create')"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
@@ -92,7 +92,7 @@ const submitUpload = async () => {
           v-model="searchQuery"
           type="text"
           placeholder="Search divisions..."
-          class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
         />
 
         <!-- Divisions Table -->

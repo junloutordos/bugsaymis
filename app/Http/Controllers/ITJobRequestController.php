@@ -78,7 +78,7 @@ public function index(Request $request)
 
     private function getUserRole($user): string
     {
-        return $user->role->name ?? '';
+        return $user->getRoleName();
     }
 
     /* =====================================================
@@ -171,7 +171,7 @@ public function index(Request $request)
         }
 
         // Notify OCD users
-        $ocdUsers = User::whereHas('role', fn($q)=>$q->where('name','OCD'))->get();
+        $ocdUsers = User::havingRole('OCD')->get();
         foreach ($ocdUsers as $ocd) {
             if ($ocd->email) {
                 $approveUrl = URL::signedRoute('it-job-requests.ocd.approve', ['jobRequest'=>$jobRequest->id,'ocd'=>$ocd->id], now()->addDays(7));
@@ -257,7 +257,7 @@ public function index(Request $request)
 {
     // 1️⃣ Validate OCD user exists and has the OCD role
     $ocdUser = User::find($ocd);
-    if (!$ocdUser || ($ocdUser->role->name ?? '') !== 'OCD') {
+    if (!$ocdUser || ! $ocdUser->hasRole('OCD')) {
         abort(403, 'Unauthorized OCD user.');
     }
 
@@ -469,7 +469,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     {
         $user = $request->user();
 
-        if (! $user->role || $user->role->name !== 'DivisionChief') {
+        if (! $user->hasRole('DivisionChief')) {
             abort(403, 'Unauthorized');
         }
 
@@ -522,7 +522,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     {
         $user = $request->user();
 
-        if (! $user->role || $user->role->name !== 'OCD') {
+        if (! $user->hasRole('OCD')) {
             abort(403, 'Unauthorized');
         }
 

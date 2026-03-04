@@ -28,7 +28,7 @@ const submit = () => {
   <Head title="New Job Request" />
 
   <AdminLayout title="Submit IT Job Request">
-    <div class="p-6">
+    <div>
       <h1 class="text-2xl font-bold text-gray-800 mb-6">Submit IT Job Request</h1>
 
       <div class="bg-white p-6 rounded-xl shadow max-w-2xl">

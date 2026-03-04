@@ -177,7 +177,7 @@ const getPhotoUrl = (asset) => {
 <template>
   <Head title="Assets" />
   <AdminLayout title="Assets">
-    <div class="p-6">
+    <div>
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold">Assets</h1>
         <button @click="openModal" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">
@@ -187,7 +187,7 @@ const getPhotoUrl = (asset) => {
 
       <div class="bg-white rounded-xl shadow p-4">
         <div class="mb-4">
-          <input v-model="searchQuery" type="text" placeholder="Search assets..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <input v-model="searchQuery" type="text" placeholder="Search assets..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
         </div>
         <div v-if="!isMobile" class="overflow-x-auto">
           <table class="min-w-full border border-gray-200">

@@ -18,14 +18,17 @@ class RoleMiddleware
     {
         $user = $request->user();
 
-        if (! $user || ! $user->role) {
+        if (! $user) {
             abort(403, 'Unauthorized');
         }
 
         // Accept both comma and pipe separators
         $rolesArray = preg_split('/[,\|]/', $roles);
 
-        if (! in_array($user->role->name, $rolesArray)) {
+        // Check if the user has ANY of the allowed roles (supports multiple roles per user)
+        $userRoleNames = $user->getRolesCollection()->pluck('name')->toArray();
+
+        if (empty(array_intersect($userRoleNames, $rolesArray))) {
             abort(403, 'Unauthorized');
         }
 

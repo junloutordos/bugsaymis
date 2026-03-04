@@ -97,7 +97,7 @@ const destroy = (f) => {
 <template>
   <Head title="Facilities" />
   <AdminLayout title="Facilities">
-    <div class="p-6">
+    <div>
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold">Facilities</h1>
         <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="showForm = !showForm" class="bg-blue-600 text-white px-3 py-1 rounded">New Facility</button>
@@ -150,7 +150,7 @@ const destroy = (f) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search facilities..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <div v-if="!isMobile" class="overflow-x-auto">

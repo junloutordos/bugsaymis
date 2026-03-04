@@ -14,9 +14,8 @@ class HealthStatisticsController extends Controller
     public function report(Request $request)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
-        if (! in_array($role, ['Administrator','Nurse','Clinic'])) {
+        if (! $user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
             abort(403);
         }
 

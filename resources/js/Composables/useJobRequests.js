@@ -31,13 +31,20 @@ export function useJobRequests(initialRequests = []) {
     })
   })
 
-  const filteredRequestsAll = computed(() =>
-    sortedRequests.value.filter((req) =>
-      req.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      req.category.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (req.user?.name ?? "").toLowerCase().includes(searchQuery.value.toLowerCase())
+  const filteredRequestsAll = computed(() => {
+    const q = searchQuery.value.toLowerCase()
+    return sortedRequests.value.filter((req) =>
+      (req.title || '').toLowerCase().includes(q) ||
+      (req.category || '').toLowerCase().includes(q) ||
+      (req.user?.name ?? '').toLowerCase().includes(q) ||
+      (req.description || '').toLowerCase().includes(q) ||
+      (req.status || '').toLowerCase().includes(q) ||
+      (req.itjr_no || req.id || '').toString().toLowerCase().includes(q) ||
+      (req.assignedto || '').toLowerCase().includes(q) ||
+      (req.assigned_user?.name || '').toLowerCase().includes(q) ||
+      (req.action_taken || '').toLowerCase().includes(q)
     )
-  )
+  })
 
   const filteredRequests = computed(() => {
     const start = (currentPage.value - 1) * perPage

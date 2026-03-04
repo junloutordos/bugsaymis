@@ -19,13 +19,11 @@ class FacilityRequestController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
-
-        $canViewAll = in_array($role, ['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
 
         $requestsQuery = FacilityRequest::latest();
 
-        if ($role === 'DivisionChief') {
+        if ($user->hasRole('DivisionChief')) {
             // Only include requests where the requester's division is led by this Division Chief.
             // FacilityRequest stores requester `email`, so use the `requester` relation then join to `division`.
             $requestsQuery->whereHas('requester', function ($q) use ($user) {
@@ -322,7 +320,7 @@ class FacilityRequestController extends Controller
 
     public function update(Request $request, FacilityRequest $facilityRequest)
     {
-        $isAdmin = ($request->user()->role->name ?? '') === 'Administrator';
+        $isAdmin = $request->user()->hasRole('Administrator');
         if (! $isAdmin) abort(403);
 
         $facilityRequest->update($request->all());
@@ -391,10 +389,8 @@ class FacilityRequestController extends Controller
     public function approveInApp(Request $request, FacilityRequest $facilityRequest)
     {
         $user = $request->user();
-        $roleName = strtolower($user->role->name ?? '');
-        $isDivisionChiefRole = in_array($roleName, ['divisionchief', 'division chief']) || (str_contains($roleName, 'division') && str_contains($roleName, 'chief'));
-        if (! $user || ! $isDivisionChiefRole) {
-            logger()->warning('Blocked facility approve in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->role->name ?? null, 'facility_request_id' => $facilityRequest->id]);
+        if (! $user || ! $user->hasRole('DivisionChief')) {
+            logger()->warning('Blocked facility approve in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->getRoleName(), 'facility_request_id' => $facilityRequest->id]);
             abort(403);
         }
 
@@ -454,10 +450,8 @@ class FacilityRequestController extends Controller
     public function declineInApp(Request $request, FacilityRequest $facilityRequest)
     {
         $user = $request->user();
-        $roleName = strtolower($user->role->name ?? '');
-        $isDivisionChiefRole = in_array($roleName, ['divisionchief', 'division chief']) || (str_contains($roleName, 'division') && str_contains($roleName, 'chief'));
-        if (! $user || ! $isDivisionChiefRole) {
-            logger()->warning('Blocked facility decline in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->role->name ?? null, 'facility_request_id' => $facilityRequest->id]);
+        if (! $user || ! $user->hasRole('DivisionChief')) {
+            logger()->warning('Blocked facility decline in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->getRoleName(), 'facility_request_id' => $facilityRequest->id]);
             abort(403);
         }
         $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
@@ -805,7 +799,7 @@ class FacilityRequestController extends Controller
 
     public function destroy(FacilityRequest $facilityRequest)
     {
-        $isAdmin = (auth()->user()->role->name ?? '') === 'Administrator';
+        $isAdmin = auth()->user()->hasRole('Administrator');
         if (! $isAdmin) abort(403);
         $facilityRequest->delete();
         return redirect()->route('facility-requests.index');
@@ -873,9 +867,8 @@ class FacilityRequestController extends Controller
     public function printTicket(Request $request, FacilityRequest $facilityRequest)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
-        if (! in_array($role, ['Administrator', 'GSU Head'])) {
+        if (! $user->hasAnyRole(['Administrator', 'GSU Head'])) {
             abort(403);
         }
 

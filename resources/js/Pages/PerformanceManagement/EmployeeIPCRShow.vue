@@ -543,7 +543,7 @@ const resubmit = () => {
 <template>
   <Head :title="`IPCR #${ipcr.id} Plans`" />
   <AdminLayout :title="`IPCR: ${ipcr.title}`">
-    <div class="p-6">
+    <div>
       <!-- Back Button -->
       <button @click="$inertia.get(route('employee-ipcr.index'))" class="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800">
         <ArrowLeftIcon class="w-5 h-5" /> Back to IPCR List

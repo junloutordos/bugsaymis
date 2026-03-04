@@ -119,8 +119,8 @@ const profilePic = (student) => {
 <template>
   <Head title="Students" />
   <AdminLayout title="Students">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-2xl font-bold">Students</h1>
       </div>
 
@@ -130,7 +130,7 @@ const profilePic = (student) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search students..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <div class="hidden md:block overflow-x-auto">

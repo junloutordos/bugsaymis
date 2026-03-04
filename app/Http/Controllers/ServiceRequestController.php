@@ -178,7 +178,7 @@ class ServiceRequestController extends Controller
 
         // Notify GSU Head users with signed approve/decline links
         try {
-            $gsuUsers = User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
+            $gsuUsers = User::havingRole('GSU Head')->get();
             foreach ($gsuUsers as $gsuUser) {
                 if ($gsuUser->email) {
                     try {
@@ -224,7 +224,7 @@ class ServiceRequestController extends Controller
     public function approveInApp(Request $request, ServiceRequest $serviceRequest)
     {
         $user = $request->user();
-        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
 
         // Validate that the division chief is responsible for this request
         $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
@@ -275,7 +275,7 @@ class ServiceRequestController extends Controller
     public function declineInApp(Request $request, ServiceRequest $serviceRequest)
     {
         $user = $request->user();
-        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
         $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
         if ($assignedChiefId && (int) $assignedChiefId !== (int) $user->id) {
             abort(403);
@@ -486,9 +486,8 @@ class ServiceRequestController extends Controller
     public function printTicket(Request $request, ServiceRequest $serviceRequest)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
-        if (! in_array($role, ['Administrator', 'GSU Head'])) {
+        if (! $user->hasAnyRole(['Administrator', 'GSU Head'])) {
             abort(403);
         }
 

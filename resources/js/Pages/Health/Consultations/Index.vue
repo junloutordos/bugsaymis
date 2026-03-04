@@ -332,7 +332,7 @@ const statusBadge = (s) => {
   return 'px-2 py-1 bg-red-100 text-red-700 rounded';
 };
 const openFor = (c) => { openSchedule.value = c; if (scheduleForm.reset) scheduleForm.reset(); };
-const openAppointmentFor = (c = null) => { openAppointment.value = c || true; if (appointmentForm.reset) appointmentForm.reset(); if (['Nurse','Administrator'].includes(roleName) && appointmentForm.patient_type === 'employee') fetchEmployees(); };
+const openAppointmentFor = (c = null) => { openAppointment.value = c || true; if (appointmentForm.reset) appointmentForm.reset(); if (hasAnyRole('Nurse', 'Administrator') && appointmentForm.patient_type === 'employee') fetchEmployees(); };
 
 const employees = ref([]);
 const loadingEmployees = ref(false);
@@ -431,20 +431,23 @@ onMounted(() => {
 
 const goTo = (url) => { if (!url) return; window.location.href = url };
 const roleName = page.props.auth?.user?.role?.name ?? '';
-const isStaff = String(roleName).toLowerCase() === 'staff';
+const roleNames = page.props.auth?.user?.roleNames ?? (roleName ? [roleName] : []);
+const hasRole = (role) => roleNames.includes(role);
+const hasAnyRole = (...roles) => roles.some(r => roleNames.includes(r));
+const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
 </script>
 
 <template>
   <Head title="Consultations" />
   <AdminLayout title="Consultations">
-      <div class="p-6">
+      <div>
       <h1 class="text-2xl font-bold mb-4">Consultations</h1>
 
       <!-- Consultation request form removed as requested -->
 
       <div class="bg-white rounded-xl shadow p-6">
           <div class="flex items-center justify-between mb-4">
-            <input v-model="searchQuery" @keydown.enter.prevent="doSearch(searchQuery)" type="text" placeholder="Search by name or Pisay ID" class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            <input v-model="searchQuery" @keydown.enter.prevent="doSearch(searchQuery)" type="text" placeholder="Search by name or Pisay ID" class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
             <div>
               <button @click.prevent="openAppointmentFor()" class="px-3 py-2 bg-blue-600 text-white rounded">New Appointment</button>
             </div>
@@ -457,7 +460,7 @@ const isStaff = String(roleName).toLowerCase() === 'staff';
               <h3 class="text-lg font-semibold mb-3">New Appointment</h3>
               <form @submit.prevent="submitAppointment" class="space-y-3">
                 <!-- Patient selection: only visible to Nurse or Administrator -->
-                <div v-if="['Nurse','Administrator'].includes(roleName)">
+                <div v-if="hasAnyRole('Nurse', 'Administrator')">
                   <label class="block text-sm font-medium">Patient</label>
                   <div class="mt-1 flex gap-2">
                     <select v-model="appointmentForm.patient_type" class="rounded border-gray-300 p-2" @change="() => { if (appointmentForm.patient_type === 'employee') fetchEmployees(); }">

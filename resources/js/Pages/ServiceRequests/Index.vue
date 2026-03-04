@@ -21,17 +21,31 @@ const handleResize = () => { windowWidth.value = window.innerWidth }
 onMounted(() => { window.addEventListener('resize', handleResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
-const filteredRequests = computed(() => {
+const filteredRequestsAll = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  const results = (requestsList.value || []).filter(r => (r.service_type || '').toString().toLowerCase().includes(q) || (r.purposes || '').toString().toLowerCase().includes(q) || (r.id || '').toString().includes(q))
-  const start = (currentPage.value - 1) * perPage
-  return results.slice(start, start + perPage)
+  return (requestsList.value || []).filter(r =>
+    (r.service_type || '').toString().toLowerCase().includes(q) ||
+    (r.purposes || '').toString().toLowerCase().includes(q) ||
+    (r.id || '').toString().includes(q) ||
+    (r.status || '').toString().toLowerCase().includes(q) ||
+    (r.requester?.name || r.requestor || '').toString().toLowerCase().includes(q) ||
+    (r.date_needed || '').toString().includes(q) ||
+    (r.details || '').toString().toLowerCase().includes(q)
+  )
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || []).filter(r => (r.service_type || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (r.purposes || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (r.id || '').toString().includes(searchQuery.value.trim())).length / perPage)))
+const filteredRequests = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filteredRequestsAll.value.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
 
 watch(searchQuery, () => { currentPage.value = 1 })
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
+const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
+const hasRole = (role) => roleNames.value.includes(role);
+const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
 
 const showModal = ref(false);
 const editingId = ref(null);
@@ -164,15 +178,15 @@ const statusClass = (s) => {
 
 const canPrint = (r) => {
   const st = (r?.status || '').toString().toLowerCase();
-  return (roleName.value === 'Administrator' || roleName.value === 'GSU Head') && st.includes('approved');
+  return hasAnyRole('Administrator', 'GSU Head') && st.includes('approved');
 };
 </script>
 
 <template>
   <Head title="Request for Services" />
   <AdminLayout title="Request for Services">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-2xl font-bold">Request for Services</h1>
         <button @click="openModal" class="bg-blue-600 text-white px-4 py-2 rounded">+ New Request</button>
       </div>
@@ -180,7 +194,7 @@ const canPrint = (r) => {
       <div class="bg-white rounded-xl shadow p-4">
         <!-- Search -->
         <div class="mb-4">
-          <input v-model="searchQuery" type="text" placeholder="Search requests..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <input v-model="searchQuery" type="text" placeholder="Search requests..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
         </div>
 
         <!-- Mobile cards -->
@@ -190,7 +204,7 @@ const canPrint = (r) => {
               <div>
                 <div class="text-sm text-gray-500">Request #{{ r.id }}</div>
                 <div class="font-semibold text-gray-800">{{ r.service_type ?? '—' }}</div>
-                <div v-if="['Administrator','GSU Head','DivisionChief'].includes(roleName)" class="text-sm text-gray-600">Requestor: {{ r.requester?.name ?? '—' }}</div>
+                <div v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="text-sm text-gray-600">Requestor: {{ r.requester?.name ?? '—' }}</div>
                 <div class="text-sm text-gray-600">{{ r.purposes ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
@@ -205,10 +219,10 @@ const canPrint = (r) => {
             </div>
 
               <div class="mt-3 flex items-center gap-2">
-              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 inline-flex items-center justify-center gap-2"><PencilSquareIcon class="w-4 h-4"/></button>
-              <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 inline-flex items-center gap-2"><TrashIcon class="w-4 h-4"/></button>
-              <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="approveRequest(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700 inline-flex items-center gap-2" title="Approve"><CheckIcon class="w-4 h-4"/></button>
-              <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="declineRequest(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 inline-flex items-center gap-2" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="openEdit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 inline-flex items-center justify-center gap-2"><PencilSquareIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="remove(r.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 inline-flex items-center gap-2"><TrashIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="approveRequest(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700 inline-flex items-center gap-2" title="Approve"><CheckIcon class="w-4 h-4"/></button>
+              <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="declineRequest(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 inline-flex items-center gap-2" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
               <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-2 rounded-full bg-gray-200 hover:bg-gray-300 text-green-700 inline-flex items-center gap-2" title="Print"><PrinterIcon class="w-4 h-4"/></a>
             </div>
           </div>
@@ -238,7 +252,7 @@ const canPrint = (r) => {
               <tr>
                 <th class="px-4 py-2">#</th>
                 <th class="px-4 py-2">Service</th>
-                <th v-if="['Administrator','GSU Head','DivisionChief'].includes(roleName)" class="px-4 py-2">Requestor</th>
+                <th v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="px-4 py-2">Requestor</th>
                 <th class="px-4 py-2">Date Needed</th>
                 <th class="px-4 py-2">Time Needed</th>
                 <th class="px-4 py-2">Purpose(s)</th>
@@ -250,7 +264,7 @@ const canPrint = (r) => {
               <tr v-for="r in filteredRequests" :key="r.id">
                 <td class="px-4 py-2">{{ r.id }}</td>
                 <td class="px-4 py-2">{{ r.service_type }} <div v-if="r.service_type==='Reproduction'" class="text-xs text-gray-600">{{ r.copies }} copies × {{ r.sheets_per_set }} sheets</div></td>
-                <td v-if="['Administrator','GSU Head','DivisionChief'].includes(roleName)" class="px-4 py-2">{{ r.requester?.name ?? '—' }}</td>
+                <td v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="px-4 py-2">{{ r.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-2">{{ r.date_needed }}</td>
                 <td class="px-4 py-2">{{ r.time_needed || '—' }}</td>
                 <td class="px-4 py-2">{{ r.purposes || '—' }}</td>
@@ -259,21 +273,21 @@ const canPrint = (r) => {
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="openEdit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
+                    <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="openEdit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
                       <PencilSquareIcon class="w-5 h-5" />
                     </button>
-                    <button v-if="r.status === 'Pending' && roleName !== 'Staff'" @click.prevent="remove(r.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
+                    <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="remove(r.id)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
                       <TrashIcon class="w-5 h-5" />
                     </button>
-                    <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="approveRequest(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
-                    <button v-if="r.status === 'Pending' && roleName === 'DivisionChief'" @click.prevent="declineRequest(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
+                    <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="approveRequest(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="declineRequest(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
                     <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="Print">
                       <PrinterIcon class="w-5 h-5" />
                     </a>
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredRequests.length === 0"><td :colspan="(['Administrator','GSU Head','DivisionChief'].includes(roleName) ? 8 : 7)" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
+              <tr v-if="filteredRequests.length === 0"><td :colspan="(hasAnyRole('Administrator', 'GSU Head', 'DivisionChief') ? 8 : 7)" class="px-4 py-6 text-center text-gray-500">No requests</td></tr>
             </tbody>
           </table>
         </div>
@@ -296,7 +310,7 @@ const canPrint = (r) => {
 
       <!-- Modal -->
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white w-full max-w-lg rounded p-4">
+        <div class="bg-white w-full max-w-lg rounded p-4 mx-4 sm:mx-0">
           <h2 class="text-xl font-semibold mb-4">{{ editingId ? 'Edit Service Request' : 'New Service Request' }}</h2>
           <div class="space-y-3">
             <div>
