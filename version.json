@@ -1,0 +1,10 @@
+{
+    "version": "1.0.0",
+    "history": [
+        {
+            "version": "1.0.0",
+            "date": "2026-03-04",
+            "remarks": "Initial release — Employee management, General Services, IPCR, Library, Document Tracking, and Dashboard analytics."
+        }
+    ]
+}

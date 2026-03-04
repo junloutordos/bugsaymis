@@ -146,6 +146,18 @@ class HandleInertiaRequests extends Middleware
                     ->whereIn('status', ['Pending', 'Received'])
                     ->count();
             },
+            // App version info from version.json
+            'appVersion' => function () {
+                try {
+                    $data = json_decode(file_get_contents(base_path('version.json')), true);
+                    return [
+                        'current' => $data['version'] ?? '1.0.0',
+                        'history' => array_reverse($data['history'] ?? []),
+                    ];
+                } catch (\Throwable $e) {
+                    return ['current' => '1.0.0', 'history' => []];
+                }
+            },
         ]);
     }
 

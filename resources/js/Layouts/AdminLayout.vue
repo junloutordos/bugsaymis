@@ -39,6 +39,7 @@ const collapsed = ref(false);
 const mobileOpen = ref(false);
 const showDropdown = ref(false);
 const expanded = ref({});
+const showVersionModal = ref(false);
 
 // Close mobile sidebar on Inertia navigation
 let removeNavListener;
@@ -51,6 +52,7 @@ onUnmounted(() => {
 
 // --- Page + Auth ---
 const page = usePage();
+const appVersion = computed(() => page.props.appVersion ?? { current: '1.0.0', history: [] });
 const user = page.props.auth?.user || { role: { name: "Guest" }, name: "Guest" };
 const roleName = user.role?.name || "Guest";
 // Support multiple roles: array of role name strings
@@ -823,7 +825,7 @@ filteredMenu.value.forEach((item) => {
       </div>
 
       <!-- Navigation -->
-      <nav class="mt-2 px-2 space-y-1 overflow-y-auto flex-1 pb-6">
+      <nav class="mt-2 px-2 space-y-1 overflow-y-auto flex-1 pb-2">
         <template v-for="item in filteredMenu" :key="item.label">
           <!-- Section label -->
           <div
@@ -921,7 +923,62 @@ filteredMenu.value.forEach((item) => {
           </div>
         </template>
       </nav>
+
+      <!-- Version footer -->
+      <div class="mt-auto border-t border-gray-200 px-3 py-3">
+        <button
+          @click="showVersionModal = true"
+          class="w-full flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition"
+          :class="collapsed ? 'justify-center' : 'justify-between'"
+        >
+          <span v-if="!collapsed" class="truncate">v{{ appVersion.current }}</span>
+          <span v-else class="font-mono font-bold">v</span>
+          <span v-if="!collapsed" class="text-gray-300">Changelog</span>
+        </button>
+      </div>
     </aside>
+
+    <!-- Version History Modal -->
+    <Teleport to="body">
+      <div v-if="showVersionModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="fixed inset-0 bg-black/40" @click="showVersionModal = false"></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
+          <div class="flex items-center justify-between px-6 py-4 border-b">
+            <div>
+              <h2 class="text-lg font-bold text-gray-800">Version History</h2>
+              <p class="text-xs text-gray-400">Current version: v{{ appVersion.current }}</p>
+            </div>
+            <button @click="showVersionModal = false" class="text-gray-400 hover:text-gray-600">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+          <div class="overflow-y-auto px-6 py-4 space-y-4">
+            <div
+              v-for="entry in appVersion.history"
+              :key="entry.version"
+              class="flex gap-4"
+            >
+              <div class="flex flex-col items-center">
+                <div class="w-2.5 h-2.5 rounded-full mt-1.5"
+                  :class="entry.version === appVersion.current ? 'bg-blue-500' : 'bg-gray-300'">
+                </div>
+                <div class="w-px flex-1 bg-gray-200 mt-1"></div>
+              </div>
+              <div class="pb-4 flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-semibold text-sm text-gray-800">v{{ entry.version }}</span>
+                  <span v-if="entry.version === appVersion.current"
+                    class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Latest</span>
+                  <span class="text-xs text-gray-400 ml-auto">{{ entry.date }}</span>
+                </div>
+                <p class="text-sm text-gray-600">{{ entry.remarks }}</p>
+              </div>
+            </div>
+            <p v-if="!appVersion.history.length" class="text-sm text-gray-400 text-center py-4">No history yet.</p>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Main -->
     <div class="flex-1 flex flex-col min-w-0">

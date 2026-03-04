@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 import axios from 'axios'
@@ -32,6 +32,7 @@ const isAuthorizedEmail = (email) =>
 
 // Show server-side errors (e.g. inactive account) using SweetAlert
 const page = usePage()
+const appVersion = computed(() => page.props.appVersion?.current ?? '1.0.0')
 watch(
   () => page.props.errors,
   (errs) => {
@@ -158,7 +159,7 @@ const googleLogin = async () => {
           Navigating Together: Centralized Management Information System of <br>
           Philippine Science High School – Caraga Region Campus in Butuan City
         </p><br><br><br>
-        <p class="mt-1"><strong>&copy; 2026 PSHS-CRC. All Rights Reserved.<br>v 1.0.0</strong></p>
+        <p class="mt-1"><strong>&copy; 2026 PSHS-CRC. All Rights Reserved.<br>v {{ appVersion }}</strong></p>
       </footer>
     </div>
   </div>
