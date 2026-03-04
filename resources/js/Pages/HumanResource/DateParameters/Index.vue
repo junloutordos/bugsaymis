@@ -9,7 +9,7 @@
       </div>
 
       <div class="mb-4">
-        <input v-model="searchQuery" placeholder="Search..." class="w-1/3 rounded-lg border-gray-300 shadow-sm px-3 py-2" />
+        <input v-model="searchQuery" placeholder="Search..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm px-3 py-2" />
       </div>
 
       <div class="overflow-x-auto">

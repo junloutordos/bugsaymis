@@ -32,18 +32,33 @@ export function useUsers(props) {
   const isEmployeesPage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('employee'))
 
   // Filtered + paginated users
+  const filteredUsersAll = computed(() => {
+    const q = searchQuery.value.toLowerCase()
+    return usersList.value.filter((u) => {
+      // resolve role names for searching
+      const roleNames = Array.isArray(u.roles)
+        ? u.roles.map(r => (r.name || '')).join(' ')
+        : (u.role?.name || '')
+      return (
+        (u.name || '').toLowerCase().includes(q) ||
+        (u.email || '').toLowerCase().includes(q) ||
+        (u.badge_id || '').toString().toLowerCase().includes(q) ||
+        (u.position || '').toLowerCase().includes(q) ||
+        (u.division?.division_name || '').toLowerCase().includes(q) ||
+        (u.office?.name || '').toLowerCase().includes(q) ||
+        (u.emp_category || '').toLowerCase().includes(q) ||
+        roleNames.toLowerCase().includes(q)
+      )
+    })
+  })
+
   const filteredUsers = computed(() => {
-    let results = usersList.value.filter(
-      (u) =>
-        u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
     const start = (currentPage.value - 1) * perPage
-    return results.slice(start, start + perPage)
+    return filteredUsersAll.value.slice(start, start + perPage)
   })
 
   const totalPages = computed(() =>
-    Math.ceil(usersList.value.length / perPage)
+    Math.max(1, Math.ceil(filteredUsersAll.value.length / perPage))
   )
 
   // Modal logic

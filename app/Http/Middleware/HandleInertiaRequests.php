@@ -12,6 +12,7 @@ use App\Models\FacilityRequest;
 use App\Models\ServiceRequest;
 use App\Models\WorkRequest;
 use App\Models\Borrowing;
+use App\Models\DocumentRouting;
 use Carbon\Carbon;
 
 class HandleInertiaRequests extends Middleware
@@ -39,17 +40,22 @@ class HandleInertiaRequests extends Middleware
     // app/Http/Middleware/HandleInertiaRequests.php
     public function share(Request $request): array
     {
+        $authUser = $request->user();
+        $userRoles = $authUser ? $authUser->getRolesCollection() : collect();
+
         return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $request->user()
+                'user' => $authUser
                     ? [
-                        'id' => $request->user()->id,
-                        'name' => $request->user()->name,
-                        'role' => $request->user()->role,
-                        'position' => $request->user()->position, // ✅ ADD THIS
-                        'email' => $request->user()->email,
-                        'profile_picture' => $request->user()->profile_picture,
-                        'electronic_signature' => $request->user()->electronic_signature,
+                        'id' => $authUser->id,
+                        'name' => $authUser->name,
+                        'role' => $userRoles->first(),                         // backward compat: primary role object
+                        'roles' => $userRoles->values(),                       // all role objects [{id, name}]
+                        'roleNames' => $userRoles->pluck('name')->toArray(),   // ['Staff', 'DivisionChief']
+                        'position' => $authUser->position,
+                        'email' => $authUser->email,
+                        'profile_picture' => $authUser->profile_picture,
+                        'electronic_signature' => $authUser->electronic_signature,
                     ]
                     : null,
             ],
@@ -64,15 +70,14 @@ class HandleInertiaRequests extends Middleware
             // Number of vehicle requests with status = 'Pending'
             'vehicleRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
-                $role = $user?->role->name ?? '';
                 // DivisionChief: pending requests in their division
-                if ($user && $role === 'DivisionChief') {
+                if ($user && $user->hasRole('DivisionChief')) {
                     $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
                     $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
                     return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
                 }
                 // GSU Head: show count of approved vehicle requests
-                if ($user && $role === 'GSU Head') {
+                if ($user && $user->hasRole('GSU Head')) {
                     return VehicleRequest::where('status', 'Approved')->count();
                 }
                 // default: pending requests
@@ -83,7 +88,7 @@ class HandleInertiaRequests extends Middleware
             // Number of facility requests with status = 'Pending'
             'facilityRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
-                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                if ($user && $user->hasRole('DivisionChief')) {
                     $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
                     $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
                     return FacilityRequest::where('status', 'Pending')
@@ -99,7 +104,7 @@ class HandleInertiaRequests extends Middleware
             // Number of service requests with status = 'Pending'
             'serviceRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
-                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                if ($user && $user->hasRole('DivisionChief')) {
                     $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
                     $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
                     return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
@@ -110,7 +115,7 @@ class HandleInertiaRequests extends Middleware
             'workRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
                 // For DivisionChief, show requests waiting for their DivisionChief approval step (Pending FAD Approval)
-                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
+                if ($user && $user->hasRole('DivisionChief')) {
                     $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
                     $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
                     return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
@@ -120,6 +125,14 @@ class HandleInertiaRequests extends Middleware
             },
             // Number of borrowings that are overdue (due_date before today and not yet returned)
             'borrowingsOverdueCount' => fn () => Borrowing::whereNull('return_date')->whereNotNull('due_date')->whereDate('due_date', '<', Carbon::today())->count(),
+            // Number of document routing steps pending the current user's action
+            'documentTrackingNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                if (!$user) return 0;
+                return DocumentRouting::where('receiver_id', $user->id)
+                    ->whereIn('status', ['Pending', 'Received'])
+                    ->count();
+            },
         ]);
     }
 

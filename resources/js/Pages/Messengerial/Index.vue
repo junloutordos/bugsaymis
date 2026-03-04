@@ -14,25 +14,27 @@ const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
 
-const filteredRequests = computed(() => {
+const filteredRequestsAll = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  const results = requestsList.value.filter(r => {
-    return (r.purpose || '').toString().toLowerCase().includes(q) ||
-      (r.requestor || '').toString().toLowerCase().includes(q) ||
-      (r.reference_no || '').toString().toLowerCase().includes(q) ||
-      (r.destination || '').toString().toLowerCase().includes(q)
-  })
-  const start = (currentPage.value - 1) * perPage
-  return results.slice(start, start + perPage)
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(requestsList.value.filter(r => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return (r.purpose || '').toString().toLowerCase().includes(q) ||
+  return requestsList.value.filter(r =>
+    (r.purpose || '').toString().toLowerCase().includes(q) ||
     (r.requestor || '').toString().toLowerCase().includes(q) ||
     (r.reference_no || '').toString().toLowerCase().includes(q) ||
-    (r.destination || '').toString().toLowerCase().includes(q)
-}).length / perPage)))
+    (r.destination || '').toString().toLowerCase().includes(q) ||
+    (r.status || '').toString().toLowerCase().includes(q) ||
+    (r.consignee_name || '').toString().toLowerCase().includes(q) ||
+    (r.consignee_contact || '').toString().toLowerCase().includes(q) ||
+    (r.unit || '').toString().toLowerCase().includes(q) ||
+    (r.id || '').toString().includes(q)
+  )
+})
+
+const filteredRequests = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filteredRequestsAll.value.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
 
 watch(searchQuery, () => { currentPage.value = 1 })
 const userRole = page.props.auth?.user?.role?.name ?? null;
@@ -130,9 +132,9 @@ const submitProof = () => {
 <template>
   <Head title="Messengerial" />
   <AdminLayout title="Messengerial">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Messengerial Requests</h1>
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Messengerial Requests</h1>
         <button @click.prevent="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">+ New Request</button>
       </div>
 
@@ -143,7 +145,7 @@ const submitProof = () => {
             v-model="searchQuery"
             type="text"
             placeholder="Search requests..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <!-- Desktop table -->

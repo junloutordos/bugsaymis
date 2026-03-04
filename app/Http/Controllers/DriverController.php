@@ -150,7 +150,7 @@ class DriverController extends Controller
         $vehicleRequest->save();
 
         // After assigning a driver, notify OCD users so they can take action
-        $ocdUsers = User::whereHas('role', function($q) { $q->where('name', 'OCD'); })->get();
+        $ocdUsers = User::havingRole('OCD')->get();
         foreach ($ocdUsers as $ocdUser) {
             if ($ocdUser->email) {
                 try {

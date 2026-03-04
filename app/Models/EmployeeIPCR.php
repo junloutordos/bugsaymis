@@ -47,6 +47,8 @@ class EmployeeIPCR extends Model
                         'sup_efficiency',
                         'sup_timeliness',
                         'sup_average',
+
+                        'remarks',
                     ])
                     ->withTimestamps();
     }

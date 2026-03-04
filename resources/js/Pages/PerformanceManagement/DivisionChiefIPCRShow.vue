@@ -14,6 +14,43 @@ const props = defineProps({
 const divisionComments = ref(props.ipcr.remarks ?? "");
 const isEditing = ref(!divisionComments.value); // editable only if empty
 
+// Per-plan remarks (keyed by plan.id), used when status is "For Review"
+const planRemarks = ref(
+  Object.fromEntries((props.plans || []).map(p => [p.id, p.pivot?.remarks ?? ""]))
+);
+
+const savePlanRemark = (plan) => {
+  router.put(
+    route("division-chief-employee-ipcr-plan.remark", [props.ipcr.id, plan.id]),
+    { remarks: planRemarks.value[plan.id] },
+    {
+      onSuccess: () => {
+        plan.pivot.remarks = planRemarks.value[plan.id];
+        Swal.fire({ icon: "success", title: "Saved", timer: 1200, showConfirmButton: false });
+      },
+      onError: () => Swal.fire({ icon: "error", title: "Error", text: "Failed to save remark." }),
+    }
+  );
+};
+
+const disapproveTargets = () => {
+  Swal.fire({
+    title: "Return for Revision?",
+    text: "This will return the IPCR to the employee for revision.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    confirmButtonText: "Yes, return it!",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      router.post(route("division-chief-employee-ipcr.disapprove", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire("Returned!", "IPCR returned for revision.", "success"),
+        onError: () => Swal.fire("Error", "Failed to return IPCR.", "error"),
+      });
+    }
+  });
+};
+
 const saveDivisionComments = () => {
   router.post(
     route("division-chief-employee-ipcr.savecomments", props.ipcr.id),
@@ -175,7 +212,8 @@ const statusBadgeClass = (status) => {
       case 'Targets Approved': return 'bg-green-100 text-green-700'
       case 'Submitted for Rating': return 'bg-orange-100 text-orange-700'
       case 'Rated & For PMT Review': return 'bg-violet-100 text-violet-700'
-      case 'Approved by PMT': return 'bg-red-100 text-red-700'
+      case 'Approved by PMT': return 'bg-teal-100 text-teal-700'
+      case 'Returned for Revision': return 'bg-red-100 text-red-700'
       default: return 'bg-gray-100 text-gray-700'
   }
 };
@@ -237,7 +275,7 @@ const approveTargets = () => {
   <Head :title="`IPCR #${ipcr.id} Plans`" />
 
   <AdminLayout :title="`IPCR: ${ipcr.title}`">
-    <div class="p-6">
+    <div>
 
       <!-- Back Button -->
       <button
@@ -286,7 +324,14 @@ const approveTargets = () => {
             @click="approveTargets"
             class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
           >
-            Approved Targets
+            Approve Targets
+          </button>
+          <button
+            v-if="ipcr.status === 'For Review'"
+            @click="disapproveTargets"
+            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow ml-2"
+          >
+            Return for Revision
           </button>
         </div>
       </div>
@@ -366,22 +411,59 @@ const approveTargets = () => {
                     <span v-else>—</span>
                   </td>
 
-                  <!-- Display self ratings first, then sup ratings if available -->
                   <td class="px-4 py-2 text-center border border-gray-300">
-                    {{ plan.pivot?.sup_quality ?? plan.pivot?.self_quality ?? "—" }}
+                    <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                      {{ plan.pivot?.sup_quality ?? "—" }}
+                    </template>
+                    <template v-else>
+                      <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_quality ?? "—" }}</div>
+                      <div>DC: {{ plan.pivot?.sup_quality ?? "—" }}</div>
+                    </template>
                   </td>
                   <td class="px-4 py-2 text-center border border-gray-300">
-                    {{ plan.pivot?.sup_efficiency ?? plan.pivot?.self_efficiency ?? "—" }}
+                    <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                      {{ plan.pivot?.sup_efficiency ?? "—" }}
+                    </template>
+                    <template v-else>
+                      <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_efficiency ?? "—" }}</div>
+                      <div>DC: {{ plan.pivot?.sup_efficiency ?? "—" }}</div>
+                    </template>
                   </td>
                   <td class="px-4 py-2 text-center border border-gray-300">
-                    {{ plan.pivot?.sup_timeliness ?? plan.pivot?.self_timeliness ?? "—" }}
+                    <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                      {{ plan.pivot?.sup_timeliness ?? "—" }}
+                    </template>
+                    <template v-else>
+                      <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_timeliness ?? "—" }}</div>
+                      <div>DC: {{ plan.pivot?.sup_timeliness ?? "—" }}</div>
+                    </template>
                   </td>
                   <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                    {{ plan.pivot?.sup_average ?? plan.pivot?.self_average ?? "—" }}
+                    <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                      {{ plan.pivot?.sup_average ?? "—" }}
+                    </template>
+                    <template v-else>
+                      <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_average ?? "—" }}</div>
+                      <div>DC: {{ plan.pivot?.sup_average ?? "—" }}</div>
+                    </template>
                   </td>
 
                   <td class="px-4 py-2 border border-gray-300">
-                    {{ plan.pivot?.remarks ?? "—" }}
+                    <template v-if="ipcr.status === 'For Review'">
+                      <textarea
+                        v-model="planRemarks[plan.id]"
+                        rows="2"
+                        class="w-full border rounded px-2 py-1 text-sm"
+                        placeholder="Add remark..."
+                      ></textarea>
+                      <button
+                        @click="savePlanRemark(plan)"
+                        class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                      >
+                        Save
+                      </button>
+                    </template>
+                    <span v-else>{{ plan.pivot?.remarks ?? "—" }}</span>
                   </td>
                 </tr>
               </template>

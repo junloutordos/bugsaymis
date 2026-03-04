@@ -10,7 +10,8 @@ const props = defineProps({
   ipcr: Object,
   employee: Object,
   supervisor: Object,
-  plans: Array
+  plans: Array,
+  workPlans: { type: Array, default: () => [] },
 });
 
 // ---------- Helpers ----------
@@ -344,7 +345,8 @@ const statusBadgeClass = (status) => {
     case 'Targets Approved': return 'bg-green-100 text-green-700';
     case 'Submitted for Rating': return 'bg-orange-100 text-orange-700';
     case 'Rated & For PMT Review': return 'bg-violet-100 text-violet-700';
-    case 'Approved by PMT': return 'bg-red-100 text-red-700';
+    case 'Approved by PMT': return 'bg-teal-100 text-teal-700';
+    case 'Returned for Revision': return 'bg-red-100 text-red-700';
     default: return 'bg-gray-100 text-gray-700';
   }
 };
@@ -462,12 +464,86 @@ const getAdjectivalRating = (rating) => {
 // ---------- Print & Export ----------
 const printIPCR = () => window.print();
 
+// ---------- Revision Workflow ----------
+const showAddPlansModal = ref(false);
+const selectedPlans = ref([]);
+const planSearchQuery = ref("");
+
+const filteredWorkPlans = computed(() => {
+  const q = planSearchQuery.value.toLowerCase();
+  const existingIds = new Set((props.plans || []).map(p => p.id));
+  return props.workPlans.filter(p =>
+    !existingIds.has(p.id) && (
+      p.success_indicator?.toLowerCase().includes(q) ||
+      p.performance_indicator?.description?.toLowerCase().includes(q)
+    )
+  );
+});
+
+const isPlanSelected = (id) => selectedPlans.value.includes(id);
+const togglePlanSelection = (plan) => {
+  const idx = selectedPlans.value.indexOf(plan.id);
+  if (idx >= 0) selectedPlans.value.splice(idx, 1);
+  else selectedPlans.value.push(plan.id);
+};
+
+const submitAddPlans = () => {
+  router.post(
+    route("employee-ipcr.addPlans", props.ipcr.id),
+    { plan_ids: selectedPlans.value },
+    {
+      onSuccess: () => {
+        showAddPlansModal.value = false;
+        selectedPlans.value = [];
+        planSearchQuery.value = "";
+        Swal.fire({ icon: "success", title: "Plans Added", timer: 1500, showConfirmButton: false });
+      },
+      onError: () => Swal.fire({ icon: "error", title: "Failed", text: "Could not add plans." }),
+    }
+  );
+};
+
+const removePlan = (plan) => {
+  Swal.fire({
+    title: "Remove Plan?",
+    text: `Remove "${plan.success_indicator}" from this IPCR?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    confirmButtonText: "Yes, remove it!",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      router.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
+        onSuccess: () => Swal.fire("Removed!", "Plan removed successfully.", "success"),
+        onError: () => Swal.fire("Error", "Failed to remove plan.", "error"),
+      });
+    }
+  });
+};
+
+const resubmit = () => {
+  Swal.fire({
+    title: "Resubmit for Review?",
+    text: "This will resubmit your IPCR for the division chief's review.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Yes, resubmit!",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      router.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire("Resubmitted!", "IPCR resubmitted for review.", "success"),
+        onError: () => Swal.fire("Error", "Failed to resubmit.", "error"),
+      });
+    }
+  });
+};
+
 </script>
 
 <template>
   <Head :title="`IPCR #${ipcr.id} Plans`" />
   <AdminLayout :title="`IPCR: ${ipcr.title}`">
-    <div class="p-6">
+    <div>
       <!-- Back Button -->
       <button @click="$inertia.get(route('employee-ipcr.index'))" class="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800">
         <ArrowLeftIcon class="w-5 h-5" /> Back to IPCR List
@@ -512,10 +588,32 @@ const printIPCR = () => window.print();
             Submit for Rating of the Accomplishment
           </button>
 
-          <button 
-            v-if="ipcr.status === 'Rated & For PMT Review'"
-            @click="printIPCR" 
-            class="bg-green-600 text-white hover:bg-red-700 px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          <button
+            v-if="ipcr.status === 'Returned for Revision'"
+            @click="showAddPlansModal = true"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Plans
+          </button>
+
+          <button
+            v-if="ipcr.status === 'Returned for Revision'"
+            @click="resubmit"
+            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Resubmit for Review
+          </button>
+
+          <button
+            v-if="ipcr.status === 'Rated & For PMT Review' || ipcr.status === 'Targets Approved'"
+            @click="printIPCR"
+            class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow flex items-center gap-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
@@ -528,7 +626,7 @@ const printIPCR = () => window.print();
       
       <!-- Plans Table -->
       <div class="bg-white p-4 rounded-lg shadow" id="ipcr-printable">
-        <div v-if="ipcr.status === 'Rated & For PMT Review'">
+        <div v-if="ipcr.status === 'Rated & For PMT Review' || ipcr.status === 'Targets Approved'">
         <div class="mb-4">
         <p class="text-l text-center font-semibold mb-2">Individual Performance Commitment and Review (IPCR) <br/>
         FY {{ ratingYear }}
@@ -690,37 +788,55 @@ const printIPCR = () => window.print();
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        {{ hasSupervisorRating(piPlans[0].pivot)
-                          ? piPlans[0].pivot.sup_quality ?? "—"
-                          : piPlans[0].pivot?.self_quality ?? "—" }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ piPlans[0].pivot?.sup_quality ?? "—" }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_quality ?? "—" }}</div>
+                          <div>DC: {{ piPlans[0].pivot?.sup_quality ?? "—" }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        {{ hasSupervisorRating(piPlans[0].pivot)
-                          ? piPlans[0].pivot.sup_efficiency ?? "—"
-                          : piPlans[0].pivot?.self_efficiency ?? "—" }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_efficiency ?? "—" }}</div>
+                          <div>DC: {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        {{ hasSupervisorRating(piPlans[0].pivot)
-                          ? piPlans[0].pivot.sup_timeliness ?? "—"
-                          : piPlans[0].pivot?.self_timeliness ?? "—" }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_timeliness ?? "—" }}</div>
+                          <div>DC: {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                        {{
-                          hasSupervisorRating(piPlans[0].pivot)
-                            ? computeAverage(piPlans[0].pivot.sup_quality, piPlans[0].pivot.sup_efficiency, piPlans[0].pivot.sup_timeliness)
-                            : piPlans[0].pivot?.self_average ?? computeAverage(
-                                piPlans[0].pivot?.self_quality,
-                                piPlans[0].pivot?.self_efficiency,
-                                piPlans[0].pivot?.self_timeliness
-                              )
-                        }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_average ?? computeAverage(piPlans[0].pivot?.self_quality, piPlans[0].pivot?.self_efficiency, piPlans[0].pivot?.self_timeliness) }}</div>
+                          <div>DC: {{ piPlans[0].pivot?.sup_average ?? computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
-                        {{ piPlans[0].pivot?.remarks ?? " " }}
+                        <div class="flex items-start gap-2">
+                          <span class="flex-1">{{ piPlans[0].pivot?.remarks || "—" }}</span>
+                          <button
+                            v-if="ipcr.status === 'Returned for Revision'"
+                            @click="removePlan(piPlans[0])"
+                            class="text-red-600 hover:text-red-800 text-xs shrink-0"
+                            title="Remove plan"
+                          >Remove</button>
+                        </div>
                       </td>
                     </tr>
 
@@ -747,37 +863,55 @@ const printIPCR = () => window.print();
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        {{ hasSupervisorRating(plan.pivot)
-                          ? plan.pivot.sup_quality ?? "—"
-                          : plan.pivot?.self_quality ?? "—" }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ plan.pivot?.sup_quality ?? "—" }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_quality ?? "—" }}</div>
+                          <div>DC: {{ plan.pivot?.sup_quality ?? "—" }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        {{ hasSupervisorRating(plan.pivot)
-                          ? plan.pivot.sup_efficiency ?? "—"
-                          : plan.pivot?.self_efficiency ?? "—" }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ plan.pivot?.sup_efficiency ?? "—" }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_efficiency ?? "—" }}</div>
+                          <div>DC: {{ plan.pivot?.sup_efficiency ?? "—" }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        {{ hasSupervisorRating(plan.pivot)
-                          ? plan.pivot.sup_timeliness ?? "—"
-                          : plan.pivot?.self_timeliness ?? "—" }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ plan.pivot?.sup_timeliness ?? "—" }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_timeliness ?? "—" }}</div>
+                          <div>DC: {{ plan.pivot?.sup_timeliness ?? "—" }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                        {{
-                          hasSupervisorRating(plan.pivot)
-                            ? computeAverage(plan.pivot.sup_quality, plan.pivot.sup_efficiency, plan.pivot.sup_timeliness)
-                            : plan.pivot?.self_average ?? computeAverage(
-                                plan.pivot?.self_quality,
-                                plan.pivot?.self_efficiency,
-                                plan.pivot?.self_timeliness
-                              )
-                        }}
+                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                          {{ computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}
+                        </template>
+                        <template v-else>
+                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_average ?? computeAverage(plan.pivot?.self_quality, plan.pivot?.self_efficiency, plan.pivot?.self_timeliness) }}</div>
+                          <div>DC: {{ plan.pivot?.sup_average ?? computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}</div>
+                        </template>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
-                        {{ plan.pivot?.remarks ?? " " }}
+                        <div class="flex items-start gap-2">
+                          <span class="flex-1">{{ plan.pivot?.remarks || "—" }}</span>
+                          <button
+                            v-if="ipcr.status === 'Returned for Revision'"
+                            @click="removePlan(plan)"
+                            class="text-red-600 hover:text-red-800 text-xs shrink-0"
+                            title="Remove plan"
+                          >Remove</button>
+                        </div>
                       </td>
 
                     </tr>
@@ -792,7 +926,7 @@ const printIPCR = () => window.print();
 
         <!-- Summary Table -->
         <br/>
-        <div v-if="ipcr.status === 'Rated & For PMT Review'">
+        <div v-if="ipcr.status === 'Rated & For PMT Review' || ipcr.status === 'Targets Approved'">
         <table class="min-w-full border text-sm border-collapse">
         <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
           <tr>
@@ -949,6 +1083,52 @@ const printIPCR = () => window.print();
           <div class="mt-4 flex justify-end gap-2">
             <button @click="closeModal" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300">Close</button>
             <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Plans Modal (visible when Returned for Revision) -->
+      <div v-if="showAddPlansModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-lg">
+          <h3 class="text-lg font-semibold mb-3">Add Plans</h3>
+          <input
+            v-model="planSearchQuery"
+            type="text"
+            placeholder="Search plans..."
+            class="w-full border rounded px-3 py-2 mb-3 text-sm"
+          />
+          <div class="max-h-64 overflow-auto border rounded p-2 space-y-1">
+            <div
+              v-for="plan in filteredWorkPlans"
+              :key="plan.id"
+              class="flex items-start gap-2 py-1"
+            >
+              <input
+                type="checkbox"
+                :id="`add-plan-${plan.id}`"
+                :checked="isPlanSelected(plan.id)"
+                @change="togglePlanSelection(plan)"
+                class="mt-1"
+              />
+              <label :for="`add-plan-${plan.id}`" class="flex-1 cursor-pointer text-sm">
+                <div class="font-medium">{{ plan.success_indicator }}</div>
+                <div class="text-gray-500">{{ plan.performance_indicator?.description }}</div>
+              </label>
+            </div>
+            <div v-if="filteredWorkPlans.length === 0" class="text-sm text-gray-500 py-2 text-center">
+              No additional plans available.
+            </div>
+          </div>
+          <div class="mt-4 flex justify-end gap-2">
+            <button
+              @click="showAddPlansModal = false; selectedPlans = []; planSearchQuery = ''"
+              class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300 text-sm"
+            >Cancel</button>
+            <button
+              @click="submitAddPlans"
+              :disabled="!selectedPlans.length"
+              class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50"
+            >Add Selected</button>
           </div>
         </div>
       </div>

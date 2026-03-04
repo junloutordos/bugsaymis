@@ -1,17 +1,5 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-const props = defineProps({
-  scholarsCount: { type: Number, default: 0 },
-  facultyCount: { type: Number, default: 0 },
-  staffCount: { type: Number, default: 0 },
-  maleCount: { type: Number, default: 0 },
-  femaleCount: { type: Number, default: 0 },
-  libraryAttendanceByGrade: { type: Array, default: () => [0,0,0,0,0,0] },
-  libraryAttendanceMaleByGrade: { type: Array, default: () => [0,0,0,0,0,0] },
-  libraryAttendanceFemaleByGrade: { type: Array, default: () => [0,0,0,0,0,0] },
-})
-
-// Chart.js + vue-chartjs
 import {
   Chart as ChartJS,
   Title,
@@ -21,100 +9,162 @@ import {
   CategoryScale,
   LinearScale,
   PointElement,
-  LineElement,
   BarElement,
 } from 'chart.js'
-import { Pie, Bar, Doughnut, Scatter } from 'vue-chartjs'
+import { Pie, Bar, Doughnut } from 'vue-chartjs'
 import { computed } from 'vue'
-
-// Calendar
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
-import { UserIcon, AcademicCapIcon, BriefcaseIcon, TrophyIcon } from "@heroicons/vue/24/solid";
-// Register Chart.js components
-ChartJS.register(
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement
-)
+import {
+  UsersIcon,
+  AcademicCapIcon,
+  ClockIcon,
+  DocumentCheckIcon,
+} from '@heroicons/vue/24/solid'
 
-// Shared chart options (responsive + proportional)
-const chartOptions = {
+ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, BarElement)
+
+const props = defineProps({
+  // Employee stats
+  totalEmployees:      { type: Number, default: 0 },
+  facultyCount:        { type: Number, default: 0 },
+  staffCount:          { type: Number, default: 0 },
+  employeeMaleCount:   { type: Number, default: 0 },
+  employeeFemaleCount: { type: Number, default: 0 },
+  activeDivisions:     { type: Number, default: 0 },
+  employeesByDivision: { type: Array,  default: () => [] },
+
+  // Scholar stats
+  scholarsCount: { type: Number, default: 0 },
+  maleCount:     { type: Number, default: 0 },
+  femaleCount:   { type: Number, default: 0 },
+
+  // Library
+  libraryAttendanceByGrade:       { type: Array, default: () => [0,0,0,0,0,0] },
+  libraryAttendanceMaleByGrade:   { type: Array, default: () => [0,0,0,0,0,0] },
+  libraryAttendanceFemaleByGrade: { type: Array, default: () => [0,0,0,0,0,0] },
+
+  // IPCR
+  ipcrByStatus:  { type: Array,  default: () => [] },
+  ipcrForReview: { type: Number, default: 0 },
+  recentIPCRs:   { type: Array,  default: () => [] },
+
+  // IT Job Requests
+  itjrByCategory: { type: Array, default: () => [] },
+
+  // Requests
+  requestOverview:      { type: Array,  default: () => [] },
+  totalPendingRequests: { type: Number, default: 0 },
+
+  // Monthly trends
+  monthlyTrends: { type: Object, default: () => ({ labels: [], datasets: [] }) },
+})
+
+// ── Chart Options ───────────────────────────────────────────────────────────
+const pieOptions = {
   responsive: true,
   maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom' } },
 }
 
-// --- Student Dashboard Data ---
-const studentData = computed(() => ({
-  labels: ['Male', 'Female'],
-  datasets: [
-    {
-      data: [props.maleCount || 0, props.femaleCount || 0],
-      backgroundColor: ['#3b82f6', '#facc15'],
-    },
-  ],
+const hBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: 'y',
+  plugins: { legend: { display: false } },
+  scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+}
+
+const stackedBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom' } },
+  scales: {
+    x: { stacked: true },
+    y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+  },
+}
+
+const barOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'bottom' } },
+  scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+}
+
+// ── Chart Data ──────────────────────────────────────────────────────────────
+const moduleColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316']
+const chartPalette = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#a3e635']
+
+const requestOverviewData = computed(() => ({
+  labels: props.requestOverview.map(r => r.label),
+  datasets: [{
+    label: 'Active / Pending',
+    data: props.requestOverview.map(r => r.pending),
+    backgroundColor: moduleColors,
+  }],
 }))
 
-const attendanceData = computed(() => ({
+const monthlyTrendsData = computed(() => ({
+  labels: props.monthlyTrends.labels ?? [],
+  datasets: (props.monthlyTrends.datasets ?? []).map(d => ({
+    label: d.label,
+    data: d.data,
+    backgroundColor: d.color,
+    stack: 'stack',
+  })),
+}))
+
+const ipcrStatusData = computed(() => ({
+  labels: props.ipcrByStatus.map(r => r.status),
+  datasets: [{
+    data: props.ipcrByStatus.map(r => r.total),
+    backgroundColor: chartPalette,
+  }],
+}))
+
+const itjrCategoryData = computed(() => ({
+  labels: props.itjrByCategory.map(r => r.category),
+  datasets: [{
+    data: props.itjrByCategory.map(r => r.total),
+    backgroundColor: chartPalette,
+  }],
+}))
+
+const employeesByDivisionData = computed(() => ({
+  labels: props.employeesByDivision.map(d => d.division),
+  datasets: [{
+    label: 'Employees',
+    data: props.employeesByDivision.map(d => d.count),
+    backgroundColor: '#3b82f6',
+  }],
+}))
+
+const employeeGenderData = computed(() => ({
+  labels: ['Male', 'Female'],
+  datasets: [{
+    data: [props.employeeMaleCount || 0, props.employeeFemaleCount || 0],
+    backgroundColor: ['#3b82f6', '#facc15'],
+  }],
+}))
+
+const studentGenderData = computed(() => ({
+  labels: ['Male', 'Female'],
+  datasets: [{
+    data: [props.maleCount || 0, props.femaleCount || 0],
+    backgroundColor: ['#3b82f6', '#facc15'],
+  }],
+}))
+
+const libraryAttendanceData = computed(() => ({
   labels: ['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'],
   datasets: [
-    { label: 'Male', data: props.libraryAttendanceMaleByGrade || [0,0,0,0,0,0], backgroundColor: '#3b82f6' },
-    { label: 'Female', data: props.libraryAttendanceFemaleByGrade || [0,0,0,0,0,0], backgroundColor: '#facc15' },
+    { label: 'Male',   data: props.libraryAttendanceMaleByGrade,   backgroundColor: '#3b82f6' },
+    { label: 'Female', data: props.libraryAttendanceFemaleByGrade, backgroundColor: '#facc15' },
   ],
 }))
 
-// --- HR Analytics Data ---
-const salaryByAgeGender = {
-  labels: ['15-24', '25-34', '35-44', '45-54', '55-64', '65+'],
-  datasets: [
-    { label: 'Male', data: [74, 79, 47, 74, 58, 63], backgroundColor: '#3b82f6' },
-    { label: 'Female', data: [98, 88, 74, 74, 82, 79], backgroundColor: '#facc15' },
-  ],
-}
-
-const salaryByOrgUnit = {
-  labels: ['Sales', 'Finance', 'Customer Support', 'Marketing', 'Logistics', 'Production', 'R&D'],
-  datasets: [
-    {
-      data: [180, 461, 65, 184, 105, 220, 330],
-      backgroundColor: ['#3b82f6', '#facc15', '#3b82f6', '#facc15', '#3b82f6', '#facc15', '#3b82f6'],
-    },
-  ],
-}
-
-const avgSalaryOrgGender = {
-  labels: ['Sales', 'Finance', 'Customer Support', 'Marketing', 'Logistics', 'Production', 'R&D'],
-  datasets: [
-    { label: 'Male', data: [120, 160, 80, 90, 110, 100, 140], backgroundColor: '#3b82f6' },
-    { label: 'Female', data: [110, 150, 70, 85, 100, 95, 130], backgroundColor: '#facc15' },
-  ],
-}
-
-const performanceBySalary = {
-  datasets: [
-    {
-      label: 'Performance vs Salary',
-      data: Array.from({ length: 200 }, () => ({
-        x: Math.floor(Math.random() * 100000),
-        y: Math.floor(Math.random() * 100),
-      })),
-      backgroundColor: '#3b82f6',
-    },
-  ],
-}
-
-const compaRatio = {
-  labels: ['Sales', 'Finance', 'Customer Support', 'Marketing', 'Logistics', 'Production', 'R&D'],
-  datasets: [{ label: 'Compa Ratio', data: [1.1, 1.0, 0.9, 0.95, 1.05, 0.98, 1.02], backgroundColor: '#facc15' }],
-}
-
-// Calendar Options
+// ── Calendar ────────────────────────────────────────────────────────────────
 const calendarOptions = {
   plugins: [dayGridPlugin],
   initialView: 'dayGridMonth',
@@ -123,176 +173,265 @@ const calendarOptions = {
   headerToolbar: { left: 'prev,next', center: 'title', right: '' },
   eventDisplay: 'block',
   dayMaxEventRows: 2,
-  events: [
-    { title: 'New Student Inauguration', date: '2025-07-17', color: '#3b82f6' },
-    { title: 'Student Body Handover', date: '2025-07-19', color: '#10b981' },
-    { title: 'Closing of School Clubs', date: '2025-07-27', color: '#facc15' },
-  ],
+  events: [],
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const statusColor = (status) => {
+  const map = {
+    'Draft':        'text-gray-500',
+    'For Review':   'text-yellow-600',
+    'For Rating':   'text-blue-600',
+    'Rated':        'text-green-600',
+    'Completed':    'text-emerald-600',
+    'Returned':     'text-red-500',
+    'Disapproved':  'text-red-600',
+  }
+  return map[status] ?? 'text-gray-500'
+}
+
+const requestBadgeColor = (label) => {
+  const map = {
+    'IT Job Requests':   'bg-blue-100 text-blue-700',
+    'Vehicle Requests':  'bg-green-100 text-green-700',
+    'Facility Requests': 'bg-yellow-100 text-yellow-700',
+    'Service Requests':  'bg-purple-100 text-purple-700',
+    'Work Requests':     'bg-red-100 text-red-700',
+    'Messengerial':      'bg-cyan-100 text-cyan-700',
+    'Consultations':     'bg-orange-100 text-orange-700',
+  }
+  return map[label] ?? 'bg-gray-100 text-gray-700'
 }
 </script>
 
 <template>
   <AdminLayout title="Dashboard">
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Left Main Content -->
+
+      <!-- ── Left Main Content ─────────────────────────────────────────── -->
       <div class="lg:col-span-3 space-y-6">
-        <!-- Top Stats -->
+
+        <!-- Stat Cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <!-- Students -->
           <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-xl shadow hover:shadow-lg transition text-white flex items-center space-x-3">
-            <UserIcon class="h-10 w-10 opacity-90" />
+            <UsersIcon class="h-10 w-10 opacity-90 shrink-0" />
             <div>
-              <p class="text-sm opacity-80">Scholars</p>
-              <h2 class="text-2xl font-bold">{{ (props.scholarsCount || 0).toLocaleString() }}</h2>
+              <p class="text-xs opacity-80">Total Employees</p>
+              <h2 class="text-2xl font-bold">{{ totalEmployees.toLocaleString() }}</h2>
+              <p class="text-xs opacity-70">{{ activeDivisions }} division{{ activeDivisions !== 1 ? 's' : '' }}</p>
             </div>
           </div>
 
-          <!-- Teachers -->
           <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-xl shadow hover:shadow-lg transition text-white flex items-center space-x-3">
-            <AcademicCapIcon class="h-10 w-10 opacity-90" />
+            <AcademicCapIcon class="h-10 w-10 opacity-90 shrink-0" />
             <div>
-              <p class="text-sm opacity-80">Faculty</p>
-              <h2 class="text-2xl font-bold">{{ (props.facultyCount || 0).toLocaleString() }}</h2>
+              <p class="text-xs opacity-80">Scholars</p>
+              <h2 class="text-2xl font-bold">{{ scholarsCount.toLocaleString() }}</h2>
+              <p class="text-xs opacity-70">{{ (maleCount + femaleCount).toLocaleString() }} enrolled</p>
             </div>
           </div>
 
-          <!-- Staffs -->
-          <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 rounded-xl shadow hover:shadow-lg transition text-white flex items-center space-x-3">
-            <BriefcaseIcon class="h-10 w-10 opacity-90" />
+          <div class="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-xl shadow hover:shadow-lg transition text-white flex items-center space-x-3">
+            <ClockIcon class="h-10 w-10 opacity-90 shrink-0" />
             <div>
-              <p class="text-sm opacity-80">Staffs</p>
-              <h2 class="text-2xl font-bold">{{ (props.staffCount || 0).toLocaleString() }}</h2>
+              <p class="text-xs opacity-80">Pending Requests</p>
+              <h2 class="text-2xl font-bold">{{ totalPendingRequests.toLocaleString() }}</h2>
+              <p class="text-xs opacity-70">across all modules</p>
             </div>
           </div>
 
-          <!-- Awards -->
           <div class="bg-gradient-to-r from-yellow-400 to-yellow-600 p-4 rounded-xl shadow hover:shadow-lg transition text-white flex items-center space-x-3">
-            <TrophyIcon class="h-10 w-10 opacity-90" />
+            <DocumentCheckIcon class="h-10 w-10 opacity-90 shrink-0" />
             <div>
-              <p class="text-sm opacity-80">Awards</p>
-              <h2 class="text-2xl font-bold">893</h2>
+              <p class="text-xs opacity-80">IPCR For Review</p>
+              <h2 class="text-2xl font-bold">{{ ipcrForReview.toLocaleString() }}</h2>
+              <p class="text-xs opacity-70">awaiting review</p>
             </div>
           </div>
         </div>
 
+        <!-- Request Overview + IPCR Status -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow">
+            <h3 class="text-lg font-semibold mb-1">Request Overview</h3>
+            <p class="text-xs text-gray-400 mb-4">Active / pending requests per module</p>
+            <div class="min-h-[260px]">
+              <Bar v-if="requestOverview.length" :data="requestOverviewData" :options="hBarOptions" />
+              <p v-else class="text-sm text-gray-400 text-center pt-10">No request data available</p>
+            </div>
+          </div>
 
-        <!-- Main Charts -->
-        <div class="space-y-6">
-          <h2 class="text-xl font-bold text-gray-700">Student Analytics</h2>
+          <div class="bg-white p-6 rounded-xl shadow">
+            <h3 class="text-lg font-semibold mb-1">IPCR Status</h3>
+            <p class="text-xs text-gray-400 mb-4">Distribution by status</p>
+            <div class="min-h-[260px]">
+              <Doughnut v-if="ipcrByStatus.length" :data="ipcrStatusData" :options="pieOptions" />
+              <p v-else class="text-sm text-gray-400 text-center pt-10">No IPCR data</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly Trends -->
+        <div class="bg-white p-6 rounded-xl shadow">
+          <h3 class="text-lg font-semibold mb-1">Monthly Request Trends</h3>
+          <p class="text-xs text-gray-400 mb-4">Requests submitted over the last 6 months</p>
+          <div class="min-h-[280px]">
+            <Bar
+              v-if="monthlyTrends.labels && monthlyTrends.labels.length"
+              :data="monthlyTrendsData"
+              :options="stackedBarOptions"
+            />
+            <p v-else class="text-sm text-gray-400 text-center pt-10">No trend data available</p>
+          </div>
+        </div>
+
+        <!-- IT Job by Category + Employee Gender -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-lg font-semibold mb-4">Students</h3>
-            <div class="chart-container min-h-[220px]">
-              <Pie :data="studentData" :options="chartOptions" />
+            <h3 class="text-lg font-semibold mb-1">IT Job Requests by Category</h3>
+            <p class="text-xs text-gray-400 mb-4">All-time breakdown</p>
+            <div class="min-h-[220px]">
+              <Pie v-if="itjrByCategory.length" :data="itjrCategoryData" :options="pieOptions" />
+              <p v-else class="text-sm text-gray-400 text-center pt-10">No IT Job Request data</p>
             </div>
           </div>
+
           <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="text-lg font-semibold mb-4">Library Traffic</h3>
-            <div class="chart-container min-h-[300px]">
-              <Bar :data="attendanceData" :options="chartOptions" />
+            <h3 class="text-lg font-semibold mb-1">Employee Gender</h3>
+            <p class="text-xs text-gray-400 mb-4">{{ totalEmployees }} total employees</p>
+            <div class="min-h-[220px]">
+              <Pie
+                v-if="employeeMaleCount + employeeFemaleCount > 0"
+                :data="employeeGenderData"
+                :options="pieOptions"
+              />
+              <p v-else class="text-sm text-gray-400 text-center pt-10">No employee gender data</p>
             </div>
           </div>
         </div>
-        </div>
-        <!-- HR Analytics Section -->
-        <div class="space-y-6">
-          <h2 class="text-xl font-bold text-gray-700">HR Analytics</h2>
 
+        <!-- Employees by Division -->
+        <div v-if="employeesByDivision.length" class="bg-white p-6 rounded-xl shadow">
+          <h3 class="text-lg font-semibold mb-1">Employees by Division</h3>
+          <p class="text-xs text-gray-400 mb-4">Top 10 divisions by headcount</p>
+          <div class="min-h-[240px]">
+            <Bar :data="employeesByDivisionData" :options="hBarOptions" />
+          </div>
+        </div>
+
+        <!-- Student Analytics -->
+        <div class="space-y-4">
+          <h2 class="text-xl font-bold text-gray-700">Student Analytics</h2>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="bg-white p-6 rounded-xl shadow">
-              <h3 class="text-lg font-semibold mb-4">Salary by Age Group & Gender</h3>
-              <div class="chart-container min-h-[300px]">
-                <Bar :data="salaryByAgeGender" :options="chartOptions" />
+              <h3 class="text-lg font-semibold mb-1">Student Gender</h3>
+              <p class="text-xs text-gray-400 mb-4">{{ (maleCount + femaleCount).toLocaleString() }} enrolled</p>
+              <div class="min-h-[220px]">
+                <Pie
+                  v-if="maleCount + femaleCount > 0"
+                  :data="studentGenderData"
+                  :options="pieOptions"
+                />
+                <p v-else class="text-sm text-gray-400 text-center pt-10">No student gender data</p>
               </div>
             </div>
+
             <div class="bg-white p-6 rounded-xl shadow">
-              <h3 class="text-lg font-semibold mb-4">Total Salary by Org Unit</h3>
-              <div class="chart-container min-h-[220px]">
-                <Doughnut :data="salaryByOrgUnit" :options="chartOptions" />
+              <h3 class="text-lg font-semibold mb-1">Library Traffic</h3>
+              <p class="text-xs text-gray-400 mb-4">Current month by grade level</p>
+              <div class="min-h-[220px]">
+                <Bar :data="libraryAttendanceData" :options="barOptions" />
               </div>
             </div>
           </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-xl shadow">
-              <h3 class="text-lg font-semibold mb-4">Average Salary by Org Unit & Gender</h3>
-              <div class="chart-container min-h-[300px]">
-                <Bar :data="avgSalaryOrgGender" :options="chartOptions" />
-              </div>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow">
-              <h3 class="text-lg font-semibold mb-4">Performance by Salary</h3>
-              <div class="chart-container min-h-[300px]">
-                <Scatter :data="performanceBySalary" :options="chartOptions" />
-              </div>
-            </div>
-          </div>
-
-          
         </div>
+
       </div>
 
-      <!-- Right Sidebar -->
+      <!-- ── Right Sidebar ─────────────────────────────────────────────── -->
       <div class="space-y-6">
+
         <!-- Calendar -->
-        <div class="bg-white p-6 rounded-xl shadow overflow-hidden">
-          <h3 class="text-lg font-semibold mb-4">Calendar</h3>
+        <div class="bg-white p-4 rounded-xl shadow overflow-hidden">
+          <h3 class="text-base font-semibold mb-3">Calendar</h3>
           <div class="rounded-lg border border-gray-100 overflow-hidden">
             <FullCalendar :options="calendarOptions" />
           </div>
         </div>
 
-        <!-- Upcoming Events -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-lg font-semibold mb-4">Upcoming Events</h3>
-          <ul class="space-y-2 text-sm text-gray-600">
-            <li class="text-blue-500">🎉 New Student Inauguration Ceremony</li>
-            <li class="text-green-500">👨‍🏫 Chairman of Student Body Handover</li>
-            <li class="text-yellow-500">🏫 Closing of School Clubs Acceptance</li>
+        <!-- Pending Requests Summary -->
+        <div class="bg-white p-4 rounded-xl shadow">
+          <h3 class="text-base font-semibold mb-3">Pending Summary</h3>
+          <ul class="space-y-2">
+            <li
+              v-for="item in requestOverview"
+              :key="item.label"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="text-gray-600 truncate mr-2">{{ item.label }}</span>
+              <span
+                v-if="item.pending > 0"
+                class="shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full"
+                :class="requestBadgeColor(item.label)"
+              >
+                {{ item.pending }}
+              </span>
+              <span v-else class="shrink-0 text-xs text-gray-300">0</span>
+            </li>
           </ul>
         </div>
 
-        <!-- Recent Activity -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-lg font-semibold mb-4">Recent Activity</h3>
+        <!-- Recent IPCR Activity -->
+        <div class="bg-white p-4 rounded-xl shadow">
+          <h3 class="text-base font-semibold mb-3">Recent IPCR Activity</h3>
+          <ul v-if="recentIPCRs.length" class="space-y-3">
+            <li
+              v-for="ipcr in recentIPCRs"
+              :key="ipcr.id"
+              class="text-sm border-l-2 border-blue-200 pl-3"
+            >
+              <p class="font-medium text-gray-700 truncate">{{ ipcr.user }}</p>
+              <p class="text-xs text-gray-400">{{ ipcr.rating_period }}</p>
+              <p class="text-xs mt-0.5" :class="statusColor(ipcr.status)">
+                {{ ipcr.status }}
+                <span class="text-gray-300 ml-1">· {{ ipcr.updated_at }}</span>
+              </p>
+            </li>
+          </ul>
+          <p v-else class="text-sm text-gray-400">No recent IPCR submissions</p>
+        </div>
+
+        <!-- HR Summary -->
+        <div class="bg-white p-4 rounded-xl shadow">
+          <h3 class="text-base font-semibold mb-3">HR Summary</h3>
           <ul class="space-y-2 text-sm text-gray-600">
-            <li class="text-green-500">✔️ Mia Gordon won art match competition</li>
-            <li class="text-green-500">✔️ Liam Fiddle and 20 others signed community cleanup</li>
-            <li class="text-green-500">✔️ Jayden Obeary completed new assignment</li>
-            <li class="text-purple-500">✔️ Mr. Bennett uploaded exam schedule</li>
+            <li class="flex justify-between">
+              <span>Total Employees</span>
+              <span class="font-semibold text-gray-800">{{ totalEmployees.toLocaleString() }}</span>
+            </li>
+            <li class="flex justify-between">
+              <span>Faculty</span>
+              <span class="font-semibold text-gray-800">{{ facultyCount.toLocaleString() }}</span>
+            </li>
+            <li class="flex justify-between">
+              <span>Staff</span>
+              <span class="font-semibold text-gray-800">{{ staffCount.toLocaleString() }}</span>
+            </li>
+            <li class="flex justify-between">
+              <span>Active Divisions</span>
+              <span class="font-semibold text-gray-800">{{ activeDivisions }}</span>
+            </li>
+            <li class="flex justify-between border-t pt-2 mt-1">
+              <span>Male Employees</span>
+              <span class="font-semibold text-blue-600">{{ employeeMaleCount.toLocaleString() }}</span>
+            </li>
+            <li class="flex justify-between">
+              <span>Female Employees</span>
+              <span class="font-semibold text-yellow-600">{{ employeeFemaleCount.toLocaleString() }}</span>
+            </li>
           </ul>
         </div>
 
-        <!-- Student Activities -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-lg font-semibold mb-4">Student Activities</h3>
-          <ul class="space-y-2 text-sm text-gray-600">
-            <li class="text-green-500">🏆 Best in Show at Statewide Art Contest</li>
-            <li class="text-green-500">🥇 Gold Medal in National Math Olympiad</li>
-            <li class="text-green-500">🥈 First Place in Regional Science Fair</li>
-          </ul>
-        </div>
-
-        <!-- Notice Board -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-lg font-semibold mb-4">Notice Board</h3>
-          <ul class="space-y-2 text-sm text-gray-600">
-            <li class="text-yellow-500">📌 School Event Reminder</li>
-            <li class="text-yellow-500">📌 Important Exam Update</li>
-            <li class="text-yellow-500">📌 Health and Safety Update</li>
-            <li class="text-yellow-500">📌 Parent-Teacher Meeting Announcement</li>
-          </ul>
-        </div>
-
-        <!-- Messages -->
-        <div class="bg-white p-6 rounded-xl shadow">
-          <h3 class="text-lg font-semibold mb-4">Messages</h3>
-          <ul class="space-y-2 text-sm text-gray-600">
-            <li class="text-pink-500">💬 Alex Campbell: "Reminder about tomorrow’s event"</li>
-            <li class="text-pink-500">💬 Mrs. Patel: "Exam schedules have been updated"</li>
-            <li class="text-pink-500">💬 Coach Davies: "Training moved to Friday"</li>
-          </ul>
-        </div>
       </div>
     </div>
   </AdminLayout>

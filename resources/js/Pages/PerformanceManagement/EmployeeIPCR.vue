@@ -44,7 +44,7 @@ const {
 <template>
   <Head title="My IPCR Targets" />
   <AdminLayout title="My IPCR Targets">
-    <div class="p-6">
+    <div>
       <!-- Header -->
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">My IPCR Targets</h1>
@@ -59,7 +59,7 @@ const {
           v-model="searchQuery"
           type="text"
           placeholder="Search targets..."
-          class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
 

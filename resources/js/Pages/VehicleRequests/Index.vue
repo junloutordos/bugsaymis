@@ -14,23 +14,28 @@ const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
 
-const filteredRequests = computed(() => {
+const filteredRequestsAll = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  const results = (requestsList.value || []).filter(req => {
-    return (req.purpose || '').toString().toLowerCase().includes(q) ||
+  return (requestsList.value || []).filter(req => {
+    return (
+      (req.purpose || '').toString().toLowerCase().includes(q) ||
       (req.vehicle_type || '').toString().toLowerCase().includes(q) ||
-      (req.requester?.name || '').toString().toLowerCase().includes(q)
+      (req.requester?.name || '').toString().toLowerCase().includes(q) ||
+      (req.destination || '').toString().toLowerCase().includes(q) ||
+      (req.status || '').toString().toLowerCase().includes(q) ||
+      (req.driver?.name || req.driver_name || '').toString().toLowerCase().includes(q) ||
+      (req.date_needed || '').toString().includes(q) ||
+      (req.id || '').toString().includes(q)
+    )
   })
-  const start = (currentPage.value - 1) * perPage
-  return results.slice(start, start + perPage)
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || []).filter(req => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return (req.purpose || '').toString().toLowerCase().includes(q) ||
-    (req.vehicle_type || '').toString().toLowerCase().includes(q) ||
-    (req.requester?.name || '').toString().toLowerCase().includes(q)
-}).length / perPage)))
+const filteredRequests = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filteredRequestsAll.value.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
 
 watch(searchQuery, () => { currentPage.value = 1 })
 
@@ -419,7 +424,7 @@ const destroy = (req) => {
 <template>
   <Head title="Vehicle Requests" />
   <AdminLayout title="Vehicle Requests">
-    <div class="p-6">
+    <div>
       <div v-if="page.props.flash?.success" class="mb-4">
         <div class="px-4 py-3 rounded bg-green-50 border border-green-100 text-green-700">{{ page.props.flash.success }}</div>
       </div>
@@ -428,8 +433,8 @@ const destroy = (req) => {
         <div v-else-if="banner.type === 'error'" class="px-4 py-3 rounded bg-red-50 border border-red-100 text-red-700">{{ banner.message }}</div>
         <div v-else class="px-4 py-3 rounded bg-gray-50 border border-gray-100 text-gray-700">{{ banner.message }}</div>
       </div>
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Vehicle Requests</h1>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Vehicle Requests</h1>
         <div class="flex items-center gap-2">
           <button
             v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
@@ -455,7 +460,7 @@ const destroy = (req) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search vehicle requests..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <!-- Desktop table -->

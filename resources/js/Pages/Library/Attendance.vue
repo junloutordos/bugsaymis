@@ -1,8 +1,8 @@
 <template>
   <Head title="Library Attendance" />
   <AdminLayout title="Library Attendance">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-2xl font-bold">Library Attendance</h1>
       </div>
 
@@ -13,7 +13,7 @@
             @keydown.enter="search"
             type="text"
             placeholder="Search by name or Pisay ID"
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 

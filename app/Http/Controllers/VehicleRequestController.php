@@ -21,13 +21,11 @@ class VehicleRequestController extends Controller
     {
 
         $user = $request->user();
-        $role = $user->role->name ?? '';
-
-        $canViewAll = in_array($role, ['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
 
         $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
 
-        if ($role === 'DivisionChief') {
+        if ($user->hasRole('DivisionChief')) {
             // Only include requests where the requester's division is led by this Division Chief.
             // Use whereHas to perform the join in a single query and avoid stale ID lists.
             $requests->whereHas('user', function ($q) use ($user) {
@@ -45,7 +43,7 @@ class VehicleRequestController extends Controller
         $vehicles = \App\Models\Vehicle::where('status','!=','Under Repair')->orderBy('name')->get();
 
         // fetch users with DivisionChief role to allow requester to pick an approver
-        $divisionChiefs = \App\Models\User::whereHas('role', fn($q) => $q->where('name', 'DivisionChief'))
+        $divisionChiefs = \App\Models\User::havingRole('DivisionChief')
             ->orderBy('name')
             ->get(['id','name']);
 
@@ -173,9 +171,9 @@ class VehicleRequestController extends Controller
     public function approveInApp(Request $request, VehicleRequest $vehicleRequest)
     {
         $user = $request->user();
-        logger()->info('approveInApp called', ['user_id' => $user->id ?? null, 'role' => $user->role->name ?? null, 'vehicle_request_id' => $vehicleRequest->id]);
+        logger()->info('approveInApp called', ['user_id' => $user->id ?? null, 'role' => $user->getRoleName(), 'vehicle_request_id' => $vehicleRequest->id]);
 
-        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') {
+        if (! $user || ! $user->hasRole('DivisionChief')) {
             logger()->warning('approveInApp forbidden - not division chief', ['user_id' => $user->id ?? null]);
             return back()->with('error', 'You are not authorized to approve this request.');
         }
@@ -206,7 +204,7 @@ class VehicleRequestController extends Controller
 
         try {
             // Notify all GSU Head users (so GSU handles driver assignment)
-            $gsuHeads = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
+            $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
             foreach ($gsuHeads as $gsuHead) {
                 if ($gsuHead->email) {
                     try {
@@ -226,9 +224,9 @@ class VehicleRequestController extends Controller
     public function declineInApp(Request $request, VehicleRequest $vehicleRequest)
     {
         $user = $request->user();
-        logger()->info('declineInApp called', ['user_id' => $user->id ?? null, 'role' => $user->role->name ?? null, 'vehicle_request_id' => $vehicleRequest->id]);
+        logger()->info('declineInApp called', ['user_id' => $user->id ?? null, 'role' => $user->getRoleName(), 'vehicle_request_id' => $vehicleRequest->id]);
 
-        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') {
+        if (! $user || ! $user->hasRole('DivisionChief')) {
             logger()->warning('declineInApp forbidden - not division chief', ['user_id' => $user->id ?? null]);
             return back()->with('error', 'You are not authorized to decline this request.');
         }
@@ -292,7 +290,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->save();
 
         // Notify all GSU Head users (Division Chief approved -> GSU assigns driver)
-        $gsuHeads = \App\Models\User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
+        $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
         foreach ($gsuHeads as $gsuHead) {
             if ($gsuHead->email) {
                 try {
@@ -443,7 +441,7 @@ class VehicleRequestController extends Controller
      */
     public function update(Request $request, VehicleRequest $vehicleRequest)
     {
-        $isAdmin = ($request->user()->role->name ?? '') === 'Administrator';
+        $isAdmin = $request->user()->hasRole('Administrator');
         if (! $isAdmin) {
             abort(403);
         }
@@ -484,7 +482,7 @@ class VehicleRequestController extends Controller
      */
     public function destroy(VehicleRequest $vehicleRequest)
     {
-        $isAdmin = (auth()->user()->role->name ?? '') === 'Administrator';
+        $isAdmin = auth()->user()->hasRole('Administrator');
         if (! $isAdmin) {
             abort(403);
         }
@@ -534,9 +532,8 @@ class VehicleRequestController extends Controller
     public function printTicket(Request $request, VehicleRequest $vehicleRequest)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
 
-        if (! in_array($role, ['Administrator', 'GSU Head'])) {
+        if (! $user->hasAnyRole(['Administrator', 'GSU Head'])) {
             abort(403);
         }
 

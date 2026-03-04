@@ -54,11 +54,42 @@ class DivisionChiefIPCRController extends Controller
             'status' => 'Targets Approved',
             'target_approved_at' => now(),
         ]);
-        
-        $employeeIPCR->save();
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets approved successfully.');
+    }
+
+    /**
+     * Disapprove IPCR targets and return to employee for revision.
+     */
+    public function disapproveTargets(EmployeeIPCR $employeeIPCR)
+    {
+        $employeeIPCR->update([
+            'status' => 'Returned for Revision',
+        ]);
+
+        return to_route('division-employee-ipcr.show', $employeeIPCR->id)
+            ->with('success', 'Targets returned to employee for revision.');
+    }
+
+    /**
+     * Save a per-plan remark from the division chief during review.
+     */
+    public function savePlanRemark(Request $request, EmployeeIPCR $ipcr, $planId)
+    {
+        $request->validate([
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        if (!$ipcr->plans()->where('work_distribution_plans.id', $planId)->exists()) {
+            abort(404, 'This plan is not assigned to this IPCR.');
+        }
+
+        $ipcr->plans()->updateExistingPivot($planId, [
+            'remarks' => $request->remarks,
+        ]);
+
+        return redirect()->back()->with('success', 'Remark saved.');
     }
 
     /**

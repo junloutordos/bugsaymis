@@ -97,9 +97,9 @@ const destroy = (id) => {
 <template>
   <Head title="Vehicles" />
   <AdminLayout title="Vehicles">
-    <div class="p-6">
+    <div>
 
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-2xl font-bold">Vehicles</h1>
         <button @click="openCreate" class="bg-blue-600 text-white px-4 py-2 rounded">+ Add Vehicle</button>
       </div>
@@ -111,7 +111,7 @@ const destroy = (id) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search vehicles..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <div v-if="!isMobile" class="overflow-x-auto">

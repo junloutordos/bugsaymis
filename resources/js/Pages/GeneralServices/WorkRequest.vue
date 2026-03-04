@@ -1,10 +1,10 @@
 <template>
   <Head title="Work Requests" />
   <AdminLayout title="Work Requests">
-    <div class="p-6">
+    <div>
 
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Work Requests</h1>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Work Requests</h1>
         <button
           v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
           @click.prevent="openModal()"
@@ -17,7 +17,7 @@
       <div class="bg-white rounded-xl shadow p-4">
         <!-- Search -->
         <div class="mb-4">
-          <input v-model="searchQuery" type="text" placeholder="Search work requests..." class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          <input v-model="searchQuery" type="text" placeholder="Search work requests..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
         </div>
         <div v-if="!isMobile" class="overflow-x-auto">
           <table class="table-fixed w-full border border-gray-200">
@@ -293,14 +293,27 @@ const handleResize = () => { windowWidth.value = window.innerWidth }
 onMounted(() => { window.addEventListener('resize', handleResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
-const filteredWorkRequests = computed(() => {
+const filteredWorkRequestsAll = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  const results = (workRequestsList.value || []).filter(wr => (wr.issue || '').toString().toLowerCase().includes(q) || (wr.description || '').toString().toLowerCase().includes(q) || (wr.id || '').toString().includes(q))
-  const start = (currentPage.value - 1) * perPage
-  return results.slice(start, start + perPage)
+  return (workRequestsList.value || []).filter(wr =>
+    (wr.issue || '').toString().toLowerCase().includes(q) ||
+    (wr.description || '').toString().toLowerCase().includes(q) ||
+    (wr.id || '').toString().includes(q) ||
+    (wr.status || '').toString().toLowerCase().includes(q) ||
+    (wr.requester?.name || '').toString().toLowerCase().includes(q) ||
+    (wr.assigned_user?.name || '').toString().toLowerCase().includes(q) ||
+    (wr.actedBy?.name || '').toString().toLowerCase().includes(q) ||
+    (wr.action_taken || '').toString().toLowerCase().includes(q) ||
+    (wr.priority || '').toString().toLowerCase().includes(q)
+  )
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil((workRequestsList.value || []).filter(wr => (wr.issue || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (wr.description || '').toString().toLowerCase().includes(searchQuery.value.trim().toLowerCase()) || (wr.id || '').toString().includes(searchQuery.value.trim())).length / perPage)))
+const filteredWorkRequests = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filteredWorkRequestsAll.value.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredWorkRequestsAll.value.length / perPage)))
 
 watch(searchQuery, () => { currentPage.value = 1 })
 

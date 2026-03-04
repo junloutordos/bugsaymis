@@ -60,8 +60,8 @@ const remove = (act) => {
 <template>
   <Head title="Activity Planner" />
   <AdminLayout title="Activity Planner">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-2xl font-bold">Activity Planner</h1>
         <button @click.prevent="openModal()" class="bg-blue-600 text-white px-4 py-2 rounded">+ New Activity</button>
       </div>

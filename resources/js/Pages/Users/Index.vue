@@ -118,16 +118,17 @@ const openSignaturePicker = (user) => {
 <template>
     <Head :title="props.pageTitle || 'Users'" />
     <AdminLayout :title="props.pageTitle || 'Users'">
-    <div class="p-6">
+    <div>
       <!-- Header -->
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">{{ props.headerTitle || 'Users List' }}</h1>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">{{ props.headerTitle || 'Users List' }}</h1>
         <button
           @click="openModal('create')"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
+          class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 md:px-4 rounded-lg shadow text-sm md:text-base"
         >
-          <PlusIcon class="w-5 h-5 inline-block mr-1" />
-          {{ (props.headerTitle && String(props.headerTitle).toLowerCase().includes('employee')) ? 'New Employee' : 'New User' }}
+          <PlusIcon class="w-4 h-4 md:w-5 md:h-5 inline-block mr-1" />
+          <span class="hidden sm:inline">{{ (props.headerTitle && String(props.headerTitle).toLowerCase().includes('employee')) ? 'New Employee' : 'New User' }}</span>
+          <span class="sm:hidden">New</span>
         </button>
       </div>
 
@@ -137,11 +138,44 @@ const openSignaturePicker = (user) => {
           v-model="searchQuery"
           type="text"
           placeholder="Search users..."
-          class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
         />
 
-        <!-- Users Table -->
-        <div class="overflow-x-auto mt-4">
+        <!-- Mobile Cards -->
+        <div class="sm:hidden mt-4 space-y-3">
+          <div
+            v-for="user in filteredUsers"
+            :key="'m-' + user.id"
+            class="border border-gray-200 rounded-lg p-3"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="font-semibold text-gray-800 truncate">{{ user.name }}</p>
+                <p class="text-xs text-gray-500 truncate">{{ user.email }}</p>
+                <p class="text-xs text-gray-500 mt-0.5">{{ getRoleNames(user) }}</p>
+              </div>
+              <div class="flex gap-1 shrink-0">
+                <button @click="viewUser(user)" class="p-1 hover:bg-gray-100 rounded">
+                  <EyeIcon class="w-4 h-4 text-blue-600" />
+                </button>
+                <button @click="openModal('edit', user)" class="p-1 hover:bg-gray-100 rounded">
+                  <PencilSquareIcon class="w-4 h-4 text-yellow-600" />
+                </button>
+                <button @click="deleteUser(user)" class="p-1 hover:bg-gray-100 rounded">
+                  <TrashIcon class="w-4 h-4 text-red-600" />
+                </button>
+              </div>
+            </div>
+            <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
+              <span v-if="user.position">{{ user.position }}</span>
+              <span v-if="user.division?.division_name">{{ user.division.division_name }}</span>
+            </div>
+          </div>
+          <p v-if="filteredUsers.length === 0" class="text-center text-gray-500 py-4 text-sm">No users found.</p>
+        </div>
+
+        <!-- Desktop Table -->
+        <div class="hidden sm:block overflow-x-auto mt-4">
           <table class="min-w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>

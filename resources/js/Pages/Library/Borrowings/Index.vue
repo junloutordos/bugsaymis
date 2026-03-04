@@ -1,8 +1,8 @@
 <template>
   <Head title="Borrowings" />
   <AdminLayout title="Borrowings">
-    <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
+    <div>
+          <div class="flex items-center justify-between mb-4 gap-2">
             <h1 class="text-2xl font-bold">Borrowings</h1>
             <div class="flex items-center gap-3">
               <div class="relative">

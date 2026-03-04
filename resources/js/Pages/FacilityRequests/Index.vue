@@ -16,27 +16,38 @@ const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
 
-const filteredRequests = computed(() => {
+const filteredRequestsAll = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  const results = (requestsList.value || []).filter(req => {
-    return (req.activity || '').toString().toLowerCase().includes(q) ||
+  return (requestsList.value || []).filter(req => {
+    const venue = Array.isArray(req.venue)
+      ? req.venue.map(v => facilityMap[v] ?? v).join(' ')
+      : (facilityMap[req.venue] ?? req.venue ?? '')
+    return (
+      (req.activity || '').toString().toLowerCase().includes(q) ||
       ((req.requester?.name ?? req.requestor) || '').toString().toLowerCase().includes(q) ||
-      (req.unit || '').toString().toLowerCase().includes(q)
+      (req.unit || req.requester?.division?.division_name || '').toString().toLowerCase().includes(q) ||
+      (req.status || '').toString().toLowerCase().includes(q) ||
+      (req.purpose || '').toString().toLowerCase().includes(q) ||
+      (req.nature || '').toString().toLowerCase().includes(q) ||
+      (req.participants || '').toString().toLowerCase().includes(q) ||
+      venue.toLowerCase().includes(q) ||
+      (req.date_start || '').toString().includes(q) ||
+      (req.id || '').toString().includes(q)
+    )
   })
-  const start = (currentPage.value - 1) * perPage
-  return results.slice(start, start + perPage)
 })
 
-const totalPages = computed(() => Math.max(1, Math.ceil((requestsList.value || []).filter(req => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return (req.activity || '').toString().toLowerCase().includes(q) ||
-    ((req.requester?.name ?? req.requestor) || '').toString().toLowerCase().includes(q) ||
-    (req.unit || '').toString().toLowerCase().includes(q)
-}).length / perPage)))
+const filteredRequests = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filteredRequestsAll.value.slice(start, start + perPage)
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
 
 watch(searchQuery, () => { currentPage.value = 1 })
 
 const showModal = ref(false);
+const editingRequest = ref(null);
 const form = useForm({
   unit: '',
   activity: '',
@@ -154,6 +165,7 @@ const venueDisplay = (venue) => {
 };
 
 const openModal = (req = null) => {
+  editingRequest.value = req ?? null;
   if (req) {
     form.reset();
     form.requestor = req.requester?.name ?? req.requestor;
@@ -191,18 +203,26 @@ const openModal = (req = null) => {
   showModal.value = true;
 };
 
-const closeModal = () => { showModal.value = false; form.reset(); };
+const closeModal = () => { showModal.value = false; editingRequest.value = null; form.reset(); };
 
 const submit = () => {
   if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
-  form.post(route('facility-requests.store'), {
-    onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
-    onError: (errors) => {
-      const venueErr = errors?.venue ?? page.props.errors?.venue;
-      const text = venueErr ? (Array.isArray(venueErr) ? venueErr.join(', ') : venueErr) : (Object.values(errors || {}).flat().join(', ') || 'Failed to submit');
-      Swal.fire({ icon: 'error', title: 'Failed to submit', text })
-    }
-  })
+  const onError = (errors) => {
+    const venueErr = errors?.venue ?? page.props.errors?.venue;
+    const text = venueErr ? (Array.isArray(venueErr) ? venueErr.join(', ') : venueErr) : (Object.values(errors || {}).flat().join(', ') || 'Failed to submit');
+    Swal.fire({ icon: 'error', title: editingRequest.value ? 'Failed to update' : 'Failed to submit', text })
+  }
+  if (editingRequest.value) {
+    form.put(route('facility-requests.update', editingRequest.value.id), {
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError,
+    })
+  } else {
+    form.post(route('facility-requests.store'), {
+      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError,
+    })
+  }
 }
 
 const destroy = (req) => {
@@ -311,9 +331,9 @@ const bookingsForDate = (dt) => {
 <template>
   <Head title="Facility Requests" />
   <AdminLayout title="Facility Requests">
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-800">Facility Requests</h1>
+    <div>
+      <div class="flex items-center justify-between mb-4 gap-2">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Facility Requests</h1>
         <div class="flex items-center gap-2">
           <button
             v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
@@ -339,7 +359,7 @@ const bookingsForDate = (dt) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search facility requests..."
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <!-- Desktop table: allow horizontal scroll and fixed layout to avoid overlap -->
@@ -546,7 +566,7 @@ const bookingsForDate = (dt) => {
         <!-- On small screens use full-screen panel; on larger screens use centered modal -->
         <div class="bg-white w-full h-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-lg p-4 sm:p-6 relative overflow-auto">
           <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
-          <h2 class="text-xl font-semibold mb-4">New Facility Request</h2>
+          <h2 class="text-xl font-semibold mb-4">{{ editingRequest ? 'Edit Facility Request' : 'New Facility Request' }}</h2>
           <div class="space-y-4 max-h-[90vh] overflow-auto">
             <!-- Requestor is set automatically from the authenticated user -->
 

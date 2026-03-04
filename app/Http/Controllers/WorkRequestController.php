@@ -86,7 +86,10 @@ class WorkRequestController extends Controller
         // Instead of sending initial notification to FAD/Division Chief,
         // send the first approval request to GSU Head(s).
         try {
-            $gsuHeads = User::whereHas('role', function($q) { $q->where('name', 'GSU Head'); })->get();
+            $gsuHeadRole = \App\Models\Role::where('name', 'GSU Head')->first();
+            $gsuHeads = $gsuHeadRole
+                ? User::whereRaw('FIND_IN_SET(?, role_id)', [$gsuHeadRole->id])->get()
+                : collect();
 
             if ($gsuHeads->isEmpty()) {
                 logger()->warning('No GSU Head users found to notify for new work request', ['work_request_id' => $wr->id]);
@@ -122,7 +125,10 @@ class WorkRequestController extends Controller
 
         // Notify all GSU Head users to assign staff
         try {
-            $gsuHeads = User::whereHas('role', function($q){ $q->where('name', 'like', '%GSU Head%'); })->get();
+            $gsuHeadRole2 = \App\Models\Role::where('name', 'GSU Head')->first();
+            $gsuHeads = $gsuHeadRole2
+                ? User::whereRaw('FIND_IN_SET(?, role_id)', [$gsuHeadRole2->id])->get()
+                : collect();
             foreach ($gsuHeads as $gsu) {
                 if ($gsu->email) {
                     Mail::to($gsu->email)->send(new WorkRequestForAssignmentMail($workRequest, $chief));
@@ -139,7 +145,7 @@ class WorkRequestController extends Controller
     public function approveInApp(Request $request, WorkRequest $workRequest)
     {
         $user = $request->user();
-        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
 
         if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
         if (in_array($workRequest->status, ['Approved','Division Approved'])) return back()->with('success', 'Already processed');
@@ -148,7 +154,10 @@ class WorkRequestController extends Controller
         $workRequest->save();
 
         try {
-            $gsuHeads = User::whereHas('role', function($q){ $q->where('name', 'like', '%GSU Head%'); })->get();
+            $gsuHeadRole3 = \App\Models\Role::where('name', 'GSU Head')->first();
+            $gsuHeads = $gsuHeadRole3
+                ? User::whereRaw('FIND_IN_SET(?, role_id)', [$gsuHeadRole3->id])->get()
+                : collect();
             foreach ($gsuHeads as $gsu) {
                 if ($gsu->email) {
                     Mail::to($gsu->email)->send(new WorkRequestForAssignmentMail($workRequest, $user->id));
@@ -164,7 +173,7 @@ class WorkRequestController extends Controller
     public function declineInApp(Request $request, WorkRequest $workRequest)
     {
         $user = $request->user();
-        if (! $user || ($user->role->name ?? '') !== 'DivisionChief') abort(403);
+        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
         if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
 
         $data = $request->validate(['reason' => 'required|string|max:1000']);
