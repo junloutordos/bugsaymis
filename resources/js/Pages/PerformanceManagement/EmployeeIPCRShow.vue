@@ -14,6 +14,10 @@ const props = defineProps({
   workPlans: { type: Array, default: () => [] },
 });
 
+// ---------- Rating visibility ----------
+const PRE_RATING_STATUSES = ['New Target', 'Draft', 'For Review', 'For Rating', 'Targets Approved', 'Returned for Revision'];
+const showRatings = computed(() => !PRE_RATING_STATUSES.includes(props.ipcr.status));
+
 // ---------- Helpers ----------
 const hasSupervisorRating = (pivot) => {
   if (!pivot) return false;
@@ -788,7 +792,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ piPlans[0].pivot?.sup_quality ?? "—" }}
                         </template>
                         <template v-else>
@@ -798,7 +803,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}
                         </template>
                         <template v-else>
@@ -808,7 +814,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}
                         </template>
                         <template v-else>
@@ -818,7 +825,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}
                         </template>
                         <template v-else>
@@ -863,7 +871,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ plan.pivot?.sup_quality ?? "—" }}
                         </template>
                         <template v-else>
@@ -873,7 +882,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ plan.pivot?.sup_efficiency ?? "—" }}
                         </template>
                         <template v-else>
@@ -883,7 +893,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ plan.pivot?.sup_timeliness ?? "—" }}
                         </template>
                         <template v-else>
@@ -893,7 +904,8 @@ const resubmit = () => {
                       </td>
 
                       <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                        <template v-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-if="!showRatings">—</template>
+                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
                           {{ computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}
                         </template>
                         <template v-else>
