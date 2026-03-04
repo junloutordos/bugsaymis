@@ -7,6 +7,10 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array, vehicles: Array, divisionChiefs: Array });
 const page = usePage();
+const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
+const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
+const hasRole = (role) => roleNames.value.includes(role);
+const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
 
 // search + client-side pagination
 const requestsList = ref(props.requests || [])
@@ -437,7 +441,7 @@ const destroy = (req) => {
         <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Vehicle Requests</h1>
         <div class="flex items-center gap-2">
           <button
-            v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
+            v-if="!hasRole('GSU Head')"
             @click.prevent="openModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
           >
@@ -469,7 +473,7 @@ const destroy = (req) => {
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">#</th>
-                <th v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left whitespace-normal break-words">{{ page.props.auth?.user?.role?.name === 'GSU Head' ? 'Requestor' : 'Submitted By' }}</th>
+                <th v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 text-left whitespace-normal break-words">{{ hasRole('GSU Head') ? 'Requestor' : 'Submitted By' }}</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Purpose</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Vehicle</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Date Needed</th>
@@ -483,7 +487,7 @@ const destroy = (req) => {
             <tbody class="divide-y divide-gray-200 text-sm">
               <tr v-for="req in filteredRequests" :key="req.id">
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.id }}</td>
-                <td v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.name ?? '—' }}</td>
+                <td v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.purpose }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.vehicle_type ?? '—' }}</td>
                 <td class="px-4 py-3"> 
@@ -530,7 +534,7 @@ const destroy = (req) => {
 
                     <!-- Assign Driver (user) -->
                     <button
-                      v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
+                      v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'Approved' && !req.driver"
                       @click.prevent="openAssignDriverModal(req)"
                       class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
                       title="Assign Driver"
@@ -540,7 +544,7 @@ const destroy = (req) => {
 
                     <!-- Print (printer) -->
                     <button
-                      v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                      v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'OCD Approved'"
                       @click.prevent="openPrint(req)"
                       class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
                       title="Print"
@@ -582,7 +586,7 @@ const destroy = (req) => {
                 <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
                 <!-- Assign Driver Modal removed here; using global modal to avoid duplication -->
 
-                <div class="text-sm text-gray-600"><span v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)">{{ req.requester?.name ?? '—' }} — </span>{{ req.vehicle_type ?? '—' }}</div>
+                <div class="text-sm text-gray-600"><span v-if="!hasAnyRole('Staff','Faculty')">{{ req.requester?.name ?? '—' }} — </span>{{ req.vehicle_type ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
                 <div class="text-gray-600">{{ req.date_needed_multiple && req.date_needed_multiple.length ? (new Date(req.date_needed_multiple[0]).toLocaleDateString()) : (req.date_needed ? new Date(req.date_needed).toLocaleDateString() : '—') }}</div>
@@ -614,7 +618,7 @@ const destroy = (req) => {
               </button>
 
               <button
-                v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'Approved' && !req.driver"
+                v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'Approved' && !req.driver"
                 @click.prevent="openAssignDriverModal(req)"
                 class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md"
               >
@@ -622,7 +626,7 @@ const destroy = (req) => {
               </button>
 
               <button
-                v-if="['Administrator','GSU Head'].includes(page.props.auth?.user?.role?.name) && req.status === 'OCD Approved'"
+                v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'OCD Approved'"
                 @click.prevent="openPrint(req)"
                 class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md"
               >

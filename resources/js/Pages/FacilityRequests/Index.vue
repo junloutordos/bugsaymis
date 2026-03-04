@@ -7,6 +7,10 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 
 const props = defineProps({ requests: Array, facilities: Array, misUsers: Array });
 const page = usePage();
+const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
+const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
+const hasRole = (role) => roleNames.value.includes(role);
+const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
 
 const usersList = ref(props.misUsers || [])
 
@@ -336,7 +340,7 @@ const bookingsForDate = (dt) => {
         <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Facility Requests</h1>
         <div class="flex items-center gap-2">
           <button
-            v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
+            v-if="!hasRole('GSU Head')"
             @click.prevent="openModal()"
             class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
           >
@@ -368,8 +372,8 @@ const bookingsForDate = (dt) => {
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">#</th>
-                <th v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left whitespace-normal break-words">Requestor</th>
-                <th v-if="!['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left whitespace-normal break-words">Unit</th>
+                <th v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 text-left whitespace-normal break-words">Requestor</th>
+                <th v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')" class="px-4 py-3 text-left whitespace-normal break-words">Unit</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Activity</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Date(s)</th>
                 <th class="px-4 py-3 text-left whitespace-normal break-words">Time(s)</th>
@@ -381,8 +385,8 @@ const bookingsForDate = (dt) => {
             <tbody class="divide-y divide-gray-200 text-sm">
               <tr v-for="req in filteredRequests" :key="req.id">
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.id }}</td>
-                <td v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.name ?? req.requestor ?? '—' }}</td>
-                <td v-if="!['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</td>
+                <td v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.name ?? req.requestor ?? '—' }}</td>
+                <td v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')" class="px-4 py-3 whitespace-normal break-words">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.activity ?? '—' }}</td>
                 <td class="px-4 py-3 whitespace-normal break-words">{{ req.date_start ? new Date(req.date_start).toLocaleDateString() : '—' }}
                   <span v-if="req.date_end"> — {{ new Date(req.date_end).toLocaleDateString() }}</span>
@@ -407,7 +411,7 @@ const bookingsForDate = (dt) => {
                 <td class="px-4 py-3 text-center whitespace-normal break-words">
                   <div class="flex items-center gap-2 justify-center">
                     <button
-                        v-if="page.props.auth?.user?.role?.name === 'Administrator'"
+                        v-if="hasRole('Administrator')"
                         @click.prevent="openModal(req)"
                         class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
                         title="Edit"
@@ -416,7 +420,7 @@ const bookingsForDate = (dt) => {
                     </button>
 
                     <button
-                      v-if="page.props.auth?.user?.role?.name === 'Administrator'"
+                      v-if="hasRole('Administrator')"
                       @click.prevent="destroy(req)"
                       class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700"
                       title="Delete"
@@ -426,7 +430,7 @@ const bookingsForDate = (dt) => {
                     
                     <!-- Print button shown when OCD Approved for Admin or GSU Head -->
                     <button
-                      v-if="(page.props.auth?.user?.role?.name === 'Administrator' && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (page.props.auth?.user?.role?.name === 'GSU Head' && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
+                      v-if="(hasRole('Administrator') && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (hasRole('GSU Head') && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
                       @click.prevent="openPrint(req)"
                       class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
                       title="Print"
@@ -439,7 +443,7 @@ const bookingsForDate = (dt) => {
                 </td>
               </tr>
                 <tr v-if="filteredRequests.length === 0">
-                <td :colspan="(['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name) ? 8 : 9)" class="px-4 py-6 text-center text-gray-500">No facility requests found.</td>
+                <td :colspan="(hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief') ? 8 : 9)" class="px-4 py-6 text-center text-gray-500">No facility requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -452,7 +456,7 @@ const bookingsForDate = (dt) => {
               <div>
                 <div class="text-sm text-gray-500">Request #{{ req.id }}</div>
                 <div class="font-semibold text-gray-800">{{ req.activity ?? '—' }}</div>
-                <div class="text-sm text-gray-600"><span v-if="!['Staff','Faculty'].includes(page.props.auth?.user?.role?.name)">{{ req.requester?.name ?? req.requestor ?? '—' }} — </span><span v-if="!['Staff','Faculty','GSU Head','Administrator','DivisionChief'].includes(page.props.auth?.user?.role?.name)">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</span></div>
+                <div class="text-sm text-gray-600"><span v-if="!hasAnyRole('Staff','Faculty')">{{ req.requester?.name ?? req.requestor ?? '—' }} — </span><span v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</span></div>
               </div>
               <div class="text-right text-sm">
                 <div class="text-gray-600">{{ req.date_start ? new Date(req.date_start).toLocaleDateString() : '—' }}
@@ -469,7 +473,7 @@ const bookingsForDate = (dt) => {
 
             <div class="mt-3 flex items-center gap-2">
               <button
-                v-if="page.props.auth?.user?.role?.name === 'Administrator'"
+                v-if="hasRole('Administrator')"
                 @click.prevent="openModal(req)"
                 class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"
               >
@@ -477,7 +481,7 @@ const bookingsForDate = (dt) => {
               </button>
 
               <button
-                v-if="page.props.auth?.user?.role?.name === 'Administrator'"
+                v-if="hasRole('Administrator')"
                 @click.prevent="destroy(req)"
                 class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"
               >
@@ -485,7 +489,7 @@ const bookingsForDate = (dt) => {
               </button>
 
               <button
-                v-if="(page.props.auth?.user?.role?.name === 'Administrator' && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (page.props.auth?.user?.role?.name === 'GSU Head' && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
+                v-if="(hasRole('Administrator') && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (hasRole('GSU Head') && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
                 @click.prevent="openPrint(req)"
                 class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md"
               >

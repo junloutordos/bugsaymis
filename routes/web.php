@@ -807,8 +807,8 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     Route::delete('/library/collection-categories/{id}', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'destroy'])
         ->name('library.collection-categories.destroy')
         ->middleware('role:Administrator|Librarian');
-    Route::middleware('role:Administrator|Staff|Faculty|HR')->group(function () {
-        
+    Route::middleware('role:Administrator|Staff|Faculty|HR|DivisionChief')->group(function () {
+
         //New IPCR Routes
         Route::get('/employee-ipcr', [EmployeeIPCRController::class, 'index'])->name('employee-ipcr.index');
         Route::post('/employee-ipcr', [EmployeeIPCRController::class, 'store'])->name('employee-ipcr.store');

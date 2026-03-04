@@ -121,7 +121,7 @@ class EmployeeIPCRController extends Controller
     public function show($id)
     {
         $ipcr = EmployeeIPCR::with([
-            'user.division.divisionchief',   // Employee → Division → Division Chief
+            'user.division.divisionchief',
             'plans.performance_indicator.agencyOutcome'
         ])->findOrFail($id);
 
@@ -129,10 +129,15 @@ class EmployeeIPCRController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+        // If the IPCR owner is a Division Chief, their immediate head is the Campus Director (OCD)
+        $supervisor = $ipcr->user->hasRole('DivisionChief')
+            ? \App\Models\User::havingRole('OCD')->first()
+            : ($ipcr->user->division->divisionchief ?? null);
+
         return Inertia::render('PerformanceManagement/EmployeeIPCRShow', [
             'ipcr'       => $ipcr,
             'employee'   => $ipcr->user,
-            'supervisor' => $ipcr->user->division->divisionchief,
+            'supervisor' => $supervisor,
             'plans'      => $ipcr->plans,
             'workPlans'  => $workPlans,
         ]);

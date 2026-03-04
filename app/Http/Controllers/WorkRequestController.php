@@ -35,24 +35,15 @@ class WorkRequestController extends Controller
         $user = Auth::user();
         $query = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->orderByDesc('created_at');
 
-        // If logged-in user is Staff, show only their own work requests
-        try {
-            $roleName = $user?->role?->name ?? null;
-        } catch (\Throwable $e) {
-            $roleName = null;
-        }
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
 
-        if ($roleName === 'DivisionChief' && $user) {
-            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-            $userIds = User::whereIn('division_id', $divisionIds)->pluck('id');
-            $query->whereIn('requester_id', $userIds);
-        } elseif (in_array($roleName, ['Staff', 'Faculty']) && $user) {
+        if (! $canViewAll) {
             $query->where('requester_id', $user->id);
         }
 
         $workRequests = $query->get();
 
-        $isDivisionChief = ($roleName === 'DivisionChief');
+        $isDivisionChief = $user->hasRole('DivisionChief');
 
         return Inertia::render('GeneralServices/WorkRequest', [
             'divisions' => $divisions,

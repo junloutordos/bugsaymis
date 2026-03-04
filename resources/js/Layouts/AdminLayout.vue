@@ -443,15 +443,15 @@ const menuItems = [
         routeName: "employee-ipcr.index",
         href: route("employee-ipcr.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff","HR"],
+        roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
       },
-      
+
       {
         label: "My Division",
         routeName: "division-chief-ipcr.index",
         href: route("division-chief-ipcr.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "DivisionChief"],
+        roles: ["Administrator", "DivisionChief", "OCD"],
       },
       
     ],

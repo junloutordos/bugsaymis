@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmployeeIPCR;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -15,15 +16,26 @@ class DivisionChiefIPCRController extends Controller
     {
         $user = auth()->user();
 
-        if (!$user->division_id) {
+        if ($user->hasRole('OCD')) {
+            // Campus Director reviews IPCRs submitted by Division Chiefs
+            $divisionChiefRoleId = \App\Models\Role::where('name', 'DivisionChief')->value('id');
+            $ipcrs = EmployeeIPCR::with('user')
+                ->whereHas('user', fn($q) => $q->whereRaw('FIND_IN_SET(?, role_id)', [$divisionChiefRoleId]))
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } elseif ($user->hasRole('DivisionChief')) {
+            if (!$user->division_id) {
+                abort(403, "You are not assigned to a division.");
+            }
+            // Division Chief reviews their subordinates' IPCRs (exclude themselves)
+            $ipcrs = EmployeeIPCR::with('user')
+                ->whereHas('user', fn($q) => $q->where('division_id', $user->division_id)
+                                                ->where('id', '!=', $user->id))
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
             abort(403, "You are not authorized to view this.");
         }
-
-        // Load all IPCRs of subordinates with their user info
-        $ipcrs = EmployeeIPCR::with('user')
-            ->whereHas('user', fn($q) => $q->where('division_id', $user->division_id))
-            ->orderBy('created_at', 'desc')
-            ->get();
 
         return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
             'ipcrs' => $ipcrs

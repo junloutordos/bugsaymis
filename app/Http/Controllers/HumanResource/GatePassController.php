@@ -30,13 +30,28 @@ class GatePassController extends Controller
         }
 
         if ($chiefDivision) {
-            $rows = DB::table('gatepass')
+            // Pending gatepasses from their division (for approval)
+            $divisionRows = DB::table('gatepass')
                 ->join('users', 'users.badge_id', '=', 'gatepass.badgeNumber')
                 ->where('users.division_id', $chiefDivision->id)
                 ->where('gatepass.status', 'Pending')
                 ->select('gatepass.*', 'users.name as name', 'users.position as position')
                 ->orderByDesc('gatepass.id')
                 ->get();
+
+            // Also include the Division Chief's own gatepasses
+            $badge = $user->badge_id ?? null;
+            $ownRows = collect([]);
+            if ($badge !== null) {
+                $ownRows = DB::table('gatepass')
+                    ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
+                    ->whereRaw("CAST(gatepass.badgeNumber AS CHAR) = ?", [(string) $badge])
+                    ->select('gatepass.*', 'users.name as name', 'users.position as position')
+                    ->orderByDesc('gatepass.id')
+                    ->get();
+            }
+
+            $rows = $divisionRows->merge($ownRows)->unique('id')->sortByDesc('id')->values();
         } elseif ($user && in_array($role, ['Staff', 'Faculty'])) {
             // Gatepass table stores the user's badge as `badgeNumber` (unsignedInteger).
             // Use the user's `badge_id` (from users table) to filter and include
@@ -201,11 +216,22 @@ class GatePassController extends Controller
             ->where('gatepass.id', $id)
             ->first();
 
-        // Notify the division chief of the requestor (if any) using signed links similar
-        // to vehicle request logic so the chief can approve/decline from email.
+        // Notification routing: DivisionChief's gatepass goes to OCD; others go to their Division Chief.
         try {
-            if ($request->user() && $request->user()->division_id) {
-                $division = DB::table('divisions')->where('id', $request->user()->division_id)->first();
+            $submitter = $request->user();
+            if ($submitter && $submitter->hasRole('DivisionChief')) {
+                // Division Chief's immediate head is the Campus Director (OCD)
+                $ocdUsers = \App\Models\User::havingRole('OCD')->get();
+                foreach ($ocdUsers as $ocd) {
+                    if (!empty($ocd->email)) {
+                        $approveUrl = URL::signedRoute('gatepass.ocd.approve', ['id' => $id, 'ocd' => $ocd->id], now()->addDays(7));
+                        $declineUrl = URL::signedRoute('gatepass.ocd.decline', ['id' => $id, 'ocd' => $ocd->id], now()->addDays(7));
+                        Mail::to($ocd->email)->send(new GatePassCreatedMail($row, $approveUrl, $declineUrl));
+                    }
+                }
+            } elseif ($submitter && $submitter->division_id) {
+                // Regular staff/faculty → notify their Division Chief
+                $division = DB::table('divisions')->where('id', $submitter->division_id)->first();
                 if ($division && !empty($division->division_chief_id)) {
                     $chief = DB::table('users')->where('id', $division->division_chief_id)->first();
                     if ($chief && !empty($chief->email)) {

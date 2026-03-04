@@ -25,15 +25,7 @@ class VehicleRequestController extends Controller
 
         $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
 
-        if ($user->hasRole('DivisionChief')) {
-            // Only include requests where the requester's division is led by this Division Chief.
-            // Use whereHas to perform the join in a single query and avoid stale ID lists.
-            $requests->whereHas('user', function ($q) use ($user) {
-                $q->whereHas('division', function ($q2) use ($user) {
-                    $q2->where('division_chief_id', $user->id);
-                });
-            });
-        } elseif (! $canViewAll) {
+        if (! $canViewAll) {
             $requests->where('requestor_id', $user->id);
         }
 

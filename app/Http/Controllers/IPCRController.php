@@ -60,7 +60,7 @@ class IPCRController extends Controller
     }
 
     // Subordinates only (exclude supervisor)
-    $subordinates = $division->employees->where('id', '=', $supervisor->id)->values();
+    $subordinates = $division->employees->where('id', '!=', $supervisor->id)->values();
 
     // Pending targets
     $pendingTargets = IPCR::with('user')

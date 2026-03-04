@@ -23,15 +23,7 @@ class FacilityRequestController extends Controller
 
         $requestsQuery = FacilityRequest::latest();
 
-        if ($user->hasRole('DivisionChief')) {
-            // Only include requests where the requester's division is led by this Division Chief.
-            // FacilityRequest stores requester `email`, so use the `requester` relation then join to `division`.
-            $requestsQuery->whereHas('requester', function ($q) use ($user) {
-                $q->whereHas('division', function ($q2) use ($user) {
-                    $q2->where('division_chief_id', $user->id);
-                });
-            });
-        } elseif (! $canViewAll) {
+        if (! $canViewAll) {
             $requestsQuery->where('requestor_id', $user->id);
         }
 

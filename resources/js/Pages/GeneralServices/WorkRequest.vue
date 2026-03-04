@@ -6,7 +6,7 @@
       <div class="flex items-center justify-between mb-4 gap-2">
         <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Work Requests</h1>
         <button
-          v-if="page.props.auth?.user?.role?.name !== 'GSU Head'"
+          v-if="!hasRole('GSU Head')"
           @click.prevent="openModal()"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
         >
@@ -25,7 +25,7 @@
               <tr>
                 <th class="px-4 py-3 text-left">#</th>
                 <th class="px-4 py-3 text-left">Issue</th>
-                <th v-if="['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3 text-left">Requestor</th>
+                <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left">Requestor</th>
                 <th class="px-4 py-3 text-left">Description</th>
                 <th class="px-4 py-3 text-left">Assigned Personnel</th>
                 <th class="px-4 py-3 text-left">Acted By</th>
@@ -40,7 +40,7 @@
               <tr v-for="wr in filteredWorkRequests" :key="wr.id">
                 <td class="px-4 py-3">{{ wr.id }}</td>
                 <td class="px-4 py-3">{{ wr.issue ?? '—' }}</td>
-                <td v-if="['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="px-4 py-3">{{ wr.requester?.name ?? '—' }}</td>
+                <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3">{{ wr.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.description ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.assigned_user?.name ?? '—' }}</td>
                 <td class="px-4 py-3">{{ wr.actedBy?.name ?? '—' }}</td>
@@ -55,7 +55,7 @@
                 <td class="px-4 py-3 text-center">
                   <div class="flex items-center gap-2 justify-center">
                     <button
-                      v-if="((wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'Administrator') || (wr.status === 'Pending' && page.props.auth?.user?.role?.name === 'GSU Head'))"
+                      v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))"
                       @click.prevent="openModal(wr)"
                       class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
                       title="Assign"
@@ -64,7 +64,7 @@
                     </button>
 
                     <button
-                      v-if="page.props.auth?.user?.role?.name === 'Administrator'"
+                      v-if="hasRole('Administrator')"
                       @click.prevent="openModal(wr)"
                       class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
                       title="Edit"
@@ -73,7 +73,7 @@
                     </button>
 
                     <button
-                      v-if="page.props.auth?.user?.role?.name === 'Administrator'"
+                      v-if="hasRole('Administrator')"
                       @click.prevent="destroy(wr)"
                       class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700"
                       title="Delete"
@@ -82,7 +82,7 @@
                     </button>
                     
                     <button
-                      v-if="((wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')) || (wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'GSU Head'))"
+                      v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))"
                       @click.prevent="openCompleteModal(wr)"
                       class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
                       title="Mark Completed"
@@ -90,7 +90,7 @@
                       <CheckCircleIcon class="w-5 h-5" />
                     </button>
                     <a
-                      v-if="(wr.status === 'Completed') && (['GSU Head','Administrator'].includes(page.props.auth?.user?.role?.name))"
+                      v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))"
                       :href="`/work-requests/${wr.id}/print`"
                       target="_blank"
                       class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
@@ -98,13 +98,13 @@
                     >
                       <PrinterIcon class="w-5 h-5" />
                     </a>
-                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
-                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
+                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
+                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredWorkRequests.length === 0">
-                <td :colspan="(['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name) ? 11 : 10)" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
+                <td :colspan="(hasAnyRole('Administrator','GSU Head','DivisionChief') ? 11 : 10)" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -117,7 +117,7 @@
               <div>
                 <div class="text-sm text-gray-500">Request #{{ wr.id }}</div>
                 <div class="font-semibold text-gray-800">{{ wr.issue ?? '—' }}</div>
-                <div v-if="['Administrator','GSU Head','DivisionChief'].includes(page.props.auth?.user?.role?.name)" class="text-sm text-gray-600">Requestor: {{ wr.requester?.name ?? '—' }}</div>
+                <div v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="text-sm text-gray-600">Requestor: {{ wr.requester?.name ?? '—' }}</div>
                 <div class="text-sm text-gray-600">{{ wr.description ?? '—' }}</div>
               </div>
               <div class="text-right text-sm">
@@ -132,13 +132,13 @@
             </div>
 
             <div class="mt-3 flex items-center gap-2">
-                <button v-if="((wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'Administrator') || (wr.status === 'Pending' && page.props.auth?.user?.role?.name === 'GSU Head'))" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
-              <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md">Edit</button>
-              <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="destroy(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Delete</button>
-              <button v-if="((wr.status === 'FAD Approved' && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')) || (wr.status === 'Division Approved' && page.props.auth?.user?.role?.name === 'GSU Head'))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
-              <a v-if="(wr.status === 'Completed') && (['GSU Head','Administrator'].includes(page.props.auth?.user?.role?.name))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md">Print</a>
-                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md">Approve</button>
-                <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Decline</button>
+                <button v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
+              <button v-if="hasRole('Administrator')" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md">Edit</button>
+              <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Delete</button>
+              <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
+              <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md">Print</a>
+                <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md">Approve</button>
+                <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Decline</button>
             </div>
           </div>
 
@@ -199,7 +199,7 @@
               </div>
             </div>
 
-            <div v-if="editingId && (page.props.auth?.user?.role?.name === 'GSU Head' || page.props.auth?.user?.role?.name === 'Administrator')" class="mt-3">
+            <div v-if="editingId && (hasRole('GSU Head') || hasRole('Administrator'))" class="mt-3">
               <label class="block text-sm font-medium text-gray-700">Assign Personnel</label>
               <select v-model="form.assigned_user_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
                 <option value="">Select staff</option>
@@ -318,6 +318,10 @@ const totalPages = computed(() => Math.max(1, Math.ceil(filteredWorkRequestsAll.
 watch(searchQuery, () => { currentPage.value = 1 })
 
 const page = usePage();
+const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
+const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
+const hasRole = (role) => roleNames.value.includes(role);
+const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
 
 const showModal = ref(false)
 const editingId = ref(null)

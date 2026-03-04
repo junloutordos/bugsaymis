@@ -21,25 +21,15 @@ class ServiceRequestController extends Controller
         // eager-load requester so frontend can display requester name
         $query = ServiceRequest::with('requester')->latest();
 
-        // If the logged-in user is a Staff, show only their own requests
-        try {
-            $roleName = $user?->role?->name ?? null;
-        } catch (\Throwable $e) {
-            $roleName = null;
-        }
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
 
-        if ($roleName === 'DivisionChief' && $user) {
-            $divisionIds = Division::where('division_chief_id', $user->id)->pluck('id');
-            $userIds = User::whereIn('division_id', $divisionIds)->pluck('id');
-            $query->whereIn('requestor_id', $userIds);
-        } elseif (in_array($roleName, ['Staff', 'Faculty']) && $user) {
+        if (! $canViewAll) {
             $query->where('requestor_id', $user->id);
         }
 
         $requests = $query->paginate(15);
 
-        // Pass division chief flag to frontend for approve action
-        $isDivisionChief = ($roleName === 'DivisionChief');
+        $isDivisionChief = $user->hasRole('DivisionChief');
 
         return Inertia::render('ServiceRequests/Index', [
             'requests' => $requests,
