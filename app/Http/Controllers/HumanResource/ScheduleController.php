@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use App\Models\Schedule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use App\Models\User;
 
 class ScheduleController extends Controller
 {

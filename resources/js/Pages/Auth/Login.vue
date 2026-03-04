@@ -1,9 +1,10 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 import { auth, provider, signInWithPopup } from '@/firebase'
+import { usePage } from '@inertiajs/vue3'
 
 /* --------------------------------------------------------------------------
  | Constants
@@ -28,6 +29,24 @@ const showAlert = (options) => {
 
 const isAuthorizedEmail = (email) =>
   email?.toLowerCase().endsWith(OFFICIAL_DOMAIN)
+
+// Show server-side errors (e.g. inactive account) using SweetAlert
+const page = usePage()
+watch(
+  () => page.props.errors,
+  (errs) => {
+    if (!errs) return
+    const emailErr = errs.email || (Array.isArray(errs.email) ? errs.email[0] : null)
+    const msg = emailErr || (typeof errs === 'string' ? errs : null)
+    if (!msg) return
+    if (String(msg).includes('Unable to logged in')) {
+      showAlert({ icon: 'error', title: 'Unable to logged in', text: 'Contact MIS administrator.' })
+    } else {
+      showAlert({ icon: 'error', title: 'Login Failed', text: String(msg) })
+    }
+  },
+  { immediate: true }
+)
 
 /* --------------------------------------------------------------------------
  | Actions

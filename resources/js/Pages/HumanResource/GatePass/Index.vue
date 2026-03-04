@@ -1,9 +1,9 @@
 <template>
-  <AdminLayout title="Gate Pass">
+  <AdminLayout :title="(currentUser.role && currentUser.role.name === 'DivisionChief') ? 'Pending Gate Pass' : 'Gate Pass'">
     <div class="p-6 bg-white rounded shadow">
-        <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold">Gate Pass</h1>
-        <button @click="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold">{{ (currentUser.role && currentUser.role.name === 'DivisionChief') ? 'Pending Gate Pass' : 'Gate Pass' }}</h1>
+        <button v-if="!(currentUser.role && currentUser.role.name === 'DivisionChief')" @click="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center">
           <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Gatepass
         </button>
       </div>
@@ -18,7 +18,8 @@
             <tr class="bg-gray-50">
               <th class="border px-2 py-1">ID</th>
               <th class="border px-2 py-1">Control No</th>
-              <th class="border px-2 py-1">Badge</th>
+              <th v-if="!isSelf" class="border px-2 py-1">Name</th>
+              <th v-if="!isSelf" class="border px-2 py-1">Badge</th>
               <th class="border px-2 py-1">Type</th>
               <th class="border px-2 py-1">Date</th>
               <th class="border px-2 py-1">Time In</th>
@@ -32,24 +33,41 @@
             <tr v-for="r in paginated" :key="r.id">
               <td class="border px-2 py-1">{{ r.id }}</td>
               <td class="border px-2 py-1">{{ r.controlno || '—' }}</td>
-              <td class="border px-2 py-1">{{ r.badgeNumber || r.badgeID || '—' }}</td>
+              <td v-if="!isSelf" class="border px-2 py-1">{{ r.name || r.employee_name || r.fullname || '—' }}</td>
+              <td v-if="!isSelf" class="border px-2 py-1">{{ r.badgeNumber || '—' }}</td>
               <td class="border px-2 py-1">{{ r.gatepass_type || '—' }}</td>
               <td class="border px-2 py-1">{{ r.gatepass_date || '—' }}</td>
               <td class="border px-2 py-1">{{ r.gatepass_timein || '—' }}</td>
               <td class="border px-2 py-1">{{ r.gatepass_timeout || '—' }}</td>
               <td class="border px-2 py-1">{{ r.destination || '—' }}</td>
-              <td class="border px-2 py-1">{{ r.status || '—' }}</td>
+              <td class="border px-2 py-1">
+                <span v-if="r.status && r.status.toLowerCase().includes('approved')" class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">{{ r.status }}</span>
+                <span v-else-if="r.status && r.status.toLowerCase().includes('declined')" class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full font-medium">{{ r.status }}</span>
+                <span v-else class="">{{ r.status || '—' }}</span>
+              </td>
               <td class="border px-2 py-1">
                 <div class="flex items-center gap-2">
-                  <button @click="edit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
-                    <PencilSquareIcon class="w-5 h-5" />
-                  </button>
-                  <button @click="printGatepass(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Print">
-                    <PrinterIcon class="w-5 h-5" />
-                  </button>
-                  <button @click="remove(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
+                  <template v-if="currentUser.role && currentUser.role.name === 'DivisionChief'">
+                    <div class="flex items-center gap-2">
+                      <button v-if="r.status === 'Pending'" @click="approve(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve">
+                        Approve
+                      </button>
+                      <button v-if="r.status === 'Pending'" @click="decline(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline">
+                        Decline
+                      </button>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <button v-if="isSelf ? r.status === 'Pending' : true" @click="edit(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
+                      <PencilSquareIcon class="w-5 h-5" />
+                    </button>
+                    <button v-if="(isSelf ? r.status === 'OCD Approved' : (isAdmin ? r.status === 'OCD Approved' : true))" @click="printGatepass(r)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Print">
+                      <PrinterIcon class="w-5 h-5" />
+                    </button>
+                    <button v-if="isSelf ? r.status === 'Pending' : true" @click="remove(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
+                      <TrashIcon class="w-5 h-5" />
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
@@ -72,10 +90,10 @@
           <h2 class="text-xl font-semibold mb-4">{{ editing ? 'Edit' : 'Add' }} Gate Pass</h2>
 
           <div class="grid grid-cols-1 gap-3">
-            <label>
+            <label v-if="!isSelf">
               <input v-model="form.name" readonly placeholder="Name" class="border p-2 rounded-lg shadow-sm w-full bg-gray-100" />
             </label>
-            <label>
+            <label v-if="!isSelf">
               <input v-model="form.position" readonly placeholder="Position" class="border p-2 rounded-lg shadow-sm w-full bg-gray-100" />
             </label>
             <label>
@@ -93,12 +111,14 @@
             </div>
             <input v-model="form.destination" placeholder="Destination" class="border p-2 rounded-lg shadow-sm" />
             <input v-model="form.purpose" placeholder="Purpose" class="border p-2 rounded-lg shadow-sm" />
-            <!-- Status is set automatically to 'Pending' on creation -->
           </div>
 
           <div class="mt-4 flex justify-end gap-2">
-            <button @click="closeModal" class="px-3 py-1 border rounded-lg">Cancel</button>
-            <button @click="save" class="px-3 py-1 bg-blue-600 text-white rounded-lg">Save</button>
+            <button @click="closeModal" :disabled="saving" class="px-3 py-1 border rounded-lg">Cancel</button>
+            <button @click="save" :disabled="saving" class="px-3 py-1 bg-blue-600 text-white rounded-lg inline-flex items-center">
+              <svg v-if="saving" class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+              <span>{{ saving ? (editing ? 'Saving...' : 'Saving...') : 'Save' }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -118,6 +138,8 @@ const rows = computed(() => page.props.rows || [])
 const divisionChief = computed(() => page.props.divisionChief || null)
 const director = computed(() => page.props.director || null)
 const currentUser = computed(() => page.props.auth?.user || {})
+const isSelf = computed(() => ['Staff', 'Faculty'].includes(currentUser.value.role?.name || ''))
+const isAdmin = computed(() => (currentUser.value.role?.name || '').toLowerCase() === 'administrator')
 
 const searchQuery = ref('')
 const currentPage = ref(1)
@@ -126,7 +148,7 @@ const perPage = 10
 const filtered = computed(() => {
   const q = (searchQuery.value || '').toLowerCase().trim()
   if (!q) return rows.value
-  return rows.value.filter(r => [r.controlno, r.badgeNumber || r.badgeID, r.gatepass_type, r.destination, r.purpose, r.status].join(' ').toLowerCase().includes(q))
+  return rows.value.filter(r => [r.controlno, r.badgeNumber, r.name || r.employee_name || r.fullname, r.gatepass_type, r.destination, r.purpose, r.status].join(' ').toLowerCase().includes(q))
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))
@@ -145,6 +167,7 @@ watch(searchQuery, () => { currentPage.value = 1 })
 
 const show = ref(false)
 const editing = ref(false)
+const saving = ref(false)
 const form = ref({ controlno: '', badgeNumber: '', name: '', position: '', gatepass_type: '', gatepass_timeout: '', gatepass_timein: '', gatepass_date: '', destination: '', purpose: '', status: '' })
 const currentId = ref(null)
 
@@ -164,12 +187,12 @@ function edit(r) {
 }
 
 async function save() {
+  if (saving.value) return
+  saving.value = true
   const url = editing.value ? `/hr/gatepass/${currentId.value}` : '/hr/gatepass'
   const method = editing.value ? 'PUT' : 'POST'
   try {
-    // ensure badgeNumber is current user's badgeNumber
     form.value.badgeNumber = currentUser.value.badgeNumber || form.value.badgeNumber
-    // ensure status is Pending when creating new gate pass
     if (!editing.value) form.value.status = form.value.status || 'Pending'
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }, body: JSON.stringify(form.value) })
     if (res.ok) {
@@ -187,6 +210,7 @@ async function save() {
       Swal.fire({ icon: 'error', title: 'Failed to save', text })
     }
   } catch (e) { Swal.fire({ icon: 'error', title: 'Save failed', text: e.message || 'Save failed' }) }
+  finally { saving.value = false }
 }
 
 async function remove(r) {
@@ -207,116 +231,60 @@ async function remove(r) {
 }
 
 function printGatepass(r) {
-  const name = r.name || r.employee_name || r.fullname || currentUser.value.name || ''
-  const position = r.position || r.job_title || currentUser.value.position || ''
-  const control = r.controlno || ''
-  const date = r.gatepass_date || new Date().toISOString().slice(0,10)
-  const timeOut = r.gatepass_timeout || ''
-  const timeIn = r.gatepass_timein || ''
-  const destination = r.destination || ''
-  const purpose = r.purpose || ''
-  const badge = r.badgeNumber || r.badgeID || ''
-  const type = r.gatepass_type || ''
-  const checked = (t) => (type === t ? '☑' : '☐')
+  const url = `/hr/gatepass/${r.id}/print`
+  const w = window.open(url, '_blank')
+  if (!w) Swal.fire({ icon: 'error', title: 'Unable to open print window' })
+}
 
-  const html = `<!doctype html>
-  <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Gate Pass ${control}</title>
-    <style>
-      body{font-family: Arial, Helvetica, sans-serif; color:#000;}
-      .container{width:820px;margin:0 auto;padding:10px}
-      table{width:100%;border-collapse:collapse}
-      .b{border:1px solid #000}
-      .no-border{border:none}
-      td, th{padding:6px}
-      .center{text-align:center}
-      .right{text-align:right}
-      .small{font-size:12px}
-      .checkbox{font-size:14px;padding-right:8px}
-      .signature{height:70px}
-    </style>
-  </head>
-  <body onload="window.print()">
-    <div class="container">
-      <table class="b">
-        <tr>
-          <td class="center small" colspan="3"><strong>PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM</strong><br/>CAMPUS: CARAGA REGION</td>
-          <td class="b small right" style="width:220px"><strong>CONTROL NO:</strong><br/>${control}</td>
-        </tr>
-        <tr>
-          <td class="no-border" colspan="3"></td>
-          <td class="b small right">DATE:<br/>${date}</td>
-        </tr>
-        <tr>
-          <td class="b" style="width:150px"><strong>NAME:</strong></td>
-          <td class="b" colspan="3">${name} </td>
-        </tr>
-        <tr>
-          <td class="b"><strong>POSITION:</strong></td>
-          <td class="b" colspan="3">${position}</td>
-        </tr>
-        <tr>
-          <td class="b"><strong>TIME OUT:</strong></td>
-          <td class="b" style="width:120px">${timeOut}</td>
-          <td class="b"><strong>TIME IN:</strong></td>
-          <td class="b" style="width:120px">${timeIn}</td>
-        </tr>
-        <tr>
-          <td class="b"><strong>DESTINATION:</strong></td>
-          <td class="b" colspan="3">${destination}</td>
-        </tr>
-        <tr>
-          <td class="b"><strong>PURPOSE:</strong></td>
-          <td class="b" colspan="3">${purpose}</td>
-        </tr>
-        <tr>
-          <td class="b" colspan="4">
-            <div style="padding:8px">
-              <span class="checkbox">${checked('Official Business')}</span> Official Business<br/>
-              <span class="checkbox">${checked('Office Time')}</span> Office Time<br/>
-              <span class="checkbox">${checked('Personal')}</span> Personal
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td class="b" colspan="4"><strong>Recommending Approval:</strong></td>
-        </tr>
-        <tr>
-          <td class="b" colspan="4" style="height:80px">
-            <div class="signature" style="text-align:left">
-              <div style="height:40px"></div>
-              <div style="border-bottom:1px solid #000; display:inline-block; padding-bottom:4px; text-transform:uppercase; font-weight:bold;">
-                ${divisionChief.value && divisionChief.value.name ? divisionChief.value.name.toUpperCase() : '______________________________'}
-              </div>
-              <div style="margin-top:6px">Division Chief</div>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td class="b" colspan="4"><strong>Approved:</strong></td>
-        </tr>
-        <tr>
-          <td class="b" colspan="4" style="height:120px">
-            <div class="signature" style="text-align:left">
-              <div style="height:40px"></div>
-              <div style="border-bottom:1px solid #000; display:inline-block; padding-bottom:4px; text-transform:uppercase; font-weight:bold;">
-                ${director && director.value && director.value.name ? director.value.name.toUpperCase() : '______________________________'}
-              </div>
-              <div style="margin-top:6px">Director</div>
-            </div>
-          </td>
-        </tr>
-      </table>
-    </div>
-  </body>
-  </html>`
+async function approve(r) {
+  const res = await Swal.fire({ title: 'Approve this gate pass?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' })
+  if (!res.isConfirmed) return
+  try {
+    const url = `/hr/gatepass/${r.id}`
+    const body = { status: 'Division Approved', date_time_approved: new Date().toISOString() }
+    const t = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+    const resp = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': t }, body: JSON.stringify(body) })
+    if (resp.ok) {
+      await Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false })
+      location.reload()
+    } else {
+      let text = 'Approve failed'
+      const data = await resp.json().catch(() => null)
+      if (data && data.message) text = data.message
+      Swal.fire({ icon: 'error', title: 'Failed to approve', text })
+    }
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'Failed to approve', text: e.message || 'Failed to approve' })
+  }
+}
 
-  const w = window.open('', '_blank')
-  if (!w) { Swal.fire({ icon: 'error', title: 'Unable to open print window' }); return }
-  w.document.open()
-  w.document.write(html)
-  w.document.close()
+async function decline(r) {
+  const { value: reason } = await Swal.fire({
+    title: 'Reason for decline',
+    input: 'textarea',
+    inputPlaceholder: 'Enter reason for declining this gate pass...',
+    showCancelButton: true,
+    confirmButtonText: 'Decline',
+    cancelButtonText: 'Cancel',
+    inputAttributes: { 'aria-label': 'Reason for decline' }
+  })
+  if (!reason) return
+  try {
+    const url = `/hr/gatepass/${r.id}`
+    const body = { status: 'Division Declined', decline_reason: reason, date_time_declined: new Date().toISOString() }
+    const t = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+    const resp = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': t }, body: JSON.stringify(body) })
+    if (resp.ok) {
+      await Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false })
+      location.reload()
+    } else {
+      let text = 'Decline failed'
+      const data = await resp.json().catch(() => null)
+      if (data && data.message) text = data.message
+      Swal.fire({ icon: 'error', title: 'Failed to decline', text })
+    }
+  } catch (e) {
+    Swal.fire({ icon: 'error', title: 'Failed to decline', text: e.message || 'Failed to decline' })
+  }
 }
 </script>

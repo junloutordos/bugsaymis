@@ -30,6 +30,7 @@ export function useUsers(props) {
   })
 
   const isEmployeesPage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('employee'))
+  const isInactivePage = !!(props.pageTitle && String(props.pageTitle).toLowerCase().includes('inactive'))
 
   // Filtered + paginated users
   const filteredUsersAll = computed(() => {
@@ -53,13 +54,24 @@ export function useUsers(props) {
   })
 
   const filteredUsers = computed(() => {
+    // Start from the pre-filtered list, then apply active/inactive filtering
+    const base = filteredUsersAll.value || []
+    const statusFiltered = base.filter((u) => {
+      const status = (u.status || '').toLowerCase()
+      return isInactivePage ? status === 'inactive' : status !== 'inactive'
+    })
     const start = (currentPage.value - 1) * perPage
-    return filteredUsersAll.value.slice(start, start + perPage)
+    return statusFiltered.slice(start, start + perPage)
   })
 
-  const totalPages = computed(() =>
-    Math.max(1, Math.ceil(filteredUsersAll.value.length / perPage))
-  )
+  const totalPages = computed(() => {
+    const base = filteredUsersAll.value || []
+    const count = base.filter((u) => {
+      const status = (u.status || '').toLowerCase()
+      return isInactivePage ? status === 'inactive' : status !== 'inactive'
+    }).length
+    return Math.max(1, Math.ceil(count / perPage))
+  })
 
   // Modal logic
   const openModal = (mode, user = null) => {
@@ -185,6 +197,29 @@ export function useUsers(props) {
     }
   }
 
+  // Activate (reactivate) user
+  const activateUser = async (user) => {
+    const result = await Swal.fire({
+      title: `Activate ${user.name}?`,
+      text: 'This will return the user to active status.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, activate',
+      cancelButtonText: 'Cancel',
+    })
+    if (result.isConfirmed) {
+      router.post(`/users/${user.id}/activate`, null, {
+        onSuccess: async () => {
+          usersList.value = usersList.value.filter((u) => u.id !== user.id)
+          await Swal.fire('Activated', 'User has been reactivated', 'success')
+        },
+        onError: async (errors) => {
+          await Swal.fire('Error', Object.values(errors).flat().join(', '), 'error')
+        }
+      })
+    }
+  }
+
   return {
     usersList,
     rolesList,
@@ -203,6 +238,8 @@ export function useUsers(props) {
     submitUser,
     viewUser,
     deleteUser,
+    activateUser,
     isEmployeesPage,
+    isInactivePage,
   }
 }

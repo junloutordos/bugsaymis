@@ -11,8 +11,9 @@ import {
   PointElement,
   BarElement,
 } from 'chart.js'
-import { Pie, Bar, Doughnut } from 'vue-chartjs'
-import { computed } from 'vue'
+import { Pie, Bar, Doughnut, Scatter } from 'vue-chartjs'
+import { computed, ref, onMounted } from 'vue'
+import axios from 'axios'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import {
@@ -202,6 +203,62 @@ const requestBadgeColor = (label) => {
   }
   return map[label] ?? 'bg-gray-100 text-gray-700'
 }
+
+// Modal state for date click
+const showDateModal = ref(false)
+const selectedDate = ref('')
+const dateBookings = ref([])
+const loadingBookings = ref(false)
+const bookingsError = ref(null)
+const calendarContainer = ref(null)
+
+async function openDateModal(dateStr) {
+  selectedDate.value = dateStr
+  showDateModal.value = true
+  loadingBookings.value = true
+  bookingsError.value = null
+  try {
+    const url = route('facility-requests.byDate')
+    console.log('[Dashboard] fetching bookings for', dateStr, '->', url)
+    const res = await axios.get(url, { params: { date: dateStr } })
+    dateBookings.value = res.data || []
+  } catch (e) {
+    bookingsError.value = 'Failed to load bookings'
+    dateBookings.value = []
+    console.error('[Dashboard] failed to fetch bookings', e)
+  } finally {
+    loadingBookings.value = false
+  }
+}
+
+// attach handler for FullCalendar date clicks
+// Register dateClick after mount via calendar API to avoid FullCalendar warning
+onMounted(() => {
+  // Use DOM delegation: calendar day cells include a data-date attribute
+  try {
+    const handler = (ev) => {
+      let el = ev.target
+      const root = calendarContainer.value
+      while (el && el !== root) {
+        if (el.dataset && el.dataset.date) {
+          const dateStr = el.dataset.date
+          console.log('[Dashboard] day cell clicked', dateStr)
+          openDateModal(dateStr)
+          return
+        }
+        el = el.parentElement
+      }
+    }
+    if (calendarContainer.value) {
+      calendarContainer.value.addEventListener('click', handler)
+      console.log('[Dashboard] attached DOM click handler to calendar container')
+    } else {
+      console.warn('[Dashboard] calendar container not found to attach click handler')
+    }
+  } catch (e) {
+    console.error('[Dashboard] failed to attach DOM click handler', e)
+  }
+})
 </script>
 
 <template>
@@ -355,7 +412,43 @@ const requestBadgeColor = (label) => {
         <div class="bg-white p-4 rounded-xl shadow overflow-hidden">
           <h3 class="text-base font-semibold mb-3">Calendar</h3>
           <div class="rounded-lg border border-gray-100 overflow-hidden">
-            <FullCalendar :options="calendarOptions" />
+            <div ref="calendarContainer">
+              <FullCalendar :options="calendarOptions" />
+            </div>
+            <!-- Date bookings modal -->
+            <div v-if="showDateModal" class="fixed inset-0 flex items-center justify-center z-50">
+              <div class="absolute inset-0 bg-black bg-opacity-40" @click="showDateModal = false"></div>
+              <div class="bg-white rounded-xl shadow-lg max-w-2xl w-full mx-4 p-4 z-10">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="font-semibold">Facility Requests — {{ selectedDate }}</h4>
+                  <button class="text-gray-600 hover:text-gray-800" @click="showDateModal = false">Close</button>
+                </div>
+                <div v-if="loadingBookings" class="py-6 text-center text-sm text-gray-600">Loading…</div>
+                <div v-else>
+                  <div v-if="bookingsError" class="text-red-600 mb-2">{{ bookingsError }}</div>
+                  <div v-if="dateBookings.length === 0" class="text-sm text-gray-600">No facility requests for this date.</div>
+                  <ul v-else class="space-y-3">
+                    <li v-for="b in dateBookings" :key="b.id" class="p-3 border rounded-lg">
+                      <div class="flex items-start justify-between">
+                        <div>
+                          <div class="text-sm text-gray-500">Requestor: <span class="font-medium">{{ b.requester_name || '—' }}</span> <small class="text-gray-400">{{ b.requester_unit || '' }}</small></div>
+                          <div class="text-lg font-semibold">{{ b.activity || '—' }}</div>
+                          <div class="text-sm text-gray-600">Venue: <span class="font-medium">{{ (b.venue && b.venue.length) ? b.venue.join(', ') : '—' }}</span></div>
+                          <div class="text-sm text-gray-600">Time: <span class="font-medium">{{ b.time_start || '—' }} — {{ b.time_end || '—' }}</span></div>
+                        </div>
+                        <div class="text-right space-y-1">
+                          <div :class="{'text-green-600': b.status && b.status.includes('Approved'), 'text-yellow-600': b.status && b.status.includes('Pending'), 'text-gray-600': !b.status}" class="text-sm font-medium">{{ b.status || '—' }}</div>
+                          <div class="text-sm">
+                            <span v-if="b.has_it_job" class="inline-flex items-center px-2 py-1 rounded bg-gray-100 text-xs">IT Job: <strong class="ml-2">{{ b.it_job_status || 'Unknown' }}</strong></span>
+                            <span v-else class="inline-flex items-center px-2 py-1 rounded bg-gray-50 text-xs text-gray-500">No IT job</span>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

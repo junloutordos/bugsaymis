@@ -14,8 +14,10 @@ class UserController extends Controller
 {
     public function index()
     {
+        // Exclude users explicitly marked as 'inactive'
         $users = User::with(['role', 'division.divisionchief', 'office'])
             ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->where('status', '<>', 'inactive')
             ->get();
 
         // For dropdowns
@@ -41,8 +43,10 @@ class UserController extends Controller
      */
     public function employeesIndex()
     {
+        // Exclude users explicitly marked as 'inactive' for the employees list as well
         $users = User::with(['role', 'division.divisionchief', 'office'])
             ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->where('status', '<>', 'inactive')
             ->get();
 
         $roles = Role::select('id', 'name')->get();
@@ -59,6 +63,32 @@ class UserController extends Controller
             // pageTitle/headerTitle used by the Vue page to display custom labels
             'pageTitle' => 'List of Employees',
             'headerTitle' => 'List of Employees',
+        ]);
+    }
+
+    /**
+     * Show users marked as inactive (Administrator only).
+     */
+    public function inactiveIndex()
+    {
+        $users = User::with(['role', 'division.divisionchief', 'office'])
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status')
+            ->where('status', 'inactive')
+            ->get();
+
+        $roles = Role::select('id', 'name')->get();
+        $divisions = Division::where('status', 'active')
+            ->select('id', 'division_name')
+            ->get();
+        $offices = Office::select('id', 'name', 'division_id')->get();
+
+        return Inertia::render('Users/Index', [
+            'users'     => $users,
+            'roles'     => $roles,
+            'divisions' => $divisions,
+            'offices'   => $offices,
+            'pageTitle' => 'Inactive Users',
+            'headerTitle' => 'Inactive Users',
         ]);
     }
 
@@ -98,7 +128,7 @@ class UserController extends Controller
      */
     public function selectList(Request $request)
     {
-        $query = User::query()->select('id', 'name', 'badge_id', 'office_id');
+        $query = User::query()->select('id', 'name', 'badge_id', 'office_id')->where('status', '<>', 'inactive');
 
         // optional filter by emp_category or search
         if ($request->filled('emp_category')) {
@@ -220,6 +250,18 @@ class UserController extends Controller
         $user->save();
 
         return back()->with('success', 'User marked as inactive.');
+    }
+
+    /**
+     * Reactivate a user previously marked inactive.
+     */
+    public function activate($id)
+    {
+        $user = User::findOrFail($id);
+        $user->status = 'active';
+        $user->save();
+
+        return back()->with('success', 'User reactivated.');
     }
 
     public function uploadSignature(Request $request, User $user)

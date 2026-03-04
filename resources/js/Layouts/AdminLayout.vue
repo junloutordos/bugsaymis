@@ -75,6 +75,8 @@ const getBadge = (child) => {
       return page.props.itJobRequestsNotificationCount || 0;
     case 'vehicle-requests.index':
       return page.props.vehicleRequestsNotificationCount || 0;
+    case 'gatepass.index':
+      return page.props.gatepassNotificationCount || 0;
     case 'messengerial.index':
       return page.props.messengerialRequestsNotificationCount || 0;
     case 'facility-requests.index':
@@ -245,6 +247,13 @@ const menuItems = [
         roles: ["Administrator"],
       },
       {
+        label: "Inactive Users",
+        routeName: "users.inactive",
+        href: route("users.inactive"),
+        icon: UserGroupIcon,
+        roles: ["Administrator"],
+      },
+      {
         label: 'DTR Upload',
         routeName: 'data.dtr.upload',
         href: route('data.dtr.upload'),
@@ -353,11 +362,11 @@ const menuItems = [
   },
   
   
-  {
-    label: "Human Resource",
-    icon: UserGroupIcon,
-    roles: ["Administrator", "HR", "Faculty", "Staff"],
-    children: [
+    {
+      label: "Human Resource",
+      icon: UserGroupIcon,
+      roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
+      children: [
       {
         label: "My PDS",
         routeName: "pds.my",
@@ -398,7 +407,7 @@ const menuItems = [
         routeName: "gatepass.index",
         href: route('gatepass.index'),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "HR", "Faculty", "Staff"],
+        roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
       },
     ],
   },
@@ -525,6 +534,20 @@ const menuItems = [
     ],
     // Only show this section for GSU Head if that's their only role
     showForGSUHeadOnly: true,
+  },
+  {
+    label: "Procurement",
+    icon: ShoppingCartIcon,
+    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
+    children: [
+      {
+        label: "Purchase Requests",
+        routeName: "procurements.index",
+        href: route("procurements.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff"],
+      },
+    ],
   },
   {
     label: "Supply & Property",
@@ -1001,7 +1024,7 @@ filteredMenu.value.forEach((item) => {
       </div>
       <div class="px-6 py-4 border-t flex justify-end gap-2">
         <button @click="closeConsultationLogModal" class="px-4 py-2 rounded bg-gray-200">Cancel</button>
-        <button @click="generateConsultationLog" class="px-4 py-2 rounded bg-blue-600 text-white">Generate</button>
+        <button @click="generateConsultationLog" class="px-4 py-2 rounded bg-blue-600 text-white">Generate Graph</button>
       </div>
     </div>
   </div>

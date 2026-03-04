@@ -47,7 +47,7 @@ class LoginRequest extends FormRequest
         $user = $userModel::where('email', $email)->first();
         if ($user && isset($user->status) && $user->status !== 'active') {
             throw ValidationException::withMessages([
-                'email' => 'Your account is inactive. Please contact the system administrator.',
+                'email' => 'Unable to logged in, contact MIS administrator.',
             ]);
         }
 

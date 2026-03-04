@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class Borrowing extends Model
 {
     protected $table = 'borrowings';
-    protected $guarded = [];
+    // Avoid allowing all attributes to be mass-assignable.
+    protected $guarded = ['id', 'created_at', 'updated_at'];
 
     public function collection()
     {

@@ -33,7 +33,12 @@ class GoogleAuthController extends Controller
             ]);
         }
 
-        // 3. Login user
+        // 3. Prevent inactive accounts from logging in via Google SSO
+        if (isset($user->status) && $user->status !== 'active') {
+            return response()->json(['success' => false, 'message' => 'Unable to logged in, contact MIS administrator.'], 403);
+        }
+
+        // 4. Login user
         Auth::login($user);
 
         // 4. Get role + redirect path

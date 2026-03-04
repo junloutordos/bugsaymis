@@ -23,6 +23,11 @@ class FirebaseController extends Controller
             ['name' => $verifiedIdToken->claims()->get('name')]
         );
 
+        // Prevent inactive accounts from logging in via Firebase SSO
+        if (isset($user->status) && $user->status !== 'active') {
+            return response()->json(['error' => 'Unable to logged in, contact MIS administrator.'], 403);
+        }
+
         Auth::login($user);
 
         return redirect()->intended('/dashboard');

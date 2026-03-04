@@ -206,7 +206,8 @@ class LibraryBorrowingsController extends Controller
 
     public function store(Request $request)
     {
-        Log::info('LibraryBorrowingsController@store called', ['user_id' => optional(Auth::user())->id, 'payload' => $request->all()]);
+        // Avoid logging full request payloads (may contain PII). Log keys only.
+        Log::info('LibraryBorrowingsController@store called', ['user_id' => optional(Auth::user())->id, 'keys' => array_keys($request->all())]);
         try {
             if (! $this->checkAccess()) {
                 Log::warning('Unauthorized attempt to create borrowing', ['user_id' => optional(Auth::user())->id]);
@@ -254,7 +255,8 @@ class LibraryBorrowingsController extends Controller
             $data['borrower_id'] = $student->id;
         }
 
-        Log::info('Borrowing data after resolution', ['data' => $data]);
+        // Data comes from validation; log minimal info for traceability.
+        Log::info('Borrowing data after resolution', ['collection_id' => $data['collection_id'] ?? null, 'borrower_type' => $data['borrower_type'] ?? null]);
 
         // Ensure collection is available (explicitly disallow if currently Borrowed)
         $collection = LibraryCollection::findOrFail($data['collection_id']);
@@ -340,7 +342,8 @@ class LibraryBorrowingsController extends Controller
         Log::info('Collection status updated to Borrowed', ['collection_id' => $collection->id]);
         return Redirect::route('library.borrowings.index')->with('success', 'Borrowing processed.');
         } catch (\Throwable $e) {
-            Log::error('Error processing borrowing', ['exception' => $e, 'payload' => $request->all()]);
+            // Avoid writing full payload to logs; include exception and minimal context.
+            Log::error('Error processing borrowing', ['exception' => $e, 'collection_id' => $request->input('collection_id')]);
             return Redirect::route('library.borrowings.index')->with('error', 'Error processing borrowing: '.$e->getMessage());
         }
     }

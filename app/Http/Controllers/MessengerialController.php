@@ -295,7 +295,8 @@ class MessengerialController extends Controller
             }
         }
 
-        $messengerialRequest->update($request->all());
+        // Restrict updates to model fillable attributes to prevent mass-assignment
+        $messengerialRequest->update($request->only($messengerialRequest->getFillable()));
         return redirect()->route('messengerial.index');
     }
 

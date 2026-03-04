@@ -53,7 +53,8 @@ class ClinicKioskController extends Controller
         // Transactional create and availability check
         DB::beginTransaction();
         try {
-            Log::info('ClinicKiosk store payload', $request->all());
+            // Avoid logging full request payloads which may contain PII
+            Log::info('ClinicKiosk store', ['user_id' => optional(auth()->user())->id, 'keys' => array_keys($request->all())]);
             // doctor schedule availability checks removed since doctor schedules were dropped
 
             // resolve student id from pisay if provided
