@@ -32,6 +32,7 @@ use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
+use App\Http\Controllers\PMTIPCRController;
 use App\Http\Controllers\PDSController;
 use App\Http\Controllers\PDSTrainingController;
 use Illuminate\Support\Facades\Route;
@@ -666,7 +667,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     | Role-Based Routes
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:Administrator|HR|DivisionChief')->group(function () {
+    Route::middleware('role:Administrator|HR|DivisionChief|OCD|PMT')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
@@ -733,6 +734,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         // Disapprove IPCR targets (return for revision)
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/disapprove', [DivisionChiefIPCRController::class, 'disapproveTargets'])
             ->name('division-chief-employee-ipcr.disapprove');
+        // Return submitted accomplishment for revision
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-accomplishment', [DivisionChiefIPCRController::class, 'returnAccomplishment'])
+            ->name('division-chief-employee-ipcr.returnAccomplishment');
         // Save per-plan remark during review
         Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/remark', [DivisionChiefIPCRController::class, 'savePlanRemark'])
             ->name('division-chief-employee-ipcr-plan.remark');
@@ -745,6 +749,21 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         // Rate accomplishments for an IPCR
         Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/rate', [DivisionChiefIPCRController::class, 'rateIPCRPlan'])->name('division-chief-employee-ipcr-plan.rateIPCRPlan');
+        // Submit rated IPCR to PMT
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/submit-to-pmt', [DivisionChiefIPCRController::class, 'submitToPMT'])
+            ->name('division-chief-employee-ipcr.submitToPMT');
+        // Return IPCR to employee after PMT requested revision
+        Route::post('/division-chief-employee-ipcr/{employeeIPCR}/return-from-pmt', [DivisionChiefIPCRController::class, 'returnFromPMT'])
+            ->name('division-chief-employee-ipcr.returnFromPMT');
+
+        // PMT Review Routes
+        Route::middleware('role:Administrator|PMT')->group(function () {
+            Route::get('/pmt/ipcrs', [PMTIPCRController::class, 'index'])->name('pmt-ipcr.index');
+            Route::get('/pmt/ipcrs/{id}', [PMTIPCRController::class, 'show'])->name('pmt-ipcr.show');
+            Route::post('/pmt/ipcrs/{employeeIPCR}/approve', [PMTIPCRController::class, 'approve'])->name('pmt-ipcr.approve');
+            Route::post('/pmt/ipcrs/{employeeIPCR}/return', [PMTIPCRController::class, 'returnForRevision'])->name('pmt-ipcr.return');
+        });
+
         // Employee plan management (also accessible here for admins)
         Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])
             ->name('employee-ipcr.removePlan');

@@ -1,6 +1,7 @@
 import { ref, reactive, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
+import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 
 export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
   const ipcrTargets = ref(initialIPCRs)
@@ -179,17 +180,7 @@ export default function useEmployeeIPCR(initialIPCRs = [], workPlans = []) {
   }
 
   const sortBy = (key) => { if(sortKey.value===key) sortAsc.value=!sortAsc.value; else sortKey.value=key,sortAsc.value=true }
-  const statusClasses = (status) => {
-    switch(status){
-      case 'New Target': return 'bg-blue-100 text-blue-700'
-      case 'For Review': return 'bg-yellow-100 text-yellow-700'
-      case 'Targets Approved': return 'bg-green-100 text-green-700'
-      case 'Submitted for Rating': return 'bg-orange-100 text-orange-700'
-      case 'Rated & For PMT Review': return 'bg-violet-100 text-violet-700'
-      case 'Rated & For PMT Review': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-700'
-    }
-  }
+  const statusClasses = ipcrStatusClass
 
   return {
     ipcrTargets,

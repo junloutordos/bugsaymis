@@ -1,0 +1,585 @@
+<script setup>
+import { Head } from "@inertiajs/vue3"
+import AdminLayout from "@/Layouts/AdminLayout.vue"
+import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
+import { computed } from "vue"
+import { router } from "@inertiajs/vue3"
+import Swal from "sweetalert2"
+import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
+
+const props = defineProps({
+  ipcr:       Object,
+  plans:      Array,
+  employee:   Object,
+  supervisor: Object,
+})
+
+// ---------- Status badge ----------
+const statusClasses = ipcrStatusClass
+
+// ---------- Date helpers ----------
+const extractYearFromRatingPeriod = (ratingPeriod) => {
+  if (!ratingPeriod || typeof ratingPeriod !== "string") return ""
+  const m = ratingPeriod.match(/(19|20)\d{2}/)
+  return m ? m[0] : ""
+}
+
+const formatDateString = (value) => {
+  if (!value) return "—"
+  let d
+  if (value instanceof Date) {
+    d = value
+  } else {
+    let parsed = Date.parse(value)
+    if (isNaN(parsed)) {
+      const digits = String(value).match(/\d{9,}/)
+      if (digits) parsed = parseInt(digits[0], 10)
+    }
+    if (isNaN(parsed)) return value || "—"
+    d = new Date(parsed)
+  }
+  if (isNaN(d)) return "—"
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+}
+
+const ratingYear                   = computed(() => extractYearFromRatingPeriod(props.ipcr?.rating_period || ""))
+const formattedSubmittedForReviewAt = computed(() => formatDateString(props.ipcr?.submitted_for_review_at))
+const formattedTargetApprovedAt    = computed(() => formatDateString(props.ipcr?.target_approved_at))
+const formattedSubmittedRatingAt   = computed(() => formatDateString(props.ipcr?.submitted_rating_at))
+
+// ---------- Function type helpers ----------
+const normalizeFunctionType = (raw) => {
+  if (!raw) return "Uncategorized"
+  const t = String(raw).trim().toLowerCase()
+  if (t === "strategic" || t === "strategic functions" || t === "strategic function") return "Strategic Functions"
+  if (t === "core" || t === "core functions" || t === "core function") return "Core Functions"
+  if (t === "support" || t === "support functions" || t === "support function") return "Support Functions"
+  return String(raw).trim()
+}
+
+const functionTypeWeights = { "Strategic Functions": 0.30, "Core Functions": 0.55, "Support Functions": 0.15, "Uncategorized": 0 }
+const functionTypeOrder   = { "Strategic Functions": 1,    "Core Functions": 2,    "Support Functions": 3,    "Uncategorized": 4 }
+
+const computeNumericAverage = (q, e, t) => {
+  const values = [q, e, t].filter(v => v !== null && v !== "" && !isNaN(v)).map(Number)
+  if (!values.length) return null
+  return values.reduce((a, b) => a + b, 0) / values.length
+}
+
+const formatAvg = (num) => {
+  if (num === null || num === undefined || isNaN(num)) return "—"
+  return Number(num).toFixed(2)
+}
+
+// ---------- Grouped plans: function type → outcome → sub-outcome → PI description ----------
+const groupedPlansByFunction = computed(() => {
+  const groups = {}
+
+  ;(props.plans || []).forEach(plan => {
+    const aoo        = plan.performance_indicator?.agency_outcome
+    const functionType = normalizeFunctionType(aoo?.function_type)
+    const outcome    = aoo?.outcome    || "Uncategorized"
+    const subOutcome = aoo?.sub_outcome || "—"
+    const subAbbrev  = subOutcome !== "—" ? subOutcome.slice(0, 4) : subOutcome
+    const piDesc     = plan.performance_indicator?.description || "—"
+
+    if (!groups[functionType]) groups[functionType] = {}
+    if (!groups[functionType][outcome]) groups[functionType][outcome] = {}
+    if (!groups[functionType][outcome][subAbbrev]) groups[functionType][outcome][subAbbrev] = {}
+    if (!groups[functionType][outcome][subAbbrev][piDesc]) groups[functionType][outcome][subAbbrev][piDesc] = []
+    groups[functionType][outcome][subAbbrev][piDesc].push(plan)
+  })
+
+  const sorted = {}
+  Object.keys(functionTypeOrder).forEach(ft => { if (groups[ft]) sorted[ft] = groups[ft] })
+  Object.keys(groups).filter(ft => !functionTypeOrder[ft]).sort().forEach(ft => (sorted[ft] = groups[ft]))
+
+  Object.keys(sorted).forEach(ft => {
+    const sortedOutcomes = {}
+    Object.keys(sorted[ft]).sort().forEach(outcome => {
+      sortedOutcomes[outcome] = {}
+      Object.keys(sorted[ft][outcome]).sort().forEach(sub => {
+        const sortedPI = {}
+        Object.keys(sorted[ft][outcome][sub]).sort().forEach(piDesc => {
+          sortedPI[piDesc] = sorted[ft][outcome][sub][piDesc]
+        })
+        sortedOutcomes[outcome][sub] = sortedPI
+      })
+    })
+    sorted[ft] = sortedOutcomes
+  })
+
+  return sorted
+})
+
+// ---------- Summary by function type (weighted) ----------
+const summaryByFunctionType = computed(() => {
+  const summary = {}
+
+  ;(props.plans || []).forEach(plan => {
+    const aoo        = plan.performance_indicator?.agency_outcome
+    const functionType = normalizeFunctionType(aoo?.function_type)
+
+    if (!summary[functionType]) {
+      summary[functionType] = { totalQ: 0, countQ: 0, totalE: 0, countE: 0, totalT: 0, countT: 0, totalA: 0, countA: 0, weight: functionTypeWeights[functionType] ?? 0 }
+    }
+
+    const entry = summary[functionType]
+    const pivot = plan.pivot
+    if (!pivot) return
+
+    const Q = pivot.sup_quality, E = pivot.sup_efficiency, T = pivot.sup_timeliness
+    if (Q !== null && Q !== "" && !isNaN(Q)) { entry.totalQ += Number(Q); entry.countQ++ }
+    if (E !== null && E !== "" && !isNaN(E)) { entry.totalE += Number(E); entry.countE++ }
+    if (T !== null && T !== "" && !isNaN(T)) { entry.totalT += Number(T); entry.countT++ }
+
+    let planAvg = null
+    if (pivot.sup_average !== undefined && pivot.sup_average !== null && pivot.sup_average !== "" && !isNaN(pivot.sup_average)) {
+      planAvg = Number(pivot.sup_average)
+    } else {
+      const c = computeNumericAverage(Q, E, T)
+      if (c !== null) planAvg = c
+    }
+    if (planAvg !== null) { entry.totalA += Number(planAvg); entry.countA++ }
+  })
+
+  return Object.keys(summary)
+    .sort((a, b) => (functionTypeOrder[a] || 99) - (functionTypeOrder[b] || 99))
+    .reduce((obj, key) => { obj[key] = summary[key]; return obj }, {})
+})
+
+const finalIPCRRating = computed(() => {
+  let totalWeighted = 0
+  for (const [, entry] of Object.entries(summaryByFunctionType.value)) {
+    if (entry.countA === 0) continue
+    totalWeighted += (entry.totalA / entry.countA) * (entry.weight || 0)
+  }
+  return Number(totalWeighted).toFixed(2)
+})
+
+const getAdjectivalRating = (rating) => {
+  const n = Number(rating)
+  if (isNaN(n) || n === 0) return "—"
+  if (n >= 4.500) return "Outstanding"
+  if (n >= 3.500) return "Very Satisfactory"
+  if (n >= 2.500) return "Satisfactory"
+  if (n >= 1.500) return "Unsatisfactory"
+  return "Poor"
+}
+
+const adjectivalColorClass = (avg) => {
+  const n = parseFloat(avg)
+  if (isNaN(n)) return 'bg-gray-100 text-gray-600'
+  if (n >= 4.500) return 'bg-teal-100 text-teal-700'
+  if (n >= 3.500) return 'bg-green-100 text-green-700'
+  if (n >= 2.500) return 'bg-yellow-100 text-yellow-700'
+  if (n >= 1.500) return 'bg-orange-100 text-orange-700'
+  return 'bg-red-100 text-red-700'
+}
+
+// ---------- Actions ----------
+const approvIPCR = () => {
+  Swal.fire({
+    title: "Approve IPCR?",
+    text: "This will mark the IPCR as Approved by PMT.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#0d9488",
+    confirmButtonText: "Yes, approve!",
+  }).then(result => {
+    if (result.isConfirmed) {
+      router.post(route("pmt-ipcr.approve", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire("Approved!", "IPCR has been approved by PMT.", "success"),
+        onError:   () => Swal.fire("Error", "Failed to approve IPCR.", "error"),
+      })
+    }
+  })
+}
+
+const returnForRevision = () => {
+  Swal.fire({
+    title: "Return for Revision?",
+    text: "This will notify the Division Chief to return the IPCR to the employee for revision.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#e11d48",
+    confirmButtonText: "Yes, return it!",
+  }).then(result => {
+    if (result.isConfirmed) {
+      router.post(route("pmt-ipcr.return", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire("Returned!", "IPCR has been returned. The Division Chief will forward this to the employee.", "success"),
+        onError:   () => Swal.fire("Error", "Failed to return IPCR.", "error"),
+      })
+    }
+  })
+}
+
+const printIPCR = () => window.print()
+</script>
+
+<template>
+  <Head :title="`PMT Review — IPCR #${ipcr.id}`" />
+  <AdminLayout :title="`PMT Review: ${ipcr.title}`">
+    <div>
+
+      <!-- Back -->
+      <button
+        @click="router.visit(route('pmt-ipcr.index'))"
+        class="mb-4 flex items-center gap-2 text-purple-600 hover:text-purple-800"
+      >
+        <ArrowLeftIcon class="w-5 h-5" /> Back to PMT Review List
+      </button>
+
+      <!-- IPCR Details Card (retained outside printable area) -->
+      <div class="bg-white p-5 rounded-xl shadow mb-4 no-print">
+        <div class="flex flex-wrap justify-between items-start gap-4">
+          <div>
+            <h2 class="text-xl font-bold">{{ ipcr.title }}</h2>
+            <p class="text-gray-500 text-sm mt-1">Rating Period: {{ ipcr.rating_period }}</p>
+            <p class="text-gray-500 text-sm">Employee: <strong>{{ employee?.name }}</strong> — {{ employee?.position }}</p>
+            <p class="text-gray-500 text-sm">Division: {{ employee?.division?.name ?? '—' }}</p>
+          </div>
+          <div class="flex flex-col items-end gap-3">
+            <span :class="`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusClasses(ipcr.status)}`">
+              {{ ipcr.status }}
+            </span>
+            <span class="text-xs text-gray-400">Submitted to PMT: {{ ipcr.submitted_for_pmtreview_at ?? '—' }}</span>
+            <div class="text-right">
+              <div class="text-2xl font-bold text-gray-800">{{ finalIPCRRating }}</div>
+              <div :class="`inline-block mt-1 px-3 py-1 rounded-full text-sm font-semibold ${adjectivalColorClass(finalIPCRRating)}`">
+                {{ getAdjectivalRating(finalIPCRRating) }}
+              </div>
+              <div class="text-xs text-gray-400 mt-1">Overall Weighted Rating</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button v-if="ipcr.status === 'Submitted to PMT'" @click="approvIPCR"
+            class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg shadow">
+            Approve
+          </button>
+          <button v-if="ipcr.status === 'Submitted to PMT'" @click="returnForRevision"
+            class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg shadow">
+            Return for Revision
+          </button>
+          <button @click="printIPCR"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-4 py-2 rounded-lg">
+            Print / View PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable IPCR Document -->
+      <div class="bg-white p-4 rounded-lg shadow" id="ipcr-printable">
+
+        <!-- Header block -->
+        <div class="mb-4">
+          <p class="text-l text-center font-semibold mb-2">
+            Individual Performance Commitment and Review (IPCR) <br/>
+            FY {{ ratingYear }}
+          </p>
+          <br/><br/>
+          <p>
+            I, <b class="uppercase">{{ employee?.name }}</b>, <b class="uppercase">{{ employee?.position }}</b>
+            of Philippine Science High School - Caraga Region Campus, commit to deliver
+            and agree to be rated on the attainment of the following targets in accordance with
+            the indicated measures for the period <b class="uppercase">{{ ipcr.rating_period }}</b>.
+          </p>
+          <br/><br/>
+          <div class="grid grid-cols-10 gap-4 mb-4 text-right">
+            <div class="col-span-4"></div>
+            <div class="col-span-4 text-center">
+              <p class="font-medium"><b style="text-transform: uppercase;">{{ employee?.name }}</b></p>
+              <small class="block">{{ employee?.position }}</small>
+              <small class="block">Date: {{ formattedSubmittedForReviewAt }}</small>
+            </div>
+            <div class="col-span-2 text-left">
+              <small class="block">5 - Outstanding</small>
+              <small class="block">4 - Very Satisfactory</small>
+              <small class="block">3 - Satisfactory</small>
+              <small class="block">2 - Unsatisfactory</small>
+              <small class="block">1 - Poor</small>
+            </div>
+          </div>
+          <table class="min-w-full border text-sm border-collapse">
+            <tr class="font-bold text-gray-800">
+              <td colspan="4" class="border px-3 text-left">Reviewed by:</td>
+              <td colspan="2" class="border px-3 text-left">Date:</td>
+              <td colspan="4" class="border px-3 text-left">Approved by:</td>
+              <td colspan="2" class="border px-3 text-left">Date:</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="border px-3 py-3 text-center">
+                <br/><br/>
+                <b style="text-transform: uppercase;">{{ supervisor?.name ?? '—' }}</b><br/>
+                <small>{{ supervisor?.position ?? '' }}</small>
+              </td>
+              <td colspan="2" class="border px-3 py-3 text-center">
+                <br/>{{ formattedTargetApprovedAt }}
+              </td>
+              <td colspan="4" class="border px-3 py-3 text-center">
+                <br/><br/>
+                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
+                <small>Director III</small>
+              </td>
+              <td colspan="2" class="border px-3 py-3 text-center">
+                <br/>{{ formattedTargetApprovedAt }}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Plans Table -->
+        <table class="min-w-full border border-gray-300 text-sm border-collapse">
+          <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
+            <tr>
+              <th rowspan="2" colspan="2" class="border px-4 py-2 text-center">Output</th>
+              <th rowspan="2" class="border px-4 py-2">Success Indicators</th>
+              <th rowspan="2" class="border px-4 py-2">Actual Accomplishment</th>
+              <th rowspan="2" class="border px-4 py-2">Means of Verification</th>
+              <th colspan="4" class="border px-4 py-2 text-center">Rating</th>
+              <th rowspan="2" class="border px-4 py-2 text-center">Remarks</th>
+            </tr>
+            <tr>
+              <th class="border px-4 py-2 text-center">Q</th>
+              <th class="border px-4 py-2 text-center">E</th>
+              <th class="border px-4 py-2 text-center">T</th>
+              <th class="border px-4 py-2 text-center">A</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr v-if="!plans || plans.length === 0">
+              <td colspan="10" class="text-center py-4 text-gray-500 border">No plans found.</td>
+            </tr>
+
+            <template v-for="(outcomes, functionType) in groupedPlansByFunction" :key="functionType">
+              <!-- Function Type Header -->
+              <tr class="bg-gray-300">
+                <td colspan="10" class="px-4 py-2 font-bold text-gray-800 border" style="text-transform: uppercase;">
+                  {{ functionType }}
+                </td>
+              </tr>
+
+              <template v-for="(subGroups, outcome) in outcomes" :key="outcome">
+                <!-- Outcome Header -->
+                <tr class="bg-gray-200">
+                  <td colspan="10" class="px-4 py-2 font-semibold text-gray-700 border">{{ outcome }}</td>
+                </tr>
+
+                <template v-for="(pis, subAbbrev) in subGroups" :key="subAbbrev">
+                  <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
+
+                    <!-- First row of each PI group -->
+                    <tr class="hover:bg-gray-50">
+                      <!-- Sub-outcome merged cell -->
+                      <td v-if="Object.keys(pis)[0] === piDesc"
+                          :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
+                          class="px-4 py-2 font-medium text-gray-700 border">
+                        {{ subAbbrev !== '—' ? subAbbrev : '' }}
+                      </td>
+
+                      <!-- PI description merged cell -->
+                      <td :rowspan="piPlans.length" class="px-4 py-2 border font-medium">{{ piDesc }}</td>
+
+                      <td class="px-4 py-2 border">{{ piPlans[0].success_indicator }}</td>
+                      <td class="px-4 py-2 border">{{ piPlans[0].pivot?.accomplishment || '—' }}</td>
+                      <td class="px-4 py-2 border">
+                        <a v-if="piPlans[0].pivot?.mov_link" :href="piPlans[0].pivot.mov_link" target="_blank"
+                           class="text-blue-600 hover:underline break-all">{{ piPlans[0].pivot.mov_link }}</a>
+                        <span v-else>—</span>
+                      </td>
+                      <td class="px-4 py-2 text-center border">{{ piPlans[0].pivot?.sup_quality ?? '—' }}</td>
+                      <td class="px-4 py-2 text-center border">{{ piPlans[0].pivot?.sup_efficiency ?? '—' }}</td>
+                      <td class="px-4 py-2 text-center border">{{ piPlans[0].pivot?.sup_timeliness ?? '—' }}</td>
+                      <td class="px-4 py-2 text-center font-medium border">{{ piPlans[0].pivot?.sup_average ?? '—' }}</td>
+                      <td class="px-4 py-2 border">{{ piPlans[0].pivot?.remarks ?? '—' }}</td>
+                    </tr>
+
+                    <!-- Remaining rows -->
+                    <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-gray-50">
+                      <td class="px-4 py-2 border">{{ plan.success_indicator }}</td>
+                      <td class="px-4 py-2 border">{{ plan.pivot?.accomplishment || '—' }}</td>
+                      <td class="px-4 py-2 border">
+                        <a v-if="plan.pivot?.mov_link" :href="plan.pivot.mov_link" target="_blank"
+                           class="text-blue-600 hover:underline break-all">{{ plan.pivot.mov_link }}</a>
+                        <span v-else>—</span>
+                      </td>
+                      <td class="px-4 py-2 text-center border">{{ plan.pivot?.sup_quality ?? '—' }}</td>
+                      <td class="px-4 py-2 text-center border">{{ plan.pivot?.sup_efficiency ?? '—' }}</td>
+                      <td class="px-4 py-2 text-center border">{{ plan.pivot?.sup_timeliness ?? '—' }}</td>
+                      <td class="px-4 py-2 text-center font-medium border">{{ plan.pivot?.sup_average ?? '—' }}</td>
+                      <td class="px-4 py-2 border">{{ plan.pivot?.remarks ?? '—' }}</td>
+                    </tr>
+
+                  </template>
+                </template>
+              </template>
+            </template>
+          </tbody>
+        </table>
+
+        <!-- Comments -->
+        <div class="mt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Comments and Recommendations for Development Purposes:
+          </label>
+          <div class="border rounded px-3 py-2 bg-gray-50 min-h-[48px] text-sm">
+            {{ ipcr.remarks || '—' }}
+          </div>
+        </div>
+
+        <!-- Summary Table + Footer -->
+        <div class="mt-6">
+          <table class="min-w-full border text-sm border-collapse">
+            <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
+              <tr>
+                <th rowspan="2" class="border px-4 py-2 text-center w-40">Output</th>
+                <th colspan="4" class="border px-4 py-2 text-center">Rating</th>
+                <th rowspan="2" class="border px-4 py-2 text-center w-24">% Weight</th>
+                <th rowspan="2" class="border px-4 py-2 text-center w-40">Overall Weighted Score</th>
+              </tr>
+              <tr>
+                <th class="border px-4 py-2 text-center w-16">Q</th>
+                <th class="border px-4 py-2 text-center w-16">E</th>
+                <th class="border px-4 py-2 text-center w-16">T</th>
+                <th class="border px-4 py-2 text-center w-16">A</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, type) in summaryByFunctionType" :key="type" class="font-medium">
+                <td class="border px-3 py-2">{{ type }}</td>
+                <td class="border px-3 py-2 text-center">{{ row.countQ ? formatAvg(row.totalQ / row.countQ) : '—' }}</td>
+                <td class="border px-3 py-2 text-center">{{ row.countE ? formatAvg(row.totalE / row.countE) : '—' }}</td>
+                <td class="border px-3 py-2 text-center">{{ row.countT ? formatAvg(row.totalT / row.countT) : '—' }}</td>
+                <td class="border px-3 py-2 text-center">{{ row.countA ? formatAvg(row.totalA / row.countA) : '—' }}</td>
+                <td class="border px-3 py-2 text-center">{{ (row.weight * 100).toFixed(0) }}%</td>
+                <td class="border px-3 py-2 text-center">{{ row.countA ? formatAvg((row.totalA / row.countA) * row.weight) : '—' }}</td>
+              </tr>
+              <tr class="bg-gray-50 text-gray-800">
+                <td colspan="6" class="border px-3 py-3 text-left font-semibold">TOTAL</td>
+                <td class="border px-3 py-3 text-center font-bold">{{ finalIPCRRating }}</td>
+              </tr>
+              <tr class="bg-gray-50 text-gray-800">
+                <td colspan="6" class="border px-3 py-3 text-left font-semibold">Adjectival Rating</td>
+                <td class="border px-3 py-3 text-center font-bold">{{ getAdjectivalRating(finalIPCRRating) }}</td>
+              </tr>
+              <tr class="bg-gray-50 text-gray-800">
+                <td colspan="7" class="border px-3 py-3 text-left">
+                  Comments and Recommendations for Development Purposes:
+                  <i class="font-bold">{{ ipcr.remarks }}</i>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Footer signature table -->
+          <table class="min-w-full border text-sm border-collapse">
+            <tr class="text-gray-800">
+              <td colspan="2" class="border px-3 text-left">Discuss with:</td>
+              <td colspan="1" class="border px-3 text-left">Date:</td>
+              <td colspan="3" class="border px-3 text-left">Assessed by:</td>
+              <td colspan="1" class="border px-3 text-left">Date:</td>
+              <td colspan="3" class="border px-3 text-left">Final Rating by:</td>
+              <td colspan="2" class="border px-3 text-left">Date:</td>
+            </tr>
+            <tr>
+              <td colspan="2" class="border px-3 py-3 text-center">
+                <br/><br/>
+                <b style="text-transform: uppercase;">{{ employee?.name }}</b><br/>
+                <small>{{ employee?.position }}</small>
+              </td>
+              <td colspan="1" class="border px-3 py-3 text-center">
+                <br/><br/>{{ formattedSubmittedForReviewAt }}
+              </td>
+              <td colspan="3" class="border px-3 py-3 text-center">
+                <br/><br/>
+                <b style="text-transform: uppercase;">{{ supervisor?.name ?? '—' }}</b><br/>
+                <small>{{ supervisor?.position ?? '' }}</small>
+              </td>
+              <td colspan="1" class="border px-3 py-3 text-center">
+                <br/><br/>{{ formattedSubmittedRatingAt }}
+              </td>
+              <td colspan="3" class="border px-3 py-3 text-center">
+                <br/><br/>
+                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
+                <small>Director III</small>
+              </td>
+              <td colspan="2" class="border px-3 py-3 text-center">
+                <br/><br/>____________________
+              </td>
+            </tr>
+            <tr class="text-gray-800">
+              <td colspan="12" class="border px-3 text-left">
+                <small><i>Legend: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1 - Effectiveness/Quality &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2 - Efficiency &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3 - Timeliness &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4 - Average</i></small>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+  </AdminLayout>
+</template>
+
+<style>
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    font-size: 8px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+    font-size: 8px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  #ipcr-printable,
+  #ipcr-printable * {
+    visibility: visible !important;
+    font-size: 8px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  #ipcr-printable {
+    position: absolute;
+    font-size: 8px !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    font-size: 8px !important;
+  }
+
+  table, th, td {
+    border: 1px solid #000 !important;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+</style>

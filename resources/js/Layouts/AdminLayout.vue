@@ -417,7 +417,7 @@ const menuItems = [
   {
     label: "Performance Mngmt",
     icon: UserGroupIcon,
-    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
+    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief", "OCD", "PMT"],
     children: [
       {
         label: "Agency Org Outcome",
@@ -455,7 +455,13 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "DivisionChief", "OCD"],
       },
-      
+      {
+        label: "PMT Review",
+        routeName: "pmt-ipcr.index",
+        href: route("pmt-ipcr.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "PMT"],
+      },
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { ref, reactive, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
+import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 
 export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) {
   const ipcrTargets = ref(initialIPCRs)
@@ -28,8 +29,8 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
   // --- Computed: Sorting ---
   const sortedIPCRs = computed(() => {
     return [...ipcrTargets.value].sort((a, b) => {
-      let valA = sortKey.value === 'user' ? `${a.user.first_name} ${a.user.last_name}`.toLowerCase() : a[sortKey.value]
-      let valB = sortKey.value === 'user' ? `${b.user.first_name} ${b.user.last_name}`.toLowerCase() : b[sortKey.value]
+      let valA = sortKey.value === 'user' ? (a.user?.name ?? '').toLowerCase() : (a[sortKey.value] ?? '')
+      let valB = sortKey.value === 'user' ? (b.user?.name ?? '').toLowerCase() : (b[sortKey.value] ?? '')
       if (valA < valB) return sortAsc.value ? -1 : 1
       if (valA > valB) return sortAsc.value ? 1 : -1
       return 0
@@ -40,17 +41,17 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
     const q = searchQuery.value.toLowerCase()
     return sortedIPCRs.value
       .filter(t => {
-        const name = `${t.user.first_name} ${t.user.last_name}`.toLowerCase()
-        return name.includes(q) || t.rating_period.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || t.status.toLowerCase().includes(q)
+        const name = (t.user?.name ?? '').toLowerCase()
+        return name.includes(q) || (t.rating_period ?? '').toLowerCase().includes(q) || (t.title ?? '').toLowerCase().includes(q) || (t.status ?? '').toLowerCase().includes(q)
       })
       .slice((currentPage.value - 1) * perPage.value, currentPage.value * perPage.value)
   })
 
   const totalPages = computed(() => Math.ceil(
     sortedIPCRs.value.filter(t => {
-      const name = `${t.user.first_name} ${t.user.last_name}`.toLowerCase()
+      const name = (t.user?.name ?? '').toLowerCase()
       const q = searchQuery.value.toLowerCase()
-      return name.includes(q) || t.rating_period.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || t.status.toLowerCase().includes(q)
+      return name.includes(q) || (t.rating_period ?? '').toLowerCase().includes(q) || (t.title ?? '').toLowerCase().includes(q) || (t.status ?? '').toLowerCase().includes(q)
     }).length / perPage.value
   ) || 1)
 
@@ -140,18 +141,7 @@ export default function useDivisionChiefIPCR(initialIPCRs = [], workPlans = []) 
   const viewIPCR = t => router.get(route("division-employee-ipcr.show", t.id))
   const sortBy = key => { sortKey.value === key ? sortAsc.value = !sortAsc.value : (sortKey.value = key, sortAsc.value = true) }
 
-  const statusClasses = status => {
-    switch(status){
-      case 'New Target': return 'bg-blue-100 text-blue-700'
-      case 'For Review': return 'bg-yellow-100 text-yellow-700'
-      case 'Targets Approved': return 'bg-green-100 text-green-700'
-      case 'Submitted for Rating': return 'bg-orange-100 text-orange-700'
-      case 'Rated & For PMT Review': return 'bg-violet-100 text-violet-700'
-      case 'Returned for Revision': return 'bg-red-100 text-red-700'
-      case 'Rejected': return 'bg-red-200 text-red-800'
-      default: return 'bg-gray-100 text-gray-700'
-    }
-  }
+  const statusClasses = ipcrStatusClass
 
   return {
     ipcrTargets,

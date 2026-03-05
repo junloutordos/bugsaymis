@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 
 const props = defineProps({
   ipcr: Object,
@@ -17,6 +18,10 @@ const props = defineProps({
 // ---------- Rating visibility ----------
 const PRE_RATING_STATUSES = ['New Target', 'Draft', 'For Review', 'For Rating', 'Targets Approved', 'Returned for Revision'];
 const showRatings = computed(() => !PRE_RATING_STATUSES.includes(props.ipcr.status));
+
+// Show header block, footer, supervisor ratings, and print button for all post-rating stages
+const PMT_STAGES = ['Rated & For PMT Review', 'Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT'];
+const isAtPMTStage = computed(() => PMT_STAGES.includes(props.ipcr.status));
 
 // ---------- Helpers ----------
 const hasSupervisorRating = (pivot) => {
@@ -342,18 +347,7 @@ const submitForRating = () => {
 };
 
 // ---------- UI Helpers ----------
-const statusBadgeClass = (status) => {
-  switch (status) {
-    case 'New Target': return 'bg-blue-100 text-blue-700';
-    case 'For Review': return 'bg-yellow-100 text-yellow-700';
-    case 'Targets Approved': return 'bg-green-100 text-green-700';
-    case 'Submitted for Rating': return 'bg-orange-100 text-orange-700';
-    case 'Rated & For PMT Review': return 'bg-violet-100 text-violet-700';
-    case 'Approved by PMT': return 'bg-teal-100 text-teal-700';
-    case 'Returned for Revision': return 'bg-red-100 text-red-700';
-    default: return 'bg-gray-100 text-gray-700';
-  }
-};
+const statusBadgeClass = ipcrStatusClass;
 
 // ---------- Correct Summary Calculation with Sorting + Weights ----------
 const summaryByFunctionType = computed(() => {
@@ -615,7 +609,7 @@ const resubmit = () => {
           </button>
 
           <button
-            v-if="ipcr.status === 'Rated & For PMT Review' || ipcr.status === 'Targets Approved'"
+            v-if="isAtPMTStage || ipcr.status === 'Targets Approved'"
             @click="printIPCR"
             class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow flex items-center gap-2"
           >
@@ -630,7 +624,7 @@ const resubmit = () => {
       
       <!-- Plans Table -->
       <div class="bg-white p-4 rounded-lg shadow" id="ipcr-printable">
-        <div v-if="ipcr.status === 'Rated & For PMT Review' || ipcr.status === 'Targets Approved'">
+        <div v-if="isAtPMTStage || ipcr.status === 'Targets Approved'">
         <div class="mb-4">
         <p class="text-l text-center font-semibold mb-2">Individual Performance Commitment and Review (IPCR) <br/>
         FY {{ ratingYear }}
@@ -793,7 +787,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ piPlans[0].pivot?.sup_quality ?? "—" }}
                         </template>
                         <template v-else>
@@ -804,7 +798,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}
                         </template>
                         <template v-else>
@@ -815,7 +809,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}
                         </template>
                         <template v-else>
@@ -826,7 +820,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center font-medium border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}
                         </template>
                         <template v-else>
@@ -872,7 +866,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ plan.pivot?.sup_quality ?? "—" }}
                         </template>
                         <template v-else>
@@ -883,7 +877,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ plan.pivot?.sup_efficiency ?? "—" }}
                         </template>
                         <template v-else>
@@ -894,7 +888,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ plan.pivot?.sup_timeliness ?? "—" }}
                         </template>
                         <template v-else>
@@ -905,7 +899,7 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 text-center font-medium border border-gray-300">
                         <template v-if="!showRatings">—</template>
-                        <template v-else-if="ipcr.status === 'Rated & For PMT Review'">
+                        <template v-else-if="isAtPMTStage">
                           {{ computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}
                         </template>
                         <template v-else>
@@ -938,7 +932,7 @@ const resubmit = () => {
 
         <!-- Summary Table -->
         <br/>
-        <div v-if="ipcr.status === 'Rated & For PMT Review' || ipcr.status === 'Targets Approved'">
+        <div v-if="isAtPMTStage || ipcr.status === 'Targets Approved'">
         <table class="min-w-full border text-sm border-collapse">
         <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
           <tr>

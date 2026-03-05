@@ -36,5 +36,7 @@ class DatabaseSeeder extends Seeder
         $this->call(\Database\Seeders\VehicleRequestSeeder::class);
         // Seed document types (ARTA/CSC-based)
         $this->call(DocumentTypeSeeder::class);
+        // Seed IPCR rating periods
+        $this->call(IPCRRatingPeriodSeeder::class);
     }
 }

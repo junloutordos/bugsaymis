@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\EmployeeIPCR;
+use App\Models\IPCRRatingPeriod;
 use App\Models\WorkDistributionPlan;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -25,9 +26,12 @@ class EmployeeIPCRController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
+        $ratingPeriods = IPCRRatingPeriod::active()->pluck('label');
+
         return Inertia::render('PerformanceManagement/EmployeeIPCR', [
-            'ipcrs' => $ipcrs,
-            'workPlans' => $workPlans,
+            'ipcrs'         => $ipcrs,
+            'workPlans'     => $workPlans,
+            'ratingPeriods' => $ratingPeriods,
         ]);
     }
 

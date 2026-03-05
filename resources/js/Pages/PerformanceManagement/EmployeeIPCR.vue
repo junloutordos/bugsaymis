@@ -7,6 +7,7 @@ import useEmployeeIPCR from "@/Composables/useEmployeeIPCR.js"
 const props = defineProps({
   ipcrs: Array,
   workPlans: Array,
+  ratingPeriods: Array,
 })
 
 const {
@@ -132,7 +133,12 @@ const {
     <div class="flex flex-col gap-3">
       <div>
         <label class="block mb-1 font-medium">Rating Period</label>
-        <input v-model="form.rating_period" type="text" class="w-full border rounded px-3 py-2" />
+        <select v-model="form.rating_period" class="w-full border rounded px-3 py-2 bg-white">
+          <option value="" disabled>-- Select Rating Period --</option>
+          <option v-for="period in props.ratingPeriods" :key="period" :value="period">
+            {{ period }}
+          </option>
+        </select>
         <div v-if="errors.rating_period" class="text-red-500 text-sm">{{ errors.rating_period }}</div>
       </div>
 

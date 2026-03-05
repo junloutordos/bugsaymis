@@ -20,6 +20,7 @@ class InitialRolesTableSeeder extends Seeder
             'Student',
             'Parent',
             'OCD',
+            'PMT',
         ];
 
         foreach ($roles as $role) {
