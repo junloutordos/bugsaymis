@@ -1,5 +1,5 @@
 // useJobRequests.js
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
 import { useForm, router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 
@@ -54,6 +54,8 @@ export function useJobRequests(initialRequests = []) {
   const totalPages = computed(() =>
     Math.ceil(filteredRequestsAll.value.length / perPage)
   )
+
+  watch(searchQuery, () => { currentPage.value = 1 })
 
   // Form (shared for all stages)
   const form = useForm({
@@ -250,6 +252,7 @@ export function useJobRequests(initialRequests = []) {
 
     // computed
     filteredRequests,
+    filteredRequestsAll,
     totalPages,
 
     // actions

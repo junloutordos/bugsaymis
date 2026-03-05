@@ -26,8 +26,10 @@ const filteredRequests = computed(() => {
 
   if (searchQuery.value) {
     results = results.filter(r =>
-      r.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      r.user?.name?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      (r.title || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (r.user?.name || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (r.status || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (r.category || '').toLowerCase().includes(searchQuery.value.toLowerCase())
     )
   }
 

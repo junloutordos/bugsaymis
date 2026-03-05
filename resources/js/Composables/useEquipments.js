@@ -1,4 +1,4 @@
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 
@@ -84,6 +84,8 @@ export default function useEquipments(initialEquipments = [], users = []) {
   const totalPages = computed(() =>
     Math.max(1, Math.ceil(filteredList.value.length / perPage.value))
   )
+
+  watch(searchQuery, () => { currentPage.value = 1 })
 
   // ---------------------------------------------------------------------------
   // CRUD

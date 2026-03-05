@@ -31,8 +31,7 @@ const {
   selectedRequest,
   searchQuery,
   currentPage,
-  totalPages,
-  filteredRequests,
+  perPage,
   form,
   formatDate,
   openModal,
@@ -56,21 +55,38 @@ function openMISAssessment(request) {
   misAssessment(request)
 }
 
-// Filter visible requests: admins see all, non-admins see only their own
-const visibleRequests = computed(() => {
-  if (!currentUser) return [] // fallback if user not available
-  if (userRole === "Administrator") {
-    return filteredRequests.value
+// Filter + paginate directly here so search is always reactive
+const visibleRequestsAll = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim()
+  let base = requestsList.value
+
+  // Non-admins only see their own requests
+  if (currentUser && userRole !== 'Administrator') {
+    base = base.filter(req => req.user_id === currentUser.id)
   }
-  return filteredRequests.value.filter(req => req.user_id === currentUser.id)
+
+  if (!q) return base
+  return base.filter(req =>
+    (req.title        || '').toLowerCase().includes(q) ||
+    (req.category     || '').toLowerCase().includes(q) ||
+    (req.status       || '').toLowerCase().includes(q) ||
+    (req.description  || '').toLowerCase().includes(q) ||
+    (req.user?.name   || '').toLowerCase().includes(q) ||
+    (req.itjr_no      || '').toString().toLowerCase().includes(q) ||
+    (req.action_taken || '').toLowerCase().includes(q)
+  )
 })
+
+const totalPages = computed(() => Math.max(1, Math.ceil(visibleRequestsAll.value.length / perPage)))
+
+const visibleRequests = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return visibleRequestsAll.value.slice(start, start + perPage)
+})
+
 const hasPendingConfirmation = computed(() => {
   if (!currentUser || userRole === 'Administrator') return false
-
-  return visibleRequests.value.some(req =>
-    req.user_id === currentUser.id &&
-    req.status === 'Acted by MIS'
-  )
+  return visibleRequestsAll.value.some(req => req.status === 'Acted by MIS')
 })
 
 /* ---------------------------------------

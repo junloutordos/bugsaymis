@@ -82,6 +82,8 @@ export default function usePMS(initialSchedules = []) {
     ) || 1
   )
 
+  watch(searchQuery, () => { currentPage.value = 1 })
+
   // CRUD
   const getSchedules = () => {
     router.get(route("ict-pms.index"), {}, {
