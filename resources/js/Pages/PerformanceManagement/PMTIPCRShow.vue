@@ -6,6 +6,7 @@ import { computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
+import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
 const props = defineProps({
   ipcr:       Object,
@@ -157,15 +158,7 @@ const finalIPCRRating = computed(() => {
   return Number(totalWeighted).toFixed(2)
 })
 
-const getAdjectivalRating = (rating) => {
-  const n = Number(rating)
-  if (isNaN(n) || n === 0) return "—"
-  if (n >= 4.500) return "Outstanding"
-  if (n >= 3.500) return "Very Satisfactory"
-  if (n >= 2.500) return "Satisfactory"
-  if (n >= 1.500) return "Unsatisfactory"
-  return "Poor"
-}
+const getAdjectivalRating = ipcrAdjectivalRating
 
 const adjectivalColorClass = (avg) => {
   const n = parseFloat(avg)

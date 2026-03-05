@@ -5,6 +5,7 @@ import { EyeIcon } from "@heroicons/vue/24/outline"
 import { ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
+import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
 const props = defineProps({
   ipcrs: Array,
@@ -14,15 +15,7 @@ const searchQuery = ref("")
 
 const statusClasses = ipcrStatusClass
 
-const adjectivalRating = (avg) => {
-  const n = parseFloat(avg)
-  if (isNaN(n)) return '—'
-  if (n >= 4.500) return 'Outstanding'
-  if (n >= 3.500) return 'Very Satisfactory'
-  if (n >= 2.500) return 'Satisfactory'
-  if (n >= 1.500) return 'Unsatisfactory'
-  return 'Poor'
-}
+const adjectivalRating = ipcrAdjectivalRating
 
 const filteredIPCRs = computed(() => {
   const q = searchQuery.value.toLowerCase()

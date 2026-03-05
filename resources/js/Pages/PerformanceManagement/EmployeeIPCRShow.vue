@@ -6,6 +6,7 @@ import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
+import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
 const props = defineProps({
   ipcr: Object,
@@ -449,15 +450,7 @@ const finalIPCRRating = computed(() => {
 });
 
 // Convert numeric rating to adjectival rating
-const getAdjectivalRating = (rating) => {
-  const num = Number(rating);
-  if (num >= 1 && num <= 1.99) return "Poor";
-  if (num >= 2 && num <= 2.99) return "Unsatisfactory";
-  if (num >= 3 && num <= 3.99) return "Satisfactory";
-  if (num >= 4 && num <= 4.99) return "Very Satisfactory";
-  if (num === 5) return "Excellent";
-  return "—";
-};
+const getAdjectivalRating = ipcrAdjectivalRating;
 
 // ---------- Print & Export ----------
 const printIPCR = () => window.print();

@@ -3,6 +3,7 @@ import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon } from "@heroicons/vue/24/outline"
 import useDivisionChiefIPCR from "@/Composables/useIPCRDC.js"
+import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { ref, computed } from "vue"
 
 const props = defineProps({
@@ -10,6 +11,7 @@ const props = defineProps({
   divisionEmployees: { type: Array, default: () => [] },
   workPlans:         Array,
   supervisor:        Object,
+  ratingPeriods:     { type: Array, default: () => [] },
 })
 
 const {
@@ -46,9 +48,12 @@ const showReportModal = ref(false)
 const reportTo        = ref('')
 const reportPeriod    = ref('')
 
+const ratedStatusList = ['Rated & For PMT Review', 'Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT']
+
 const ratedIPCRs = computed(() =>
   props.ipcrs.filter(i =>
-    ['Rated & For PMT Review', 'Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT'].includes(i.status)
+    ratedStatusList.includes(i.status) &&
+    (!reportPeriod.value || i.rating_period === reportPeriod.value)
   )
 )
 
@@ -58,24 +63,10 @@ const employeesWithoutIpcr = computed(() => {
   return props.divisionEmployees.filter(emp => !ipcrUserIds.has(emp.id))
 })
 
-// Auto-detect rating period from rated IPCRs
-const detectedPeriod = computed(() => {
-  const periods = [...new Set(ratedIPCRs.value.map(i => i.rating_period).filter(Boolean))]
-  return periods.join(' / ')
-})
-
-const adjectivalRating = (avg) => {
-  const n = parseFloat(avg)
-  if (isNaN(n)) return '—'
-  if (n >= 4.500) return 'Outstanding'
-  if (n >= 3.500) return 'Very Satisfactory'
-  if (n >= 2.500) return 'Satisfactory'
-  if (n >= 1.500) return 'Unsatisfactory'
-  return 'Poor'
-}
+const adjectivalRating = ipcrAdjectivalRating
 
 const openReportModal = () => {
-  reportPeriod.value = detectedPeriod.value
+  reportPeriod.value = props.ratingPeriods[0] ?? ''
   reportTo.value = ''
   showReportModal.value = true
 }
@@ -355,14 +346,16 @@ const today = new Date().toLocaleDateString('en-PH', {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Rating Period</label>
-            <input
+            <select
               v-model="reportPeriod"
-              type="text"
-              placeholder="e.g. January 1 to June 30, 2025"
               class="w-full border rounded px-3 py-2 text-sm"
-            />
+            >
+              <option value="" disabled>— Select a rating period —</option>
+              <option v-for="period in ratingPeriods" :key="period" :value="period">{{ period }}</option>
+            </select>
+            <p v-if="ratingPeriods.length === 0" class="text-xs text-red-500 mt-1">No rated IPCRs found.</p>
           </div>
-          <p class="text-xs text-gray-500">{{ ratedIPCRs.length }} rated employee(s) will be included.</p>
+          <p class="text-xs text-gray-500">{{ ratedIPCRs.length }} rated employee(s) will be included for this period.</p>
         </div>
 
         <div class="mt-5 flex justify-end gap-2">

@@ -6,6 +6,7 @@ import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
+import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
 const props = defineProps({
   ipcr: Object,
@@ -292,15 +293,7 @@ const finalIPCRRating = computed(() => {
   return Number(totalWeighted).toFixed(2);
 });
 
-const getAdjectivalRating = (rating) => {
-  const num = Number(rating);
-  if (num >= 1 && num <= 1.99) return "Poor";
-  if (num >= 2 && num <= 2.99) return "Unsatisfactory";
-  if (num >= 3 && num <= 3.99) return "Satisfactory";
-  if (num >= 4 && num <= 4.99) return "Very Satisfactory";
-  if (num === 5) return "Excellent";
-  return "—";
-};
+const getAdjectivalRating = ipcrAdjectivalRating;
 
 // ---------- Modal control ----------
 const openModal = (plan) => {
@@ -836,7 +829,7 @@ const approveTargets = () => {
   </AdminLayout>
 </template>
 
-<style scoped>
+<style>
 @media print {
   @page { size: A4 landscape; margin: 10mm; }
 
@@ -845,7 +838,7 @@ const approveTargets = () => {
   #ipcr-printable * { visibility: visible !important; }
 
   #ipcr-printable {
-    position: fixed;
+    position: absolute;
     top: 0; left: 0;
     width: 100%;
     font-size: 8px;
@@ -853,5 +846,9 @@ const approveTargets = () => {
     color: #000;
     background: white;
   }
+
+  #ipcr-printable table { border-collapse: collapse; width: 100%; }
+  #ipcr-printable th,
+  #ipcr-printable td { border: 1px solid #000 !important; padding: 3px 6px; }
 }
 </style>

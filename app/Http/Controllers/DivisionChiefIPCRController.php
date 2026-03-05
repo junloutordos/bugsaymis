@@ -66,10 +66,14 @@ class DivisionChiefIPCRController extends Controller
             abort(403, "You are not authorized to view this.");
         }
 
+        // Distinct rating periods from the visible IPCRs (for the memo report dropdown)
+        $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
+
         return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
             'ipcrs'             => $ipcrs,
             'divisionEmployees' => $divisionEmployees,
             'supervisor'        => $user->load('division'),
+            'ratingPeriods'     => $ratingPeriods,
         ]);
     }
 
