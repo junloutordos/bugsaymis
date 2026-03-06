@@ -13,6 +13,7 @@ const props = defineProps({
   plans: Array,
   employee: Object,
   supervisor: Object,
+  canManageIpcr: Boolean,
 });
 
 const divisionComments = ref(props.ipcr.remarks ?? "");
@@ -130,7 +131,25 @@ const isModalOpen = ref(false);
 const currentPlan = ref(null);
 const form = ref({ accomplishment: "", mov_link: "", quality: null, efficiency: null, timeliness: null });
 
-const canEdit = computed(() => props.ipcr.status === "Submitted for Rating");
+const canEdit = computed(() => props.ipcr.status === "Submitted for Rating")
+
+// Determine whether the logged-in user can rate a specific plan
+const canRatePlan = (plan) => {
+  if (!canEdit.value) return false
+  // Division Chief and OCD can rate any plan
+  if (props.canManageIpcr) return true
+  const ratedBy = plan.rated_by
+  if (ratedBy === 'Unit Head') {
+    return plan.offices?.some(o => o.unit_head == props.supervisor?.id) ?? false
+  }
+  if (ratedBy === 'Committee Head') {
+    return plan.committees?.some(c => c.head_id == props.supervisor?.id) ?? false
+  }
+  if (ratedBy === 'Coordinator') {
+    return plan.special_assignments?.some(a => a.coordinator_id == props.supervisor?.id) ?? false
+  }
+  return false
+};
 
 const computeAverage = (q, e, t) => {
   const values = [q, e, t].filter(v => v !== null && v !== "" && !isNaN(v)).map(Number);
@@ -297,7 +316,7 @@ const getAdjectivalRating = ipcrAdjectivalRating;
 
 // ---------- Modal control ----------
 const openModal = (plan) => {
-  if (!canEdit.value) return;
+  if (!canRatePlan(plan)) return;
   currentPlan.value = plan;
   form.value = {
     accomplishment: plan.pivot?.accomplishment || "",
@@ -388,27 +407,27 @@ const approveTargets = () => {
         </div>
 
         <div class="mt-4 flex flex-wrap gap-2">
-          <button v-if="ipcr.status === 'Submitted for Rating'" @click="saveRatings"
+          <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="saveRatings"
             class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
             Save Ratings
           </button>
-          <button v-if="ipcr.status === 'For Review'" @click="approveTargets"
+          <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="approveTargets"
             class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
             Approve Targets
           </button>
-          <button v-if="ipcr.status === 'For Review'" @click="disapproveTargets"
+          <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="disapproveTargets"
             class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">
             Return for Revision
           </button>
-          <button v-if="ipcr.status === 'Submitted for Rating'" @click="returnAccomplishment"
+          <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="returnAccomplishment"
             class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">
             Return Accomplishment for Revision
           </button>
-          <button v-if="ipcr.status === 'Rated & For PMT Review'" @click="submitToPMT"
+          <button v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'" @click="submitToPMT"
             class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow">
             Submit to PMT
           </button>
-          <button v-if="ipcr.status === 'PMT Returned for Revision'" @click="showReturnFromPMTModal = true"
+          <button v-if="canManageIpcr && ipcr.status === 'PMT Returned for Revision'" @click="showReturnFromPMTModal = true"
             class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg shadow">
             Return to Employee
           </button>
@@ -539,11 +558,16 @@ const approveTargets = () => {
                         {{ piDesc }}
                       </td>
 
-                      <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
+                      <td class="px-4 py-2 border border-gray-300">
+                        <div>{{ piPlans[0].success_indicator }}</div>
+                        <div class="text-xs text-gray-400 mt-1">
+                          Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template>
+                        </div>
+                      </td>
 
                       <td class="px-4 py-2 border border-gray-300"
-                          :class="canEdit ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
-                          @click="canEdit ? openModal(piPlans[0]) : null">
+                          :class="canRatePlan(piPlans[0]) ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
+                          @click="canRatePlan(piPlans[0]) ? openModal(piPlans[0]) : null">
                         {{ piPlans[0].pivot?.accomplishment || '—' }}
                       </td>
 
@@ -596,10 +620,15 @@ const approveTargets = () => {
 
                     <!-- Remaining rows in this PI group -->
                     <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-gray-50">
-                      <td class="px-4 py-2 border border-gray-300">{{ plan.success_indicator }}</td>
+                      <td class="px-4 py-2 border border-gray-300">
+                        <div>{{ plan.success_indicator }}</div>
+                        <div class="text-xs text-gray-400 mt-1">
+                          Rater: {{ plan.rated_by || 'Division Chief' }}<template v-if="plan.offices?.length"> — {{ plan.offices.map(o => o.name).join(', ') }}</template><template v-if="plan.committees?.length"> — {{ plan.committees.map(c => c.name).join(', ') }}</template><template v-if="plan.special_assignments?.length"> — {{ plan.special_assignments.map(a => a.name).join(', ') }}</template>
+                        </div>
+                      </td>
                       <td class="px-4 py-2 border border-gray-300"
-                          :class="canEdit ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
-                          @click="canEdit ? openModal(plan) : null">
+                          :class="canRatePlan(plan) ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
+                          @click="canRatePlan(plan) ? openModal(plan) : null">
                         {{ plan.pivot?.accomplishment || '—' }}
                       </td>
                       <td class="px-4 py-2 border border-gray-300">

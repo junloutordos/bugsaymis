@@ -53,6 +53,16 @@ Route::middleware(['auth','role:Administrator'])->group(function(){
     Route::post('/data-management/rooms', [App\Http\Controllers\RoomController::class, 'store'])->name('rooms.store');
     Route::put('/data-management/rooms/{room}', [App\Http\Controllers\RoomController::class, 'update'])->name('rooms.update');
     Route::delete('/data-management/rooms/{room}', [App\Http\Controllers\RoomController::class, 'destroy'])->name('rooms.destroy');
+    // Committees
+    Route::get('/data-management/committees', [App\Http\Controllers\CommitteeController::class, 'index'])->name('committees.index');
+    Route::post('/data-management/committees', [App\Http\Controllers\CommitteeController::class, 'store'])->name('committees.store');
+    Route::put('/data-management/committees/{committee}', [App\Http\Controllers\CommitteeController::class, 'update'])->name('committees.update');
+    Route::delete('/data-management/committees/{committee}', [App\Http\Controllers\CommitteeController::class, 'destroy'])->name('committees.destroy');
+    // Special Assignments
+    Route::get('/data-management/special-assignments', [App\Http\Controllers\SpecialAssignmentController::class, 'index'])->name('special-assignments.index');
+    Route::post('/data-management/special-assignments', [App\Http\Controllers\SpecialAssignmentController::class, 'store'])->name('special-assignments.store');
+    Route::put('/data-management/special-assignments/{specialAssignment}', [App\Http\Controllers\SpecialAssignmentController::class, 'update'])->name('special-assignments.update');
+    Route::delete('/data-management/special-assignments/{specialAssignment}', [App\Http\Controllers\SpecialAssignmentController::class, 'destroy'])->name('special-assignments.destroy');
     // Sections API (used by Rooms UI to load sections for a school year)
     Route::get('/sections', function (\Illuminate\Http\Request $request) {
         $q = \Illuminate\Support\Facades\DB::table('sections')->select('id', 'sectionname as name', 'syid');

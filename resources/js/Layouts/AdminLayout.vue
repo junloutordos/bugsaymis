@@ -284,6 +284,20 @@ const menuItems = [
         roles: ["Administrator"],
       },
       {
+        label: "Committees",
+        routeName: "committees.index",
+        href: route("committees.index"),
+        icon: UserGroupIcon,
+        roles: ["Administrator"],
+      },
+      {
+        label: "Special Assignments",
+        routeName: "special-assignments.index",
+        href: route("special-assignments.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator"],
+      },
+      {
         label: "Buildings",
         routeName: "buildings.index",
         href: route("buildings.index"),
@@ -449,11 +463,11 @@ const menuItems = [
       },
 
       {
-        label: "My Division",
+        label: "Rate IPCRs",
         routeName: "division-chief-ipcr.index",
         href: route("division-chief-ipcr.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "DivisionChief", "OCD"],
+        roles: ["Administrator", "DivisionChief", "OCD", "Faculty", "Staff"],
       },
       {
         label: "PMT Review",

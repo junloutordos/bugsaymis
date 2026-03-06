@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Committee;
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
+use App\Models\Office;
 use App\Models\Role;
+use App\Models\SpecialAssignment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +26,59 @@ class DivisionChiefIPCRController extends Controller
             ->selectRaw('ROUND(AVG(sup_average), 2)')
             ->whereColumn('ipcr_id', 'employee_ipcrs.id')
             ->whereNotNull('sup_average');
+
+        // Determine what non-DC rater roles the user holds
+        $unitHeadOfficeIds        = Office::where('unit_head', $user->id)->pluck('id');
+        $headedCommitteeIds       = Committee::where('head_id', $user->id)->pluck('id');
+        $coordinatedAssignmentIds = SpecialAssignment::where('coordinator_id', $user->id)->pluck('id');
+        $isNonDCRater = $unitHeadOfficeIds->isNotEmpty()
+                     || $headedCommitteeIds->isNotEmpty()
+                     || $coordinatedAssignmentIds->isNotEmpty();
+
+        // Gate access
+        if (!$user->hasAnyRole(['OCD', 'DivisionChief']) && !$isNonDCRater) {
+            abort(403, "You are not authorized to view this.");
+        }
+
+        // Non-DC rater branch: show IPCRs containing plans they can rate
+        if ($isNonDCRater && !$user->hasAnyRole(['OCD', 'DivisionChief'])) {
+            $ipcrs = EmployeeIPCR::with(['user.division'])
+                ->addSelect(['overall_average' => $avgSubquery])
+                ->whereHas('plans', fn($q) =>
+                    $q->where(function ($q2) use ($unitHeadOfficeIds, $headedCommitteeIds, $coordinatedAssignmentIds) {
+                        $q2->where(fn($q3) =>
+                            $q3->where('rated_by', 'Unit Head')
+                               ->whereHas('offices', fn($oq) => $oq->whereIn('offices.id', $unitHeadOfficeIds))
+                        )
+                        ->orWhere(fn($q3) =>
+                            $q3->where('rated_by', 'Committee Head')
+                               ->whereHas('committees', fn($cq) => $cq->whereIn('committees.id', $headedCommitteeIds))
+                        )
+                        ->orWhere(fn($q3) =>
+                            $q3->where('rated_by', 'Coordinator')
+                               ->whereHas('specialAssignments', fn($aq) => $aq->whereIn('special_assignments.id', $coordinatedAssignmentIds))
+                        );
+                    })
+                )
+                ->whereIn('status', [
+                    'Submitted for Rating',
+                    'Rated & For PMT Review',
+                    'Submitted to PMT',
+                    'PMT Returned for Revision',
+                    'Approved by PMT',
+                ])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
+
+            return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
+                'ipcrs'             => $ipcrs,
+                'divisionEmployees' => collect(),
+                'supervisor'        => $user,
+                'ratingPeriods'     => $ratingPeriods,
+            ]);
+        }
 
         if ($user->hasAnyRole(['OCD', 'DivisionChief'])) {
             // --- Subordinate Division Chief IPCRs (visible only to OCD) ---
@@ -84,14 +140,22 @@ class DivisionChiefIPCRController extends Controller
     {
         $ipcr = EmployeeIPCR::with([
             'user.division',
-            'plans.performance_indicator.agencyOutcome'
+            'plans.performance_indicator.agencyOutcome',
+            'plans.offices',
+            'plans.committees',
+            'plans.specialAssignments',
         ])->findOrFail($id);
 
+        $user = auth()->user();
+        $employeeDivisionChiefId = $ipcr->user->division->division_chief_id ?? null;
+        $canManageIpcr = $user->hasRole('OCD') || $user->id == $employeeDivisionChiefId;
+
         return Inertia::render('PerformanceManagement/DivisionChiefIPCRShow', [
-            'ipcr'       => $ipcr,
-            'plans'      => $ipcr->plans,
-            'employee'   => $ipcr->user,
-            'supervisor' => auth()->user(),
+            'ipcr'          => $ipcr,
+            'plans'         => $ipcr->plans,
+            'employee'      => $ipcr->user,
+            'supervisor'    => $user,
+            'canManageIpcr' => $canManageIpcr,
         ]);
     }
 
@@ -208,6 +272,23 @@ class DivisionChiefIPCRController extends Controller
         // Ensure this plan belongs to THIS IPCR
         if (!$ipcr->plans()->where('work_distribution_plans.id', $planId)->exists()) {
             abort(404, "This plan is not assigned to this IPCR.");
+        }
+
+        // Authorization: check the logged-in user is the correct rater for this plan
+        $user = auth()->user();
+        $plan = \App\Models\WorkDistributionPlan::with(['offices', 'committees', 'specialAssignments'])->findOrFail($planId);
+        $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
+
+        $isDCForEmployee = $divisionId && $ipcr->user->division_id == $divisionId;
+        $canRate = $user->hasRole('OCD') || $isDCForEmployee || match ($plan->rated_by) {
+            'Unit Head'      => $plan->offices->contains(fn($o) => $o->unit_head == $user->id),
+            'Committee Head' => $plan->committees->contains(fn($c) => $c->head_id == $user->id),
+            'Coordinator'    => $plan->specialAssignments->contains(fn($a) => $a->coordinator_id == $user->id),
+            default          => false,
+        };
+
+        if (!$canRate) {
+            abort(403, 'You are not authorized to rate this plan.');
         }
 
         // Compute average for supervisor ratings

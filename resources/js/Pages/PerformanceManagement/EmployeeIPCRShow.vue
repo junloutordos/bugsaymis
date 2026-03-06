@@ -667,8 +667,8 @@ const resubmit = () => {
             <tr>
               <td colspan="4" class="border px-3 py-3 text-center">
                 <br/><br/>
-                <b style="text-transform: uppercase;">{{supervisor.name}}</b><br/>
-                <small>{{supervisor.position }}</small>
+                <b style="text-transform: uppercase;">{{supervisor?.name ?? '—'}}</b><br/>
+                <small>{{supervisor?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border px-3 py-3 text-center">
                 <br/>
@@ -1029,8 +1029,8 @@ const resubmit = () => {
             </td>
             <td colspan="3" class="border px-3 py-3 text-center">
               <br/><br/>
-              <b style="text-transform: uppercase;">{{ supervisor.name }}</b><br/>
-              <small>{{supervisor.position}}</small>
+              <b style="text-transform: uppercase;">{{ supervisor?.name ?? '—' }}</b><br/>
+              <small>{{ supervisor?.position ?? '' }}</small>
             </td>
             <td colspan="1" class="border px-3 py-3 text-center">
               <br/><br/>
