@@ -675,13 +675,14 @@ const menuItems = [
     icon: ChatBubbleLeftRightIcon,
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
     children: [
-      {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
+
+          {
+            label: "Consultations",
+            routeName: "guidance.consultations.index",
+            href: route('guidance.consultations.index'),
+            icon: ClipboardDocumentListIcon,
+            roles: ["Administrator", "Faculty", "Staff"],
+          },
     ],
   },
   {
@@ -770,11 +771,39 @@ const menuItems = [
 
 // --- Filter Menu by Role ---
 
+// Support numeric role_id checks (CSV stored in user.role_id)
+const roleIds = (user.role_id || "")
+  .toString()
+  .split(",")
+  .map((s) => Number(s.trim()))
+  .filter((n) => !Number.isNaN(n));
+
+// Show Guidance Services when role_id includes 17 or 1
+const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1);
+// Show Health Statistics Report when role_id includes 16 or 1
+const showHealthStatisticsByRoleId = roleIds.includes(16) || roleIds.includes(1);
+
 const filterMenuByRole = (items, userRoleNames) =>
   items
     .filter((item) => {
-      if (item.showForGSUHeadOnly && userRoleNames.includes('GSU Head')) return true;
-      return item.roles.some(r => userRoleNames.includes(r));
+      if (item.showForGSUHeadOnly && userRoleNames.includes("GSU Head")) return true;
+      if (item.label === "Guidance Services") {
+        // Only show the entire Guidance Services section when numeric role_id includes 17 (Guidance) or 1 (Administrator)
+        return showGuidanceByRoleId;
+      }
+      // Allow Dashboard to be visible to Guidance role (role_id 17) as well
+      if (item.routeName === 'dashboard') {
+        if (roleIds.includes(17)) return true;
+      }
+      // Allow health statistics specifically for role_id 16 (and admin 1)
+      if (item.routeName === 'health.statistics.report') {
+        return showHealthStatisticsByRoleId;
+      }
+      // Show Guidance consultations link when role_id includes 17 (Guidance) or admin 1
+      if (item.routeName === 'guidance.consultations.index') {
+        return showGuidanceByRoleId;
+      }
+      return item.roles.some((r) => userRoleNames.includes(r));
     })
     .map((item) =>
       item.children

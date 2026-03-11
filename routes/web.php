@@ -106,6 +106,10 @@ Route::get('/library/collections/kiosk/search', [App\Http\Controllers\LibraryCol
 Route::get('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'index'])->name('clinic.kiosk');
 Route::post('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'store'])->name('clinic.kiosk.store');
 
+// Guidance kiosk (public, no login required)
+Route::get('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::class, 'index'])->name('guidance.kiosk');
+Route::post('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::class, 'store'])->name('guidance.kiosk.store');
+
 // DTR Upload (Data Management) - front-end page
 Route::get('/data-management/dtr-upload', function () {
     return Inertia::render('DataManagement/DTRUpload');
@@ -331,6 +335,16 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware('role:Administrator|GSU Head');
 
     // Print view for a single work request (printable slip)
+
+    // Guidance consultations list (Guidance Services)
+    Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
+    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('role:Administrator|Faculty|Staff|Guidance');
+    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('role:Administrator|Faculty|Staff|Guidance');
+    Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('role:Administrator|Guidance');
+    Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('role:Administrator|Guidance');
+    // Save intervention details (Guidance personnel only)
+    Route::get('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'getIntervention'])->name('guidance.consultations.intervention.get')->middleware('role:Administrator|Guidance');
+    Route::post('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'intervention'])->name('guidance.consultations.intervention')->middleware('role:Administrator|Guidance');
     Route::get('/work-requests/{workRequest}/print', [WorkRequestController::class, 'print'])
         ->name('work-requests.print')
         ->middleware('role:Administrator|GSU Head');
