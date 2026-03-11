@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
@@ -15,6 +16,8 @@ const props = defineProps({
   plans: Array,
   workPlans: { type: Array, default: () => [] },
 });
+
+const { isSubmitting, submit } = useSubmit();
 
 // ---------- Rating visibility ----------
 const PRE_RATING_STATUSES = ['New Target', 'Draft', 'For Review', 'For Rating', 'Targets Approved', 'Returned for Revision'];
@@ -293,9 +296,12 @@ const saveModal = async () => {
     self_timeliness: form.value.timeliness,
   };
 
-  router.put(
-    route("employee-ipcr-plan.updateSelfRating", [props.ipcr.id, currentPlan.value.id]),
-    payload,
+  submit(
+    (o) => router.put(
+      route("employee-ipcr-plan.updateSelfRating", [props.ipcr.id, currentPlan.value.id]),
+      payload,
+      o
+    ),
     {
       onSuccess: () => {
         const avg = computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness);
@@ -337,7 +343,7 @@ const submitForReview = () => {
     confirmButtonText: "Yes, submit",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Submitted!", "Target submitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit target.", "error")
       });
@@ -354,7 +360,7 @@ const submitForRating = () => {
     confirmButtonText: "Submit",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Submitted!", "Accomplishments submitted for rating.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit accomplishments.", "error")
       });
@@ -494,7 +500,7 @@ const togglePlanSelection = (plan) => {
 };
 
 const submitAddPlans = () => {
-  router.post(
+  submit.post(
     route("employee-ipcr.addPlans", props.ipcr.id),
     { plan_ids: selectedPlans.value },
     {
@@ -519,7 +525,7 @@ const removePlan = (plan) => {
     confirmButtonText: "Yes, remove it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
+      submit.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
         onSuccess: () => Swal.fire("Removed!", "Plan removed successfully.", "success"),
         onError: () => Swal.fire("Error", "Failed to remove plan.", "error"),
       });
@@ -536,7 +542,7 @@ const resubmit = () => {
     confirmButtonText: "Yes, resubmit!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Resubmitted!", "IPCR resubmitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to resubmit.", "error"),
       });
@@ -570,28 +576,30 @@ const resubmit = () => {
         
 
         <div class="mt-4 flex justify-end gap-2">
-          <button 
-            v-if="ipcr.status === 'New Target'" 
-            @click="submitForReview" 
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          <button
+            v-if="ipcr.status === 'New Target'"
+            @click="submitForReview"
+            :disabled="isSubmitting"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <!-- Optional icon for submit -->
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Submit for Review and Approval
+            {{ isSubmitting ? 'Processing…' : 'Submit for Review and Approval' }}
           </button>
 
-          <button 
-            v-if="ipcr.status === 'Targets Approved'" 
-            @click="submitForRating" 
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          <button
+            v-if="ipcr.status === 'Targets Approved'"
+            @click="submitForRating"
+            :disabled="isSubmitting"
+            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <!-- Optional icon for submit -->
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Submit for Rating of the Accomplishment
+            {{ isSubmitting ? 'Processing…' : 'Submit for Rating of the Accomplishment' }}
           </button>
 
           <button
@@ -608,12 +616,13 @@ const resubmit = () => {
           <button
             v-if="ipcr.status === 'Returned for Revision'"
             @click="resubmit"
-            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+            :disabled="isSubmitting"
+            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Resubmit for Review
+            {{ isSubmitting ? 'Processing…' : 'Resubmit for Review' }}
           </button>
 
           <button
@@ -1114,7 +1123,7 @@ const resubmit = () => {
           </div>
           <div class="mt-4 flex justify-end gap-2">
             <button @click="closeModal" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300">Close</button>
-            <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+            <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" :disabled="isSubmitting" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
           </div>
         </div>
       </div>
@@ -1158,9 +1167,9 @@ const resubmit = () => {
             >Cancel</button>
             <button
               @click="submitAddPlans"
-              :disabled="!selectedPlans.length"
-              class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50"
-            >Add Selected</button>
+              :disabled="!selectedPlans.length || isSubmitting"
+              class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >{{ isSubmitting ? 'Adding…' : 'Add Selected' }}</button>
           </div>
         </div>
       </div>

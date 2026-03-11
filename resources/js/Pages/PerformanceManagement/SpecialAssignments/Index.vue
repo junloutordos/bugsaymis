@@ -4,6 +4,7 @@ import { Head, router, Link } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { PencilSquareIcon, TrashIcon, PlusIcon, ArrowRightIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   assignments: Array,
@@ -11,6 +12,8 @@ const props = defineProps({
   plans: Array,
   authUser: Object,
 })
+
+const { isSubmitting, submit } = useSubmit()
 
 // --- List ---
 const searchQuery = ref("")
@@ -87,12 +90,12 @@ const submitAssignment = () => {
   }
 
   if (modalMode.value === "create") {
-    router.post(route("pm-special-assignments.store"), { ...form.value }, {
+    submit.post(route("pm-special-assignments.store"), { ...form.value }, {
       onSuccess: () => { closeModal(); Swal.fire("Created", "Special Assignment created.", "success") },
       onError,
     })
   } else {
-    router.put(route("pm-special-assignments.update", form.value.id), { ...form.value }, {
+    submit.put(route("pm-special-assignments.update", form.value.id), { ...form.value }, {
       onSuccess: () => { closeModal(); Swal.fire("Updated", "Special Assignment updated.", "success") },
       onError,
     })
@@ -108,7 +111,7 @@ const deleteAssignment = async (assignment) => {
     confirmButtonText: "Delete",
   })
   if (result.isConfirmed) {
-    router.delete(route("pm-special-assignments.destroy", assignment.id), {
+    submit.delete(route("pm-special-assignments.destroy", assignment.id), {
       onSuccess: () => Swal.fire("Deleted", "Special Assignment deleted.", "success"),
     })
   }
@@ -239,7 +242,7 @@ const deleteAssignment = async (assignment) => {
 
             <div class="flex justify-end gap-2 pt-4">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+              <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
         </div>

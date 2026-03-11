@@ -5,6 +5,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   assignment: Object,
@@ -13,6 +14,8 @@ const props = defineProps({
   isCoordinator: Boolean,
   canManage: Boolean,
 })
+
+const { isSubmitting, submit } = useSubmit()
 
 const showModal = ref(false)
 const modalEntry = ref(null)
@@ -61,7 +64,7 @@ const submitEdit = () => {
   }
 
   if (entry.isOwn && !entry.canRate) {
-    router.post(
+    submit.post(
       route("pm-special-assignments.member-accomplishment", [props.assignment.id, entry.member.user_id]),
       {
         ipcr_id:        editForm.value.ipcr_id,
@@ -72,7 +75,7 @@ const submitEdit = () => {
       { onSuccess, onError }
     )
   } else {
-    router.post(
+    submit.post(
       route("pm-special-assignments.rate-member", [props.assignment.id, entry.member.user_id]),
       { ...editForm.value },
       { onSuccess, onError }
@@ -291,7 +294,7 @@ const statusColor = (status) => {
 
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded text-sm">Cancel</button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded text-sm">Save</button>
+            <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
           </div>
         </form>
       </div>

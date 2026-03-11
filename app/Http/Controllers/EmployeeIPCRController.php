@@ -2,10 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\IPCRCreatedMail;
+use App\Mail\IPCRSubmittedForRatingMail;
+use App\Mail\IPCRSubmittedForReviewMail;
+use App\Models\Division;
 use App\Models\EmployeeIPCR;
 use App\Models\IPCRRatingPeriod;
+use App\Models\User;
 use App\Models\WorkDistributionPlan;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class EmployeeIPCRController extends Controller
@@ -47,12 +54,25 @@ class EmployeeIPCRController extends Controller
             'remarks'       => 'nullable|string',
         ]);
 
-        EmployeeIPCR::create([
+        $ipcr = EmployeeIPCR::create([
             'user_id'       => auth()->id(),
             'rating_period' => $data['rating_period'],
             'title'         => $data['title'],
             'status'        => 'New Target',
             'remarks'       => $data['remarks'] ?? null,
+        ]);
+
+        $dc = $this->resolveDivisionChief(auth()->user());
+        if ($dc) {
+            $ipcr->load('user');
+            Mail::to($dc->email)->send(new IPCRCreatedMail($ipcr, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_created',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $ipcr->id,
+            'new_values'     => ['title' => $ipcr->title, 'rating_period' => $ipcr->rating_period],
         ]);
 
         return redirect()->back()->with('success', 'IPCR Target Created.');
@@ -71,6 +91,19 @@ class EmployeeIPCRController extends Controller
         ]);
 
         $employeeIPCR->update($data);
+
+        $dc = $this->resolveDivisionChief(auth()->user());
+        if ($dc) {
+            $employeeIPCR->load('user');
+            Mail::to($dc->email)->send(new IPCRCreatedMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_updated',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['title' => $employeeIPCR->title, 'status' => $employeeIPCR->status],
+        ]);
 
         return redirect()->back()->with('success', 'IPCR Target Updated.');
     }
@@ -213,11 +246,32 @@ class EmployeeIPCRController extends Controller
     }
 
 
+    private function resolveDivisionChief(User $employee): ?User
+    {
+        $divisionId = $employee->division_id;
+        if (!$divisionId) return null;
+        $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
+        return $chiefId ? User::find($chiefId) : null;
+    }
+
     public function submitForReview(EmployeeIPCR $employeeIPCR)
     {
         $employeeIPCR->update([
             'status' => 'For Review',
             'submitted_for_review_at' => now(),
+        ]);
+
+        $employeeIPCR->load('user');
+        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        if ($dc) {
+            Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_submitted_for_review',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'For Review'],
         ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
@@ -229,6 +283,19 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->update([
             'status' => 'Submitted for Rating',
             'submitted_for_rating_at' => now(),
+        ]);
+
+        $employeeIPCR->load('user');
+        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        if ($dc) {
+            Mail::to($dc->email)->send(new IPCRSubmittedForRatingMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_submitted_for_rating',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Submitted for Rating'],
         ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
@@ -269,6 +336,19 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->update([
             'status' => 'For Review',
             'submitted_for_review_at' => now(),
+        ]);
+
+        $employeeIPCR->load('user');
+        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        if ($dc) {
+            Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_resubmitted',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'For Review'],
         ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)

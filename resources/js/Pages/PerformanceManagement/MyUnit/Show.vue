@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
@@ -103,6 +104,8 @@ const finalIPCRRating = computed(() => {
   return Number(total).toFixed(2);
 });
 
+const { isSubmitting, submit } = useSubmit();
+
 // ---------- Per-plan rating authorization ----------
 // Unit heads can only rate plans whose rated_by = 'Unit Head'
 // AND one of the plan's offices has unit_head = this user
@@ -138,9 +141,12 @@ const saveModal = () => {
     Swal.fire({ icon: "warning", title: "Missing Required Fields", text: "Please fill in BOTH the Accomplishment and MOV Link before saving.", confirmButtonColor: "#2563eb" });
     return;
   }
-  router.put(
-    route("division-chief-employee-ipcr-plan.rateIPCRPlan", [props.ipcr.id, currentPlan.value.id]),
-    { accomplishment: form.value.accomplishment, mov_link: form.value.mov_link, sup_quality: form.value.quality, sup_efficiency: form.value.efficiency, sup_timeliness: form.value.timeliness },
+  submit(
+    (o) => router.put(
+      route("division-chief-employee-ipcr-plan.rateIPCRPlan", [props.ipcr.id, currentPlan.value.id]),
+      { accomplishment: form.value.accomplishment, mov_link: form.value.mov_link, sup_quality: form.value.quality, sup_efficiency: form.value.efficiency, sup_timeliness: form.value.timeliness },
+      o
+    ),
     {
       onSuccess: () => {
         const avg = computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness);
@@ -469,7 +475,7 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
         </div>
         <div class="mt-4 flex justify-end gap-2">
           <button @click="isModalOpen = false" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300 text-sm">Cancel</button>
-          <button @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm">Save Rating</button>
+          <button @click="saveModal" :disabled="isSubmitting" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save Rating' }}</button>
         </div>
       </div>
     </div>

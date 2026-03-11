@@ -32,6 +32,7 @@ use App\Http\Controllers\WorkDistributionPlanController;
 use App\Http\Controllers\IPCRController;
 use App\Http\Controllers\EmployeeIPCRController;
 use App\Http\Controllers\DivisionChiefIPCRController;
+use App\Http\Controllers\HRIPCRController;
 use App\Http\Controllers\PMTIPCRController;
 use App\Http\Controllers\PDSController;
 use App\Http\Controllers\PDSTrainingController;
@@ -766,12 +767,25 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             ->name('division-chief-employee-ipcr.returnFromPMT');
 
         // PMT Review Routes
-        Route::middleware('role:Administrator|PMT')->group(function () {
+        Route::middleware('role:Administrator|PMT|OCD')->group(function () {
             Route::get('/pmt/ipcrs', [PMTIPCRController::class, 'index'])->name('pmt-ipcr.index');
             Route::get('/pmt/ipcrs/{id}', [PMTIPCRController::class, 'show'])->name('pmt-ipcr.show');
             Route::post('/pmt/ipcrs/{employeeIPCR}/approve', [PMTIPCRController::class, 'approve'])->name('pmt-ipcr.approve');
             Route::post('/pmt/ipcrs/{employeeIPCR}/return', [PMTIPCRController::class, 'returnForRevision'])->name('pmt-ipcr.return');
+            Route::post('/pmt/ipcrs/{employeeIPCR}/director-sign', [PMTIPCRController::class, 'directorSign'])->name('pmt-ipcr.directorSign');
         });
+
+        // HR IPCR Review Routes
+        Route::middleware('role:Administrator|HR')->group(function () {
+            Route::get('/hr/ipcrs', [HRIPCRController::class, 'index'])->name('hr-ipcr.index');
+            Route::get('/hr/ipcrs/{id}', [HRIPCRController::class, 'show'])->name('hr-ipcr.show');
+            Route::post('/hr/ipcrs/{employeeIPCR}/submit-to-pmt', [HRIPCRController::class, 'submitToPMT'])->name('hr-ipcr.submitToPMT');
+            Route::post('/hr/ipcrs/batch-submit-to-pmt', [HRIPCRController::class, 'batchSubmitToPMT'])->name('hr-ipcr.batchSubmitToPMT');
+        });
+
+        // DC batch submit to HR
+        Route::post('/division-chief-employee-ipcr/submit-to-hr', [DivisionChiefIPCRController::class, 'submitToHR'])
+            ->name('division-chief-ipcr.submitToHR');
 
         // Employee plan management (also accessible here for admins)
         Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])

@@ -1,10 +1,11 @@
 <script setup>
-import { Head, usePage, useForm, router } from "@inertiajs/vue3"
+import { Head, usePage, useForm } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { computed, ref, reactive } from "vue"
 import html2pdf from "html2pdf.js"
 import { ArrowDownTrayIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   pms: Object,
@@ -14,6 +15,7 @@ const props = defineProps({
 // ✅ Access logged-in user
 const page = usePage()
 const currentUser = computed(() => page.props.auth.user)
+const { isSubmitting, submit } = useSubmit()
 
 // Months
 const months = [
@@ -177,7 +179,7 @@ const saveActivity = () => {
   form.cost_of_repair = modalData.cost
   form.remarks = modalData.remarks
 
-  router.post(route("ict-pms-history.store"), form, {
+  submit.post(route("ict-pms-history.store"), form, {
     preserveScroll: true,
     onSuccess: () => {
       // immediately reflect done state
@@ -420,11 +422,12 @@ const equipmentHistoryMap = computed(() => {
           >
             Cancel
           </button>
-          <button 
-            @click="saveActivity" 
-            class="px-4 py-2 border border-blue-600 rounded text-blue-600 bg-white hover:bg-blue-50"
+          <button
+            @click="saveActivity"
+            :disabled="isSubmitting"
+            class="px-4 py-2 border border-blue-600 rounded text-blue-600 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save
+            {{ isSubmitting ? 'Saving…' : 'Save' }}
           </button>
         </div>
       </div>

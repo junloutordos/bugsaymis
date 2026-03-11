@@ -3,8 +3,8 @@ import { Head } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
-import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
@@ -23,8 +23,10 @@ const planRemarks = ref(
   Object.fromEntries((props.plans || []).map(p => [p.id, p.pivot?.remarks ?? ""]))
 );
 
+const { isSubmitting, submit } = useSubmit();
+
 const savePlanRemark = (plan) => {
-  router.put(
+  submit.put(
     route("division-chief-employee-ipcr-plan.remark", [props.ipcr.id, plan.id]),
     { remarks: planRemarks.value[plan.id] },
     {
@@ -37,23 +39,6 @@ const savePlanRemark = (plan) => {
   );
 };
 
-const submitToPMT = () => {
-  Swal.fire({
-    title: "Submit to PMT?",
-    text: "This will submit the rated IPCR to the Performance Management Team for review.",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Yes, submit!",
-  }).then((result) => {
-    if (result.isConfirmed) {
-      router.post(route("division-chief-employee-ipcr.submitToPMT", props.ipcr.id), {}, {
-        onSuccess: () => Swal.fire("Submitted!", "IPCR submitted to PMT for review.", "success"),
-        onError: () => Swal.fire("Error", "Failed to submit to PMT.", "error"),
-      });
-    }
-  });
-};
-
 const showReturnFromPMTModal = ref(false);
 const returnFromPMTRemarks = ref("");
 
@@ -62,7 +47,7 @@ const confirmReturnFromPMT = () => {
     Swal.fire({ icon: "warning", title: "Remarks required", text: "Please provide remarks explaining why the IPCR is being returned." });
     return;
   }
-  router.post(
+  submit.post(
     route("division-chief-employee-ipcr.returnFromPMT", props.ipcr.id),
     { remarks: returnFromPMTRemarks.value },
     {
@@ -86,7 +71,7 @@ const returnAccomplishment = () => {
     confirmButtonText: "Yes, return it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("division-chief-employee-ipcr.returnAccomplishment", props.ipcr.id), {}, {
+      submit.post(route("division-chief-employee-ipcr.returnAccomplishment", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Returned!", "Accomplishment returned to employee for revision.", "success"),
         onError: () => Swal.fire("Error", "Failed to return accomplishment.", "error"),
       });
@@ -104,7 +89,7 @@ const disapproveTargets = () => {
     confirmButtonText: "Yes, return it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("division-chief-employee-ipcr.disapprove", props.ipcr.id), {}, {
+      submit.post(route("division-chief-employee-ipcr.disapprove", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Returned!", "IPCR returned for revision.", "success"),
         onError: () => Swal.fire("Error", "Failed to return IPCR.", "error"),
       });
@@ -113,7 +98,7 @@ const disapproveTargets = () => {
 };
 
 const saveDivisionComments = () => {
-  router.post(
+  submit.post(
     route("division-chief-employee-ipcr.savecomments", props.ipcr.id),
     { division_comments: divisionComments.value },
     {
@@ -334,7 +319,7 @@ const saveModal = async () => {
     Swal.fire({ icon: "warning", title: "Missing Required Fields", text: "Please fill in BOTH the Accomplishment and MOV Link before saving.", confirmButtonColor: "#2563eb" });
     return;
   }
-  router.put(
+  submit.put(
     route("division-chief-employee-ipcr-plan.rateIPCRPlan", [props.ipcr.id, currentPlan.value.id]),
     { accomplishment: form.value.accomplishment, mov_link: form.value.mov_link, sup_quality: form.value.quality, sup_efficiency: form.value.efficiency, sup_timeliness: form.value.timeliness },
     {
@@ -377,7 +362,7 @@ const printIPCR = () => window.print();
 const saveRatings = () => {
   Swal.fire({ title: "Save Ratings?", text: "Are you sure you want to save these ratings?", icon: "question", showCancelButton: true, confirmButtonText: "Yes, save it!" })
     .then(result => {
-      if (result.isConfirmed) router.post(route("division-chief-employee-ipcr.saveratings", props.ipcr.id), {}, {
+      if (result.isConfirmed) submit.post(route("division-chief-employee-ipcr.saveratings", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Saved!", "Ratings for the rating period successfully saved!", "success"),
         onError:   () => Swal.fire("Error", "Failed to save ratings.", "error"),
       });
@@ -387,7 +372,7 @@ const saveRatings = () => {
 const approveTargets = () => {
   Swal.fire({ title: "Approve Targets?", text: "Are you sure you want to approve these targets?", icon: "question", showCancelButton: true, confirmButtonText: "Yes, approve it!" })
     .then(result => {
-      if (result.isConfirmed) router.post(route("division-chief-employee-ipcr.targetsapproval", props.ipcr.id), {}, {
+      if (result.isConfirmed) submit.post(route("division-chief-employee-ipcr.targetsapproval", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Approved!", "Targets for the rating period successfully approved!", "success"),
         onError:   () => Swal.fire("Error", "Failed to approve targets.", "error"),
       });
@@ -422,25 +407,29 @@ const approveTargets = () => {
 
         <div class="mt-4 flex flex-wrap gap-2">
           <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="saveRatings"
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
-            Save Ratings
+            :disabled="isSubmitting"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Save Ratings' }}
           </button>
           <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="approveTargets"
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
-            Approve Targets
+            :disabled="isSubmitting"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Approve Targets' }}
           </button>
           <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="disapproveTargets"
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">
-            Return for Revision
+            :disabled="isSubmitting"
+            class="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
           </button>
           <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="returnAccomplishment"
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">
-            Return Accomplishment for Revision
+            :disabled="isSubmitting"
+            class="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Return Accomplishment for Revision' }}
           </button>
-          <button v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'" @click="submitToPMT"
-            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow">
-            Submit to PMT
-          </button>
+          <span v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'"
+            class="text-sm text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-2 rounded-lg">
+            Rated — use the <strong>Division index page</strong> to batch-submit to HR.
+          </span>
           <button v-if="canManageIpcr && ipcr.status === 'PMT Returned for Revision'" @click="showReturnFromPMTModal = true"
             class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg shadow">
             Return to Employee
@@ -633,8 +622,8 @@ const approveTargets = () => {
                         <template v-if="['For Review', 'Submitted for Rating'].includes(ipcr.status)">
                           <textarea v-model="planRemarks[piPlans[0].id]" rows="2"
                             class="w-full border rounded px-2 py-1 text-sm" placeholder="Add remark..."></textarea>
-                          <button @click="savePlanRemark(piPlans[0])"
-                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Save</button>
+                          <button @click="savePlanRemark(piPlans[0])" :disabled="isSubmitting"
+                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
                         </template>
                         <span v-else>{{ piPlans[0].pivot?.remarks ?? "—" }}</span>
                       </td>
@@ -698,8 +687,8 @@ const approveTargets = () => {
                         <template v-if="['For Review', 'Submitted for Rating'].includes(ipcr.status)">
                           <textarea v-model="planRemarks[plan.id]" rows="2"
                             class="w-full border rounded px-2 py-1 text-sm" placeholder="Add remark..."></textarea>
-                          <button @click="savePlanRemark(plan)"
-                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Save</button>
+                          <button @click="savePlanRemark(plan)" :disabled="isSubmitting"
+                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
                         </template>
                         <span v-else>{{ plan.pivot?.remarks ?? "—" }}</span>
                       </td>
@@ -733,8 +722,9 @@ const approveTargets = () => {
             <button
               v-if="isEditing"
               @click="saveDivisionComments"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
-            >Save Comments</button>
+              :disabled="isSubmitting"
+              class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow"
+            >{{ isSubmitting ? 'Saving…' : 'Save Comments' }}</button>
           </div>
         </div>
 
@@ -852,7 +842,7 @@ const approveTargets = () => {
           </div>
           <div class="mt-4 flex justify-end gap-2">
             <button @click="isModalOpen = false" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
-            <button @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+            <button @click="saveModal" :disabled="isSubmitting" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
           </div>
         </div>
       </div>
@@ -880,7 +870,10 @@ const approveTargets = () => {
           <button @click="showReturnFromPMTModal = false; returnFromPMTRemarks = ''"
             class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
           <button @click="confirmReturnFromPMT"
-            class="px-4 py-2 bg-rose-600 text-white rounded hover:bg-rose-700">Return to Employee</button>
+            :disabled="isSubmitting"
+            class="px-4 py-2 bg-rose-600 text-white rounded hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ isSubmitting ? 'Processing…' : 'Return to Employee' }}
+          </button>
         </div>
       </div>
     </div>

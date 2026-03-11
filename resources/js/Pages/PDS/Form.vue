@@ -1,6 +1,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useForm, router } from '@inertiajs/vue3'
+import { useSubmit } from '@/Composables/useSubmit'
 import {
   PlusIcon,
   TrashIcon,
@@ -15,6 +16,7 @@ import Swal from 'sweetalert2'
 const props = defineProps({
   pds: { type: Object, default: null },
 })
+const { isSubmitting: isUploading, submit: submitUpload } = useSubmit()
 
 function exportPDF(pdsId) {
   router.get(`/pds/${pdsId}/export-pdf`, {}, { target: '_blank' })
@@ -351,7 +353,7 @@ const uploadTrainingCSV = () => {
   const formData = new FormData()
   formData.append('file', csvFile.value)
 
-  router.post(route('pds.trainings.upload-csv', props.pds.id), formData, {
+  submitUpload.post(route('pds.trainings.upload-csv', props.pds.id), formData, {
     forceFormData: true,
     preserveScroll: true,
     onSuccess: (page) => {
@@ -866,9 +868,10 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             <button
               type="button"
               @click="uploadTrainingCSV"
-              class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded shadow"
+              :disabled="isUploading"
+              class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded shadow disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Upload Trainings CSV
+              {{ isUploading ? 'Uploading…' : 'Upload Trainings CSV' }}
             </button>
 
             <!-- Download Template -->
@@ -1330,8 +1333,8 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <!-- Submit -->
         <div v-if="editMode" class="pt-6 flex justify-end">
-          <button @click="submit" class="btn-success">
-            {{ props.pds ? 'Update PDS' : 'Save PDS' }}
+          <button @click="submit" :disabled="form.processing" class="btn-success disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ form.processing ? 'Saving…' : (props.pds ? 'Update PDS' : 'Save PDS') }}
           </button>
         </div>
 

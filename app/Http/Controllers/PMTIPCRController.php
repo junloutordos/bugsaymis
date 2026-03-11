@@ -2,7 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\IPCRApprovedByPMTMail;
+use App\Mail\IPCRDirectorSignedMail;
+use App\Mail\IPCRPMTReturnedMail;
+use App\Models\Division;
 use App\Models\EmployeeIPCR;
+use App\Models\User;
+use App\Services\AuditLogger;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class PMTIPCRController extends Controller
@@ -57,7 +64,7 @@ class PMTIPCRController extends Controller
                 'user.division',
                 'plans.performance_indicator.agencyOutcome',
             ])
-            ->whereIn('status', ['Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT'])
+            ->whereIn('status', ['Submitted to PMT', 'PMT Returned for Revision', 'Approved by PMT', 'Director Signed'])
             ->orderBy('submitted_for_pmtreview_at', 'desc')
             ->get()
             ->map(function ($ipcr) {
@@ -85,6 +92,7 @@ class PMTIPCRController extends Controller
             'plans'      => $ipcr->plans,
             'employee'   => $ipcr->user,
             'supervisor' => $ipcr->user?->division?->divisionchief,
+            'isOCD'      => auth()->user()->hasRole('OCD'),
         ]);
     }
 
@@ -95,6 +103,17 @@ class PMTIPCRController extends Controller
     {
         $employeeIPCR->update([
             'status' => 'Approved by PMT',
+        ]);
+
+        User::havingRole('OCD')->each(function ($ocd) use ($employeeIPCR) {
+            Mail::to($ocd->email)->send(new IPCRApprovedByPMTMail($employeeIPCR, $ocd->name));
+        });
+
+        AuditLogger::log([
+            'action'         => 'ipcr_pmt_approved',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Approved by PMT'],
         ]);
 
         return to_route('pmt-ipcr.show', $employeeIPCR->id)
@@ -110,7 +129,63 @@ class PMTIPCRController extends Controller
             'status' => 'PMT Returned for Revision',
         ]);
 
+        $employeeIPCR->load('user.division');
+
+        // Notify Division Chief
+        $divisionId = $employeeIPCR->user->division_id;
+        if ($divisionId) {
+            $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
+            $dc = $chiefId ? User::find($chiefId) : null;
+            if ($dc) {
+                Mail::to($dc->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $dc->name));
+            }
+        }
+
+        // Notify Employee
+        Mail::to($employeeIPCR->user->email)->send(new IPCRPMTReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_pmt_returned',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'PMT Returned for Revision'],
+        ]);
+
         return to_route('pmt-ipcr.show', $employeeIPCR->id)
-            ->with('success', 'IPCR returned for revision. Division Chief will be notified.');
+            ->with('success', 'IPCR returned for revision. Division Chief and employee have been notified.');
+    }
+
+    public function directorSign(EmployeeIPCR $employeeIPCR)
+    {
+        abort_unless(auth()->user()->hasRole('OCD'), 403);
+
+        $user = auth()->user();
+        $employeeIPCR->update([
+            'status'             => 'Director Signed',
+            'director_signed_at' => now(),
+            'director_signature' => $user->electronic_signature,
+        ]);
+
+        // Notify DC
+        $divisionId = $employeeIPCR->user->division_id;
+        if ($divisionId) {
+            $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
+            $dc = $chiefId ? User::find($chiefId) : null;
+            if ($dc) {
+                Mail::to($dc->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $dc->name));
+            }
+        }
+
+        // Notify Employee
+        Mail::to($employeeIPCR->user->email)->send(new IPCRDirectorSignedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_director_signed',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Director Signed'],
+        ]);
+
+        return to_route('pmt-ipcr.show', $employeeIPCR->id)->with('success', 'IPCR signed by Director.');
     }
 }

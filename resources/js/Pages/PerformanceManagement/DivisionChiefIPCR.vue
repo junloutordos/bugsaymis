@@ -1,10 +1,12 @@
 <script setup>
-import { Head } from "@inertiajs/vue3"
+import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { EyeIcon } from "@heroicons/vue/24/outline"
 import useDivisionChiefIPCR from "@/Composables/useIPCRDC.js"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { ref, computed } from "vue"
+import Swal from "sweetalert2"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   ipcrs:             Array,
@@ -65,6 +67,33 @@ const adjectivalRating = ipcrAdjectivalRating
 const formatDate = (val) => {
   if (!val) return "—"
   return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+// ── Submit to HR ─────────────────────────────────────────────
+const { isSubmitting, submit } = useSubmit()
+
+const submitToHRPeriod = ref(props.ratingPeriods[0] ?? "")
+const ratedForHRCount  = computed(() =>
+  props.ipcrs.filter(i =>
+    i.status === 'Rated & For PMT Review' &&
+    (!submitToHRPeriod.value || i.rating_period === submitToHRPeriod.value)
+  ).length
+)
+
+const submitToHR = () => {
+  if (!submitToHRPeriod.value) return
+  Swal.fire({
+    title: "Submit to HR?",
+    text: `Submit all ${ratedForHRCount.value} rated IPCR(s) for "${submitToHRPeriod.value}" to HR?`,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#0891b2",
+    confirmButtonText: "Yes, submit!",
+  }).then(result => {
+    if (result.isConfirmed) {
+      submit.post(route('division-chief-ipcr.submitToHR'), { rating_period: submitToHRPeriod.value })
+    }
+  })
 }
 
 // ── Memo Report ──────────────────────────────────────────────
@@ -202,14 +231,33 @@ const printMemo = () => {
   <AdminLayout title="My Division">
 
     <!-- Header -->
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
       <h1 class="text-xl font-bold text-gray-800">Division IPCR Targets</h1>
-      <button
-        @click="openReportModal"
-        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm"
-      >
-        Generate Memo Report
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Submit to HR batch action -->
+        <div class="flex items-center gap-2 border border-cyan-300 rounded-lg px-3 py-1.5 bg-cyan-50">
+          <select
+            v-model="submitToHRPeriod"
+            class="border-0 bg-transparent text-sm text-cyan-800 focus:ring-0 p-0"
+          >
+            <option value="" disabled>— Period —</option>
+            <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <button
+            @click="submitToHR"
+            :disabled="ratedForHRCount === 0 || !submitToHRPeriod || isSubmitting"
+            class="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1 rounded text-sm font-medium"
+          >
+            {{ isSubmitting ? 'Processing…' : `Submit to HR (${ratedForHRCount})` }}
+          </button>
+        </div>
+        <button
+          @click="openReportModal"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm"
+        >
+          Generate Memo Report
+        </button>
+      </div>
     </div>
 
     <div class="bg-white p-4 rounded-lg shadow">

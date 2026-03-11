@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\IPCRAccomplishmentReturnedMail;
+use App\Mail\IPCRDCReturnedFromPMTMail;
+use App\Mail\IPCRRatedMail;
+use App\Mail\IPCRSubmittedToHRMail;
+use App\Mail\IPCRTargetsApprovedMail;
+use App\Mail\IPCRTargetsReturnedMail;
 use App\Models\Committee;
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
@@ -9,8 +15,10 @@ use App\Models\Office;
 use App\Models\Role;
 use App\Models\SpecialAssignment;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class DivisionChiefIPCRController extends Controller
@@ -188,6 +196,16 @@ class DivisionChiefIPCRController extends Controller
             'target_approved_at' => now(),
         ]);
 
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsApprovedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_targets_approved',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Targets Approved'],
+        ]);
+
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets approved successfully.');
     }
@@ -199,6 +217,16 @@ class DivisionChiefIPCRController extends Controller
     {
         $employeeIPCR->update([
             'status' => 'Returned for Revision',
+        ]);
+
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_targets_returned',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Returned for Revision'],
         ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
@@ -237,6 +265,16 @@ class DivisionChiefIPCRController extends Controller
             'submitted_for_pmtreview_at' => null,
         ]);
 
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRDCReturnedFromPMTMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_returned_from_pmt',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Targets Approved'],
+        ]);
+
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR returned to employee for revision.');
     }
@@ -249,6 +287,16 @@ class DivisionChiefIPCRController extends Controller
         $employeeIPCR->update([
             'status' => 'Targets Approved',
             'submitted_for_rating_at' => null,
+        ]);
+
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRAccomplishmentReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_accomplishment_returned',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Targets Approved'],
         ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
@@ -339,11 +387,56 @@ class DivisionChiefIPCRController extends Controller
             'status' => 'Rated & For PMT Review',
             'submitted_rating_at' => now(),
         ]);
-        
-        $employeeIPCR->save();
+
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_rated',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Rated & For PMT Review'],
+        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Rating recorded successfully.');
+    }
+
+    public function submitToHR(Request $request)
+    {
+        $request->validate(['rating_period' => 'required|string']);
+
+        $user = auth()->user();
+        $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
+
+        $ipcrs = EmployeeIPCR::where('status', 'Rated & For PMT Review')
+            ->where('rating_period', $request->rating_period)
+            ->when($divisionId, fn($q) => $q->whereHas('user', fn($u) => $u->where('division_id', $divisionId)))
+            ->get();
+
+        DB::transaction(function () use ($ipcrs) {
+            foreach ($ipcrs as $ipcr) {
+                $ipcr->update([
+                    'status'            => 'Submitted to HR',
+                    'submitted_to_hr_at' => now(),
+                ]);
+
+                AuditLogger::log([
+                    'action'         => 'ipcr_submitted_to_hr',
+                    'auditable_type' => EmployeeIPCR::class,
+                    'auditable_id'   => $ipcr->id,
+                    'new_values'     => ['status' => 'Submitted to HR'],
+                ]);
+            }
+        });
+
+        User::havingRole('HR')->each(function ($hr) use ($ipcrs, $request) {
+            foreach ($ipcrs as $ipcr) {
+                Mail::to($hr->email)->send(new IPCRSubmittedToHRMail($ipcr, $hr->name));
+            }
+        });
+
+        return redirect()->back()->with('success', $ipcrs->count().' IPCR(s) submitted to HR for the selected period.');
     }
 
     /**

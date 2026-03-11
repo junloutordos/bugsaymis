@@ -4,6 +4,7 @@ import { Head, router, usePage } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import Swal from "sweetalert2"
 import axios from "axios"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   accomplishments: Array,
@@ -13,6 +14,7 @@ const props = defineProps({
 })
 
 const page = usePage()
+const { isSubmitting, submit } = useSubmit()
 
 // ─── Month filter ────────────────────────────────────────────────────────────
 const filterMonth = ref(props.selectedMonth ?? "")
@@ -54,9 +56,9 @@ function submitForm() {
   }
 
   if (editingId.value) {
-    router.put(route("my-accomplishments.update", editingId.value), form.value, opts)
+    submit.put(route("my-accomplishments.update", editingId.value), form.value, opts)
   } else {
-    router.post(route("my-accomplishments.store"), form.value, opts)
+    submit.post(route("my-accomplishments.store"), form.value, opts)
   }
 }
 
@@ -69,7 +71,7 @@ function deleteAccomplishment(id) {
     confirmButtonText: "Delete",
   }).then((r) => {
     if (r.isConfirmed) {
-      router.delete(route("my-accomplishments.destroy", id), {
+      submit.delete(route("my-accomplishments.destroy", id), {
         onSuccess: () => flash("Deleted."),
       })
     }
@@ -123,7 +125,7 @@ function deletePhoto(photoId) {
   Swal.fire({ title: "Remove photo?", icon: "warning", showCancelButton: true, confirmButtonColor: "#dc2626", confirmButtonText: "Remove" })
     .then((r) => {
       if (r.isConfirmed) {
-        router.delete(route("my-accomplishments.delete-photo", photoId), {
+        submit.delete(route("my-accomplishments.delete-photo", photoId), {
           onSuccess: () => flash("Photo removed."),
         })
       }
@@ -239,12 +241,12 @@ const monthLabel = computed(() => {
             </td>
             <td class="px-4 py-3 text-center">
               <div class="flex justify-center gap-2">
-                <button @click="openEdit(acc)"
-                  class="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600">
+                <button @click="openEdit(acc)" :disabled="isSubmitting"
+                  class="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed">
                   Edit
                 </button>
-                <button @click="deleteAccomplishment(acc.id)"
-                  class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">
+                <button @click="deleteAccomplishment(acc.id)" :disabled="isSubmitting"
+                  class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
                   Delete
                 </button>
               </div>
@@ -292,9 +294,9 @@ const monthLabel = computed(() => {
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" @click="closeModal"
               class="px-4 py-2 bg-gray-200 rounded-lg text-sm">Cancel</button>
-            <button type="submit"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-              {{ editingId ? "Update" : "Save" }}
+            <button type="submit" :disabled="isSubmitting"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ isSubmitting ? 'Saving…' : (editingId ? 'Update' : 'Save') }}
             </button>
           </div>
         </form>

@@ -11,6 +11,7 @@ import {
 import { useUsers } from "@/Composables/useUsers.js"
 import { ref, watch, computed } from "vue"
 import { router } from "@inertiajs/vue3"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   users: Array,
@@ -64,6 +65,8 @@ watch(
     return officesList.value.filter((o) => o.division_id === divId)
   })
 
+const { isSubmitting: isUploading, submit: submitUpload } = useSubmit()
+
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
 
@@ -85,18 +88,16 @@ const handleUpload = (user, e) => {
   const fd = new FormData()
   fd.append('electronic_signature', file)
 
-  router.post(`/users/${user.id}/upload-signature`, fd, {
-    preserveState: false,
-    onStart: () => {},
-    onSuccess: () => {
-      // reload to refresh the users list with new signature
-      window.location.reload()
-    },
-    onError: (errors) => {
-      const msg = errors && Object.values(errors).flat().join(', ')
-      alert(msg || 'Failed to upload signature')
+  submitUpload(
+    (o) => router.post(`/users/${user.id}/upload-signature`, fd, { ...o, preserveState: false }),
+    {
+      onSuccess: () => { window.location.reload() },
+      onError: (errors) => {
+        const msg = errors && Object.values(errors).flat().join(', ')
+        alert(msg || 'Failed to upload signature')
+      }
     }
-  })
+  )
 }
 
 const openSignaturePicker = (user) => {
@@ -270,8 +271,9 @@ const openSignaturePicker = (user) => {
                         />
                         <button
                           @click.prevent="openSignaturePicker(user)"
+                          :disabled="isUploading"
                           title="Upload signature (PNG)"
-                          class="p-1 hover:bg-gray-100 rounded"
+                          class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <ArrowUpOnSquareIcon class="w-5 h-5 text-green-600" />
                         </button>

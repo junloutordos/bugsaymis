@@ -4,6 +4,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline"
 import { useDivisions } from "@/Composables/useDivisions.js"
 import { ref } from 'vue'
+import { useSubmit } from "@/Composables/useSubmit"
 
 // Props from backend (DivisionsController@index)
 const props = defineProps({
@@ -27,6 +28,8 @@ const {
   submitDivision,
   deleteDivision,
 } = useDivisions(props)
+
+const { isSubmitting: isUploading, submit: submitSignature } = useSubmit()
 
 // Upload signature modal state
 const showUploadModal = ref(false)
@@ -59,7 +62,7 @@ const submitUpload = async () => {
   if (!uploadFile.value || !uploadDivision.value) return
   const fd = new FormData()
   fd.append('signature', uploadFile.value)
-  router.post(`/users-divisions/${uploadDivision.value.id}/upload-signature`, fd, {
+  submitSignature.post(`/users-divisions/${uploadDivision.value.id}/upload-signature`, fd, {
     onSuccess: (page) => {
       // update local list entry if present
       const idx = divisionsList.value.findIndex(d => d.id === uploadDivision.value.id)
@@ -306,7 +309,7 @@ const submitUpload = async () => {
 
           <div class="flex justify-end gap-3">
             <button @click="closeUploadModal" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-            <button @click="submitUpload" class="px-4 py-2 bg-green-600 text-white rounded">Upload</button>
+            <button @click="submitUpload" :disabled="isUploading" class="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isUploading ? 'Uploading…' : 'Upload' }}</button>
           </div>
         </div>
       </div>
