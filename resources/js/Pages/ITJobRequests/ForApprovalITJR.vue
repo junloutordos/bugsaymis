@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed } from "vue"
-import { Head, router } from "@inertiajs/vue3"
+import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import { useSubmit } from "@/Composables/useSubmit"
 import { CheckCircleIcon, XCircleIcon, EyeIcon, FunnelIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
@@ -9,6 +10,8 @@ import "sweetalert2/dist/sweetalert2.min.css"
 const props = defineProps({
   requests: Array
 })
+
+const { isSubmitting, submit } = useSubmit()
 
 // State
 const filterStatus = ref("all")

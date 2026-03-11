@@ -54,7 +54,7 @@
                     <button @click.prevent="openModal(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
                       <PencilSquareIcon class="h-5 w-5" />
                     </button>
-                    <button @click.prevent="destroy(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
+                    <button @click.prevent="destroy(r)" :disabled="isDeleting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
                       <TrashIcon class="h-5 w-5" />
                     </button>
                   </div>
@@ -84,7 +84,7 @@
               </div>
               <div class="flex flex-col items-end gap-2">
                 <button @click.prevent="openModal(r)" class="px-3 py-1 bg-blue-600 text-white rounded">Edit</button>
-                <button @click.prevent="destroy(r)" class="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+                <button @click.prevent="destroy(r)" :disabled="isDeleting" class="px-3 py-1 bg-red-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
               </div>
             </div>
           </div>
@@ -187,7 +187,7 @@
 
             <div class="flex justify-end space-x-3 pt-4">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ form.processing ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
         </div>
@@ -202,9 +202,11 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
+import { useSubmit } from '@/Composables/useSubmit'
 
 const props = defineProps({ rooms: Array, buildings: Array, offices: Array })
 const page = usePage()
+const { isSubmitting: isDeleting, submit: submitDelete } = useSubmit()
 
 const roomsList = ref(props.rooms || [])
 // responsive: track window width to switch to card layout on small screens
@@ -333,11 +335,9 @@ const destroy = (r) => {
     cancelButtonText: 'Cancel'
   }).then((res) => {
     if (!res.isConfirmed) return
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.delete(route('rooms.destroy', r.id), {
-        onSuccess: () => { window.location.reload() },
-        onError: () => { alert('Failed to delete') }
-      })
+    submitDelete.delete(route('rooms.destroy', r.id), {
+      onSuccess: () => { window.location.reload() },
+      onError: () => { alert('Failed to delete') }
     })
   })
 }

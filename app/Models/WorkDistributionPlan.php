@@ -13,9 +13,25 @@ class WorkDistributionPlan extends Model
         'performance_indicator_id',
         'success_indicator',
         'office_involved',
+        'free_text_involved',
         'rated_by',
     ];
 
+    // Many offices can be involved in a plan
+    public function offices()
+    {
+        return $this->belongsToMany(\App\Models\Office::class, 'office_work_distribution_plan');
+    }
+
+    public function committees()
+    {
+        return $this->belongsToMany(\App\Models\Committee::class, 'committee_work_distribution_plan');
+    }
+
+    public function specialAssignments()
+    {
+        return $this->belongsToMany(\App\Models\SpecialAssignment::class, 'special_assignment_work_distribution_plan');
+    }
 
     // Each plan belongs to one performance indicator
     public function performanceIndicator()

@@ -5,6 +5,7 @@ import { ref, computed, watch } from "vue"
 import Swal from "sweetalert2"
 import Multiselect from "vue-multiselect"
 import "vue-multiselect/dist/vue-multiselect.css"
+import { useSubmit } from "@/Composables/useSubmit"
 
 import {
   EyeIcon,
@@ -52,6 +53,8 @@ const {
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
 
+const { isSubmitting, submit } = useSubmit()
+
 // Equipment assignment modal state
 const showAssignEquipmentModal = ref(false)
 const selectedPMS = ref(null)
@@ -73,7 +76,7 @@ function closeAssignEquipmentModal() {
 }
 function assignEquipment() {
   if (!selectedEquipments.value.length || !selectedPMS.value) return
-  router.post(
+  submit.post(
     route("ict-pms.assign-equipments", selectedPMS.value.id),
     { equipment_ids: selectedEquipments.value.map(e => e.id) },
     {
@@ -413,9 +416,10 @@ function formatFrequencyAndDates(schedule) {
               </button>
               <button
                 type="submit"
-                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                :disabled="isSubmitting"
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Assign
+                {{ isSubmitting ? 'Assigning…' : 'Assign' }}
               </button>
             </div>
           </form>

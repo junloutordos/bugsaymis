@@ -1,15 +1,18 @@
 <script setup>
 import { ref, computed } from "vue"
-import { Head, router } from "@inertiajs/vue3"
+import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { CheckCircleIcon, XCircleIcon, EyeIcon, FunnelIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
+import { useSubmit } from "@/Composables/useSubmit"
 
 // Props
 const props = defineProps({
   requests: Array
 })
+
+const { isSubmitting, submit } = useSubmit()
 
 // State
 const filterStatus = ref("all")
@@ -61,8 +64,9 @@ const approveRequest = async (id) => {
   })
 
   if (result.isConfirmed) {
-    router.post(route("job-requests.ocd-action", id), { action: "approve" })
-    Swal.fire("Approved!", "The request has been approved.", "success")
+    submit.post(route("job-requests.ocd-action", id), { action: "approve" }, {
+      onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
+    })
   }
 }
 
@@ -78,8 +82,9 @@ const rejectRequest = async (id) => {
   })
 
   if (result.isConfirmed) {
-    router.post(route("job-requests.ocd-action", id), { action: "reject" })
-    Swal.fire("Rejected!", "The request has been rejected.", "error")
+    submit.post(route("job-requests.ocd-action", id), { action: "reject" }, {
+      onSuccess: () => Swal.fire("Rejected!", "The request has been rejected.", "error"),
+    })
   }
 }
 </script>
@@ -156,7 +161,8 @@ const rejectRequest = async (id) => {
                     <button
                         v-if="req.status === 'Pending OCD Approval'"
                         @click="approveRequest(req.id)"
-                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 text-green-700 font-medium"
+                        :disabled="isSubmitting"
+                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 text-green-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <CheckCircleIcon class="w-5 h-5" />
                         <span>Approve</span>
@@ -166,7 +172,8 @@ const rejectRequest = async (id) => {
                     <button
                         v-if="req.status === 'Pending OCD Approval'"
                         @click="rejectRequest(req.id)"
-                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-medium"
+                        :disabled="isSubmitting"
+                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <XCircleIcon class="w-5 h-5" />
                         <span>Reject</span>

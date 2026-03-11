@@ -64,7 +64,7 @@
                   <button @click="openEdit(c)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
                     <PencilSquareIcon class="w-5 h-5" />
                   </button>
-                  <button @click="confirmDelete(c)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 ml-2" title="Delete">
+                  <button @click="confirmDelete(c)" :disabled="isSubmitting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 ml-2 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
                     <TrashIcon class="w-5 h-5" />
                   </button>
                 </td>
@@ -91,7 +91,7 @@
                   <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
                     <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
                   </button>
-                  <button @click="confirmDelete(c)" class="p-1 hover:bg-gray-100 rounded" title="Delete">
+                  <button @click="confirmDelete(c)" :disabled="isSubmitting" class="p-1 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
                     <TrashIcon class="w-5 h-5 text-red-600" />
                   </button>
                 </div>
@@ -181,7 +181,7 @@
 
             <div class="flex justify-end mt-4 space-x-2">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+              <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
         </div>
@@ -200,10 +200,12 @@ import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue';
 import { usePage, router, Head } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
+import { useSubmit } from '@/Composables/useSubmit';
 
 const page = usePage();
 const collections = computed(() => page.props.collections || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null });
 const q = ref(page.props.q || '');
+const { isSubmitting, submit } = useSubmit();
 const csrfToken = page.props.csrf_token ?? page.props.csrfToken ?? null;
 const sort = ref(page.props.sort || 'title');
 const direction = ref(page.props.direction || 'asc');
@@ -299,7 +301,7 @@ async function confirmDelete(c){
   const id = c.id
   const previous = deleting.value
   deleting.value = null
-  router.delete(route('library.collections.destroy', id), {}, {
+  submit.delete(route('library.collections.destroy', id), {
     preserveState: true,
     onSuccess: () => {
       Swal.fire({ icon: 'success', title: 'Collection deleted', timer: 1000, showConfirmButton: false }).then(() => {
@@ -341,13 +343,13 @@ async function submitForm(){
   // keep compatibility with backend validation which still expects `volume`
   payload.volume = payload.collection_type ?? payload.volume
   if (editing.value) {
-    router.put(route('library.collections.update', editing.value), payload, {
+    submit.put(route('library.collections.update', editing.value), payload, {
       preserveState: true,
       onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Collection updated', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) }) },
       onError: (e) => { errors.value = e }
     })
   } else {
-    router.post(route('library.collections.store'), payload, {
+    submit.post(route('library.collections.store'), payload, {
       preserveState: true,
       onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Collection added', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) }) },
       onError: (e) => { errors.value = e }
@@ -363,7 +365,7 @@ function deleteCollection(){
   // kept for compatibility if referenced elsewhere
   deleting.value = null
 
-  router.delete(route('library.collections.destroy', id), {}, {
+  submit.delete(route('library.collections.destroy', id), {
     preserveState: true,
     onSuccess: () => {
       Swal.fire({ icon: 'success', title: 'Collection deleted', timer: 1000, showConfirmButton: false }).then(() => { router.get(route('library.collections.index'), { q: q.value, collection_type: filterType.value, category: filterCategory.value, sort: sort.value, direction: direction.value }, { replace: true }) })
