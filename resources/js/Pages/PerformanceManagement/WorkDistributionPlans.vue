@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { Head } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline"
@@ -48,7 +48,19 @@ const tagDropdownOptions = computed(() => {
   return { hasAll, offices, committees, assignments }
 })
 
-const showDropdown = computed(() => tagSearch.value.length > 0 || true)
+const tagInputFocused = ref(false)
+const showDropdown = computed(() => tagInputFocused.value || tagSearch.value.length > 0)
+
+const selectTag = (tag) => {
+  addTag(tag)
+  tagSearch.value = ''
+  tagInputFocused.value = false
+}
+
+const handleAddFreeText = () => {
+  addFreeTextTag()
+  tagInputFocused.value = false
+}
 
 const tagTypeColor = (type) => {
   if (type === 'all') return 'bg-blue-100 text-blue-800'
@@ -189,18 +201,20 @@ const tagTypeLabel = (type) => {
                   type="text"
                   placeholder="Search or type to add a party... (Enter for free text)"
                   class="w-full rounded-lg border-gray-300 text-sm"
-                  @keydown.enter.prevent="addFreeTextTag"
+                  @keydown.enter.prevent="handleAddFreeText"
+                  @focus="tagInputFocused = true"
+                  @blur="setTimeout(() => { tagInputFocused = false }, 150)"
                 />
 
                 <!-- Dropdown -->
-                <div v-if="tagSearch || true"
+                <div v-if="showDropdown"
                   class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto text-sm">
 
                   <!-- All Offices option -->
                   <div v-if="!form.involved.some(t => t.type === 'all')"
                     class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b">All</div>
                   <div v-if="!form.involved.some(t => t.type === 'all')"
-                    @click="addTag({ type: 'all', label: 'All Offices' })"
+                    @click="selectTag({ type: 'all', label: 'All Offices' })"
                     class="px-3 py-2 cursor-pointer hover:bg-blue-50 text-blue-700 font-medium">
                     All Offices
                   </div>
@@ -209,7 +223,7 @@ const tagTypeLabel = (type) => {
                   <template v-if="tagDropdownOptions.offices.length">
                     <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-t">Offices</div>
                     <div v-for="opt in tagDropdownOptions.offices" :key="'o'+opt.id"
-                      @click="addTag(opt); tagSearch = ''"
+                      @click="selectTag(opt)"
                       class="px-3 py-2 cursor-pointer hover:bg-green-50">
                       {{ opt.label }}
                     </div>
@@ -219,7 +233,7 @@ const tagTypeLabel = (type) => {
                   <template v-if="tagDropdownOptions.committees.length">
                     <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-t">Committees</div>
                     <div v-for="opt in tagDropdownOptions.committees" :key="'c'+opt.id"
-                      @click="addTag(opt); tagSearch = ''"
+                      @click="selectTag(opt)"
                       class="px-3 py-2 cursor-pointer hover:bg-purple-50">
                       {{ opt.label }}
                     </div>
@@ -229,7 +243,7 @@ const tagTypeLabel = (type) => {
                   <template v-if="tagDropdownOptions.assignments.length">
                     <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-t">Special Assignments</div>
                     <div v-for="opt in tagDropdownOptions.assignments" :key="'a'+opt.id"
-                      @click="addTag(opt); tagSearch = ''"
+                      @click="selectTag(opt)"
                       class="px-3 py-2 cursor-pointer hover:bg-orange-50">
                       {{ opt.label }}
                     </div>
@@ -237,7 +251,7 @@ const tagTypeLabel = (type) => {
 
                   <!-- Free text hint -->
                   <div v-if="tagSearch.trim()" class="px-3 py-2 text-gray-400 border-t text-xs italic cursor-pointer hover:bg-gray-50"
-                    @click="addFreeTextTag">
+                    @click="handleAddFreeText">
                     Press Enter or click to add "{{ tagSearch }}" as free text
                   </div>
 

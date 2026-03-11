@@ -150,9 +150,28 @@ class DivisionChiefIPCRController extends Controller
         $employeeDivisionChiefId = $ipcr->user->division->division_chief_id ?? null;
         $canManageIpcr = $user->hasRole('OCD') || $user->id == $employeeDivisionChiefId;
 
+        // Bulk-load accomplishments for all plans (2 queries, avoids N+1)
+        $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
+            ->pluck('id', 'plan_id');
+
+        $accomplishmentsByPivot = \App\Models\Accomplishment::with('photos')
+            ->whereIn('ipcr_plan_id', $ipcrPlanIds->values())
+            ->orderBy('accomplishment_date', 'desc')
+            ->get()
+            ->groupBy('ipcr_plan_id');
+
+        $plans = $ipcr->plans->map(function ($plan) use ($ipcrPlanIds, $accomplishmentsByPivot) {
+            $pivotId = $ipcrPlanIds[$plan->id] ?? null;
+            $accs = $pivotId ? ($accomplishmentsByPivot[$pivotId] ?? collect()) : collect();
+            $plan->ipcr_plan_id        = $pivotId;
+            $plan->accomplishments     = $accs->values();
+            $plan->accomplishments_count = $accs->count();
+            return $plan;
+        });
+
         return Inertia::render('PerformanceManagement/DivisionChiefIPCRShow', [
             'ipcr'          => $ipcr,
-            'plans'         => $ipcr->plans,
+            'plans'         => $plans,
             'employee'      => $ipcr->user,
             'supervisor'    => $user,
             'canManageIpcr' => $canManageIpcr,

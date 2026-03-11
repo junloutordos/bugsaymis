@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "doctrine/dbal": "^4.4",
+        "google/apiclient": "^2.15",
         "inertiajs/inertia-laravel": "^2.0",
         "kreait/firebase-php": "^5.26",
         "laravel/framework": "^12.0",

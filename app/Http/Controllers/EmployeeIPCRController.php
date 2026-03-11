@@ -138,11 +138,32 @@ class EmployeeIPCRController extends Controller
             ? \App\Models\User::havingRole('OCD')->first()
             : ($ipcr->user->division->divisionchief ?? null);
 
+        // Load all pivot IDs for this IPCR (keyed by plan_id)
+        $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
+            ->pluck('id', 'plan_id');
+
+        // Load all daily accomplishments for those pivots in one query
+        $accomplishmentsByPivot = \App\Models\Accomplishment::with('photos')
+            ->whereIn('ipcr_plan_id', $ipcrPlanIds->values())
+            ->orderBy('accomplishment_date', 'desc')
+            ->get()
+            ->groupBy('ipcr_plan_id');
+
+        // Append accomplishments + count to each plan
+        $plans = $ipcr->plans->map(function ($plan) use ($ipcrPlanIds, $accomplishmentsByPivot) {
+            $pivotId                   = $ipcrPlanIds[$plan->id] ?? null;
+            $accs                      = $pivotId ? ($accomplishmentsByPivot[$pivotId] ?? collect()) : collect();
+            $plan->ipcr_plan_id        = $pivotId;
+            $plan->accomplishments     = $accs->values();
+            $plan->accomplishments_count = $accs->count();
+            return $plan;
+        });
+
         return Inertia::render('PerformanceManagement/EmployeeIPCRShow', [
             'ipcr'       => $ipcr,
             'employee'   => $ipcr->user,
             'supervisor' => $supervisor,
-            'plans'      => $ipcr->plans,
+            'plans'      => $plans,
             'workPlans'  => $workPlans,
         ]);
     }

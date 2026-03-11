@@ -757,8 +757,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/save-comments', [DivisionChiefIPCRController::class, 'saveComments'])
             ->name('division-chief-employee-ipcr.savecomments');
 
-        // Rate accomplishments for an IPCR
-        Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/rate', [DivisionChiefIPCRController::class, 'rateIPCRPlan'])->name('division-chief-employee-ipcr-plan.rateIPCRPlan');
+        // (rateIPCRPlan moved to the open auth group below so Unit Heads can access it)
         // Submit rated IPCR to PMT
         Route::post('/division-chief-employee-ipcr/{employeeIPCR}/submit-to-pmt', [DivisionChiefIPCRController::class, 'submitToPMT'])
             ->name('division-chief-employee-ipcr.submitToPMT');
@@ -781,10 +780,42 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             ->name('employee-ipcr.resubmit');
 
 
-
-
-        
     });
+
+// Performance Management — Committees & Special Assignments (open to any authenticated user; controller handles auth)
+Route::middleware(['auth', 'pshs.email'])->group(function () {
+    Route::get('/performance-management/committees', [\App\Http\Controllers\CommitteePerformanceController::class, 'index'])->name('pm-committees.index');
+    Route::post('/performance-management/committees', [\App\Http\Controllers\CommitteePerformanceController::class, 'store'])->name('pm-committees.store');
+    Route::put('/performance-management/committees/{committee}', [\App\Http\Controllers\CommitteePerformanceController::class, 'update'])->name('pm-committees.update');
+    Route::delete('/performance-management/committees/{committee}', [\App\Http\Controllers\CommitteePerformanceController::class, 'destroy'])->name('pm-committees.destroy');
+    Route::get('/performance-management/committees/{committee}', [\App\Http\Controllers\CommitteePerformanceController::class, 'show'])->name('pm-committees.show');
+    Route::post('/performance-management/committees/{committee}/members/{member}/accomplishment', [\App\Http\Controllers\CommitteePerformanceController::class, 'saveMemberAccomplishment'])->name('pm-committees.member-accomplishment');
+    Route::post('/performance-management/committees/{committee}/members/{member}/rate', [\App\Http\Controllers\CommitteePerformanceController::class, 'rateMember'])->name('pm-committees.rate-member');
+
+    Route::get('/performance-management/special-assignments', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'index'])->name('pm-special-assignments.index');
+    Route::post('/performance-management/special-assignments', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'store'])->name('pm-special-assignments.store');
+    Route::put('/performance-management/special-assignments/{specialAssignment}', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'update'])->name('pm-special-assignments.update');
+    Route::delete('/performance-management/special-assignments/{specialAssignment}', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'destroy'])->name('pm-special-assignments.destroy');
+    Route::get('/performance-management/special-assignments/{specialAssignment}', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'show'])->name('pm-special-assignments.show');
+    Route::post('/performance-management/special-assignments/{specialAssignment}/members/{member}/accomplishment', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'saveMemberAccomplishment'])->name('pm-special-assignments.member-accomplishment');
+    Route::post('/performance-management/special-assignments/{specialAssignment}/members/{member}/rate', [\App\Http\Controllers\SpecialAssignmentPerformanceController::class, 'rateMember'])->name('pm-special-assignments.rate-member');
+
+    // My Accomplishments
+    Route::get('/performance-management/my-accomplishments', [\App\Http\Controllers\AccomplishmentController::class, 'index'])->name('my-accomplishments.index');
+    Route::post('/performance-management/my-accomplishments', [\App\Http\Controllers\AccomplishmentController::class, 'store'])->name('my-accomplishments.store');
+    Route::put('/performance-management/my-accomplishments/{accomplishment}', [\App\Http\Controllers\AccomplishmentController::class, 'update'])->name('my-accomplishments.update');
+    Route::delete('/performance-management/my-accomplishments/{accomplishment}', [\App\Http\Controllers\AccomplishmentController::class, 'destroy'])->name('my-accomplishments.destroy');
+    Route::post('/performance-management/my-accomplishments/{accomplishment}/photos', [\App\Http\Controllers\AccomplishmentController::class, 'uploadPhoto'])->name('my-accomplishments.upload-photo');
+    Route::delete('/performance-management/my-accomplishments/photos/{photo}', [\App\Http\Controllers\AccomplishmentController::class, 'deletePhoto'])->name('my-accomplishments.delete-photo');
+    Route::get('/performance-management/my-accomplishments/monthly-report', [\App\Http\Controllers\AccomplishmentController::class, 'monthlyReport'])->name('my-accomplishments.monthly-report');
+
+    // My Unit (Unit Head IPCR review)
+    Route::get('/performance-management/my-unit', [\App\Http\Controllers\MyUnitIPCRController::class, 'index'])->name('my-unit-ipcr.index');
+    Route::get('/performance-management/my-unit/{id}', [\App\Http\Controllers\MyUnitIPCRController::class, 'show'])->name('my-unit-ipcr.show');
+
+    // Rate accomplishments — open to any auth user; controller enforces per-plan authorization
+    Route::put('/division-chief-employee-ipcr-plan/{ipcr}/{plan}/rate', [\App\Http\Controllers\DivisionChiefIPCRController::class, 'rateIPCRPlan'])->name('division-chief-employee-ipcr-plan.rateIPCRPlan');
+});
 
 // Lightweight users JSON endpoint for dropdowns (authenticated)
 Route::middleware('auth')->get('/api/users/select', [UserController::class, 'selectList'])->name('users.select');

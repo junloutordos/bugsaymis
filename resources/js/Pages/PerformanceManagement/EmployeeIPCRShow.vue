@@ -91,6 +91,21 @@ const formatDateString = (value) => {
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
 
+// ---------- Daily Accomplishments Viewer ----------
+const accViewerPlan = ref(null); // plan whose daily accomplishments we're viewing
+
+function openAccViewer(plan) {
+  accViewerPlan.value = plan;
+}
+function closeAccViewer() {
+  accViewerPlan.value = null;
+}
+
+function formatAccDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
 // ---------- Modal / Form State ----------
 const isModalOpen = ref(false);
 const currentPlan = ref(null);
@@ -763,9 +778,18 @@ const resubmit = () => {
                       <!-- FIRST PLAN ROW -->
                       <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
 
-                      <td class="px-4 py-2 border border-gray-300 cursor-pointer text-blue-600 hover:underline"
-                          @click="openModal(piPlans[0])">
-                        {{ piPlans[0].pivot?.accomplishment || '—' }}
+                      <td class="px-4 py-2 border border-gray-300">
+                        <p class="cursor-pointer text-blue-600 hover:underline text-sm"
+                           @click="openModal(piPlans[0])">
+                          {{ piPlans[0].pivot?.accomplishment || '—' }}
+                        </p>
+                        <button
+                          v-if="piPlans[0].accomplishments_count > 0"
+                          @click="openAccViewer(piPlans[0])"
+                          class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                          📋 {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
+                        </button>
+                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
@@ -842,9 +866,18 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 border border-gray-300">{{ plan.success_indicator }}</td>
 
-                      <td class="px-4 py-2 border border-gray-300 cursor-pointer text-blue-600 hover:underline"
-                          @click="openModal(plan)">
-                        {{ plan.pivot?.accomplishment || '—' }}
+                      <td class="px-4 py-2 border border-gray-300">
+                        <p class="cursor-pointer text-blue-600 hover:underline text-sm"
+                           @click="openModal(plan)">
+                          {{ plan.pivot?.accomplishment || '—' }}
+                        </p>
+                        <button
+                          v-if="plan.accomplishments_count > 0"
+                          @click="openAccViewer(plan)"
+                          class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                          📋 {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
+                        </button>
+                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
@@ -1133,6 +1166,59 @@ const resubmit = () => {
       </div>
     </div>
   </AdminLayout>
+
+  <!-- ── Daily Accomplishments Viewer Modal ───────────────────────────── -->
+  <div v-if="accViewerPlan"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    @click.self="closeAccViewer">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-start justify-between px-6 py-4 border-b">
+        <div>
+          <h2 class="text-base font-semibold text-gray-800">Accomplishments</h2>
+          <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+        </div>
+        <button @click="closeAccViewer" class="text-gray-400 hover:text-gray-700 text-xl leading-none ml-4">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div class="overflow-y-auto flex-1 px-6 py-4">
+        <div v-if="!accViewerPlan.accomplishments?.length"
+          class="text-center text-gray-400 text-sm py-8">
+          No accomplishments logged for this plan.
+        </div>
+
+        <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
+          class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+              {{ formatAccDate(acc.accomplishment_date) }}
+            </span>
+          </div>
+          <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ acc.description }}</p>
+          <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+            <a v-for="photo in acc.photos" :key="photo.id"
+              :href="photo.google_drive_link" target="_blank"
+              class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              📎 {{ photo.file_name || 'Photo' }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 border-t text-right">
+        <span class="text-xs text-gray-400 mr-4">
+          {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
+        </span>
+        <button @click="closeAccViewer"
+          class="px-4 py-2 bg-gray-200 rounded-lg text-sm hover:bg-gray-300">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <style>

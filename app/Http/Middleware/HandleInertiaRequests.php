@@ -12,7 +12,9 @@ use App\Models\FacilityRequest;
 use App\Models\ServiceRequest;
 use App\Models\WorkRequest;
 use App\Models\Borrowing;
+use App\Models\Committee;
 use App\Models\DocumentRouting;
+use App\Models\SpecialAssignment;
 use Carbon\Carbon;
 
 class HandleInertiaRequests extends Middleware
@@ -145,6 +147,13 @@ class HandleInertiaRequests extends Middleware
                 return DocumentRouting::where('receiver_id', $user->id)
                     ->whereIn('status', ['Pending', 'Received'])
                     ->count();
+            },
+            // True when the user is a committee head or special assignment coordinator
+            'isPMRater' => function () use ($request) {
+                $user = $request->user();
+                if (!$user) return false;
+                return Committee::where('head_id', $user->id)->exists()
+                    || SpecialAssignment::where('coordinator_id', $user->id)->exists();
             },
             // App version info from version.json
             'appVersion' => function () {
