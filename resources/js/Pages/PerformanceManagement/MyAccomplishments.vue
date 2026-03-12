@@ -79,32 +79,32 @@ function deleteAccomplishment(id) {
 }
 
 // ─── Photo upload ────────────────────────────────────────────────────────────
-const photoAccId      = ref(null)
-const showPhotoModal  = ref(false)
-const photoFile       = ref(null)
-const driveLink       = ref("")
-const uploading       = ref(false)
-const driveConfigured = ref(false) // assume false; real check is server-side
+const photoAccId     = ref(null)
+const showPhotoModal = ref(false)
+const photoFile      = ref(null)
+const driveLink      = ref("")
+const uploading      = ref(false)
+const photoErrors    = ref({})
 
 function openPhotoModal(acc) {
-  photoAccId.value   = acc.id
-  photoFile.value    = null
-  driveLink.value    = ""
+  photoAccId.value     = acc.id
+  photoFile.value      = null
+  driveLink.value      = ""
+  photoErrors.value    = {}
   showPhotoModal.value = true
 }
 
 function closePhotoModal() { showPhotoModal.value = false }
 
 async function submitPhoto() {
-  if (!photoFile.value && !driveLink.value) {
-    Swal.fire("Error", "Choose a file or paste a Drive link.", "error")
+  if (!photoFile.value && !driveLink.value.trim()) {
+    photoErrors.value = { proof: "Upload a file or paste a Drive link." }
     return
   }
 
   const fd = new FormData()
-  if (photoFile.value) fd.append("photo", photoFile.value)
-  if (driveLink.value) fd.append("drive_link", driveLink.value)
-  fd.append("_method", "POST")
+  if (photoFile.value)      fd.append("photo", photoFile.value)
+  if (driveLink.value.trim()) fd.append("drive_link", driveLink.value.trim())
 
   uploading.value = true
   try {
@@ -113,12 +113,33 @@ async function submitPhoto() {
     })
     closePhotoModal()
     router.reload({ only: ["accomplishments"] })
-    flash("Photo added.")
+    flash("Proof added.")
   } catch (err) {
-    Swal.fire("Error", err.response?.data?.message || "Upload failed.", "error")
+    const errors = err.response?.data?.errors
+    if (errors) {
+      photoErrors.value = Object.fromEntries(Object.entries(errors).map(([k, v]) => [k, v[0]]))
+    } else {
+      Swal.fire("Error", err.response?.data?.message || "Upload failed.", "error")
+    }
   } finally {
     uploading.value = false
   }
+}
+
+function proofUrl(photo) {
+  if (photo.local_path) return "/storage/" + photo.local_path
+  return photo.google_drive_link
+}
+
+function proofLabel(photo) {
+  if (photo.local_path) return photo.file_name || "File"
+  if (photo.file_name && photo.file_name !== "Drive Link") return photo.file_name
+  return "Drive Link"
+}
+
+function proofIcon(photo) {
+  if (photo.local_path) return "📄"
+  return "🔗"
 }
 
 function deletePhoto(photoId) {
@@ -227,16 +248,19 @@ const monthLabel = computed(() => {
             </td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
-                <a v-for="photo in acc.photos" :key="photo.id"
-                  :href="photo.google_drive_link" target="_blank"
-                  class="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                  📎 {{ photo.file_name || "Photo" }}
-                </a>
+                <span v-for="photo in acc.photos" :key="photo.id" class="flex items-center gap-1">
+                  <a v-if="proofUrl(photo)" :href="proofUrl(photo)" target="_blank"
+                    class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                    {{ proofIcon(photo) }} {{ proofLabel(photo) }}
+                  </a>
+                  <button @click="deletePhoto(photo.id)"
+                    class="text-red-400 hover:text-red-600 text-xs leading-none" title="Remove">✕</button>
+                </span>
                 <span v-if="!acc.photos.length" class="text-xs text-gray-400">—</span>
               </div>
               <button @click="openPhotoModal(acc)"
                 class="mt-1 text-xs text-indigo-600 hover:underline">
-                + Add photo
+                + Add proof
               </button>
             </td>
             <td class="px-4 py-3 text-center">
@@ -303,37 +327,37 @@ const monthLabel = computed(() => {
       </div>
     </div>
 
-    <!-- ── Photo Upload Modal ───────────────────────────────────────────── -->
+    <!-- ── Proof Upload Modal ───────────────────────────────────────────── -->
     <div v-if="showPhotoModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
         <button @click="closePhotoModal" class="absolute top-3 right-4 text-gray-400 hover:text-gray-700 text-xl">✕</button>
-        <h2 class="text-lg font-semibold mb-4">Add Photo Proof</h2>
+        <h2 class="text-lg font-semibold mb-1">Add Proof</h2>
+        <p class="text-xs text-gray-400 mb-4">You can upload a file, paste a link, or both at once.</p>
+
+        <p v-if="photoErrors.proof" class="text-red-500 text-xs mb-3">{{ photoErrors.proof }}</p>
 
         <form @submit.prevent="submitPhoto" class="space-y-4">
           <div>
-            <label class="text-sm font-medium text-gray-700">Upload File</label>
+            <label class="text-sm font-medium text-gray-700">Upload File <span class="text-gray-400 font-normal">(optional)</span></label>
             <input type="file" accept="image/*,.pdf"
               @change="photoFile = $event.target.files[0]"
               class="w-full mt-1 text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700" />
-            <p class="text-xs text-gray-400 mt-1">JPG, PNG, GIF, PDF — max 10 MB. Will be uploaded to Google Drive.</p>
-          </div>
-
-          <div class="relative">
-            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>
-            <div class="relative text-center text-xs text-gray-400 bg-white px-2 inline-block mx-auto">or paste a Drive link</div>
+            <p class="text-xs text-gray-400 mt-1">JPG, PNG, GIF, PDF — max 10 MB.</p>
+            <p v-if="photoErrors.photo" class="text-red-500 text-xs mt-1">{{ photoErrors.photo }}</p>
           </div>
 
           <div>
-            <label class="text-sm font-medium text-gray-700">Google Drive Link</label>
-            <input v-model="driveLink" type="url" placeholder="https://drive.google.com/..."
+            <label class="text-sm font-medium text-gray-700">Google Drive / External Link <span class="text-gray-400 font-normal">(optional)</span></label>
+            <input v-model="driveLink" type="url" placeholder="https://drive.google.com/…"
               class="w-full mt-1 rounded-lg border-gray-300 text-sm" />
+            <p v-if="photoErrors.drive_link" class="text-red-500 text-xs mt-1">{{ photoErrors.drive_link }}</p>
           </div>
 
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" @click="closePhotoModal" class="px-4 py-2 bg-gray-200 rounded-lg text-sm">Cancel</button>
             <button type="submit" :disabled="uploading"
               class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-              {{ uploading ? "Uploading…" : "Add Photo" }}
+              {{ uploading ? "Uploading…" : "Add Proof" }}
             </button>
           </div>
         </form>
@@ -389,9 +413,9 @@ const monthLabel = computed(() => {
               </td>
               <td class="px-3 py-2 border border-gray-300 align-top">
                 <div v-for="photo in acc.photos" :key="photo.id">
-                  <a :href="photo.google_drive_link" target="_blank"
-                    class="text-blue-600 hover:underline text-xs print:text-gray-700">
-                    {{ photo.file_name || "Link" }}
+                  <a v-if="proofUrl(photo)" :href="proofUrl(photo)" target="_blank"
+                    class="text-blue-600 hover:underline text-xs print:text-gray-700 flex items-center gap-1">
+                    {{ proofIcon(photo) }} {{ proofLabel(photo) }}
                   </a>
                 </div>
                 <span v-if="!acc.photos?.length" class="text-xs text-gray-400">—</span>

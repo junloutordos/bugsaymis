@@ -11,6 +11,7 @@ class AccomplishmentPhoto extends Model
         'google_drive_file_id',
         'google_drive_link',
         'file_name',
+        'local_path',
     ];
 
     public function accomplishment()
