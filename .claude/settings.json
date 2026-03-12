@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -:*)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/UserController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/VehicleRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/MessengerialController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/FacilityRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/WorkRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/ITJobRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/DocumentTrackingController.php)",
+      "Bash(git reset --hard df61ce5)"
+    ]
+  }
+}
