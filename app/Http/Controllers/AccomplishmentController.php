@@ -7,6 +7,7 @@ use App\Models\AccomplishmentPhoto;
 use App\Models\EmployeeIPCRPlan;
 use App\Services\GoogleDriveService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class AccomplishmentController extends Controller
@@ -115,46 +116,57 @@ class AccomplishmentController extends Controller
         $this->authorizeOwner($accomplishment);
 
         $request->validate([
-            'photo' => 'required|file|mimes:jpg,jpeg,png,gif,pdf|max:10240',
+            'photo'      => 'nullable|file|mimes:jpg,jpeg,png,gif,pdf|max:10240',
+            'drive_link' => 'nullable|url|max:500',
         ]);
 
-        $file     = $request->file('photo');
-        $fileName = $accomplishment->id . '_' . now()->format('YmdHis') . '_' . $file->getClientOriginalName();
-
-        $photoData = [
-            'accomplishment_id'    => $accomplishment->id,
-            'file_name'            => $file->getClientOriginalName(),
-            'google_drive_file_id' => null,
-            'google_drive_link'    => null,
-        ];
-
-        // Upload to Google Drive if credentials are configured
-        if (config('services.google_drive.credentials')) {
-            try {
-                $drive  = app(GoogleDriveService::class);
-                $result = $drive->upload($file, $fileName);
-
-                $photoData['google_drive_file_id'] = $result['file_id'];
-                $photoData['google_drive_link']    = $result['link'];
-            } catch (\Throwable $e) {
-                return redirect()->back()->with('error', 'Drive upload failed: ' . $e->getMessage());
-            }
-        } else {
-            // Fallback: accept a manually entered Drive link via form field
-            $request->validate(['drive_link' => 'nullable|url|max:500']);
-            $photoData['google_drive_link'] = $request->input('drive_link');
+        if (! $request->hasFile('photo') && ! $request->filled('drive_link')) {
+            return redirect()->back()->withErrors(['proof' => 'Upload a file or paste a Drive link.']);
         }
 
-        AccomplishmentPhoto::create($photoData);
+        // Handle file upload
+        if ($request->hasFile('photo')) {
+            $file      = $request->file('photo');
+            $slug      = $accomplishment->id . '_' . now()->format('YmdHis') . '_' . $file->getClientOriginalName();
+            $photoData = [
+                'accomplishment_id' => $accomplishment->id,
+                'file_name'         => $file->getClientOriginalName(),
+            ];
 
-        return redirect()->back()->with('success', 'Photo added.');
+            if (config('services.google_drive.credentials')) {
+                try {
+                    $result = app(GoogleDriveService::class)->upload($file, $slug);
+                    $photoData['google_drive_file_id'] = $result['file_id'];
+                    $photoData['google_drive_link']    = $result['link'];
+                } catch (\Throwable $e) {
+                    return redirect()->back()->withErrors(['photo' => 'Drive upload failed: ' . $e->getMessage()]);
+                }
+            } else {
+                $photoData['local_path'] = $file->store('accomplishments', 'public');
+            }
+
+            AccomplishmentPhoto::create($photoData);
+        }
+
+        // Handle drive link (independent — both can be submitted together)
+        if ($request->filled('drive_link')) {
+            AccomplishmentPhoto::create([
+                'accomplishment_id' => $accomplishment->id,
+                'google_drive_link' => $request->input('drive_link'),
+                'file_name'         => 'Drive Link',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Proof added.');
     }
 
     public function deletePhoto(AccomplishmentPhoto $photo)
     {
         $this->authorizeOwner($photo->accomplishment);
 
-        if ($photo->google_drive_file_id && config('services.google_drive.credentials')) {
+        if ($photo->local_path) {
+            Storage::disk('public')->delete($photo->local_path);
+        } elseif ($photo->google_drive_file_id && config('services.google_drive.credentials')) {
             try {
                 app(GoogleDriveService::class)->delete($photo->google_drive_file_id);
             } catch (\Throwable) {
@@ -164,7 +176,7 @@ class AccomplishmentController extends Controller
 
         $photo->delete();
 
-        return redirect()->back()->with('success', 'Photo removed.');
+        return redirect()->back()->with('success', 'Proof removed.');
     }
 
     // ───── Monthly report data ────────────────────────────────────────────────
