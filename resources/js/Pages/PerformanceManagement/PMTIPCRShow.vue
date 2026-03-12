@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
 import { computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
+import { useSubmit } from "@/Composables/useSubmit"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
@@ -13,6 +14,7 @@ const props = defineProps({
   plans:      Array,
   employee:   Object,
   supervisor: Object,
+  isOCD:      { type: Boolean, default: false },
 })
 
 // ---------- Status badge ----------
@@ -171,6 +173,8 @@ const adjectivalColorClass = (avg) => {
 }
 
 // ---------- Actions ----------
+const { isSubmitting, submit } = useSubmit()
+
 const approvIPCR = () => {
   Swal.fire({
     title: "Approve IPCR?",
@@ -181,9 +185,27 @@ const approvIPCR = () => {
     confirmButtonText: "Yes, approve!",
   }).then(result => {
     if (result.isConfirmed) {
-      router.post(route("pmt-ipcr.approve", props.ipcr.id), {}, {
+      submit.post(route("pmt-ipcr.approve", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Approved!", "IPCR has been approved by PMT.", "success"),
         onError:   () => Swal.fire("Error", "Failed to approve IPCR.", "error"),
+      })
+    }
+  })
+}
+
+const directorSign = () => {
+  Swal.fire({
+    title: "Sign IPCR as Director?",
+    text: "This will apply your electronic signature and mark the IPCR as Director Signed.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#059669",
+    confirmButtonText: "Yes, sign!",
+  }).then(result => {
+    if (result.isConfirmed) {
+      submit.post(route("pmt-ipcr.directorSign", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire("Signed!", "IPCR has been signed by the Director.", "success"),
+        onError:   () => Swal.fire("Error", "Failed to sign IPCR.", "error"),
       })
     }
   })
@@ -199,7 +221,7 @@ const returnForRevision = () => {
     confirmButtonText: "Yes, return it!",
   }).then(result => {
     if (result.isConfirmed) {
-      router.post(route("pmt-ipcr.return", props.ipcr.id), {}, {
+      submit.post(route("pmt-ipcr.return", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Returned!", "IPCR has been returned. The Division Chief will forward this to the employee.", "success"),
         onError:   () => Swal.fire("Error", "Failed to return IPCR.", "error"),
       })
@@ -250,13 +272,25 @@ const printIPCR = () => window.print()
         <!-- Action buttons -->
         <div class="mt-4 flex flex-wrap gap-2">
           <button v-if="ipcr.status === 'Submitted to PMT'" @click="approvIPCR"
-            class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg shadow">
-            Approve
+            :disabled="isSubmitting"
+            class="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Approve' }}
           </button>
           <button v-if="ipcr.status === 'Submitted to PMT'" @click="returnForRevision"
-            class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg shadow">
-            Return for Revision
+            :disabled="isSubmitting"
+            class="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
           </button>
+          <button v-if="isOCD && ipcr.status === 'Approved by PMT'" @click="directorSign"
+            :disabled="isSubmitting"
+            class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Director Sign' }}
+          </button>
+          <div v-if="ipcr.status === 'Director Signed' && ipcr.director_signature"
+            class="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
+            <img :src="ipcr.director_signature" alt="Director Signature" class="h-10 object-contain" />
+            <span>Signed by Director</span>
+          </div>
           <button @click="printIPCR"
             class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-4 py-2 rounded-lg">
             Print / View PDF

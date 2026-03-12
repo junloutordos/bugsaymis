@@ -4,9 +4,11 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 import { EyeIcon, PrinterIcon, ClockIcon, HeartIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
+import { useSubmit } from '@/Composables/useSubmit'
 
 const props = defineProps({ consultations: Object, physicianSchedules: Array });
 const page = usePage();
+const { isSubmitting: isDeleting, submit: deleteSubmit } = useSubmit();
 
 const physicianSchedules = ref(props.physicianSchedules || []);
 
@@ -310,7 +312,7 @@ const submitVitals = () => {
 function confirmDelete(c) {
   Swal.fire({ title: 'Delete consultation?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true }).then((r) => {
     if (r.isConfirmed) {
-      router.delete(route('consultations.destroy', c.id), {
+      deleteSubmit.delete(route('consultations.destroy', c.id), {
         onSuccess: () => {
           Swal.fire({ icon: 'success', title: 'Consultation deleted' }).then(() => {
             router.get(route('consultations.index'), { q: searchQuery.value }, { replace: true })
@@ -601,7 +603,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
                     <button v-if="String(c.status).toLowerCase() === 'completed' && ['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name)" @click.prevent="openVitalsFor(c)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700" aria-label="Edit Vitals">
                       <PencilIcon class="h-5 w-5" />
                     </button>
-                    <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" aria-label="Delete">
+                    <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" :disabled="isDeleting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Delete">
                       <TrashIcon class="h-5 w-5" />
                     </button>
                     <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" aria-label="Schedule">
@@ -642,7 +644,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
                 <button @click.prevent="openView(c)" class="px-3 py-2 bg-gray-100 rounded text-sm">View</button>
                 <a v-if="String(c.status).toLowerCase() === 'completed'" :href="route('consultations.print', c.id)" target="_blank" class="px-3 py-2 bg-white rounded text-sm">Print</a>
                 <button v-if="String(c.status).toLowerCase() === 'completed' && ['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name)" @click.prevent="openVitalsFor(c)" class="px-3 py-2 bg-yellow-100 rounded text-sm">Edit Vitals</button>
-                <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" class="px-3 py-2 bg-red-100 rounded text-sm">Delete</button>
+                <button v-if="['Administrator','Nurse'].includes(page.props.auth?.user?.role?.name) && String(c.status).toLowerCase() !== 'completed'" @click.prevent="confirmDelete(c)" :disabled="isDeleting" class="px-3 py-2 bg-red-100 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
                 <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && !['active','completed'].includes(String(c.status).toLowerCase())" @click.prevent="openFor(c)" class="px-3 py-2 bg-indigo-100 rounded text-sm">Schedule</button>
                 <button v-if="['Administrator','Nurse','Clinic'].includes(page.props.auth?.user?.role?.name) && ['active','scheduled'].includes(String(c.status).toLowerCase())" @click="openVitalsFor(c)" class="px-3 py-2 bg-green-100 rounded text-sm">Record Vitals</button>
               </div>

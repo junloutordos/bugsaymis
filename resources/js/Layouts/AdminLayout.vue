@@ -56,7 +56,9 @@ const appVersion = computed(() => page.props.appVersion ?? { current: '1.0.0', h
 const user = page.props.auth?.user || { role: { name: "Guest" }, name: "Guest" };
 const roleName = user.role?.name || "Guest";
 // Support multiple roles: array of role name strings
-const roleNames = user.roleNames?.length ? user.roleNames : (roleName !== "Guest" ? [roleName] : []);
+const baseRoleNames = user.roleNames?.length ? user.roleNames : (roleName !== "Guest" ? [roleName] : []);
+// Inject synthetic 'PMRater' role when user is a committee head or SA coordinator
+const roleNames = page.props.isPMRater ? [...baseRoleNames, 'PMRater'] : baseRoleNames;
 
 
 // --- Helpers ---
@@ -417,7 +419,7 @@ const menuItems = [
   {
     label: "Performance Mngmt",
     icon: UserGroupIcon,
-    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief", "OCD", "PMT"],
+    roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief", "OCD", "PMT", "PMRater"],
     children: [
       {
         label: "Agency Org Outcome",
@@ -447,20 +449,56 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
       },
+      
 
+      {
+        label: "Committees",
+        routeName: "pm-committees.index",
+        href: route("pm-committees.index"),
+        icon: UserGroupIcon,
+        roles: ["Administrator", "DivisionChief", "OCD", "HR", "Faculty", "Staff", "PMRater"],
+      },
+      {
+        label: "Special Assignments",
+        routeName: "pm-special-assignments.index",
+        href: route("pm-special-assignments.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "DivisionChief", "OCD", "HR", "Faculty", "Staff", "PMRater"],
+      },
+      {
+        label: "My Accomplishments",
+        routeName: "my-accomplishments.index",
+        href: route("my-accomplishments.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief", "OCD"],
+      },
+      {
+        label: "My Unit",
+        routeName: "my-unit-ipcr.index",
+        href: route("my-unit-ipcr.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "DivisionChief", "OCD", "Faculty", "Staff"],
+      },
       {
         label: "My Division",
         routeName: "division-chief-ipcr.index",
         href: route("division-chief-ipcr.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "DivisionChief", "OCD"],
+        roles: ["Administrator", "DivisionChief", "OCD", "Faculty", "Staff"],
+      },
+      {
+        label: "HR IPCR Review",
+        routeName: "hr-ipcr.index",
+        href: route("hr-ipcr.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "HR"],
       },
       {
         label: "PMT Review",
         routeName: "pmt-ipcr.index",
         href: route("pmt-ipcr.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "PMT"],
+        roles: ["Administrator", "PMT", "OCD"],
       },
     ],
   },
