@@ -32,7 +32,10 @@ class AccomplishmentController extends Controller
                 'rating_period' => $p->ipcr->rating_period,
             ]);
 
-        $query = Accomplishment::with(['ipcrPlan.ipcr:id,rating_period', 'ipcrPlan.plan:id,success_indicator', 'photos'])
+        $query = Accomplishment::with([
+                'ipcrPlan' => fn($q) => $q->with(['ipcr:id,rating_period', 'plan:id,success_indicator']),
+                'photos',
+            ])
             ->where('user_id', $user->id)
             ->orderBy('accomplishment_date', 'desc');
 
@@ -188,17 +191,24 @@ class AccomplishmentController extends Controller
 
         [$year, $mon] = explode('-', $month);
 
-        $accomplishments = Accomplishment::with(['ipcrPlan.plan:id,success_indicator', 'photos'])
+        $accomplishments = Accomplishment::with([
+                'ipcrPlan' => fn($q) => $q->with(['ipcr:id,rating_period', 'plan:id,success_indicator']),
+                'photos',
+            ])
             ->where('user_id', $user->id)
             ->whereYear('accomplishment_date', $year)
             ->whereMonth('accomplishment_date', $mon)
             ->orderBy('accomplishment_date')
             ->get();
 
+        $user->loadMissing('division.divisionchief');
+        $immediateHead = $user->division?->divisionchief;
+
         return response()->json([
             'month'           => $month,
             'employee'        => $user->only('id', 'name', 'position'),
             'accomplishments' => $accomplishments,
+            'immediate_head'  => $immediateHead ? $immediateHead->only('name', 'position') : null,
         ]);
     }
 
