@@ -53,7 +53,7 @@
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <button v-if="!b.return_date" @click="processReturn(b)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" :title="'Return ' + (b.collection?.title || '')">
+                    <button v-if="!b.return_date" @click="processReturn(b)" :disabled="isSubmitting" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700 disabled:opacity-50 disabled:cursor-not-allowed" :title="'Return ' + (b.collection?.title || '')">
                       <CheckCircleIcon class="h-5 w-5" />
                     </button>
                     <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700" title="Override due date">
@@ -82,7 +82,7 @@
               </div>
               <div class="flex flex-col items-end space-y-2">
                 <div class="flex flex-col space-y-2">
-                  <button v-if="!b.return_date" @click="processReturn(b)" class="p-2 text-green-600 hover:bg-green-100 rounded" :title="'Return ' + (b.collection?.title || '')">
+                  <button v-if="!b.return_date" @click="processReturn(b)" :disabled="isSubmitting" class="p-2 text-green-600 hover:bg-green-100 rounded disabled:opacity-50 disabled:cursor-not-allowed" :title="'Return ' + (b.collection?.title || '')">
                     <CheckCircleIcon class="h-5 w-5" />
                   </button>
                   <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-2 text-yellow-600 hover:bg-yellow-100 rounded" title="Override due date">
@@ -139,7 +139,7 @@
 
             <div class="flex justify-end mt-4 space-x-2">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" @click.prevent="submitForm" class="px-4 py-2 bg-blue-600 text-white rounded">Process Borrow</button>
+              <button type="submit" @click.prevent="submitForm" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Process Borrow' }}</button>
             </div>
           </form>
         </div>
@@ -230,7 +230,7 @@
             </div>
             <div class="flex justify-end mt-4">
               <button type="button" @click="closeOverride" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+              <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
         </div>
@@ -246,10 +246,12 @@ import { ref, nextTick, watch, reactive, computed, onMounted, onBeforeUnmount } 
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { CheckCircleIcon, PencilSquareIcon } from "@heroicons/vue/24/outline";
+import { useSubmit } from '@/Composables/useSubmit'
 
 const page = usePage()
 const borrowings = page.props.borrowings || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null }
 const employees = page.props.employees || []
+const { isSubmitting, submit } = useSubmit()
 
 const showModal = ref(false)
 const showOverride = ref(false)
@@ -358,7 +360,7 @@ function submitForm(){
 
   try {
     console.log('Submitting borrowing', form.value)
-    router.post(route('library.borrowings.store'), form.value, {
+    submit.post(route('library.borrowings.store'), form.value, {
       onStart: () => console.log('borrow request started'),
       onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Borrowing processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index')) }) },
       onError: (errors) => { console.error('borrow error', errors); Swal.fire({ icon: 'error', title: 'Error processing borrowing', text: Object.values(errors || {}).join('\n') || 'Error processing borrowing' }) }
@@ -379,7 +381,7 @@ async function processReturn(b){
     cancelButtonText: 'Cancel'
   })
   if (!res.isConfirmed) return
-  router.post(route('library.borrowings.return', b.id), {}, {
+  submit.post(route('library.borrowings.return', b.id), {}, {
     onSuccess: () => { Swal.fire({ icon: 'success', title: 'Return processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
     onError: (e) => { console.error('return error', e); Swal.fire({ icon: 'error', title: 'Failed to process return' }) }
   })
@@ -388,7 +390,7 @@ async function processReturn(b){
 function openOverride(b){ overrideForm.value = { id: b.id, due_date: b.due_date || '', remarks: b.remarks || '' }; showOverride.value = true }
 function closeOverride(){ showOverride.value = false; overrideForm.value = { id: null, due_date: '', remarks: '' } }
 function submitOverride(){
-  router.post(route('library.borrowings.override', overrideForm.value.id), { due_date: overrideForm.value.due_date, remarks: overrideForm.value.remarks }, {
+  submit.post(route('library.borrowings.override', overrideForm.value.id), { due_date: overrideForm.value.due_date, remarks: overrideForm.value.remarks }, {
     onSuccess: () => { closeOverride(); Swal.fire({ icon: 'success', title: 'Due date overridden', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
     onError: (e) => { console.error('override error', e); Swal.fire({ icon: 'error', title: 'Failed to override due date' }) }
   })

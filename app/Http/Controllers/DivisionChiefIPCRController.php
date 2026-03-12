@@ -2,12 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\IPCRAccomplishmentReturnedMail;
+use App\Mail\IPCRDCReturnedFromPMTMail;
+use App\Mail\IPCRRatedMail;
+use App\Mail\IPCRSubmittedToHRMail;
+use App\Mail\IPCRTargetsApprovedMail;
+use App\Mail\IPCRTargetsReturnedMail;
+use App\Models\Committee;
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
+use App\Models\Office;
 use App\Models\Role;
+use App\Models\SpecialAssignment;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class DivisionChiefIPCRController extends Controller
@@ -23,6 +34,59 @@ class DivisionChiefIPCRController extends Controller
             ->selectRaw('ROUND(AVG(sup_average), 2)')
             ->whereColumn('ipcr_id', 'employee_ipcrs.id')
             ->whereNotNull('sup_average');
+
+        // Determine what non-DC rater roles the user holds
+        $unitHeadOfficeIds        = Office::where('unit_head', $user->id)->pluck('id');
+        $headedCommitteeIds       = Committee::where('head_id', $user->id)->pluck('id');
+        $coordinatedAssignmentIds = SpecialAssignment::where('coordinator_id', $user->id)->pluck('id');
+        $isNonDCRater = $unitHeadOfficeIds->isNotEmpty()
+                     || $headedCommitteeIds->isNotEmpty()
+                     || $coordinatedAssignmentIds->isNotEmpty();
+
+        // Gate access
+        if (!$user->hasAnyRole(['OCD', 'DivisionChief']) && !$isNonDCRater) {
+            abort(403, "You are not authorized to view this.");
+        }
+
+        // Non-DC rater branch: show IPCRs containing plans they can rate
+        if ($isNonDCRater && !$user->hasAnyRole(['OCD', 'DivisionChief'])) {
+            $ipcrs = EmployeeIPCR::with(['user.division'])
+                ->addSelect(['overall_average' => $avgSubquery])
+                ->whereHas('plans', fn($q) =>
+                    $q->where(function ($q2) use ($unitHeadOfficeIds, $headedCommitteeIds, $coordinatedAssignmentIds) {
+                        $q2->where(fn($q3) =>
+                            $q3->where('rated_by', 'Unit Head')
+                               ->whereHas('offices', fn($oq) => $oq->whereIn('offices.id', $unitHeadOfficeIds))
+                        )
+                        ->orWhere(fn($q3) =>
+                            $q3->where('rated_by', 'Committee Head')
+                               ->whereHas('committees', fn($cq) => $cq->whereIn('committees.id', $headedCommitteeIds))
+                        )
+                        ->orWhere(fn($q3) =>
+                            $q3->where('rated_by', 'Coordinator')
+                               ->whereHas('specialAssignments', fn($aq) => $aq->whereIn('special_assignments.id', $coordinatedAssignmentIds))
+                        );
+                    })
+                )
+                ->whereIn('status', [
+                    'Submitted for Rating',
+                    'Rated & For PMT Review',
+                    'Submitted to PMT',
+                    'PMT Returned for Revision',
+                    'Approved by PMT',
+                ])
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $ratingPeriods = $ipcrs->pluck('rating_period')->filter()->unique()->sort()->values();
+
+            return Inertia::render('PerformanceManagement/DivisionChiefIPCR', [
+                'ipcrs'             => $ipcrs,
+                'divisionEmployees' => collect(),
+                'supervisor'        => $user,
+                'ratingPeriods'     => $ratingPeriods,
+            ]);
+        }
 
         if ($user->hasAnyRole(['OCD', 'DivisionChief'])) {
             // --- Subordinate Division Chief IPCRs (visible only to OCD) ---
@@ -84,14 +148,41 @@ class DivisionChiefIPCRController extends Controller
     {
         $ipcr = EmployeeIPCR::with([
             'user.division',
-            'plans.performance_indicator.agencyOutcome'
+            'plans.performance_indicator.agencyOutcome',
+            'plans.offices',
+            'plans.committees',
+            'plans.specialAssignments',
         ])->findOrFail($id);
 
+        $user = auth()->user();
+        $employeeDivisionChiefId = $ipcr->user->division->division_chief_id ?? null;
+        $canManageIpcr = $user->hasRole('OCD') || $user->id == $employeeDivisionChiefId;
+
+        // Bulk-load accomplishments for all plans (2 queries, avoids N+1)
+        $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
+            ->pluck('id', 'plan_id');
+
+        $accomplishmentsByPivot = \App\Models\Accomplishment::with('photos')
+            ->whereIn('ipcr_plan_id', $ipcrPlanIds->values())
+            ->orderBy('accomplishment_date', 'desc')
+            ->get()
+            ->groupBy('ipcr_plan_id');
+
+        $plans = $ipcr->plans->map(function ($plan) use ($ipcrPlanIds, $accomplishmentsByPivot) {
+            $pivotId = $ipcrPlanIds[$plan->id] ?? null;
+            $accs = $pivotId ? ($accomplishmentsByPivot[$pivotId] ?? collect()) : collect();
+            $plan->ipcr_plan_id        = $pivotId;
+            $plan->accomplishments     = $accs->values();
+            $plan->accomplishments_count = $accs->count();
+            return $plan;
+        });
+
         return Inertia::render('PerformanceManagement/DivisionChiefIPCRShow', [
-            'ipcr'       => $ipcr,
-            'plans'      => $ipcr->plans,
-            'employee'   => $ipcr->user,
-            'supervisor' => auth()->user(),
+            'ipcr'          => $ipcr,
+            'plans'         => $plans,
+            'employee'      => $ipcr->user,
+            'supervisor'    => $user,
+            'canManageIpcr' => $canManageIpcr,
         ]);
     }
 
@@ -105,6 +196,16 @@ class DivisionChiefIPCRController extends Controller
             'target_approved_at' => now(),
         ]);
 
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsApprovedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_targets_approved',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Targets Approved'],
+        ]);
+
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Targets approved successfully.');
     }
@@ -116,6 +217,16 @@ class DivisionChiefIPCRController extends Controller
     {
         $employeeIPCR->update([
             'status' => 'Returned for Revision',
+        ]);
+
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRTargetsReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_targets_returned',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Returned for Revision'],
         ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
@@ -154,6 +265,16 @@ class DivisionChiefIPCRController extends Controller
             'submitted_for_pmtreview_at' => null,
         ]);
 
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRDCReturnedFromPMTMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_returned_from_pmt',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Targets Approved'],
+        ]);
+
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'IPCR returned to employee for revision.');
     }
@@ -166,6 +287,16 @@ class DivisionChiefIPCRController extends Controller
         $employeeIPCR->update([
             'status' => 'Targets Approved',
             'submitted_for_rating_at' => null,
+        ]);
+
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRAccomplishmentReturnedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_accomplishment_returned',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Targets Approved'],
         ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
@@ -210,6 +341,23 @@ class DivisionChiefIPCRController extends Controller
             abort(404, "This plan is not assigned to this IPCR.");
         }
 
+        // Authorization: check the logged-in user is the correct rater for this plan
+        $user = auth()->user();
+        $plan = \App\Models\WorkDistributionPlan::with(['offices', 'committees', 'specialAssignments'])->findOrFail($planId);
+        $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
+
+        $isDCForEmployee = $divisionId && $ipcr->user->division_id == $divisionId;
+        $canRate = $user->hasRole('OCD') || $isDCForEmployee || match ($plan->rated_by) {
+            'Unit Head'      => $plan->offices->contains(fn($o) => $o->unit_head == $user->id),
+            'Committee Head' => $plan->committees->contains(fn($c) => $c->head_id == $user->id),
+            'Coordinator'    => $plan->specialAssignments->contains(fn($a) => $a->coordinator_id == $user->id),
+            default          => false,
+        };
+
+        if (!$canRate) {
+            abort(403, 'You are not authorized to rate this plan.');
+        }
+
         // Compute average for supervisor ratings
         $ratings = collect([
             $request->sup_quality,
@@ -239,11 +387,56 @@ class DivisionChiefIPCRController extends Controller
             'status' => 'Rated & For PMT Review',
             'submitted_rating_at' => now(),
         ]);
-        
-        $employeeIPCR->save();
+
+        $employeeIPCR->load('user');
+        Mail::to($employeeIPCR->user->email)->send(new IPCRRatedMail($employeeIPCR, $employeeIPCR->user->name));
+
+        AuditLogger::log([
+            'action'         => 'ipcr_rated',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Rated & For PMT Review'],
+        ]);
 
         return to_route('division-employee-ipcr.show', $employeeIPCR->id)
             ->with('success', 'Rating recorded successfully.');
+    }
+
+    public function submitToHR(Request $request)
+    {
+        $request->validate(['rating_period' => 'required|string']);
+
+        $user = auth()->user();
+        $divisionId = Division::where('division_chief_id', $user->id)->value('id') ?? $user->division_id;
+
+        $ipcrs = EmployeeIPCR::where('status', 'Rated & For PMT Review')
+            ->where('rating_period', $request->rating_period)
+            ->when($divisionId, fn($q) => $q->whereHas('user', fn($u) => $u->where('division_id', $divisionId)))
+            ->get();
+
+        DB::transaction(function () use ($ipcrs) {
+            foreach ($ipcrs as $ipcr) {
+                $ipcr->update([
+                    'status'            => 'Submitted to HR',
+                    'submitted_to_hr_at' => now(),
+                ]);
+
+                AuditLogger::log([
+                    'action'         => 'ipcr_submitted_to_hr',
+                    'auditable_type' => EmployeeIPCR::class,
+                    'auditable_id'   => $ipcr->id,
+                    'new_values'     => ['status' => 'Submitted to HR'],
+                ]);
+            }
+        });
+
+        User::havingRole('HR')->each(function ($hr) use ($ipcrs, $request) {
+            foreach ($ipcrs as $ipcr) {
+                Mail::to($hr->email)->send(new IPCRSubmittedToHRMail($ipcr, $hr->name));
+            }
+        });
+
+        return redirect()->back()->with('success', $ipcrs->count().' IPCR(s) submitted to HR for the selected period.');
     }
 
     /**

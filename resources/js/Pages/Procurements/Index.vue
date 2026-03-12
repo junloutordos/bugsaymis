@@ -1,11 +1,13 @@
 <script setup>
-import { Head, useForm } from "@inertiajs/vue3";
+import { Head, useForm, router as inertiaRouter } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import { useSubmit } from "@/Composables/useSubmit";
 
 const props = defineProps({ procurements: Array, currentUser: Object, units: Array });
+const { isSubmitting: isDeleting, submit: submitDelete } = useSubmit();
 const procurementsList = ref(props.procurements || []);
 const units = computed(() => props.units || []);
 
@@ -134,13 +136,11 @@ const submit = () => {
 const destroy = (p) => {
   Swal.fire({ title: 'Delete this purchase request?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
     if (!res.isConfirmed) return;
-    import('@inertiajs/vue3').then(({ router }) => {
-      let destroyUrl;
-      try { destroyUrl = route('procurements.destroy', p.id) } catch (e) { destroyUrl = `/procurements/${p.id}` }
-      router.delete(destroyUrl, {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
-        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
-      })
+    let destroyUrl;
+    try { destroyUrl = route('procurements.destroy', p.id) } catch (e) { destroyUrl = `/procurements/${p.id}` }
+    submitDelete.delete(destroyUrl, {
+      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
+      onError: () => { Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
     })
   })
 }
@@ -316,7 +316,7 @@ const removeItemRow = async (i) => {
                   <button @click.prevent="openItemsModal(p)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Manage Items">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 7a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 4a1 1 0 000 2h9a1 1 0 100-2H4z"/></svg>
                   </button>
-                  <button @click.prevent="destroy(p)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
+                  <button @click.prevent="destroy(p)" :disabled="isDeleting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
                     <TrashIcon class="w-5 h-5" />
                   </button>
                   <button @click.prevent="sendForApproval(p)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700" title="Send for Approval">
@@ -359,7 +359,7 @@ const removeItemRow = async (i) => {
 
           <div class="mt-4 flex justify-end">
             <button class="px-3 py-1 mr-2 border rounded" @click="closeModal">Cancel</button>
-            <button class="px-3 py-1 bg-blue-600 text-white rounded" @click="submit">Save</button>
+            <button class="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" :disabled="form.processing" @click="submit">{{ form.processing ? 'Saving…' : 'Save' }}</button>
           </div>
         </div>
       </div>

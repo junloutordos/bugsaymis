@@ -32,7 +32,7 @@
                   <button @click="openEdit(c)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit" aria-label="Edit category">
                     <PencilSquareIcon class="w-5 h-5" />
                   </button>
-                  <button @click="confirmDelete(c)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 ml-2" title="Delete" aria-label="Delete category">
+                  <button @click="confirmDelete(c)" :disabled="isSubmitting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 ml-2 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" aria-label="Delete category">
                     <TrashIcon class="w-5 h-5" />
                   </button>
                 </td>
@@ -57,7 +57,7 @@
                   <button @click="openEdit(c)" class="p-1 hover:bg-gray-100 rounded" title="Edit" aria-label="Edit category">
                     <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
                   </button>
-                  <button @click="confirmDelete(c)" class="p-1 hover:bg-gray-100 rounded ml-2" title="Delete" aria-label="Delete category">
+                  <button @click="confirmDelete(c)" :disabled="isSubmitting" class="p-1 hover:bg-gray-100 rounded ml-2 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" aria-label="Delete category">
                     <TrashIcon class="w-5 h-5 text-red-600" />
                   </button>
                 </div>
@@ -98,7 +98,7 @@
                     </div>
             <div class="flex justify-end mt-4 space-x-2">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+              <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
             </div>
           </form>
         </div>
@@ -116,10 +116,12 @@ import Swal from 'sweetalert2'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { useSubmit } from '@/Composables/useSubmit'
 
 const page = usePage()
 const categories = computed(() => page.props.categories || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null })
 const q = ref(page.props.q || '')
+const { isSubmitting, submit } = useSubmit()
 
 const showModal = ref(false)
 const editing = ref(null)
@@ -152,7 +154,7 @@ async function confirmDelete(c){
   const id = c.id
   const previous = deleting.value
   deleting.value = null
-  router.delete(route('library.collection-categories.destroy', id), {}, {
+  submit.delete(route('library.collection-categories.destroy', id), {
     preserveState: true,
     onSuccess: () => { Swal.fire({ icon: 'success', title: 'Category deleted', timer: 1000, showConfirmButton: false }).then(() => { router.get(route('library.collection-categories.index'), { q: q.value }) }) },
     onError: (e) => { console.error(e); deleting.value = previous; Swal.fire({ icon: 'error', title: 'Failed to delete' }) }
@@ -163,13 +165,13 @@ async function submitForm(){
   errors.value = {}
   const payload = { ...form.value }
   if (editing.value) {
-    router.put(route('library.collection-categories.update', editing.value), payload, {
+    submit.put(route('library.collection-categories.update', editing.value), payload, {
       preserveState: true,
       onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Category updated', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.collection-categories.index'), { q: q.value }) }) },
       onError: (e) => { errors.value = e }
     })
   } else {
-    router.post(route('library.collection-categories.store'), payload, {
+    submit.post(route('library.collection-categories.store'), payload, {
       preserveState: true,
       onSuccess: () => { showModal.value = false; Swal.fire({ icon: 'success', title: 'Category added', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.collection-categories.index'), { q: q.value }) }) },
       onError: (e) => { errors.value = e }
@@ -187,7 +189,7 @@ function deleteCategory(){
   const previous = deleting.value
   showDeleteConfirm.value = false
   deleting.value = null
-  router.delete(route('library.collection-categories.destroy', id), {}, {
+  submit.delete(route('library.collection-categories.destroy', id), {
     preserveState: true,
     onSuccess: () => { Swal.fire({ icon: 'success', title: 'Category deleted', timer: 1000, showConfirmButton: false }).then(() => { router.get(route('library.collection-categories.index'), { q: q.value }) }) },
     onError: (e) => { console.error(e); deleting.value = previous; Swal.fire({ icon: 'error', title: 'Failed to delete' }) }

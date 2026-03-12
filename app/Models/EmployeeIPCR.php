@@ -21,7 +21,10 @@ class EmployeeIPCR extends Model
         'target_approved_at',
         'submitted_for_rating_at',
         'submitted_rating_at',
-        'submitted_for_pmtreview_at',  
+        'submitted_for_pmtreview_at',
+        'submitted_to_hr_at',
+        'director_signed_at',
+        'director_signature',
     ];
 
     // Each IPCR belongs to a user (employee)

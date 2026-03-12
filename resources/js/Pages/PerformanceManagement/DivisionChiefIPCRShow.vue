@@ -3,8 +3,8 @@ import { Head } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
-import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
@@ -13,6 +13,7 @@ const props = defineProps({
   plans: Array,
   employee: Object,
   supervisor: Object,
+  canManageIpcr: Boolean,
 });
 
 const divisionComments = ref(props.ipcr.remarks ?? "");
@@ -22,8 +23,10 @@ const planRemarks = ref(
   Object.fromEntries((props.plans || []).map(p => [p.id, p.pivot?.remarks ?? ""]))
 );
 
+const { isSubmitting, submit } = useSubmit();
+
 const savePlanRemark = (plan) => {
-  router.put(
+  submit.put(
     route("division-chief-employee-ipcr-plan.remark", [props.ipcr.id, plan.id]),
     { remarks: planRemarks.value[plan.id] },
     {
@@ -36,23 +39,6 @@ const savePlanRemark = (plan) => {
   );
 };
 
-const submitToPMT = () => {
-  Swal.fire({
-    title: "Submit to PMT?",
-    text: "This will submit the rated IPCR to the Performance Management Team for review.",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Yes, submit!",
-  }).then((result) => {
-    if (result.isConfirmed) {
-      router.post(route("division-chief-employee-ipcr.submitToPMT", props.ipcr.id), {}, {
-        onSuccess: () => Swal.fire("Submitted!", "IPCR submitted to PMT for review.", "success"),
-        onError: () => Swal.fire("Error", "Failed to submit to PMT.", "error"),
-      });
-    }
-  });
-};
-
 const showReturnFromPMTModal = ref(false);
 const returnFromPMTRemarks = ref("");
 
@@ -61,7 +47,7 @@ const confirmReturnFromPMT = () => {
     Swal.fire({ icon: "warning", title: "Remarks required", text: "Please provide remarks explaining why the IPCR is being returned." });
     return;
   }
-  router.post(
+  submit.post(
     route("division-chief-employee-ipcr.returnFromPMT", props.ipcr.id),
     { remarks: returnFromPMTRemarks.value },
     {
@@ -85,7 +71,7 @@ const returnAccomplishment = () => {
     confirmButtonText: "Yes, return it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("division-chief-employee-ipcr.returnAccomplishment", props.ipcr.id), {}, {
+      submit.post(route("division-chief-employee-ipcr.returnAccomplishment", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Returned!", "Accomplishment returned to employee for revision.", "success"),
         onError: () => Swal.fire("Error", "Failed to return accomplishment.", "error"),
       });
@@ -103,7 +89,7 @@ const disapproveTargets = () => {
     confirmButtonText: "Yes, return it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("division-chief-employee-ipcr.disapprove", props.ipcr.id), {}, {
+      submit.post(route("division-chief-employee-ipcr.disapprove", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Returned!", "IPCR returned for revision.", "success"),
         onError: () => Swal.fire("Error", "Failed to return IPCR.", "error"),
       });
@@ -112,7 +98,7 @@ const disapproveTargets = () => {
 };
 
 const saveDivisionComments = () => {
-  router.post(
+  submit.post(
     route("division-chief-employee-ipcr.savecomments", props.ipcr.id),
     { division_comments: divisionComments.value },
     {
@@ -130,7 +116,25 @@ const isModalOpen = ref(false);
 const currentPlan = ref(null);
 const form = ref({ accomplishment: "", mov_link: "", quality: null, efficiency: null, timeliness: null });
 
-const canEdit = computed(() => props.ipcr.status === "Submitted for Rating");
+const canEdit = computed(() => props.ipcr.status === "Submitted for Rating")
+
+// Determine whether the logged-in user can rate a specific plan
+const canRatePlan = (plan) => {
+  if (!canEdit.value) return false
+  // Division Chief and OCD can rate any plan
+  if (props.canManageIpcr) return true
+  const ratedBy = plan.rated_by
+  if (ratedBy === 'Unit Head') {
+    return plan.offices?.some(o => o.unit_head == props.supervisor?.id) ?? false
+  }
+  if (ratedBy === 'Committee Head') {
+    return plan.committees?.some(c => c.head_id == props.supervisor?.id) ?? false
+  }
+  if (ratedBy === 'Coordinator') {
+    return plan.special_assignments?.some(a => a.coordinator_id == props.supervisor?.id) ?? false
+  }
+  return false
+};
 
 const computeAverage = (q, e, t) => {
   const values = [q, e, t].filter(v => v !== null && v !== "" && !isNaN(v)).map(Number);
@@ -297,7 +301,7 @@ const getAdjectivalRating = ipcrAdjectivalRating;
 
 // ---------- Modal control ----------
 const openModal = (plan) => {
-  if (!canEdit.value) return;
+  if (!canRatePlan(plan)) return;
   currentPlan.value = plan;
   form.value = {
     accomplishment: plan.pivot?.accomplishment || "",
@@ -315,7 +319,7 @@ const saveModal = async () => {
     Swal.fire({ icon: "warning", title: "Missing Required Fields", text: "Please fill in BOTH the Accomplishment and MOV Link before saving.", confirmButtonColor: "#2563eb" });
     return;
   }
-  router.put(
+  submit.put(
     route("division-chief-employee-ipcr-plan.rateIPCRPlan", [props.ipcr.id, currentPlan.value.id]),
     { accomplishment: form.value.accomplishment, mov_link: form.value.mov_link, sup_quality: form.value.quality, sup_efficiency: form.value.efficiency, sup_timeliness: form.value.timeliness },
     {
@@ -335,6 +339,20 @@ const saveModal = async () => {
   );
 };
 
+// ---------- Accomplishments viewer ----------
+const accViewerPlan = ref(null);
+
+function openAccViewer(plan) {
+  accViewerPlan.value = plan;
+}
+function closeAccViewer() {
+  accViewerPlan.value = null;
+}
+function formatAccDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
 // ---------- Status badge ----------
 const statusBadgeClass = ipcrStatusClass;
 
@@ -344,7 +362,7 @@ const printIPCR = () => window.print();
 const saveRatings = () => {
   Swal.fire({ title: "Save Ratings?", text: "Are you sure you want to save these ratings?", icon: "question", showCancelButton: true, confirmButtonText: "Yes, save it!" })
     .then(result => {
-      if (result.isConfirmed) router.post(route("division-chief-employee-ipcr.saveratings", props.ipcr.id), {}, {
+      if (result.isConfirmed) submit.post(route("division-chief-employee-ipcr.saveratings", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Saved!", "Ratings for the rating period successfully saved!", "success"),
         onError:   () => Swal.fire("Error", "Failed to save ratings.", "error"),
       });
@@ -354,7 +372,7 @@ const saveRatings = () => {
 const approveTargets = () => {
   Swal.fire({ title: "Approve Targets?", text: "Are you sure you want to approve these targets?", icon: "question", showCancelButton: true, confirmButtonText: "Yes, approve it!" })
     .then(result => {
-      if (result.isConfirmed) router.post(route("division-chief-employee-ipcr.targetsapproval", props.ipcr.id), {}, {
+      if (result.isConfirmed) submit.post(route("division-chief-employee-ipcr.targetsapproval", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Approved!", "Targets for the rating period successfully approved!", "success"),
         onError:   () => Swal.fire("Error", "Failed to approve targets.", "error"),
       });
@@ -388,27 +406,31 @@ const approveTargets = () => {
         </div>
 
         <div class="mt-4 flex flex-wrap gap-2">
-          <button v-if="ipcr.status === 'Submitted for Rating'" @click="saveRatings"
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
-            Save Ratings
+          <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="saveRatings"
+            :disabled="isSubmitting"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Save Ratings' }}
           </button>
-          <button v-if="ipcr.status === 'For Review'" @click="approveTargets"
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
-            Approve Targets
+          <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="approveTargets"
+            :disabled="isSubmitting"
+            class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Approve Targets' }}
           </button>
-          <button v-if="ipcr.status === 'For Review'" @click="disapproveTargets"
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">
-            Return for Revision
+          <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="disapproveTargets"
+            :disabled="isSubmitting"
+            class="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
           </button>
-          <button v-if="ipcr.status === 'Submitted for Rating'" @click="returnAccomplishment"
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">
-            Return Accomplishment for Revision
+          <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="returnAccomplishment"
+            :disabled="isSubmitting"
+            class="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow">
+            {{ isSubmitting ? 'Processing…' : 'Return Accomplishment for Revision' }}
           </button>
-          <button v-if="ipcr.status === 'Rated & For PMT Review'" @click="submitToPMT"
-            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow">
-            Submit to PMT
-          </button>
-          <button v-if="ipcr.status === 'PMT Returned for Revision'" @click="showReturnFromPMTModal = true"
+          <span v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'"
+            class="text-sm text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-2 rounded-lg">
+            Rated — use the <strong>Division index page</strong> to batch-submit to HR.
+          </span>
+          <button v-if="canManageIpcr && ipcr.status === 'PMT Returned for Revision'" @click="showReturnFromPMTModal = true"
             class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg shadow">
             Return to Employee
           </button>
@@ -539,12 +561,25 @@ const approveTargets = () => {
                         {{ piDesc }}
                       </td>
 
-                      <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
+                      <td class="px-4 py-2 border border-gray-300">
+                        <div>{{ piPlans[0].success_indicator }}</div>
+                        <div class="text-xs text-gray-400 mt-1">
+                          Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template>
+                        </div>
+                      </td>
 
-                      <td class="px-4 py-2 border border-gray-300"
-                          :class="canEdit ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
-                          @click="canEdit ? openModal(piPlans[0]) : null">
-                        {{ piPlans[0].pivot?.accomplishment || '—' }}
+                      <td class="px-4 py-2 border border-gray-300">
+                        <p :class="canRatePlan(piPlans[0]) ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
+                           @click="canRatePlan(piPlans[0]) ? openModal(piPlans[0]) : null">
+                          {{ piPlans[0].pivot?.accomplishment || '—' }}
+                        </p>
+                        <button
+                          v-if="piPlans[0].accomplishments_count > 0"
+                          @click="openAccViewer(piPlans[0])"
+                          class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                          📋 {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
+                        </button>
+                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
@@ -587,8 +622,8 @@ const approveTargets = () => {
                         <template v-if="['For Review', 'Submitted for Rating'].includes(ipcr.status)">
                           <textarea v-model="planRemarks[piPlans[0].id]" rows="2"
                             class="w-full border rounded px-2 py-1 text-sm" placeholder="Add remark..."></textarea>
-                          <button @click="savePlanRemark(piPlans[0])"
-                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Save</button>
+                          <button @click="savePlanRemark(piPlans[0])" :disabled="isSubmitting"
+                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
                         </template>
                         <span v-else>{{ piPlans[0].pivot?.remarks ?? "—" }}</span>
                       </td>
@@ -596,11 +631,24 @@ const approveTargets = () => {
 
                     <!-- Remaining rows in this PI group -->
                     <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-gray-50">
-                      <td class="px-4 py-2 border border-gray-300">{{ plan.success_indicator }}</td>
-                      <td class="px-4 py-2 border border-gray-300"
-                          :class="canEdit ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
-                          @click="canEdit ? openModal(plan) : null">
-                        {{ plan.pivot?.accomplishment || '—' }}
+                      <td class="px-4 py-2 border border-gray-300">
+                        <div>{{ plan.success_indicator }}</div>
+                        <div class="text-xs text-gray-400 mt-1">
+                          Rater: {{ plan.rated_by || 'Division Chief' }}<template v-if="plan.offices?.length"> — {{ plan.offices.map(o => o.name).join(', ') }}</template><template v-if="plan.committees?.length"> — {{ plan.committees.map(c => c.name).join(', ') }}</template><template v-if="plan.special_assignments?.length"> — {{ plan.special_assignments.map(a => a.name).join(', ') }}</template>
+                        </div>
+                      </td>
+                      <td class="px-4 py-2 border border-gray-300">
+                        <p :class="canRatePlan(plan) ? 'text-blue-600 cursor-pointer hover:underline' : 'text-gray-400 cursor-default'"
+                           @click="canRatePlan(plan) ? openModal(plan) : null">
+                          {{ plan.pivot?.accomplishment || '—' }}
+                        </p>
+                        <button
+                          v-if="plan.accomplishments_count > 0"
+                          @click="openAccViewer(plan)"
+                          class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                          📋 {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
+                        </button>
+                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
                       <td class="px-4 py-2 border border-gray-300">
                         <a v-if="plan.pivot?.mov_link" :href="plan.pivot.mov_link" target="_blank"
@@ -639,8 +687,8 @@ const approveTargets = () => {
                         <template v-if="['For Review', 'Submitted for Rating'].includes(ipcr.status)">
                           <textarea v-model="planRemarks[plan.id]" rows="2"
                             class="w-full border rounded px-2 py-1 text-sm" placeholder="Add remark..."></textarea>
-                          <button @click="savePlanRemark(plan)"
-                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Save</button>
+                          <button @click="savePlanRemark(plan)" :disabled="isSubmitting"
+                            class="mt-1 text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
                         </template>
                         <span v-else>{{ plan.pivot?.remarks ?? "—" }}</span>
                       </td>
@@ -674,8 +722,9 @@ const approveTargets = () => {
             <button
               v-if="isEditing"
               @click="saveDivisionComments"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
-            >Save Comments</button>
+              :disabled="isSubmitting"
+              class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg shadow"
+            >{{ isSubmitting ? 'Saving…' : 'Save Comments' }}</button>
           </div>
         </div>
 
@@ -793,7 +842,7 @@ const approveTargets = () => {
           </div>
           <div class="mt-4 flex justify-end gap-2">
             <button @click="isModalOpen = false" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
-            <button @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+            <button @click="saveModal" :disabled="isSubmitting" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
           </div>
         </div>
       </div>
@@ -821,10 +870,61 @@ const approveTargets = () => {
           <button @click="showReturnFromPMTModal = false; returnFromPMTRemarks = ''"
             class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
           <button @click="confirmReturnFromPMT"
-            class="px-4 py-2 bg-rose-600 text-white rounded hover:bg-rose-700">Return to Employee</button>
+            :disabled="isSubmitting"
+            class="px-4 py-2 bg-rose-600 text-white rounded hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ isSubmitting ? 'Processing…' : 'Return to Employee' }}
+          </button>
         </div>
       </div>
     </div>
+
+  <!-- Accomplishments Viewer Modal -->
+  <div v-if="accViewerPlan"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    @click.self="closeAccViewer">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <div class="flex items-start justify-between px-6 py-4 border-b">
+        <div>
+          <h2 class="text-base font-semibold text-gray-800">Accomplishments</h2>
+          <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+        </div>
+        <button @click="closeAccViewer" class="text-gray-400 hover:text-gray-700 text-xl leading-none ml-4">✕</button>
+      </div>
+
+      <div class="overflow-y-auto flex-1 px-6 py-4">
+        <div v-if="!accViewerPlan.accomplishments?.length"
+          class="text-center text-gray-400 text-sm py-8">
+          No accomplishments logged for this plan.
+        </div>
+        <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
+          class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+              {{ formatAccDate(acc.accomplishment_date) }}
+            </span>
+          </div>
+          <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ acc.description }}</p>
+          <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+            <a v-for="photo in acc.photos" :key="photo.id"
+              :href="photo.google_drive_link" target="_blank"
+              class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              📎 {{ photo.file_name || 'Photo' }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 border-t text-right">
+        <span class="text-xs text-gray-400 mr-4">
+          {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
+        </span>
+        <button @click="closeAccViewer"
+          class="px-4 py-2 bg-gray-200 rounded-lg text-sm hover:bg-gray-300">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
 
   </AdminLayout>
 </template>

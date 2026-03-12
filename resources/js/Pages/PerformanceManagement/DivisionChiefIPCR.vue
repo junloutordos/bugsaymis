@@ -1,10 +1,12 @@
 <script setup>
-import { Head } from "@inertiajs/vue3"
+import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon } from "@heroicons/vue/24/outline"
+import { EyeIcon } from "@heroicons/vue/24/outline"
 import useDivisionChiefIPCR from "@/Composables/useIPCRDC.js"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 import { ref, computed } from "vue"
+import Swal from "sweetalert2"
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   ipcrs:             Array,
@@ -15,33 +17,84 @@ const props = defineProps({
 })
 
 const {
-  ipcrTargets,
   workPlans: workPlansList,
-  searchQuery,
   planSearch,
-  currentPage,
-  totalPages,
-  filteredIPCRs,
+  showModal, showAddPlansModal, modalMode, selectedIPCR, selectedPlans,
+  form, isPlanSelected, togglePlanSelection,
+  openModal, closeModal, submitIPCR,
+  openAddPlansModal, closeAddPlansModal, submitPlans,
+  viewIPCR, destroyIPCR, statusClasses,
   filteredPlans,
-  showModal,
-  showAddPlansModal,
-  modalMode,
-  selectedIPCR,
-  selectedPlans,
-  form,
-  isPlanSelected,
-  togglePlanSelection,
-  openModal,
-  closeModal,
-  submitIPCR,
-  openAddPlansModal,
-  closeAddPlansModal,
-  submitPlans,
-  viewIPCR,
-  destroyIPCR,
-  sortBy,
-  statusClasses
 } = useDivisionChiefIPCR(props.ipcrs, props.workPlans)
+
+// ---------- Filters ----------
+const searchQuery    = ref("")
+const selectedPeriod = ref("")
+
+const filtered = computed(() => {
+  const q = searchQuery.value.toLowerCase()
+  return (props.ipcrs || []).filter(ipcr => {
+    const matchesSearch =
+      !q ||
+      ipcr.user?.name?.toLowerCase().includes(q) ||
+      ipcr.title?.toLowerCase().includes(q) ||
+      ipcr.rating_period?.toLowerCase().includes(q) ||
+      ipcr.status?.toLowerCase().includes(q)
+    const matchesPeriod = !selectedPeriod.value || ipcr.rating_period === selectedPeriod.value
+    return matchesSearch && matchesPeriod
+  })
+})
+
+// ---------- Pagination ----------
+const perPage     = 10
+const currentPage = ref(1)
+const totalPages  = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))
+const paginated   = computed(() => {
+  const start = (currentPage.value - 1) * perPage
+  return filtered.value.slice(start, start + perPage)
+})
+const goToPage  = (p) => { if (p >= 1 && p <= totalPages.value) currentPage.value = p }
+const resetPage = () => { currentPage.value = 1 }
+
+// ---------- Employees without IPCR ----------
+const employeesWithoutIpcr = computed(() => {
+  const ipcrUserIds = new Set(props.ipcrs.map(i => i.user?.id).filter(Boolean))
+  return props.divisionEmployees.filter(emp => !ipcrUserIds.has(emp.id))
+})
+
+const adjectivalRating = ipcrAdjectivalRating
+
+const formatDate = (val) => {
+  if (!val) return "—"
+  return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+// ── Submit to HR ─────────────────────────────────────────────
+const { isSubmitting, submit } = useSubmit()
+
+const submitToHRPeriod = ref(props.ratingPeriods[0] ?? "")
+const ratedForHRCount  = computed(() =>
+  props.ipcrs.filter(i =>
+    i.status === 'Rated & For PMT Review' &&
+    (!submitToHRPeriod.value || i.rating_period === submitToHRPeriod.value)
+  ).length
+)
+
+const submitToHR = () => {
+  if (!submitToHRPeriod.value) return
+  Swal.fire({
+    title: "Submit to HR?",
+    text: `Submit all ${ratedForHRCount.value} rated IPCR(s) for "${submitToHRPeriod.value}" to HR?`,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#0891b2",
+    confirmButtonText: "Yes, submit!",
+  }).then(result => {
+    if (result.isConfirmed) {
+      submit.post(route('division-chief-ipcr.submitToHR'), { rating_period: submitToHRPeriod.value })
+    }
+  })
+}
 
 // ── Memo Report ──────────────────────────────────────────────
 const showReportModal = ref(false)
@@ -57,19 +110,15 @@ const ratedIPCRs = computed(() =>
   )
 )
 
-// Employees in this division who have not created any IPCR yet
-const employeesWithoutIpcr = computed(() => {
-  const ipcrUserIds = new Set(props.ipcrs.map(i => i.user?.id).filter(Boolean))
-  return props.divisionEmployees.filter(emp => !ipcrUserIds.has(emp.id))
-})
-
-const adjectivalRating = ipcrAdjectivalRating
-
 const openReportModal = () => {
   reportPeriod.value = props.ratingPeriods[0] ?? ''
   reportTo.value = ''
   showReportModal.value = true
 }
+
+const today = new Date().toLocaleDateString('en-PH', {
+  year: 'numeric', month: 'long', day: 'numeric'
+})
 
 const printMemo = () => {
   showReportModal.value = false
@@ -175,19 +224,33 @@ const printMemo = () => {
   win.document.write(html)
   win.document.close()
 }
-
-const today = new Date().toLocaleDateString('en-PH', {
-  year: 'numeric', month: 'long', day: 'numeric'
-})
 </script>
 
 <template>
-  <Head title="Division IPCR Targets" />
-  <AdminLayout title="Division IPCR Targets">
-    <div>
-      <!-- Header -->
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Division IPCR Targets</h1>
+  <Head title="My Division" />
+  <AdminLayout title="My Division">
+
+    <!-- Header -->
+    <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+      <h1 class="text-xl font-bold text-gray-800">Division IPCR Targets</h1>
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Submit to HR batch action -->
+        <div class="flex items-center gap-2 border border-cyan-300 rounded-lg px-3 py-1.5 bg-cyan-50">
+          <select
+            v-model="submitToHRPeriod"
+            class="border-0 bg-transparent text-sm text-cyan-800 focus:ring-0 p-0"
+          >
+            <option value="" disabled>— Period —</option>
+            <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <button
+            @click="submitToHR"
+            :disabled="ratedForHRCount === 0 || !submitToHRPeriod || isSubmitting"
+            class="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1 rounded text-sm font-medium"
+          >
+            {{ isSubmitting ? 'Processing…' : `Submit to HR (${ratedForHRCount})` }}
+          </button>
+        </div>
         <button
           @click="openReportModal"
           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm"
@@ -195,89 +258,144 @@ const today = new Date().toLocaleDateString('en-PH', {
           Generate Memo Report
         </button>
       </div>
+    </div>
 
-      <!-- Search -->
-      <div class="bg-white p-4 rounded-xl shadow mb-4">
+    <div class="bg-white p-4 rounded-lg shadow">
+
+      <!-- Toolbar -->
+      <div class="flex flex-col sm:flex-row gap-3 mb-4">
         <input
           v-model="searchQuery"
+          @input="resetPage"
           type="text"
-          placeholder="Search targets..."
-          class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Search by employee, title, period, or status..."
+          class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
         />
+        <select
+          v-model="selectedPeriod"
+          @change="resetPage"
+          class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="">All Periods</option>
+          <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
+        </select>
       </div>
 
-      <!-- IPCR Table -->
-      <div class="overflow-x-auto bg-white p-4 rounded-xl shadow">
-        <table class="min-w-full border border-gray-200 text-center">
-          <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table -->
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm border-collapse">
+          <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
             <tr>
-              <th @click="sortBy('user')" class="px-4 py-3 cursor-pointer">Employee Name</th>
-              <th @click="sortBy('rating_period')" class="px-4 py-3 cursor-pointer">Rating Period</th>
-              <th @click="sortBy('title')" class="px-4 py-3 cursor-pointer">Title</th>
-              <th @click="sortBy('status')" class="px-4 py-3 cursor-pointer">Status</th>
-              <th class="px-4 py-3">Submitted at</th>
-              <th class="px-4 py-3">Approved at</th>
-              <th class="px-4 py-3">Accomplishment Submitted at</th>
-              <th class="px-4 py-3">Rated at</th>
-              <th class="px-4 py-3">Actions</th>
+              <th class="border px-4 py-2 text-left">Employee</th>
+              <th class="border px-4 py-2 text-left">Division</th>
+              <th class="border px-4 py-2 text-left">Rating Period</th>
+              <th class="border px-4 py-2 text-left">Title</th>
+              <th class="border px-4 py-2 text-center">Status</th>
+              <th class="border px-4 py-2 text-center">Avg Rating</th>
+              <th class="border px-4 py-2 text-center">Submitted</th>
+              <th class="border px-4 py-2 text-center">Action</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="t in filteredIPCRs" :key="t.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3">{{ t.user.name }}</td>
-              <td class="px-4 py-3">{{ t.rating_period }}</td>
-              <td class="px-4 py-3">{{ t.title }}</td>
-              <td class="px-4 py-3">
-                <span :class="`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusClasses(t.status)}`">
-                  {{ t.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3"><small>{{ t.submitted_for_review_at }}</small></td>
-              <td class="px-4 py-3"><small>{{ t.target_approved_at }}</small></td>
-              <td class="px-4 py-3"><small>{{ t.submitted_for_rating_at }}</small></td>
-              <td class="px-4 py-3"><small>{{ t.submitted_rating_at }}</small></td>
-              <td class="px-4 py-3 flex justify-center gap-2">
-                <button @click="viewIPCR(t)" class="p-2 hover:bg-gray-100 rounded" title="View">
-                  <EyeIcon class="w-5 h-5 text-blue-600"/>
-                </button>
-                
-                
+          <tbody>
+            <tr v-if="paginated.length === 0 && employeesWithoutIpcr.length === 0">
+              <td colspan="8" class="border px-4 py-6 text-center text-gray-400">
+                No IPCRs found for your division with the selected filters.
               </td>
             </tr>
-            <!-- Employees who have not created an IPCR yet -->
+
+            <!-- IPCRs -->
+            <tr
+              v-for="ipcr in paginated"
+              :key="ipcr.id"
+              class="hover:bg-gray-50"
+            >
+              <td class="border px-4 py-2">
+                <div class="font-medium text-gray-800">{{ ipcr.user?.name ?? "—" }}</div>
+                <div class="text-xs text-gray-500">{{ ipcr.user?.position ?? "" }}</div>
+              </td>
+              <td class="border px-4 py-2 text-gray-600 text-xs">
+                {{ ipcr.user?.division?.name ?? "—" }}
+              </td>
+              <td class="border px-4 py-2 text-gray-600">{{ ipcr.rating_period ?? "—" }}</td>
+              <td class="border px-4 py-2 text-gray-600">{{ ipcr.title ?? "—" }}</td>
+              <td class="border px-4 py-2 text-center">
+                <span
+                  :class="statusClasses(ipcr.status)"
+                  class="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap"
+                >
+                  {{ ipcr.status }}
+                </span>
+              </td>
+              <td class="border px-4 py-2 text-center font-medium">
+                <template v-if="ipcr.overall_average">
+                  {{ ipcr.overall_average }}
+                  <div class="text-xs text-gray-400">{{ adjectivalRating(ipcr.overall_average) }}</div>
+                </template>
+                <span v-else class="text-gray-400">—</span>
+              </td>
+              <td class="border px-4 py-2 text-center text-xs text-gray-500">
+                {{ formatDate(ipcr.submitted_for_rating_at) }}
+              </td>
+              <td class="border px-4 py-2 text-center">
+                <button
+                  @click="viewIPCR(ipcr)"
+                  class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  <EyeIcon class="w-4 h-4" /> View
+                </button>
+              </td>
+            </tr>
+
+            <!-- Employees without IPCR -->
             <tr
               v-for="emp in employeesWithoutIpcr"
               :key="`emp-${emp.id}`"
               class="hover:bg-gray-50 bg-gray-50"
             >
-              <td class="px-4 py-3 font-medium">{{ emp.name }}</td>
-              <td class="px-4 py-3 text-gray-400">—</td>
-              <td class="px-4 py-3 text-gray-400">—</td>
-              <td class="px-4 py-3">
-                <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+              <td class="border px-4 py-2">
+                <div class="font-medium text-gray-800">{{ emp.name }}</div>
+                <div class="text-xs text-gray-500">{{ emp.position ?? "" }}</div>
+              </td>
+              <td class="border px-4 py-2 text-gray-400">—</td>
+              <td class="border px-4 py-2 text-gray-400">—</td>
+              <td class="border px-4 py-2 text-gray-400">—</td>
+              <td class="border px-4 py-2 text-center">
+                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">
                   No IPCR Created
                 </span>
               </td>
-              <td class="px-4 py-3 text-gray-400">—</td>
-              <td class="px-4 py-3 text-gray-400">—</td>
-              <td class="px-4 py-3 text-gray-400">—</td>
-              <td class="px-4 py-3 text-gray-400">—</td>
-              <td class="px-4 py-3"></td>
-            </tr>
-
-            <tr v-if="filteredIPCRs.length === 0 && employeesWithoutIpcr.length === 0">
-              <td colspan="9" class="px-4 py-6 text-gray-500">No employees found in this division.</td>
+              <td class="border px-4 py-2 text-gray-400 text-center">—</td>
+              <td class="border px-4 py-2 text-gray-400 text-center">—</td>
+              <td class="border px-4 py-2"></td>
             </tr>
           </tbody>
         </table>
+      </div>
 
-        <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 text-sm text-gray-600">
+        <span>Page {{ currentPage }} of {{ totalPages }} ({{ filtered.length }} records)</span>
+        <div class="flex gap-1">
+          <button
+            @click="goToPage(currentPage - 1)"
+            :disabled="currentPage === 1"
+            class="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-100"
+          >&laquo;</button>
+          <button
+            v-for="p in totalPages"
+            :key="p"
+            @click="goToPage(p)"
+            :class="p === currentPage ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'"
+            class="px-3 py-1 border rounded"
+          >{{ p }}</button>
+          <button
+            @click="goToPage(currentPage + 1)"
+            :disabled="currentPage === totalPages"
+            class="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-100"
+          >&raquo;</button>
         </div>
       </div>
+
     </div>
 
     <!-- Add/Edit IPCR Modal -->
@@ -329,11 +447,11 @@ const today = new Date().toLocaleDateString('en-PH', {
         </div>
       </div>
     </div>
-    <!-- Pre-print Modal -->
+
+    <!-- Memo Report Modal -->
     <div v-if="showReportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
         <h2 class="text-lg font-semibold mb-4">Generate IPCR Memo Report</h2>
-
         <div class="flex flex-col gap-3">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">TO (Recipient Name & Designation)</label>
@@ -346,10 +464,7 @@ const today = new Date().toLocaleDateString('en-PH', {
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Rating Period</label>
-            <select
-              v-model="reportPeriod"
-              class="w-full border rounded px-3 py-2 text-sm"
-            >
+            <select v-model="reportPeriod" class="w-full border rounded px-3 py-2 text-sm">
               <option value="" disabled>— Select a rating period —</option>
               <option v-for="period in ratingPeriods" :key="period" :value="period">{{ period }}</option>
             </select>
@@ -357,7 +472,6 @@ const today = new Date().toLocaleDateString('en-PH', {
           </div>
           <p class="text-xs text-gray-500">{{ ratedIPCRs.length }} rated employee(s) will be included for this period.</p>
         </div>
-
         <div class="mt-5 flex justify-end gap-2">
           <button @click="showReportModal = false" class="px-4 py-2 bg-gray-200 rounded text-sm">Cancel</button>
           <button @click="printMemo" class="px-4 py-2 bg-blue-600 text-white rounded text-sm">Print</button>
@@ -365,7 +479,5 @@ const today = new Date().toLocaleDateString('en-PH', {
       </div>
     </div>
 
-
   </AdminLayout>
 </template>
-

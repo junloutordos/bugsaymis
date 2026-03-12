@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
@@ -15,6 +16,8 @@ const props = defineProps({
   plans: Array,
   workPlans: { type: Array, default: () => [] },
 });
+
+const { isSubmitting, submit } = useSubmit();
 
 // ---------- Rating visibility ----------
 const PRE_RATING_STATUSES = ['New Target', 'Draft', 'For Review', 'For Rating', 'Targets Approved', 'Returned for Revision'];
@@ -90,6 +93,21 @@ const formatDateString = (value) => {
   // Format: Month dd, yyyy (e.g. December 11, 2025)
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
+
+// ---------- Daily Accomplishments Viewer ----------
+const accViewerPlan = ref(null); // plan whose daily accomplishments we're viewing
+
+function openAccViewer(plan) {
+  accViewerPlan.value = plan;
+}
+function closeAccViewer() {
+  accViewerPlan.value = null;
+}
+
+function formatAccDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
 
 // ---------- Modal / Form State ----------
 const isModalOpen = ref(false);
@@ -278,9 +296,12 @@ const saveModal = async () => {
     self_timeliness: form.value.timeliness,
   };
 
-  router.put(
-    route("employee-ipcr-plan.updateSelfRating", [props.ipcr.id, currentPlan.value.id]),
-    payload,
+  submit(
+    (o) => router.put(
+      route("employee-ipcr-plan.updateSelfRating", [props.ipcr.id, currentPlan.value.id]),
+      payload,
+      o
+    ),
     {
       onSuccess: () => {
         const avg = computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness);
@@ -322,7 +343,7 @@ const submitForReview = () => {
     confirmButtonText: "Yes, submit",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Submitted!", "Target submitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit target.", "error")
       });
@@ -339,7 +360,7 @@ const submitForRating = () => {
     confirmButtonText: "Submit",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Submitted!", "Accomplishments submitted for rating.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit accomplishments.", "error")
       });
@@ -479,7 +500,7 @@ const togglePlanSelection = (plan) => {
 };
 
 const submitAddPlans = () => {
-  router.post(
+  submit.post(
     route("employee-ipcr.addPlans", props.ipcr.id),
     { plan_ids: selectedPlans.value },
     {
@@ -504,7 +525,7 @@ const removePlan = (plan) => {
     confirmButtonText: "Yes, remove it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
+      submit.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
         onSuccess: () => Swal.fire("Removed!", "Plan removed successfully.", "success"),
         onError: () => Swal.fire("Error", "Failed to remove plan.", "error"),
       });
@@ -521,7 +542,7 @@ const resubmit = () => {
     confirmButtonText: "Yes, resubmit!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Resubmitted!", "IPCR resubmitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to resubmit.", "error"),
       });
@@ -555,28 +576,30 @@ const resubmit = () => {
         
 
         <div class="mt-4 flex justify-end gap-2">
-          <button 
-            v-if="ipcr.status === 'New Target'" 
-            @click="submitForReview" 
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          <button
+            v-if="ipcr.status === 'New Target'"
+            @click="submitForReview"
+            :disabled="isSubmitting"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <!-- Optional icon for submit -->
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Submit for Review and Approval
+            {{ isSubmitting ? 'Processing…' : 'Submit for Review and Approval' }}
           </button>
 
-          <button 
-            v-if="ipcr.status === 'Targets Approved'" 
-            @click="submitForRating" 
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+          <button
+            v-if="ipcr.status === 'Targets Approved'"
+            @click="submitForRating"
+            :disabled="isSubmitting"
+            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <!-- Optional icon for submit -->
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Submit for Rating of the Accomplishment
+            {{ isSubmitting ? 'Processing…' : 'Submit for Rating of the Accomplishment' }}
           </button>
 
           <button
@@ -593,12 +616,13 @@ const resubmit = () => {
           <button
             v-if="ipcr.status === 'Returned for Revision'"
             @click="resubmit"
-            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
+            :disabled="isSubmitting"
+            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
-            Resubmit for Review
+            {{ isSubmitting ? 'Processing…' : 'Resubmit for Review' }}
           </button>
 
           <button
@@ -667,8 +691,8 @@ const resubmit = () => {
             <tr>
               <td colspan="4" class="border px-3 py-3 text-center">
                 <br/><br/>
-                <b style="text-transform: uppercase;">{{supervisor.name}}</b><br/>
-                <small>{{supervisor.position }}</small>
+                <b style="text-transform: uppercase;">{{supervisor?.name ?? '—'}}</b><br/>
+                <small>{{supervisor?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border px-3 py-3 text-center">
                 <br/>
@@ -763,9 +787,18 @@ const resubmit = () => {
                       <!-- FIRST PLAN ROW -->
                       <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
 
-                      <td class="px-4 py-2 border border-gray-300 cursor-pointer text-blue-600 hover:underline"
-                          @click="openModal(piPlans[0])">
-                        {{ piPlans[0].pivot?.accomplishment || '—' }}
+                      <td class="px-4 py-2 border border-gray-300">
+                        <p class="cursor-pointer text-blue-600 hover:underline text-sm"
+                           @click="openModal(piPlans[0])">
+                          {{ piPlans[0].pivot?.accomplishment || '—' }}
+                        </p>
+                        <button
+                          v-if="piPlans[0].accomplishments_count > 0"
+                          @click="openAccViewer(piPlans[0])"
+                          class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                          📋 {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
+                        </button>
+                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
@@ -842,9 +875,18 @@ const resubmit = () => {
 
                       <td class="px-4 py-2 border border-gray-300">{{ plan.success_indicator }}</td>
 
-                      <td class="px-4 py-2 border border-gray-300 cursor-pointer text-blue-600 hover:underline"
-                          @click="openModal(plan)">
-                        {{ plan.pivot?.accomplishment || '—' }}
+                      <td class="px-4 py-2 border border-gray-300">
+                        <p class="cursor-pointer text-blue-600 hover:underline text-sm"
+                           @click="openModal(plan)">
+                          {{ plan.pivot?.accomplishment || '—' }}
+                        </p>
+                        <button
+                          v-if="plan.accomplishments_count > 0"
+                          @click="openAccViewer(plan)"
+                          class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100">
+                          📋 {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
+                        </button>
+                        <span v-else class="block mt-1 text-xs text-gray-400 italic">No accomplishments</span>
                       </td>
 
                       <td class="px-4 py-2 border border-gray-300">
@@ -1029,8 +1071,8 @@ const resubmit = () => {
             </td>
             <td colspan="3" class="border px-3 py-3 text-center">
               <br/><br/>
-              <b style="text-transform: uppercase;">{{ supervisor.name }}</b><br/>
-              <small>{{supervisor.position}}</small>
+              <b style="text-transform: uppercase;">{{ supervisor?.name ?? '—' }}</b><br/>
+              <small>{{ supervisor?.position ?? '' }}</small>
             </td>
             <td colspan="1" class="border px-3 py-3 text-center">
               <br/><br/>
@@ -1081,7 +1123,7 @@ const resubmit = () => {
           </div>
           <div class="mt-4 flex justify-end gap-2">
             <button @click="closeModal" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300">Close</button>
-            <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+            <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" :disabled="isSubmitting" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
           </div>
         </div>
       </div>
@@ -1125,14 +1167,67 @@ const resubmit = () => {
             >Cancel</button>
             <button
               @click="submitAddPlans"
-              :disabled="!selectedPlans.length"
-              class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50"
-            >Add Selected</button>
+              :disabled="!selectedPlans.length || isSubmitting"
+              class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >{{ isSubmitting ? 'Adding…' : 'Add Selected' }}</button>
           </div>
         </div>
       </div>
     </div>
   </AdminLayout>
+
+  <!-- ── Daily Accomplishments Viewer Modal ───────────────────────────── -->
+  <div v-if="accViewerPlan"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    @click.self="closeAccViewer">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <!-- Header -->
+      <div class="flex items-start justify-between px-6 py-4 border-b">
+        <div>
+          <h2 class="text-base font-semibold text-gray-800">Accomplishments</h2>
+          <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+        </div>
+        <button @click="closeAccViewer" class="text-gray-400 hover:text-gray-700 text-xl leading-none ml-4">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div class="overflow-y-auto flex-1 px-6 py-4">
+        <div v-if="!accViewerPlan.accomplishments?.length"
+          class="text-center text-gray-400 text-sm py-8">
+          No accomplishments logged for this plan.
+        </div>
+
+        <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
+          class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+              {{ formatAccDate(acc.accomplishment_date) }}
+            </span>
+          </div>
+          <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ acc.description }}</p>
+          <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+            <a v-for="photo in acc.photos" :key="photo.id"
+              :href="photo.google_drive_link" target="_blank"
+              class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              📎 {{ photo.file_name || 'Photo' }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3 border-t text-right">
+        <span class="text-xs text-gray-400 mr-4">
+          {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
+        </span>
+        <button @click="closeAccViewer"
+          class="px-4 py-2 bg-gray-200 rounded-lg text-sm hover:bg-gray-300">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <style>

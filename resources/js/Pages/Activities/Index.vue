@@ -9,6 +9,7 @@ const activities = page.props.activities ?? [];
 
 const showModal = ref(false);
 const editing = ref(null);
+const isDeleting = ref(false);
 
 const form = useForm({
   name: '',
@@ -51,9 +52,18 @@ const submit = () => {
   }
 }
 
-const remove = (act) => {
+const remove = async (act) => {
   if (!confirm('Delete activity?')) return;
-  window.axios.delete(route('activities.destroy', act.id)).then(() => location.reload()).catch(e => alert('Delete failed'));
+  if (isDeleting.value) return;
+  isDeleting.value = true;
+  try {
+    await window.axios.delete(route('activities.destroy', act.id));
+    location.reload();
+  } catch (e) {
+    alert('Delete failed');
+  } finally {
+    isDeleting.value = false;
+  }
 }
 </script>
 
@@ -85,7 +95,7 @@ const remove = (act) => {
               <td class="py-2">{{ a.working_committee ?? '—' }}</td>
               <td class="py-2">
                 <button @click.prevent="openModal(a)" class="text-sm text-blue-600 mr-2">Edit</button>
-                <button @click.prevent="remove(a)" class="text-sm text-red-600">Delete</button>
+                <button @click.prevent="remove(a)" :disabled="isDeleting" class="text-sm text-red-600 disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
               </td>
             </tr>
             <tr v-if="activities.length === 0"><td colspan="5" class="py-6 text-center text-gray-500">No activities yet.</td></tr>
@@ -137,7 +147,7 @@ const remove = (act) => {
             </div>
 
             <div class="flex gap-2 mt-4">
-              <button @click.prevent="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+              <button @click.prevent="submit" :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ form.processing ? 'Saving…' : 'Save' }}</button>
               <button @click.prevent="closeModal" class="px-4 py-2 rounded border">Cancel</button>
             </div>
           </div>

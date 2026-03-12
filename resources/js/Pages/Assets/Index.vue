@@ -2,9 +2,9 @@
 import { Head, usePage } from "@inertiajs/vue3"
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { router } from '@inertiajs/vue3'
 import { PencilSquareIcon, TrashIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
+import { useSubmit } from "@/Composables/useSubmit"
 
 const props = defineProps({
   assets: Array,
@@ -12,6 +12,8 @@ const props = defineProps({
   rooms: Array,
   users: Array,
 })
+
+const { isSubmitting, submit } = useSubmit()
 
 const assets = ref(props.assets || [])
 const searchQuery = ref('')
@@ -91,12 +93,12 @@ const submitAsset = () => {
     // When sending files, PHP/Laravel does not reliably parse multipart PUT requests.
     // Use POST with method spoofing so Laravel receives the form data and files.
     fd.append('_method', 'PUT')
-    router.post(`/assets/${editingId.value}`, fd, {
+    submit.post(`/assets/${editingId.value}`, fd, {
       onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Asset updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
       onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errors).flat().join('\n') }) }
     })
   } else {
-    router.post('/assets', fd, {
+    submit.post('/assets', fd, {
       onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Asset added', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
       onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to add', text: Object.values(errors).flat().join('\n') }) }
     })
@@ -127,7 +129,7 @@ const openEdit = (asset) => {
 const deleteAsset = (asset) => {
   Swal.fire({ title: `Delete asset ${asset.property_no}?`, text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' }).then((res) => {
     if (!res.isConfirmed) return
-    router.delete(`/assets/${asset.id}`, {
+    submit.delete(`/assets/${asset.id}`, {
       onSuccess: () => { Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false }).then(() => { window.location.reload() }) },
       onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors).flat().join('\n') || 'Failed to delete' }) }
     })
