@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ref } from "vue"
+import { ref, computed } from "vue"
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -61,51 +61,22 @@ const csrfToken = page.props.csrf_token || document.querySelector('meta[name="cs
 const showReportModal = ref(false)
 const reportGroupBy = ref('category') // 'category' or 'location'
 
-// Generate report grouped by category or location
+// Group all equipments by category or location for the print report
+const groupedEquipments = computed(() => {
+  const groups = {}
+  ;(props.equipments ?? []).forEach(eq => {
+    const key = reportGroupBy.value === 'category'
+      ? (eq.category || 'Uncategorized')
+      : (eq.room?.name || 'No Location')
+    if (!groups[key]) groups[key] = []
+    groups[key].push(eq)
+  })
+  return groups
+})
+
 function generateReport() {
-  // Show loading indicator
-  const isLoading = ref(true)
-  
-  try {
-    // Use fetch for file download
-    fetch(route('ict-equipments.report.generate'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
-      },
-      body: JSON.stringify({
-        groupBy: reportGroupBy.value,
-      }),
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to generate report')
-      }
-      return response.blob()
-    })
-    .then(blob => {
-      // Create a temporary URL for the blob
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `ict-equipment-report-${new Date().toISOString().split('T')[0]}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-    })
-    .catch(error => {
-      console.error('Error generating report:', error)
-      alert('Error generating report. Please try again.')
-    })
-    .finally(() => {
-      isLoading.value = false
-    })
-  } catch (error) {
-    console.error('Error:', error)
-    alert('An error occurred. Please try again.')
-  }
+  showReportModal.value = false
+  window.print()
 }
 
 // ✅ Print Modal Content
@@ -568,4 +539,158 @@ function printModal() {
 
     </div>
   </AdminLayout>
+
+  <!-- Print-only area (teleported outside #app for clean isolation) -->
+  <Teleport to="body">
+  <div id="ict-print-area">
+    <table id="ict-pt-wrap">
+      <thead>
+        <tr><td id="ict-pt-head">
+          <img src="/images/report_header.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </thead>
+      <tfoot>
+        <tr><td id="ict-pt-foot">
+          <img src="/images/report_footer.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </tfoot>
+      <tbody>
+        <tr><td id="ict-pt-body">
+
+          <!-- Title -->
+          <div style="text-align:center; margin:10px 0 14px;">
+            <h2 style="font-size:14pt; font-weight:bold; margin:0;">ICT EQUIPMENT INVENTORY REPORT</h2>
+            <p style="margin:4px 0 0; font-size:9pt; color:#555;">
+              Grouped by {{ reportGroupBy === 'category' ? 'Category' : 'Location / Room' }}
+              &nbsp;&mdash;&nbsp;
+              As of {{ new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+            </p>
+          </div>
+
+          <!-- Summary Table -->
+          <div style="margin-bottom:6px; font-size:10pt; font-weight:bold; color:#1e3a8a;">SUMMARY</div>
+          <table style="width:50%; border-collapse:collapse; font-size:9pt; margin-bottom:20px;">
+            <thead>
+              <tr style="background:#e5e7eb;">
+                <th style="border:1px solid #000; padding:5px 8px; text-align:left; font-weight:bold; color:#000;">
+                  {{ reportGroupBy === 'category' ? 'Category' : 'Location / Room' }}
+                </th>
+                <th style="border:1px solid #000; padding:5px 8px; text-align:center; width:60px; font-weight:bold; color:#000;">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(items, groupName) in groupedEquipments" :key="'s-'+groupName" class="ict-summary-row">
+                <td style="border:1px solid #000; padding:4px 8px;">{{ groupName }}</td>
+                <td style="border:1px solid #000; padding:4px 8px; text-align:center;">{{ items.length }}</td>
+              </tr>
+              <tr style="background:#f3f4f6; font-weight:bold;">
+                <td style="border:1px solid #000; padding:4px 8px;">TOTAL</td>
+                <td style="border:1px solid #000; padding:4px 8px; text-align:center;">{{ props.equipments?.length ?? 0 }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Section divider -->
+          <div style="border-top:2px solid #1d4ed8; margin-bottom:14px;"></div>
+          <div style="font-size:10pt; font-weight:bold; color:#1e3a8a; margin-bottom:10px;">DETAILED INVENTORY</div>
+
+          <!-- Equipment groups -->
+          <template v-for="(items, groupName) in groupedEquipments" :key="groupName">
+            <div class="ict-group-header" style="margin-top:14px; margin-bottom:0; font-size:10pt; font-weight:bold; background:#f3f4f6; padding:4px 8px; border-left:3px solid #2563eb;">
+              {{ groupName }} ({{ items.length }})
+            </div>
+            <table class="ict-group-table" style="width:100%; border-collapse:collapse; font-size:8.5pt; margin-bottom:4px;">
+              <thead>
+                <tr style="background:#e5e7eb;">
+                  <th style="border:1px solid #999; padding:4px 6px; text-align:left; width:60px;">Prop. No.</th>
+                  <th style="border:1px solid #999; padding:4px 6px; text-align:left; width:90px;">Serial No.</th>
+                  <th style="border:1px solid #999; padding:4px 6px; text-align:left;">Description</th>
+                  <th style="border:1px solid #999; padding:4px 6px; text-align:left; width:120px;">Owner</th>
+                  <th v-if="reportGroupBy === 'location'" style="border:1px solid #999; padding:4px 6px; text-align:left; width:90px;">Category</th>
+                  <th v-if="reportGroupBy === 'category'" style="border:1px solid #999; padding:4px 6px; text-align:left; width:100px;">Location</th>
+                  <th style="border:1px solid #999; padding:4px 6px; text-align:left; width:80px;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="eq in items" :key="eq.id" class="ict-data-row">
+                  <td style="border:1px solid #ccc; padding:3px 6px;">{{ eq.property_no || '—' }}</td>
+                  <td style="border:1px solid #ccc; padding:3px 6px;">{{ eq.serial_no || '—' }}</td>
+                  <td style="border:1px solid #ccc; padding:3px 6px;">{{ eq.description }}</td>
+                  <td style="border:1px solid #ccc; padding:3px 6px;">{{ props.users.find(u => u.id === eq.owner_id)?.name || 'N/A' }}</td>
+                  <td v-if="reportGroupBy === 'location'" style="border:1px solid #ccc; padding:3px 6px;">{{ eq.category || '—' }}</td>
+                  <td v-if="reportGroupBy === 'category'" style="border:1px solid #ccc; padding:3px 6px;">{{ eq.room?.name || '—' }}</td>
+                  <td style="border:1px solid #ccc; padding:3px 6px;">{{ eq.status }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+  </Teleport>
+
 </template>
+
+<style>
+#ict-print-area {
+  display: none;
+}
+
+@page {
+  margin: 0.25in 0 0 0;
+}
+
+@media print {
+  #app {
+    display: none !important;
+  }
+
+  #ict-print-area {
+    display: block !important;
+  }
+
+  #ict-pt-wrap {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  #ict-pt-head {
+    padding: 0;
+  }
+
+  #ict-pt-foot {
+    padding: 0;
+  }
+
+  #ict-pt-body {
+    padding: 10px 1in;
+    vertical-align: top;
+  }
+
+  /* Prevent individual data rows from being split across pages */
+  .ict-data-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Summary rows should also stay whole */
+  .ict-summary-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Keep group header attached to the table that follows it */
+  .ict-group-header {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Allow the group table itself to break across pages (for large groups) */
+  .ict-group-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+}
+</style>
