@@ -1,7 +1,6 @@
 <script setup>
-import { ref, computed } from "vue"
-import { Head, usePage } from "@inertiajs/vue3"
-import { router } from '@inertiajs/vue3'
+import { ref, computed, watch } from "vue"
+import { Head, usePage, router } from "@inertiajs/vue3"
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import {
@@ -12,26 +11,22 @@ import {
   ArrowDownTrayIcon
 } from "@heroicons/vue/24/outline"
 import { useJobRequests } from "@/Composables/useJobRequests.js"
-import axios from "axios"
 
-// Props from backend
-const props = defineProps({ 
-  requests: Array,
+// Props from backend — requests is now a paginator object
+const props = defineProps({
+  requests: Object,
+  filters: Object,
   categories: Array,
-  divisionChiefs: Array,   
-  administrators: Array,
-  ictEquipment: Array // ✅ NEW
+  divisionChiefs: Array,
+  misPersonnel: Array,
+  ictEquipment: Array,
 })
 
-// Composable: all request logic
+// Composable: modal/form/submit logic (pass current page's data)
 const {
-  requestsList,
   showModal,
   modalMode,
   selectedRequest,
-  searchQuery,
-  currentPage,
-  perPage,
   form,
   formatDate,
   openModal,
@@ -40,53 +35,71 @@ const {
   viewRequest,
   misAssessment,
   deleteRequest,
-  sortBy,
   exportCSV,
   printTable,
-} = useJobRequests(props.requests)
+} = useJobRequests(props.requests?.data ?? [])
 
 // Auth info
 const page = usePage()
 const currentUser = page.props.auth?.user ?? null
 const userRole = currentUser?.role?.name ?? null
 
-// Open MIS Assessment modal
 function openMISAssessment(request) {
   misAssessment(request)
 }
 
-// Filter + paginate directly here so search is always reactive
-const visibleRequestsAll = computed(() => {
-  const q = searchQuery.value.toLowerCase().trim()
-  let base = requestsList.value
+// Server-side filters
+const search         = ref(props.filters?.search   ?? '')
+const filterCategory = ref(props.filters?.category ?? '')
+const filterStatus   = ref(props.filters?.status   ?? '')
+const isLoading      = ref(false)
+let debounceTimer    = null
 
-  // Non-admins only see their own requests
-  if (currentUser && userRole !== 'Administrator') {
-    base = base.filter(req => req.user_id === currentUser.id)
+const buildParams = (page = undefined) => ({
+  search:   search.value   || undefined,
+  category: filterCategory.value || undefined,
+  status:   filterStatus.value   || undefined,
+  page:     page            || undefined,
+})
+
+const applyFilters = (immediate = true) => {
+  clearTimeout(debounceTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('jobrequests.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['requests', 'filters'],
+      onFinish: () => { isLoading.value = false },
+    })
   }
+  if (immediate) go()
+  else debounceTimer = setTimeout(go, 400)
+}
 
-  if (!q) return base
-  return base.filter(req =>
-    (req.title        || '').toLowerCase().includes(q) ||
-    (req.category     || '').toLowerCase().includes(q) ||
-    (req.status       || '').toLowerCase().includes(q) ||
-    (req.description  || '').toLowerCase().includes(q) ||
-    (req.user?.name   || '').toLowerCase().includes(q) ||
-    (req.itjr_no      || '').toString().toLowerCase().includes(q) ||
-    (req.action_taken || '').toLowerCase().includes(q)
-  )
-})
+// Auto-search while typing (debounced); dropdowns fire immediately
+watch(search, () => applyFilters(false))
+watch(filterCategory, () => applyFilters(true))
+watch(filterStatus,   () => applyFilters(true))
 
-const totalPages = computed(() => Math.max(1, Math.ceil(visibleRequestsAll.value.length / perPage)))
+const goToPage = (pageNum) => {
+  isLoading.value = true
+  router.get(route('jobrequests.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
 
-const visibleRequests = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return visibleRequestsAll.value.slice(start, start + perPage)
-})
+// Current page data from paginator
+const visibleRequests = computed(() => props.requests?.data ?? [])
+const currentPage = computed(() => props.requests?.current_page ?? 1)
+const totalPages = computed(() => props.requests?.last_page ?? 1)
 
 const hasPendingConfirmation = computed(() => {
   if (!currentUser || userRole === 'Administrator') return false
-  return visibleRequestsAll.value.some(req => req.status === 'Acted by MIS')
+  return visibleRequests.value.some(req => req.status === 'Acted by MIS')
 })
 
 /* ---------------------------------------
@@ -126,7 +139,7 @@ const submitRating = async () => {
     },
     {
       preserveScroll: true,
-      onSuccess: async (page) => {
+      onSuccess: async () => {
         // Update local status immediately
         requestToRate.value.status = "Request Completed"
 
@@ -183,12 +196,49 @@ const handleNewRequest = async () => {
       <!-- Search & Actions -->
       <div class="bg-white rounded-xl shadow p-4 mb-4">
         <div class="flex justify-between items-center mb-4">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search requests..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-64">
+              <input
+                v-model="search"
+                type="text"
+                placeholder="Search requests..."
+                @keydown.enter.prevent="applyFilters(true)"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+              <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⏳</span>
+            </div>
+            <button
+              @click="applyFilters(true)"
+              :disabled="isLoading"
+              class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+            >
+              Search
+            </button>
+          </div>
+          <!-- Dropdown Filters -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <select
+              v-model="filterCategory"
+              class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Categories</option>
+              <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+            </select>
+            <select
+              v-model="filterStatus"
+              class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="Pending Division Chief Approval">Pending DC Approval</option>
+              <option value="Pending OCD Approval">Pending OCD Approval</option>
+              <option value="In Progress">In Progress</option>
+              <option value="MIS Assessed the Request">MIS Assessed</option>
+              <option value="Acted by MIS">Acted by MIS</option>
+              <option value="Request Completed">Completed</option>
+              <option value="Rejected by Division Chief">Rejected by DC</option>
+              <option value="Rejected by OCD">Rejected by OCD</option>
+            </select>
+          </div>
           <div class="flex gap-2">
             <button @click="exportCSV">
               <ArrowDownTrayIcon class="w-5 h-5 text-blue-600" />
@@ -354,9 +404,9 @@ const handleNewRequest = async () => {
 
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 
@@ -564,8 +614,8 @@ const handleNewRequest = async () => {
                   required
                 >
                   <option value="">-- Select MIS Personnel --</option>
-                  <option v-for="admin in props.administrators" :key="admin.id" :value="admin.id">
-                    {{ admin.name }}
+                  <option v-for="mis in props.misPersonnel" :key="mis.id" :value="mis.id">
+                    {{ mis.name }}
                   </option>
                 </select>
               </div>

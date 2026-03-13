@@ -1,43 +1,64 @@
 <script setup>
-import { ref, computed } from "vue"
-import { Head } from "@inertiajs/vue3"
+import { ref, computed, watch } from "vue"
+import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { useSubmit } from "@/Composables/useSubmit"
 import { CheckCircleIcon, XCircleIcon, EyeIcon, FunnelIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
 
 const props = defineProps({
-  requests: Array
+  requests: Object,
+  filters: Object,
+  categories: Array,
 })
 
-const { isSubmitting, submit } = useSubmit()
-
 // State
-const filterStatus = ref("all")
-const searchQuery = ref("")
 const showModal = ref(false)
 const selectedRequest = ref(null)
 
-// Computed: filter + search
-const filteredRequests = computed(() => {
-  let results = props.requests
+// Server-side filters
+const search         = ref(props.filters?.search   ?? '')
+const filterCategory = ref(props.filters?.category ?? '')
+const isLoading      = ref(false)
+let debounceTimer    = null
 
-  if (filterStatus.value !== "all") {
-    results = results.filter(r => r.status === filterStatus.value)
-  }
-
-  if (searchQuery.value) {
-    results = results.filter(r =>
-      (r.title || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (r.user?.name || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (r.status || '').toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      (r.category || '').toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-  }
-
-  return results
+const buildParams = (page = undefined) => ({
+  search:   search.value         || undefined,
+  category: filterCategory.value || undefined,
+  page:     page                 || undefined,
 })
+
+const applyFilters = (immediate = true) => {
+  clearTimeout(debounceTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('job-requests.for-approval'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['requests', 'filters'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else debounceTimer = setTimeout(go, 400)
+}
+
+watch(search,         () => applyFilters(false))
+watch(filterCategory, () => applyFilters(true))
+
+const goToPage = (pageNum) => {
+  isLoading.value = true
+  router.get(route('job-requests.for-approval'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const currentPage = computed(() => props.requests?.current_page ?? 1)
+const totalPages = computed(() => props.requests?.last_page ?? 1)
+const filteredRequests = computed(() => props.requests?.data ?? [])
 
 // SweetAlert actions
 const approveRequest = async (id) => {
@@ -52,8 +73,9 @@ const approveRequest = async (id) => {
   })
 
   if (result.isConfirmed) {
-    router.post(route("job-requests.division-chief-action", id), { action: "approve" })
-    Swal.fire("Approved!", "The request has been approved.", "success")
+    router.post(route("job-requests.division-chief-action", id), { action: "approve" }, {
+      onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
+    })
   }
 }
 
@@ -69,8 +91,9 @@ const rejectRequest = async (id) => {
   })
 
   if (result.isConfirmed) {
-    router.post(route("job-requests.division-chief-action", id), { action: "reject" })
-    Swal.fire("Rejected!", "The request has been rejected.", "error")
+    router.post(route("job-requests.division-chief-action", id), { action: "reject" }, {
+      onSuccess: () => Swal.fire("Rejected!", "The request has been rejected.", "error"),
+    })
   }
 }
 
@@ -97,26 +120,32 @@ const closeModal = () => {
 
       <!-- Card: Search + Filter + Table -->
       <div class="bg-white rounded-xl shadow p-4">
-        <!-- Search + Filter -->
-        <div class="mb-4 flex items-center justify-between">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search requests..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
-          <div class="flex items-center gap-2">
-            <FunnelIcon class="w-5 h-5 text-gray-500" />
-            <select
-              v-model="filterStatus"
-              class="rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="all">All</option>
-              <option value="Pending Division Chief Approval">Pending</option>
-              <option value="Pending OCD Approval">Approved</option>
-              <option value="Rejected by Division Chief">Rejected</option>
-            </select>
+        <!-- Search + Filters -->
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+          <div class="relative flex-1 sm:w-64 sm:flex-none">
+            <input
+              v-model="search"
+              type="text"
+              placeholder="Search requests..."
+              @keydown.enter.prevent="applyFilters(true)"
+              class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+            <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⏳</span>
           </div>
+          <button
+            @click="applyFilters(true)"
+            :disabled="isLoading"
+            class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+          >
+            Search
+          </button>
+          <select
+            v-model="filterCategory"
+            class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">All Categories</option>
+            <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+          </select>
         </div>
 
         <!-- Table -->
@@ -195,6 +224,13 @@ const closeModal = () => {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 mt-4">
+          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 

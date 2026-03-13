@@ -46,9 +46,7 @@ class FacilityRequestController extends Controller
             return $ra;
         });
 
-        // Provide MIS users for optional auto-assignment when requesting IT assistance
-        // Select users whose position contains the phrase 'MIS Staff'
-        $misUsers = User::whereRaw('position LIKE ?', ['%MIS Staff%'])->select('id','name','position')->orderBy('name')->get();
+        $misUsers = User::havingRole('MIS')->select('id', 'name', 'position')->orderBy('name')->get();
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
