@@ -364,12 +364,12 @@ const monthLabel = computed(() => {
       </div>
     </div>
 
-    <!-- ── Monthly Report Modal ──────────────────────────────────────────── -->
-    <div v-if="showReport" class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 overflow-y-auto py-8 print:static print:bg-transparent print:py-0">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl p-8 mx-4 print:shadow-none print:rounded-none print:mx-0 print:p-6">
+    <!-- ── Monthly Report Modal (screen only) ───────────────────────────── -->
+    <div v-if="showReport" class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 overflow-y-auto py-8">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl p-8 mx-4">
 
-        <!-- Print controls (hidden when printing) -->
-        <div class="flex justify-between items-center mb-6 print:hidden">
+        <!-- Controls -->
+        <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-bold">Monthly Accomplishment Report</h2>
           <div class="flex gap-2">
             <button @click="printReport" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
@@ -381,10 +381,9 @@ const monthLabel = computed(() => {
           </div>
         </div>
 
-        <!-- Report header -->
-        <div class="text-center mb-6">
-          <h1 class="text-2xl font-bold text-gray-800">Monthly Accomplishment Report</h1>
-          <p class="text-gray-600 mt-1">
+        <!-- Preview header -->
+        <div class="text-center mb-4">
+          <p class="font-semibold text-gray-700">
             {{ reportData?.employee?.name }} — {{ reportData?.employee?.position }}
           </p>
           <p class="text-sm text-gray-500 mt-0.5">
@@ -392,14 +391,15 @@ const monthLabel = computed(() => {
           </p>
         </div>
 
-        <!-- Report table -->
-        <table class="w-full text-sm border border-gray-300">
+        <!-- Preview table -->
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm border border-gray-300 min-w-[600px]">
           <thead class="bg-gray-100 text-gray-700 text-xs uppercase">
             <tr>
               <th class="px-3 py-2 text-left border border-gray-300 w-28">Date</th>
               <th class="px-3 py-2 text-left border border-gray-300">Description</th>
               <th class="px-3 py-2 text-left border border-gray-300">Linked IPCR Plan</th>
-              <th class="px-3 py-2 text-left border border-gray-300">Photo Proof</th>
+              <th class="px-3 py-2 text-left border border-gray-300">Proof</th>
             </tr>
           </thead>
           <tbody>
@@ -409,13 +409,13 @@ const monthLabel = computed(() => {
               </td>
               <td class="px-3 py-2 border border-gray-300 align-top whitespace-pre-wrap">{{ acc.description }}</td>
               <td class="px-3 py-2 border border-gray-300 align-top text-xs text-gray-600">
-                {{ acc.ipcr_plan?.plan?.success_indicator ?? "—" }}
+                {{ planLabel(acc) }}
               </td>
               <td class="px-3 py-2 border border-gray-300 align-top">
                 <div v-for="photo in acc.photos" :key="photo.id">
                   <a v-if="proofUrl(photo)" :href="proofUrl(photo)" target="_blank"
-                    class="text-blue-600 hover:underline text-xs print:text-gray-700 flex items-center gap-1">
-                    {{ proofIcon(photo) }} {{ proofLabel(photo) }}
+                    class="text-blue-600 hover:underline text-xs">
+                    {{ proofLabel(photo) }}
                   </a>
                 </div>
                 <span v-if="!acc.photos?.length" class="text-xs text-gray-400">—</span>
@@ -428,29 +428,141 @@ const monthLabel = computed(() => {
             </tr>
           </tbody>
         </table>
+        </div>
 
-        <p class="text-xs text-gray-400 mt-4 print:mt-6">
+        <p class="text-xs text-gray-400 mt-3">
           Total: {{ reportData?.accomplishments?.length ?? 0 }} accomplishment(s)
         </p>
-
-        <!-- Signature line for print -->
-        <div class="hidden print:flex justify-end mt-12">
-          <div class="text-center">
-            <div class="border-t border-gray-700 w-48 mt-8 pt-1 text-xs text-gray-600">
-              {{ reportData?.employee?.name }}<br />Signature over Printed Name
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
   </AdminLayout>
+
+  <!-- ── Print-only area (teleported outside #app for clean isolation) ── -->
+  <Teleport to="body">
+  <div v-if="reportData" id="print-area">
+    <!--
+      Outer wrapper table:
+        <thead> → header image repeats at top of every page (browser-native, never cut)
+        <tfoot> → footer image repeats at bottom of every page
+        <tbody> → single cell holds all flowing content with 1in side margins
+    -->
+    <!-- Footer fixed to bottom of every page -->
+    <div id="print-footer">
+      <img src="/images/report_footer.jpeg" style="width:100%; display:block;" />
+    </div>
+
+    <table id="pt-wrap">
+      <thead>
+        <tr><td id="pt-head">
+          <img src="/images/report_header.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </thead>
+      <tbody>
+        <tr><td id="pt-body">
+
+          <!-- Title -->
+          <div style="text-align:center; margin:10px 0 10px;">
+            <h2 style="font-size:14pt; font-weight:bold; margin:0;">MONTHLY ACCOMPLISHMENT REPORT</h2>
+            <p style="margin:2px 0 0; font-size:9pt; color:#555;">
+              {{ new Date(reportData?.month + "-01").toLocaleString("default", { month: "long", year: "numeric" }) }}
+            </p>
+          </div>
+
+          <!-- Data table -->
+          <table style="width:100%; border-collapse:collapse; font-size:9pt;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="border:1px solid #999; padding:5px 8px; text-align:left; width:80px;">Date</th>
+                <th style="border:1px solid #999; padding:5px 8px; text-align:left;">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="acc in reportData?.accomplishments" :key="'p'+acc.id">
+                <td style="border:1px solid #999; padding:5px 8px; vertical-align:top; white-space:nowrap;">
+                  {{ new Date(acc.accomplishment_date).toLocaleDateString("en-PH", { month:"short", day:"numeric" }) }}
+                </td>
+                <td style="border:1px solid #999; padding:5px 8px; vertical-align:top; white-space:pre-wrap;">{{ acc.description }}</td>
+              </tr>
+              <tr v-if="!reportData?.accomplishments?.length">
+                <td colspan="2" style="border:1px solid #999; padding:16px; text-align:center; color:#999;">
+                  No accomplishments recorded for this month.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Signatures -->
+          <div style="display:flex; justify-content:space-between; margin-top:40px;">
+            <div style="text-align:center;">
+              <p style="margin:0 0 4px; font-size:9pt;">Prepared by:</p>
+              <div style="margin-top:32px; border-top:1px solid #333; padding-top:4px; min-width:180px; font-size:9pt;">
+                <strong>{{ reportData?.employee?.name }}</strong><br />
+                <span>{{ reportData?.employee?.position }}</span>
+              </div>
+            </div>
+            <div style="text-align:center;">
+              <p style="margin:0 0 4px; font-size:9pt;">Noted by:</p>
+              <div style="margin-top:32px; border-top:1px solid #333; padding-top:4px; min-width:180px; font-size:9pt;">
+                <strong>{{ reportData?.immediate_head?.name ?? '________________________________' }}</strong><br />
+                <span>{{ reportData?.immediate_head?.position ?? '' }}</span>
+              </div>
+            </div>
+          </div>
+
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+  </Teleport>
+
 </template>
 
 <style>
+#print-area {
+  display: none;
+}
+
+@page {
+  /* Small top margin prevents header from being clipped by printer unprintable area.
+     Bottom/sides are 0 so images reach the edge; side margins set via #pt-body padding. */
+  margin: 0.25in 0 0 0;
+}
+
 @media print {
-  body > *:not(.fixed) { display: none !important; }
-  .fixed { position: static !important; display: block !important; }
-  .print\:hidden { display: none !important; }
+  /* Hide entire Inertia app; #print-area is teleported to <body> */
+  #app {
+    display: none !important;
+  }
+
+  #print-area {
+    display: block !important;
+  }
+
+  /* Outer wrapper table fills the full page */
+  #pt-wrap {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  /* Footer: fixed to the bottom of every page */
+  #print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+  }
+
+  /* Header cell: no padding so image reaches the page edge */
+  #pt-head {
+    padding: 0;
+  }
+
+  /* Content cell: 1-inch side margins; bottom padding clears the fixed footer */
+  #pt-body {
+    padding: 10px 1in 90px;  /* increase 90px if footer image is taller */
+    vertical-align: top;
+  }
 }
 </style>
