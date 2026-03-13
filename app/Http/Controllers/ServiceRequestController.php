@@ -21,7 +21,8 @@ class ServiceRequestController extends Controller
         // eager-load requester so frontend can display requester name
         $query = ServiceRequest::with('requester')->latest();
 
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief'])
+            || str_contains($user->position ?? '', 'FAD');
 
         if (! $canViewAll) {
             $query->where('requestor_id', $user->id);

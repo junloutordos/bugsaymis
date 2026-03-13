@@ -21,12 +21,19 @@ class VehicleRequestController extends Controller
     {
 
         $user = $request->user();
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'OCD']);
 
         $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
 
         if (! $canViewAll) {
-            $requests->where('requestor_id', $user->id);
+            if ($user->hasRole('DivisionChief')) {
+                $requests->where(function ($q) use ($user) {
+                    $q->where('requestor_id', $user->id)
+                      ->orWhere('division_chief_id', $user->id);
+                });
+            } else {
+                $requests->where('requestor_id', $user->id);
+            }
         }
 
         $requests = $requests->get();
