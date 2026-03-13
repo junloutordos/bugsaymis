@@ -99,25 +99,40 @@ public function index(Request $request)
             'assignedto' => 'required|exists:users,id',
         ]);
 
-        // Generate ITJR number
-        $prefix = now()->format('Y-m');
-        $latestSeq = ITJobRequest::where('itjr_no', 'like', "{$prefix}-%")
-            ->select(DB::raw("MAX(CAST(SUBSTRING_INDEX(itjr_no, '-', -1) AS UNSIGNED)) as seq"))
-            ->value('seq');
+        // Duplicate guard: same user submitted identical title+category within the last 30 seconds
+        $isDuplicate = ITJobRequest::where('user_id', $request->user()->id)
+            ->where('title', $validated['title'])
+            ->where('category', $validated['category'])
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->exists();
 
-        $validated['itjr_no'] = sprintf('%s-%04d', $prefix, ($latestSeq ?? 0) + 1);
-        $validated['user_id'] = $request->user()->id;
-        $validated['status'] = 'Pending Division Chief Approval';
+        if ($isDuplicate) {
+            return back()->withErrors(['title' => 'Duplicate request detected. Please wait before submitting again.']);
+        }
 
-        $jobRequest = ITJobRequest::create($validated);
+        $jobRequest = DB::transaction(function () use ($validated, $request) {
+            // Generate ITJR number (inside transaction to prevent race conditions)
+            $prefix = now()->format('Y-m');
+            $latestSeq = ITJobRequest::where('itjr_no', 'like', "{$prefix}-%")
+                ->lockForUpdate()
+                ->select(DB::raw("MAX(CAST(SUBSTRING_INDEX(itjr_no, '-', -1) AS UNSIGNED)) as seq"))
+                ->value('seq');
 
-        // Log creation
-        ITJRTrackingLog::create([
-            'it_job_request_id' => $jobRequest->id,
-            'status' => 'Submitted IT Job Request',
-            'remarks' => 'Request submitted by user.',
-            'updated_by' => $request->user()->id,
-        ]);
+            $validated['itjr_no'] = sprintf('%s-%04d', $prefix, ($latestSeq ?? 0) + 1);
+            $validated['user_id'] = $request->user()->id;
+            $validated['status'] = 'Pending Division Chief Approval';
+
+            $jobRequest = ITJobRequest::create($validated);
+
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'Submitted IT Job Request',
+                'remarks' => 'Request submitted by user.',
+                'updated_by' => $request->user()->id,
+            ]);
+
+            return $jobRequest;
+        });
 
         // Send email to Division Chief with signed approve/decline links
         if ($jobRequest->divisionchief_id) {
@@ -391,37 +406,36 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         ? 'Acted by MIS'
         : 'MIS Assessed the Request';
 
-    // 🔄 Update IT Job Request
-    $jobRequest->update(array_merge($validated, [
-        'status' => $status,
-        'attendedby' => $request->user()->name,
-    ]));
+    DB::transaction(function () use ($jobRequest, $validated, $status, $isActedByMIS, $request) {
+        $jobRequest->update(array_merge($validated, [
+            'status' => $status,
+            'attendedby' => $request->user()->name,
+        ]));
 
-    // 🧾 Tracking log
-    ITJRTrackingLog::create([
-        'it_job_request_id' => $jobRequest->id,
-        'status' => $status,
-        'remarks' => collect($validated)->filter()->implode("\n"),
-        'updated_by' => $request->user()->id,
-    ]);
-
-    // 📘 Save to ICT PMS History (only if acted)
-    if ($isActedByMIS && !empty($validated['ict_equipment_id'])) {
-        ICTPMSHistory::create([
-            'ict_pms_id'     => null,
-            'equipment_id'   => $validated['ict_equipment_id'],
-            'pms_date'       => now()->toDateString(),
-            'description'    => 'IT Job Request Service (' . $jobRequest->itjr_no . ')',
-            'type'           => 'Repair',
-            'cost_of_repair' => 0.00,
-            'remarks'        => $validated['action_taken']
-                                ?? $validated['mis_assessment']
-                                ?? 'Service action from IT Job Request',
-            'created_by'     => $request->user()->id,
+        ITJRTrackingLog::create([
+            'it_job_request_id' => $jobRequest->id,
+            'status' => $status,
+            'remarks' => collect($validated)->filter()->implode("\n"),
+            'updated_by' => $request->user()->id,
         ]);
-    }
 
-    // 📧 NOTIFY REQUESTER
+        if ($isActedByMIS && !empty($validated['ict_equipment_id'])) {
+            ICTPMSHistory::create([
+                'ict_pms_id'     => null,
+                'equipment_id'   => $validated['ict_equipment_id'],
+                'pms_date'       => now()->toDateString(),
+                'description'    => 'IT Job Request Service (' . $jobRequest->itjr_no . ')',
+                'type'           => 'Repair',
+                'cost_of_repair' => 0.00,
+                'remarks'        => $validated['action_taken']
+                                    ?? $validated['mis_assessment']
+                                    ?? 'Service action from IT Job Request',
+                'created_by'     => $request->user()->id,
+            ]);
+        }
+    });
+
+    // 📧 NOTIFY REQUESTER (outside transaction — email failures must not roll back DB changes)
     if ($jobRequest->user && $jobRequest->user->email) {
         try {
             Mail::to($jobRequest->user->email)->send(
@@ -448,24 +462,31 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
     public function confirmCompletion(Request $request, ITJobRequest $jobRequest)
     {
+        // Idempotency: already completed — return early without duplicate entry
+        if ($jobRequest->status === 'Request Completed') {
+            return back()->with('success', 'Request already confirmed.');
+        }
+
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'remarks' => 'nullable|string|max:500',
         ]);
 
-        $jobRequest->update([
-            'status' => 'Request Completed',
-            'rating' => $validated['rating'],
-            'rating_remarks' => $validated['remarks'],
-            'rated_at' => now(),
-        ]);
+        DB::transaction(function () use ($jobRequest, $validated, $request) {
+            $jobRequest->update([
+                'status' => 'Request Completed',
+                'rating' => $validated['rating'],
+                'rating_remarks' => $validated['remarks'],
+                'rated_at' => now(),
+            ]);
 
-        ITJRTrackingLog::create([
-            'it_job_request_id' => $jobRequest->id,
-            'status' => 'Request Completed',
-            'remarks' => 'User confirmed completion and rated the service.',
-            'updated_by' => $request->user()->id,
-        ]);
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'Request Completed',
+                'remarks' => 'User confirmed completion and rated the service.',
+                'updated_by' => $request->user()->id,
+            ]);
+        });
 
         return back()->with('success', 'Request confirmed and rated.');
     }
