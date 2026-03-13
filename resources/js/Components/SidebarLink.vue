@@ -19,8 +19,8 @@ defineProps({
     class="flex items-center px-3 py-2 rounded-md transition font-medium"
     :class="[
       active
-        ? 'bg-blue-100 text-blue-600'   // stays blue when active
-        : 'text-gray-700 hover:bg-blue-100 hover:text-blue-600'
+        ? 'bg-blue-50 text-blue-600 font-semibold'
+        : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
     ]"
   >
     <component
