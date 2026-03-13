@@ -882,7 +882,7 @@ filteredMenu.value.forEach((item) => {
       ]"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center border-b px-4">
+      <div class="h-16 flex items-center border-b border-gray-200 px-4">
         <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-10 shrink-0" />
         <span v-if="!collapsed" class="ml-3 text-xl font-bold text-gray-800 truncate">
           BugsayMIS
@@ -925,9 +925,9 @@ filteredMenu.value.forEach((item) => {
               @click="toggleExpand(item.label)"
               class="flex items-center w-full px-3 py-2 rounded-md transition
                 text-gray-700 hover:bg-gray-100"
-              :class="{ 'bg-gray-200 font-semibold': expanded[item.label] }"
+              :class="{ 'bg-gray-100 font-semibold': expanded[item.label] }"
             >
-              <component v-if="item.icon" :is="item.icon" class="h-5 w-5 mr-2" />
+              <component v-if="item.icon" :is="item.icon" class="h-5 w-5 mr-2 text-blue-500" />
               <span v-if="!collapsed">{{ item.label }}</span>
               <ChevronDownIcon
                 class="h-4 w-4 ml-auto transform transition-transform"
@@ -952,7 +952,7 @@ filteredMenu.value.forEach((item) => {
                   @click="openConsultationLogModal(child.routeName)"
                   class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
                   <span v-if="!collapsed" class="flex items-center w-full">
                     <span>{{ child.label }}</span>
                   </span>
@@ -963,7 +963,7 @@ filteredMenu.value.forEach((item) => {
                   @click="openLibraryStatsModal"
                   class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
                   <span v-if="!collapsed" class="flex items-center w-full">
                     <span>{{ child.label }}</span>
                   </span>
@@ -974,7 +974,7 @@ filteredMenu.value.forEach((item) => {
                   @click="openHealthStatsModal"
                   class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
                   <span v-if="!collapsed" class="flex items-center w-full">
                     <span>{{ child.label }}</span>
                   </span>
@@ -985,7 +985,7 @@ filteredMenu.value.forEach((item) => {
                   @click="openAttendanceModal"
                   class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2" />
+                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
                   <span v-if="!collapsed" class="flex items-center w-full">
                     <span>{{ child.label }}</span>
                   </span>

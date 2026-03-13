@@ -25,52 +25,57 @@ class ITJobRequestController extends Controller
      |=====================================================*/
 public function index(Request $request)
 {
-    $user = $request->user();
-
-    $roles = array_filter(explode(',', $user->role_id));
+    $user    = $request->user();
+    $roles   = array_filter(explode(',', $user->role_id));
     $isAdmin = isset($roles[0]) && (int) $roles[0] === 1;
+    $search   = trim($request->query('search', ''));
+    $category = trim($request->query('category', ''));
+    $status   = trim($request->query('status', ''));
+    $perPage  = min((int) $request->query('per_page', 15), 50);
 
-    $requests = ITJobRequest::with([
-        'user:id,name',
-        'divisionChief:id,name',
-        'assignedTo:id,name',
-        'trackingLogs:id,it_job_request_id,status,remarks,created_at',
-
-        // 🔥 THIS IS THE IMPORTANT PART
-        'equipment' => function ($q) {
-            $q->select('id','description','room_id','owner_id')
-              ->with([
-                  'room:id,name,code',
-                  'owner:id,name'
-              ]);
-        }
-    ])
-    ->when(!$isAdmin, fn ($q) => $q->where('user_id', $user->id))
-    ->latest()
-    ->get();
+    $requests = ITJobRequest::select([
+            'id', 'itjr_no', 'title', 'category', 'description', 'status',
+            'user_id', 'divisionchief_id', 'assignedto', 'attendedby',
+            'action_taken', 'created_at', 'updated_at',
+            'mis_assessment', 'expected_completion_date', 'completed_at',
+            'ict_equipment_id', 'rating', 'rating_remarks', 'rated_at',
+        ])
+        ->with([
+            'user:id,name',
+            'divisionChief:id,name',
+            'assignedTo:id,name',
+            'trackingLogs:id,it_job_request_id,status,remarks,created_at',
+            'equipment' => fn($q) => $q->select('id', 'description', 'room_id', 'owner_id')
+                ->with(['room:id,name,code', 'owner:id,name']),
+        ])
+        ->when(!$isAdmin, fn($q) => $q->where('user_id', $user->id))
+        ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+            $inner->where('title', 'like', "%{$search}%")
+                  ->orWhere('category', 'like', "%{$search}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  ->orWhere('itjr_no', 'like', "%{$search}%")
+                  ->orWhere('action_taken', 'like', "%{$search}%")
+                  ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+        }))
+        ->when($category, fn($q) => $q->where('category', $category))
+        ->when($status,   fn($q) => $q->where('status',   $status))
+        ->latest()
+        ->paginate($perPage)
+        ->withQueryString();
 
     return Inertia::render('ITJobRequests/Index', [
-        'requests' => $requests,
-        'categories' => ITJobCategory::orderBy('name')->get(),
-
+        'requests'       => $requests,
+        'filters'        => ['search' => $search, 'category' => $category, 'status' => $status],
+        'categories'     => ITJobCategory::orderBy('name')->get(['id', 'name']),
         'divisionChiefs' => User::where(function ($q) {
             $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
               ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]);
-        })->select('id','name')->orderBy('name')->get(),
-
-        'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [1])
-            ->select('id','name')->orderBy('name')->get(),
-
-        'ictEquipment' => ICTEquipment::with([
-            'room:id,name,code',
-            'owner:id,name',
-        ])
-        ->orderBy('description')
-        ->get(),
-
-
-
-        'isAdmin' => $isAdmin,
+        })->select('id', 'name')->orderBy('name')->get(),
+        'misPersonnel'   => User::havingRole('MIS')->select('id', 'name')->orderBy('name')->get(),
+        'ictEquipment'   => ICTEquipment::with(['room:id,name,code', 'owner:id,name'])
+            ->orderBy('description')
+            ->get(['id', 'description', 'room_id', 'owner_id', 'serial_no']),
+        'isAdmin'        => $isAdmin,
     ]);
 }
 
@@ -473,13 +478,28 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             abort(403, 'Unauthorized');
         }
 
-        $requests = ITJobRequest::with('user')
+        $search   = trim($request->query('search', ''));
+        $category = trim($request->query('category', ''));
+        $perPage  = min((int) $request->query('per_page', 15), 50);
+
+        $requests = ITJobRequest::with('user:id,name')
             ->where('divisionchief_id', $user->id)
             ->where('status', 'Pending Division Chief Approval')
-            ->get();
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('title', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhere('itjr_no', 'like', "%{$search}%")
+                      ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->when($category, fn($q) => $q->where('category', $category))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('ITJobRequests/ForApprovalITJR', [
-            'requests' => $requests
+            'requests'   => $requests,
+            'filters'    => ['search' => $search, 'category' => $category],
+            'categories' => ITJobCategory::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -526,12 +546,27 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             abort(403, 'Unauthorized');
         }
 
-        $requests = ITJobRequest::with('user')
+        $search   = trim($request->query('search', ''));
+        $category = trim($request->query('category', ''));
+        $perPage  = min((int) $request->query('per_page', 15), 50);
+
+        $requests = ITJobRequest::with('user:id,name')
             ->where('status', 'Pending OCD Approval')
-            ->get();
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('title', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhere('itjr_no', 'like', "%{$search}%")
+                      ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->when($category, fn($q) => $q->where('category', $category))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('ITJobRequests/OCDApprovalITJR', [
-            'requests' => $requests
+            'requests'   => $requests,
+            'filters'    => ['search' => $search, 'category' => $category],
+            'categories' => ITJobCategory::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
