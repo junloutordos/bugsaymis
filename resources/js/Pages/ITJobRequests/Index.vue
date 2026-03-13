@@ -111,6 +111,7 @@ const showRatingModal = ref(false)
 const requestToRate = ref(null)
 const rating = ref(0)
 const ratingRemarks = ref("")
+const isRatingSubmitting = ref(false)
 
 // Open rating modal
 function openRatingModal(request) {
@@ -130,7 +131,8 @@ const submitRating = async () => {
     return
   }
 
-  // Use Inertia router to send POST request
+  isRatingSubmitting.value = true
+
   router.post(
     `/it-job-requests/${requestToRate.value.id}/confirm`,
     {
@@ -140,22 +142,20 @@ const submitRating = async () => {
     {
       preserveScroll: true,
       onSuccess: async () => {
-        // Update local status immediately
         requestToRate.value.status = "Request Completed"
-
-        // Reset modal state
         showRatingModal.value = false
         requestToRate.value = null
         rating.value = 0
         ratingRemarks.value = ""
-
         await Swal.fire("Success", "Request confirmed and rated successfully!", "success")
-        // Optionally reload the page to get fresh data
         window.location.reload()
       },
       onError: async (errors) => {
         console.error(errors)
         await Swal.fire("Error", "Failed to submit rating. Please try again.", "error")
+      },
+      onFinish: () => {
+        isRatingSubmitting.value = false
       },
     }
   )
@@ -683,7 +683,10 @@ const handleNewRequest = async () => {
 
             <div class="flex justify-end space-x-3 pt-4">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed min-w-[80px]">
+                <span v-if="form.processing">Saving…</span>
+                <span v-else>Save</span>
+              </button>
             </div>
 
           </form>
@@ -727,8 +730,11 @@ const handleNewRequest = async () => {
         </div>
 
         <div class="flex justify-end gap-3">
-          <button @click="showRatingModal=false" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-          <button @click="submitRating" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Submit</button>
+          <button @click="showRatingModal=false" :disabled="isRatingSubmitting" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-60">Cancel</button>
+          <button @click="submitRating" :disabled="isRatingSubmitting" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed min-w-[90px]">
+            <span v-if="isRatingSubmitting">Submitting…</span>
+            <span v-else>Submit</span>
+          </button>
         </div>
       </div>
     </div>

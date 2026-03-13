@@ -131,13 +131,15 @@ export function useJobRequests(initialRequests = []) {
     }
 
     if (modalMode.value === "mis-assessment" && form.id) {
-      //  Use dedicated assessment route
-      router.put(`/job-requests/${form.id}/update`, form.data(), {
+      form.put(`/job-requests/${form.id}/update`, {
         preserveScroll: true,
         onSuccess: async () => {
           closeModal()
           await Swal.fire("Success", "MIS Assessment saved!", "success")
           window.location.reload()
+        },
+        onError: async () => {
+          await Swal.fire("Error", "Failed to save assessment. Please try again.", "error")
         },
       })
     }
