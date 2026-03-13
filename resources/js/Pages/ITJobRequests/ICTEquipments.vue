@@ -175,12 +175,12 @@ function printModal() {
           />
           
           <div class="flex gap-2">
-            <button @click="exportCSV" title="Export CSV">
+            <!--<button @click="exportCSV" title="Export CSV">
               <ArrowDownTrayIcon class="w-5 h-5 text-blue-600" />
             </button>
             <button @click="printTable" title="Print table">
               <PrinterIcon class="w-5 h-5 text-blue-600" />
-            </button>
+            </button>-->
             <button @click="showReportModal = true" title="Generate Report">
               <ChartBarIcon class="w-5 h-5 text-blue-600" />
             </button>
