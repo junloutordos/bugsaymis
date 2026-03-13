@@ -90,6 +90,10 @@ use App\Http\Controllers\LibraryKioskController;
 */
 Route::post('/google/login', [GoogleAuthController::class, 'login'])->name('google.login');
 
+// Socialite OAuth (server-side, no popup)
+Route::get('/auth/google', [GoogleAuthController::class, 'redirect'])->name('auth.google');
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
+
 /*
 |--------------------------------------------------------------------------
 | Public Routes

@@ -13,6 +13,7 @@ const props = defineProps({
   ipcr: Object,
   employee: Object,
   supervisor: Object,
+  ocdUser: { type: Object, default: null },
   plans: Array,
   workPlans: { type: Array, default: () => [] },
 });
@@ -700,8 +701,8 @@ const resubmit = () => {
               </td>
               <td colspan="4" class="border px-3 py-3 text-center">
                 <br/><br/>
-                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-                <small>Director III</small>
+                <b style="text-transform: uppercase;">{{ ocdUser?.name ?? '—' }}</b><br/>
+                <small>{{ ocdUser?.position ?? '' }}</small>
               </td>
               <td colspan="2" class="border px-3 py-3 text-center">
                 <br/>
@@ -1080,8 +1081,8 @@ const resubmit = () => {
             </td>
             <td colspan="3" class="border px-3 py-3 text-center">
               <br/><br/>
-              <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-              <small>Director III</small>
+              <b style="text-transform: uppercase;">{{ ocdUser?.name ?? '—' }}</b><br/>
+              <small>{{ ocdUser?.position ?? '' }}</small>
             </td>
             <td colspan="2" class="border px-3 py-3 text-center">
               <br/><br/>

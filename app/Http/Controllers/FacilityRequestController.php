@@ -19,7 +19,8 @@ class FacilityRequestController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief', 'OCD'])
+            || str_contains($user->position ?? '', 'FAD');
 
         $requestsQuery = FacilityRequest::latest();
 
