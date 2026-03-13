@@ -182,7 +182,7 @@ function printModal() {
               <PrinterIcon class="w-5 h-5 text-blue-600" />
             </button>-->
             <button @click="showReportModal = true" title="Generate Report">
-              <ChartBarIcon class="w-5 h-5 text-blue-600" />
+              <PrinterIcon class="w-5 h-5 text-blue-600" />
             </button>
           </div>
         </div>
