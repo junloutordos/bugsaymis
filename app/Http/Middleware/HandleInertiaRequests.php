@@ -157,13 +157,18 @@ class HandleInertiaRequests extends Middleware
                 return Committee::where('head_id', $user->id)->exists()
                     || SpecialAssignment::where('coordinator_id', $user->id)->exists();
             },
-            // App version info from version.json
+            // App version info from database
             'appVersion' => function () {
                 try {
-                    $data = json_decode(file_get_contents(base_path('version.json')), true);
+                    $versions = \App\Models\AppVersion::orderBy('date', 'desc')->get();
+                    $current  = $versions->firstWhere('is_current', true) ?? $versions->first();
                     return [
-                        'current' => $data['version'] ?? '1.0.0',
-                        'history' => array_reverse($data['history'] ?? []),
+                        'current' => $current?->version ?? '1.0.0',
+                        'history' => $versions->map(fn ($v) => [
+                            'version' => $v->version,
+                            'date'    => $v->date->format('Y-m-d'),
+                            'remarks' => $v->remarks,
+                        ])->values()->toArray(),
                     ];
                 } catch (\Throwable $e) {
                     return ['current' => '1.0.0', 'history' => []];

@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
-import { Head, usePage, router } from "@inertiajs/vue3";
+import { Head, usePage, router, useForm } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
 import ProfileEditModal from '@/Components/ProfileEditModal.vue';
 import {
@@ -40,6 +40,28 @@ const mobileOpen = ref(false);
 const showDropdown = ref(false);
 const expanded = ref({});
 const showVersionModal = ref(false);
+const showAddVersionModal = ref(false);
+const versionForm = useForm({
+  version:    '',
+  date:       new Date().toISOString().slice(0, 10),
+  remarks:    '',
+  is_current: true,
+});
+function openAddVersionModal() {
+  versionForm.reset();
+  versionForm.date       = new Date().toISOString().slice(0, 10);
+  versionForm.is_current = true;
+  showAddVersionModal.value = true;
+}
+function submitVersion() {
+  versionForm.post(route('app-versions.store'), {
+    preserveScroll: true,
+    onSuccess: () => {
+      showAddVersionModal.value = false;
+      versionForm.reset();
+    },
+  });
+}
 
 // Close mobile sidebar on Inertia navigation
 let removeNavListener;
@@ -1049,6 +1071,77 @@ filteredMenu.value.forEach((item) => {
             </div>
             <p v-if="!appVersion.history.length" class="text-sm text-gray-400 text-center py-4">No history yet.</p>
           </div>
+          <!-- Admin footer -->
+          <div v-if="roleName === 'Administrator'" class="px-6 py-3 border-t flex justify-end">
+            <button
+              @click="openAddVersionModal"
+              class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              + Add New Version
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Add Version Modal -->
+    <Teleport to="body">
+      <div v-if="showAddVersionModal" class="fixed inset-0 z-[60] flex items-center justify-center">
+        <div class="fixed inset-0 bg-black/50" @click="showAddVersionModal = false"></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+          <div class="flex items-center justify-between px-6 py-4 border-b">
+            <h2 class="text-lg font-bold text-gray-800">Add New Version</h2>
+            <button @click="showAddVersionModal = false" class="text-gray-400 hover:text-gray-600">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+          <form @submit.prevent="submitVersion" class="px-6 py-4 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Version <span class="text-red-500">*</span></label>
+              <input
+                v-model="versionForm.version"
+                type="text"
+                placeholder="e.g. 1.2.0"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              <p v-if="versionForm.errors.version" class="mt-1 text-xs text-red-500">{{ versionForm.errors.version }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Release Date <span class="text-red-500">*</span></label>
+              <input
+                v-model="versionForm.date"
+                type="date"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Remarks / Changelog <span class="text-red-500">*</span></label>
+              <textarea
+                v-model="versionForm.remarks"
+                rows="4"
+                placeholder="Describe what changed in this version…"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                required
+              ></textarea>
+            </div>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input v-model="versionForm.is_current" type="checkbox" class="rounded border-gray-300 text-blue-600" />
+              Set as current version
+            </label>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" @click="showAddVersionModal = false" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm">Cancel</button>
+              <button
+                type="submit"
+                :disabled="versionForm.processing"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed min-w-[80px]"
+              >
+                <span v-if="versionForm.processing">Saving…</span>
+                <span v-else>Save</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </Teleport>
