@@ -87,6 +87,7 @@ const approveRequest = async (id) => {
 
   if (result.isConfirmed) {
     isSubmitting.value = true
+    Swal.fire({ title: 'Approving request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
     router.post(route("job-requests.ocd-action", id), { action: "approve" }, {
       onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
       onFinish: () => { isSubmitting.value = false },
@@ -107,6 +108,7 @@ const rejectRequest = async (id) => {
 
   if (result.isConfirmed) {
     isSubmitting.value = true
+    Swal.fire({ title: 'Rejecting request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
     router.post(route("job-requests.ocd-action", id), { action: "reject" }, {
       onSuccess: () => Swal.fire("Rejected!", "The request has been rejected.", "error"),
       onFinish: () => { isSubmitting.value = false },

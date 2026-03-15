@@ -73,6 +73,7 @@ const approveRequest = async (id) => {
   })
 
   if (result.isConfirmed) {
+    Swal.fire({ title: 'Approving request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
     router.post(route("job-requests.division-chief-action", id), { action: "approve" }, {
       onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
     })
@@ -91,6 +92,7 @@ const rejectRequest = async (id) => {
   })
 
   if (result.isConfirmed) {
+    Swal.fire({ title: 'Rejecting request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
     router.post(route("job-requests.division-chief-action", id), { action: "reject" }, {
       onSuccess: () => Swal.fire("Rejected!", "The request has been rejected.", "error"),
     })

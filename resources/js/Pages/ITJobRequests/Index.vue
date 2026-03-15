@@ -133,6 +133,14 @@ const submitRating = async () => {
 
   isRatingSubmitting.value = true
 
+  Swal.fire({
+    title: 'Submitting rating...',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => { Swal.showLoading() },
+  })
+
   router.post(
     `/it-job-requests/${requestToRate.value.id}/confirm`,
     {
@@ -205,7 +213,12 @@ const handleNewRequest = async () => {
                 @keydown.enter.prevent="applyFilters(true)"
                 class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
-              <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⏳</span>
+              <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
+                <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              </span>
             </div>
             <button
               @click="applyFilters(true)"
@@ -249,8 +262,21 @@ const handleNewRequest = async () => {
           </div>
         </div>
 
+        <!-- Loading overlay -->
+        <div v-if="isLoading" class="relative">
+          <div class="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10 rounded-lg">
+            <div class="flex flex-col items-center gap-2 text-blue-600">
+              <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span class="text-sm font-medium">Loading...</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Desktop table -->
-<div class="hidden sm:block overflow-x-auto">
+<div class="hidden sm:block overflow-x-auto" :class="{ 'opacity-50 pointer-events-none': isLoading }">
   <table class="w-full table-fixed border border-gray-200">
     <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
       <tr>
@@ -327,7 +353,7 @@ const handleNewRequest = async () => {
   </table>
 </div>
 <!-- Mobile cards -->
-<div class="sm:hidden space-y-3">
+<div class="sm:hidden space-y-3" :class="{ 'opacity-50 pointer-events-none': isLoading }">
   <div
     v-for="req in visibleRequests"
     :key="req.id"
@@ -684,8 +710,7 @@ const handleNewRequest = async () => {
             <div class="flex justify-end space-x-3 pt-4">
               <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
               <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed min-w-[80px]">
-                <span v-if="form.processing">Saving…</span>
-                <span v-else>Save</span>
+                Save
               </button>
             </div>
 
@@ -732,8 +757,7 @@ const handleNewRequest = async () => {
         <div class="flex justify-end gap-3">
           <button @click="showRatingModal=false" :disabled="isRatingSubmitting" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-60">Cancel</button>
           <button @click="submitRating" :disabled="isRatingSubmitting" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed min-w-[90px]">
-            <span v-if="isRatingSubmitting">Submitting…</span>
-            <span v-else>Submit</span>
+            Submit
           </button>
         </div>
       </div>
