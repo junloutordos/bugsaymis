@@ -14,7 +14,7 @@ class ICTPMSHistoryController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'ict_pms_id'     => 'required|integer|exists:ict_pms,id',
+            'ict_pms_id'     => 'nullable|integer|exists:ict_pms,id',
             'equipment_id'   => 'required|integer|exists:ict_equipments,id',
             'pms_date'       => 'nullable|date',
             'description'    => 'nullable|string',
@@ -28,8 +28,8 @@ class ICTPMSHistoryController extends Controller
         // Save PMS history
         ICTPMSHistory::create($data);
 
-        // ✅ Update status in ict_pms_dates instead of ict_pms_equipment
-        if (!empty($data['pms_date'])) {
+        // ✅ Update status in ict_pms_dates only if ict_pms_id is provided
+        if (!empty($data['ict_pms_id']) && !empty($data['pms_date'])) {
             $pms = PMS::findOrFail($data['ict_pms_id']);
 
             $pms->dates()
@@ -37,7 +37,7 @@ class ICTPMSHistoryController extends Controller
                 ->update(['status' => 'done']);
         }
 
-        return redirect()->back()->with('success', 'PMS history saved and schedule status updated successfully.');
+        return redirect()->back()->with('success', 'PMS history saved successfully.');
     }
 }
 

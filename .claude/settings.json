@@ -3,7 +3,9 @@
     "allow": [
       "Bash(php artisan migrate --path=database/migrations/2026_03_12_000002_add_local_path_to_accomplishment_photos.php)",
       "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/AccomplishmentController.php)",
-      "Bash(php artisan migrate --path=database/migrations/2026_03_13_000001_create_app_versions_table.php)"
+      "Bash(php artisan migrate --path=database/migrations/2026_03_13_000001_create_app_versions_table.php)",
+      "Bash(php artisan:*)",
+      "Bash(grep -r ziggy resources/js/ --include=*.js --include=*.ts -l)"
     ]
   }
 }

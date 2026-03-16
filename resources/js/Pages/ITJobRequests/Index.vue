@@ -52,6 +52,7 @@ function openMISAssessment(request) {
 const search         = ref(props.filters?.search   ?? '')
 const filterCategory = ref(props.filters?.category ?? '')
 const filterStatus   = ref(props.filters?.status   ?? '')
+const perPage        = ref(props.filters?.per_page ?? 15) // Default to 15 items per page
 const isLoading      = ref(false)
 let debounceTimer    = null
 
@@ -59,6 +60,7 @@ const buildParams = (page = undefined) => ({
   search:   search.value   || undefined,
   category: filterCategory.value || undefined,
   status:   filterStatus.value   || undefined,
+  per_page: perPage.value  || undefined,
   page:     page            || undefined,
 })
 
@@ -85,6 +87,17 @@ watch(filterStatus,   () => applyFilters(true))
 const goToPage = (pageNum) => {
   isLoading.value = true
   router.get(route('jobrequests.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const showAll = () => {
+  perPage.value = 1000 // Large number to show all items
+  isLoading.value = true
+  router.get(route('jobrequests.index'), buildParams(1), {
     preserveState: true,
     replace: true,
     only: ['requests', 'filters'],
@@ -433,6 +446,7 @@ const handleNewRequest = async () => {
           <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
           <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <button @click="showAll" :disabled="isLoading" class="px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50">Show All</button>
         </div>
       </div>
 
