@@ -315,6 +315,13 @@ const menuItems = [
         roles: ["Administrator"],
       },
       {
+        label: "Campus",
+        routeName: "campuses.index",
+        href: route("campuses.index"),
+        icon: HomeIcon,
+        roles: ["Administrator"],
+      },
+      {
         label: "Rooms",
         routeName: "rooms.index",
         href: route("rooms.index"),

@@ -64,6 +64,11 @@ Route::middleware(['auth','role:Administrator'])->group(function(){
     Route::post('/data-management/special-assignments', [App\Http\Controllers\SpecialAssignmentController::class, 'store'])->name('special-assignments.store');
     Route::put('/data-management/special-assignments/{specialAssignment}', [App\Http\Controllers\SpecialAssignmentController::class, 'update'])->name('special-assignments.update');
     Route::delete('/data-management/special-assignments/{specialAssignment}', [App\Http\Controllers\SpecialAssignmentController::class, 'destroy'])->name('special-assignments.destroy');
+    // Campuses
+    Route::get('/data-management/campuses', [App\Http\Controllers\DataManagement\CampusController::class, 'index'])->name('campuses.index');
+    Route::post('/data-management/campuses', [App\Http\Controllers\DataManagement\CampusController::class, 'store'])->name('campuses.store');
+    Route::put('/data-management/campuses/{campus}', [App\Http\Controllers\DataManagement\CampusController::class, 'update'])->name('campuses.update');
+    Route::delete('/data-management/campuses/{campus}', [App\Http\Controllers\DataManagement\CampusController::class, 'destroy'])->name('campuses.destroy');
     // Sections API (used by Rooms UI to load sections for a school year)
     Route::get('/sections', function (\Illuminate\Http\Request $request) {
         $q = \Illuminate\Support\Facades\DB::table('sections')->select('id', 'sectionname as name', 'syid');

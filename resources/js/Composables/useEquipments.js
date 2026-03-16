@@ -110,38 +110,30 @@ export default function useEquipments(initialEquipments = [], users = []) {
     })
   }
 
+  const showLoadingSwal = (title) => {
+    Swal.fire({ title, allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
+  }
+
   const storeEquipment = async () => {
     errors.value = {}
+    showLoadingSwal('Saving equipment...')
     router.post(route("ict-equipments.store"), form.value, {
-      onError: e => errors.value = e,
+      onError: e => { errors.value = e; Swal.close() },
       onSuccess: () => {
         closeModal()
-        getEquipments()
-        Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "New equipment has been added!",
-          timer: 2000,
-          showConfirmButton: false,
-        })
+        Swal.fire({ icon: "success", title: "Success", text: "New equipment has been added!", timer: 2000, showConfirmButton: false })
       }
     })
   }
 
   const updateEquipment = async (id) => {
     errors.value = {}
+    showLoadingSwal('Updating equipment...')
     router.put(route("ict-equipments.update", id), form.value, {
-      onError: e => errors.value = e,
+      onError: e => { errors.value = e; Swal.close() },
       onSuccess: () => {
         closeModal()
-        getEquipments()
-        Swal.fire({
-          icon: "success",
-          title: "Updated",
-          text: "Equipment details have been updated!",
-          timer: 2000,
-          showConfirmButton: false,
-        })
+        Swal.fire({ icon: "success", title: "Updated", text: "Equipment details have been updated!", timer: 2000, showConfirmButton: false })
       }
     })
   }
@@ -166,7 +158,6 @@ export default function useEquipments(initialEquipments = [], users = []) {
 
       router.delete(route("ict-equipments.destroy", id), {
         onSuccess: () => {
-          getEquipments()
           Swal.fire({
             icon: "success",
             title: "Deleted",

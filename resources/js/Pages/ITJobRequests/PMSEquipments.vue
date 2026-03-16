@@ -179,6 +179,7 @@ const saveActivity = () => {
   form.cost_of_repair = modalData.cost
   form.remarks = modalData.remarks
 
+  Swal.fire({ title: 'Saving PMS activity...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
   submit.post(route("ict-pms-history.store"), form, {
     preserveScroll: true,
     onSuccess: () => {

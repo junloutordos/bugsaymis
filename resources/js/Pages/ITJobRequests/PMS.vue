@@ -19,35 +19,26 @@ import usePMS from "@/Composables/usePMS.js"
 
 // Props from backend
 const props = defineProps({
-  pmsSchedules: Array,
+  pmsSchedules: Object,
   users: Array,
   equipments: Array,
+  filters: Object,
 })
 
 // Composable
 const {
-  schedules,
   errors,
   showModal,
   modalMode,
   selectedSchedule,
   form,
   scheduleDates,
-  searchQuery,
-  currentPage,
-  totalPages,
-  filteredSchedules,
-  getSchedules,
   destroySchedule,
-  sortBy,
   openModal,
   closeModal,
   submitSchedule,
-  viewSchedule,
-  exportCSV,
-  printTable,
   formatDateForDisplay,
-} = usePMS(props.pmsSchedules)
+} = usePMS(props.pmsSchedules?.data ?? [])
 
 // User role
 const page = usePage()
@@ -76,26 +67,17 @@ function closeAssignEquipmentModal() {
 }
 function assignEquipment() {
   if (!selectedEquipments.value.length || !selectedPMS.value) return
+  Swal.fire({ title: 'Assigning equipment...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
   submit.post(
     route("ict-pms.assign-equipments", selectedPMS.value.id),
     { equipment_ids: selectedEquipments.value.map(e => e.id) },
     {
       onSuccess: () => {
         closeAssignEquipmentModal()
-        getSchedules()
-        Swal.fire({
-          icon: "success",
-          title: "Equipments Assigned",
-          timer: 2000,
-          showConfirmButton: false,
-        })
+        Swal.fire({ icon: "success", title: "Equipments Assigned", timer: 2000, showConfirmButton: false })
       },
       onError: (e) => {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: e?.equipment_ids || "Failed to assign equipments.",
-        })
+        Swal.fire({ icon: "error", title: "Error", text: e?.equipment_ids || "Failed to assign equipments." })
       },
     }
   )
@@ -108,6 +90,53 @@ function formatFrequencyAndDates(schedule) {
     .map(d => formatDateForDisplay(d))
     .join(", ")}`
 }
+
+// Server-side filters
+const search          = ref(props.filters?.search    ?? '')
+const filterStatus    = ref(props.filters?.status    ?? '')
+const filterFrequency = ref(props.filters?.frequency ?? '')
+const isLoading       = ref(false)
+let debounceTimer     = null
+
+const buildParams = (page = undefined) => ({
+  search:    search.value          || undefined,
+  status:    filterStatus.value    || undefined,
+  frequency: filterFrequency.value || undefined,
+  page:      page                  || undefined,
+})
+
+const applyFilters = (immediate = true) => {
+  clearTimeout(debounceTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('ict-pms.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['pmsSchedules', 'filters'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else debounceTimer = setTimeout(go, 400)
+}
+
+watch(search,          () => applyFilters(false))
+watch(filterStatus,    () => applyFilters(true))
+watch(filterFrequency, () => applyFilters(true))
+
+const goToPage = (pageNum) => {
+  isLoading.value = true
+  router.get(route('ict-pms.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['pmsSchedules', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const visibleSchedules = computed(() => props.pmsSchedules?.data ?? [])
+const currentPage      = computed(() => props.pmsSchedules?.current_page ?? 1)
+const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
 </script>
 
 <template>
@@ -129,39 +158,73 @@ function formatFrequencyAndDates(schedule) {
 
       <!-- Search & Actions -->
       <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <div class="flex justify-between items-center mb-4">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search schedules..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
-          <div class="flex gap-2">
-            <button @click="exportCSV">
-              <ArrowDownTrayIcon class="w-5 h-5 text-blue-600" />
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+          <div class="flex items-center gap-2">
+            <div class="relative">
+              <input
+                v-model="search"
+                type="text"
+                placeholder="Search schedules..."
+                @keydown.enter.prevent="applyFilters(true)"
+                class="w-64 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+              <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
+                <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              </span>
+            </div>
+            <button @click="applyFilters(true)" :disabled="isLoading" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+              Search
             </button>
-            <button @click="printTable">
-              <PrinterIcon class="w-5 h-5 text-blue-600" />
-            </button>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <select v-model="filterStatus" class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+              <option value="">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Ongoing">Ongoing</option>
+              <option value="Completed">Completed</option>
+            </select>
+            <select v-model="filterFrequency" class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+              <option value="">All Frequencies</option>
+              <option value="Monthly">Monthly</option>
+              <option value="Quarterly">Quarterly</option>
+              <option value="Bi-Annual">Bi-Annual</option>
+              <option value="Annually">Annually</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div v-if="isLoading" class="relative">
+          <div class="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10 rounded-lg">
+            <div class="flex flex-col items-center gap-2 text-blue-600">
+              <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span class="text-sm font-medium">Loading...</span>
+            </div>
           </div>
         </div>
 
         <!-- PMS Table -->
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" :class="{ 'opacity-50 pointer-events-none': isLoading }">
           <table class="min-w-full border border-gray-200 text-center">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
-                <th class="px-4 py-3 cursor-pointer" @click="sortBy('id')">ID</th>
-                <th class="px-4 py-3 cursor-pointer" @click="sortBy('title')">Title</th>
-                <th class="px-4 py-3 cursor-pointer" @click="sortBy('school_year')">School Year</th>
-                <th class="px-4 py-3 cursor-pointer" @click="sortBy('office_area')">Office</th>
-                <th class="px-4 py-3 cursor-pointer" @click="sortBy('frequency')">Frequency</th>
-                <th class="px-4 py-3 cursor-pointer" @click="sortBy('status')">Status</th>
+                <th class="px-4 py-3">ID</th>
+                <th class="px-4 py-3">Title</th>
+                <th class="px-4 py-3">School Year</th>
+                <th class="px-4 py-3">Office</th>
+                <th class="px-4 py-3">Frequency</th>
+                <th class="px-4 py-3">Status</th>
                 <th class="px-4 py-3">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm text-center">
-              <tr v-for="s in filteredSchedules" :key="s.id" class="hover:bg-gray-50">
+              <tr v-for="s in visibleSchedules" :key="s.id" class="hover:bg-gray-50">
                 <td class="px-4 py-3">{{ s.id }}</td>
                 <td class="px-4 py-3">{{ s.title }}</td>
                 <td class="px-4 py-3">{{ s.school_year }}</td>
@@ -170,35 +233,22 @@ function formatFrequencyAndDates(schedule) {
                 <td class="px-4 py-3">{{ s.status }}</td>
                 <td class="px-4 py-3">
                   <div class="flex justify-center gap-1 items-center">
-                    <button
-                      @click="router.get(route('ict-pms.show-equipments', s.id))"
-                      class="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <EyeIcon class="w-5 h-5 text-blue-600" />
+                    <button @click="router.get(route('ict-pms.show-equipments', s.id))" class="p-2 bg-blue-100 rounded hover:bg-blue-200" title="View">
+                      <EyeIcon class="w-5 h-5 text-blue-700" />
                     </button>
-                    <button
-                      @click="openAssignEquipmentModal(s)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                      title="Assign Equipment"
-                    >
-                      <PlusIcon class="w-5 h-5 text-green-600" />
+                    <button @click="openAssignEquipmentModal(s)" class="p-2 bg-green-100 rounded hover:bg-green-200" title="Assign Equipment">
+                      <PlusIcon class="w-5 h-5 text-green-700" />
                     </button>
-                    <button
-                      @click="openModal('edit', s)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                    <button @click="openModal('edit', s)" class="p-2 bg-yellow-100 rounded hover:bg-yellow-200" title="Edit">
+                      <PencilSquareIcon class="w-5 h-5 text-yellow-700" />
                     </button>
-                    <button
-                      @click="destroySchedule(s.id)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <TrashIcon class="w-5 h-5 text-red-600" />
+                    <button @click="destroySchedule(s.id)" class="p-2 bg-red-100 rounded hover:bg-red-200" title="Delete">
+                      <TrashIcon class="w-5 h-5 text-red-700" />
                     </button>
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredSchedules.length === 0">
+              <tr v-if="visibleSchedules.length === 0">
                 <td colspan="5" class="px-4 py-6 text-center text-gray-500">
                   No schedules found.
                 </td>
@@ -210,21 +260,9 @@ function formatFrequencyAndDates(schedule) {
 
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
-          <button
-            @click="currentPage--"
-            :disabled="currentPage === 1"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
+          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button
-            @click="currentPage++"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import Swal from 'sweetalert2'
 
 // Form state
 const form = useForm({
@@ -11,14 +12,15 @@ const form = useForm({
 
 // Submit handler
 const submit = () => {
+  Swal.fire({ title: 'Submitting request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
   form.post(route('jobrequests.store'), {
     preserveScroll: true,
     onSuccess: () => {
       form.reset()
-      console.log('✅ Job Request Saved')
+      Swal.fire({ icon: 'success', title: 'Submitted!', text: 'IT Job Request has been created.', timer: 2000, showConfirmButton: false })
     },
-    onError: (errors) => {
-      console.error(errors)
+    onError: () => {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Please fill all required fields.' })
     }
   })
 }

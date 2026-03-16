@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -15,43 +15,29 @@ import useEquipments from "@/Composables/useEquipments.js"
 
 // Props from backend
 const props = defineProps({
-  equipments: Array,
-  users: Array, // ✅ Accept users from backend
-  rooms: Array, // ✅ ADD
+  equipments: Object,
+  users: Array,
+  rooms: Array,
+  filters: Object,
 })
 
-// include ALL returned properties you use in template
 const {
-  equipments,
-  equipment,
   errors,
   showModal,
   modalMode,
   selectedEquipment,
   form,
-  searchQuery,
-  currentPage,
-  totalPages,
-  filteredEquipments,
-  getEquipments,
-  storeEquipment,
-  updateEquipment,
   destroyEquipment,
-  sortBy,
   openModal,
   closeModal,
   formatDate,
   submitEquipment,
   viewEquipment,
-  exportCSV,
-  printTable,
   printPmsHistory,
-
-  // PMS-related (these were missing before and caused your error)
   showPmsModal,
   selectedPmsHistory,
   openPmsHistory,
-} = useEquipments(props.equipments, props.users)
+} = useEquipments(props.equipments?.data ?? [], props.users)
 
 const page = usePage()
 const userRole = page.props.auth?.user?.role?.name ?? null
@@ -64,7 +50,7 @@ const reportGroupBy = ref('category') // 'category' or 'location'
 // Group all equipments by category or location for the print report
 const groupedEquipments = computed(() => {
   const groups = {}
-  ;(props.equipments ?? []).forEach(eq => {
+  ;(props.equipments?.data ?? []).forEach(eq => {
     const key = reportGroupBy.value === 'category'
       ? (eq.category || 'Uncategorized')
       : (eq.room?.name || 'No Location')
@@ -147,6 +133,53 @@ function printModal() {
     newWindow.close();
   };
 }
+
+// Server-side filters
+const search         = ref(props.filters?.search   ?? '')
+const filterCategory = ref(props.filters?.category ?? '')
+const filterStatus   = ref(props.filters?.status   ?? '')
+const isLoading      = ref(false)
+let debounceTimer    = null
+
+const buildParams = (page = undefined) => ({
+  search:   search.value         || undefined,
+  category: filterCategory.value || undefined,
+  status:   filterStatus.value   || undefined,
+  page:     page                 || undefined,
+})
+
+const applyFilters = (immediate = true) => {
+  clearTimeout(debounceTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('ict-equipments.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['equipments', 'filters'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else debounceTimer = setTimeout(go, 400)
+}
+
+watch(search, () => applyFilters(false))
+watch(filterCategory, () => applyFilters(true))
+watch(filterStatus,   () => applyFilters(true))
+
+const goToPage = (pageNum) => {
+  isLoading.value = true
+  router.get(route('ict-equipments.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['equipments', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const visibleEquipments = computed(() => props.equipments?.data ?? [])
+const currentPage       = computed(() => props.equipments?.current_page ?? 1)
+const totalPages        = computed(() => props.equipments?.last_page ?? 1)
 </script>
 
 <template>
@@ -166,42 +199,88 @@ function printModal() {
 
       <!-- Search & Actions -->
       <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <div class="flex justify-between items-center mb-4">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search equipment..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
-          
-          <div class="flex gap-2">
-            <!--<button @click="exportCSV" title="Export CSV">
-              <ArrowDownTrayIcon class="w-5 h-5 text-blue-600" />
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+          <div class="flex items-center gap-2">
+            <div class="relative">
+              <input
+                v-model="search"
+                type="text"
+                placeholder="Search equipment..."
+                @keydown.enter.prevent="applyFilters(true)"
+                class="w-64 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+              <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
+                <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              </span>
+            </div>
+            <button @click="applyFilters(true)" :disabled="isLoading" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+              Search
             </button>
-            <button @click="printTable" title="Print table">
-              <PrinterIcon class="w-5 h-5 text-blue-600" />
-            </button>-->
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <select v-model="filterCategory" class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+              <option value="">All Categories</option>
+              <option value="CPU/System Unit">CPU/System Unit</option>
+              <option value="Monitor">Monitor</option>
+              <option value="Mouse">Mouse</option>
+              <option value="Keyboard">Keyboard</option>
+              <option value="UPS">UPS</option>
+              <option value="AVR">AVR</option>
+              <option value="Printer">Printer</option>
+              <option value="Laptop">Laptop</option>
+              <option value="Scanner">Scanner</option>
+              <option value="Projector">Projector</option>
+              <option value="Network Devices">Network Devices</option>
+              <option value="CCTV Camera">CCTV Camera</option>
+              <option value="CCTV NVR/DVR">CCTV NVR/DVR</option>
+              <option value="Access Point">Access Point</option>
+              <option value="Other">Other</option>
+            </select>
+            <select v-model="filterStatus" class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500">
+              <option value="">All Statuses</option>
+              <option value="Good Working">Good Working</option>
+              <option value="For Repair">For Repair</option>
+              <option value="Disposed">Disposed</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
             <button @click="showReportModal = true" title="Generate Report">
               <PrinterIcon class="w-5 h-5 text-blue-600" />
             </button>
           </div>
         </div>
 
+        <!-- Loading overlay -->
+        <div v-if="isLoading" class="relative">
+          <div class="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10 rounded-lg">
+            <div class="flex flex-col items-center gap-2 text-blue-600">
+              <svg class="animate-spin h-8 w-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              <span class="text-sm font-medium">Loading...</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Equipment Table -->
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto" :class="{ 'opacity-50 pointer-events-none': isLoading }">
           <table class="min-w-full border border-gray-200">
             <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
               <tr>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('id')">ID</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('property_no')">Serial No</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('description')">Description</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('owner_id')">Owner</th>
-                <th class="px-4 py-3 text-left cursor-pointer" @click="sortBy('status')">Status</th>
+                <th class="px-4 py-3 text-left">ID</th>
+                <th class="px-4 py-3 text-left">Serial No</th>
+                <th class="px-4 py-3 text-left">Description</th>
+                <th class="px-4 py-3 text-left">Owner</th>
+                <th class="px-4 py-3 text-left">Status</th>
                 <th class="px-4 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="eq in filteredEquipments" :key="eq.id" class="hover:bg-gray-50">
+              <tr v-for="eq in visibleEquipments" :key="eq.id" class="hover:bg-gray-50">
                 <td class="px-4 py-3">{{ eq.id }}</td>
                 
                 <td class="px-4 py-3">{{ eq.serial_no }}</td>
@@ -212,27 +291,22 @@ function printModal() {
                 <td class="px-4 py-3">{{ eq.status }}</td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
-                    <button @click="viewEquipment(eq)" class="p-1 hover:bg-gray-100 rounded" title="View">
-                      <EyeIcon class="w-5 h-5 text-blue-600"/>
+                    <button @click="viewEquipment(eq)" class="p-2 bg-blue-100 rounded hover:bg-blue-200" title="View">
+                      <EyeIcon class="w-5 h-5 text-blue-700"/>
                     </button>
-                    <button @click="openModal('edit', eq)" class="p-1 hover:bg-gray-100 rounded" title="Edit">
-                      <PencilSquareIcon class="w-5 h-5 text-yellow-600"/>
+                    <button @click="openModal('edit', eq)" class="p-2 bg-yellow-100 rounded hover:bg-yellow-200" title="Edit">
+                      <PencilSquareIcon class="w-5 h-5 text-yellow-700"/>
                     </button>
-                    <button
-                      @click="openPmsHistory(eq)"
-                      class="p-1 hover:bg-gray-100 rounded"
-                      title="PMS History"
-                    >
-                      <ClockIcon class="w-5 h-5 text-green-600" />
+                    <button @click="openPmsHistory(eq)" class="p-2 bg-green-100 rounded hover:bg-green-200" title="PMS History">
+                      <ClockIcon class="w-5 h-5 text-green-700" />
                     </button>
-
-                    <button @click="destroyEquipment(eq)" class="p-1 hover:bg-gray-100 rounded" title="Delete">
-                      <TrashIcon class="w-5 h-5 text-red-600"/>
+                    <button @click="destroyEquipment(eq)" class="p-2 bg-red-100 rounded hover:bg-red-200" title="Delete">
+                      <TrashIcon class="w-5 h-5 text-red-700"/>
                     </button>
                   </div>
                 </td>
               </tr>
-              <tr v-if="filteredEquipments.length===0">
+              <tr v-if="visibleEquipments.length===0">
                 <td colspan="6" class="px-4 py-6 text-center text-gray-500">
                   No equipment found.
                 </td>
@@ -243,21 +317,9 @@ function printModal() {
 
         <!-- Pagination -->
         <div class="flex justify-center items-center gap-2 mt-4">
-          <button
-            @click="currentPage = Math.max(1, currentPage - 1)"
-            :disabled="currentPage===1"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
+          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button
-            @click="currentPage = Math.min(totalPages, currentPage + 1)"
-            :disabled="currentPage===totalPages"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
         </div>
       </div>
 
@@ -585,7 +647,7 @@ function printModal() {
               </tr>
               <tr style="background:#f3f4f6; font-weight:bold;">
                 <td style="border:1px solid #000; padding:4px 8px;">TOTAL</td>
-                <td style="border:1px solid #000; padding:4px 8px; text-align:center;">{{ props.equipments?.length ?? 0 }}</td>
+                <td style="border:1px solid #000; padding:4px 8px; text-align:center;">{{ props.equipments?.total ?? 0 }}</td>
               </tr>
             </tbody>
           </table>
