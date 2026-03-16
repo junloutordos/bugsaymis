@@ -311,6 +311,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/job-requests', [ITJobRequestController::class, 'index'])->name('jobrequests.index');
     Route::get('/job-requests/create', [ITJobRequestController::class, 'create'])->name('jobrequests.create');
     Route::post('/job-requests', [ITJobRequestController::class, 'store'])->name('jobrequests.store');
+    Route::delete('/job-requests/{jobRequest}', [ITJobRequestController::class, 'destroy'])->name('jobrequests.destroy');
+    Route::post('/app-versions', [\App\Http\Controllers\AppVersionController::class, 'store'])->name('app-versions.store');
     Route::post('/it-job-requests/{jobRequest}/confirm',[ITJobRequestController::class, 'confirmCompletion']
 );
 

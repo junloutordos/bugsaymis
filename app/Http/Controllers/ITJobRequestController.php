@@ -625,4 +625,17 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
         return back()->with('success', 'OCD action recorded!');
     }
+
+    /* =====================================================
+     | DESTROY
+     |=====================================================*/
+    public function destroy(ITJobRequest $jobRequest)
+    {
+        DB::transaction(function () use ($jobRequest) {
+            $jobRequest->trackingLogs()->delete();
+            $jobRequest->delete();
+        });
+
+        return back()->with('success', 'IT Job Request deleted successfully.');
+    }
 }
