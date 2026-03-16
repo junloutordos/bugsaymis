@@ -82,6 +82,9 @@ const baseRoleNames = user.roleNames?.length ? user.roleNames : (roleName !== "G
 // Inject synthetic 'PMRater' role when user is a committee head or SA coordinator
 const roleNames = page.props.isPMRater ? [...baseRoleNames, 'PMRater'] : baseRoleNames;
 
+console.log('User:', user);
+console.log('Role names:', roleNames);
+
 
 // --- Helpers ---
 const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
@@ -845,6 +848,8 @@ const roleIds = (user.role_id || "")
   .map((s) => Number(s.trim()))
   .filter((n) => !Number.isNaN(n));
 
+console.log('Role IDs:', roleIds);
+
 // Show Guidance Services when role_id includes 17 or 1
 const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1);
 // Show Health Statistics Report when role_id includes 16 or 1
@@ -879,6 +884,8 @@ const filterMenuByRole = (items, userRoleNames) =>
     );
 
 const filteredMenu = computed(() => filterMenuByRole(menuItems, roleNames));
+
+console.log('Filtered menu:', filteredMenu.value);
 
 // --- Expand logic ---
 const toggleExpand = (label) => (expanded.value[label] = !expanded.value[label]);

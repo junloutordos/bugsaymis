@@ -644,6 +644,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     ->name('equipment.public.show');
     Route::post('/ict-equipments/report/generate', [ICTEquipmentController::class, 'generateReport'])->name('ict-equipments.report.generate');
 
+    // PMS History routes
+    Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');
+
     Route::get('/ict-pms', [PMSController::class, 'index'])->name('ict-pms.index');
     Route::post('/ict-pms', [PMSController::class, 'store'])->name('ict-pms.store');
     Route::get('/ict-pms/{id}', [PMSController::class, 'show'])->name('ict-pms.show');

@@ -31,7 +31,7 @@ public function index(Request $request)
     $search   = trim($request->query('search', ''));
     $category = trim($request->query('category', ''));
     $status   = trim($request->query('status', ''));
-    $perPage  = min((int) $request->query('per_page', 15), 50);
+    $perPage  = min((int) $request->query('per_page', 15), 1000);
 
     $requests = ITJobRequest::select([
             'id', 'itjr_no', 'title', 'category', 'description', 'status',
@@ -65,7 +65,7 @@ public function index(Request $request)
 
     return Inertia::render('ITJobRequests/Index', [
         'requests'       => $requests,
-        'filters'        => ['search' => $search, 'category' => $category, 'status' => $status],
+        'filters'        => ['search' => $search, 'category' => $category, 'status' => $status, 'per_page' => $perPage],
         'categories'     => ITJobCategory::orderBy('name')->get(['id', 'name']),
         'divisionChiefs' => User::where(function ($q) {
             $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])

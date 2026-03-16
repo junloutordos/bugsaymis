@@ -10,6 +10,7 @@ import {
   ArrowDownTrayIcon,
   ClockIcon,
   ChartBarIcon,
+  PlusIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -37,6 +38,12 @@ const {
   showPmsModal,
   selectedPmsHistory,
   openPmsHistory,
+  showAddPmsModal,
+  pmsForm,
+  pmsFormErrors,
+  isSubmittingPms,
+  openAddPmsHistory,
+  submitPmsHistory,
 } = useEquipments(props.equipments?.data ?? [], props.users)
 
 const page = usePage()
@@ -138,6 +145,7 @@ function printModal() {
 const search         = ref(props.filters?.search   ?? '')
 const filterCategory = ref(props.filters?.category ?? '')
 const filterStatus   = ref(props.filters?.status   ?? '')
+const perPage        = ref(props.filters?.per_page ?? 15) // Default to 15 items per page
 const isLoading      = ref(false)
 let debounceTimer    = null
 
@@ -145,6 +153,7 @@ const buildParams = (page = undefined) => ({
   search:   search.value         || undefined,
   category: filterCategory.value || undefined,
   status:   filterStatus.value   || undefined,
+  per_page: perPage.value        || undefined,
   page:     page                 || undefined,
 })
 
@@ -166,6 +175,7 @@ const applyFilters = (immediate = true) => {
 watch(search, () => applyFilters(false))
 watch(filterCategory, () => applyFilters(true))
 watch(filterStatus,   () => applyFilters(true))
+watch(perPage, () => applyFilters(true))
 
 const goToPage = (pageNum) => {
   isLoading.value = true
@@ -180,6 +190,10 @@ const goToPage = (pageNum) => {
 const visibleEquipments = computed(() => props.equipments?.data ?? [])
 const currentPage       = computed(() => props.equipments?.current_page ?? 1)
 const totalPages        = computed(() => props.equipments?.last_page ?? 1)
+const showAllChecked    = computed({
+  get: () => perPage.value === 1000,
+  set: (value) => perPage.value = value ? 1000 : 15
+})
 </script>
 
 <template>
@@ -247,6 +261,14 @@ const totalPages        = computed(() => props.equipments?.last_page ?? 1)
             </select>
           </div>
           <div class="flex gap-2">
+            <label class="flex items-center gap-1 text-sm">
+              <input
+                type="checkbox"
+                v-model="showAllChecked"
+                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Show All
+            </label>
             <button @click="showReportModal = true" title="Generate Report">
               <PrinterIcon class="w-5 h-5 text-blue-600" />
             </button>
@@ -296,6 +318,9 @@ const totalPages        = computed(() => props.equipments?.last_page ?? 1)
                     </button>
                     <button @click="openModal('edit', eq)" class="p-2 bg-yellow-100 rounded hover:bg-yellow-200" title="Edit">
                       <PencilSquareIcon class="w-5 h-5 text-yellow-700"/>
+                    </button>
+                    <button @click="openAddPmsHistory(eq)" class="p-2 bg-purple-100 rounded hover:bg-purple-200" title="Add PMS History">
+                      <PlusIcon class="w-5 h-5 text-purple-700"/>
                     </button>
                     <button @click="openPmsHistory(eq)" class="p-2 bg-green-100 rounded hover:bg-green-200" title="PMS History">
                       <ClockIcon class="w-5 h-5 text-green-700" />
@@ -537,6 +562,111 @@ const totalPages        = computed(() => props.equipments?.last_page ?? 1)
               <PrinterIcon class="w-5 h-5 inline" /> Print History
             </button>
           </div>
+
+        </div>
+      </div>
+
+      <!-- ADD PMS HISTORY MODAL -->
+      <div
+        v-if="showAddPmsModal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      >
+        <div class="bg-white w-full max-w-2xl rounded-lg p-6 relative">
+
+          <!-- Close button -->
+          <button
+            @click="showAddPmsModal = false"
+            class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+          >
+            ✕
+          </button>
+
+          <h2 class="text-2xl font-bold mb-4">
+            Add PMS History for {{ selectedEquipment?.description }} / {{ selectedEquipment?.serial_no }}
+          </h2>
+
+          <form @submit.prevent="submitPmsHistory" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">PMS Date</label>
+                <input
+                  v-model="pmsForm.pms_date"
+                  type="date"
+                  class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  :class="{ 'border-red-500': pmsFormErrors.pms_date }"
+                />
+                <div v-if="pmsFormErrors.pms_date" class="text-red-500 text-sm mt-1">{{ pmsFormErrors.pms_date }}</div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select
+                  v-model="pmsForm.type"
+                  class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  :class="{ 'border-red-500': pmsFormErrors.type }"
+                >
+                  <option value="PMS">PMS</option>
+                  <option value="Repair">Repair</option>
+                </select>
+                <div v-if="pmsFormErrors.type" class="text-red-500 text-sm mt-1">{{ pmsFormErrors.type }}</div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                v-model="pmsForm.description"
+                rows="3"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="List of checked items or repair details"
+                :class="{ 'border-red-500': pmsFormErrors.description }"
+              ></textarea>
+              <div v-if="pmsFormErrors.description" class="text-red-500 text-sm mt-1">{{ pmsFormErrors.description }}</div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Cost of Repair (₱)</label>
+              <input
+                v-model.number="pmsForm.cost_of_repair"
+                type="number"
+                step="0.01"
+                min="0"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                :class="{ 'border-red-500': pmsFormErrors.cost_of_repair }"
+              />
+              <div v-if="pmsFormErrors.cost_of_repair" class="text-red-500 text-sm mt-1">{{ pmsFormErrors.cost_of_repair }}</div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <textarea
+                v-model="pmsForm.remarks"
+                rows="2"
+                class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Additional remarks"
+                :class="{ 'border-red-500': pmsFormErrors.remarks }"
+              ></textarea>
+              <div v-if="pmsFormErrors.remarks" class="text-red-500 text-sm mt-1">{{ pmsFormErrors.remarks }}</div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+              <button
+                type="button"
+                @click="showAddPmsModal = false"
+                :disabled="isSubmittingPms"
+                class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                :disabled="isSubmittingPms"
+                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {{ isSubmittingPms ? 'Adding...' : 'Add PMS History' }}
+              </button>
+            </div>
+          </form>
 
         </div>
       </div>

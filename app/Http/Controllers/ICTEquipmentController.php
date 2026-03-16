@@ -18,6 +18,7 @@ class ICTEquipmentController extends Controller
         $search   = $request->input('search');
         $category = $request->input('category');
         $status   = $request->input('status');
+        $perPage  = min((int) $request->query('per_page', 15), 1000);
 
         $query = ICTEquipment::with([
             'owner',
@@ -45,7 +46,7 @@ class ICTEquipmentController extends Controller
             $query->where('status', $status);
         }
 
-        $equipments = $query->paginate(15)->withQueryString();
+        $equipments = $query->paginate($perPage)->withQueryString();
         $users = User::all();
         $rooms = Room::orderBy('name')->get();
 
@@ -53,7 +54,7 @@ class ICTEquipmentController extends Controller
             'equipments' => $equipments,
             'users'      => $users,
             'rooms'      => $rooms,
-            'filters'    => $request->only('search', 'category', 'status'),
+            'filters'    => $request->only('search', 'category', 'status', 'per_page'),
         ]);
     }
 
