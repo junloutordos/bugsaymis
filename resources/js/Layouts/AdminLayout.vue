@@ -548,7 +548,7 @@ const menuItems = [
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head","DivisionChief"],
     children: [
       {
         label: "Docu Track",
@@ -562,7 +562,7 @@ const menuItems = [
         routeName: "messengerial.index",
         href: route("messengerial.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head","DivisionChief"],
       },
     ],
   },
