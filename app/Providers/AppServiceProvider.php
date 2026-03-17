@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\WFHAccomplishment;
+use App\Models\WFHAttendance;
+use App\Policies\WFHAccomplishmentPolicy;
+use App\Policies\WFHAttendancePolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +29,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ── WFH Policies ──────────────────────────────────────────────────────
+        Gate::policy(WFHAttendance::class, WFHAttendancePolicy::class);
+        Gate::policy(WFHAccomplishment::class, WFHAccomplishmentPolicy::class);
+
         Vite::prefetch(concurrency: 3);
 
         // Ensure preload tags for CSS use the correct `as` attribute so browsers
