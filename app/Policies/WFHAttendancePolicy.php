@@ -5,21 +5,18 @@ namespace App\Policies;
 use App\Models\User;
 use App\Models\WFHAttendance;
 
-class WFHAttendancePolicy
+class WFHAttendancePolicy extends GenericPolicy
 {
     /**
-     * Any authenticated user may time in / time out (create their own record).
+     * Any authenticated user with wfh.time-in permission may create a record.
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasAnyPermission(['wfh.time-in', 'wfh.view']);
     }
 
     /**
-     * A user may view their own record.
-     * Unit Heads may view records belonging to their office/unit.
-     * Division Chiefs may view records belonging to their division.
-     * HR Directors may view all records.
+     * Owner always allowed. Monitors need wfh.monitor + org-scope match.
      */
     public function view(User $user, WFHAttendance $attendance): bool
     {
@@ -27,7 +24,11 @@ class WFHAttendancePolicy
             return true;
         }
 
-        if ($user->hasAnyRole(['HR', 'Administrator'])) {
+        if (! $user->hasPermission('wfh.monitor')) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin() || $user->hasPermission('hr.employees.manage')) {
             return true;
         }
 
@@ -53,19 +54,19 @@ class WFHAttendancePolicy
     }
 
     /**
-     * Only the record owner or HR Director may delete.
+     * Owner or users with hr.employees.manage (HR/Admin) may delete.
      */
     public function delete(User $user, WFHAttendance $attendance): bool
     {
         return $user->id === $attendance->user_id
-            || $user->hasAnyRole(['HR', 'Administrator']);
+            || $user->hasPermission('hr.employees.manage');
     }
 
     /**
-     * Unit Heads, Division Chiefs, and HR Directors may access the monitoring view.
+     * Users with wfh.monitor permission may access the monitoring view.
      */
     public function monitor(User $user): bool
     {
-        return $user->hasAnyRole(['DivisionChief', 'OCD', 'HR', 'Administrator']);
+        return $user->hasPermission('wfh.monitor');
     }
 }

@@ -43,7 +43,10 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $authUser = $request->user();
-        $userRoles = $authUser ? $authUser->getRolesCollection() : collect();
+        if ($authUser) {
+            $authUser->loadMissing('roles');
+        }
+        $userRoles = $authUser ? $authUser->roles : collect();
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -60,6 +63,7 @@ class HandleInertiaRequests extends Middleware
                         'role_id' => $authUser->role_id ?? $userRoles->pluck('id')->implode(','),
                         'profile_picture' => $authUser->profile_picture,
                         'electronic_signature' => $authUser->electronic_signature,
+                        'permissions' => $authUser->getPermissions(),
                     ]
                     : null,
             ],

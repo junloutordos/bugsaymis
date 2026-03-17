@@ -17,11 +17,16 @@ class DatabaseSeeder extends Seeder
         // Call your roles seeder
         $this->call(InitialRolesTableSeeder::class);
 
+        // RBAC seeders
+        $this->call(RolesSeeder::class);
+        $this->call(PermissionsSeeder::class);
+        $this->call(RolePermissionSeeder::class);
+
         // Ensure Administrator role exists
         $adminRole = Role::firstOrCreate(['name' => 'Administrator']);
 
         // Create Administrator user if not exists
-        User::firstOrCreate(
+        $adminUser = User::firstOrCreate(
             ['email' => 'jtordos@crc.pshs.edu.ph'],
             [
                 'name' => 'Junlou R. Tordos',
@@ -29,6 +34,9 @@ class DatabaseSeeder extends Seeder
                 'role_id' => $adminRole->id,
             ]
         );
+
+        // Ensure Administrator role is in the pivot (idempotent)
+        $adminUser->roles()->syncWithoutDetaching([$adminRole->id]);
 
         // ✅ Call the IPCR Weight Seeder
         $this->call(IPCRWeightSeeder::class);

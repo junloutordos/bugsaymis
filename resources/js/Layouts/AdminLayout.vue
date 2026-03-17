@@ -31,6 +31,8 @@ import {
   CursorArrowRippleIcon,
   ClockIcon,
   XMarkIcon,
+  ShieldCheckIcon,
+  KeyIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -82,8 +84,13 @@ const baseRoleNames = user.roleNames?.length ? user.roleNames : (roleName !== "G
 // Inject synthetic 'PMRater' role when user is a committee head or SA coordinator
 const roleNames = page.props.isPMRater ? [...baseRoleNames, 'PMRater'] : baseRoleNames;
 
-console.log('User:', user);
-console.log('Role names:', roleNames);
+// Permission set — populated by HandleInertiaRequests via shared Inertia props
+// Using a Set for O(1) lookups on every sidebar render
+const userPermissions = new Set(user.permissions ?? []);
+const hasPerm = (...perms) => perms.some(p => userPermissions.has(p));
+
+// Also expose hasPerm for use in template (e.g. version modal button)
+const isAdmin = hasPerm('roles.assign');
 
 
 // --- Helpers ---
@@ -126,7 +133,6 @@ const getBadge = (child) => {
 // --- Profile Modal State ---
 const showProfileModal = ref(false);
 const openProfileModal = () => {
-  console.log('AdminLayout: openProfileModal called');
   showDropdown.value = false;
   showProfileModal.value = true;
 };
@@ -274,6 +280,7 @@ const menuItems = [
         href: route("users.index"),
         icon: UserGroupIcon,
         roles: ["Administrator"],
+        permissions: ["users.view"],
       },
       {
         label: "Inactive Users",
@@ -281,6 +288,7 @@ const menuItems = [
         href: route("users.inactive"),
         icon: UserGroupIcon,
         roles: ["Administrator"],
+        permissions: ["hr.employees.manage"],
       },
       {
         label: 'DTR Upload',
@@ -288,6 +296,7 @@ const menuItems = [
         href: route('data.dtr.upload'),
         icon: DocumentTextIcon,
         roles: ['Administrator'],
+        permissions: ["roles.assign"],
       },
       {
         label: "User Roles",
@@ -295,6 +304,31 @@ const menuItems = [
         href: route("roles.index"),
         icon: CursorArrowRippleIcon,
         roles: ["Administrator"],
+        permissions: ["roles.assign"],
+      },
+      {
+        label: "Roles & Permissions",
+        routeName: "admin.roles",
+        href: route("admin.roles"),
+        icon: ShieldCheckIcon,
+        roles: ["Administrator"],
+        permissions: ["roles.assign"],
+      },
+      {
+        label: "Permissions",
+        routeName: "admin.permissions",
+        href: route("admin.permissions"),
+        icon: KeyIcon,
+        roles: ["Administrator"],
+        permissions: ["roles.assign"],
+      },
+      {
+        label: "Assign Roles",
+        routeName: "admin.assign-roles",
+        href: route("admin.assign-roles"),
+        icon: UserGroupIcon,
+        roles: ["Administrator"],
+        permissions: ["roles.assign"],
       },
       {
         label: "Division",
@@ -302,6 +336,7 @@ const menuItems = [
         href: route("roles.divisions"),
         icon: CursorArrowRippleIcon,
         roles: ["Administrator"],
+        permissions: ["roles.assign"],
       },
       {
         label: "Office/Unit",
@@ -309,6 +344,7 @@ const menuItems = [
         href: route("offices.index"),
         icon: HomeIcon,
         roles: ["Administrator"],
+        permissions: ["roles.assign"],
       },
       {
         label: "Buildings",
@@ -316,6 +352,7 @@ const menuItems = [
         href: route("buildings.index"),
         icon: HomeModernIcon,
         roles: ["Administrator"],
+        permissions: ["roles.assign"],
       },
       {
         label: "Campus",
@@ -323,6 +360,7 @@ const menuItems = [
         href: route("campuses.index"),
         icon: HomeIcon,
         roles: ["Administrator"],
+        permissions: ["roles.assign"],
       },
       {
         label: "Rooms",
@@ -330,6 +368,7 @@ const menuItems = [
         href: route("rooms.index"),
         icon: HomeIcon,
         roles: ["Administrator"],
+        permissions: ["roles.assign"],
       },
       {
         label: "Vehicle",
@@ -337,14 +376,16 @@ const menuItems = [
         href: route("vehicles.index"),
         icon: ArchiveBoxIcon,
         roles: ["Administrator"],
+        permissions: ["vehicles.manage"],
       },
-          {
-            label: "Facility",
-            routeName: "facilities.index",
-            href: route("facilities.index"),
-            icon: ArchiveBoxIcon,
-            roles: ["Administrator"],
-          },
+      {
+        label: "Facility",
+        routeName: "facilities.index",
+        href: route("facilities.index"),
+        icon: ArchiveBoxIcon,
+        roles: ["Administrator"],
+        permissions: ["facilities.manage"],
+      },
       
     ],
   },
@@ -359,6 +400,7 @@ const menuItems = [
         href: route("jobrequests.index"),
         icon: ComputerDesktopIcon,
         roles: ["Administrator", "Faculty", "Staff", "DivisionChief"],
+        permissions: ["it.requests.view"],
       },
       {
         label: "For Approval ITJR",
@@ -366,6 +408,7 @@ const menuItems = [
         href: route("job-requests.for-approval"),
         icon: BookOpenIcon,
         roles: ["DivisionChief"],
+        permissions: ["it.requests.manage"],
       },
       {
         label: "OCD Approval ITJR",
@@ -373,6 +416,7 @@ const menuItems = [
         href: route("job-requests.ocd-approval"),
         icon: BookOpenIcon,
         roles: ["OCD"],
+        permissions: ["it.requests.manage"],
       },
       {
         label: "Equipment Inventory",
@@ -380,6 +424,7 @@ const menuItems = [
         href: route("ict-equipments.index"),
         icon: QueueListIcon,
         roles: ["Administrator", "OCD"],
+        permissions: ["it.equipment.view"],
       },
       {
         label: "PMS",
@@ -387,6 +432,7 @@ const menuItems = [
         href: route("ict-pms.index"),
         icon: ClockIcon,
         roles: ["Administrator", "OCD"],
+        permissions: ["it.equipment.view"],
       },
 
     ],
@@ -409,6 +455,7 @@ const menuItems = [
         href: route("pds.my"),
         icon: ClipboardDocumentListIcon,
         roles: ["Faculty", "Staff", "DivisionChief", "OCD", "Administrator", "HR"],
+        permissions: ["hr.pds.view"],
       },
       {
         label: "Employees",
@@ -416,6 +463,7 @@ const menuItems = [
         href: route('hr.employees.index'),
         icon: UserIcon,
         roles: ["Administrator"],
+        permissions: ["hr.employees.manage"],
       },
       {
         label: "Attendance Logs",
@@ -423,6 +471,7 @@ const menuItems = [
         href: route('hr.attendance.index'),
         icon: ClockIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff"],
+        permissions: ["hr.attendance.view"],
       },
       {
         label: "Schedule",
@@ -430,6 +479,7 @@ const menuItems = [
         href: route("schedules.index"),
         icon: DocumentTextIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff"],
+        permissions: ["hr.schedule.view"],
       },
       {
         label: "Date Parameters",
@@ -437,6 +487,7 @@ const menuItems = [
         href: route('hr.date-parameters.index'),
         icon: ClockIcon,
         roles: ["Administrator", "HR"],
+        permissions: ["hr.employees.manage"],
       },
       {
         label: "Gate Pass",
@@ -444,6 +495,7 @@ const menuItems = [
         href: route('gatepass.index'),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
+        permissions: ["hr.gatepass.view"],
       },
       {
         label: "Work From Home",
@@ -451,6 +503,7 @@ const menuItems = [
         href: route('hr.wfh.index'),
         icon: HomeModernIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD"],
+        permissions: ["wfh.view"],
       },
       {
         label: "WFH Monitoring",
@@ -458,6 +511,7 @@ const menuItems = [
         href: route('hr.wfh.monitor.page'),
         icon: ChartBarIcon,
         roles: ["Administrator", "HR", "DivisionChief", "OCD"],
+        permissions: ["wfh.monitor"],
       },
     ],
   },
@@ -473,6 +527,7 @@ const menuItems = [
         href: route("outcome.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator","HR"],
+        permissions: ["ipcr.view"],
       },
       {
         label: "Performance Indicators",
@@ -480,6 +535,7 @@ const menuItems = [
         href: route("performanceindicator.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator","HR","DivisionChief"],
+        permissions: ["ipcr.view"],
       },
       {
         label: "Work Distribution Plan",
@@ -487,6 +543,7 @@ const menuItems = [
         href: route("workdistribution.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator","HR","DivisionChief"],
+        permissions: ["ipcr.view"],
       },
       {
         label: "IPCR",
@@ -494,15 +551,15 @@ const menuItems = [
         href: route("employee-ipcr.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief"],
+        permissions: ["ipcr.view"],
       },
-      
-
       {
         label: "Committees",
         routeName: "pm-committees.index",
         href: route("pm-committees.index"),
         icon: UserGroupIcon,
         roles: ["Administrator", "DivisionChief", "OCD", "HR", "Faculty", "Staff", "PMRater"],
+        permissions: ["accomplishments.view"],
       },
       {
         label: "Special Assignments",
@@ -510,6 +567,7 @@ const menuItems = [
         href: route("pm-special-assignments.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "DivisionChief", "OCD", "HR", "Faculty", "Staff", "PMRater"],
+        permissions: ["accomplishments.view"],
       },
       {
         label: "My Accomplishments",
@@ -517,6 +575,7 @@ const menuItems = [
         href: route("my-accomplishments.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "HR", "DivisionChief", "OCD"],
+        permissions: ["accomplishments.view"],
       },
       {
         label: "My Unit",
@@ -524,6 +583,7 @@ const menuItems = [
         href: route("my-unit-ipcr.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "DivisionChief", "OCD", "Faculty", "Staff"],
+        permissions: ["ipcr.view"],
       },
       {
         label: "My Division",
@@ -531,6 +591,7 @@ const menuItems = [
         href: route("division-chief-ipcr.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "DivisionChief", "OCD", "Faculty", "Staff"],
+        permissions: ["ipcr.approve"],
       },
       {
         label: "HR IPCR Review",
@@ -538,6 +599,7 @@ const menuItems = [
         href: route("hr-ipcr.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR"],
+        permissions: ["ipcr.monitor"],
       },
       {
         label: "PMT Review",
@@ -545,6 +607,7 @@ const menuItems = [
         href: route("pmt-ipcr.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "PMT", "OCD"],
+        permissions: ["ipcr.approve"],
       },
     ],
   },
@@ -594,35 +657,40 @@ const menuItems = [
         href: route("vehicle-requests.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        permissions: ["vehicles.view"],
       },
-          {
-            label: "Facility Request",
-            routeName: "facility-requests.index",
-            href: route("facility-requests.index"),
-            icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
-          },
-          {
-            label: "Request for Services",
-            routeName: "service-requests.index",
-            href: route('service-requests.index'),
-            icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
-          },
-          {
-            label: "Assets",
-            routeName: "assets.index",
-            href: route('assets.index'),
-            icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "GSU Head"],
-          },
-          {
-            label: "Work Request",
-            routeName: "work-requests.index",
-            href: route('work-requests.index'),
-            icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
-          },
+      {
+        label: "Facility Request",
+        routeName: "facility-requests.index",
+        href: route("facility-requests.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        permissions: ["facilities.view"],
+      },
+      {
+        label: "Request for Services",
+        routeName: "service-requests.index",
+        href: route('service-requests.index'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        permissions: ["facilities.view"],
+      },
+      {
+        label: "Assets",
+        routeName: "assets.index",
+        href: route('assets.index'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "GSU Head"],
+        permissions: ["facilities.manage"],
+      },
+      {
+        label: "Work Request",
+        routeName: "work-requests.index",
+        href: route('work-requests.index'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        permissions: ["facilities.view"],
+      },
     ],
     // Only show this section for GSU Head if that's their only role
     showForGSUHeadOnly: true,
@@ -638,6 +706,7 @@ const menuItems = [
         href: route("procurements.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["procurement.view"],
       },
     ],
   },
@@ -729,14 +798,16 @@ const menuItems = [
             href: route("consultations.index"),
             icon: ChatBubbleLeftRightIcon,
             roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
+            permissions: ["health.view"],
           },
           {
             label: "Consultation Logs",
             routeName: "consultations.log.print",
             href: route("consultations.log.print"),
             icon: DocumentTextIcon,
-            roles: ["Administrator", "Nurse", "Clinic","Nurse"],
+            roles: ["Administrator", "Nurse", "Clinic"],
             target: '_blank',
+            permissions: ["health.view"],
           },
           {
             label: "Statistics Report",
@@ -744,6 +815,7 @@ const menuItems = [
             href: "#",
             icon: ChartBarIcon,
             roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "Clinic","Nurse"],
+            permissions: ["health.view"],
           },
           {
             label: "Doctor's Schedule",
@@ -751,6 +823,7 @@ const menuItems = [
             href: route("physician-schedule.index"),
             icon: ClockIcon,
             roles: ["Administrator","Clinic","Nurse"],
+            permissions: ["health.manage"],
           },
         ],
       },
@@ -780,6 +853,7 @@ const menuItems = [
         href: route('library.attendance.index'),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Librarian"],
+        permissions: ["library.manage"],
       },
       {
         label: "Collections",
@@ -787,28 +861,32 @@ const menuItems = [
         href: route('library.collections.index'),
         icon: ArchiveBoxIcon,
         roles: ["Administrator", "Librarian"],
+        permissions: ["library.manage"],
       },
-          {
-            label: "Collection Categories",
-            routeName: "library.collection-categories.index",
-            href: route('library.collection-categories.index'),
-            icon: BookOpenIcon,
-            roles: ["Administrator", "Librarian"],
-          },
-          {
-            label: "Borrowing",
-            routeName: "library.borrowings.index",
-            href: route('library.borrowings.index'),
-            icon: BookOpenIcon,
-            roles: ["Administrator", "Librarian"],
-          },
-          {
-            label: "Statistics Report",
-            routeName: "library.statistics.report",
-            href: '#',
-            icon: ChartBarIcon,
-            roles: ["Administrator", "Librarian"],
-          },
+      {
+        label: "Collection Categories",
+        routeName: "library.collection-categories.index",
+        href: route('library.collection-categories.index'),
+        icon: BookOpenIcon,
+        roles: ["Administrator", "Librarian"],
+        permissions: ["library.manage"],
+      },
+      {
+        label: "Borrowing",
+        routeName: "library.borrowings.index",
+        href: route('library.borrowings.index'),
+        icon: BookOpenIcon,
+        roles: ["Administrator", "Librarian"],
+        permissions: ["library.view"],
+      },
+      {
+        label: "Statistics Report",
+        routeName: "library.statistics.report",
+        href: '#',
+        icon: ChartBarIcon,
+        roles: ["Administrator", "Librarian"],
+        permissions: ["library.manage"],
+      },
     ],
   },
   {
@@ -841,14 +919,16 @@ const menuItems = [
         href: route("reports.index"),
         icon: ChartBarIcon,
         roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["reports.view"],
       },
-          {
-            label: "Audit Logs",
-            routeName: "reports.audit_logs",
-            href: route("reports.audit_logs"),
-            icon: DocumentTextIcon,
-            roles: ["Administrator"],
-          },
+      {
+        label: "Audit Logs",
+        routeName: "reports.audit_logs",
+        href: route("reports.audit_logs"),
+        icon: DocumentTextIcon,
+        roles: ["Administrator"],
+        permissions: ["roles.assign"],
+      },
     ],
   },
 ];
@@ -862,7 +942,6 @@ const roleIds = (user.role_id || "")
   .map((s) => Number(s.trim()))
   .filter((n) => !Number.isNaN(n));
 
-console.log('Role IDs:', roleIds);
 
 // Show Guidance Services when role_id includes 17 or 1
 const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1);
@@ -872,24 +951,23 @@ const showHealthStatisticsByRoleId = roleIds.includes(16) || roleIds.includes(1)
 const filterMenuByRole = (items, userRoleNames) =>
   items
     .filter((item) => {
+      // Special-case: Guidance (numeric role_id 17 still used for legacy Guidance role)
+      if (item.label === "Guidance Services") return showGuidanceByRoleId;
+      if (item.routeName === 'guidance.consultations.index') return showGuidanceByRoleId;
+      // Dashboard visible to Guidance role via numeric ID
+      if (item.routeName === 'dashboard' && roleIds.includes(17)) return true;
+      // Health stats via numeric ID
+      if (item.routeName === 'health.statistics.report') return showHealthStatisticsByRoleId;
+      // GSU Head override
       if (item.showForGSUHeadOnly && userRoleNames.includes("GSU Head")) return true;
-      if (item.label === "Guidance Services") {
-        // Only show the entire Guidance Services section when numeric role_id includes 17 (Guidance) or 1 (Administrator)
-        return showGuidanceByRoleId;
+
+      // ── Permission-first check ───────────────────────────────────────────
+      if (item.permissions?.length) {
+        return hasPerm(...item.permissions);
       }
-      // Allow Dashboard to be visible to Guidance role (role_id 17) as well
-      if (item.routeName === 'dashboard') {
-        if (roleIds.includes(17)) return true;
-      }
-      // Allow health statistics specifically for role_id 16 (and admin 1)
-      if (item.routeName === 'health.statistics.report') {
-        return showHealthStatisticsByRoleId;
-      }
-      // Show Guidance consultations link when role_id includes 17 (Guidance) or admin 1
-      if (item.routeName === 'guidance.consultations.index') {
-        return showGuidanceByRoleId;
-      }
-      return item.roles.some((r) => userRoleNames.includes(r));
+
+      // ── Fallback: role-name check (legacy, backward-compat) ─────────────
+      return item.roles?.some((r) => userRoleNames.includes(r)) ?? true;
     })
     .map((item) =>
       item.children
@@ -899,7 +977,6 @@ const filterMenuByRole = (items, userRoleNames) =>
 
 const filteredMenu = computed(() => filterMenuByRole(menuItems, roleNames));
 
-console.log('Filtered menu:', filteredMenu.value);
 
 // --- Expand logic ---
 const toggleExpand = (label) => (expanded.value[label] = !expanded.value[label]);
@@ -1100,7 +1177,7 @@ filteredMenu.value.forEach((item) => {
             <p v-if="!appVersion.history.length" class="text-sm text-gray-400 text-center py-4">No history yet.</p>
           </div>
           <!-- Admin footer -->
-          <div v-if="roleName === 'Administrator'" class="px-6 py-3 border-t flex justify-end">
+          <div v-if="isAdmin" class="px-6 py-3 border-t flex justify-end">
             <button
               @click="openAddVersionModal"
               class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700"

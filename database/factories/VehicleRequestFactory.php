@@ -17,7 +17,7 @@ class VehicleRequestFactory extends Factory
     public function definition()
     {
         return [
-            'user_id' => User::factory(),
+            'requestor_id' => User::factory(),
             'purpose' => $this->faker->sentence(6),
             'destination' => $this->faker->city(),
             'date_needed' => $this->faker->dateTimeBetween('now', '+1 year')->format('Y-m-d'),

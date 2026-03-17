@@ -5,22 +5,18 @@ namespace App\Policies;
 use App\Models\User;
 use App\Models\WFHAccomplishment;
 
-class WFHAccomplishmentPolicy
+class WFHAccomplishmentPolicy extends GenericPolicy
 {
     /**
-     * Any authenticated user may create an accomplishment
-     * (service layer enforces the time-in guard).
+     * Any user with wfh.accomplishments.create permission may add accomplishments.
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermission('wfh.accomplishments.create');
     }
 
     /**
-     * A user may view their own accomplishment.
-     * Unit Heads may view accomplishments of users in their office/unit.
-     * Division Chiefs may view accomplishments of users in their division.
-     * HR Directors may view all.
+     * Owner always allowed. Monitors need wfh.monitor + org-scope match.
      */
     public function view(User $user, WFHAccomplishment $accomplishment): bool
     {
@@ -28,7 +24,11 @@ class WFHAccomplishmentPolicy
             return true;
         }
 
-        if ($user->hasAnyRole(['HR', 'Administrator'])) {
+        if (! $user->hasPermission('wfh.monitor')) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin() || $user->hasPermission('hr.employees.manage')) {
             return true;
         }
 
@@ -54,10 +54,11 @@ class WFHAccomplishmentPolicy
     }
 
     /**
-     * Only the record owner may delete their accomplishment.
+     * Owner or users with wfh.accomplishments.delete may delete.
      */
     public function delete(User $user, WFHAccomplishment $accomplishment): bool
     {
-        return $user->id === $accomplishment->user_id;
+        return $user->id === $accomplishment->user_id
+            || $user->hasPermission('wfh.accomplishments.delete');
     }
 }

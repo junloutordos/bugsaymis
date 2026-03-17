@@ -18,7 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Register custom middleware
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'role'       => \App\Http\Middleware\RoleMiddleware::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
             'pshs.email' => \App\Http\Middleware\EnsurePshsEmail::class,
         ]);
     })

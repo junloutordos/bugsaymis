@@ -39,7 +39,7 @@ use App\Http\Controllers\PDSTrainingController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 // Data Management - Offices
-Route::middleware(['auth','role:Administrator'])->group(function(){
+Route::middleware(['auth','permission:roles.assign'])->group(function(){
     Route::get('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'index'])->name('offices.index');
     Route::post('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'store'])->name('offices.store');
     Route::put('/data-management/offices/{office}', [App\Http\Controllers\OfficeController::class, 'update'])->name('offices.update');
@@ -133,21 +133,21 @@ Route::post('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::c
 // DTR Upload (Data Management) - front-end page
 Route::get('/data-management/dtr-upload', function () {
     return Inertia::render('DataManagement/DTRUpload');
-})->name('data.dtr.upload')->middleware(['auth','role:Administrator']);
+})->name('data.dtr.upload')->middleware(['auth','permission:roles.assign']);
 
 // Endpoint to accept uploaded .dat file and insert attendance rows
 Route::post('/data-management/dtr-upload', [\App\Http\Controllers\DataManagement\DTRUploadController::class, 'store'])
     ->name('data.dtr.upload.store')
-    ->middleware(['auth','role:Administrator']);
+    ->middleware(['auth','permission:roles.assign']);
 
     // Consultation log printable report (A4 landscape)
     Route::get('/consultations/log/print', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])
         ->name('consultations.log.print')
-        ->middleware('role:Administrator|Nurse|Clinic');
+        ->middleware('permission:health.view');
     // Employee consultation log route (uses same controller method)
     Route::get('/consultations/log/print/employee', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])
         ->name('consultations.employee.log.print')
-        ->middleware('role:Administrator|Nurse|Clinic');
+        ->middleware('permission:health.view');
 
 /*
 |--------------------------------------------------------------------------
@@ -159,7 +159,7 @@ Route::prefix('it-job-requests')->group(function () {
     // GET — For Approval (Division Chief view)
     Route::get('/for-approval', [ITJobRequestController::class, 'forApproval'])
         ->name('job-requests.for-approval')
-        ->middleware(['auth', 'role:DivisionChief']);
+        ->middleware(['auth', 'permission:it.requests.manage']);
 
     // GET — Signed link to approve request
     Route::get('dc/approve/{jobRequest}/{chief}', [ITJobRequestController::class, 'approveByDivisionChiefSigned'])
@@ -327,8 +327,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
-    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('role:DivisionChief');
-    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('role:DivisionChief');
+    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('permission:vehicles.manage');
+    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('permission:vehicles.manage');
     // Vehicle bookings API for calendar
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Facility bookings API for calendar
@@ -343,42 +343,42 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
-    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('role:DivisionChief');
-    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('role:DivisionChief');
+    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('permission:facilities.manage');
+    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('permission:facilities.manage');
     // Work Requests (General Services)
-    Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
-    Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
-    Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
-    Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('role:Administrator|Faculty|Staff|Student|Parent|GSU Head|DivisionChief');
+    Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('permission:facilities.view');
+    Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('permission:facilities.create');
+    Route::put('/work-requests/{workRequest}', [WorkRequestController::class, 'update'])->name('work-requests.update')->middleware('permission:facilities.create');
+    Route::delete('/work-requests/{workRequest}', [WorkRequestController::class, 'destroy'])->name('work-requests.destroy')->middleware('permission:facilities.create');
 
-    // Completion endpoint — only GSU Head or Administrator can mark completed
+    // Completion endpoint — GSU Head / Admin (facilities.manage)
     Route::post('/work-requests/{workRequest}/complete', [WorkRequestController::class, 'complete'])
         ->name('work-requests.complete')
-        ->middleware('role:Administrator|GSU Head');
+        ->middleware('permission:facilities.manage');
 
     // Print view for a single work request (printable slip)
 
     // Guidance consultations list (Guidance Services)
     Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
-    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('role:Administrator|Faculty|Staff|Guidance');
-    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('role:Administrator|Faculty|Staff|Guidance');
-    Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('role:Administrator|Guidance');
-    Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('role:Administrator|Guidance');
+    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:health.view');
+    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:health.view');
+    Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:health.manage');
+    Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('permission:health.manage');
     // Save intervention details (Guidance personnel only)
-    Route::get('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'getIntervention'])->name('guidance.consultations.intervention.get')->middleware('role:Administrator|Guidance');
-    Route::post('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'intervention'])->name('guidance.consultations.intervention')->middleware('role:Administrator|Guidance');
+    Route::get('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'getIntervention'])->name('guidance.consultations.intervention.get')->middleware('permission:health.manage');
+    Route::post('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'intervention'])->name('guidance.consultations.intervention')->middleware('permission:health.manage');
     Route::get('/work-requests/{workRequest}/print', [WorkRequestController::class, 'print'])
         ->name('work-requests.print')
-        ->middleware('role:Administrator|GSU Head');
+        ->middleware('permission:facilities.manage');
 
     // Division chief approve/decline via signed links for Work Requests
     Route::get('/work-requests/{workRequest}/approve/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'approveByDivisionChief'])
         ->name('work-requests.approve')
         ->middleware(['signed']);
 
-    // Authenticated in-app approve/decline for DivisionChief
-    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('role:DivisionChief');
-    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('role:DivisionChief');
+    // Authenticated in-app approve/decline
+    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('permission:facilities.manage');
 
     Route::get('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showDeclineForm'])
         ->name('work-requests.decline')
@@ -408,8 +408,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
     Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');
     // In-app approval endpoints for Division Chief (named .inapp to avoid collision with signed email routes)
-    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('role:DivisionChief');
-    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('role:DivisionChief');
+    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('permission:facilities.manage');
+    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('permission:facilities.manage');
     Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
     Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
     // Assets (General Services)
@@ -459,10 +459,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('vehicle-requests.ocd.decline.submit')
         ->middleware(['signed']);
 
-    // Print trip ticket (only GSU Head and Administrator)
+    // Print trip ticket
     Route::get('/vehicle-requests/{vehicleRequest}/print', [VehicleRequestController::class, 'printTicket'])
         ->name('vehicle-requests.print')
-        ->middleware('role:Administrator|GSU Head');
+        ->middleware('permission:vehicles.manage');
 
     // Decline flow (signed): show decline form and submit decline
     Route::get('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'showDeclineForm'])
@@ -539,10 +539,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('service-requests.gsu.decline.submit')
         ->middleware(['signed']);
 
-    // Print service request (only GSU Head and Administrator)
+    // Print service request
     Route::get('/service-requests/{serviceRequest}/print', [\App\Http\Controllers\ServiceRequestController::class, 'printTicket'])
         ->name('service-requests.print')
-        ->middleware('role:Administrator|GSU Head');
+        ->middleware('permission:facilities.manage');
 
     Route::get('/facility-requests/{facilityRequest}/gsu/decline/{gsu}', [\App\Http\Controllers\FacilityRequestController::class, 'showGsuDeclineForm'])
         ->name('facility-requests.gsu.decline')
@@ -569,10 +569,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/messengerial/{messengerialRequest}/print', [\App\Http\Controllers\MessengerialController::class, 'printTicket'])
         ->name('messengerial.print');
 
-    // Upload proof of delivery (Records and Administrator)
+    // Upload proof of delivery
     Route::post('/messengerial/{messengerialRequest}/upload-proof', [\App\Http\Controllers\MessengerialController::class, 'uploadProof'])
         ->name('messengerial.upload_proof')
-        ->middleware('role:Administrator|Records');
+        ->middleware('permission:documents.approve');
 
     // Document Tracking
     Route::get('/document-tracking', [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('document-tracking.index');
@@ -606,25 +606,26 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::put('/physician-schedule/{schedule}', [\App\Http\Controllers\PhysicianScheduleController::class, 'update'])->name('physician-schedule.update');
     Route::delete('/physician-schedule/{schedule}', [\App\Http\Controllers\PhysicianScheduleController::class, 'destroy'])->name('physician-schedule.destroy');
 
-    // Print facility request (only GSU Head and Administrator)
+    // Print facility request
     Route::get('/facility-requests/{facilityRequest}/print', [\App\Http\Controllers\FacilityRequestController::class, 'printTicket'])
         ->name('facility-requests.print')
-        ->middleware('role:Administrator|GSU Head');
+        ->middleware('permission:facilities.manage');
 
     Route::post('/vehicle-requests/{vehicleRequest}/decline/{chief}', [VehicleRequestController::class, 'submitDecline'])
         ->name('vehicle-requests.decline.submit')
         ->middleware(['signed']);
-    Route::middleware('role:Administrator')->group(function () {
+    Route::middleware('permission:vehicles.manage')->group(function () {
         Route::put('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'update'])->name('vehicle-requests.update');
         Route::delete('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'destroy'])->name('vehicle-requests.destroy');
-        // Facility Requests admin actions
+    });
+    Route::middleware('permission:facilities.manage')->group(function () {
         Route::put('/facility-requests/{facilityRequest}', [\App\Http\Controllers\FacilityRequestController::class, 'update'])->name('facility-requests.update');
         Route::delete('/facility-requests/{facilityRequest}', [\App\Http\Controllers\FacilityRequestController::class, 'destroy'])->name('facility-requests.destroy');
     });
 
-    // Only Admin can assess requests
+    // Only MIS/Admin can assess requests
     Route::post('/job-requests/{jobRequest}/assess', [ITJobRequestController::class, 'assess'])
-        ->middleware('role:Administrator')
+        ->middleware('permission:it.requests.manage')
         ->name('jobrequests.assess');
 
     Route::put('/job-requests/{itJobRequest}/update', [ITJobRequestController::class, 'update'])
@@ -655,19 +656,19 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/ict-pms/{pmsId}/assign-equipments', [PMSController::class, 'assignEquipments'])->name('ict-pms.assign-equipments');
     Route::get('/ict-pms/{pms}/equipments', [PMSController::class, 'showEquipments'])->name('ict-pms.show-equipments');
     
-    // Administrator only: Vehicles management
-    Route::middleware('role:Administrator')->group(function () {
+    // Vehicles & Facilities management
+    Route::middleware('permission:vehicles.manage')->group(function () {
         Route::get('/vehicles', [VehicleController::class, 'index'])->name('vehicles.index');
         Route::post('/vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
         Route::put('/vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
         Route::delete('/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+    });
+    Route::middleware('permission:facilities.manage')->group(function () {
         // Facilities admin management
         Route::get('/facilities', [FacilityController::class, 'index'])->name('facilities.index');
         Route::post('/facilities', [FacilityController::class, 'store'])->name('facilities.store');
         Route::put('/facilities/{facility}', [FacilityController::class, 'update'])->name('facilities.update');
         Route::delete('/facilities/{facility}', [FacilityController::class, 'destroy'])->name('facilities.destroy');
-        
-        
     });
 
     Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');
@@ -678,7 +679,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     |--------------------------------------------------------------------------
     */
     
-    Route::middleware(['auth', 'role:DivisionChief'])->group(function () {
+    Route::middleware(['auth', 'permission:it.requests.manage'])->group(function () {
     Route::get('/job-requests/for-approval', [ITJobRequestController::class, 'forApproval'])
         ->name('job-requests.for-approval');
 
@@ -691,7 +692,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     |--------------------------------------------------------------------------
     */
     
-    Route::middleware(['auth', 'role:OCD'])->group(function () {
+    Route::middleware(['auth', 'permission:it.requests.manage'])->group(function () {
     Route::get('/job-requests/ocd-approval', [ITJobRequestController::class, 'ocdApproval'])
         ->name('job-requests.ocd-approval');
 
@@ -706,20 +707,20 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     | Role-Based Routes
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:Administrator|HR|DivisionChief|OCD|PMT')->group(function () {
+    Route::middleware('permission:users.view')->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{id}', [UserController::class, 'update'])->name('users.update');
         Route::delete('users/{id}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::post('users/{user}/upload-signature', [UserController::class, 'uploadSignature'])->name('users.upload_signature');
-        Route::get('/users/inactive', [UserController::class, 'inactiveIndex'])->name('users.inactive')->middleware('role:Administrator');
-        Route::post('/users/{id}/activate', [UserController::class, 'activate'])->name('users.activate')->middleware('role:Administrator');
+        Route::get('/users/inactive', [UserController::class, 'inactiveIndex'])->name('users.inactive')->middleware('permission:hr.employees.manage');
+        Route::post('/users/{id}/activate', [UserController::class, 'activate'])->name('users.activate')->middleware('permission:hr.employees.manage');
         Route::get('/users-roles', [RolesController::class, 'index'])->name('roles.index');
         Route::post('users-roles', [RolesController::class, 'store'])->name('roles.store');
         Route::put('users-roles/{id}', [RolesController::class, 'update'])->name('roles.update');
         Route::delete('users-roles/{id}', [RolesController::class, 'destroy'])->name('roles.destroy');
         Route::get('/reports', fn () => Inertia::render('Reports/Index'))->name('reports.index');
-        Route::get('/reports/audit-logs', [\App\Http\Controllers\Reports\AuditLogController::class, 'index'])->name('reports.audit_logs')->middleware('role:Administrator');
+        Route::get('/reports/audit-logs', [\App\Http\Controllers\Reports\AuditLogController::class, 'index'])->name('reports.audit_logs')->middleware('permission:roles.assign');
         Route::get('/settings', fn () => Inertia::render('Settings/Index'))->name('settings');
 
         Route::get('/users-division', [RolesController::class, 'showDivisions'])->name('roles.divisions');
@@ -795,7 +796,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             ->name('division-chief-employee-ipcr.returnFromPMT');
 
         // PMT Review Routes
-        Route::middleware('role:Administrator|PMT|OCD')->group(function () {
+        Route::middleware('permission:ipcr.approve')->group(function () {
             Route::get('/pmt/ipcrs', [PMTIPCRController::class, 'index'])->name('pmt-ipcr.index');
             Route::get('/pmt/ipcrs/{id}', [PMTIPCRController::class, 'show'])->name('pmt-ipcr.show');
             Route::post('/pmt/ipcrs/{employeeIPCR}/approve', [PMTIPCRController::class, 'approve'])->name('pmt-ipcr.approve');
@@ -804,7 +805,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         });
 
         // HR IPCR Review Routes
-        Route::middleware('role:Administrator|HR')->group(function () {
+        Route::middleware('permission:ipcr.monitor')->group(function () {
             Route::get('/hr/ipcrs', [HRIPCRController::class, 'index'])->name('hr-ipcr.index');
             Route::get('/hr/ipcrs/{id}', [HRIPCRController::class, 'show'])->name('hr-ipcr.show');
             Route::post('/hr/ipcrs/{employeeIPCR}/submit-to-pmt', [HRIPCRController::class, 'submitToPMT'])->name('hr-ipcr.submitToPMT');
@@ -862,15 +863,54 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 // Lightweight users JSON endpoint for dropdowns (authenticated)
 Route::middleware('auth')->get('/api/users/select', [UserController::class, 'selectList'])->name('users.select');
 
-// HR Employees page (admin-only) — renders the same Users page but labelled as Employees
-Route::middleware(['auth','role:Administrator'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
-Route::middleware(['auth','role:Administrator|HR'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
+// ─── RBAC Admin Pages (Inertia) ───────────────────────────────────────────────
+Route::middleware(['auth', 'permission:roles.assign'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/roles',       fn () => Inertia::render('Admin/Roles/Index'))->name('roles');
+        Route::get('/permissions', fn () => Inertia::render('Admin/Roles/Permissions'))->name('permissions');
+        Route::get('/assign-roles',fn () => Inertia::render('Admin/Users/AssignRoles'))->name('assign-roles');
+    });
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── RBAC Admin API ───────────────────────────────────────────────────────────
+Route::middleware(['auth', 'permission:roles.assign'])
+    ->prefix('admin/rbac')
+    ->name('admin.rbac.')
+    ->group(function () {
+        // Roles
+        Route::get('/roles',                                   [\App\Http\Controllers\Admin\RoleController::class, 'index'])->name('roles.index');
+        Route::post('/roles',                                  [\App\Http\Controllers\Admin\RoleController::class, 'store'])->name('roles.store');
+        Route::get('/roles/{role}',                            [\App\Http\Controllers\Admin\RoleController::class, 'show'])->name('roles.show');
+        Route::put('/roles/{role}',                            [\App\Http\Controllers\Admin\RoleController::class, 'update'])->name('roles.update');
+        Route::delete('/roles/{role}',                         [\App\Http\Controllers\Admin\RoleController::class, 'destroy'])->name('roles.destroy');
+        Route::put('/roles/{role}/permissions',                [\App\Http\Controllers\Admin\RoleController::class, 'syncPermissions'])->name('roles.permissions.sync');
+        Route::get('/permissions-all',                         [\App\Http\Controllers\Admin\RoleController::class, 'allPermissions'])->name('permissions.all');
+
+        // Permissions
+        Route::get('/permissions',                             [\App\Http\Controllers\Admin\PermissionController::class, 'index'])->name('permissions.index');
+        Route::post('/permissions',                            [\App\Http\Controllers\Admin\PermissionController::class, 'store'])->name('permissions.store');
+        Route::put('/permissions/{permission}',                [\App\Http\Controllers\Admin\PermissionController::class, 'update'])->name('permissions.update');
+        Route::delete('/permissions/{permission}',             [\App\Http\Controllers\Admin\PermissionController::class, 'destroy'])->name('permissions.destroy');
+
+        // User → Role assignment
+        Route::get('/users',                                   [\App\Http\Controllers\Admin\UserRoleController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}',                            [\App\Http\Controllers\Admin\UserRoleController::class, 'show'])->name('users.show');
+        Route::put('/users/{user}/roles',                      [\App\Http\Controllers\Admin\UserRoleController::class, 'sync'])->name('users.roles.sync');
+        Route::get('/roles-list',                              [\App\Http\Controllers\Admin\UserRoleController::class, 'rolesList'])->name('roles.list');
+    });
+// ─────────────────────────────────────────────────────────────────────────────
+
+// HR Employees page
+Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
+Route::middleware(['auth','permission:hr.employees.manage'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
 
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
 
 // ─── Work From Home (WFH) Module ─────────────────────────────────────────────
-Route::middleware('auth')->prefix('hr/wfh')->name('hr.wfh.')->group(function () {
+Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.wfh.')->group(function () {
 
     // Inertia dashboard page
     Route::get('/', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'index'])
@@ -878,8 +918,10 @@ Route::middleware('auth')->prefix('hr/wfh')->name('hr.wfh.')->group(function () 
 
     // Time In / Time Out (JSON API, called via axios)
     Route::post('/time-in',  [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'timeIn'])
+        ->middleware('permission:wfh.time-in')
         ->name('time-in');
     Route::post('/time-out', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'timeOut'])
+        ->middleware('permission:wfh.time-out')
         ->name('time-out');
 
     // Attendance records
@@ -892,24 +934,24 @@ Route::middleware('auth')->prefix('hr/wfh')->name('hr.wfh.')->group(function () 
     Route::get('/accomplishments',                    [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'index'])
         ->name('accomplishments.index');
     Route::post('/accomplishments',                   [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'store'])
+        ->middleware('permission:wfh.accomplishments.create')
         ->name('accomplishments.store');
     Route::delete('/accomplishments/{wfhAccomplishment}', [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'destroy'])
+        ->middleware('permission:wfh.accomplishments.delete')
         ->name('accomplishments.destroy');
 
-    // Monitoring — Unit Head / Division Chief / HR Director only
+    // Monitoring — users with wfh.monitor permission only
     Route::get('/monitor',      [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'monitorPage'])
+        ->middleware('permission:wfh.monitor')
         ->name('monitor.page');
     Route::get('/monitor/data', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'monitor'])
+        ->middleware('permission:wfh.monitor')
         ->name('monitor');
 
     // Image proxy — streams Drive photos server-side (no client Google auth needed)
     Route::get('/photo/{fileId}', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'photo'])
         ->name('photo')
         ->where('fileId', '[a-zA-Z0-9_-]+');
-
-    // Static map proxy — proxies OpenStreetMap tile to avoid CORS
-    Route::get('/map', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'map'])
-        ->name('map');
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -925,35 +967,35 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     // Library attendance (authenticated view)
     Route::get('/library/attendance', [\App\Http\Controllers\LibraryAttendanceController::class, 'index'])
         ->name('library.attendance.index')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
 
     // Library collections (CRUD for librarians/admins)
     Route::get('/library/collections', [\App\Http\Controllers\LibraryCollectionsController::class, 'index'])
         ->name('library.collections.index')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     Route::post('/library/collections', [\App\Http\Controllers\LibraryCollectionsController::class, 'store'])
         ->name('library.collections.store')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     Route::put('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'update'])
         ->name('library.collections.update')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     Route::delete('/library/collections/{id}', [\App\Http\Controllers\LibraryCollectionsController::class, 'destroy'])
         ->name('library.collections.destroy')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     // Collection Categories (CRUD for librarians/admins)
     Route::get('/library/collection-categories', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'index'])
         ->name('library.collection-categories.index')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     Route::post('/library/collection-categories', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'store'])
         ->name('library.collection-categories.store')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     Route::put('/library/collection-categories/{id}', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'update'])
         ->name('library.collection-categories.update')
-        ->middleware('role:Administrator|Librarian');
+        ->middleware('permission:library.manage');
     Route::delete('/library/collection-categories/{id}', [\App\Http\Controllers\LibraryCollectionCategoriesController::class, 'destroy'])
         ->name('library.collection-categories.destroy')
-        ->middleware('role:Administrator|Librarian');
-    Route::middleware('role:Administrator|Staff|Faculty|HR|DivisionChief')->group(function () {
+        ->middleware('permission:library.manage');
+    Route::middleware('permission:ipcr.view')->group(function () {
 
         //New IPCR Routes
         Route::get('/employee-ipcr', [EmployeeIPCRController::class, 'index'])->name('employee-ipcr.index');

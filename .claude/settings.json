@@ -10,7 +10,9 @@
       "Bash(grep -l \"pds\\\\|PDS\\\\|personal.*data\" /Users/junlou/bugsaymis-docker/src/bugsaymis/database/migrations/*.php)",
       "Bash(docker ps:*)",
       "Bash(docker exec:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(docker compose exec app php artisan tinker --execute=\":*)",
+      "Bash(docker compose:*)"
     ]
   }
 }
