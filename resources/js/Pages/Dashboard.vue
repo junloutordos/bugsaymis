@@ -290,7 +290,7 @@ onMounted(() => {
             <p class="text-xs opacity-60 mt-0.5">{{ (maleCount + femaleCount).toLocaleString() }} enrolled</p>
           </div>
 
-          <div class="bg-gradient-to-br from-amber-400 to-yellow-500 p-5 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-white">
+          <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-white">
             <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
               <ClockIcon class="h-5 w-5" />
             </div>
@@ -299,7 +299,7 @@ onMounted(() => {
             <p class="text-xs opacity-60 mt-0.5">across all modules</p>
           </div>
 
-          <div class="bg-gradient-to-br from-amber-400 to-yellow-500 p-5 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-white">
+          <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-5 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 text-white">
             <div class="h-10 w-10 rounded-xl bg-white/20 flex items-center justify-center mb-3">
               <DocumentCheckIcon class="h-5 w-5" />
             </div>
