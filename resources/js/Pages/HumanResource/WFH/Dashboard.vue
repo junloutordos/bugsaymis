@@ -219,26 +219,29 @@ const duration = computed(() => {
 })
 
 // ── Camera ────────────────────────────────────────────────────────────────────
+const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
 async function openCamera(mode) {
   cameraMode.value    = mode
   capturedImage.value = null
+  showCamera.value    = true
 
-  // Try getUserMedia first (works on HTTPS and http://localhost).
-  // If unavailable (HTTP on non-localhost, e.g. mobile), fall back to
-  // <input capture> which opens the device camera natively.
-  if (navigator.mediaDevices?.getUserMedia) {
-    cameraMethod.value = 'stream'
-    showCamera.value   = true
-    await nextTick()
-    try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-      if (videoEl.value) videoEl.value.srcObject = mediaStream
-    } catch {
-      cameraMethod.value = 'file'
-    }
-  } else {
+  // Mobile devices: use native camera via <input capture> (works on HTTP).
+  // Desktop/laptop: always attempt getUserMedia live stream (original behavior).
+  if (isMobile) {
     cameraMethod.value = 'file'
-    showCamera.value   = true
+    return
+  }
+
+  cameraMethod.value = 'stream'
+  await nextTick()
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    if (videoEl.value) videoEl.value.srcObject = mediaStream
+  } catch {
+    Swal.fire('Camera Error', 'Could not access your camera. Please allow camera permission or use HTTPS.', 'error')
+    showCamera.value = false
   }
 }
 
