@@ -869,6 +869,50 @@ Route::middleware(['auth','role:Administrator|HR'])->post('/hr/employees', [User
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
 
+// ─── Work From Home (WFH) Module ─────────────────────────────────────────────
+Route::middleware('auth')->prefix('hr/wfh')->name('hr.wfh.')->group(function () {
+
+    // Inertia dashboard page
+    Route::get('/', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'index'])
+        ->name('index');
+
+    // Time In / Time Out (JSON API, called via axios)
+    Route::post('/time-in',  [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'timeIn'])
+        ->name('time-in');
+    Route::post('/time-out', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'timeOut'])
+        ->name('time-out');
+
+    // Attendance records
+    Route::get('/attendance',     [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'myAttendance'])
+        ->name('attendance.index');
+    Route::get('/attendance/{wfhAttendance}', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'show'])
+        ->name('attendance.show');
+
+    // Accomplishments
+    Route::get('/accomplishments',                    [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'index'])
+        ->name('accomplishments.index');
+    Route::post('/accomplishments',                   [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'store'])
+        ->name('accomplishments.store');
+    Route::delete('/accomplishments/{wfhAccomplishment}', [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'destroy'])
+        ->name('accomplishments.destroy');
+
+    // Monitoring — Unit Head / Division Chief / HR Director only
+    Route::get('/monitor',      [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'monitorPage'])
+        ->name('monitor.page');
+    Route::get('/monitor/data', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'monitor'])
+        ->name('monitor');
+
+    // Image proxy — streams Drive photos server-side (no client Google auth needed)
+    Route::get('/photo/{fileId}', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'photo'])
+        ->name('photo')
+        ->where('fileId', '[a-zA-Z0-9_-]+');
+
+    // Static map proxy — proxies OpenStreetMap tile to avoid CORS
+    Route::get('/map', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'map'])
+        ->name('map');
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Library statistics printable report
 Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controllers\LibraryAttendanceController::class, 'report'])->name('library.statistics.report');
     // Students CRUD (Registrar / public admin may use)

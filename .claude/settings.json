@@ -5,7 +5,12 @@
       "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/AccomplishmentController.php)",
       "Bash(php artisan migrate --path=database/migrations/2026_03_13_000001_create_app_versions_table.php)",
       "Bash(php artisan:*)",
-      "Bash(grep -r ziggy resources/js/ --include=*.js --include=*.ts -l)"
+      "Bash(grep -r ziggy resources/js/ --include=*.js --include=*.ts -l)",
+      "Bash(find /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Services -type f -name *.php)",
+      "Bash(grep -l \"pds\\\\|PDS\\\\|personal.*data\" /Users/junlou/bugsaymis-docker/src/bugsaymis/database/migrations/*.php)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

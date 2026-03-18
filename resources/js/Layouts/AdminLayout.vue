@@ -445,6 +445,20 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
       },
+      {
+        label: "Work From Home",
+        routeName: "hr.wfh.index",
+        href: route('hr.wfh.index'),
+        icon: HomeModernIcon,
+        roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD"],
+      },
+      {
+        label: "WFH Monitoring",
+        routeName: "hr.wfh.monitor.page",
+        href: route('hr.wfh.monitor.page'),
+        icon: ChartBarIcon,
+        roles: ["Administrator", "HR", "DivisionChief", "OCD"],
+      },
     ],
   },
 
