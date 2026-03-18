@@ -67,19 +67,44 @@
           {{ cameraMode === 'in' ? 'Capture Time-In Photo' : 'Capture Time-Out Photo' }}
         </h3>
 
-        <!-- Live preview -->
-        <div v-if="!capturedImage" class="relative">
-          <video ref="videoEl" autoplay playsinline
-                 class="w-full rounded-lg bg-black" style="max-height:280px;" />
-          <button @click="capture"
-                  class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
-            📸 Capture Photo
-          </button>
-        </div>
+        <!-- Not yet captured -->
+        <template v-if="!capturedImage">
+
+          <!-- Live stream (HTTPS / localhost) -->
+          <div v-if="cameraMethod === 'stream'" class="relative">
+            <video ref="videoEl" autoplay playsinline
+                   class="w-full rounded-lg bg-black" style="max-height:280px;" />
+            <button @click="capture"
+                    class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
+              📸 Capture Photo
+            </button>
+          </div>
+
+          <!-- Native camera (HTTP — opens device camera directly, no file picker) -->
+          <div v-else class="flex flex-col items-center gap-4 py-6">
+            <div class="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center">
+              <svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <p class="text-sm text-gray-500">Your camera will open when you tap the button below.</p>
+            <label class="w-full cursor-pointer">
+              <input ref="fileInputEl" type="file" accept="image/*" capture="user"
+                     class="sr-only" @change="onFileCapture" />
+              <span class="flex items-center justify-center gap-2 w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
+                📷 Open Camera
+              </span>
+            </label>
+          </div>
+
+        </template>
 
         <!-- Captured preview -->
         <div v-else class="space-y-3">
-          <img :src="capturedImage" class="w-full rounded-lg border" alt="Captured photo" style="max-height:280px;object-fit:cover;" />
+          <img :src="capturedImage" class="w-full rounded-lg border" alt="Captured photo"
+               style="max-height:280px;object-fit:cover;" />
           <div class="flex gap-3">
             <button @click="retake"
                     class="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
@@ -87,7 +112,7 @@
             </button>
             <button @click="confirmCapture" :disabled="loading"
                     class="flex-1 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition">
-              {{ loading ? 'Uploading…' : (cameraMode === 'in' ? 'Confirm Time In' : 'Confirm Time Out') }}
+              {{ loading ? 'Saving…' : (cameraMode === 'in' ? 'Confirm Time In' : 'Confirm Time Out') }}
             </button>
           </div>
         </div>
@@ -96,7 +121,7 @@
           Cancel
         </button>
 
-        <!-- Hidden canvas for snapshot -->
+        <!-- Hidden canvas for getUserMedia snapshot -->
         <canvas ref="canvasEl" class="hidden" />
       </div>
 
@@ -173,13 +198,15 @@ const attendance             = ref(props.todayAttendance)
 const localAccomplishments   = ref(props.todayAttendance?.accomplishments ?? [])
 const showCamera             = ref(false)
 const cameraMode             = ref('in')   // 'in' | 'out'
+const cameraMethod           = ref('stream') // 'stream' | 'file'
 const capturedImage          = ref(null)
 const loading                = ref(false)
 const showAccomplishmentPanel = ref(false)
 
 // Template refs
-const videoEl  = ref(null)
-const canvasEl = ref(null)
+const videoEl     = ref(null)
+const canvasEl    = ref(null)
+const fileInputEl = ref(null)
 let mediaStream = null
 
 // ── Computed ──────────────────────────────────────────────────────────────────
@@ -197,15 +224,30 @@ async function openCamera(mode) {
   capturedImage.value = null
   showCamera.value    = true
 
+  // getUserMedia requires a secure context (HTTPS or localhost)
+  const canStream = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia
+  cameraMethod.value = canStream ? 'stream' : 'file'
+
+  if (!canStream) return  // file input handles it from the template
+
   await nextTick()
 
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
     if (videoEl.value) videoEl.value.srcObject = mediaStream
   } catch {
-    Swal.fire('Camera Error', 'Could not access your camera. Please allow camera permission.', 'error')
-    showCamera.value = false
+    // Fall back to file input if permission denied
+    cameraMethod.value = 'file'
   }
+}
+
+
+function onFileCapture(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => { capturedImage.value = ev.target.result }
+  reader.readAsDataURL(file)
 }
 
 function capture() {

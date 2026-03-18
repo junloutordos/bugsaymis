@@ -12,7 +12,11 @@
       "Bash(docker exec:*)",
       "Bash(npm run:*)",
       "Bash(docker compose exec app php artisan tinker --execute=\":*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(ipconfig getifaddr:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/junlou/bugsaymis-docker/nginx"
     ]
   }
 }
