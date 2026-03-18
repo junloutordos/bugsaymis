@@ -222,22 +222,23 @@ const duration = computed(() => {
 async function openCamera(mode) {
   cameraMode.value    = mode
   capturedImage.value = null
-  showCamera.value    = true
 
-  // getUserMedia requires a secure context (HTTPS or localhost)
-  const canStream = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia
-  cameraMethod.value = canStream ? 'stream' : 'file'
-
-  if (!canStream) return  // file input handles it from the template
-
-  await nextTick()
-
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-    if (videoEl.value) videoEl.value.srcObject = mediaStream
-  } catch {
-    // Fall back to file input if permission denied
+  // Try getUserMedia first (works on HTTPS and http://localhost).
+  // If unavailable (HTTP on non-localhost, e.g. mobile), fall back to
+  // <input capture> which opens the device camera natively.
+  if (navigator.mediaDevices?.getUserMedia) {
+    cameraMethod.value = 'stream'
+    showCamera.value   = true
+    await nextTick()
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      if (videoEl.value) videoEl.value.srcObject = mediaStream
+    } catch {
+      cameraMethod.value = 'file'
+    }
+  } else {
     cameraMethod.value = 'file'
+    showCamera.value   = true
   }
 }
 
