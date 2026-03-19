@@ -1,6 +1,7 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
+import axios from "axios";
 import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
@@ -208,6 +209,28 @@ const openModal = (req = null) => {
 };
 
 const closeModal = () => { showModal.value = false; editingRequest.value = null; form.reset(); };
+
+const onItAssistanceChange = async () => {
+  if (!form.requires_it_assistance) return  // unchecking — nothing to check
+
+  try {
+    const { data } = await axios.get(route('jobrequests.check-pending'))
+    if (data.has_pending) {
+      form.requires_it_assistance = false
+      form.assigned_mis_user = null
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Pending IT Job Request',
+        html: `You have <strong>${data.count}</strong> IT Job Request${data.count > 1 ? 's' : ''} waiting to be completed and rated (status: <em>Acted by MIS</em>).<br><br>
+               Please go to <strong>IT Job Requests</strong> and rate the completed service first before requesting IT assistance.<br><br>
+               Your Facility Request will still be submitted, but an IT Job Request will <strong>not</strong> be auto-created.`,
+        confirmButtonText: 'Understood',
+      })
+    }
+  } catch {
+    // silently ignore network errors — let the request proceed normally
+  }
+}
 
 const submit = () => {
   if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
@@ -592,7 +615,8 @@ const bookingsForDate = (dt) => {
 
             <div class="mt-2">
               <label class="inline-flex items-center gap-3">
-                <input type="checkbox" v-model="form.requires_it_assistance" class="h-4 w-4" />
+                <input type="checkbox" v-model="form.requires_it_assistance" class="h-4 w-4"
+                       @change="onItAssistanceChange" />
                 <span class="text-sm text-gray-700">Requires IT Technical Assistance</span>
               </label>
               <p class="text-xs text-gray-500 mt-1">If enabled, an IT Job Request will be automatically created for this event.</p>

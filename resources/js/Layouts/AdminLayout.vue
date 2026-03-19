@@ -418,6 +418,7 @@ const menuItems = [
         roles: ["OCD"],
         permissions: ["it.requests.manage"],
       },
+      
       {
         label: "Equipment Inventory",
         routeName: "ict-equipments.index",
@@ -496,6 +497,14 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
         permissions: ["hr.gatepass.view"],
+      },
+      {
+        label: "OCD Approval - Gate Pass",
+        routeName: "gatepass.ocd-approval",
+        href: route('gatepass.ocd-approval'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["OCD"],
+        permissions: ["hr.gatepass.approve"],
       },
       {
         label: "Work From Home",
@@ -690,6 +699,22 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
         permissions: ["facilities.view"],
+      },
+      {
+        label: "OCD Approval - Facility",
+        routeName: "facility-requests.ocd-approval",
+        href: route("facility-requests.ocd-approval"),
+        icon: BookOpenIcon,
+        roles: ["OCD"],
+        permissions: ["facilities.manage"],
+      },
+      {
+        label: "OCD Approval - Vehicle",
+        routeName: "vehicle-requests.ocd-approval",
+        href: route("vehicle-requests.ocd-approval"),
+        icon: BookOpenIcon,
+        roles: ["OCD"],
+        permissions: ["vehicles.manage"],
       },
     ],
     // Only show this section for GSU Head if that's their only role

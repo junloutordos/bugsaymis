@@ -628,4 +628,54 @@ class GatePassController extends Controller
 
         return view('gatepass_declined', ['gatepass' => $row, 'reason' => $request->input('reason')]);
     }
+
+    /* =====================================================
+     | OCD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $query = DB::table('gatepass')
+            ->join('users', 'gatepass.user_id', '=', 'users.id')
+            ->where('gatepass.status', 'Division Approved')
+            ->select('gatepass.*', 'users.name as requester_name');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('gatepass.purpose', 'like', "%{$search}%")
+                  ->orWhere('users.name',     'like', "%{$search}%");
+            });
+        }
+
+        $requests = $query->latest('gatepass.created_at')->paginate($perPage)->withQueryString();
+
+        return Inertia::render('HumanResource/GatePass/OCDApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function approveByOCDInApp(Request $request, $id)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        $row = DB::table('gatepass')->where('id', $id)->first();
+        if (! $row) abort(404);
+
+        $newStatus = $request->action === 'approve' ? 'OCD Approved' : 'OCD Declined';
+        DB::table('gatepass')->where('id', $id)->update(['status' => $newStatus, 'updated_at' => now()]);
+
+        try {
+            $requester = \App\Models\User::find($row->user_id);
+            if ($requester?->email) {
+                Mail::to($requester->email)->send(new GatePassStatusMail($row, $newStatus, null, $request->user()->name));
+            }
+        } catch (\Throwable $e) {
+            logger()->error('GatePass OCD in-app action email failed', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'OCD action recorded.');
+    }
 }

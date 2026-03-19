@@ -627,6 +627,18 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     }
 
     /* =====================================================
+     | CHECK PENDING "ACTED BY MIS" FOR CURRENT USER
+     |=====================================================*/
+    public function checkPendingActedByMis(Request $request)
+    {
+        $count = ITJobRequest::where('user_id', $request->user()->id)
+            ->where('status', 'Acted by MIS')
+            ->count();
+
+        return response()->json(['has_pending' => $count > 0, 'count' => $count]);
+    }
+
+    /* =====================================================
      | DESTROY
      |=====================================================*/
     public function destroy(ITJobRequest $jobRequest)

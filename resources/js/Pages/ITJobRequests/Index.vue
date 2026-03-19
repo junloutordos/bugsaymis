@@ -94,16 +94,12 @@ const goToPage = (pageNum) => {
   })
 }
 
-const showAll = () => {
-  perPage.value = 1000 // Large number to show all items
-  isLoading.value = true
-  router.get(route('jobrequests.index'), buildParams(1), {
-    preserveState: true,
-    replace: true,
-    only: ['requests', 'filters'],
-    onFinish: () => { isLoading.value = false },
-  })
-}
+const showAllChecked = ref((props.filters?.per_page ?? 15) >= 1000)
+
+watch(showAllChecked, (val) => {
+  perPage.value = val ? 1000 : 15
+  applyFilters(true)
+})
 
 // Current page data from paginator
 const visibleRequests = computed(() => props.requests?.data ?? [])
@@ -240,6 +236,10 @@ const handleNewRequest = async () => {
             >
               Search
             </button>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap text-sm text-gray-600">
+              <input type="checkbox" v-model="showAllChecked" class="h-4 w-4 rounded border-gray-300 text-blue-600" />
+              Show All
+            </label>
           </div>
           <!-- Dropdown Filters -->
           <div class="flex items-center gap-2 flex-wrap">
@@ -446,7 +446,6 @@ const handleNewRequest = async () => {
           <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
           <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
-          <button @click="showAll" :disabled="isLoading" class="px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50">Show All</button>
         </div>
       </div>
 
