@@ -68,38 +68,14 @@
         </h3>
 
         <!-- Not yet captured -->
-        <template v-if="!capturedImage">
-
-          <!-- Live stream (HTTPS / localhost) -->
-          <div v-if="cameraMethod === 'stream'" class="relative">
-            <video ref="videoEl" autoplay playsinline
-                   class="w-full rounded-lg bg-black" style="max-height:280px;" />
-            <button @click="capture"
-                    class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
-              📸 Capture Photo
-            </button>
-          </div>
-
-          <!-- Native camera (HTTP — opens device camera directly, no file picker) -->
-          <div v-else class="flex flex-col items-center gap-4 py-6">
-            <div class="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center">
-              <svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-            </div>
-            <p class="text-sm text-gray-500">Your camera will open when you tap the button below.</p>
-            <label class="w-full cursor-pointer">
-              <input ref="fileInputEl" type="file" accept="image/*" capture="user"
-                     class="sr-only" @change="onFileCapture" />
-              <span class="flex items-center justify-center gap-2 w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
-                📷 Open Camera
-              </span>
-            </label>
-          </div>
-
-        </template>
+        <div v-if="!capturedImage" class="relative">
+          <video ref="videoEl" autoplay playsinline
+                 class="w-full rounded-lg bg-black" style="max-height:280px;" />
+          <button @click="capture"
+                  class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
+            📸 Capture Photo
+          </button>
+        </div>
 
         <!-- Captured preview -->
         <div v-else class="space-y-3">
@@ -198,15 +174,13 @@ const attendance             = ref(props.todayAttendance)
 const localAccomplishments   = ref(props.todayAttendance?.accomplishments ?? [])
 const showCamera             = ref(false)
 const cameraMode             = ref('in')   // 'in' | 'out'
-const cameraMethod           = ref('stream') // 'stream' | 'file'
 const capturedImage          = ref(null)
 const loading                = ref(false)
 const showAccomplishmentPanel = ref(false)
 
 // Template refs
-const videoEl     = ref(null)
-const canvasEl    = ref(null)
-const fileInputEl = ref(null)
+const videoEl  = ref(null)
+const canvasEl = ref(null)
 let mediaStream = null
 
 // ── Computed ──────────────────────────────────────────────────────────────────
@@ -219,39 +193,20 @@ const duration = computed(() => {
 })
 
 // ── Camera ────────────────────────────────────────────────────────────────────
-const isMobile = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-
 async function openCamera(mode) {
   cameraMode.value    = mode
   capturedImage.value = null
   showCamera.value    = true
 
-  // Mobile devices: use native camera via <input capture> (works on HTTP).
-  // Desktop/laptop: always attempt getUserMedia live stream (original behavior).
-  if (isMobile) {
-    cameraMethod.value = 'file'
-    return
-  }
-
-  cameraMethod.value = 'stream'
   await nextTick()
 
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
     if (videoEl.value) videoEl.value.srcObject = mediaStream
   } catch {
-    Swal.fire('Camera Error', 'Could not access your camera. Please allow camera permission or use HTTPS.', 'error')
+    Swal.fire('Camera Error', 'Could not access your camera. Please allow camera permission.', 'error')
     showCamera.value = false
   }
-}
-
-
-function onFileCapture(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = (ev) => { capturedImage.value = ev.target.result }
-  reader.readAsDataURL(file)
 }
 
 function capture() {
