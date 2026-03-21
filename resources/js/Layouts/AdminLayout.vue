@@ -33,6 +33,8 @@ import {
   XMarkIcon,
   ShieldCheckIcon,
   KeyIcon,
+  TableCellsIcon,
+  StarIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -621,6 +623,184 @@ const menuItems = [
     ],
   },
   {
+    label: "Recruitment",
+    icon: UserGroupIcon,
+    roles: ["Administrator", "HR", "OCD"],
+    permissions: ["recruitment.view"],
+    children: [
+      {
+        label: "Job Items",
+        routeName: "recruitment.job-items.index",
+        href: route("recruitment.job-items.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["recruitment.manage"],
+      },
+      {
+        label: "Applicant Pool",
+        routeName: "recruitment.applicants.index",
+        href: route("recruitment.applicants.index"),
+        icon: UsersIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["recruitment.manage"],
+      },
+      {
+        label: "Applications",
+        routeName: "recruitment.applications.index",
+        href: route("recruitment.applications.index"),
+        icon: QueueListIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["recruitment.evaluate"],
+      },
+      {
+        label: "Placements & Onboarding",
+        routeName: "recruitment.placements.index",
+        href: route("recruitment.placements.index"),
+        icon: HomeModernIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["recruitment.onboarding"],
+      },
+      {
+        label: "Type Configuration",
+        routeName: "recruitment.types.index",
+        href: route("recruitment.types.index"),
+        icon: ShieldCheckIcon,
+        roles: ["Administrator"],
+        permissions: ["recruitment.manage"],
+      },
+      {
+        label: "HRMPSB Members",
+        routeName: "recruitment.hrmpsb.index",
+        href: route("recruitment.hrmpsb.index"),
+        icon: UsersIcon,
+        roles: ["Administrator"],
+        permissions: ["recruitment.manage"],
+      },
+      {
+        label: "Reports",
+        routeName: "recruitment.reports.index",
+        href: route("recruitment.reports.index"),
+        icon: ChartBarIcon,
+        roles: ["Administrator", "HR", "Recruitment Officer"],
+        permissions: ["recruitment.view"],
+      },
+      {
+        label: "Salary Grade Table",
+        routeName: "salary-grades.index",
+        href: route("salary-grades.index"),
+        icon: TableCellsIcon,
+        roles: ["Administrator", "HR", "Recruitment Officer"],
+        permissions: ["recruitment.view"],
+      },
+    ],
+  },
+  {
+    label: "Learning & Devt", 
+    icon: BookOpenIcon,
+    roles: ["Administrator", "HR"],
+    permissions: ["lnd.view"],
+    children: [
+      {
+        label: "Learning Programs",
+        routeName: "lnd.programs.index",
+        href: route("lnd.programs.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["lnd.view"],
+      },
+      {
+        label: "Training Sessions",
+        routeName: "lnd.sessions.index",
+        href: route("lnd.sessions.index"),
+        icon: QueueListIcon,
+        permissions: ["lnd.view"],
+      },
+      {
+        label: "Training Needs (TNA)",
+        routeName: "lnd.tna.index",
+        href: route("lnd.tna.index"),
+        icon: ChartBarIcon,
+        permissions: ["lnd.view"],
+      },
+      {
+        label: "IDP",
+        routeName: "lnd.idp.index",
+        href: route("lnd.idp.index"),
+        icon: DocumentTextIcon,
+        permissions: ["lnd.view"],
+      },
+      {
+        label: "My Trainings",
+        routeName: "lnd.my-trainings",
+        href: route("lnd.my-trainings"),
+        icon: UserIcon,
+        permissions: ["lnd.view"],
+      },
+      {
+        label: "My IDP",
+        routeName: "lnd.my-idp",
+        href: route("lnd.my-idp"),
+        icon: ClockIcon,
+        permissions: ["lnd.view"],
+      },
+    ],
+  },
+  {
+    label: "Rewards & Recog",
+    icon: StarIcon,
+    permissions: ["rewards.view"],
+    children: [
+      {
+        label: "Dashboard",
+        routeName: "rewards.dashboard",
+        href: route("rewards.dashboard"),
+        icon: ChartBarIcon,
+        permissions: ["rewards.view"],
+      },
+      {
+        label: "Nominations",
+        routeName: "rewards.nominations.index",
+        href: route("rewards.nominations.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["rewards.view"],
+      },
+      {
+        label: "Evaluation Panel",
+        routeName: "rewards.evaluations.panel",
+        href: route("rewards.evaluations.panel"),
+        icon: QueueListIcon,
+        permissions: ["rewards.evaluate"],
+      },
+      {
+        label: "Approvals",
+        routeName: "rewards.approvals.index",
+        href: route("rewards.approvals.index"),
+        icon: DocumentTextIcon,
+        permissions: ["rewards.approve"],
+      },
+      {
+        label: "Award Types",
+        routeName: "rewards.types.index",
+        href: route("rewards.types.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["rewards.manage"],
+      },
+      {
+        label: "My Recognitions",
+        routeName: "rewards.my-recognitions",
+        href: route("rewards.my-recognitions"),
+        icon: UserIcon,
+        permissions: ["rewards.view"],
+      },
+      {
+        label: "Reports",
+        routeName: "rewards.reports",
+        href: route("rewards.reports"),
+        icon: ChartBarIcon,
+        permissions: ["rewards.view"],
+      },
+    ],
+  },
+  {
     label: "Planning",
     icon: ChartBarIcon,
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
@@ -1016,49 +1196,52 @@ filteredMenu.value.forEach((item) => {
 <template>
   <Head :title="title" />
 
-  <div class="min-h-screen flex bg-gray-100">
+  <div class="min-h-screen flex bg-slate-50">
     <!-- Mobile backdrop -->
     <div
       v-if="mobileOpen"
       @click="mobileOpen = false"
-      class="fixed inset-0 bg-black/40 z-30 md:hidden"
+      class="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
     />
 
     <!-- Sidebar -->
     <aside
       :class="[
-        'bg-white shadow-lg transition-all duration-300 z-40 flex-shrink-0 flex flex-col',
+        'bg-slate-900 transition-all duration-300 z-40 flex-shrink-0 flex flex-col',
         'fixed inset-y-0 left-0 md:static md:inset-auto',
         mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-        collapsed ? 'w-72 md:w-20' : 'w-72 md:w-64',
+        collapsed ? 'w-72 md:w-[68px]' : 'w-72 md:w-60',
       ]"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center border-b border-gray-200 px-4">
-        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-10 shrink-0" />
-        <span v-if="!collapsed" class="ml-3 text-xl font-bold text-gray-800 truncate">
-          BugsayMIS
-        </span>
+      <div class="h-16 flex items-center gap-3 border-b border-slate-800 px-4 shrink-0">
+        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-8 w-8 shrink-0 rounded-lg object-contain" />
+        <div v-if="!collapsed" class="min-w-0">
+          <p class="text-sm font-bold text-white leading-tight truncate">BugsayMIS</p>
+          <p class="text-[10px] text-slate-500 truncate">Management Information System</p>
+        </div>
         <!-- Close button (mobile only) -->
         <button
           @click="mobileOpen = false"
-          class="ml-auto p-1 rounded hover:bg-gray-100 md:hidden shrink-0"
+          class="ml-auto p-1 rounded-lg hover:bg-slate-800 md:hidden shrink-0"
           aria-label="Close sidebar"
         >
-          <XMarkIcon class="h-5 w-5 text-gray-500" />
+          <XMarkIcon class="h-4 w-4 text-slate-400" />
         </button>
       </div>
 
       <!-- Navigation -->
-      <nav class="mt-2 px-2 space-y-1 overflow-y-auto flex-1 pb-2">
+      <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5 scrollbar-thin">
         <template v-for="item in filteredMenu" :key="item.label">
+
           <!-- Section label -->
           <div
             v-if="item.type === 'section' && !collapsed"
-            class="px-3 pt-4 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider"
+            class="px-3 pt-5 pb-1.5 text-[10px] font-bold text-slate-600 uppercase tracking-[0.12em]"
           >
             {{ item.label }}
           </div>
+          <div v-else-if="item.type === 'section' && collapsed" class="my-2 mx-3 h-px bg-slate-800" />
 
           <!-- Single link -->
           <SidebarLink
@@ -1071,23 +1254,33 @@ filteredMenu.value.forEach((item) => {
             :active="isActive(item.routeName)"
           />
 
-          <!-- With children -->
+          <!-- Group with children -->
           <div v-else>
             <button
               @click="toggleExpand(item.label)"
-              class="flex items-center w-full px-3 py-2 rounded-md transition
-                text-gray-700 hover:bg-gray-100"
-              :class="{ 'bg-gray-100 font-semibold': expanded[item.label] }"
+              class="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 border-l-2 border-transparent"
+              :class="expanded[item.label]
+                ? 'bg-slate-800 text-slate-200 border-l-2 border-indigo-500'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'"
             >
-              <component v-if="item.icon" :is="item.icon" class="h-5 w-5 mr-2 text-blue-500" />
-              <span v-if="!collapsed">{{ item.label }}</span>
+              <component
+                v-if="item.icon"
+                :is="item.icon"
+                class="h-4 w-4 shrink-0 transition-colors"
+                :class="[
+                  collapsed ? 'mx-auto' : 'mr-2.5',
+                  expanded[item.label] ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'
+                ]"
+              />
+              <span v-if="!collapsed" class="flex-1 truncate text-left">{{ item.label }}</span>
               <ChevronDownIcon
-                class="h-4 w-4 ml-auto transform transition-transform"
-                :class="{ 'rotate-180': expanded[item.label] }"
+                v-if="!collapsed"
+                class="h-3.5 w-3.5 ml-1 shrink-0 text-slate-600 transition-transform duration-200"
+                :class="{ 'rotate-180 text-indigo-400': expanded[item.label] }"
               />
             </button>
 
-            <div v-show="expanded[item.label]" class="ml-6 mt-1 space-y-1">
+            <div v-show="expanded[item.label]" class="mt-0.5 ml-4 pl-3 border-l border-slate-800 space-y-0.5">
               <template v-for="child in item.children" :key="child.label">
                 <SidebarLink
                   v-if="!['consultations.log.print','consultations.employee.log.print','library.statistics.report','health.statistics.report','hr.attendance.index'].includes(child.routeName)"
@@ -1099,49 +1292,38 @@ filteredMenu.value.forEach((item) => {
                   :active="isActive(child.routeName)"
                   :badge="getBadge(child)"
                 />
+                <!-- Modal-trigger child buttons — styled to match SidebarLink -->
                 <button
                   v-else-if="['consultations.log.print','consultations.employee.log.print'].includes(child.routeName)"
                   @click="openConsultationLogModal(child.routeName)"
-                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-400 transition-all duration-150 hover:bg-slate-800 hover:text-slate-200 pl-[10px]"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
-                  <span v-if="!collapsed" class="flex items-center w-full">
-                    <span>{{ child.label }}</span>
-                  </span>
-                  <span v-else class="mx-auto"></span>
+                  <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-500 group-hover:text-slate-300" />
+                  <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
                 </button>
                 <button
                   v-else-if="child.routeName === 'library.statistics.report'"
                   @click="openLibraryStatsModal"
-                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-400 transition-all duration-150 hover:bg-slate-800 hover:text-slate-200 pl-[10px]"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
-                  <span v-if="!collapsed" class="flex items-center w-full">
-                    <span>{{ child.label }}</span>
-                  </span>
-                  <span v-else class="mx-auto"></span>
+                  <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-500 group-hover:text-slate-300" />
+                  <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
                 </button>
                 <button
                   v-else-if="child.routeName === 'health.statistics.report'"
                   @click="openHealthStatsModal"
-                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-400 transition-all duration-150 hover:bg-slate-800 hover:text-slate-200 pl-[10px]"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
-                  <span v-if="!collapsed" class="flex items-center w-full">
-                    <span>{{ child.label }}</span>
-                  </span>
-                  <span v-else class="mx-auto"></span>
+                  <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-500 group-hover:text-slate-300" />
+                  <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
                 </button>
                 <button
                   v-else-if="child.routeName === 'hr.attendance.index'"
                   @click="openAttendanceModal"
-                  class="flex items-center px-3 py-2 rounded-md transition text-gray-700 hover:bg-gray-100 w-full text-left"
+                  class="group flex w-full items-center rounded-lg border-l-2 border-transparent px-3 py-2 text-sm font-medium text-slate-400 transition-all duration-150 hover:bg-slate-800 hover:text-slate-200 pl-[10px]"
                 >
-                  <component v-if="child.icon" :is="child.icon" class="h-5 w-5 mr-2 text-blue-500" />
-                  <span v-if="!collapsed" class="flex items-center w-full">
-                    <span>{{ child.label }}</span>
-                  </span>
-                  <span v-else class="mx-auto"></span>
+                  <component v-if="child.icon" :is="child.icon" class="h-4 w-4 shrink-0 mr-2.5 text-slate-500 group-hover:text-slate-300" />
+                  <span v-if="!collapsed" class="truncate">{{ child.label }}</span>
                 </button>
               </template>
             </div>
@@ -1150,15 +1332,16 @@ filteredMenu.value.forEach((item) => {
       </nav>
 
       <!-- Version footer -->
-      <div class="mt-auto border-t border-gray-200 px-3 py-3">
+      <div class="shrink-0 border-t border-slate-800 px-3 py-3">
         <button
           @click="showVersionModal = true"
-          class="w-full flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition"
+          class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-800 hover:text-slate-400 transition-all duration-150"
           :class="collapsed ? 'justify-center' : 'justify-between'"
         >
-          <span v-if="!collapsed" class="truncate">v{{ appVersion.current }}</span>
-          <span v-else class="font-mono font-bold">v</span>
-          <span v-if="!collapsed" class="text-gray-300">Changelog</span>
+          <span class="font-mono" :class="collapsed ? 'font-bold text-slate-500' : 'text-slate-500'">
+            v{{ appVersion.current }}
+          </span>
+          <span v-if="!collapsed" class="text-slate-700">Changelog →</span>
         </button>
       </div>
     </aside>
@@ -1279,54 +1462,61 @@ filteredMenu.value.forEach((item) => {
     <!-- Main -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Navbar -->
-      <header class="h-16 bg-white shadow flex items-center justify-between px-4 md:px-6">
-        <!-- Mobile hamburger -->
-        <button
-          @click="mobileOpen = !mobileOpen"
-          class="p-2 rounded-md hover:bg-gray-100 md:hidden"
-          aria-label="Open sidebar"
-        >
-          <Bars3Icon class="h-6 w-6 text-gray-600" />
-        </button>
-        <!-- Desktop hamburger -->
-        <button
-          @click="collapsed = !collapsed"
-          class="hidden md:block p-2 rounded-md hover:bg-gray-100"
-          aria-label="Toggle sidebar"
-        >
-          <Bars3Icon class="h-6 w-6 text-gray-600" />
-        </button>
+      <header class="h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-6">
+        <!-- Left: hamburger + page title -->
+        <div class="flex items-center gap-3">
+          <!-- Mobile hamburger -->
+          <button
+            @click="mobileOpen = !mobileOpen"
+            class="p-1.5 rounded-md hover:bg-gray-100 md:hidden"
+            aria-label="Open sidebar"
+          >
+            <Bars3Icon class="h-5 w-5 text-gray-500" />
+          </button>
+          <!-- Desktop hamburger -->
+          <button
+            @click="collapsed = !collapsed"
+            class="hidden md:block p-1.5 rounded-md hover:bg-gray-100"
+            aria-label="Toggle sidebar"
+          >
+            <Bars3Icon class="h-5 w-5 text-gray-500" />
+          </button>
+          <span v-if="title" class="hidden md:block text-sm font-medium text-gray-700">{{ title }}</span>
+        </div>
 
         <!-- Profile Dropdown -->
         <div class="relative">
           <button
             @click="toggleDropdown"
-            class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100"
+            class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <img
               :src="user.profile_picture ? ('/storage/' + user.profile_picture) : 'https://i.pravatar.cc/40'"
               alt="User Avatar"
-              class="w-10 h-10 rounded-full border"
+              class="w-7 h-7 rounded-full object-cover ring-2 ring-gray-200"
             />
-            <span class="hidden md:inline text-gray-700">{{ user.name }}</span>
-            <ChevronDownIcon class="h-5 w-5 text-gray-600" />
+            <div class="hidden md:block text-left">
+              <p class="text-sm font-medium text-gray-800 leading-none">{{ user.name }}</p>
+              <p class="text-[11px] text-gray-500 leading-none mt-0.5">{{ roleName }}</p>
+            </div>
+            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
           </button>
-
 
           <div
             v-if="showDropdown"
-            class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border z-50"
+            class="absolute right-0 mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1"
           >
             <button
               type="button"
               @click.prevent="openProfileModal"
-              class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
               Profile
             </button>
+            <div class="my-1 border-t border-gray-100"></div>
             <button
               @click="logout"
-              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50"
             >
               Logout
             </button>

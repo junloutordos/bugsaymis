@@ -11,6 +11,13 @@ class DTRUploadController extends Controller
 {
     public function store(Request $request)
     {
+        // Validate before accessing uploaded files
+        $request->validate([
+            'files'   => 'nullable|array|max:20',
+            'files.*' => 'file|mimes:txt,csv,dat,log|max:5120', // 5 MB per file, text-only types
+            'file'    => 'nullable|file|mimes:txt,csv,dat,log|max:5120',
+        ]);
+
         // accept multiple uploaded files (files[]), or a single file input 'file'
         $uploadedFiles = [];
         if ($request->hasFile('files')) {

@@ -81,84 +81,91 @@ const rejectRequest = async (id) => {
   <Head title="OCD Approval - Gate Pass" />
   <AdminLayout title="OCD Approval - Gate Pass">
     <div>
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">OCD Approval — Gate Pass</h1>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">OCD Approval — Gate Pass</h1>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-          <div class="relative flex-1 sm:w-64 sm:flex-none">
-            <input v-model="search" type="text" placeholder="Search gate passes…"
-                   @keydown.enter.prevent="applyFilters(true)"
-                   class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-            <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⏳</span>
-          </div>
-          <button @click="applyFilters(true)" :disabled="isLoading"
-                  class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-            Search
-          </button>
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 sm:w-64 sm:flex-none">
+          <input v-model="search" type="text" placeholder="Search gate passes…"
+                 @keydown.enter.prevent="applyFilters(true)"
+                 class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⏳</span>
         </div>
+        <button @click="applyFilters(true)" :disabled="isLoading"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Search
+        </button>
+      </div>
 
-        <div class="overflow-x-auto">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Requestor</th>
-                <th class="px-4 py-3 text-left">Purpose</th>
-                <th class="px-4 py-3 text-left">Date</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                <th class="px-4 py-3 text-center">Actions</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Purpose</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ req.id }}</td>
-                <td class="px-4 py-3">{{ req.requester_name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ req.purpose ?? '—' }}</td>
-                <td class="px-4 py-3">{{ req.date ?? req.created_at?.slice(0,10) ?? '—' }}</td>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.requester_name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.purpose ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.date ?? req.created_at?.slice(0,10) ?? '—' }}</td>
                 <td class="px-4 py-3">
-                  <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">{{ req.status }}</span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">{{ req.status }}</span>
                 </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-2 justify-center">
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
                     <button v-if="req.status === 'Division Approved'" @click="approveRequest(req.id)" :disabled="isSubmitting"
-                            class="flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 text-green-700 font-medium disabled:opacity-50">
-                      <CheckCircleIcon class="w-4 h-4" /> Approve
+                            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+                      <CheckCircleIcon class="w-4 h-4 text-emerald-600" /> Approve
                     </button>
                     <button v-if="req.status === 'Division Approved'" @click="rejectRequest(req.id)" :disabled="isSubmitting"
-                            class="flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-medium disabled:opacity-50">
+                            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
                       <XCircleIcon class="w-4 h-4" /> Decline
                     </button>
                     <button @click="openModal(req)"
-                            class="flex items-center gap-1 px-3 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium">
+                            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
                       <EyeIcon class="w-4 h-4" /> View
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredRequests.length === 0">
-                <td colspan="6" class="px-4 py-6 text-center text-gray-500">No pending gate passes for OCD approval.</td>
+                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">No pending gate passes for OCD approval.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 mt-4">
-          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading"
-                  class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading"
-                  class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <div class="flex gap-2">
+            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading"
+                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
+            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading"
+                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
+          </div>
         </div>
       </div>
 
       <!-- Detail Modal -->
-      <div v-if="showModal && selectedRequest" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-xl w-full max-w-lg shadow-lg p-6 relative">
-          <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700">✖</button>
-          <h2 class="text-lg font-bold mb-4">Gate Pass #{{ selectedRequest.id }}</h2>
-          <div class="space-y-2 text-sm">
+      <div v-if="showModal && selectedRequest" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full relative">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Gate Pass #{{ selectedRequest.id }}</h2>
+            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">✖</button>
+          </div>
+          <div class="px-6 py-5 space-y-2 text-sm text-slate-700">
             <p><strong>Requestor:</strong> {{ selectedRequest.requester_name ?? '—' }}</p>
             <p><strong>Purpose:</strong> {{ selectedRequest.purpose ?? '—' }}</p>
             <p><strong>Date:</strong> {{ selectedRequest.date ?? '—' }}</p>

@@ -46,5 +46,12 @@ class DatabaseSeeder extends Seeder
         $this->call(DocumentTypeSeeder::class);
         // Seed IPCR rating periods
         $this->call(IPCRRatingPeriodSeeder::class);
+
+        // Recruitment & Selection Module
+        $this->call(RecruitmentTypeSeeder::class);
+        $this->call(RecruitmentCriteriaSeeder::class);
+        $this->call(RecruitmentOnboardingSeeder::class);
+        $this->call(ApplicationRequirementsSeeder::class);
+        $this->call(SalaryGradeSeeder::class);
     }
 }

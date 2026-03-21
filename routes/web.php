@@ -116,19 +116,27 @@ Route::get('/hello', function () {
 
 // Library kiosk (public, no login required)
 Route::get('/library/kiosk', [LibraryKioskController::class, 'index'])->name('library.kiosk');
-Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])->name('library.kiosk.scan');
+Route::post('/library/kiosk/scan', [LibraryKioskController::class, 'scan'])
+    ->middleware('throttle:30,1')
+    ->name('library.kiosk.scan');
 
 // Public library collections kiosk (search collections without login)
 Route::get('/library/collections/kiosk', [App\Http\Controllers\LibraryCollectionsController::class, 'kiosk'])->name('library.collections.kiosk');
-Route::get('/library/collections/kiosk/search', [App\Http\Controllers\LibraryCollectionsController::class, 'publicSearch'])->name('library.collections.kiosk.search');
+Route::get('/library/collections/kiosk/search', [App\Http\Controllers\LibraryCollectionsController::class, 'publicSearch'])
+    ->middleware('throttle:60,1')
+    ->name('library.collections.kiosk.search');
 
 // Clinic kiosk (public, no login required)
 Route::get('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'index'])->name('clinic.kiosk');
-Route::post('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'store'])->name('clinic.kiosk.store');
+Route::post('/clinic/kiosk', [\App\Http\Controllers\ClinicKioskController::class, 'store'])
+    ->middleware('throttle:20,1')
+    ->name('clinic.kiosk.store');
 
 // Guidance kiosk (public, no login required)
 Route::get('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::class, 'index'])->name('guidance.kiosk');
-Route::post('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::class, 'store'])->name('guidance.kiosk.store');
+Route::post('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::class, 'store'])
+    ->middleware('throttle:20,1')
+    ->name('guidance.kiosk.store');
 
 // DTR Upload (Data Management) - front-end page
 Route::get('/data-management/dtr-upload', function () {
@@ -1062,7 +1070,328 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recruitment & Selection Module
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('recruitment')->name('recruitment.')->group(function () {
+
+        // ── Recruitment Types (admin config) ─────────────────────────────────
+        Route::get('/types', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'index'])
+            ->name('types.index');
+        Route::put('/types/{recruitmentType}', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'update'])
+            ->name('types.update');
+        // Evaluation criteria sub-resource
+        Route::post('/types/{recruitmentType}/criteria', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'storeCriteria'])
+            ->name('types.criteria.store');
+        Route::put('/types/{recruitmentType}/criteria/{criterion}', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'updateCriteria'])
+            ->name('types.criteria.update');
+        Route::delete('/types/{recruitmentType}/criteria/{criterion}', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'destroyCriteria'])
+            ->name('types.criteria.destroy');
+        // Onboarding requirements sub-resource
+        Route::post('/types/{recruitmentType}/onboarding', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'storeOnboarding'])
+            ->name('types.onboarding.store');
+        Route::delete('/types/{recruitmentType}/onboarding/{requirement}', [\App\Http\Controllers\Recruitment\RecruitmentTypeController::class, 'destroyOnboarding'])
+            ->name('types.onboarding.destroy');
+
+        // ── Job Items ─────────────────────────────────────────────────────────
+        Route::get('/job-items', [\App\Http\Controllers\Recruitment\JobItemController::class, 'index'])
+            ->name('job-items.index');
+        Route::post('/job-items', [\App\Http\Controllers\Recruitment\JobItemController::class, 'store'])
+            ->name('job-items.store');
+        Route::put('/job-items/{jobItem}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'update'])
+            ->name('job-items.update');
+        Route::patch('/job-items/{jobItem}/status', [\App\Http\Controllers\Recruitment\JobItemController::class, 'changeStatus'])
+            ->name('job-items.status');
+        Route::post('/job-items/{jobItem}/publish', [\App\Http\Controllers\Recruitment\JobItemController::class, 'publish'])
+            ->name('job-items.publish');
+        Route::delete('/job-items/{jobItem}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'destroy'])
+            ->name('job-items.destroy');
+
+        // ── Applicants ────────────────────────────────────────────────────────
+        Route::get('/applicants', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'index'])
+            ->name('applicants.index');
+        Route::get('/applicants/{applicant}', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'show'])
+            ->name('applicants.show');
+        Route::post('/applicants', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'store'])
+            ->name('applicants.store');
+        Route::put('/applicants/{applicant}', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'update'])
+            ->name('applicants.update');
+        Route::delete('/applicants/{applicant}', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'destroy'])
+            ->name('applicants.destroy');
+        // Documents
+        Route::post('/applicants/{applicant}/documents', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'uploadDocument'])
+            ->name('applicants.documents.upload');
+        Route::patch('/applicants/{applicant}/documents/{document}/verify', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'verifyDocument'])
+            ->name('applicants.documents.verify');
+        Route::delete('/applicants/{applicant}/documents/{document}', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'destroyDocument'])
+            ->name('applicants.documents.destroy');
+
+        // ── Applications ──────────────────────────────────────────────────────
+        Route::get('/applications', [\App\Http\Controllers\Recruitment\ApplicationController::class, 'index'])
+            ->name('applications.index');
+        Route::get('/applications/{application}', [\App\Http\Controllers\Recruitment\ApplicationController::class, 'show'])
+            ->name('applications.show');
+        Route::post('/applications', [\App\Http\Controllers\Recruitment\ApplicationController::class, 'store'])
+            ->name('applications.store');
+        Route::patch('/applications/{application}/advance', [\App\Http\Controllers\Recruitment\ApplicationController::class, 'advance'])
+            ->name('applications.advance');
+        Route::patch('/applications/{application}/reject', [\App\Http\Controllers\Recruitment\ApplicationController::class, 'reject'])
+            ->name('applications.reject');
+        Route::patch('/applications/{application}/withdraw', [\App\Http\Controllers\Recruitment\ApplicationController::class, 'withdraw'])
+            ->name('applications.withdraw');
+
+        // ── Evaluation ────────────────────────────────────────────────────────
+        Route::post('/applications/{application}/scores', [\App\Http\Controllers\Recruitment\EvaluationController::class, 'saveScores'])
+            ->name('evaluations.scores');
+        Route::post('/applications/{application}/interview', [\App\Http\Controllers\Recruitment\EvaluationController::class, 'scheduleInterview'])
+            ->name('evaluations.interview.schedule');
+        Route::patch('/applications/{application}/interview/{interview}/result', [\App\Http\Controllers\Recruitment\EvaluationController::class, 'recordInterviewResult'])
+            ->name('evaluations.interview.result');
+        Route::post('/applications/{application}/rank', [\App\Http\Controllers\Recruitment\EvaluationController::class, 'computeRanking'])
+            ->name('evaluations.rank');
+        Route::post('/vacancies/{jobVacancyId}/re-rank', [\App\Http\Controllers\Recruitment\EvaluationController::class, 'reRankVacancy'])
+            ->name('evaluations.rerank');
+        Route::patch('/applications/{application}/recommend', [\App\Http\Controllers\Recruitment\EvaluationController::class, 'recommend'])
+            ->name('evaluations.recommend');
+
+        // ── Placements & Onboarding ───────────────────────────────────────────
+        Route::get('/placements', [\App\Http\Controllers\Recruitment\PlacementController::class, 'index'])
+            ->name('placements.index');
+        Route::get('/placements/{placement}', [\App\Http\Controllers\Recruitment\PlacementController::class, 'show'])
+            ->name('placements.show');
+        Route::post('/applications/{application}/approve', [\App\Http\Controllers\Recruitment\PlacementController::class, 'approve'])
+            ->name('placements.approve');
+        Route::post('/applications/{application}/disapprove', [\App\Http\Controllers\Recruitment\PlacementController::class, 'disapprove'])
+            ->name('placements.disapprove');
+        Route::patch('/placements/{placement}/tasks/{task}/complete', [\App\Http\Controllers\Recruitment\PlacementController::class, 'completeTask'])
+            ->name('placements.tasks.complete');
+        Route::patch('/placements/{placement}/tasks/{task}/skip', [\App\Http\Controllers\Recruitment\PlacementController::class, 'skipTask'])
+            ->name('placements.tasks.skip');
+        Route::patch('/placements/{placement}/tasks/{task}/assign', [\App\Http\Controllers\Recruitment\PlacementController::class, 'assignTask'])
+            ->name('placements.tasks.assign');
+
+        // ── Reports ───────────────────────────────────────────────────────────
+        Route::get('/reports', [\App\Http\Controllers\Recruitment\RecruitmentReportController::class, 'index'])
+            ->name('reports.index');
+
+        // ── HRMPSB Member Management ──────────────────────────────────────────
+        Route::get('/hrmpsb', [\App\Http\Controllers\Recruitment\HrmpsbController::class, 'index'])
+            ->name('hrmpsb.index');
+        Route::post('/hrmpsb/assign', [\App\Http\Controllers\Recruitment\HrmpsbController::class, 'assign'])
+            ->name('hrmpsb.assign');
+        Route::delete('/hrmpsb/{user}', [\App\Http\Controllers\Recruitment\HrmpsbController::class, 'remove'])
+            ->name('hrmpsb.remove');
+    });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Recruitment — Public Job Portal (no auth required)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('jobs')->name('recruitment.public.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'index'])
+        ->name('vacancies.index');
+    Route::get('/track', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'trackForm'])
+        ->name('track');
+    Route::post('/track', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'track'])
+        ->name('track');
+    Route::get('/{vacancy}', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'show'])
+        ->name('vacancies.show');
+    Route::post('/{vacancy}/apply', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'apply'])
+        ->name('vacancies.apply');
+});
+/*
+|--------------------------------------------------------------------------
+| Salary Grade Module
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'permission:recruitment.view'])->group(function () {
+    Route::get('/salary-grades', [\App\Http\Controllers\SalaryGradeController::class, 'index'])
+        ->name('salary-grades.index');
+    Route::put('/salary-grades/{salaryGrade}', [\App\Http\Controllers\SalaryGradeController::class, 'update'])
+        ->name('salary-grades.update');
+    Route::post('/salary-grades/tranche', [\App\Http\Controllers\SalaryGradeController::class, 'storeTranche'])
+        ->name('salary-grades.tranche.store');
+    Route::post('/salary-grades/tranche/activate', [\App\Http\Controllers\SalaryGradeController::class, 'setCurrentTranche'])
+        ->name('salary-grades.tranche.activate');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Learning & Development (L&D) Module
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('lnd')->name('lnd.')->group(function () {
+
+    // ── Learning Programs ─────────────────────────────────────────────────────
+    Route::get('/programs', [\App\Http\Controllers\LnD\LearningProgramController::class, 'index'])
+        ->name('programs.index');
+    Route::post('/programs', [\App\Http\Controllers\LnD\LearningProgramController::class, 'store'])
+        ->name('programs.store');
+    Route::get('/programs/{learningProgram}', [\App\Http\Controllers\LnD\LearningProgramController::class, 'show'])
+        ->name('programs.show');
+    Route::put('/programs/{learningProgram}', [\App\Http\Controllers\LnD\LearningProgramController::class, 'update'])
+        ->name('programs.update');
+    Route::delete('/programs/{learningProgram}', [\App\Http\Controllers\LnD\LearningProgramController::class, 'destroy'])
+        ->name('programs.destroy');
+    Route::patch('/programs/{learningProgram}/status', [\App\Http\Controllers\LnD\LearningProgramController::class, 'updateStatus'])
+        ->name('programs.status');
+
+    // ── Training Sessions ─────────────────────────────────────────────────────
+    Route::get('/sessions', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'index'])
+        ->name('sessions.index');
+    Route::post('/sessions', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'store'])
+        ->name('sessions.store');
+    Route::get('/sessions/{trainingSession}', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'show'])
+        ->name('sessions.show');
+    Route::put('/sessions/{trainingSession}', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'update'])
+        ->name('sessions.update');
+    Route::delete('/sessions/{trainingSession}', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'destroy'])
+        ->name('sessions.destroy');
+    Route::post('/sessions/{trainingSession}/attendance', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'markAttendance'])
+        ->name('sessions.attendance');
+    Route::post('/sessions/{trainingSession}/complete', [\App\Http\Controllers\LnD\TrainingSessionController::class, 'complete'])
+        ->name('sessions.complete');
+    Route::get('/sessions/{trainingSession}/evaluation-summary', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'sessionSummary'])
+        ->name('sessions.evaluation-summary');
+
+    // ── Training Participants ─────────────────────────────────────────────────
+    Route::post('/sessions/{trainingSession}/participants', [\App\Http\Controllers\LnD\TrainingParticipantController::class, 'store'])
+        ->name('participants.store');
+    Route::delete('/participants/{trainingParticipant}', [\App\Http\Controllers\LnD\TrainingParticipantController::class, 'destroy'])
+        ->name('participants.destroy');
+    Route::patch('/participants/{trainingParticipant}/nomination', [\App\Http\Controllers\LnD\TrainingParticipantController::class, 'approveNomination'])
+        ->name('participants.nomination');
+    Route::post('/participants/{trainingParticipant}/certificate', [\App\Http\Controllers\LnD\TrainingParticipantController::class, 'uploadCertificate'])
+        ->name('participants.certificate');
+
+    // ── Employee Self-Service ─────────────────────────────────────────────────
+    Route::get('/my-trainings', [\App\Http\Controllers\LnD\TrainingParticipantController::class, 'myTrainings'])
+        ->name('my-trainings');
+    Route::get('/my-idp', [\App\Http\Controllers\LnD\IDPController::class, 'myIdp'])
+        ->name('my-idp');
+    Route::post('/my-tna', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'submitOwn'])
+        ->name('my-tna.store');
+
+    // ── Training Needs (TNA) ──────────────────────────────────────────────────
+    Route::get('/tna', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'index'])
+        ->name('tna.index');
+    Route::post('/tna', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'store'])
+        ->name('tna.store');
+    Route::put('/tna/{trainingNeed}', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'update'])
+        ->name('tna.update');
+    Route::delete('/tna/{trainingNeed}', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'destroy'])
+        ->name('tna.destroy');
+    Route::patch('/tna/{trainingNeed}/approve', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'approve'])
+        ->name('tna.approve');
+    Route::get('/tna/consolidation', [\App\Http\Controllers\LnD\TrainingNeedsController::class, 'consolidation'])
+        ->name('tna.consolidation');
+
+    // ── Individual Development Plans (IDP) ────────────────────────────────────
+    Route::get('/idp', [\App\Http\Controllers\LnD\IDPController::class, 'index'])
+        ->name('idp.index');
+    Route::post('/idp', [\App\Http\Controllers\LnD\IDPController::class, 'store'])
+        ->name('idp.store');
+    Route::get('/idp/{iDP}', [\App\Http\Controllers\LnD\IDPController::class, 'show'])
+        ->name('idp.show');
+    Route::put('/idp/{iDP}', [\App\Http\Controllers\LnD\IDPController::class, 'update'])
+        ->name('idp.update');
+    Route::delete('/idp/{iDP}', [\App\Http\Controllers\LnD\IDPController::class, 'destroy'])
+        ->name('idp.destroy');
+    Route::patch('/idp/{iDP}/submit', [\App\Http\Controllers\LnD\IDPController::class, 'submit'])
+        ->name('idp.submit');
+    Route::patch('/idp/{iDP}/approve', [\App\Http\Controllers\LnD\IDPController::class, 'approve'])
+        ->name('idp.approve');
+    Route::patch('/idp/{iDP}/status', [\App\Http\Controllers\LnD\IDPController::class, 'updateStatus'])
+        ->name('idp.status');
+    Route::get('/team-idp', [\App\Http\Controllers\LnD\IDPController::class, 'teamIdp'])
+        ->name('team-idp');
+
+    // ── Kirkpatrick Evaluations ───────────────────────────────────────────────
+    Route::get('/participants/{trainingParticipant}/evaluation', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'show'])
+        ->name('evaluations.show');
+    Route::post('/participants/{trainingParticipant}/evaluation/reaction', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'storeReaction'])
+        ->name('evaluations.reaction');
+    Route::post('/participants/{trainingParticipant}/evaluation/learning', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'storeLearning'])
+        ->name('evaluations.learning');
+    Route::post('/participants/{trainingParticipant}/evaluation/behavior', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'storeBehavior'])
+        ->name('evaluations.behavior');
+    Route::post('/participants/{trainingParticipant}/evaluation/results', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'storeResults'])
+        ->name('evaluations.results');
+    Route::patch('/participants/{trainingParticipant}/evaluation/feedback', [\App\Http\Controllers\LnD\TrainingEvaluationController::class, 'updateFeedback'])
+        ->name('evaluations.feedback');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Rewards & Recognition Module (PRAISE)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('rewards')->name('rewards.')->group(function () {
+
+    // ── Dashboard ─────────────────────────────────────────────────────────────
+    Route::get('/dashboard', [\App\Http\Controllers\Rewards\RecognitionReportController::class, 'dashboard'])
+        ->name('dashboard');
+
+    // ── Reports ───────────────────────────────────────────────────────────────
+    Route::get('/reports', [\App\Http\Controllers\Rewards\RecognitionReportController::class, 'report'])
+        ->name('reports');
+
+    // ── Reward Types ──────────────────────────────────────────────────────────
+    Route::get('/types', [\App\Http\Controllers\Rewards\RewardTypeController::class, 'index'])
+        ->name('types.index');
+    Route::post('/types', [\App\Http\Controllers\Rewards\RewardTypeController::class, 'store'])
+        ->name('types.store');
+    Route::patch('/types/{rewardType}', [\App\Http\Controllers\Rewards\RewardTypeController::class, 'update'])
+        ->name('types.update');
+    Route::delete('/types/{rewardType}', [\App\Http\Controllers\Rewards\RewardTypeController::class, 'destroy'])
+        ->name('types.destroy');
+
+    // ── Nominations ───────────────────────────────────────────────────────────
+    Route::get('/nominations', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'index'])
+        ->name('nominations.index');
+    Route::get('/nominations/create', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'create'])
+        ->name('nominations.create');
+    Route::post('/nominations', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'store'])
+        ->name('nominations.store');
+    Route::get('/nominations/{rewardNomination}', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'show'])
+        ->name('nominations.show');
+    Route::post('/nominations/{rewardNomination}/screen', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'screen'])
+        ->name('nominations.screen');
+    Route::delete('/nominations/{rewardNomination}', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'destroy'])
+        ->name('nominations.destroy');
+
+    // ── My Recognitions ───────────────────────────────────────────────────────
+    Route::get('/my-recognitions', [\App\Http\Controllers\Rewards\RewardNominationController::class, 'myNominations'])
+        ->name('my-recognitions');
+
+    // ── Evaluation Panel ──────────────────────────────────────────────────────
+    Route::get('/evaluations', [\App\Http\Controllers\Rewards\RewardEvaluationController::class, 'panel'])
+        ->name('evaluations.panel');
+    Route::post('/nominations/{rewardNomination}/evaluations', [\App\Http\Controllers\Rewards\RewardEvaluationController::class, 'store'])
+        ->name('evaluations.store');
+    Route::patch('/evaluations/{rewardEvaluation}', [\App\Http\Controllers\Rewards\RewardEvaluationController::class, 'update'])
+        ->name('evaluations.update');
+
+    // ── Approvals ─────────────────────────────────────────────────────────────
+    Route::get('/approvals', [\App\Http\Controllers\Rewards\RewardApprovalController::class, 'index'])
+        ->name('approvals.index');
+    Route::post('/nominations/{rewardNomination}/approve', [\App\Http\Controllers\Rewards\RewardApprovalController::class, 'decide'])
+        ->name('approvals.decide');
+
+    // ── Awards (recording actual incentives) ──────────────────────────────────
+    Route::get('/awards', [\App\Http\Controllers\Rewards\RewardController::class, 'index'])
+        ->name('awards.index');
+    Route::post('/nominations/{rewardNomination}/award', [\App\Http\Controllers\Rewards\RewardController::class, 'store'])
+        ->name('awards.store');
+    Route::patch('/awards/{reward}', [\App\Http\Controllers\Rewards\RewardController::class, 'update'])
+        ->name('awards.update');
+});
+
 // Development-only: send a test email
 if (app()->environment('local')) {
     Route::get('/dev/send-test-email', function () {

@@ -104,13 +104,32 @@ class StudentController extends Controller
         ]);
     }
 
+    // Columns that may be written via the form — anything not in this list is ignored.
+    private const WRITABLE_COLUMNS = [
+        'student_id', 'lrn', 'first_name', 'last_name', 'middle_name', 'suffix',
+        'firstname', 'lastname', 'middlename', 'fname', 'lname', 'mname',
+        'given_name', 'surname', 'name', 'full_name',
+        'sex', 'gender', 'birthdate', 'birth_date', 'age',
+        'grade_level', 'grade', 'year_level', 'strand', 'track', 'section', 'section_id',
+        'address', 'barangay', 'city', 'municipality', 'province', 'zip',
+        'contact_no', 'phone', 'mobile', 'email',
+        'parent_name', 'guardian_name', 'parent_contact', 'guardian_contact',
+        'school_year', 'sy', 'semester',
+        'status', 'student_status', 'enrollment_status',
+        'campus', 'campus_id',
+    ];
+
     public function store(Request $request)
     {
-        $columns = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
+        $this->authorize('manage-students');
+
+        $allowedColumns = collect(DB::select("SHOW COLUMNS FROM students"))
+            ->map(fn($c) => $c->Field)
+            ->intersect(self::WRITABLE_COLUMNS)
+            ->all();
 
         $data = [];
-        foreach ($columns as $col) {
-            if ($col === 'id' || $col === 'created_at' || $col === 'updated_at') continue;
+        foreach ($allowedColumns as $col) {
             if ($request->has($col)) {
                 $data[$col] = $request->input($col);
             }
@@ -137,11 +156,15 @@ class StudentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $columns = collect(DB::select("SHOW COLUMNS FROM students"))->map(fn($c) => $c->Field)->all();
+        $this->authorize('manage-students');
+
+        $allowedColumns = collect(DB::select("SHOW COLUMNS FROM students"))
+            ->map(fn($c) => $c->Field)
+            ->intersect(self::WRITABLE_COLUMNS)
+            ->all();
 
         $data = [];
-        foreach ($columns as $col) {
-            if ($col === 'id' || $col === 'created_at' || $col === 'updated_at') continue;
+        foreach ($allowedColumns as $col) {
             if ($request->has($col)) {
                 $data[$col] = $request->input($col);
             }

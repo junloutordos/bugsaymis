@@ -638,9 +638,9 @@ class GatePassController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 50);
 
         $query = DB::table('gatepass')
-            ->join('users', 'gatepass.user_id', '=', 'users.id')
+            ->join('users', 'users.badge_id', '=', 'gatepass.badgeNumber')
             ->where('gatepass.status', 'Division Approved')
-            ->select('gatepass.*', 'users.name as requester_name');
+            ->select('gatepass.*', 'users.name as requester_name', 'users.email as requester_email');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -668,7 +668,7 @@ class GatePassController extends Controller
         DB::table('gatepass')->where('id', $id)->update(['status' => $newStatus, 'updated_at' => now()]);
 
         try {
-            $requester = \App\Models\User::find($row->user_id);
+            $requester = \App\Models\User::where('badge_id', $row->badgeNumber)->first();
             if ($requester?->email) {
                 Mail::to($requester->email)->send(new GatePassStatusMail($row, $newStatus, null, $request->user()->name));
             }

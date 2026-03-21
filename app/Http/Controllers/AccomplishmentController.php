@@ -119,7 +119,7 @@ class AccomplishmentController extends Controller
         $this->authorizeOwner($accomplishment);
 
         $request->validate([
-            'photo'      => 'nullable|file|mimes:jpg,jpeg,png,gif,pdf|max:10240',
+            'photo'      => 'nullable|file|mimes:jpg,jpeg,png,gif|max:5120', // images only, 5 MB max
             'drive_link' => 'nullable|url|max:500',
         ]);
 
@@ -129,11 +129,12 @@ class AccomplishmentController extends Controller
 
         // Handle file upload
         if ($request->hasFile('photo')) {
-            $file      = $request->file('photo');
-            $slug      = $accomplishment->id . '_' . now()->format('YmdHis') . '_' . $file->getClientOriginalName();
-            $photoData = [
+            $file          = $request->file('photo');
+            $safeBasename  = preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($file->getClientOriginalName()));
+            $slug          = $accomplishment->id . '_' . now()->format('YmdHis') . '_' . $safeBasename;
+            $photoData     = [
                 'accomplishment_id' => $accomplishment->id,
-                'file_name'         => $file->getClientOriginalName(),
+                'file_name'         => $safeBasename,
             ];
 
             if (config('services.google_drive.credentials')) {

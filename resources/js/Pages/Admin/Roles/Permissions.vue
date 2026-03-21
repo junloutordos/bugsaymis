@@ -98,99 +98,106 @@ async function deletePerm(perm) {
   <Head title="Permissions" />
   <AdminLayout title="Permissions">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold text-gray-800">Permissions</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <h1 class="text-xl font-semibold text-slate-800">Permissions</h1>
       <button @click="openCreate"
-        class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm">
+        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
         <PlusIcon class="w-4 h-4" /> New Permission
       </button>
     </div>
 
     <!-- Search -->
-    <div class="bg-white rounded-xl shadow p-4 mb-4">
-      <div class="flex items-center gap-2">
-        <MagnifyingGlassIcon class="w-5 h-5 text-gray-400 shrink-0" />
-        <input v-model="search" type="text" placeholder="Search permissions…"
-          class="w-full sm:w-72 rounded-lg border-gray-300 text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-      </div>
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+      <MagnifyingGlassIcon class="w-4 h-4 text-slate-400 shrink-0" />
+      <input v-model="search" type="text" placeholder="Search permissions…"
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
     </div>
 
     <!-- Grouped tables -->
-    <div v-if="loading" class="text-center py-10 text-gray-400">Loading…</div>
-    <div v-else class="space-y-6">
-      <div v-for="group in filtered" :key="group.module" class="bg-white rounded-xl shadow p-4">
-        <h2 class="text-sm font-bold uppercase tracking-wider text-blue-700 mb-3">{{ group.module }}</h2>
-        <table class="min-w-full text-sm border border-gray-200">
-          <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
-            <tr>
-              <th class="px-4 py-2 text-left">Permission</th>
-              <th class="px-4 py-2 text-left">Description</th>
-              <th class="px-4 py-2 text-center">Roles</th>
-              <th class="px-4 py-2 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="perm in group.permissions" :key="perm.id" class="hover:bg-gray-50">
-              <td class="px-4 py-2 font-mono text-blue-800">{{ perm.name }}</td>
-              <td class="px-4 py-2 text-gray-500">{{ perm.description ?? '—' }}</td>
-              <td class="px-4 py-2 text-center">
-                <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{{ perm.roles_count }}</span>
-              </td>
-              <td class="px-4 py-2 text-center">
-                <div class="flex items-center justify-center gap-2">
-                  <button @click="openEdit(perm)"
-                    class="p-1.5 rounded hover:bg-yellow-100 text-yellow-600" title="Edit">
-                    <PencilSquareIcon class="w-4 h-4" />
-                  </button>
-                  <button @click="deletePerm(perm)"
-                    class="p-1.5 rounded hover:bg-red-100 text-red-600" title="Delete">
-                    <TrashIcon class="w-4 h-4" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <div v-if="loading" class="py-16 text-center text-slate-400 text-sm">Loading…</div>
+    <div v-else class="space-y-4">
+      <div v-for="group in filtered" :key="group.module" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-indigo-600">{{ group.module }}</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Permission</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Roles</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="perm in group.permissions" :key="perm.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 font-mono text-indigo-800 text-sm">{{ perm.name }}</td>
+                <td class="px-4 py-3 text-slate-500 text-sm">{{ perm.description ?? '—' }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">{{ perm.roles_count }}</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <button @click="openEdit(perm)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      <PencilSquareIcon class="w-4 h-4" />
+                    </button>
+                    <button @click="deletePerm(perm)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <p v-if="filtered.length === 0" class="text-center py-8 text-gray-400">No permissions found.</p>
+      <p v-if="filtered.length === 0" class="py-16 text-center text-slate-400 text-sm">No permissions found.</p>
     </div>
 
     <!-- Modal -->
-    <div v-if="showModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-bold mb-4">{{ modalMode === 'create' ? 'New Permission' : 'Edit Permission' }}</h2>
-        <form @submit.prevent="submit" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name
-              <span class="text-gray-400 text-xs font-normal ml-1">(lowercase, dots/dashes only)</span>
-            </label>
-            <input v-model="form.name" type="text" required maxlength="100"
-              pattern="[a-z0-9._\-]+"
-              placeholder="e.g. wfh.view"
-              class="w-full font-mono rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Module</label>
-            <input v-model="form.module" list="module-list" type="text" required maxlength="50"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-            <datalist id="module-list">
-              <option v-for="m in moduleList" :key="m" :value="m" />
-            </datalist>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input v-model="form.description" type="text" maxlength="255"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          <div class="flex justify-end gap-2 pt-2">
-            <button type="button" @click="showModal = false"
-              class="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 text-sm">Cancel</button>
-            <button type="submit" :disabled="saving"
-              class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-60">
-              {{ saving ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
-        </form>
+    <div v-if="showModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-800">{{ modalMode === 'create' ? 'New Permission' : 'Edit Permission' }}</h2>
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="showModal = false">✕</button>
+        </div>
+        <div class="px-6 py-5">
+          <form @submit.prevent="submit" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Name
+                <span class="text-slate-400 font-normal ml-1">(lowercase, dots/dashes only)</span>
+              </label>
+              <input v-model="form.name" type="text" required maxlength="100"
+                pattern="[a-z0-9._\-]+"
+                placeholder="e.g. wfh.view"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Module</label>
+              <input v-model="form.module" list="module-list" type="text" required maxlength="50"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              <datalist id="module-list">
+                <option v-for="m in moduleList" :key="m" :value="m" />
+              </datalist>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+              <input v-model="form.description" type="text" maxlength="255"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" @click="showModal = false"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+              <button type="submit" :disabled="saving"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+                {{ saving ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </AdminLayout>

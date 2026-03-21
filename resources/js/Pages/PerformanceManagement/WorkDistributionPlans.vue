@@ -82,194 +82,216 @@ const tagTypeLabel = (type) => {
 <template>
   <Head title="Work Distribution Plan" />
   <AdminLayout title="Work Distribution Plan">
-    <div>
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Work Distribution Plan</h1>
-        <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">
-          <PlusIcon class="w-5 h-5 inline-block mr-1" /> New WDP
+    <div class="p-6 space-y-5">
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">Work Distribution Plan</h1>
+        <button @click="openModal('create')" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <PlusIcon class="w-4 h-4" /> New WDP
         </button>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
         <input v-model="searchQuery" type="text" placeholder="Search plans..."
-          class="w-1/3 rounded-lg border-gray-300 shadow-sm" />
+          class="flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+      </div>
 
-        <div class="overflow-x-auto mt-4">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Performance Indicator</th>
-                <th class="px-4 py-3 text-left">Success Indicator</th>
-                <th class="px-4 py-3 text-left">Office/Unit Involved</th>
-                <th class="px-4 py-3 text-left">Rated By</th>
-                <th class="px-4 py-3 text-center">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Performance Indicator</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Success Indicator</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Office/Unit Involved</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rated By</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="plan in filteredPlans" :key="plan.id">
-                <td class="px-4 py-3">{{ plan.id }}</td>
-                <td class="px-4 py-3">{{ plan.performance_indicator?.description ?? "—" }}</td>
-                <td class="px-4 py-3">{{ plan.success_indicator ?? "—" }}</td>
-                <td class="px-4 py-3">{{ plan.office_involved ?? "—" }}</td>
-                <td class="px-4 py-3">{{ plan.rated_by ?? "—" }}</td>
-                <td class="px-4 py-3 text-center space-x-2">
-                  <button @click="openModal('view', plan)" class="text-blue-600"><EyeIcon class="w-5 h-5" /></button>
-                  <button @click="openModal('edit', plan)" class="text-yellow-600"><PencilSquareIcon class="w-5 h-5" /></button>
-                  <button @click="deletePlan(plan)" class="text-red-600"><TrashIcon class="w-5 h-5" /></button>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="plan in filteredPlans" :key="plan.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ plan.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{{ plan.performance_indicator?.description ?? "—" }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{{ plan.success_indicator ?? "—" }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ plan.office_involved ?? "—" }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ plan.rated_by ?? "—" }}</td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex justify-center gap-1">
+                    <button @click="openModal('view', plan)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><EyeIcon class="w-4 h-4" /></button>
+                    <button @click="openModal('edit', plan)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-amber-700 transition-colors"><PencilSquareIcon class="w-4 h-4" /></button>
+                    <button @click="deletePlan(plan)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors"><TrashIcon class="w-4 h-4" /></button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="filteredPlans.length === 0">
-                <td colspan="6" class="px-4 py-6 text-center text-gray-500">No plans found.</td>
+                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">No plans found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1 bg-gray-200 rounded">Prev</button>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1 bg-gray-200 rounded">Next</button>
+          <div class="flex items-center gap-1">
+            <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
+            <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
+          </div>
         </div>
       </div>
 
       <!-- MODAL -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-xl p-6 relative max-h-[90vh] overflow-y-auto">
-          <button class="absolute top-3 right-3 text-gray-500" @click="closeModal">✕</button>
-
-          <h2 class="text-xl font-semibold mb-4">
-            {{ modalMode==='create' ? 'New WDP' : modalMode==='edit' ? 'Edit WDP' : 'View WDP' }}
-          </h2>
+      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+            <h2 class="text-base font-semibold text-slate-800">
+              {{ modalMode==='create' ? 'New WDP' : modalMode==='edit' ? 'Edit WDP' : 'View WDP' }}
+            </h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" @click="closeModal">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
 
           <!-- VIEW MODE -->
-          <div v-if="modalMode==='view'" class="space-y-2">
-            <p><strong>Performance Indicator:</strong> {{ selectedPlan.performance_indicator?.description }}</p>
-            <p><strong>Success Indicator:</strong> {{ selectedPlan.success_indicator }}</p>
-            <p><strong>Office/Unit Involved:</strong> {{ selectedPlan.office_involved ?? "—" }}</p>
-            <p><strong>Rated By:</strong> {{ selectedPlan.rated_by ?? "—" }}</p>
+          <div v-if="modalMode==='view'" class="px-6 py-5 space-y-3">
+            <div class="flex flex-col gap-1 text-sm">
+              <span class="text-xs text-slate-500">Performance Indicator</span>
+              <span class="text-slate-800 font-medium">{{ selectedPlan.performance_indicator?.description }}</span>
+            </div>
+            <div class="flex flex-col gap-1 text-sm">
+              <span class="text-xs text-slate-500">Success Indicator</span>
+              <span class="text-slate-800">{{ selectedPlan.success_indicator }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Office/Unit Involved</span>
+              <span class="text-slate-800">{{ selectedPlan.office_involved ?? "—" }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Rated By</span>
+              <span class="text-slate-800">{{ selectedPlan.rated_by ?? "—" }}</span>
+            </div>
           </div>
 
           <!-- FORM -->
-          <form v-else @submit.prevent="submitPlan" class="space-y-4">
-            <div>
-              <label class="font-medium">Performance Indicator</label>
-              <select v-model="form.performance_indicator_id" class="w-full mt-1 rounded-lg border-gray-300" required>
-                <option value="">-- Select Performance Indicator --</option>
-                <option v-for="i in props.indicators" :key="i.id" :value="i.id">{{ i.description }}</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="font-medium">Success Indicator</label>
-              <textarea v-model="form.success_indicator" rows="3" class="w-full rounded-lg border-gray-300"></textarea>
-            </div>
-
-            <div>
-              <label class="font-medium">Rated By</label>
-              <select v-model="form.rated_by" class="w-full mt-1 rounded-lg border-gray-300">
-                <option value="">-- Select Rater --</option>
-                <option value="Division Chief">Division Chief</option>
-                <option value="Unit Head">Unit Head</option>
-                <option value="Committee Head">Committee Head</option>
-                <option value="Coordinator">Coordinator</option>
-                <option value="Others">Others</option>
-              </select>
-            </div>
-
-            <!-- Tag-based Office/Unit Involved selector -->
-            <div>
-              <label class="font-medium block mb-1">Office/Unit/Committee Involved</label>
-
-              <!-- Selected tags -->
-              <div v-if="form.involved.length" class="flex flex-wrap gap-1 mb-2">
-                <span v-for="(tag, idx) in form.involved" :key="idx"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                  :class="tagTypeColor(tag.type)">
-                  <span class="opacity-60">{{ tagTypeLabel(tag.type) }}:</span>
-                  {{ tag.label }}
-                  <button type="button" @click="removeTag(idx)" class="ml-0.5 hover:opacity-70">
-                    <XMarkIcon class="w-3 h-3" />
-                  </button>
-                </span>
+          <form v-else @submit.prevent="submitPlan">
+            <div class="px-6 py-5 space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Performance Indicator</label>
+                <select v-model="form.performance_indicator_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                  <option value="">-- Select Performance Indicator --</option>
+                  <option v-for="i in props.indicators" :key="i.id" :value="i.id">{{ i.description }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Success Indicator</label>
+                <textarea v-model="form.success_indicator" rows="3" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Rated By</label>
+                <select v-model="form.rated_by" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">-- Select Rater --</option>
+                  <option value="Division Chief">Division Chief</option>
+                  <option value="Unit Head">Unit Head</option>
+                  <option value="Committee Head">Committee Head</option>
+                  <option value="Coordinator">Coordinator</option>
+                  <option value="Others">Others</option>
+                </select>
               </div>
 
-              <!-- Search input + dropdown -->
-              <div class="relative">
-                <input
-                  v-model="tagSearch"
-                  type="text"
-                  placeholder="Search or type to add a party... (Enter for free text)"
-                  class="w-full rounded-lg border-gray-300 text-sm"
-                  @keydown.enter.prevent="handleAddFreeText"
-                  @focus="tagInputFocused = true"
-                  @blur="setTimeout(() => { tagInputFocused = false }, 150)"
-                />
+              <!-- Tag-based Office/Unit Involved selector -->
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Office/Unit/Committee Involved</label>
 
-                <!-- Dropdown -->
-                <div v-if="showDropdown"
-                  class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto text-sm">
+                <!-- Selected tags -->
+                <div v-if="form.involved.length" class="flex flex-wrap gap-1 mb-2">
+                  <span v-for="(tag, idx) in form.involved" :key="idx"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                    :class="tagTypeColor(tag.type)">
+                    <span class="opacity-60">{{ tagTypeLabel(tag.type) }}:</span>
+                    {{ tag.label }}
+                    <button type="button" @click="removeTag(idx)" class="ml-0.5 hover:opacity-70">
+                      <XMarkIcon class="w-3 h-3" />
+                    </button>
+                  </span>
+                </div>
 
-                  <!-- All Offices option -->
-                  <div v-if="!form.involved.some(t => t.type === 'all')"
-                    class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b">All</div>
-                  <div v-if="!form.involved.some(t => t.type === 'all')"
-                    @click="selectTag({ type: 'all', label: 'All Offices' })"
-                    class="px-3 py-2 cursor-pointer hover:bg-blue-50 text-blue-700 font-medium">
-                    All Offices
-                  </div>
+                <!-- Search input + dropdown -->
+                <div class="relative">
+                  <input
+                    v-model="tagSearch"
+                    type="text"
+                    placeholder="Search or type to add a party… (Enter for free text)"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    @keydown.enter.prevent="handleAddFreeText"
+                    @focus="tagInputFocused = true"
+                    @blur="setTimeout(() => { tagInputFocused = false }, 150)"
+                  />
 
-                  <!-- Offices -->
-                  <template v-if="tagDropdownOptions.offices.length">
-                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-t">Offices</div>
-                    <div v-for="opt in tagDropdownOptions.offices" :key="'o'+opt.id"
-                      @click="selectTag(opt)"
-                      class="px-3 py-2 cursor-pointer hover:bg-green-50">
-                      {{ opt.label }}
+                  <!-- Dropdown -->
+                  <div v-if="showDropdown"
+                    class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto text-sm">
+
+                    <div v-if="!form.involved.some(t => t.type === 'all')"
+                      class="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b">All</div>
+                    <div v-if="!form.involved.some(t => t.type === 'all')"
+                      @click="selectTag({ type: 'all', label: 'All Offices' })"
+                      class="px-3 py-2 cursor-pointer hover:bg-indigo-50 text-indigo-700 font-medium">
+                      All Offices
                     </div>
-                  </template>
 
-                  <!-- Committees -->
-                  <template v-if="tagDropdownOptions.committees.length">
-                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-t">Committees</div>
-                    <div v-for="opt in tagDropdownOptions.committees" :key="'c'+opt.id"
-                      @click="selectTag(opt)"
-                      class="px-3 py-2 cursor-pointer hover:bg-purple-50">
-                      {{ opt.label }}
+                    <template v-if="tagDropdownOptions.offices.length">
+                      <div class="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-t">Offices</div>
+                      <div v-for="opt in tagDropdownOptions.offices" :key="'o'+opt.id"
+                        @click="selectTag(opt)"
+                        class="px-3 py-2 cursor-pointer hover:bg-emerald-50 text-slate-700">
+                        {{ opt.label }}
+                      </div>
+                    </template>
+
+                    <template v-if="tagDropdownOptions.committees.length">
+                      <div class="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-t">Committees</div>
+                      <div v-for="opt in tagDropdownOptions.committees" :key="'c'+opt.id"
+                        @click="selectTag(opt)"
+                        class="px-3 py-2 cursor-pointer hover:bg-violet-50 text-slate-700">
+                        {{ opt.label }}
+                      </div>
+                    </template>
+
+                    <template v-if="tagDropdownOptions.assignments.length">
+                      <div class="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-t">Special Assignments</div>
+                      <div v-for="opt in tagDropdownOptions.assignments" :key="'a'+opt.id"
+                        @click="selectTag(opt)"
+                        class="px-3 py-2 cursor-pointer hover:bg-amber-50 text-slate-700">
+                        {{ opt.label }}
+                      </div>
+                    </template>
+
+                    <div v-if="tagSearch.trim()" class="px-3 py-2 text-slate-400 border-t text-xs italic cursor-pointer hover:bg-slate-50"
+                      @click="handleAddFreeText">
+                      Press Enter or click to add "{{ tagSearch }}" as free text
                     </div>
-                  </template>
 
-                  <!-- Special Assignments -->
-                  <template v-if="tagDropdownOptions.assignments.length">
-                    <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 border-b border-t">Special Assignments</div>
-                    <div v-for="opt in tagDropdownOptions.assignments" :key="'a'+opt.id"
-                      @click="selectTag(opt)"
-                      class="px-3 py-2 cursor-pointer hover:bg-orange-50">
-                      {{ opt.label }}
+                    <div v-if="!tagDropdownOptions.offices.length && !tagDropdownOptions.committees.length && !tagDropdownOptions.assignments.length && !tagSearch.trim()"
+                      class="px-3 py-2 text-slate-400 text-xs">
+                      All options selected
                     </div>
-                  </template>
-
-                  <!-- Free text hint -->
-                  <div v-if="tagSearch.trim()" class="px-3 py-2 text-gray-400 border-t text-xs italic cursor-pointer hover:bg-gray-50"
-                    @click="handleAddFreeText">
-                    Press Enter or click to add "{{ tagSearch }}" as free text
-                  </div>
-
-                  <div v-if="!tagDropdownOptions.offices.length && !tagDropdownOptions.committees.length && !tagDropdownOptions.assignments.length && !tagSearch.trim()"
-                    class="px-3 py-2 text-gray-400 text-xs">
-                    All options selected
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="flex justify-end gap-2 pt-4">
-              <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+              <button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
             </div>
           </form>
         </div>
       </div>
+
     </div>
   </AdminLayout>
 </template>

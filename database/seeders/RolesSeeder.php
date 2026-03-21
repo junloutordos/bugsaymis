@@ -34,6 +34,10 @@ class RolesSeeder extends Seeder
             ['name' => 'GSU Head',           'description' => 'General Services Unit Head.'],
             ['name' => 'Dorm Manager',       'description' => 'Manages dormitory operations.'],
 
+            // ── Recruitment ───────────────────────────────────────────────────
+            ['name' => 'Recruitment Officer','description' => 'Manages the full recruitment and selection process.'],
+            ['name' => 'HRMPSB',             'description' => 'Human Resource Merit Promotion and Selection Board member. Evaluates, interviews, and ranks applicants.'],
+
             // ── Non-staff ─────────────────────────────────────────────────────
             ['name' => 'Student',            'description' => 'Student with limited read-only access.'],
             ['name' => 'Parent',             'description' => 'Parent/Guardian with limited access to student information.'],

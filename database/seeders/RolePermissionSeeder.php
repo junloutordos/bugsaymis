@@ -50,6 +50,42 @@ class RolePermissionSeeder extends Seeder
             'accomplishments.view',
             'users.view',
             'reports.view', 'reports.export',
+            // Recruitment — HR can view and manage the full pipeline
+            'recruitment.view', 'recruitment.manage', 'recruitment.publish',
+            'recruitment.evaluate', 'recruitment.rank', 'recruitment.approve',
+            'recruitment.onboarding',
+            // L&D — HR manages the full L&D cycle
+            'lnd.view', 'lnd.create', 'lnd.edit', 'lnd.delete',
+            'lnd.approve', 'lnd.evaluate',
+            // Rewards — HR manages full PRAISE cycle
+            'rewards.view', 'rewards.nominate', 'rewards.evaluate',
+            'rewards.approve', 'rewards.manage',
+        ]);
+
+        // ── HRMPSB ───────────────────────────────────────────────────────────
+        // Evaluate applicants, conduct interviews, and participate in ranking.
+        // No manage/approve/publish — those stay with Recruitment Officer / HR.
+        $assign('HRMPSB', [
+            'recruitment.view',
+            'recruitment.evaluate',
+            'recruitment.rank',
+            'hr.view',
+            'hr.employees.view',
+        ]);
+
+        // ── Recruitment Officer ───────────────────────────────────────────────
+        $assign('Recruitment Officer', [
+            'recruitment.view',
+            'recruitment.manage',
+            'recruitment.publish',
+            'recruitment.apply',
+            'recruitment.evaluate',
+            'recruitment.rank',
+            'recruitment.approve',
+            'recruitment.onboarding',
+            'hr.view',
+            'hr.employees.view',
+            'reports.view', 'reports.export',
         ]);
 
         // ── DivisionChief ─────────────────────────────────────────────────────
@@ -66,6 +102,10 @@ class RolePermissionSeeder extends Seeder
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.approve',
             'reports.view',
+            // L&D — supervisors approve nominations, IDP, and submit behavior evals
+            'lnd.view', 'lnd.approve', 'lnd.evaluate',
+            // Rewards — supervisors can nominate and sit on evaluation/approval panels
+            'rewards.view', 'rewards.nominate', 'rewards.evaluate', 'rewards.approve',
         ]);
 
         // ── OCD (Office/Unit Chief Director) ──────────────────────────────────
@@ -106,6 +146,10 @@ class RolePermissionSeeder extends Seeder
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.create',
             'library.view',
+            // L&D — employees view own trainings, submit TNA, manage own IDP
+            'lnd.view', 'lnd.create', 'lnd.evaluate',
+            // Rewards — employees can nominate peers and view own recognitions
+            'rewards.view', 'rewards.nominate',
         ]);
 
         // ── Staff ─────────────────────────────────────────────────────────────
@@ -125,6 +169,10 @@ class RolePermissionSeeder extends Seeder
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.create',
             'library.view',
+            // L&D — employees view own trainings, submit TNA, manage own IDP
+            'lnd.view', 'lnd.create', 'lnd.evaluate',
+            // Rewards — employees can nominate peers and view own recognitions
+            'rewards.view', 'rewards.nominate',
         ]);
 
         // ── Registrar ─────────────────────────────────────────────────────────

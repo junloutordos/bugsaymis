@@ -2,8 +2,15 @@
 
 namespace App\Providers;
 
+use App\Models\Application;
+use App\Models\JobItem;
+use App\Models\Placement;
+use App\Models\User;
 use App\Models\WFHAccomplishment;
 use App\Models\WFHAttendance;
+use App\Policies\Recruitment\ApplicationPolicy;
+use App\Policies\Recruitment\JobItemPolicy;
+use App\Policies\Recruitment\PlacementPolicy;
 use App\Policies\WFHAccomplishmentPolicy;
 use App\Policies\WFHAttendancePolicy;
 use Illuminate\Support\Facades\Gate;
@@ -32,6 +39,51 @@ class AppServiceProvider extends ServiceProvider
         // ── WFH Policies ──────────────────────────────────────────────────────
         Gate::policy(WFHAttendance::class, WFHAttendancePolicy::class);
         Gate::policy(WFHAccomplishment::class, WFHAccomplishmentPolicy::class);
+
+        // ── Recruitment Policies ───────────────────────────────────────────────
+        Gate::policy(JobItem::class, JobItemPolicy::class);
+        Gate::policy(Application::class, ApplicationPolicy::class);
+        Gate::policy(Placement::class, PlacementPolicy::class);
+
+        // ── Recruitment permission gates (used by controllers via authorize()) ─
+        foreach ([
+            'recruitment.view',
+            'recruitment.manage',
+            'recruitment.publish',
+            'recruitment.apply',
+            'recruitment.evaluate',
+            'recruitment.rank',
+            'recruitment.approve',
+            'recruitment.onboarding',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // ── L&D permission gates ───────────────────────────────────────────────
+        foreach ([
+            'lnd.view',
+            'lnd.create',
+            'lnd.edit',
+            'lnd.delete',
+            'lnd.approve',
+            'lnd.evaluate',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // ── Rewards & Recognition permission gates ─────────────────────────────
+        foreach ([
+            'rewards.view',
+            'rewards.nominate',
+            'rewards.evaluate',
+            'rewards.approve',
+            'rewards.manage',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // Student data management — restricted to Administrators only
+        Gate::define('manage-students', fn (User $user) => $user->hasRole('Administrator'));
 
         Vite::prefetch(concurrency: 3);
 
