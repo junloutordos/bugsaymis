@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bugsaymis_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+      - /var/www/vendor
+    networks:
+      - bugsaymis_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: bugsaymis_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: bugsaymis
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - bugsaymis_network
+
+  nginx:
+    image: nginx:latest
+    container_name: bugsaymis_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - .:/var/www
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    networks:
+      - bugsaymis_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: bugsaymis_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      - mysql
+    networks:
+      - bugsaymis_network
+
+networks:
+  bugsaymis_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
