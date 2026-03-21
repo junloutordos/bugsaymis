@@ -1,99 +1,121 @@
 <template>
   <AdminLayout title="Date Parameters">
-    <div class="p-6 bg-white rounded shadow">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold">Date Parameters</h1>
-        <button @click="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center">
-          <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Date Parameter
+    <div>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">Date Parameters</h1>
+        <button @click="openModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <PlusIcon class="w-4 h-4" /> New Date Parameter
         </button>
       </div>
 
-      <div class="mb-4">
-        <input v-model="searchQuery" placeholder="Search..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm px-3 py-2" />
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <input v-model="searchQuery" placeholder="Search..." class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="min-w-full border-collapse border border-gray-300">
-          <thead>
-            <tr class="bg-gray-50">
-              <th class="border px-2 py-1">ID</th>
-              <th class="border px-2 py-1">Type</th>
-              <th class="border px-2 py-1">Description</th>
-              <th class="border px-2 py-1">Date</th>
-              <th class="border px-2 py-1">Time In</th>
-              <th class="border px-2 py-1">Break Out</th>
-              <th class="border px-2 py-1">Break In</th>
-              <th class="border px-2 py-1">Time Out</th>
-              <th class="border px-2 py-1">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in paginated" :key="p.id">
-              <td class="border px-2 py-1">{{ p.id }}</td>
-              <td class="border px-2 py-1">{{ displayType(p.type) }}</td>
-              <td class="border px-2 py-1">{{ p.description || '—' }}</td>
-              <td class="border px-2 py-1">{{ p.date || '—' }}</td>
-              <td class="border px-2 py-1">{{ p.timein || '—' }}</td>
-              <td class="border px-2 py-1">{{ p.breakout || '—' }}</td>
-              <td class="border px-2 py-1">{{ p.breakin || '—' }}</td>
-              <td class="border px-2 py-1">{{ p.timeout || '—' }}</td>
-              <td class="border px-2 py-1">
-                <div class="flex items-center gap-2">
-                  <button @click="edit(p)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
-                    <PencilSquareIcon class="w-5 h-5" />
-                  </button>
-                  <button @click="remove(p)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete">
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ID</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time In</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Break Out</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Break In</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Out</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="p in paginated" :key="p.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayType(p.type) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.description || '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.date || '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.timein || '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.breakout || '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.breakin || '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.timeout || '—' }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-1">
+                    <button @click="edit(p)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      <PencilSquareIcon class="w-4 h-4" />
+                    </button>
+                    <button @click="remove(p)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="paginated.length === 0">
+                <td colspan="9" class="py-16 text-center text-slate-400 text-sm">No date parameters found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <div class="mt-4 flex items-center justify-center">
-        <div class="inline-flex items-center gap-2">
-          <button @click="goToPage(currentPage-1)" :disabled="currentPage===1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-          <span class="text-sm">Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="goToPage(currentPage+1)" :disabled="currentPage>=totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <div class="flex gap-2">
+            <button @click="goToPage(currentPage-1)" :disabled="currentPage===1" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
+            <button @click="goToPage(currentPage+1)" :disabled="currentPage>=totalPages" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
+          </div>
         </div>
       </div>
 
       <!-- Modal -->
-      <div
-        v-show="show"
-        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity"
-      >
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-          <button
-            class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-            @click="closeModal"
-          >
-            ✕
-          </button>
-          <h2 class="text-xl font-semibold mb-4">{{ editing ? 'Edit' : 'Add' }} Date Parameter</h2>
-
-          <div class="grid grid-cols-1 gap-3">
-            <label class="block">
-              <select v-model="form.type" class="border p-2 w-full rounded-lg shadow-sm">
-                <option value="">-- Select Type --</option>
-                <option value="HOL">Holiday</option>
-                <option value="SUSPENDED">Work Suspension</option>
-                <option value="WFH">Work From Home</option>
-              </select>
-            </label>
-            <input v-model="form.description" placeholder="Description" class="border p-2 rounded-lg shadow-sm" />
-            <input v-model="form.date" type="date" placeholder="Date" class="border p-2 rounded-lg shadow-sm" />
-            <input v-model="form.timein" type="time" placeholder="Time In" class="border p-2 rounded-lg shadow-sm" />
-            <input v-model="form.breakout" type="time" placeholder="Break Out" class="border p-2 rounded-lg shadow-sm" />
-            <input v-model="form.breakin" type="time" placeholder="Break In" class="border p-2 rounded-lg shadow-sm" />
-            <input v-model="form.timeout" type="time" placeholder="Time Out" class="border p-2 rounded-lg shadow-sm" />
+      <div v-show="show" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md relative">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-xl font-semibold text-slate-800">{{ editing ? 'Edit' : 'Add' }} Date Parameter</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
           </div>
-
-          <div class="mt-4 flex justify-end gap-2">
-            <button @click="closeModal" class="px-3 py-1 border rounded-lg">Cancel</button>
-            <button @click="save" class="px-3 py-1 bg-blue-600 text-white rounded-lg">Save</button>
+          <div class="px-6 py-5">
+            <div class="grid grid-cols-1 gap-3">
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Type</span>
+                <select v-model="form.type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
+                  <option value="">-- Select Type --</option>
+                  <option value="HOL">Holiday</option>
+                  <option value="SUSPENDED">Work Suspension</option>
+                  <option value="WFH">Work From Home</option>
+                </select>
+              </div>
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Description</span>
+                <input v-model="form.description" placeholder="Description" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Date</span>
+                <input v-model="form.date" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Time In</span>
+                <input v-model="form.timein" type="time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Break Out</span>
+                <input v-model="form.breakout" type="time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Break In</span>
+                <input v-model="form.breakin" type="time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+              <div>
+                <span class="block text-xs font-medium text-slate-600 mb-1">Time Out</span>
+                <input v-model="form.timeout" type="time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click="save" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Save</button>
           </div>
         </div>
       </div>

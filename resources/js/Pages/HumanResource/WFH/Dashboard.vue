@@ -1,150 +1,147 @@
 <template>
   <Head title="Work From Home" />
   <AdminLayout title="Work From Home">
-    <div class="max-w-2xl mx-auto p-6 space-y-6">
+    <div class="max-w-2xl mx-auto space-y-6">
 
-      <!-- ── Status Card ──────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl shadow p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold text-gray-800">Today's WFH Status</h2>
-          <span class="text-sm text-gray-400">{{ today }}</span>
+      <!-- Status Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-xl font-semibold text-slate-800">Today's WFH Status</h2>
+          <span class="text-sm text-slate-400">{{ today }}</span>
         </div>
-
-        <!-- Not yet timed in -->
-        <div v-if="!attendance" class="text-center py-4">
-          <p class="text-gray-500 mb-1">You have not timed in yet.</p>
-          <p class="text-xs text-gray-400">Camera access is required to time in.</p>
-        </div>
-
-        <!-- Timed in or completed -->
-        <div v-else class="space-y-4">
-          <!-- Times row -->
-          <div class="grid grid-cols-2 gap-3">
-
-            <!-- Time In card -->
-            <div class="bg-green-50 border-2 border-green-300 rounded-xl p-3 flex flex-col items-center gap-2">
-              <span class="text-xs font-semibold text-green-600 uppercase tracking-wide">Time In</span>
-              <span class="text-base font-bold text-green-700">{{ formatTime(attendance.time_in) }}</span>
-              <a v-if="attendance.time_in_photo_link"
-                 :href="attendance.time_in_photo_link" target="_blank">
-                <img :src="driveThumb(attendance.time_in_photo_link)"
-                     class="w-28 h-28 object-cover rounded-lg border-2 border-green-300"
-                     alt="Time-in photo" />
-              </a>
-              <div v-else class="w-28 h-28 rounded-lg border-2 border-dashed border-green-200 flex items-center justify-center text-green-300 text-xs">
-                No photo
-              </div>
-            </div>
-
-            <!-- Time Out card -->
-            <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-3 flex flex-col items-center gap-2">
-              <span class="text-xs font-semibold text-blue-600 uppercase tracking-wide">Time Out</span>
-              <span class="text-base font-bold text-blue-700">{{ attendance.time_out ? formatTime(attendance.time_out) : '—' }}</span>
-              <a v-if="attendance.time_out_photo_link"
-                 :href="attendance.time_out_photo_link" target="_blank">
-                <img :src="driveThumb(attendance.time_out_photo_link)"
-                     class="w-28 h-28 object-cover rounded-lg border-2 border-blue-300"
-                     alt="Time-out photo" />
-              </a>
-              <div v-else class="w-28 h-28 rounded-lg border-2 border-dashed border-blue-200 flex items-center justify-center text-blue-300 text-xs">
-                {{ attendance.time_out ? 'No photo' : 'Pending' }}
-              </div>
-            </div>
-
+        <div class="p-5">
+          <!-- Not yet timed in -->
+          <div v-if="!attendance" class="py-16 text-center text-slate-400 text-sm">
+            <p class="mb-1">You have not timed in yet.</p>
+            <p class="text-xs">Camera access is required to time in.</p>
           </div>
 
-          <!-- Duration (only when fully complete) -->
-          <div v-if="attendance.time_out"
-               class="text-center text-sm font-medium text-gray-600 bg-gray-50 rounded-lg py-2">
-            Total Duration: <span class="text-gray-900 font-bold">{{ duration }}</span>
+          <!-- Timed in or completed -->
+          <div v-else class="space-y-4">
+            <!-- Times row -->
+            <div class="grid grid-cols-2 gap-3">
+              <!-- Time In card -->
+              <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3 flex flex-col items-center gap-2">
+                <span class="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Time In</span>
+                <span class="text-base font-bold text-emerald-700">{{ formatTime(attendance.time_in) }}</span>
+                <a v-if="attendance.time_in_photo_link" :href="attendance.time_in_photo_link" target="_blank">
+                  <img :src="driveThumb(attendance.time_in_photo_link)"
+                       class="w-28 h-28 object-cover rounded-lg border-2 border-emerald-300"
+                       alt="Time-in photo" />
+                </a>
+                <div v-else class="w-28 h-28 rounded-lg border-2 border-dashed border-emerald-200 flex items-center justify-center text-emerald-300 text-xs">
+                  No photo
+                </div>
+              </div>
+
+              <!-- Time Out card -->
+              <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-3 flex flex-col items-center gap-2">
+                <span class="text-xs font-semibold text-blue-600 uppercase tracking-wide">Time Out</span>
+                <span class="text-base font-bold text-blue-700">{{ attendance.time_out ? formatTime(attendance.time_out) : '—' }}</span>
+                <a v-if="attendance.time_out_photo_link" :href="attendance.time_out_photo_link" target="_blank">
+                  <img :src="driveThumb(attendance.time_out_photo_link)"
+                       class="w-28 h-28 object-cover rounded-lg border-2 border-blue-300"
+                       alt="Time-out photo" />
+                </a>
+                <div v-else class="w-28 h-28 rounded-lg border-2 border-dashed border-blue-200 flex items-center justify-center text-blue-300 text-xs">
+                  {{ attendance.time_out ? 'No photo' : 'Pending' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Duration -->
+            <div v-if="attendance.time_out"
+                 class="text-center text-sm font-medium text-slate-600 bg-slate-50 rounded-lg py-2">
+              Total Duration: <span class="text-slate-900 font-bold">{{ duration }}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ── Camera Card ───────────────────────────────────────────────── -->
-      <div v-if="showCamera" class="bg-white rounded-xl shadow p-6 space-y-4">
-        <h3 class="font-semibold text-gray-700">
-          {{ cameraMode === 'in' ? 'Capture Time-In Photo' : 'Capture Time-Out Photo' }}
-        </h3>
+      <!-- Camera Card -->
+      <div v-if="showCamera" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <h3 class="text-xl font-semibold text-slate-800">
+            {{ cameraMode === 'in' ? 'Capture Time-In Photo' : 'Capture Time-Out Photo' }}
+          </h3>
+        </div>
+        <div class="p-5 space-y-4">
+          <!-- Not yet captured -->
+          <div v-if="!capturedImage" class="relative">
+            <video ref="videoEl" autoplay playsinline
+                   class="w-full rounded-lg bg-black" style="max-height:280px;" />
+            <button @click="capture"
+                    class="mt-3 w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              📸 Capture Photo
+            </button>
+          </div>
 
-        <!-- Not yet captured -->
-        <div v-if="!capturedImage" class="relative">
-          <video ref="videoEl" autoplay playsinline
-                 class="w-full rounded-lg bg-black" style="max-height:280px;" />
-          <button @click="capture"
-                  class="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
-            📸 Capture Photo
+          <!-- Captured preview -->
+          <div v-else class="space-y-3">
+            <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" alt="Captured photo"
+                 style="max-height:280px;object-fit:cover;" />
+            <div class="flex gap-3">
+              <button @click="retake"
+                      class="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Retake
+              </button>
+              <button @click="confirmCapture" :disabled="loading"
+                      class="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                {{ loading ? 'Saving…' : (cameraMode === 'in' ? 'Confirm Time In' : 'Confirm Time Out') }}
+              </button>
+            </div>
+          </div>
+
+          <button @click="cancelCamera" class="text-sm text-slate-400 hover:text-slate-600 w-full text-center">
+            Cancel
           </button>
+
+          <!-- Hidden canvas for getUserMedia snapshot -->
+          <canvas ref="canvasEl" class="hidden" />
         </div>
-
-        <!-- Captured preview -->
-        <div v-else class="space-y-3">
-          <img :src="capturedImage" class="w-full rounded-lg border" alt="Captured photo"
-               style="max-height:280px;object-fit:cover;" />
-          <div class="flex gap-3">
-            <button @click="retake"
-                    class="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
-              Retake
-            </button>
-            <button @click="confirmCapture" :disabled="loading"
-                    class="flex-1 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium transition">
-              {{ loading ? 'Saving…' : (cameraMode === 'in' ? 'Confirm Time In' : 'Confirm Time Out') }}
-            </button>
-          </div>
-        </div>
-
-        <button @click="cancelCamera" class="text-sm text-gray-400 hover:text-gray-600 w-full text-center">
-          Cancel
-        </button>
-
-        <!-- Hidden canvas for getUserMedia snapshot -->
-        <canvas ref="canvasEl" class="hidden" />
       </div>
 
-      <!-- ── Action Buttons ────────────────────────────────────────────── -->
+      <!-- Action Buttons -->
       <div v-if="!showCamera" class="flex gap-4">
         <!-- Time In -->
         <button v-if="!attendance"
                 @click="openCamera('in')"
-                class="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold shadow transition">
+                class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           🟢 Time In
         </button>
 
         <!-- Time Out -->
         <button v-if="attendance && !attendance.time_out"
                 @click="openCamera('out')"
-                class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow transition">
+                class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           🔵 Time Out
         </button>
 
         <!-- Already completed -->
         <div v-if="attendance && attendance.time_out"
-             class="flex-1 py-3 bg-gray-100 text-gray-500 rounded-xl text-center font-medium">
+             class="flex-1 py-3 bg-slate-100 text-slate-500 rounded-xl text-center text-sm font-medium">
           ✅ WFH Day Complete
         </div>
       </div>
 
-      <!-- ── Accomplishments shortcut ──────────────────────────────────── -->
-      <div v-if="attendance" class="bg-white rounded-xl shadow p-5">
-        <div class="flex items-center justify-between">
+      <!-- Accomplishments shortcut -->
+      <div v-if="attendance" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <p class="font-semibold text-gray-800">Accomplishments</p>
-            <p class="text-sm text-gray-400">
+            <p class="font-semibold text-slate-800">Accomplishments</p>
+            <p class="text-sm text-slate-400">
               {{ attendance.accomplishments?.length ?? 0 }} recorded today
             </p>
           </div>
           <button @click="showAccomplishmentPanel = !showAccomplishmentPanel"
-                  class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition">
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             {{ showAccomplishmentPanel ? 'Hide' : 'Add / View' }}
           </button>
         </div>
 
         <!-- Inline Accomplishment Panel -->
-        <div v-if="showAccomplishmentPanel" class="mt-4 border-t pt-4 space-y-4">
-          <!-- Form -->
+        <div v-if="showAccomplishmentPanel" class="p-5 space-y-4">
           <AccomplishmentForm :attendance-id="attendance.id" @saved="onAccomplishmentSaved" />
-
-          <!-- List -->
           <AccomplishmentList :items="localAccomplishments" @deleted="onAccomplishmentDeleted" />
         </div>
       </div>

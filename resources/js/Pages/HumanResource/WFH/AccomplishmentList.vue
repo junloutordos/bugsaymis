@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- Empty state -->
-    <p v-if="!items.length" class="text-sm text-gray-400 text-center py-4">
+    <p v-if="!items.length" class="py-16 text-center text-slate-400 text-sm">
       No accomplishments recorded yet.
     </p>
 
@@ -10,13 +10,13 @@
       <li
         v-for="item in items"
         :key="item.id"
-        class="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-start justify-between gap-3"
+        class="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-start justify-between gap-3"
       >
         <!-- Content -->
         <div class="flex-1 min-w-0 space-y-1">
-          <p class="font-semibold text-gray-800 text-sm truncate">{{ item.title }}</p>
+          <p class="font-semibold text-slate-800 text-sm truncate">{{ item.title }}</p>
 
-          <p v-if="item.description" class="text-xs text-gray-500 line-clamp-2">
+          <p v-if="item.description" class="text-xs text-slate-500 line-clamp-2">
             {{ item.description }}
           </p>
 
@@ -47,7 +47,7 @@
             </a>
           </div>
 
-          <p class="text-xs text-gray-300 mt-1">{{ formatDate(item.created_at) }}</p>
+          <p class="text-xs text-slate-300 mt-1">{{ formatDate(item.created_at) }}</p>
         </div>
 
         <!-- Delete button -->
@@ -55,7 +55,7 @@
           @click="confirmDelete(item)"
           :disabled="deletingId === item.id"
           title="Delete accomplishment"
-          class="flex-shrink-0 text-gray-300 hover:text-red-500 disabled:opacity-40 transition"
+          class="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

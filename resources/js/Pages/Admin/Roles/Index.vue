@@ -156,56 +156,56 @@ async function savePermissions() {
   <Head title="Roles & Permissions" />
   <AdminLayout title="Roles & Permissions">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold text-gray-800">Roles</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <h1 class="text-xl font-semibold text-slate-800">Roles</h1>
       <button @click="openCreate"
-        class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm">
+        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
         <PlusIcon class="w-4 h-4" /> New Role
       </button>
     </div>
 
     <!-- Search + Table -->
-    <div class="bg-white rounded-xl shadow p-4">
-      <div class="flex items-center gap-2 mb-4">
-        <MagnifyingGlassIcon class="w-5 h-5 text-gray-400 shrink-0" />
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+        <MagnifyingGlassIcon class="w-4 h-4 text-slate-400 shrink-0" />
         <input v-model="search" type="text" placeholder="Search roles…"
-          class="w-full sm:w-72 rounded-lg border-gray-300 text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
       </div>
 
-      <div v-if="loading" class="text-center py-10 text-gray-400">Loading…</div>
+      <div v-if="loading" class="py-16 text-center text-slate-400 text-sm">Loading…</div>
       <div v-else class="overflow-x-auto">
-        <table class="min-w-full text-sm border border-gray-200">
-          <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+        <table class="min-w-full divide-y divide-slate-100 text-sm">
+          <thead class="bg-slate-50">
             <tr>
-              <th class="px-4 py-3 text-left">Role</th>
-              <th class="px-4 py-3 text-left">Description</th>
-              <th class="px-4 py-3 text-center">Permissions</th>
-              <th class="px-4 py-3 text-center">Users</th>
-              <th class="px-4 py-3 text-center">Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Role</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Permissions</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Users</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-for="role in filtered" :key="role.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-medium text-gray-800">{{ role.name }}</td>
-              <td class="px-4 py-3 text-gray-500">{{ role.description ?? '—' }}</td>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="role in filtered" :key="role.id" class="hover:bg-slate-50/60">
+              <td class="px-4 py-3 font-medium text-slate-800">{{ role.name }}</td>
+              <td class="px-4 py-3 text-slate-500">{{ role.description ?? '—' }}</td>
               <td class="px-4 py-3 text-center">
-                <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700">
                   {{ role.permissions_count }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-center text-gray-600">{{ role.users_count }}</td>
+              <td class="px-4 py-3 text-center text-slate-600">{{ role.users_count }}</td>
               <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-2">
+                <div class="flex items-center justify-center gap-1">
                   <button @click="openPermissions(role)"
-                    class="p-1.5 rounded hover:bg-green-100 text-green-600" title="Edit permissions">
+                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Edit permissions">
                     <ShieldCheckIcon class="w-4 h-4" />
                   </button>
                   <button @click="openEdit(role)"
-                    class="p-1.5 rounded hover:bg-yellow-100 text-yellow-600" title="Edit role">
+                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit role">
                     <PencilSquareIcon class="w-4 h-4" />
                   </button>
                   <button @click="deleteRole(role)"
-                    class="p-1.5 rounded hover:bg-red-100 text-red-600" title="Delete role"
+                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete role"
                     :disabled="role.name === 'Administrator'">
                     <TrashIcon class="w-4 h-4" />
                   </button>
@@ -213,7 +213,7 @@ async function savePermissions() {
               </td>
             </tr>
             <tr v-if="filtered.length === 0">
-              <td colspan="5" class="text-center py-8 text-gray-400">No roles found.</td>
+              <td colspan="5" class="py-16 text-center text-slate-400 text-sm">No roles found.</td>
             </tr>
           </tbody>
         </table>
@@ -221,51 +221,56 @@ async function savePermissions() {
     </div>
 
     <!-- Role create/edit modal -->
-    <div v-if="showRoleModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h2 class="text-lg font-bold mb-4">{{ modalMode === 'create' ? 'New Role' : 'Edit Role' }}</h2>
-        <form @submit.prevent="submitRole" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input v-model="form.name" type="text" required maxlength="100"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input v-model="form.description" type="text" maxlength="255"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          <div class="flex justify-end gap-2 pt-2">
-            <button type="button" @click="showRoleModal = false"
-              class="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 text-sm">Cancel</button>
-            <button type="submit" :disabled="saving"
-              class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-60">
-              {{ saving ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
-        </form>
+    <div v-if="showRoleModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-800">{{ modalMode === 'create' ? 'New Role' : 'Edit Role' }}</h2>
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="showRoleModal = false">✕</button>
+        </div>
+        <div class="px-6 py-5">
+          <form @submit.prevent="submitRole" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
+              <input v-model="form.name" type="text" required maxlength="100"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+              <input v-model="form.description" type="text" maxlength="255"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" @click="showRoleModal = false"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+              <button type="submit" :disabled="saving"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+                {{ saving ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
     <!-- Permission assignment modal -->
-    <div v-if="showPermModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
-        <div class="px-6 py-4 border-b flex items-center justify-between">
-          <h2 class="text-lg font-bold">
-            Permissions — <span class="text-blue-600">{{ editingRole?.name }}</span>
+    <div v-if="showPermModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-800">
+            Permissions — <span class="text-indigo-600">{{ editingRole?.name }}</span>
           </h2>
-          <span class="text-sm text-gray-500">{{ rolePerms.length }} selected</span>
+          <span class="text-sm text-slate-500">{{ rolePerms.length }} selected</span>
         </div>
 
-        <div class="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+        <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           <div v-for="group in allPerms" :key="group.module">
             <label class="flex items-center gap-2 mb-2 cursor-pointer">
               <input type="checkbox"
                 :checked="moduleChecked(group)"
                 :indeterminate="moduleIndeterminate(group)"
                 @change="toggleModule(group)"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span class="font-semibold text-gray-700 uppercase text-xs tracking-wider">{{ group.module }}</span>
+                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <span class="font-semibold text-slate-700 uppercase text-xs tracking-wider">{{ group.module }}</span>
             </label>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pl-5">
               <label v-for="perm in group.permissions" :key="perm.id"
@@ -273,18 +278,18 @@ async function savePermissions() {
                 <input type="checkbox"
                   :checked="rolePerms.includes(perm.id)"
                   @change="togglePerm(perm.id)"
-                  class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                <span :title="perm.description" class="truncate">{{ perm.name }}</span>
+                  class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                <span :title="perm.description" class="truncate text-slate-700">{{ perm.name }}</span>
               </label>
             </div>
           </div>
         </div>
 
-        <div class="px-6 py-4 border-t flex justify-end gap-2">
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
           <button @click="showPermModal = false"
-            class="px-4 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 text-sm">Cancel</button>
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
           <button @click="savePermissions" :disabled="syncingPerms"
-            class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-60">
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
             {{ syncingPerms ? 'Saving…' : 'Save Permissions' }}
           </button>
         </div>

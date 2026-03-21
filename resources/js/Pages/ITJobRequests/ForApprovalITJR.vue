@@ -116,68 +116,67 @@ const closeModal = () => {
   <AdminLayout title="For Approval IT Job Requests">
     <div>
       <!-- Header -->
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">For Approval - IT Job Requests</h1>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">For Approval — IT Job Requests</h1>
       </div>
 
-      <!-- Card: Search + Filter + Table -->
-      <div class="bg-white rounded-xl shadow p-4">
-        <!-- Search + Filters -->
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-          <div class="relative flex-1 sm:w-64 sm:flex-none">
-            <input
-              v-model="search"
-              type="text"
-              placeholder="Search requests..."
-              @keydown.enter.prevent="applyFilters(true)"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-            <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⏳</span>
-          </div>
-          <button
-            @click="applyFilters(true)"
-            :disabled="isLoading"
-            class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
-          >
-            Search
-          </button>
-          <select
-            v-model="filterCategory"
-            class="rounded-lg border-gray-300 shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">All Categories</option>
-            <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
-          </select>
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 sm:w-64 sm:flex-none">
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search requests..."
+            @keydown.enter.prevent="applyFilters(true)"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+          />
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⏳</span>
         </div>
+        <button
+          @click="applyFilters(true)"
+          :disabled="isLoading"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+        >
+          Search
+        </button>
+        <select
+          v-model="filterCategory"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+        >
+          <option value="">All Categories</option>
+          <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+        </select>
+      </div>
 
-        <!-- Table -->
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div class="overflow-x-auto">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">ITJR #</th>
-                <th class="px-4 py-3 text-left">Title</th>
-                <th class="px-4 py-3 text-left">Submitted By</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                <th class="px-4 py-3 text-center">Actions</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ITJR #</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted By</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
+            <tbody class="divide-y divide-slate-100">
               <tr
                 v-for="req in filteredRequests"
                 :key="req.id"
-                class="hover:bg-gray-50"
+                class="hover:bg-slate-50/60"
               >
-                <td class="px-4 py-3">{{ req.itjr_no ?? req.id }}</td>
-                <td class="px-4 py-3">{{ req.title }}</td>
-                <td class="px-4 py-3">{{ req.user?.name ?? "—" }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.itjr_no ?? req.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.title }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.user?.name ?? "—" }}</td>
                 <td class="px-4 py-3">
                   <span
-                    class="px-3 py-1 text-xs rounded-full"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
                     :class="{
-                      'bg-yellow-100 text-yellow-700': req.status.includes('Pending'),
-                      'bg-green-100 text-green-700': req.status.includes('Approved'),
-                      'bg-red-100 text-red-700': req.status.includes('Rejected')
+                      'bg-amber-50 text-amber-700': req.status.includes('Pending'),
+                      'bg-emerald-50 text-emerald-700': req.status.includes('Approved'),
+                      'bg-red-50 text-red-600': req.status.includes('Rejected')
                     }"
                   >
                     {{ req.status }}
@@ -189,9 +188,9 @@ const closeModal = () => {
                     <button
                         v-if="req.status === 'Pending Division Chief Approval'"
                         @click="approveRequest(req.id)"
-                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 text-green-700 font-medium"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition-colors"
                     >
-                        <CheckCircleIcon class="w-5 h-5" />
+                        <CheckCircleIcon class="w-4 h-4" />
                         <span>Approve</span>
                     </button>
 
@@ -199,28 +198,25 @@ const closeModal = () => {
                     <button
                         v-if="req.status === 'Pending Division Chief Approval'"
                         @click="rejectRequest(req.id)"
-                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-medium"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium transition-colors"
                     >
-                        <XCircleIcon class="w-5 h-5" />
+                        <XCircleIcon class="w-4 h-4" />
                         <span>Reject</span>
                     </button>
 
                     <!-- View Button -->
                     <button
                         @click="openModal(req)"
-                        class="flex items-center gap-1 px-3 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium"
+                        class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
                     >
-                        <EyeIcon class="w-5 h-5" />
-                        <span>View</span>
+                        <EyeIcon class="w-4 h-4" />
                     </button>
-                    </div>
-
-
+                  </div>
                 </td>
               </tr>
 
               <tr v-if="filteredRequests.length === 0">
-                <td colspan="5" class="px-4 py-6 text-center text-gray-500">
+                <td colspan="5" class="py-16 text-center text-slate-400 text-sm">
                   No requests found.
                 </td>
               </tr>
@@ -229,19 +225,21 @@ const closeModal = () => {
         </div>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 mt-4">
-          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Prev</button>
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Next</button>
         </div>
       </div>
 
       <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-xl w-2/3 max-w-3xl shadow-lg p-6 relative">
-          <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700">✖</button>
-          <h2 class="text-xl font-bold mb-4">{{ selectedRequest.title }}</h2>
-          <div class="space-y-2">
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ selectedRequest.title }}</h2>
+            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">✖</button>
+          </div>
+          <div class="px-6 py-5 space-y-2 text-sm text-slate-700">
             <p><strong>ITJR #:</strong> {{ selectedRequest.itjr_no ?? selectedRequest.id }}</p>
             <p><strong>Submitted By:</strong> {{ selectedRequest.user?.name ?? '—' }}</p>
             <p><strong>Status:</strong> {{ selectedRequest.status }}</p>

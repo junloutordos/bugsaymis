@@ -97,6 +97,31 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Reports',  'name' => 'reports.view',       'description' => 'View system reports'],
             ['module' => 'Reports',  'name' => 'reports.export',     'description' => 'Export reports'],
 
+            // ── Recruitment & Selection ───────────────────────────────────────
+            ['module' => 'Recruitment', 'name' => 'recruitment.view',       'description' => 'View job items, vacancies and applications'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.manage',     'description' => 'Manage job items, types, and applicant records'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.publish',    'description' => 'Publish job vacancies'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.apply',      'description' => 'Submit applications for vacancies'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.evaluate',   'description' => 'Score applicants and manage interviews'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.rank',       'description' => 'Compute and manage applicant rankings'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.approve',    'description' => 'Approve selections and create placements'],
+            ['module' => 'Recruitment', 'name' => 'recruitment.onboarding', 'description' => 'Manage onboarding tasks for new hires'],
+
+            // ── Learning & Development (L&D) ──────────────────────────────────
+            ['module' => 'LnD', 'name' => 'lnd.view',     'description' => 'View learning programs, sessions, TNA, and IDP'],
+            ['module' => 'LnD', 'name' => 'lnd.create',   'description' => 'Create learning programs, sessions, TNA, and IDP entries'],
+            ['module' => 'LnD', 'name' => 'lnd.edit',     'description' => 'Edit learning programs, sessions, and IDP records'],
+            ['module' => 'LnD', 'name' => 'lnd.delete',   'description' => 'Delete L&D records'],
+            ['module' => 'LnD', 'name' => 'lnd.approve',  'description' => 'Approve nominations, TNA, and IDP submissions'],
+            ['module' => 'LnD', 'name' => 'lnd.evaluate', 'description' => 'Submit and manage Kirkpatrick evaluations'],
+
+            // ── Rewards & Recognition (PRAISE) ────────────────────────────────
+            ['module' => 'Rewards', 'name' => 'rewards.view',     'description' => 'View nominations, evaluations, approvals, and awards'],
+            ['module' => 'Rewards', 'name' => 'rewards.nominate', 'description' => 'Submit nominations for rewards and recognition'],
+            ['module' => 'Rewards', 'name' => 'rewards.evaluate', 'description' => 'Evaluate nominations as a committee member'],
+            ['module' => 'Rewards', 'name' => 'rewards.approve',  'description' => 'Approve or reject nominations (committee / head of office)'],
+            ['module' => 'Rewards', 'name' => 'rewards.manage',   'description' => 'Manage reward types and record awards (HR/Admin)'],
+
         ];
 
         foreach ($permissions as $data) {

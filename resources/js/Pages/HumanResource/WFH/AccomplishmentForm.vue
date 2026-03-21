@@ -1,16 +1,16 @@
 <template>
   <div class="space-y-4">
-    <h4 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">Add Accomplishment</h4>
+    <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add Accomplishment</h4>
 
     <!-- Title -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Title <span class="text-red-500">*</span></label>
       <input
         v-model="form.title"
         type="text"
         maxlength="255"
         placeholder="e.g. Completed project report"
-        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
         :class="{ 'border-red-400': errors.title }"
       />
       <p v-if="errors.title" class="text-red-500 text-xs mt-1">{{ errors.title }}</p>
@@ -18,42 +18,42 @@
 
     <!-- Description -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
       <textarea
         v-model="form.description"
         rows="3"
         maxlength="2000"
         placeholder="Brief description of what you accomplished…"
-        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full resize-none"
       />
     </div>
 
     <!-- Proof Type -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Proof (optional)</label>
+      <label class="block text-xs font-medium text-slate-600 mb-2">Proof (optional)</label>
       <div class="flex gap-3">
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="radio" v-model="form.proof_type" value="" class="accent-indigo-600" />
-          <span class="text-sm text-gray-600">None</span>
+          <span class="text-sm text-slate-600">None</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="radio" v-model="form.proof_type" value="photo" class="accent-indigo-600" />
-          <span class="text-sm text-gray-600">📷 Photo</span>
+          <span class="text-sm text-slate-600">📷 Photo</span>
         </label>
         <label class="flex items-center gap-2 cursor-pointer">
           <input type="radio" v-model="form.proof_type" value="link" class="accent-indigo-600" />
-          <span class="text-sm text-gray-600">🔗 Link</span>
+          <span class="text-sm text-slate-600">🔗 Link</span>
         </label>
       </div>
     </div>
 
     <!-- Photo upload -->
     <div v-if="form.proof_type === 'photo'" class="space-y-2">
-      <label class="block text-sm font-medium text-gray-700">Upload Photo</label>
+      <label class="block text-xs font-medium text-slate-600">Upload Photo</label>
 
       <!-- Drop zone -->
       <div
-        class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-400 transition"
+        class="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-400 transition"
         :class="{ 'border-indigo-500 bg-indigo-50': isDragging }"
         @click="photoInputEl?.click()"
         @dragover.prevent="isDragging = true"
@@ -61,8 +61,8 @@
         @drop.prevent="onDrop"
       >
         <div v-if="!photoPreview">
-          <p class="text-sm text-gray-400">Click or drag & drop an image here</p>
-          <p class="text-xs text-gray-300 mt-1">JPEG · PNG · WebP — max 10 MB</p>
+          <p class="text-sm text-slate-400">Click or drag & drop an image here</p>
+          <p class="text-xs text-slate-300 mt-1">JPEG · PNG · WebP — max 10 MB</p>
         </div>
         <div v-else class="relative inline-block">
           <img :src="photoPreview" class="max-h-40 rounded-lg mx-auto" alt="Preview" />
@@ -85,12 +85,12 @@
 
     <!-- Link input -->
     <div v-if="form.proof_type === 'link'" class="space-y-1">
-      <label class="block text-sm font-medium text-gray-700">Proof URL</label>
+      <label class="block text-xs font-medium text-slate-600">Proof URL</label>
       <input
         v-model="form.proof_link"
         type="url"
         placeholder="https://drive.google.com/…"
-        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
         :class="{ 'border-red-400': errors.proof_link }"
       />
       <p v-if="errors.proof_link" class="text-red-500 text-xs">{{ errors.proof_link }}</p>
@@ -100,7 +100,7 @@
     <button
       @click="submit"
       :disabled="loading"
-      class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition"
+      class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
     >
       {{ loading ? 'Saving…' : 'Save Accomplishment' }}
     </button>

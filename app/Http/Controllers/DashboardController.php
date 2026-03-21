@@ -16,6 +16,12 @@ use App\Models\ServiceRequest;
 use App\Models\WorkRequest;
 use App\Models\MessengerialRequest;
 use App\Models\Consultation;
+use App\Models\LearningProgram;
+use App\Models\TrainingSession;
+use App\Models\TrainingNeed;
+use App\Models\IDP;
+use App\Models\RewardNomination;
+use App\Models\Reward;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -241,6 +247,40 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | L&D Analytics
+        |--------------------------------------------------------------------------
+        */
+        $lndStats = ['programs' => 0, 'sessions' => 0, 'tna_pending' => 0, 'idp_pending' => 0];
+        try {
+            $lndStats = [
+                'programs'    => LearningProgram::count(),
+                'sessions'    => TrainingSession::count(),
+                'tna_pending' => TrainingNeed::where('status', 'pending')->count(),
+                'idp_pending' => IDP::where('status', 'submitted')->count(),
+            ];
+        } catch (\Throwable $e) {
+            logger()->warning('L&D analytics error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Rewards & Recognition Analytics
+        |--------------------------------------------------------------------------
+        */
+        $rewardsStats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'awarded_this_year' => 0];
+        try {
+            $rewardsStats = [
+                'total'             => RewardNomination::count(),
+                'pending'           => RewardNomination::where('status', 'pending')->count(),
+                'approved'          => RewardNomination::where('status', 'approved')->count(),
+                'awarded_this_year' => Reward::whereYear('award_date', now()->year)->count(),
+            ];
+        } catch (\Throwable $e) {
+            logger()->warning('Rewards analytics error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | Student Gender Count
         |--------------------------------------------------------------------------
         */
@@ -388,6 +428,12 @@ class DashboardController extends Controller
 
             // Monthly trends
             'monthlyTrends' => $monthlyTrends,
+
+            // L&D
+            'lndStats' => $lndStats,
+
+            // Rewards
+            'rewardsStats' => $rewardsStats,
         ]);
     }
 }

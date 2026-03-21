@@ -73,8 +73,25 @@ class HandleInertiaRequests extends Middleware
             ],
             // Number of consultations that are pending or active (for sidebar badge)
             'consultationsNotificationCount' => fn () => Consultation::whereIn('status', ['Pending', 'Active'])->count(),
-            // Number of IT job requests with status 'In Progress'
-            'itJobRequestsNotificationCount' => fn () => ITJobRequest::where('status', 'In Progress')->count(),
+            // Number of IT job requests needing action — role-aware
+            'itJobRequestsNotificationCount' => function () use ($request) {
+                $user = $request->user();
+                if (!$user) return 0;
+                // DivisionChief: requests in their division waiting for their approval
+                if ($user->hasRole('DivisionChief')) {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                    return ITJobRequest::where('status', 'Pending Division Chief Approval')
+                        ->whereIn('user_id', $userIds)
+                        ->count();
+                }
+                // OCD: requests waiting for OCD approval
+                if ($user->hasRole('OCD')) {
+                    return ITJobRequest::where('status', 'Pending OCD Approval')->count();
+                }
+                // MIS/Administrator: active requests (In Progress or acted on but not yet completed)
+                return ITJobRequest::whereIn('status', ['In Progress', 'Acted by MIS'])->count();
+            },
             // Number of vehicle requests with status = 'Pending'
             'vehicleRequestsNotificationCount' => function () use ($request) {
                 $user = $request->user();
