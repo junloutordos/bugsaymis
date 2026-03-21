@@ -18,86 +18,92 @@ const interventionLabel = { training: 'Training', coaching: 'Coaching', assignme
   <AdminLayout :title="`IDP — ${idp.competency}`">
     <Head :title="`IDP · ${idp.competency}`" />
 
-    <div class="p-6 space-y-6">
+    <div class="p-6 space-y-5">
 
-      <!-- Back -->
-      <div class="flex items-center gap-3">
+      <!-- Breadcrumb -->
+      <div class="flex items-center gap-2 text-sm">
         <a :href="route('lnd.idp.index')"
-          class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+          class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
           IDP List
         </a>
-        <span class="text-gray-300">/</span>
-        <span class="text-sm font-medium text-gray-700 truncate">{{ idp.competency }}</span>
+        <span class="text-slate-300">/</span>
+        <span class="font-medium text-slate-700 truncate">{{ idp.competency }}</span>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
 
         <!-- Main details -->
         <div class="md:col-span-2 space-y-5">
-          <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="flex items-start justify-between mb-4">
-              <h2 class="text-lg font-bold text-gray-800">{{ idp.competency }}</h2>
-              <div class="flex gap-2">
-                <span :class="['inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium', approvalColors[idp.approval_status] ?? 'bg-gray-100 text-gray-600']">
+          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-start justify-between">
+              <h2 class="text-xl font-semibold text-slate-800">{{ idp.competency }}</h2>
+              <div class="flex gap-2 shrink-0">
+                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', approvalColors[idp.approval_status] ?? 'bg-slate-100 text-slate-600']">
                   {{ idp.approval_status === 'submitted' ? 'Pending Approval' : idp.approval_status.charAt(0).toUpperCase() + idp.approval_status.slice(1) }}
                 </span>
-                <span :class="['inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize', statusColors[idp.status] ?? 'bg-gray-100 text-gray-600']">
+                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize', statusColors[idp.status] ?? 'bg-slate-100 text-slate-600']">
                   {{ idp.status }}
                 </span>
               </div>
             </div>
-            <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <dt class="text-gray-500">Employee</dt>
-              <dd class="font-medium text-gray-800">{{ idp.employee?.name ?? '—' }}</dd>
-              <dt class="text-gray-500">Supervisor</dt>
-              <dd class="text-gray-800">{{ idp.supervisor?.name ?? '—' }}</dd>
-              <dt class="text-gray-500">Year</dt>
-              <dd class="text-gray-800">{{ idp.year }}</dd>
-              <dt class="text-gray-500">Intervention</dt>
-              <dd class="text-gray-800">{{ interventionLabel[idp.intervention_type] ?? idp.intervention_type }}</dd>
-              <dt class="text-gray-500">Learning Program</dt>
-              <dd class="text-gray-800">{{ idp.learning_program?.title ?? '—' }}</dd>
-              <dt class="text-gray-500">Linked TNA</dt>
-              <dd class="text-gray-800">{{ idp.training_need?.competency_area ?? '—' }}</dd>
-              <dt class="text-gray-500">Competency Gap</dt>
-              <dd class="text-center">
-                <div class="inline-flex items-center gap-1 text-xs">
-                  <span :class="['rounded px-2 py-0.5 font-medium', levelColors[idp.current_level]]">{{ idp.current_level }}</span>
-                  <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                  <span :class="['rounded px-2 py-0.5 font-medium', levelColors[idp.target_level]]">{{ idp.target_level }}</span>
-                </div>
-              </dd>
-              <dt class="text-gray-500">Timeline</dt>
-              <dd class="text-gray-800">
-                <template v-if="idp.timeline_start">{{ fmt(idp.timeline_start) }} – {{ fmt(idp.timeline_end) }}</template>
-                <template v-else>—</template>
-              </dd>
-            </dl>
+            <div class="p-5">
+              <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <dt class="text-slate-500">Employee</dt>
+                <dd class="font-medium text-slate-800">{{ idp.employee?.name ?? '—' }}</dd>
+                <dt class="text-slate-500">Supervisor</dt>
+                <dd class="text-slate-800">{{ idp.supervisor?.name ?? '—' }}</dd>
+                <dt class="text-slate-500">Year</dt>
+                <dd class="text-slate-800">{{ idp.year }}</dd>
+                <dt class="text-slate-500">Intervention</dt>
+                <dd class="text-slate-800">{{ interventionLabel[idp.intervention_type] ?? idp.intervention_type }}</dd>
+                <dt class="text-slate-500">Learning Program</dt>
+                <dd class="text-slate-800">{{ idp.learning_program?.title ?? '—' }}</dd>
+                <dt class="text-slate-500">Linked TNA</dt>
+                <dd class="text-slate-800">{{ idp.training_need?.competency_area ?? '—' }}</dd>
+                <dt class="text-slate-500">Competency Gap</dt>
+                <dd>
+                  <div class="inline-flex items-center gap-1 text-xs">
+                    <span :class="['rounded px-2 py-0.5 font-medium', levelColors[idp.current_level]]">{{ idp.current_level }}</span>
+                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span :class="['rounded px-2 py-0.5 font-medium', levelColors[idp.target_level]]">{{ idp.target_level }}</span>
+                  </div>
+                </dd>
+                <dt class="text-slate-500">Timeline</dt>
+                <dd class="text-slate-800">
+                  <template v-if="idp.timeline_start">{{ fmt(idp.timeline_start) }} – {{ fmt(idp.timeline_end) }}</template>
+                  <template v-else>—</template>
+                </dd>
+              </dl>
+            </div>
           </div>
 
           <!-- Development Activity -->
-          <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 class="font-semibold text-gray-800 mb-2">Development Activity</h3>
-            <p class="text-sm text-gray-700 whitespace-pre-line">{{ idp.development_activity ?? '—' }}</p>
+          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+            <div class="px-5 py-4 border-b border-slate-100">
+              <h3 class="text-base font-semibold text-slate-800">Development Activity</h3>
+            </div>
+            <div class="p-5">
+              <p class="text-sm text-slate-700 whitespace-pre-line">{{ idp.development_activity ?? '—' }}</p>
+            </div>
           </div>
         </div>
 
-        <!-- Remarks sidebar -->
+        <!-- Remarks Sidebar -->
         <div class="space-y-4">
-          <div v-if="idp.supervisor_remarks" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Supervisor Remarks</h4>
-            <p class="text-sm text-gray-700">{{ idp.supervisor_remarks }}</p>
-            <p v-if="idp.approved_by" class="mt-2 text-xs text-gray-400">
+          <div v-if="idp.supervisor_remarks" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Supervisor Remarks</h4>
+            <p class="text-sm text-slate-700">{{ idp.supervisor_remarks }}</p>
+            <p v-if="idp.approved_by" class="mt-2 text-xs text-slate-400">
               By {{ idp.approved_by?.name }} · {{ fmt(idp.approved_at) }}
             </p>
           </div>
-          <div v-if="idp.employee_remarks" class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Employee Remarks</h4>
-            <p class="text-sm text-gray-700">{{ idp.employee_remarks }}</p>
+          <div v-if="idp.employee_remarks" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Employee Remarks</h4>
+            <p class="text-sm text-slate-700">{{ idp.employee_remarks }}</p>
           </div>
           <div v-if="!idp.supervisor_remarks && !idp.employee_remarks"
-            class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm text-sm text-gray-400 text-center">
+            class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center text-slate-400 text-sm">
             No remarks yet.
           </div>
         </div>

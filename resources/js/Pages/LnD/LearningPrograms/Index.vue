@@ -168,115 +168,121 @@ const yearOptions = computed(() => {
 
     <div class="p-6 space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 class="text-xl font-bold text-gray-800">Learning Programs</h1>
-          <p class="text-sm text-gray-500">Manage training and development programs</p>
+          <h1 class="text-xl font-semibold text-slate-800">Learning Programs</h1>
+          <p class="text-sm text-slate-500">Manage training and development programs</p>
         </div>
         <button @click="openCreate"
-          class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           New Program
         </button>
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
         <input v-model="search" type="text" placeholder="Search title / provider..."
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none w-56" />
-        <select v-model="type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-56" />
+        <select v-model="type"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Types</option>
           <option value="mandatory">Mandatory</option>
           <option value="technical">Technical</option>
           <option value="leadership">Leadership</option>
           <option value="functional">Functional</option>
         </select>
-        <select v-model="status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="status"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Status</option>
           <option value="planned">Planned</option>
           <option value="ongoing">Ongoing</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select v-model="year" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="year"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Years</option>
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
         </select>
         <button v-if="search || type || status || year" @click="search=''; type=''; status=''; year=''"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           Clear
         </button>
       </div>
 
       <!-- Table -->
-      <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div v-if="isLoading" class="flex items-center justify-center py-12 text-gray-400 text-sm">Loading…</div>
-        <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            <tr>
-              <th class="px-4 py-3 text-left">Title</th>
-              <th class="px-4 py-3 text-left">Type</th>
-              <th class="px-4 py-3 text-left">Provider</th>
-              <th class="px-4 py-3 text-center">Hours</th>
-              <th class="px-4 py-3 text-center">Sessions</th>
-              <th class="px-4 py-3 text-left">Duration</th>
-              <th class="px-4 py-3 text-left">Status</th>
-              <th class="px-4 py-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-if="programs.data.length === 0">
-              <td colspan="8" class="py-10 text-center text-gray-400">No programs found.</td>
-            </tr>
-            <tr v-for="p in programs.data" :key="p.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3">
-                <div class="font-medium text-gray-800">{{ p.title }}</div>
-                <div v-if="p.competency_area" class="text-xs text-gray-500">{{ p.competency_area }}</div>
-              </td>
-              <td class="px-4 py-3">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', typeColors[p.type] ?? 'bg-gray-100 text-gray-600']">
-                  {{ typeLabel[p.type] ?? p.type }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-gray-600">{{ p.provider ?? '—' }}</td>
-              <td class="px-4 py-3 text-center text-gray-600">{{ p.hours ?? '—' }}</td>
-              <td class="px-4 py-3 text-center font-medium text-blue-600">{{ p.sessions_count }}</td>
-              <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
-                <template v-if="p.start_date">
-                  {{ p.start_date.substring(0,10) }}
-                  <template v-if="p.end_date"> – {{ p.end_date.substring(0,10) }}</template>
-                </template>
-                <template v-else>—</template>
-              </td>
-              <td class="px-4 py-3">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColors[p.status] ?? 'bg-gray-100 text-gray-600']">
-                  {{ p.status.charAt(0).toUpperCase() + p.status.slice(1) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-2">
-                  <a :href="route('lnd.programs.show', p.id)"
-                    class="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">View</a>
-                  <button @click="openEdit(p)"
-                    class="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Edit</button>
-                  <button @click="deleteProgram(p)"
-                    class="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div v-if="isLoading" class="py-16 text-center text-slate-400 text-sm">Loading…</div>
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Provider</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Hours</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sessions</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Duration</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="programs.data.length === 0">
+                <td colspan="8" class="py-16 text-center text-slate-400 text-sm">No programs found.</td>
+              </tr>
+              <tr v-for="p in programs.data" :key="p.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3">
+                  <div class="font-medium text-slate-800">{{ p.title }}</div>
+                  <div v-if="p.competency_area" class="text-xs text-slate-500">{{ p.competency_area }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', typeColors[p.type] ?? 'bg-slate-100 text-slate-600']">
+                    {{ typeLabel[p.type] ?? p.type }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ p.provider ?? '—' }}</td>
+                <td class="px-4 py-3 text-center text-sm text-slate-700">{{ p.hours ?? '—' }}</td>
+                <td class="px-4 py-3 text-center font-medium text-indigo-600 text-sm">{{ p.sessions_count }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+                  <template v-if="p.start_date">
+                    {{ p.start_date.substring(0,10) }}
+                    <template v-if="p.end_date"> – {{ p.end_date.substring(0,10) }}</template>
+                  </template>
+                  <template v-else>—</template>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusColors[p.status] ?? 'bg-slate-100 text-slate-600']">
+                    {{ p.status.charAt(0).toUpperCase() + p.status.slice(1) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <a :href="route('lnd.programs.show', p.id)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors text-xs font-medium px-2">View</a>
+                    <button @click="openEdit(p)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors text-xs font-medium px-2">Edit</button>
+                    <button @click="deleteProgram(p)"
+                      class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors text-xs font-medium px-2">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Pagination -->
-      <div v-if="programs.last_page > 1" class="flex items-center justify-between text-sm text-gray-600">
+      <div v-if="programs.last_page > 1"
+        class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
         <span>Showing {{ programs.from }}–{{ programs.to }} of {{ programs.total }}</span>
         <div class="flex gap-1">
           <button v-for="p in programs.links" :key="p.label"
             @click="p.url && goToPage(new URL(p.url).searchParams.get('page'))"
             :disabled="!p.url"
-            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50 disabled:opacity-40']"
+            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-slate-600']"
             v-html="p.label" />
         </div>
       </div>
@@ -284,32 +290,33 @@ const yearOptions = computed(() => {
 
     <!-- Create / Edit Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">
               {{ editingItem ? 'Edit Program' : 'New Learning Program' }}
             </h2>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <button @click="closeModal"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
 
-          <form @submit.prevent="submit" class="p-6 space-y-4">
+          <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
 
             <!-- Title -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Title <span class="text-red-500">*</span></label>
               <input v-model="form.title" type="text" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
 
             <!-- Type + Status -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Type <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-red-500">*</span></label>
                 <select v-model="form.type" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="mandatory">Mandatory</option>
                   <option value="technical">Technical</option>
                   <option value="leadership">Leadership</option>
@@ -317,9 +324,9 @@ const yearOptions = computed(() => {
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Status <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Status <span class="text-red-500">*</span></label>
                 <select v-model="form.status" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="planned">Planned</option>
                   <option value="ongoing">Ongoing</option>
                   <option value="completed">Completed</option>
@@ -331,67 +338,67 @@ const yearOptions = computed(() => {
             <!-- Competency Area + Target Position -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Competency Area</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Competency Area</label>
                 <input v-model="form.competency_area" type="text"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Target Position</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Target Position</label>
                 <input v-model="form.target_position" type="text"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Provider -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Provider / Organizer</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Provider / Organizer</label>
               <input v-model="form.provider" type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
 
             <!-- Start / End date -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
                 <input v-model="form.start_date" type="date"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
                 <input v-model="form.end_date" type="date" :min="form.start_date"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Hours + Budget -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Training Hours</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Training Hours</label>
                 <input v-model="form.hours" type="number" min="1"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Budget (₱)</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Budget (₱)</label>
                 <input v-model="form.budget" type="number" min="0" step="0.01"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Description -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
               <textarea v-model="form.description" rows="3"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
 
             <!-- Actions -->
-            <div class="flex justify-end gap-3 pt-2">
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button type="button" @click="closeModal"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
                 Cancel
               </button>
               <button type="submit" :disabled="isSubmitting"
-                class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
                 {{ isSubmitting ? 'Saving…' : (editingItem ? 'Update' : 'Create') }}
               </button>
             </div>

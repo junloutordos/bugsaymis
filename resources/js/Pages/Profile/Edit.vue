@@ -30,27 +30,31 @@ defineProps({
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                Profile
-                <button @click="openProfileModal" class="ml-4 px-3 py-1 bg-blue-600 text-white rounded shadow hover:bg-blue-700">Update Profile</button>
-            </h2>
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-slate-800">
+                    Profile
+                </h2>
+                <button @click="openProfileModal" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    Update Profile
+                </button>
+            </div>
         </template>
 
         <!-- <UpdateProfileModal :show="showProfileModal" @close="closeProfileModal" /> -->
 
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
-                <div class="bg-white p-4 shadow sm:rounded-lg sm:p-8">
+        <div class="py-10">
+            <div class="mx-auto max-w-3xl space-y-5 sm:px-6 lg:px-8">
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
                     <UpdateProfileInformationForm
                         :must-verify-email="mustVerifyEmail"
                         :status="status"
                         class="max-w-xl"
                     />
                 </div>
-                <div class="bg-white p-4 shadow sm:rounded-lg sm:p-8">
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
                     <UpdatePasswordForm class="max-w-xl" />
                 </div>
-                <div class="bg-white p-4 shadow sm:rounded-lg sm:p-8">
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-6 py-5">
                     <DeleteUserForm class="max-w-xl" />
                 </div>
             </div>

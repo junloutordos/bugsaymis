@@ -2,263 +2,267 @@
   <Head title="Work Requests" />
   <AdminLayout title="Work Requests">
     <div>
-
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Work Requests</h1>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Work Requests</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Manage building and maintenance work requests</p>
+        </div>
         <button
           v-if="!hasRole('GSU Head')"
           @click.prevent="openModal()"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
         >
           + New Request
         </button>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="mb-4">
-          <input v-model="searchQuery" type="text" placeholder="Search work requests..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+        <div class="px-5 py-4 border-b border-slate-100">
+          <input v-model="searchQuery" type="text" placeholder="Search work requests…"
+                 class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
         </div>
+
+        <!-- Desktop table -->
         <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="table-fixed w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Issue</th>
-                <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left">Requestor</th>
-                <th class="px-4 py-3 text-left">Description</th>
-                <th class="px-4 py-3 text-left">Assigned Personnel</th>
-                <th class="px-4 py-3 text-left">Acted By</th>
-                <th class="px-4 py-3 text-left">Expected Completion</th>
-                <th class="px-4 py-3 text-left">Action Taken</th>
-                <th class="px-4 py-3 text-left">Date Completed</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                <th class="px-4 py-3 text-center">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Issue</th>
+                <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Assigned Personnel</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Acted By</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Expected Completion</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action Taken</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Completed</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="wr in filteredWorkRequests" :key="wr.id">
-                <td class="px-4 py-3">{{ wr.id }}</td>
-                <td class="px-4 py-3">{{ wr.issue ?? '—' }}</td>
-                <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3">{{ wr.requester?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ wr.description ?? '—' }}</td>
-                <td class="px-4 py-3">{{ wr.assigned_user?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ wr.actedBy?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</td>
-                <td class="px-4 py-3">{{ wr.action_taken ?? '—' }}</td>
-                <td class="px-4 py-3">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</td>
-                <td class="px-4 py-3">
-                  <span :class="statusClass(wr.status) + ' px-2 py-1 rounded-full text-xs font-medium'">
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="wr in filteredWorkRequests" :key="wr.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.issue ?? '—' }}</td>
+                <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ wr.requester?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.description ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.assigned_user?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.actedBy?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ wr.action_taken ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusClass(wr.status)]">
                     {{ wr.status ?? '—' }}
                   </span>
                 </td>
                 <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-2 justify-center">
+                  <div class="flex items-center gap-1.5 justify-center">
                     <button
                       v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))"
                       @click.prevent="openModal(wr)"
-                      class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
+                      class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 transition-colors"
                       title="Assign"
                     >
-                      <UserPlusIcon class="w-5 h-5" />
+                      <UserPlusIcon class="w-4 h-4" />
                     </button>
 
                     <button
                       v-if="hasRole('Administrator')"
                       @click.prevent="openModal(wr)"
-                      class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
                       title="Edit"
                     >
-                      <PencilSquareIcon class="w-5 h-5" />
+                      <PencilSquareIcon class="w-4 h-4" />
                     </button>
 
                     <button
                       v-if="hasRole('Administrator')"
                       @click.prevent="destroy(wr)"
-                      class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700"
+                      class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"
                       title="Delete"
                     >
-                      <TrashIcon class="w-5 h-5" />
+                      <TrashIcon class="w-4 h-4" />
                     </button>
-                    
+
                     <button
                       v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))"
                       @click.prevent="openCompleteModal(wr)"
-                      class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700"
+                      class="p-1.5 rounded-lg hover:bg-blue-50 text-slate-500 hover:text-blue-700 transition-colors"
                       title="Mark Completed"
                     >
-                      <CheckCircleIcon class="w-5 h-5" />
+                      <CheckCircleIcon class="w-4 h-4" />
                     </button>
                     <a
                       v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))"
                       :href="`/work-requests/${wr.id}/print`"
                       target="_blank"
-                      class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
                       title="Print"
                     >
-                      <PrinterIcon class="w-5 h-5" />
+                      <PrinterIcon class="w-4 h-4" />
                     </a>
-                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Approve"><CheckIcon class="w-5 h-5"/></button>
-                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Decline"><XMarkIcon class="w-5 h-5"/></button>
+                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve"><CheckIcon class="w-4 h-4"/></button>
+                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredWorkRequests.length === 0">
-                <td :colspan="(hasAnyRole('Administrator','GSU Head','DivisionChief') ? 11 : 10)" class="px-4 py-6 text-center text-gray-500">No work requests found.</td>
+                <td :colspan="(hasAnyRole('Administrator','GSU Head','DivisionChief') ? 11 : 10)" class="py-16 text-center text-slate-400 text-sm">No work requests found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <!-- Mobile list -->
-        <div v-else class="sm:hidden space-y-3">
-          <div v-for="wr in filteredWorkRequests" :key="wr.id" class="border rounded-lg p-3 bg-white shadow-sm">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="text-sm text-gray-500">Request #{{ wr.id }}</div>
-                <div class="font-semibold text-gray-800">{{ wr.issue ?? '—' }}</div>
-                <div v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="text-sm text-gray-600">Requestor: {{ wr.requester?.name ?? '—' }}</div>
-                <div class="text-sm text-gray-600">{{ wr.description ?? '—' }}</div>
+        <div v-else class="p-4 space-y-3">
+          <div v-for="wr in filteredWorkRequests" :key="wr.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-xs text-slate-500">Request #{{ wr.id }}</p>
+                <p class="text-sm font-semibold text-slate-800 mt-0.5 truncate">{{ wr.issue ?? '—' }}</p>
+                <p v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="text-xs text-slate-600 mt-1">Requestor: {{ wr.requester?.name ?? '—' }}</p>
+                <p class="text-xs text-slate-600">{{ wr.description ?? '—' }}</p>
               </div>
-              <div class="text-right text-sm">
-                <div class="text-gray-600">{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</div>
-                <div class="text-gray-500 text-xs">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</div>
+              <div class="shrink-0 text-right text-xs text-slate-600">
+                <div>{{ wr.expected_completion_date ? new Date(wr.expected_completion_date).toLocaleDateString() : '—' }}</div>
+                <div class="text-slate-400">{{ wr.date_completed ? new Date(wr.date_completed).toLocaleDateString() : '—' }}</div>
               </div>
             </div>
-
-            <div class="mt-2 text-sm text-gray-700">
-              <div><strong>Assigned:</strong> <span class="ml-1">{{ wr.assigned_user?.name ?? '—' }}</span></div>
-              <div class="mt-1"><strong>Status:</strong> <span class="ml-1"><span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold', statusClass(wr.status)]">{{ wr.status }}</span></span></div>
+            <div class="mt-2 space-y-1 text-xs text-slate-700">
+              <div><span class="font-medium text-slate-500">Assigned:</span> {{ wr.assigned_user?.name ?? '—' }}</div>
+              <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
+                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusClass(wr.status)]">{{ wr.status }}</span>
+              </div>
             </div>
-
-            <div class="mt-3 flex items-center gap-2">
-                <button v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md">Assign</button>
-              <button v-if="hasRole('Administrator')" @click.prevent="openModal(wr)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md">Edit</button>
-              <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Delete</button>
-              <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-md">Mark Completed</button>
-              <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md">Print</a>
-                <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md">Approve</button>
-                <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md">Decline</button>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <button v-if="((wr.status === 'Division Approved' && hasRole('Administrator')) || (wr.status === 'Pending' && hasRole('GSU Head')))" @click.prevent="openModal(wr)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Assign</button>
+              <button v-if="hasRole('Administrator')" @click.prevent="openModal(wr)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Edit</button>
+              <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Delete</button>
+              <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Mark Completed</button>
+              <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Print</a>
+              <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Approve</button>
+              <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Decline</button>
             </div>
           </div>
-
-          <div v-if="filteredWorkRequests.length === 0" class="text-center text-gray-500 py-6">No work requests found.</div>
+          <div v-if="filteredWorkRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No work requests found.</div>
         </div>
+
         <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click="currentPage--" :disabled="currentPage === 1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <div class="flex items-center gap-2">
+            <button @click="currentPage--" :disabled="currentPage === 1" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
+            <button @click="currentPage++" :disabled="currentPage === totalPages" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
+          </div>
         </div>
       </div>
 
-      <!-- Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 relative">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
-          <h2 class="text-xl font-semibold mb-4">{{ editingId ? 'Edit Work Request' : 'New Work Request' }}</h2>
-          <form @submit.prevent="submitForm" class="space-y-3">
+      <!-- Create / Edit Modal -->
+      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl relative">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Work Request' : 'New Work Request' }}</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
+              <XMarkIcon class="w-4 h-4" />
+            </button>
+          </div>
+          <form @submit.prevent="submitForm" class="px-6 py-5 space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Issue <span class="text-red-500">*</span></label>
-              <input v-model="form.issue" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
+              <label class="block text-xs font-medium text-slate-600 mb-1">Issue <span class="text-red-500">*</span></label>
+              <input v-model="form.issue" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" required />
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700">Description</label>
-              <textarea v-model="form.description" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" rows="4"></textarea>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+              <textarea v-model="form.description" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="4"></textarea>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Building</label>
-                <select v-model="form.location_division_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
+                <select v-model="form.location_division_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="">Select building</option>
                   <option v-for="d in props.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
                 </select>
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700">Room</label>
-                <select v-model="form.location_office_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Room</label>
+                <select v-model="form.location_office_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="">Select room</option>
                   <option v-for="o in filteredOffices" :key="o.id" :value="o.id">{{ o.name }}</option>
                 </select>
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700">Priority</label>
-                <select v-model="form.priority" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Priority</label>
+                <select v-model="form.priority" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option>Low</option>
                   <option>Normal</option>
                   <option>High</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700">Expected Completion</label>
-                <input v-model="form.expected_completion_date" type="date" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
+                <label class="block text-xs font-medium text-slate-600 mb-1">Expected Completion</label>
+                <input v-model="form.expected_completion_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <div v-if="editingId && (hasRole('GSU Head') || hasRole('Administrator'))" class="mt-3">
-              <label class="block text-sm font-medium text-gray-700">Assign Personnel</label>
-              <select v-model="form.assigned_user_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Assign Personnel</label>
+              <select v-model="form.assigned_user_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="">Select staff</option>
                 <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
               </select>
             </div>
-
-            <div class="flex justify-end space-x-3 pt-4">
-              <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 inline-flex items-center justify-center">
-                <span v-if="form.processing" class="inline-flex items-center">
-                  <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                  Saving...
-                </span>
-                <span v-else>Save</span>
-              </button>
-            </div>
           </form>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button type="submit" @click="submitForm" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+              <span v-if="form.processing">Saving…</span>
+              <span v-else>Save</span>
+            </button>
+          </div>
         </div>
       </div>
+
       <!-- Completion Modal -->
-      <div v-show="showCompleteModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeCompleteModal">✕</button>
-          <h2 class="text-xl font-semibold mb-4">Mark Work Request Completed</h2>
-          <form @submit.prevent="submitCompletion" class="space-y-3">
+      <div v-show="showCompleteModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md relative">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Mark Work Request Completed</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeCompleteModal">
+              <XMarkIcon class="w-4 h-4" />
+            </button>
+          </div>
+          <form @submit.prevent="submitCompletion" class="px-6 py-5 space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Acted By</label>
-              <select v-model="completeForm.acted_by_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Acted By</label>
+              <select v-model="completeForm.acted_by_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="">Select staff</option>
                 <option v-for="u in (props.skilledUsers || [])" :key="u.id" :value="u.id">{{ u.name }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Action Taken</label>
-              <textarea v-model="completeForm.action_taken" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" rows="4" required></textarea>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Action Taken</label>
+              <textarea v-model="completeForm.action_taken" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="4" required></textarea>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Date Completed</label>
-              <input v-model="completeForm.date_completed" type="date" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
-            </div>
-
-            <div class="flex justify-end space-x-3 pt-4">
-              <button type="button" @click="closeCompleteModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" :disabled="completeForm.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 inline-flex items-center justify-center">
-                <span v-if="completeForm.processing" class="inline-flex items-center">
-                  <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                  Saving...
-                </span>
-                <span v-else>Save</span>
-              </button>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date Completed</label>
+              <input v-model="completeForm.date_completed" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" required />
             </div>
           </form>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" @click="closeCompleteModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button type="submit" @click="submitCompletion" :disabled="completeForm.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+              <span v-if="completeForm.processing">Saving…</span>
+              <span v-else>Save</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -449,12 +453,12 @@ const declineRequest = (wr) => {
 
 // Return CSS classes for status badges
 const statusClass = (s) => {
-  if (!s) return 'bg-gray-100 text-gray-700'
+  if (!s) return 'bg-slate-100 text-slate-600'
   const st = String(s).toLowerCase()
-  if (st.includes('approve')) return 'bg-green-600 text-white'
-  if (st.includes('declin')) return 'bg-red-600 text-white'
-  if (st.includes('completed')) return 'bg-blue-600 text-white'
-  return 'bg-gray-100 text-gray-700'
+  if (st.includes('approve')) return 'bg-emerald-50 text-emerald-700'
+  if (st.includes('declin')) return 'bg-red-50 text-red-600'
+  if (st.includes('completed')) return 'bg-blue-50 text-blue-700'
+  if (st.includes('pending')) return 'bg-amber-50 text-amber-700'
+  return 'bg-slate-100 text-slate-600'
 }
-  </script>
-
+</script>

@@ -2,8 +2,9 @@
 import { ref, computed, watch } from "vue"
 import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { CheckCircleIcon, XCircleIcon, EyeIcon } from "@heroicons/vue/24/outline"
+import { CheckCircleIcon, XCircleIcon, EyeIcon, XMarkIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({ requests: Object, filters: Object })
 
@@ -81,93 +82,111 @@ const rejectRequest = async (id) => {
   <Head title="OCD Approval - Vehicle Requests" />
   <AdminLayout title="OCD Approval - Vehicle Requests">
     <div>
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">OCD Approval — Vehicle Requests</h1>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">OCD Approval — Vehicle Requests</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Review and act on vehicle requests pending OCD approval</p>
+        </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-          <div class="relative flex-1 sm:w-64 sm:flex-none">
-            <input v-model="search" type="text" placeholder="Search requests…"
-                   @keydown.enter.prevent="applyFilters(true)"
-                   class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-            <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">⏳</span>
-          </div>
-          <button @click="applyFilters(true)" :disabled="isLoading"
-                  class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-            Search
-          </button>
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <div class="relative flex-1 sm:w-64 sm:flex-none">
+          <input v-model="search" type="text" placeholder="Search requests…"
+                 @keydown.enter.prevent="applyFilters(true)"
+                 class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Loading…</span>
         </div>
+        <button @click="applyFilters(true)" :disabled="isLoading"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Search
+        </button>
+      </div>
 
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div class="overflow-x-auto">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Requestor</th>
-                <th class="px-4 py-3 text-left">Purpose</th>
-                <th class="px-4 py-3 text-left">Destination</th>
-                <th class="px-4 py-3 text-left">Date Needed</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                <th class="px-4 py-3 text-center">Actions</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Purpose</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Destination</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Needed</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ req.id }}</td>
-                <td class="px-4 py-3">{{ req.requester?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ req.purpose ?? '—' }}</td>
-                <td class="px-4 py-3">{{ req.destination ?? '—' }}</td>
-                <td class="px-4 py-3">{{ req.date_needed ?? '—' }}</td>
-                <td class="px-4 py-3">
-                  <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700">{{ req.status }}</span>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.requester?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.purpose ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.destination ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ req.date_needed ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-2 justify-center">
+                  <div class="flex items-center gap-1.5 justify-center">
                     <button v-if="req.status === 'Approved'" @click="approveRequest(req.id)" :disabled="isSubmitting"
-                            class="flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 text-green-700 font-medium disabled:opacity-50">
-                      <CheckCircleIcon class="w-4 h-4" /> Approve
+                            class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
+                      <CheckCircleIcon class="w-3.5 h-3.5" /> Approve
                     </button>
                     <button v-if="req.status === 'Approved'" @click="rejectRequest(req.id)" :disabled="isSubmitting"
-                            class="flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 hover:bg-red-200 text-red-700 font-medium disabled:opacity-50">
-                      <XCircleIcon class="w-4 h-4" /> Decline
+                            class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50">
+                      <XCircleIcon class="w-3.5 h-3.5" /> Decline
                     </button>
                     <button @click="openModal(req)"
-                            class="flex items-center gap-1 px-3 py-1 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium">
-                      <EyeIcon class="w-4 h-4" /> View
+                            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View details">
+                      <EyeIcon class="w-4 h-4" />
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredRequests.length === 0">
-                <td colspan="7" class="px-4 py-6 text-center text-gray-500">No pending vehicle requests for OCD approval.</td>
+                <td colspan="7" class="py-16 text-center text-slate-400 text-sm">No pending vehicle requests for OCD approval.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 mt-4">
-          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading"
-                  class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading"
-                  class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <div class="flex items-center gap-2">
+            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading"
+                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
+            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading"
+                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
+          </div>
         </div>
       </div>
 
       <!-- Detail Modal -->
-      <div v-if="showModal && selectedRequest" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-xl w-full max-w-lg shadow-lg p-6 relative">
-          <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700">✖</button>
-          <h2 class="text-lg font-bold mb-4">Vehicle Request #{{ selectedRequest.id }}</h2>
-          <div class="space-y-2 text-sm">
-            <p><strong>Requestor:</strong> {{ selectedRequest.requester?.name ?? '—' }}</p>
-            <p><strong>Purpose:</strong> {{ selectedRequest.purpose ?? '—' }}</p>
-            <p><strong>Destination:</strong> {{ selectedRequest.destination ?? '—' }}</p>
-            <p><strong>Date Needed:</strong> {{ selectedRequest.date_needed ?? '—' }}</p>
-            <p><strong>Vehicle Type:</strong> {{ selectedRequest.vehicle_type ?? '—' }}</p>
-            <p><strong>Passengers:</strong> {{ selectedRequest.passengers ?? '—' }}</p>
-            <p><strong>Status:</strong> {{ selectedRequest.status }}</p>
+      <div v-if="showModal && selectedRequest" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Vehicle Request #{{ selectedRequest.id }}</h2>
+            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <XMarkIcon class="w-4 h-4" />
+            </button>
+          </div>
+          <div class="px-6 py-5 space-y-3 text-sm text-slate-700">
+            <div class="grid grid-cols-2 gap-3">
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Requestor</span><p class="mt-0.5">{{ selectedRequest.requester?.name ?? '—' }}</p></div>
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Status</span><p class="mt-0.5"><span :class="[badgeBase, statusBadgeClass(selectedRequest.status)]">{{ selectedRequest.status }}</span></p></div>
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Purpose</span><p class="mt-0.5">{{ selectedRequest.purpose ?? '—' }}</p></div>
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Destination</span><p class="mt-0.5">{{ selectedRequest.destination ?? '—' }}</p></div>
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Date Needed</span><p class="mt-0.5">{{ selectedRequest.date_needed ?? '—' }}</p></div>
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Vehicle Type</span><p class="mt-0.5">{{ selectedRequest.vehicle_type ?? '—' }}</p></div>
+              <div><span class="text-xs font-medium text-slate-500 uppercase tracking-wide">Passengers</span><p class="mt-0.5">{{ selectedRequest.passengers ?? '—' }}</p></div>
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
           </div>
         </div>
       </div>

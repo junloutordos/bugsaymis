@@ -157,28 +157,29 @@ const printIPCR = () => window.print()
     <div>
       <!-- Back -->
       <button @click="router.visit(route('hr-ipcr.index'))"
-        class="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800">
-        <ArrowLeftIcon class="w-5 h-5" /> Back to HR IPCR List
+        class="mb-4 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors">
+        <ArrowLeftIcon class="w-4 h-4" /> Back to HR IPCR List
       </button>
 
       <!-- Header card -->
-      <div class="bg-white p-4 rounded-lg shadow mb-4">
-        <h2 class="text-2xl font-semibold">{{ ipcr.title }}</h2>
-        <p class="text-gray-600">Rating Period: {{ ipcr.rating_period }}</p>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-gray-600">Status:</span>
-          <span :class="statusBadgeClass(ipcr.status)" class="px-2 py-1 text-xs font-semibold rounded-full">
-            {{ ipcr.status }}
-          </span>
-        </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="printIPCR"
-            class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
-            </svg>
-            Print IPCR
-          </button>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4 no-print">
+        <div class="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h2 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h2>
+            <p class="text-slate-500 text-sm mt-0.5">Rating Period: {{ ipcr.rating_period }}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span :class="statusBadgeClass(ipcr.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
+              {{ ipcr.status }}
+            </span>
+            <button @click="printIPCR"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
+              </svg>
+              Print IPCR
+            </button>
+          </div>
         </div>
       </div>
 
@@ -435,30 +436,31 @@ const printIPCR = () => window.print()
     </div>
 
     <!-- Accomplishments Viewer Modal -->
+    <Teleport to="body">
     <div v-if="accViewerPlan"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
       @click.self="closeAccViewer">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div class="flex items-start justify-between px-6 py-4 border-b">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="flex items-start justify-between px-6 py-4 border-b border-slate-100">
           <div>
-            <h2 class="text-base font-semibold text-gray-800">Accomplishments</h2>
-            <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+            <h2 class="text-base font-semibold text-slate-800">Accomplishments</h2>
+            <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
           </div>
-          <button @click="closeAccViewer" class="text-gray-400 hover:text-gray-700 text-xl leading-none ml-4">✕</button>
+          <button @click="closeAccViewer" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors ml-4">✕</button>
         </div>
         <div class="overflow-y-auto flex-1 px-6 py-4">
-          <div v-if="!accViewerPlan.accomplishments?.length" class="text-center text-gray-400 text-sm py-8">
+          <div v-if="!accViewerPlan.accomplishments?.length" class="py-16 text-center text-slate-400 text-sm">
             No daily accomplishments recorded.
           </div>
           <div v-else class="space-y-4">
-            <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id" class="border rounded-lg p-3 text-sm">
+            <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id" class="border border-slate-100 rounded-lg p-3 text-sm">
               <div class="flex items-center justify-between mb-1">
-                <span class="font-medium text-gray-700">{{ formatAccDate(acc.accomplishment_date) }}</span>
+                <span class="font-medium text-slate-700">{{ formatAccDate(acc.accomplishment_date) }}</span>
               </div>
-              <p class="text-gray-600">{{ acc.description || "—" }}</p>
+              <p class="text-slate-600">{{ acc.description || "—" }}</p>
               <div v-if="acc.photos?.length" class="mt-2 flex flex-wrap gap-2">
                 <a v-for="photo in acc.photos" :key="photo.id" :href="photo.url" target="_blank">
-                  <img :src="photo.url" class="h-16 w-16 object-cover rounded border" />
+                  <img :src="photo.url" class="h-16 w-16 object-cover rounded-lg border border-slate-200" />
                 </a>
               </div>
             </div>
@@ -466,6 +468,7 @@ const printIPCR = () => window.print()
         </div>
       </div>
     </div>
+    </Teleport>
 
   </AdminLayout>
 </template>

@@ -89,8 +89,8 @@ class HandleInertiaRequests extends Middleware
                 if ($user->hasRole('OCD')) {
                     return ITJobRequest::where('status', 'Pending OCD Approval')->count();
                 }
-                // MIS/Administrator: active requests (In Progress or acted on but not yet completed)
-                return ITJobRequest::whereIn('status', ['In Progress', 'Acted by MIS'])->count();
+                // MIS/Administrator: active requests (In Progress)
+                return ITJobRequest::whereIn('status', ['In Progress'])->count();
             },
             // Number of vehicle requests with status = 'Pending'
             'vehicleRequestsNotificationCount' => function () use ($request) {

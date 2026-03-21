@@ -247,18 +247,18 @@ const hasFilters = computed(() =>
     <div class="p-6 space-y-5">
 
       <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 class="text-xl font-bold text-gray-800">Individual Development Plans (IDP)</h1>
-          <p class="text-sm text-gray-500">Track employee development activities and competency growth</p>
+          <h1 class="text-xl font-semibold text-slate-800">Individual Development Plans (IDP)</h1>
+          <p class="text-sm text-slate-500">Track employee development activities and competency growth</p>
         </div>
         <div class="flex gap-2">
           <a :href="route('lnd.team-idp')"
-            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             My Team's IDP
           </a>
           <button @click="openCreate"
-            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             New IDP
           </button>
@@ -266,27 +266,32 @@ const hasFilters = computed(() =>
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
-        <select v-model="employeeId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none min-w-[160px]">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <select v-model="employeeId"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 min-w-[160px]">
           <option value="">All Employees</option>
           <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
         </select>
-        <select v-model="supervisorId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none min-w-[160px]">
+        <select v-model="supervisorId"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 min-w-[160px]">
           <option value="">All Supervisors</option>
           <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
         </select>
-        <select v-model="year" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="year"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Years</option>
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
         </select>
-        <select v-model="approvalSt" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="approvalSt"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Approval</option>
           <option value="draft">Draft</option>
           <option value="submitted">Pending</option>
           <option value="approved">Approved</option>
           <option value="returned">Returned</option>
         </select>
-        <select v-model="statusF" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="statusF"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Progress</option>
           <option value="planned">Planned</option>
           <option value="ongoing">Ongoing</option>
@@ -294,7 +299,8 @@ const hasFilters = computed(() =>
           <option value="deferred">Deferred</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select v-model="intervention" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="intervention"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Interventions</option>
           <option value="training">Training</option>
           <option value="coaching">Coaching</option>
@@ -305,106 +311,109 @@ const hasFilters = computed(() =>
         </select>
         <button v-if="hasFilters"
           @click="employeeId=''; supervisorId=''; year=''; approvalSt=''; statusF=''; intervention=''"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">Clear</button>
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Clear</button>
       </div>
 
       <!-- Table -->
-      <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div v-if="isLoading" class="flex items-center justify-center py-12 text-gray-400 text-sm">Loading…</div>
-        <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            <tr>
-              <th class="px-4 py-3 text-left">Employee</th>
-              <th class="px-4 py-3 text-left">Competency</th>
-              <th class="px-4 py-3 text-center">Gap</th>
-              <th class="px-4 py-3 text-left">Intervention</th>
-              <th class="px-4 py-3 text-left">Program</th>
-              <th class="px-4 py-3 text-center">Timeline</th>
-              <th class="px-4 py-3 text-center">Year</th>
-              <th class="px-4 py-3 text-center">Approval</th>
-              <th class="px-4 py-3 text-center">Progress</th>
-              <th class="px-4 py-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-if="idps.data.length === 0">
-              <td colspan="10" class="py-10 text-center text-gray-400">No IDPs found.</td>
-            </tr>
-            <tr v-for="idp in idps.data" :key="idp.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3">
-                <div class="font-medium text-gray-800">{{ idp.employee?.name ?? '—' }}</div>
-                <div class="text-xs text-gray-500">Supervisor: {{ idp.supervisor?.name ?? '—' }}</div>
-              </td>
-              <td class="px-4 py-3">
-                <div class="font-medium text-gray-800 max-w-[160px] truncate">{{ idp.competency }}</div>
-                <div v-if="idp.training_need" class="text-xs text-gray-400">TNA: {{ idp.training_need.competency_area }}</div>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-1 text-xs">
-                  <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[idp.current_level]]">{{ idp.current_level }}</span>
-                  <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                  <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[idp.target_level]]">{{ idp.target_level }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <span class="text-xs text-gray-700">{{ interventionLabel[idp.intervention_type] ?? idp.intervention_type }}</span>
-              </td>
-              <td class="px-4 py-3 text-gray-600 text-xs max-w-[120px] truncate">
-                {{ idp.learning_program?.title ?? '—' }}
-              </td>
-              <td class="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">
-                <template v-if="idp.timeline_start">
-                  {{ fmt(idp.timeline_start) }}<br>
-                  <span class="text-gray-400">to</span><br>
-                  {{ fmt(idp.timeline_end) }}
-                </template>
-                <span v-else class="text-gray-400">—</span>
-              </td>
-              <td class="px-4 py-3 text-center text-gray-600">{{ idp.year }}</td>
-              <td class="px-4 py-3 text-center">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', approvalColors[idp.approval_status] ?? 'bg-gray-100 text-gray-600']">
-                  {{ approvalLabel[idp.approval_status] ?? idp.approval_status }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize', statusColors[idp.status] ?? 'bg-gray-100 text-gray-600']">
-                  {{ idp.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-1 flex-wrap">
-                  <a :href="route('lnd.idp.show', idp.id)"
-                    class="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">View</a>
-                  <button v-if="idp.approval_status !== 'approved'"
-                    @click="openEdit(idp)"
-                    class="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Edit</button>
-                  <button v-if="idp.approval_status === 'draft' || idp.approval_status === 'returned'"
-                    @click="submitForApproval(idp)"
-                    class="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50">Submit</button>
-                  <button v-if="idp.approval_status === 'submitted'"
-                    @click="openApprove(idp)"
-                    class="rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50">Approve</button>
-                  <button v-if="idp.approval_status === 'approved'"
-                    @click="openStatus(idp)"
-                    class="rounded px-2 py-1 text-xs font-medium text-yellow-600 hover:bg-yellow-50">Progress</button>
-                  <button v-if="idp.approval_status !== 'approved'"
-                    @click="deleteIdp(idp)"
-                    class="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <div v-if="isLoading" class="flex items-center justify-center py-12 text-slate-400 text-sm">Loading…</div>
+          <table v-else class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Competency</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Gap</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Intervention</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Program</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Timeline</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Year</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Approval</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Progress</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="idps.data.length === 0">
+                <td colspan="10" class="py-16 text-center text-slate-400 text-sm">No IDPs found.</td>
+              </tr>
+              <tr v-for="idp in idps.data" :key="idp.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3">
+                  <div class="font-medium text-sm text-slate-800">{{ idp.employee?.name ?? '—' }}</div>
+                  <div class="text-xs text-slate-500">Supervisor: {{ idp.supervisor?.name ?? '—' }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-sm text-slate-800 max-w-[160px] truncate">{{ idp.competency }}</div>
+                  <div v-if="idp.training_need" class="text-xs text-slate-400">TNA: {{ idp.training_need.competency_area }}</div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1 text-xs">
+                    <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[idp.current_level]]">{{ idp.current_level }}</span>
+                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[idp.target_level]]">{{ idp.target_level }}</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="text-xs text-slate-700">{{ interventionLabel[idp.intervention_type] ?? idp.intervention_type }}</span>
+                </td>
+                <td class="px-4 py-3 text-slate-600 text-xs max-w-[120px] truncate">
+                  {{ idp.learning_program?.title ?? '—' }}
+                </td>
+                <td class="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap">
+                  <template v-if="idp.timeline_start">
+                    {{ fmt(idp.timeline_start) }}<br>
+                    <span class="text-slate-400">to</span><br>
+                    {{ fmt(idp.timeline_end) }}
+                  </template>
+                  <span v-else class="text-slate-400">—</span>
+                </td>
+                <td class="px-4 py-3 text-center text-sm text-slate-600">{{ idp.year }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', approvalColors[idp.approval_status] ?? 'bg-slate-100 text-slate-600']">
+                    {{ approvalLabel[idp.approval_status] ?? idp.approval_status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize', statusColors[idp.status] ?? 'bg-slate-100 text-slate-600']">
+                    {{ idp.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1 flex-wrap">
+                    <a :href="route('lnd.idp.show', idp.id)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors text-xs font-medium">View</a>
+                    <button v-if="idp.approval_status !== 'approved'"
+                      @click="openEdit(idp)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors text-xs font-medium">Edit</button>
+                    <button v-if="idp.approval_status === 'draft' || idp.approval_status === 'returned'"
+                      @click="submitForApproval(idp)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-indigo-600 hover:text-indigo-700 transition-colors text-xs font-medium">Submit</button>
+                    <button v-if="idp.approval_status === 'submitted'"
+                      @click="openApprove(idp)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-emerald-600 hover:text-emerald-700 transition-colors text-xs font-medium">Approve</button>
+                    <button v-if="idp.approval_status === 'approved'"
+                      @click="openStatus(idp)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-amber-600 hover:text-amber-700 transition-colors text-xs font-medium">Progress</button>
+                    <button v-if="idp.approval_status !== 'approved'"
+                      @click="deleteIdp(idp)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-red-500 hover:text-red-600 transition-colors text-xs font-medium">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Pagination -->
-      <div v-if="idps.last_page > 1" class="flex items-center justify-between text-sm text-gray-600">
+      <div v-if="idps.last_page > 1"
+        class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
         <span>Showing {{ idps.from }}–{{ idps.to }} of {{ idps.total }}</span>
         <div class="flex gap-1">
           <button v-for="p in idps.links" :key="p.label"
             @click="p.url && goToPage(new URL(p.url).searchParams.get('page'))"
             :disabled="!p.url"
-            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50 disabled:opacity-40']"
+            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-slate-600']"
             v-html="p.label" />
         </div>
       </div>
@@ -412,30 +421,30 @@ const hasFilters = computed(() =>
 
     <!-- Create / Edit Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">{{ editingItem ? 'Edit IDP' : 'New IDP' }}</h2>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ editingItem ? 'Edit IDP' : 'New IDP' }}</h2>
+            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
-          <form @submit.prevent="submit" class="p-6 space-y-4">
+          <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
 
             <!-- Employee + Supervisor -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Employee <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Employee <span class="text-red-500">*</span></label>
                 <select v-model="form.employee_id" required :disabled="!!editingItem"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-50">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50">
                   <option value="">— Select —</option>
                   <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Supervisor <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Supervisor <span class="text-red-500">*</span></label>
                 <select v-model="form.supervisor_id" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="">— Select —</option>
                   <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
                 </select>
@@ -445,14 +454,14 @@ const hasFilters = computed(() =>
             <!-- Year + Learning Program -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Year <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Year <span class="text-red-500">*</span></label>
                 <input v-model="form.year" type="number" min="2000" max="2099" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Learning Program</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Learning Program</label>
                 <select v-model="form.learning_program_id"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="">— None —</option>
                   <option v-for="p in programs" :key="p.id" :value="p.id">{{ p.title }}</option>
                 </select>
@@ -461,17 +470,17 @@ const hasFilters = computed(() =>
 
             <!-- Competency -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Competency <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Competency <span class="text-red-500">*</span></label>
               <input v-model="form.competency" type="text" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
 
             <!-- Current / Target Level -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Current Level <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Current Level <span class="text-red-500">*</span></label>
                 <select v-model="form.current_level" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="none">None</option>
                   <option value="basic">Basic</option>
                   <option value="intermediate">Intermediate</option>
@@ -479,9 +488,9 @@ const hasFilters = computed(() =>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Target Level <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Target Level <span class="text-red-500">*</span></label>
                 <select v-model="form.target_level" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="none">None</option>
                   <option value="basic">Basic</option>
                   <option value="intermediate">Intermediate</option>
@@ -492,17 +501,17 @@ const hasFilters = computed(() =>
 
             <!-- Development Activity -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Development Activity <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Development Activity <span class="text-red-500">*</span></label>
               <textarea v-model="form.development_activity" rows="2" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
 
             <!-- Intervention + Status -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Intervention Type <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Intervention Type <span class="text-red-500">*</span></label>
                 <select v-model="form.intervention_type" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="training">Training</option>
                   <option value="coaching">Coaching</option>
                   <option value="assignment">Assignment</option>
@@ -512,9 +521,9 @@ const hasFilters = computed(() =>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Progress Status <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Progress Status <span class="text-red-500">*</span></label>
                 <select v-model="form.status" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="planned">Planned</option>
                   <option value="ongoing">Ongoing</option>
                   <option value="completed">Completed</option>
@@ -527,29 +536,29 @@ const hasFilters = computed(() =>
             <!-- Timeline -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
                 <input v-model="form.timeline_start" type="date"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
                 <input v-model="form.timeline_end" type="date" :min="form.timeline_start"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Employee Remarks -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Employee Remarks</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Employee Remarks</label>
               <textarea v-model="form.employee_remarks" rows="2"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
 
-            <div class="flex justify-end gap-3 pt-2">
+            <div class="flex justify-end gap-2 pt-2">
               <button type="button" @click="closeModal"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
               <button type="submit" :disabled="isSubmitting"
-                class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
                 {{ isSubmitting ? 'Saving…' : (editingItem ? 'Update' : 'Create') }}
               </button>
             </div>
@@ -560,44 +569,44 @@ const hasFilters = computed(() =>
 
     <!-- Approve / Return Modal -->
     <Teleport to="body">
-      <div v-if="showApproveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">Review IDP</h2>
-            <button @click="showApproveModal = false" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <div v-if="showApproveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Review IDP</h2>
+            <button @click="showApproveModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
-          <div class="p-6 space-y-4">
-            <div v-if="approveItem" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+          <div class="px-6 py-5 space-y-4">
+            <div v-if="approveItem" class="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
               <span class="font-medium">{{ approveItem.employee?.name }}</span> — {{ approveItem.competency }}
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Decision <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Decision <span class="text-red-500">*</span></label>
               <div class="flex gap-4">
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="approveForm.action" value="approved" class="text-green-600" />
-                  <span class="text-sm text-gray-700">Approve</span>
+                  <input type="radio" v-model="approveForm.action" value="approved" />
+                  <span class="text-sm text-slate-700">Approve</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="approveForm.action" value="returned" class="text-red-500" />
-                  <span class="text-sm text-gray-700">Return for Revision</span>
+                  <input type="radio" v-model="approveForm.action" value="returned" />
+                  <span class="text-sm text-slate-700">Return for Revision</span>
                 </label>
               </div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Supervisor Remarks</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Supervisor Remarks</label>
               <textarea v-model="approveForm.supervisor_remarks" rows="3" placeholder="Optional remarks…"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
-            <div class="flex justify-end gap-3 pt-2">
-              <button @click="showApproveModal = false"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button @click="submitApprove" :disabled="isSubmitting"
-                :class="['rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-50', approveForm.action === 'approved' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-500 hover:bg-red-600']">
-                {{ isSubmitting ? 'Saving…' : (approveForm.action === 'approved' ? 'Approve' : 'Return') }}
-              </button>
-            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="showApproveModal = false"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click="submitApprove" :disabled="isSubmitting"
+              :class="['inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors shadow-sm disabled:opacity-50', approveForm.action === 'approved' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-red-600 hover:bg-red-700']">
+              {{ isSubmitting ? 'Saving…' : (approveForm.action === 'approved' ? 'Approve' : 'Return') }}
+            </button>
           </div>
         </div>
       </div>
@@ -605,22 +614,22 @@ const hasFilters = computed(() =>
 
     <!-- Update Progress Modal -->
     <Teleport to="body">
-      <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">Update Progress</h2>
-            <button @click="showStatusModal = false" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <div v-if="showStatusModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Update Progress</h2>
+            <button @click="showStatusModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
-          <div class="p-6 space-y-4">
-            <div v-if="statusItem" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+          <div class="px-6 py-5 space-y-4">
+            <div v-if="statusItem" class="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
               <span class="font-medium">{{ statusItem.employee?.name }}</span> — {{ statusItem.competency }}
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Progress Status <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Progress Status <span class="text-red-500">*</span></label>
               <select v-model="statusForm.status" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="planned">Planned</option>
                 <option value="ongoing">Ongoing</option>
                 <option value="completed">Completed</option>
@@ -629,18 +638,18 @@ const hasFilters = computed(() =>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Employee Remarks</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Employee Remarks</label>
               <textarea v-model="statusForm.employee_remarks" rows="3"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
-            <div class="flex justify-end gap-3 pt-2">
-              <button @click="showStatusModal = false"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button @click="submitStatus" :disabled="isSubmitting"
-                class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                {{ isSubmitting ? 'Saving…' : 'Update' }}
-              </button>
-            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="showStatusModal = false"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click="submitStatus" :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+              {{ isSubmitting ? 'Saving…' : 'Update' }}
+            </button>
           </div>
         </div>
       </div>

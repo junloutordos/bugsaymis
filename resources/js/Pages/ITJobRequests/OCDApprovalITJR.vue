@@ -5,6 +5,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { CheckCircleIcon, XCircleIcon, EyeIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 // Props
 const props = defineProps({
@@ -177,16 +178,7 @@ const rejectRequest = async (id) => {
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.title }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.user?.name ?? "—" }}</td>
                 <td class="px-4 py-3">
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    :class="{
-                      'bg-amber-50 text-amber-700': req.status.includes('Pending'),
-                      'bg-emerald-50 text-emerald-700': req.status.includes('Approved'),
-                      'bg-red-50 text-red-600': req.status.includes('Rejected')
-                    }"
-                  >
-                    {{ req.status }}
-                  </span>
+                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex items-center gap-2 justify-center">

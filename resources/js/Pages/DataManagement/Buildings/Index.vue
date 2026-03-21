@@ -2,200 +2,245 @@
   <Head title="Buildings" />
   <AdminLayout title="Buildings">
     <div>
+      <!-- Flash -->
       <div v-if="page.props.flash?.success" class="mb-4">
-        <div class="px-4 py-3 rounded bg-green-50 border border-green-100 text-green-700">{{ page.props.flash.success }}</div>
+        <div class="px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">{{ page.props.flash.success }}</div>
       </div>
 
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Buildings</h1>
-        <button @click.prevent="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">+ New Building</button>
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Buildings</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Manage campus buildings</p>
+        </div>
+        <button @click.prevent="openModal()"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          + New Building
+        </button>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
-            <!-- Search -->
-            <div class="mb-4">
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="Search buildings..."
-                class="w-full sm:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div class="overflow-x-auto" v-if="!isMobile">
-              <table class="table-fixed w-full border border-gray-200 min-w-[640px]">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <!-- Search -->
+        <div class="px-5 py-4 border-b border-slate-100">
+          <input v-model="searchQuery" type="text" placeholder="Search buildings..."
+            class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+        </div>
+
+        <div class="overflow-x-auto" v-if="!isMobile">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Name</th>
-                <th class="px-4 py-3 text-left">Code</th>
-                <th class="px-4 py-3 text-left">No of Rooms</th>
-                <th class="px-4 py-3 text-left">No of Floors</th>
-                <th class="px-4 py-3 text-left">Occupants</th>
-                <th class="px-4 py-3 text-center">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Code</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No of Rooms</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">No of Floors</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Occupants</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="b in filteredBuildings" :key="b.id">
-                <td class="px-4 py-3">{{ b.id }}</td>
-                <td class="px-4 py-3">{{ b.name }}</td>
-                <td class="px-4 py-3">{{ b.code ?? '—' }}</td>
-                <td class="px-4 py-3">{{ b.no_of_rooms ?? '—' }}</td>
-                <td class="px-4 py-3">{{ b.number_of_floors ?? '—' }}</td>
-                <td class="px-4 py-3">{{ b.occupants_count ?? 0 }}</td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-2 justify-center">
-                    <button @click.prevent="viewRemarks(b)" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="View Remarks">
-                      <EyeIcon class="h-5 w-5" />
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="b in filteredBuildings" :key="b.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ b.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 font-medium">{{ b.name }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ b.code ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ b.no_of_rooms ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ b.number_of_floors ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ b.occupants_count ?? 0 }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-1">
+                    <button @click.prevent="viewRemarks(b)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Remarks">
+                      <EyeIcon class="h-4 w-4" />
                     </button>
-                    <button @click.prevent="openRooms(b)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" title="Rooms">
-                      <Squares2X2Icon class="h-5 w-5" />
+                    <button @click.prevent="openRooms(b)"
+                      class="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors" title="Rooms">
+                      <Squares2X2Icon class="h-4 w-4" />
                     </button>
-                    <button @click.prevent="openModal(b)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
-                      <PencilSquareIcon class="h-5 w-5" />
+                    <button @click.prevent="openModal(b)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      <PencilSquareIcon class="h-4 w-4" />
                     </button>
-                    <button @click.prevent="destroy(b)" :disabled="isDeleting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
-                      <TrashIcon class="h-5 w-5" />
+                    <button @click.prevent="destroy(b)" :disabled="isDeleting"
+                      class="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
+                      <TrashIcon class="h-4 w-4" />
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredBuildings.length === 0">
-                <td colspan="7" class="px-4 py-6 text-center text-gray-500">No buildings found.</td>
+                <td colspan="7" class="py-16 text-center text-slate-400 text-sm">No buildings found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Mobile / small screens: card list -->
-        <div v-else class="space-y-3">
-          <div v-for="b in filteredBuildings" :key="b.id" class="bg-white border rounded-lg p-4 shadow-sm">
+        <!-- Mobile card list -->
+        <div v-else class="p-4 space-y-3">
+          <div v-for="b in filteredBuildings" :key="b.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
             <div class="flex justify-between items-start">
               <div>
-                <div class="text-sm text-gray-500">ID: {{ b.id }}</div>
-                <div class="text-lg font-semibold">{{ b.name }}</div>
-                <div class="text-sm text-gray-600">Code: {{ b.code ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Rooms: {{ b.no_of_rooms ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Floors: {{ b.number_of_floors ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Occupants: {{ b.occupants_count ?? 0 }}</div>
+                <div class="text-xs text-slate-400">ID: {{ b.id }}</div>
+                <div class="text-sm font-semibold text-slate-800">{{ b.name }}</div>
+                <div class="text-xs text-slate-500 mt-1">Code: {{ b.code ?? '—' }} · Rooms: {{ b.no_of_rooms ?? '—' }} · Floors: {{ b.number_of_floors ?? '—' }}</div>
+                <div class="text-xs text-slate-500">Occupants: {{ b.occupants_count ?? 0 }}</div>
               </div>
               <div class="flex flex-col items-end gap-2">
-                <button @click.prevent="viewRemarks(b)" class="px-3 py-1 bg-gray-200 text-gray-800 rounded">View</button>
-                <button @click.prevent="openModal(b)" class="px-3 py-1 bg-blue-600 text-white rounded">Edit</button>
-                <button @click.prevent="destroy(b)" :disabled="isDeleting" class="px-3 py-1 bg-red-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
+                <button @click.prevent="viewRemarks(b)"
+                  class="inline-flex items-center gap-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors">View</button>
+                <button @click.prevent="openModal(b)"
+                  class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors">Edit</button>
+                <button @click.prevent="destroy(b)" :disabled="isDeleting"
+                  class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
               </div>
             </div>
           </div>
-          <div v-if="filteredBuildings.length === 0" class="text-center text-gray-500 py-6">No buildings found.</div>
-        </div>
-        <!-- Remarks viewer modal (global) -->
-        <div v-show="showRemarksModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-            <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeRemarks">✕</button>
-            <h3 class="text-lg font-semibold mb-3">Remarks</h3>
-            <div class="whitespace-pre-wrap text-sm text-gray-700">{{ currentRemarks }}</div>
-            <div class="flex justify-end mt-4">
-              <button @click="closeRemarks" class="px-4 py-2 bg-blue-600 text-white rounded">Close</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rooms modal -->
-        <div v-show="showRoomsModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative max-h-[80vh] overflow-y-auto">
-            <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeRooms">✕</button>
-            <h3 class="text-lg font-semibold mb-3">Rooms — {{ currentBuildingName }}</h3>
-            <div v-if="currentRooms.length === 0" class="text-sm text-gray-500">No rooms found for this building.</div>
-            <div v-else class="space-y-2">
-              <div v-for="r in currentRooms" :key="r.id" class="border rounded p-3">
-                <div class="flex justify-between items-center">
-                  <div>
-                    <div class="font-medium">{{ r.name }}</div>
-                    <div class="text-sm text-gray-600">Code: {{ r.code ?? '—' }} · Floor: {{ r.floor ?? '—' }}</div>
-                  </div>
-                  <div class="text-sm text-gray-600">Office: {{ r.office?.name ?? '—' }}</div>
-                </div>
-                <div class="text-sm text-gray-600 mt-2">Capacity: {{ r.capacity ?? '—' }} · Section: {{ r.section_name ?? '—' }}</div>
-              </div>
-            </div>
-            <div class="flex justify-end mt-4">
-              <button @click="closeRooms" class="px-4 py-2 bg-blue-600 text-white rounded">Close</button>
-            </div>
-          </div>
+          <div v-if="filteredBuildings.length === 0" class="py-16 text-center text-slate-400 text-sm">No buildings found.</div>
         </div>
 
         <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button
-            @click="currentPage--"
-            :disabled="currentPage === 1"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button
-            @click="currentPage++"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+          <div class="flex items-center gap-2">
+            <button @click="currentPage--" :disabled="currentPage === 1"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+              Prev
+            </button>
+            <button @click="currentPage++" :disabled="currentPage === totalPages"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-lg sm:max-w-2xl lg:max-w-3xl p-4 sm:p-6 relative max-h-[90vh] overflow-y-auto">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
-          <h2 class="text-xl font-semibold mb-4">{{ editingId ? 'Edit Building' : 'New Building' }}</h2>
-          <form @submit.prevent="submitForm" class="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-gray-700">Name <span class="text-red-500">*</span></label>
-              <input v-model="form.name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Code</label>
-              <input v-model="form.code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">No of Rooms</label>
-              <input v-model="form.no_of_rooms" type="number" min="0" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-gray-700">Building Use</label>
-              <select v-model="form.building_use" multiple class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                <option value="Classrooms">Classrooms</option>
-                <option value="Laboratories">Laboratories</option>
-                <option value="Admin">Admin</option>
-                <option value="Sports/Recreatation">Sports/Recreatation</option>
-                <option value="Assembly">Assembly</option>
-                <option value="Mixed">Mixed</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Number of Floors</label>
-              <input v-model="form.number_of_floors" type="number" min="0" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Year Constructed</label>
-              <input v-model="form.year_constructed" type="number" min="1800" :max="new Date().getFullYear()+1" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Year Completed</label>
-              <input v-model="form.year_completed" type="number" min="1800" :max="new Date().getFullYear()+1" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Amount</label>
-              <input v-model="form.amount" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-sm font-medium text-gray-700">Remarks</label>
-              <textarea v-model="form.remarks" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" rows="3"></textarea>
-            </div>
+      <!-- Remarks Modal -->
+      <div v-show="showRemarksModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">Remarks</h3>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeRemarks">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="px-6 py-5 whitespace-pre-wrap text-sm text-slate-700">{{ currentRemarks }}</div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
+            <button @click="closeRemarks"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
 
-            <div class="sm:col-span-2 flex justify-end space-x-3 pt-4">
-              <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ form.processing ? 'Saving…' : 'Save' }}</button>
+      <!-- Rooms Modal -->
+      <div v-show="showRoomsModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">Rooms — {{ currentBuildingName }}</h3>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeRooms">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="px-6 py-5">
+            <div v-if="currentRooms.length === 0" class="py-8 text-center text-slate-400 text-sm">No rooms found for this building.</div>
+            <div v-else class="space-y-2">
+              <div v-for="r in currentRooms" :key="r.id" class="border border-slate-100 rounded-lg p-3">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <div class="text-sm font-medium text-slate-800">{{ r.name }}</div>
+                    <div class="text-xs text-slate-500 mt-0.5">Code: {{ r.code ?? '—' }} · Floor: {{ r.floor ?? '—' }}</div>
+                  </div>
+                  <div class="text-xs text-slate-500">{{ r.office?.name ?? '—' }}</div>
+                </div>
+                <div class="text-xs text-slate-500 mt-1">Capacity: {{ r.capacity ?? '—' }} · Section: {{ r.section_name ?? '—' }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
+            <button @click="closeRooms"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create/Edit Modal -->
+      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Building' : 'New Building' }}</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <form @submit.prevent="submitForm" class="px-6 py-5">
+            <div class="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
+                <input v-model="form.name" type="text"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                  required />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Code</label>
+                <input v-model="form.code" type="text"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">No of Rooms</label>
+                <input v-model="form.no_of_rooms" type="number" min="0"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Building Use</label>
+                <select v-model="form.building_use" multiple
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                  <option value="Classrooms">Classrooms</option>
+                  <option value="Laboratories">Laboratories</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Sports/Recreatation">Sports/Recreatation</option>
+                  <option value="Assembly">Assembly</option>
+                  <option value="Mixed">Mixed</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Number of Floors</label>
+                <input v-model="form.number_of_floors" type="number" min="0"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Year Constructed</label>
+                <input v-model="form.year_constructed" type="number" min="1800" :max="new Date().getFullYear()+1"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Year Completed</label>
+                <input v-model="form.year_completed" type="number" min="1800" :max="new Date().getFullYear()+1"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Amount</label>
+                <input v-model="form.amount" type="number" min="0" step="0.01"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+                <textarea v-model="form.remarks" rows="3"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 mt-2 border-t border-slate-100">
+              <button type="button" @click="closeModal"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Cancel
+              </button>
+              <button type="submit" :disabled="form.processing"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                {{ form.processing ? 'Saving…' : 'Save' }}
+              </button>
             </div>
           </form>
         </div>
@@ -278,7 +323,7 @@ const closeModal = () => { showModal.value = false; editingId.value = null; form
 const submitForm = () => {
   if (editingId.value) {
     form.put(`/data-management/buildings/${editingId.value}`, {
-      onSuccess: () => { 
+      onSuccess: () => {
         closeModal();
         Swal.fire({ icon: 'success', title: 'Building updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
       },
@@ -286,7 +331,7 @@ const submitForm = () => {
     })
   } else {
     form.post('/data-management/buildings', {
-      onSuccess: () => { 
+      onSuccess: () => {
         closeModal();
         Swal.fire({ icon: 'success', title: 'Building added', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() })
       },

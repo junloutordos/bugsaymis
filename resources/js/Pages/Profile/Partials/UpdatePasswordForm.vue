@@ -35,27 +35,26 @@ const updatePassword = () => {
 
 <template>
     <section>
-        <header>
-            <h2 class="text-lg font-medium text-gray-900">
+        <header class="mb-6">
+            <h2 class="text-base font-semibold text-slate-800">
                 Update Password
             </h2>
 
-            <p class="mt-1 text-sm text-gray-600">
-                Ensure your account is using a long, random password to stay
-                secure.
+            <p class="mt-1 text-sm text-slate-500">
+                Ensure your account is using a long, random password to stay secure.
             </p>
         </header>
 
-        <form @submit.prevent="updatePassword" class="mt-6 space-y-6">
+        <form @submit.prevent="updatePassword" class="space-y-5">
             <div>
-                <InputLabel for="current_password" value="Current Password" />
+                <label for="current_password" class="block text-xs font-medium text-slate-600 mb-1">Current Password</label>
 
                 <TextInput
                     id="current_password"
                     ref="currentPasswordInput"
                     v-model="form.current_password"
                     type="password"
-                    class="mt-1 block w-full"
+                    class="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
                     autocomplete="current-password"
                 />
 
@@ -66,14 +65,14 @@ const updatePassword = () => {
             </div>
 
             <div>
-                <InputLabel for="password" value="New Password" />
+                <label for="password" class="block text-xs font-medium text-slate-600 mb-1">New Password</label>
 
                 <TextInput
                     id="password"
                     ref="passwordInput"
                     v-model="form.password"
                     type="password"
-                    class="mt-1 block w-full"
+                    class="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
                     autocomplete="new-password"
                 />
 
@@ -81,16 +80,13 @@ const updatePassword = () => {
             </div>
 
             <div>
-                <InputLabel
-                    for="password_confirmation"
-                    value="Confirm Password"
-                />
+                <label for="password_confirmation" class="block text-xs font-medium text-slate-600 mb-1">Confirm Password</label>
 
                 <TextInput
                     id="password_confirmation"
                     v-model="form.password_confirmation"
                     type="password"
-                    class="mt-1 block w-full"
+                    class="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
                     autocomplete="new-password"
                 />
 
@@ -101,7 +97,13 @@ const updatePassword = () => {
             </div>
 
             <div class="flex items-center gap-4">
-                <PrimaryButton :disabled="form.processing">Save</PrimaryButton>
+                <button
+                    type="submit"
+                    :disabled="form.processing"
+                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Save
+                </button>
 
                 <Transition
                     enter-active-class="transition ease-in-out"
@@ -111,7 +113,7 @@ const updatePassword = () => {
                 >
                     <p
                         v-if="form.recentlySuccessful"
-                        class="text-sm text-gray-600"
+                        class="text-sm text-emerald-600 font-medium"
                     >
                         Saved.
                     </p>

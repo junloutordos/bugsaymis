@@ -192,19 +192,19 @@ const deleteNeed = (n) => {
 
     <div class="p-6 space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 class="text-xl font-bold text-gray-800">Training Needs Analysis (TNA)</h1>
-          <p class="text-sm text-gray-500">Identify and manage employee training needs</p>
+          <h1 class="text-xl font-semibold text-slate-800">Training Needs Analysis (TNA)</h1>
+          <p class="text-sm text-slate-500">Identify and manage employee training needs</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <a :href="route('lnd.tna.consolidation')"
-            class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             Consolidation View
           </a>
           <button @click="openCreate"
-            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             Add Need
           </button>
@@ -212,31 +212,36 @@ const deleteNeed = (n) => {
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
         <input v-model="search" type="text" placeholder="Search competency / training…"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none w-52" />
-        <select v-model="employeeId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none min-w-[160px]">
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-52" />
+        <select v-model="employeeId"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 min-w-[160px]">
           <option value="">All Employees</option>
           <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
         </select>
-        <select v-model="year" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="year"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Years</option>
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
         </select>
-        <select v-model="priority" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="priority"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Priority</option>
           <option value="high">High</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
-        <select v-model="status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="status"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Status</option>
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="addressed">Addressed</option>
           <option value="deferred">Deferred</option>
         </select>
-        <select v-model="source" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="source"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Sources</option>
           <option value="self">Self</option>
           <option value="supervisor">Supervisor</option>
@@ -246,88 +251,93 @@ const deleteNeed = (n) => {
         </select>
         <button v-if="search || employeeId || year || priority || status || source"
           @click="search=''; employeeId=''; year=''; priority=''; status=''; source=''"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">Clear</button>
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Clear
+        </button>
       </div>
 
       <!-- Table -->
-      <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div v-if="isLoading" class="flex items-center justify-center py-12 text-gray-400 text-sm">Loading…</div>
-        <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            <tr>
-              <th class="px-4 py-3 text-left">Employee</th>
-              <th class="px-4 py-3 text-left">Competency Area</th>
-              <th class="px-4 py-3 text-center">Gap</th>
-              <th class="px-4 py-3 text-left">Recommended Training</th>
-              <th class="px-4 py-3 text-center">Priority</th>
-              <th class="px-4 py-3 text-center">Source</th>
-              <th class="px-4 py-3 text-center">Year</th>
-              <th class="px-4 py-3 text-center">IDP</th>
-              <th class="px-4 py-3 text-center">Status</th>
-              <th class="px-4 py-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-if="needs.data.length === 0">
-              <td colspan="10" class="py-10 text-center text-gray-400">No training needs found.</td>
-            </tr>
-            <tr v-for="n in needs.data" :key="n.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-medium text-gray-800">{{ n.employee?.name ?? '—' }}</td>
-              <td class="px-4 py-3">
-                <div class="font-medium text-gray-800">{{ n.competency_area }}</div>
-                <div v-if="n.competency_gap" class="text-xs text-gray-500 line-clamp-1">{{ n.competency_gap }}</div>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-1 text-xs">
-                  <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[n.current_level]]">{{ n.current_level }}</span>
-                  <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                  <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[n.target_level]]">{{ n.target_level }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3 text-gray-600 max-w-[160px] truncate">{{ n.recommended_training ?? '—' }}</td>
-              <td class="px-4 py-3 text-center">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize', priorityColors[n.priority_level]]">
-                  {{ n.priority_level }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center text-xs text-gray-600">{{ sourceLabel[n.source] ?? n.source }}</td>
-              <td class="px-4 py-3 text-center text-gray-600">{{ n.year }}</td>
-              <td class="px-4 py-3 text-center">
-                <span v-if="n.individual_development_plan" class="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                  Yes
-                </span>
-                <span v-else class="text-xs text-gray-400">—</span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize', statusColors[n.status] ?? 'bg-gray-100 text-gray-600']">
-                  {{ n.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-1 flex-wrap">
-                  <button @click="openEdit(n)"
-                    class="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Edit</button>
-                  <button v-if="n.status === 'pending'"
-                    @click="openApprove(n)"
-                    class="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">Approve</button>
-                  <button @click="deleteNeed(n)"
-                    class="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div v-if="isLoading" class="py-16 text-center text-slate-400 text-sm">Loading…</div>
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Competency Area</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Gap</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Recommended Training</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Priority</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Source</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Year</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">IDP</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="needs.data.length === 0">
+                <td colspan="10" class="py-16 text-center text-slate-400 text-sm">No training needs found.</td>
+              </tr>
+              <tr v-for="n in needs.data" :key="n.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 font-medium text-sm text-slate-800">{{ n.employee?.name ?? '—' }}</td>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-slate-800 text-sm">{{ n.competency_area }}</div>
+                  <div v-if="n.competency_gap" class="text-xs text-slate-500 line-clamp-1">{{ n.competency_gap }}</div>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1 text-xs">
+                    <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[n.current_level]]">{{ n.current_level }}</span>
+                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span :class="['rounded px-1.5 py-0.5 font-medium', levelColors[n.target_level]]">{{ n.target_level }}</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700 max-w-[160px] truncate">{{ n.recommended_training ?? '—' }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize', priorityColors[n.priority_level]]">
+                    {{ n.priority_level }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center text-xs text-slate-600">{{ sourceLabel[n.source] ?? n.source }}</td>
+                <td class="px-4 py-3 text-center text-sm text-slate-700">{{ n.year }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span v-if="n.individual_development_plan" class="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Yes
+                  </span>
+                  <span v-else class="text-xs text-slate-400">—</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize', statusColors[n.status] ?? 'bg-slate-100 text-slate-600']">
+                    {{ n.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1 flex-wrap">
+                    <button @click="openEdit(n)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors text-xs font-medium px-2">Edit</button>
+                    <button v-if="n.status === 'pending'"
+                      @click="openApprove(n)"
+                      class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 transition-colors text-xs font-medium px-2">Approve</button>
+                    <button @click="deleteNeed(n)"
+                      class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors text-xs font-medium px-2">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Pagination -->
-      <div v-if="needs.last_page > 1" class="flex items-center justify-between text-sm text-gray-600">
+      <div v-if="needs.last_page > 1"
+        class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
         <span>Showing {{ needs.from }}–{{ needs.to }} of {{ needs.total }}</span>
         <div class="flex gap-1">
           <button v-for="p in needs.links" :key="p.label"
             @click="p.url && goToPage(new URL(p.url).searchParams.get('page'))"
             :disabled="!p.url"
-            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50 disabled:opacity-40']"
+            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-slate-600']"
             v-html="p.label" />
         </div>
       </div>
@@ -335,21 +345,22 @@ const deleteNeed = (n) => {
 
     <!-- Create / Edit Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">{{ editingItem ? 'Edit Training Need' : 'Add Training Need' }}</h2>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ editingItem ? 'Edit Training Need' : 'Add Training Need' }}</h2>
+            <button @click="closeModal"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
-          <form @submit.prevent="submit" class="p-6 space-y-4">
+          <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
 
             <!-- Employee -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Employee <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Employee <span class="text-red-500">*</span></label>
               <select v-model="form.employee_id" required :disabled="!!editingItem"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none disabled:bg-gray-50">
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400">
                 <option value="">— Select employee —</option>
                 <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
               </select>
@@ -357,24 +368,24 @@ const deleteNeed = (n) => {
 
             <!-- Competency Area -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Competency Area <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Competency Area <span class="text-red-500">*</span></label>
               <input v-model="form.competency_area" type="text" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
 
             <!-- Competency Gap -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Competency Gap Description</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Competency Gap Description</label>
               <textarea v-model="form.competency_gap" rows="2"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
 
             <!-- Current / Target Level -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Current Level <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Current Level <span class="text-red-500">*</span></label>
                 <select v-model="form.current_level" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="none">None</option>
                   <option value="basic">Basic</option>
                   <option value="intermediate">Intermediate</option>
@@ -382,9 +393,9 @@ const deleteNeed = (n) => {
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Target Level <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Target Level <span class="text-red-500">*</span></label>
                 <select v-model="form.target_level" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="none">None</option>
                   <option value="basic">Basic</option>
                   <option value="intermediate">Intermediate</option>
@@ -396,18 +407,18 @@ const deleteNeed = (n) => {
             <!-- Priority + Source + Year -->
             <div class="grid grid-cols-3 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Priority <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Priority <span class="text-red-500">*</span></label>
                 <select v-model="form.priority_level" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Source <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Source <span class="text-red-500">*</span></label>
                 <select v-model="form.source" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="self">Self</option>
                   <option value="supervisor">Supervisor</option>
                   <option value="hr">HR</option>
@@ -416,31 +427,33 @@ const deleteNeed = (n) => {
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Year <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Year <span class="text-red-500">*</span></label>
                 <input v-model="form.year" type="number" required min="2000" max="2099"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Recommended Training -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Recommended Training</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Recommended Training</label>
               <input v-model="form.recommended_training" type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
 
             <!-- Remarks -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
               <textarea v-model="form.remarks" rows="2"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
 
-            <div class="flex justify-end gap-3 pt-2">
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button type="button" @click="closeModal"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Cancel
+              </button>
               <button type="submit" :disabled="isSubmitting"
-                class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
                 {{ isSubmitting ? 'Saving…' : (editingItem ? 'Update' : 'Save') }}
               </button>
             </div>
@@ -451,44 +464,47 @@ const deleteNeed = (n) => {
 
     <!-- Approve / Defer Modal -->
     <Teleport to="body">
-      <div v-if="showApprove" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">Approve / Defer Training Need</h2>
-            <button @click="showApprove = false" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <div v-if="showApprove" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Approve / Defer Training Need</h2>
+            <button @click="showApprove = false"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
-          <div class="p-6 space-y-4">
-            <div v-if="approveItem" class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+          <div class="px-6 py-5 space-y-4">
+            <div v-if="approveItem" class="rounded-lg bg-slate-50 border border-slate-100 p-3 text-sm text-slate-700">
               <span class="font-medium">{{ approveItem.employee?.name }}</span> — {{ approveItem.competency_area }}
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Action <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Action <span class="text-red-500">*</span></label>
               <div class="flex gap-3">
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="approveForm.status" value="approved" class="text-blue-600" />
-                  <span class="text-sm text-gray-700">Approve</span>
+                  <input type="radio" v-model="approveForm.status" value="approved" />
+                  <span class="text-sm text-slate-700">Approve</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" v-model="approveForm.status" value="deferred" class="text-orange-500" />
-                  <span class="text-sm text-gray-700">Defer</span>
+                  <input type="radio" v-model="approveForm.status" value="deferred" />
+                  <span class="text-sm text-slate-700">Defer</span>
                 </label>
               </div>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
               <textarea v-model="approveForm.remarks" rows="3" placeholder="Optional remarks…"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
-            <div class="flex justify-end gap-3 pt-2">
-              <button @click="showApprove = false"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button @click="submitApprove" :disabled="isSubmitting"
-                :class="['rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-50', approveForm.status === 'approved' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-500 hover:bg-orange-600']">
-                {{ isSubmitting ? 'Saving…' : (approveForm.status === 'approved' ? 'Approve' : 'Defer') }}
-              </button>
-            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="showApprove = false"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              Cancel
+            </button>
+            <button @click="submitApprove" :disabled="isSubmitting"
+              :class="['inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors shadow-sm disabled:opacity-50', approveForm.status === 'approved' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-amber-500 hover:bg-amber-600']">
+              {{ isSubmitting ? 'Saving…' : (approveForm.status === 'approved' ? 'Approve' : 'Defer') }}
+            </button>
           </div>
         </div>
       </div>

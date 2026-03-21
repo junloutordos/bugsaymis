@@ -4,6 +4,7 @@ import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { CheckCircleIcon, XCircleIcon, EyeIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({ requests: Object, filters: Object })
 
@@ -121,7 +122,7 @@ const rejectRequest = async (id) => {
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.purpose ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.date ?? req.created_at?.slice(0,10) ?? '—' }}</td>
                 <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">{{ req.status }}</span>
+                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
