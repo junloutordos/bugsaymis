@@ -4,6 +4,7 @@ import { computed } from "vue";
 import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { useVehicleRequests } from "@/Composables/useVehicleRequests";
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({ requests: Array, vehicles: Array, divisionChiefs: Array });
 const page  = usePage();
@@ -104,9 +105,7 @@ const {
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.time_of_departure ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.eta ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">
-                  <span v-if="req.status?.includes('Approved')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">{{ req.status }}</span>
-                  <span v-else-if="req.status === 'Declined'" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600">{{ req.status }}</span>
-                  <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">{{ req.status }}</span>
+                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ req.driver?.name ?? '—' }}</td>
                 <td class="px-4 py-3">

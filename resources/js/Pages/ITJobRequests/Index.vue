@@ -11,6 +11,7 @@ import {
   ArrowDownTrayIcon
 } from "@heroicons/vue/24/outline"
 import { useJobRequests } from "@/Composables/useJobRequests.js"
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 // Props from backend — requests is now a paginator object
 const props = defineProps({
@@ -318,19 +319,7 @@ const handleNewRequest = async () => {
                 <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(req.created_at) }}</td>
 
                 <td class="px-4 py-3">
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    :class="{
-                      'bg-amber-50 text-amber-700': req.status==='Pending Division Chief Approval',
-                      'bg-amber-50 text-amber-700': req.status==='MIS Assessed the Request',
-                      'bg-amber-50 text-amber-700': req.status==='Pending OCD Approval',
-                      'bg-blue-50 text-blue-700': req.status==='In Progress',
-                      'bg-blue-50 text-blue-700': req.status==='Acted by MIS',
-                      'bg-emerald-50 text-emerald-700': req.status==='Request Completed'
-                    }"
-                  >
-                    {{ req.status }}
-                  </span>
+                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
                 </td>
 
                 <td class="px-4 py-3 text-center">
@@ -382,19 +371,7 @@ const handleNewRequest = async () => {
                 <div class="text-sm text-slate-500">{{ req.category }}</div>
               </div>
 
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                :class="{
-                  'bg-amber-50 text-amber-700': req.status==='Pending Division Chief Approval',
-                  'bg-amber-50 text-amber-700': req.status==='MIS Assessed the Request',
-                  'bg-amber-50 text-amber-700': req.status==='Pending OCD Approval',
-                  'bg-blue-50 text-blue-700': req.status==='In Progress',
-                  'bg-blue-50 text-blue-700': req.status==='Acted by MIS',
-                  'bg-emerald-50 text-emerald-700': req.status==='Request Completed'
-                }"
-              >
-                {{ req.status }}
-              </span>
+              <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
             </div>
 
             <div class="mt-2 text-sm text-slate-600 space-y-1">
@@ -482,19 +459,7 @@ const handleNewRequest = async () => {
                   </div>
 
                   <!-- Status Badge -->
-                  <span
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    :class="{
-                      'bg-amber-50 text-amber-700': selectedRequest.status==='Pending Division Chief Approval',
-                      'bg-amber-50 text-amber-700': selectedRequest.status==='MIS Assessed the Request',
-                      'bg-amber-50 text-amber-700': selectedRequest.status==='Pending OCD Approval',
-                      'bg-blue-50 text-blue-700': selectedRequest.status==='In Progress',
-                      'bg-blue-50 text-blue-700': selectedRequest.status==='Acted by MIS',
-                      'bg-emerald-50 text-emerald-700': selectedRequest.status==='Request Completed'
-                    }"
-                  >
-                    {{ selectedRequest.status ?? 'Pending' }}
-                  </span>
+                  <span :class="[badgeBase, statusBadgeClass(selectedRequest.status)]">{{ selectedRequest.status ?? 'Pending' }}</span>
                 </div>
 
                 <!-- Details Grid -->

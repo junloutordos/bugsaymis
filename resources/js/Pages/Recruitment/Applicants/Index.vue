@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({
   applicants: { type: Object, required: true },
@@ -202,15 +203,7 @@ const deleteApplicant = async (applicant) => {
                   </span>
                 </td>
                 <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                        :class="{
-                          'bg-emerald-50 text-emerald-700': applicant.status === 'active',
-                          'bg-emerald-50 text-emerald-700': applicant.status === 'hired',
-                          'bg-red-50 text-red-600':         applicant.status === 'blacklisted',
-                          'bg-slate-100 text-slate-600':    applicant.status === 'withdrawn',
-                        }">
-                    {{ applicant.status }}
-                  </span>
+                  <span :class="[badgeBase, statusBadgeClass(applicant.status)]">{{ applicant.status }}</span>
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-1 justify-center">

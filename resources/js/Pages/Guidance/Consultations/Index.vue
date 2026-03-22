@@ -3,151 +3,178 @@
   <AdminLayout :title="'Guidance Consultations'">
     <template #default>
       <div>
-        <div class="mb-4 flex items-center justify-between">
-          <h1 class="text-xl md:text-2xl font-bold text-gray-800">Guidance Consultations</h1>
-          <button v-if="canRefer" @click.prevent="openReferralModal" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Add Referral</button>
+        <!-- Page header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div>
+            <h1 class="text-xl font-semibold text-slate-800">Guidance Consultations</h1>
+            <p class="text-sm text-slate-500">Track and manage student consultation records</p>
+          </div>
+          <button v-if="canRefer" @click.prevent="openReferralModal" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Add Referral
+          </button>
         </div>
 
-        <div class="mb-4">
-          <input v-model="q" type="text" placeholder="Search consultations..." class="w-full md:w-1/3 rounded-lg border-gray-300 p-2" />
+        <!-- Filter bar -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+          <input v-model="q" type="text" placeholder="Search consultations..." class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
         </div>
 
-        <div class="bg-white shadow rounded overflow-x-auto">
-          <table class="min-w-full divide-y w-full">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left w-12">#</th>
-                <th class="px-4 py-3 text-left">Requestor</th>
-                <th class="px-4 py-3 text-left">Concern</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Referred By</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Referral Category</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Behavior Spotted</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Description</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Preferred</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Assigned</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                  <th class="px-4 py-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="c in paged" :key="c.id" class="border-t">
-                <td class="px-4 py-3">{{ c.id }}</td>
-                <td class="px-4 py-3">{{ c.requestor_name || c.requestor_id || '—' }}</td>
-                <td class="px-4 py-3">{{ c.concern }}</td>
-                <td class="px-4 py-3 hidden md:table-cell">{{ c.referred_by_name || c.referred_by || '—' }}</td>
-                <td class="px-4 py-3 hidden md:table-cell">
-                  <div class="max-w-[20rem] truncate">{{ c.referral_category || '—' }}</div>
-                </td>
-                <td class="px-4 py-3 hidden md:table-cell">
-                  <div class="max-w-[24rem] truncate">{{ c.behavior_spotted || '—' }}</div>
-                  <button v-if="c.behavior_spotted && c.behavior_spotted.length > 120" @click.prevent="openDesc(c.behavior_spotted)" class="text-sm text-blue-600 mt-1">View</button>
-                </td>
-                <td class="px-4 py-3 hidden md:table-cell">
-                  <div class="max-w-[28rem] truncate">{{ c.brief_description || c.description || '—' }}</div>
-                  <button v-if="(c.brief_description || c.description) && (c.brief_description || c.description).length > 120" @click.prevent="openDesc(c.brief_description || c.description)" class="text-sm text-blue-600 mt-1">View</button>
-                </td>
-                <td class="px-4 py-3 hidden md:table-cell">{{ formatDate(c.date_time_preferred) }}</td>
-                <td class="px-4 py-3 hidden md:table-cell">{{ c.assigned_personnel_name || '—' }}</td>
-                <td class="px-4 py-3">{{ c.status }}</td>
+        <!-- Table card -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-100 text-sm">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Concern</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Referred By</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Referral Category</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Behavior Spotted</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Description</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Preferred</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap hidden md:table-cell">Assigned</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="c in paged" :key="c.id" class="hover:bg-slate-50/60">
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ c.id }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ c.requestor_name || c.requestor_id || '—' }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ c.concern }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700 hidden md:table-cell">{{ c.referred_by_name || c.referred_by || '—' }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700 hidden md:table-cell">
+                    <div class="max-w-[20rem] truncate">{{ c.referral_category || '—' }}</div>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-slate-700 hidden md:table-cell">
+                    <div class="max-w-[24rem] truncate">{{ c.behavior_spotted || '—' }}</div>
+                    <button v-if="c.behavior_spotted && c.behavior_spotted.length > 120" @click.prevent="openDesc(c.behavior_spotted)" class="text-xs text-indigo-600 hover:text-indigo-800 mt-1">View</button>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-slate-700 hidden md:table-cell">
+                    <div class="max-w-[28rem] truncate">{{ c.brief_description || c.description || '—' }}</div>
+                    <button v-if="(c.brief_description || c.description) && (c.brief_description || c.description).length > 120" @click.prevent="openDesc(c.brief_description || c.description)" class="text-xs text-indigo-600 hover:text-indigo-800 mt-1">View</button>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-slate-700 hidden md:table-cell">{{ formatDate(c.date_time_preferred) }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700 hidden md:table-cell">{{ c.assigned_personnel_name || '—' }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="{
+                        'bg-amber-50 text-amber-700': String(c.status).toLowerCase() === 'pending',
+                        'bg-emerald-50 text-emerald-700': ['done intervention', 'for monitoring'].includes(String(c.status).toLowerCase()),
+                        'bg-blue-50 text-blue-700': String(c.status).toLowerCase() === 'scheduled' || String(c.status).toLowerCase() === 'for follow-up',
+                        'bg-slate-100 text-slate-600': !['pending','done intervention','for monitoring','scheduled','for follow-up'].includes(String(c.status).toLowerCase()),
+                      }"
+                    >{{ c.status }}</span>
+                  </td>
                   <td class="px-4 py-3">
-                    <div class="flex gap-2">
-                        <button v-if="canAssign && String(c.status).toLowerCase() === 'pending'" @click.prevent="openAssign(c)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" :title="'Update Appointment for #'+c.id" aria-label="Update Appointment">
-                          <ClockIcon class="h-5 w-5" />
+                    <div class="flex gap-1">
+                      <button v-if="canAssign && String(c.status).toLowerCase() === 'pending'" @click.prevent="openAssign(c)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" :title="'Update Appointment for #'+c.id" aria-label="Update Appointment">
+                        <ClockIcon class="h-4 w-4" />
                       </button>
-                        <button v-if="canAssign && String(c.status).toLowerCase() === 'scheduled'" @click.prevent="openIntervention(c)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" :title="'Add Intervention for #'+c.id" aria-label="Add Intervention">
-                          <HeartIcon class="h-5 w-5" />
+                      <button v-if="canAssign && String(c.status).toLowerCase() === 'scheduled'" @click.prevent="openIntervention(c)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" :title="'Add Intervention for #'+c.id" aria-label="Add Intervention">
+                        <HeartIcon class="h-4 w-4" />
                       </button>
-                        <button v-if="canAssign && c.status === 'For Follow-up'" @click.prevent="openEditIntervention(c)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700 flex items-center justify-center" :title="'Update Intervention for #'+c.id" aria-label="Update Intervention">
-                          <PencilIcon class="h-5 w-5" />
+                      <button v-if="canAssign && c.status === 'For Follow-up'" @click.prevent="openEditIntervention(c)" class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-700 transition-colors" :title="'Update Intervention for #'+c.id" aria-label="Update Intervention">
+                        <PencilIcon class="h-4 w-4" />
                       </button>
-                        <span v-if="c.status === 'Done Intervention'" class="p-2 rounded-full bg-green-100 text-green-700 flex items-center justify-center" :title="'Done'" aria-hidden="true">
-                          <CheckCircleIcon class="h-5 w-5" />
+                      <span v-if="c.status === 'Done Intervention'" class="p-1.5 rounded-lg text-emerald-600" :title="'Done'" aria-hidden="true">
+                        <CheckCircleIcon class="h-4 w-4" />
                       </span>
-                      <!-- Print icon for specified statuses -->
-                        <button v-if="['For Follow-up','For Monitoring','Done Intervention','Refer to School Psychologist'].includes(c.status)" @click.prevent="openAdmissionSlip(c)" class="p-2 rounded-full bg-white text-gray-700" :title="'Print Admission Slip'" aria-label="Print Admission Slip">
-                          <PrinterIcon class="h-5 w-5" />
+                      <button v-if="['For Follow-up','For Monitoring','Done Intervention','Refer to School Psychologist'].includes(c.status)" @click.prevent="openAdmissionSlip(c)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" :title="'Print Admission Slip'" aria-label="Print Admission Slip">
+                        <PrinterIcon class="h-4 w-4" />
                       </button>
                     </div>
                   </td>
-              </tr>
-              <tr v-if="filtered.length === 0">
-                <td class="px-4 py-6 text-center text-gray-500" colspan="11">No consultations found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                </tr>
+                <tr v-if="filtered.length === 0">
+                  <td class="py-16 text-center text-slate-400 text-sm" colspan="11">No consultations found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <div>Page {{ page }} of {{ totalPages }}</div>
-          <div>
-            <button @click="prev" :disabled="page===1" class="px-3 py-1 rounded bg-gray-200 mr-2">Prev</button>
-            <button @click="next" :disabled="page===totalPages" class="px-3 py-1 rounded bg-gray-200">Next</button>
+          <!-- Pagination -->
+          <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+            <span>Page {{ page }} of {{ totalPages }}</span>
+            <div class="flex gap-2">
+              <button @click="prev" :disabled="page===1" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
+              <button @click="next" :disabled="page===totalPages" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Add Referral modal -->
-      <div v-if="showReferralModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-          <h2 class="text-lg font-semibold mb-4">Student Referral to Guidance Office</h2>
-
-          <div class="mb-4 relative">
-            <label class="block text-sm font-medium text-gray-700">Student</label>
-            <input
-              v-model="studentSearchQuery"
-              type="text"
-              placeholder="Search student name..."
-              class="mt-1 block w-full rounded border-gray-300 p-2"
-              autocomplete="off"
-            />
-            <div v-if="searchingStudents" class="text-xs text-gray-500 mt-1">Searching...</div>
-            <div v-if="studentSearchResults.length > 0" class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded shadow max-h-56 overflow-y-auto">
-              <button
-                v-for="student in studentSearchResults"
-                :key="student.id"
-                type="button"
-                @click="selectStudent(student)"
-                class="w-full text-left px-3 py-2 hover:bg-gray-100"
-              >
-                <div class="font-medium text-sm">{{ student.name }}</div>
-                <div v-if="student.pisay" class="text-xs text-gray-500">{{ student.pisay }}</div>
-              </button>
-            </div>
-            <div v-if="selectedStudent" class="text-xs text-green-700 mt-2">Selected: {{ selectedStudent.name }}</div>
+      <div v-if="showReferralModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Student Referral to Guidance Office</h2>
+            <button @click="closeReferralModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
           </div>
 
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Referral Category</label>
-            <div class="space-y-2">
-              <label v-for="category in referralCategoryOptions" :key="category" class="flex items-center gap-2">
-                <input type="checkbox" :value="category" v-model="referralForm.referral_category" />
-                <span>{{ category }}</span>
-              </label>
+          <div class="px-6 py-5 space-y-4">
+            <div class="relative">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Student</label>
+              <input
+                v-model="studentSearchQuery"
+                type="text"
+                placeholder="Search student name..."
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                autocomplete="off"
+              />
+              <div v-if="searchingStudents" class="text-xs text-slate-500 mt-1">Searching...</div>
+              <div v-if="studentSearchResults.length > 0" class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                <button
+                  v-for="student in studentSearchResults"
+                  :key="student.id"
+                  type="button"
+                  @click="selectStudent(student)"
+                  class="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors"
+                >
+                  <div class="font-medium text-sm text-slate-800">{{ student.name }}</div>
+                  <div v-if="student.pisay" class="text-xs text-slate-500">{{ student.pisay }}</div>
+                </button>
+              </div>
+              <div v-if="selectedStudent" class="text-xs text-emerald-700 mt-2 font-medium">Selected: {{ selectedStudent.name }}</div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Referral Category</label>
+              <div class="space-y-2">
+                <label v-for="category in referralCategoryOptions" :key="category" class="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" :value="category" v-model="referralForm.referral_category" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                  <span>{{ category }}</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Brief Description</label>
+              <textarea v-model="referralForm.brief_description" rows="4" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Behavior Spotted</label>
+              <div class="space-y-2 max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-3">
+                <label v-for="behavior in behaviorOptions" :key="behavior" class="flex items-start gap-2 text-sm text-slate-700">
+                  <input type="checkbox" :value="behavior" v-model="referralForm.behavior_spotted" class="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                  <span>{{ behavior }}</span>
+                </label>
+              </div>
+              <div v-if="showBehaviorOtherInput" class="mt-3">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Others (please specify)</label>
+                <input v-model="referralForm.behavior_other" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
             </div>
           </div>
 
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Brief Description</label>
-            <textarea v-model="referralForm.brief_description" rows="4" class="mt-1 block w-full rounded border-gray-300 p-2"></textarea>
-          </div>
-
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Behavior Spotted</label>
-            <div class="space-y-2 max-h-56 overflow-y-auto border rounded p-3">
-              <label v-for="behavior in behaviorOptions" :key="behavior" class="flex items-start gap-2">
-                <input type="checkbox" :value="behavior" v-model="referralForm.behavior_spotted" class="mt-1" />
-                <span class="text-sm">{{ behavior }}</span>
-              </label>
-            </div>
-            <div v-if="showBehaviorOtherInput" class="mt-3">
-              <label class="block text-sm font-medium text-gray-700">Others (please specify)</label>
-              <input v-model="referralForm.behavior_other" type="text" class="mt-1 block w-full rounded border-gray-300 p-2" />
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-2">
-            <button @click="closeReferralModal" :disabled="loadingReferral" class="px-4 py-2 rounded border">Cancel</button>
-            <button @click.prevent="submitReferral" :disabled="loadingReferral" class="px-4 py-2 bg-blue-600 text-white rounded flex items-center gap-2">
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeReferralModal" :disabled="loadingReferral" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click.prevent="submitReferral" :disabled="loadingReferral" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
               <svg v-if="loadingReferral" class="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
               <span>{{ loadingReferral ? 'Saving...' : 'Save Referral' }}</span>
             </button>
@@ -156,34 +183,46 @@
       </div>
 
       <!-- Description modal -->
-      <div v-if="showDescModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
-          <h2 class="text-lg font-semibold mb-4">Description</h2>
-          <div class="mb-4 whitespace-pre-wrap">{{ descModalText }}</div>
-          <div class="flex justify-end">
-            <button @click="closeDesc" class="px-4 py-2 rounded border">Close</button>
+      <div v-if="showDescModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Description</h2>
+            <button @click="closeDesc" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <div class="px-6 py-5 whitespace-pre-wrap text-sm text-slate-700">{{ descModalText }}</div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
+            <button @click="closeDesc" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
           </div>
         </div>
       </div>
 
       <!-- Assign modal -->
-      <div v-if="showAssignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-          <h2 class="text-lg font-semibold mb-4">Update Appointment</h2>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Assigned Date & Time</label>
-            <input type="datetime-local" v-model="assignDateTime" class="mt-1 block w-full rounded border-gray-300 p-2" />
+      <div v-if="showAssignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Update Appointment</h2>
+            <button @click="closeAssign" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Class Adviser (Faculty)</label>
-            <select v-model="adviserId" class="mt-1 block w-full rounded border-gray-300 p-2">
-              <option :value="null">-- select adviser (optional) --</option>
-              <option v-for="f in facultyUsers" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Assigned Date & Time</label>
+              <input type="datetime-local" v-model="assignDateTime" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Class Adviser (Faculty)</label>
+              <select v-model="adviserId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
+                <option :value="null">-- select adviser (optional) --</option>
+                <option v-for="f in facultyUsers" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+            </div>
           </div>
-          <div class="flex justify-end gap-2">
-            <button @click="closeAssign" :disabled="loadingAssign" class="px-4 py-2 rounded border">Cancel</button>
-            <button @click.prevent="submitAssign" :disabled="loadingAssign" class="px-4 py-2 bg-blue-600 text-white rounded flex items-center gap-2">
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeAssign" :disabled="loadingAssign" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click.prevent="submitAssign" :disabled="loadingAssign" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
               <svg v-if="loadingAssign" class="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
               <span>{{ loadingAssign ? 'Saving...' : 'Save' }}</span>
             </button>
@@ -192,37 +231,44 @@
       </div>
 
       <!-- Intervention modal -->
-      <div v-if="showInterventionModal" class="intervention-modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-          <h2 class="text-lg font-semibold mb-4">Record Intervention</h2>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Intervention Details</label>
-            <textarea v-model="interventionText" rows="6" class="mt-1 block w-full rounded border-gray-300 p-2"></textarea>
+      <div v-if="showInterventionModal" class="intervention-modal fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Record Intervention</h2>
+            <button @click="closeIntervention" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Status</label>
-            <select v-model="interventionStatus" class="mt-1 block w-full rounded border-gray-300 p-2">
-              <option value="">-- select status --</option>
-              <option>For Follow-up</option>
-              <option>For Monitoring</option>
-              <option>Done Intervention</option>
-              <option>Refer to School Psychologist</option>
-            </select>
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Intervention Details</label>
+              <textarea v-model="interventionText" rows="6" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+              <select v-model="interventionStatus" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
+                <option value="">-- select status --</option>
+                <option>For Follow-up</option>
+                <option>For Monitoring</option>
+                <option>Done Intervention</option>
+                <option>Refer to School Psychologist</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Class Adviser (Faculty)</label>
+              <select v-model="interventionTeacherId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
+                <option :value="null">-- select adviser (optional) --</option>
+                <option v-for="f in facultyUsers" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+            </div>
+            <div v-if="interventionStatus === 'For Follow-up'">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Follow-up Date</label>
+              <input type="date" v-model="interventionFollowupDate" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Class Adviser (Faculty)</label>
-            <select v-model="interventionTeacherId" class="mt-1 block w-full rounded border-gray-300 p-2">
-              <option :value="null">-- select adviser (optional) --</option>
-              <option v-for="f in facultyUsers" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-          </div>
-          <div v-if="interventionStatus === 'For Follow-up'" class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Follow-up Date</label>
-            <input type="date" v-model="interventionFollowupDate" class="mt-1 block w-full rounded border-gray-300 p-2" />
-          </div>
-          <div class="flex justify-end gap-2">
-            <button @click="closeIntervention" :disabled="loadingIntervention" class="px-4 py-2 rounded border">Cancel</button>
-            <button @click.prevent="submitIntervention" :disabled="loadingIntervention" class="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2">
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeIntervention" :disabled="loadingIntervention" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click.prevent="submitIntervention" :disabled="loadingIntervention" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
               <svg v-if="loadingIntervention" class="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
               <span>{{ loadingIntervention ? 'Saving...' : 'Save Intervention' }}</span>
             </button>
@@ -231,37 +277,44 @@
       </div>
 
       <!-- Edit Intervention modal (separate, not nested) -->
-      <div v-if="showEditInterventionModal" class="edit-intervention-modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-          <h2 class="text-lg font-semibold mb-4">Update Intervention</h2>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Previous Intervention Details</label>
-            <textarea v-model="editInterventionText" rows="6" class="mt-1 block w-full rounded border-gray-300 p-2"></textarea>
+      <div v-if="showEditInterventionModal" class="edit-intervention-modal fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Update Intervention</h2>
+            <button @click="closeEditIntervention" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Status</label>
-            <select v-model="editInterventionStatus" class="mt-1 block w-full rounded border-gray-300 p-2">
-              <option value="">-- select status --</option>
-              <option>For Follow-up</option>
-              <option>For Monitoring</option>
-              <option>Done Intervention</option>
-              <option>Refer to School Psychologist</option>
-            </select>
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Previous Intervention Details</label>
+              <textarea v-model="editInterventionText" rows="6" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+              <select v-model="editInterventionStatus" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
+                <option value="">-- select status --</option>
+                <option>For Follow-up</option>
+                <option>For Monitoring</option>
+                <option>Done Intervention</option>
+                <option>Refer to School Psychologist</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Class Adviser (Faculty)</label>
+              <select v-model="editInterventionTeacherId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
+                <option :value="null">-- select adviser (optional) --</option>
+                <option v-for="f in facultyUsers" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+            </div>
+            <div v-if="editInterventionStatus === 'For Follow-up'">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Follow-up Date</label>
+              <input type="date" v-model="editInterventionFollowupDate" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+            </div>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Class Adviser (Faculty)</label>
-            <select v-model="editInterventionTeacherId" class="mt-1 block w-full rounded border-gray-300 p-2">
-              <option :value="null">-- select adviser (optional) --</option>
-              <option v-for="f in facultyUsers" :key="f.id" :value="f.id">{{ f.name }}</option>
-            </select>
-          </div>
-          <div v-if="editInterventionStatus === 'For Follow-up'" class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Follow-up Date</label>
-            <input type="date" v-model="editInterventionFollowupDate" class="mt-1 block w-full rounded border-gray-300 p-2" />
-          </div>
-          <div class="flex justify-end gap-2">
-            <button @click="closeEditIntervention" :disabled="loadingEditIntervention" class="px-4 py-2 rounded border">Cancel</button>
-            <button @click.prevent="submitEditIntervention" :disabled="loadingEditIntervention" class="px-4 py-2 bg-yellow-600 text-white rounded flex items-center gap-2">
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeEditIntervention" :disabled="loadingEditIntervention" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click.prevent="submitEditIntervention" :disabled="loadingEditIntervention" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
               <svg v-if="loadingEditIntervention" class="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
               <span>{{ loadingEditIntervention ? 'Saving...' : 'Save Changes' }}</span>
             </button>

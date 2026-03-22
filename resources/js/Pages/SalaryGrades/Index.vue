@@ -1,19 +1,19 @@
 <template>
   <AdminLayout title="Salary Grade Table">
-    <div class="max-w-full px-4 py-6 space-y-6">
+    <div class="max-w-full space-y-6">
 
-      <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Salary Grade Table</h1>
-          <p class="text-sm text-gray-500 mt-0.5">SSL V — Philippine Government Salary Standardization Law</p>
+          <h1 class="text-xl font-semibold text-slate-800">Salary Grade Table</h1>
+          <p class="text-sm text-slate-500 mt-0.5">SSL V — Philippine Government Salary Standardization Law</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
           <!-- Tranche selector -->
           <select
             v-model="selectedTranche"
             @change="changeTranche"
-            class="border border-gray-300 rounded-md text-sm px-3 py-2 focus:ring-blue-500 focus:border-blue-500 min-w-[220px]"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 min-w-[220px]"
           >
             <option v-for="t in tranches" :key="t.tranche" :value="t.tranche">
               {{ t.tranche }}
@@ -25,18 +25,18 @@
           <button
             v-if="!isCurrentTranche"
             @click="setActive"
-            class="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md font-medium"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             Set as Active
           </button>
-          <span v-else class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+          <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">
             Active Schedule
           </span>
 
           <!-- New tranche -->
           <button
             @click="openNewTranche"
-            class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md font-medium"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             + New Tranche
           </button>
@@ -44,44 +44,43 @@
       </div>
 
       <!-- Flash messages -->
-      <div v-if="$page.props.flash?.success" class="bg-green-50 border border-green-200 text-green-800 rounded-md px-4 py-3 text-sm">
+      <div v-if="$page.props.flash?.success" class="px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">
         {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.errors?.error" class="bg-red-50 border border-red-200 text-red-800 rounded-md px-4 py-3 text-sm">
+      <div v-if="$page.props.errors?.error" class="px-4 py-3 rounded-lg bg-red-50 border border-red-100 text-red-700 text-sm">
         {{ $page.props.errors.error }}
       </div>
 
-      <!-- Table -->
-      <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-        <table class="min-w-full text-sm">
-          <thead class="bg-gray-50 sticky top-0">
+      <!-- Table Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-100 text-sm">
+          <thead class="bg-slate-50">
             <tr>
-              <th class="px-3 py-3 text-left font-semibold text-gray-700 border-b border-r border-gray-200 bg-gray-100 w-16">
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border-r border-slate-100 w-16 sticky left-0 bg-slate-50">
                 SG
               </th>
               <th
                 v-for="step in steps"
                 :key="step"
-                class="px-3 py-3 text-center font-semibold text-gray-700 border-b border-r border-gray-200 min-w-[130px]"
+                class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap border-r border-slate-100 min-w-[130px]"
               >
                 Step {{ step }}
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-slate-100">
             <tr
               v-for="grade in grades"
               :key="grade"
-              :class="grade % 2 === 0 ? 'bg-white' : 'bg-gray-50'"
-              class="hover:bg-blue-50 transition-colors"
+              class="hover:bg-slate-50/60 transition-colors"
             >
-              <td class="px-3 py-2 font-bold text-center text-gray-800 border-r border-gray-200 bg-blue-50">
+              <td class="px-4 py-2 font-bold text-center text-slate-700 border-r border-slate-100 bg-slate-50/80 sticky left-0">
                 {{ grade }}
               </td>
               <td
                 v-for="step in steps"
                 :key="step"
-                class="px-2 py-1.5 text-right border-r border-gray-100"
+                class="px-2 py-1.5 text-right border-r border-slate-100"
               >
                 <template v-if="editing?.grade === grade && editing?.step === step">
                   <div class="flex items-center gap-1">
@@ -90,19 +89,19 @@
                       type="number"
                       step="0.01"
                       min="0"
-                      class="w-28 border border-blue-400 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      class="w-28 rounded-lg border border-indigo-400 px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       @keydown.enter="saveEdit"
                       @keydown.esc="cancelEdit"
                       ref="editInput"
                     />
-                    <button @click="saveEdit" class="text-green-600 hover:text-green-800 font-bold text-xs">✓</button>
-                    <button @click="cancelEdit" class="text-red-500 hover:text-red-700 text-xs">✕</button>
+                    <button @click="saveEdit" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs p-1">✓</button>
+                    <button @click="cancelEdit" class="text-red-400 hover:text-red-600 text-xs p-1">✕</button>
                   </div>
                 </template>
                 <template v-else>
                   <button
                     @click="startEdit(grade, step)"
-                    class="w-full text-right px-2 py-0.5 rounded hover:bg-blue-100 font-mono text-gray-700 text-xs transition-colors"
+                    class="w-full text-right px-2 py-0.5 rounded-lg hover:bg-indigo-50 font-mono text-slate-700 text-xs transition-colors"
                     :title="`SG ${grade} Step ${step} — click to edit`"
                   >
                     {{ formatRate(getRate(grade, step)) }}
@@ -114,7 +113,7 @@
         </table>
       </div>
 
-      <p class="text-xs text-gray-400 text-right">
+      <p class="text-xs text-slate-400 text-right">
         Effective date: {{ effectiveDate }} &nbsp;·&nbsp;
         Rates in Philippine Peso (₱) &nbsp;·&nbsp;
         Click any cell to edit
@@ -123,61 +122,53 @@
 
     <!-- New Tranche Modal -->
     <Teleport to="body">
-      <div v-if="showNewTranche" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
-          <div class="p-6 border-b border-gray-100">
-            <h2 class="text-lg font-semibold text-gray-900">Create New Tranche</h2>
-            <p class="text-sm text-gray-500 mt-1">Copy an existing tranche with an optional salary increment.</p>
+      <div v-if="showNewTranche" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-slate-800">Create New Tranche</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Copy an existing tranche with an optional salary increment.</p>
+            </div>
+            <button @click="showNewTranche = false"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
           </div>
-          <form @submit.prevent="submitNewTranche" class="p-6 space-y-4">
+          <form @submit.prevent="submitNewTranche" class="px-6 py-5 space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tranche Name <span class="text-red-500">*</span></label>
-              <input
-                v-model="newTranche.tranche"
-                type="text"
-                placeholder="e.g. SSL V T5 2025"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+              <label class="block text-xs font-medium text-slate-600 mb-1">Tranche Name <span class="text-red-500">*</span></label>
+              <input v-model="newTranche.tranche" type="text" placeholder="e.g. SSL V T5 2025"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                required />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Effective Date <span class="text-red-500">*</span></label>
-              <input
-                v-model="newTranche.effective_date"
-                type="date"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
+              <label class="block text-xs font-medium text-slate-600 mb-1">Effective Date <span class="text-red-500">*</span></label>
+              <input v-model="newTranche.effective_date" type="date"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                required />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Base Tranche <span class="text-red-500">*</span></label>
-              <select
-                v-model="newTranche.base_tranche"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-                required
-              >
+              <label class="block text-xs font-medium text-slate-600 mb-1">Base Tranche <span class="text-red-500">*</span></label>
+              <select v-model="newTranche.base_tranche"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                required>
                 <option value="">— Select base —</option>
                 <option v-for="t in tranches" :key="t.tranche" :value="t.tranche">{{ t.tranche }}</option>
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Increment % <span class="text-gray-400">(optional)</span></label>
-              <input
-                v-model="newTranche.increment_pct"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                placeholder="0 = copy as-is"
-                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-              />
-              <p class="text-xs text-gray-400 mt-1">All rates in the new tranche will be multiplied by (1 + increment%).</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Increment % <span class="text-slate-400">(optional)</span></label>
+              <input v-model="newTranche.increment_pct" type="number" step="0.01" min="0" max="100" placeholder="0 = copy as-is"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p class="text-xs text-slate-400 mt-1">All rates in the new tranche will be multiplied by (1 + increment%).</p>
             </div>
-            <div class="flex justify-end gap-2 pt-2">
-              <button type="button" @click="showNewTranche = false" class="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button type="button" @click="showNewTranche = false"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
                 Cancel
               </button>
-              <button type="submit" :disabled="newTrancheSaving" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium disabled:opacity-50">
+              <button type="submit" :disabled="newTrancheSaving"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 {{ newTrancheSaving ? 'Creating...' : 'Create Tranche' }}
               </button>
             </div>
@@ -190,7 +181,7 @@
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
-import { router, useForm, usePage } from '@inertiajs/vue3'
+import { router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
 const props = defineProps({

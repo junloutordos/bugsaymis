@@ -1,7 +1,7 @@
 <script setup>
 import { Head, useForm, router as inertiaRouter } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
-import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon, ListBulletIcon, PaperAirplaneIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { useSubmit } from "@/Composables/useSubmit";
@@ -273,162 +273,276 @@ const removeItemRow = async (i) => {
   <AdminLayout>
     <template #title>Purchase Requests</template>
 
-    <div class="p-4">
-      <div class="mb-4 flex items-center justify-end">
-        <button @click="openModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition">New Purchase Request</button>
+    <div class="space-y-5">
+
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-bold text-slate-800">Purchase Requests</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Manage and track all purchase requests</p>
+        </div>
+        <button
+          @click="openModal()"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+        >
+          New Purchase Request
+        </button>
       </div>
 
-      <h2 class="text-xl font-semibold mb-3">Purchase Request</h2>
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
 
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-4">
+        <!-- Card header / search -->
+        <div class="px-5 py-4 border-b border-slate-100">
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search by PR No, requester, purpose"
-            class="w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Search by PR No, requester, purpose…"
+            class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
         </div>
 
-        <table class="table-fixed w-full border border-gray-200">
-          <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
-            <tr>
-              <th class="px-4 py-2 text-left">PR No</th>
-              <th class="px-4 py-2 text-left">Date</th>
-              <th class="px-4 py-2 text-left">Requested By</th>
-              <th class="px-4 py-2 text-left">Purpose</th>
-              <th class="px-4 py-2 text-left">Items</th>
-              <th class="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="p in filtered" :key="p.id">
-              <td class="px-4 py-2">{{ p.pr_no }}</td>
-              <td class="px-4 py-2">{{ formatDate(p.pr_date) }}</td>
-              <td class="px-4 py-2">{{ isAdmin ? ((p.requester && p.requester.name) || p.requested_by) : p.requested_by }}</td>
-              <td class="px-4 py-2">{{ p.purpose }}</td>
-              <td class="px-4 py-2">{{ (p.items || []).length }}</td>
-              <td class="px-4 py-2 text-center whitespace-normal break-words">
-                <div class="flex items-center gap-2 justify-center">
-                  <button @click.prevent="openModal(p)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
-                    <PencilSquareIcon class="w-5 h-5" />
-                  </button>
-                  <button @click.prevent="openItemsModal(p)" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Manage Items">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 7a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 4a1 1 0 000 2h9a1 1 0 100-2H4z"/></svg>
-                  </button>
-                  <button @click.prevent="destroy(p)" :disabled="isDeleting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-                  <button @click.prevent="sendForApproval(p)" class="p-2 rounded-full bg-yellow-100 hover:bg-yellow-200 text-yellow-700" title="Send for Approval">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a1 1 0 00-1 1v6H6a1 1 0 000 2h3v6a1 1 0 001 1h0a1 1 0 001-1v-6h3a1 1 0 100-2h-3V3a1 1 0 00-1-1z"/></svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="(filtered || []).length === 0">
-              <td class="p-4 text-center" colspan="6">No purchase requests found.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PR No</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requested By</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Purpose</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Items</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="p in filtered" :key="p.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700 font-mono">{{ p.pr_no }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ formatDate(p.pr_date) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ isAdmin ? ((p.requester && p.requester.name) || p.requested_by) : p.requested_by }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 max-w-xs truncate">{{ p.purpose }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+                    {{ (p.items || []).length }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-1">
+                    <button @click.prevent="openModal(p)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      <PencilSquareIcon class="w-4 h-4" />
+                    </button>
+                    <button @click.prevent="openItemsModal(p)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Manage Items">
+                      <ListBulletIcon class="w-4 h-4" />
+                    </button>
+                    <button @click.prevent="destroy(p)" :disabled="isDeleting" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
+                    <button @click.prevent="sendForApproval(p)" class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition-colors" title="Send for Approval">
+                      <PaperAirplaneIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="(filtered || []).length === 0">
+                <td class="px-4 py-10 text-center text-sm text-slate-400" colspan="6">No purchase requests found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-      <div class="mt-3 flex items-center justify-center">
-        <div class="flex items-center gap-3">
-          <button @click="currentPage = Math.max(1, currentPage - 1)" class="px-3 py-1 border rounded">Prev</button>
-          <div class="text-sm">Page {{ currentPage }} / {{ totalPages }}</div>
-          <button @click="currentPage = Math.min(totalPages, currentPage + 1)" class="px-3 py-1 border rounded">Next</button>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <div class="flex items-center gap-2">
+            <button
+              @click="currentPage = Math.max(1, currentPage - 1)"
+              :disabled="currentPage === 1"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >Prev</button>
+            <button
+              @click="currentPage = Math.min(totalPages, currentPage + 1)"
+              :disabled="currentPage === totalPages"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >Next</button>
+          </div>
         </div>
       </div>
 
-      <!-- Modal (basic) -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white w-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-md p-4 sm:p-6 relative overflow-auto">
-          <h3 class="text-lg font-semibold mb-2">{{ editMode ? 'Edit Purchase Request' : 'New Purchase Request' }}</h3>
-          <div class="grid grid-cols-2 gap-3">
-            <div class="col-span-1">
-              <label class="block text-sm">PR Date</label>
-              <input type="date" v-model="form.pr_date" :min="today" @change="() => validateField('pr_date')" :class="['border px-2 py-1 w-full', fieldErrors.pr_date ? 'rounded ring-1 ring-red-200 border-red-500' : 'rounded']" />
-              <p v-if="fieldErrors.pr_date" class="text-red-600 text-sm mt-1">{{ fieldErrors.pr_date }}</p>
+      <!-- Create / Edit Modal -->
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white w-full sm:max-w-md rounded-2xl shadow-xl flex flex-col">
+
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">{{ editMode ? 'Edit Purchase Request' : 'New Purchase Request' }}</h3>
+            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">PR Date</label>
+              <input
+                type="date"
+                v-model="form.pr_date"
+                :min="today"
+                @change="() => validateField('pr_date')"
+                :class="[
+                  'w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                  fieldErrors.pr_date ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400'
+                ]"
+              />
+              <p v-if="fieldErrors.pr_date" class="text-red-600 text-xs mt-1">{{ fieldErrors.pr_date }}</p>
             </div>
-            <div class="col-span-2">
-              <label class="block text-sm">Purpose</label>
-              <textarea v-model="form.purpose" @input="() => validateField('purpose')" :class="['border px-2 py-1 w-full', fieldErrors.purpose ? 'rounded ring-1 ring-red-200 border-red-500' : 'rounded']" rows="3"></textarea>
-              <p v-if="fieldErrors.purpose" class="text-red-600 text-sm mt-1">{{ fieldErrors.purpose }}</p>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Purpose</label>
+              <textarea
+                v-model="form.purpose"
+                @input="() => validateField('purpose')"
+                rows="3"
+                :class="[
+                  'w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500',
+                  fieldErrors.purpose ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400'
+                ]"
+              ></textarea>
+              <p v-if="fieldErrors.purpose" class="text-red-600 text-xs mt-1">{{ fieldErrors.purpose }}</p>
             </div>
           </div>
 
-          <div class="mt-4 flex justify-end">
-            <button class="px-3 py-1 mr-2 border rounded" @click="closeModal">Cancel</button>
-            <button class="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed" :disabled="form.processing" @click="submit">{{ form.processing ? 'Saving…' : 'Save' }}</button>
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click="closeModal" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button
+              :disabled="form.processing"
+              @click="submit"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60"
+            >
+              {{ form.processing ? 'Saving…' : 'Save' }}
+            </button>
           </div>
         </div>
       </div>
 
       <!-- Items Modal -->
-      <div v-if="showItemsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white w-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-4xl p-4 sm:p-6 relative overflow-auto">
-          <h3 class="text-lg font-semibold mb-2">Add Items to {{ currentProcurement ? currentProcurement.pr_no : '' }}</h3>
-          <div>
-            <div class="grid grid-cols-12 gap-2 items-end mb-3">
-              <div class="col-span-2">
-                <label class="text-sm">PPMP No</label>
-                <input v-model="newItem.ppmp_line_item_no" class="border px-2 py-1 w-full rounded" />
-              </div>
-                          <div class="col-span-2">
-                            <label class="text-sm">Unit</label>
-                            <select v-model="newItem.unit" class="border px-2 py-1 w-full rounded">
-                              <option value="">Select unit</option>
-                              <option v-for="u in units" :key="u.id" :value="u.name">{{ u.name }}</option>
-                            </select>
-                          </div>
-              <div class="col-span-5">
-                <label class="text-sm">Description</label>
-                <input v-model="newItem.description" class="border px-2 py-1 w-full rounded" />
-              </div>
-              <div class="col-span-1">
-                <label class="text-sm">Qty</label>
-                <input type="number" v-model.number="newItem.quantity" min="1" class="border px-2 py-1 w-full rounded" />
-              </div>
-              <div class="col-span-1">
-                <label class="text-sm">Unit Cost</label>
-                <input type="number" step="0.01" v-model="newItem.unit_cost" class="border px-2 py-1 w-full rounded" />
-              </div>
-              <div class="col-span-1">
-                <button class="px-3 py-1 bg-gray-100 rounded" @click="addItemRow">Add Item</button>
+      <div v-if="showItemsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white w-full sm:max-w-4xl rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">
+              Items — <span class="text-indigo-600 font-mono">{{ currentProcurement ? currentProcurement.pr_no : '' }}</span>
+            </h3>
+            <button @click="closeItemsModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="overflow-y-auto px-6 py-5 space-y-4">
+
+            <!-- Add item row -->
+            <div class="bg-slate-50 rounded-xl p-4">
+              <p class="text-xs font-medium text-slate-500 mb-3 uppercase tracking-wide">Add Item</p>
+              <div class="grid grid-cols-12 gap-2 items-end">
+                <div class="col-span-2">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">PPMP No</label>
+                  <input
+                    v-model="newItem.ppmp_line_item_no"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                  />
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Unit</label>
+                  <select
+                    v-model="newItem.unit"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                  >
+                    <option value="">Select unit</option>
+                    <option v-for="u in units" :key="u.id" :value="u.name">{{ u.name }}</option>
+                  </select>
+                </div>
+                <div class="col-span-4">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                  <input
+                    v-model="newItem.description"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                  />
+                </div>
+                <div class="col-span-1">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Qty</label>
+                  <input
+                    type="number"
+                    v-model.number="newItem.quantity"
+                    min="1"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                  />
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Unit Cost</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    v-model="newItem.unit_cost"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                  />
+                </div>
+                <div class="col-span-1">
+                  <button
+                    @click="addItemRow"
+                    class="w-full inline-flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             </div>
 
-            <table class="w-full table-auto border-collapse border border-gray-200 text-sm">
-              <thead class="bg-gray-100">
-                <tr>
-                  <th class="px-2 py-2 border">PPMP No</th>
-                  <th class="px-2 py-2 border">Unit</th>
-                  <th class="px-2 py-2 border">Description</th>
-                  <th class="px-2 py-2 border">Qty</th>
-                  <th class="px-2 py-2 border">Unit Cost</th>
-                  <th class="px-2 py-2 border">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(it, idx) in itemsForm.items" :key="idx" class="odd:bg-white even:bg-gray-50">
-                  <td class="px-2 py-2 border">{{ it.ppmp_line_item_no }}</td>
-                  <td class="px-2 py-2 border">{{ it.unit }}</td>
-                  <td class="px-2 py-2 border">{{ it.description }}</td>
-                  <td class="px-2 py-2 border">{{ it.quantity }}</td>
-                  <td class="px-2 py-2 border">{{ it.unit_cost }}</td>
-                  <td class="px-2 py-2 border text-center">
-                    <button class="px-2 py-1 bg-red-100 text-red-700 rounded" @click="removeItemRow(idx)">Remove</button>
-                  </td>
-                </tr>
-                <tr v-if="!(itemsForm.items || []).length">
-                  <td class="p-4 text-center" colspan="6">No items. Use the inputs above to add items.</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- Items table -->
+            <div class="overflow-x-auto">
+              <table class="min-w-full">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PPMP No</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Unit</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Qty</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Unit Cost</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(it, idx) in itemsForm.items" :key="idx" class="hover:bg-slate-50/60">
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.ppmp_line_item_no }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.unit }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.description }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.quantity }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ it.unit_cost }}</td>
+                    <td class="px-4 py-3">
+                      <button
+                        @click="removeItemRow(idx)"
+                        class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"
+                        title="Remove"
+                      >
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="!(itemsForm.items || []).length">
+                    <td class="px-4 py-10 text-center text-sm text-slate-400" colspan="6">No items. Use the form above to add items.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-            <div class="mt-4 flex justify-end">
-            <button class="px-3 py-1 mr-2 border rounded" @click="closeItemsModal">Close</button>
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
+            <button
+              @click="closeItemsModal"
+              class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+            >Close</button>
           </div>
         </div>
       </div>

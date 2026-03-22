@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import axios from 'axios'
 
 const props = defineProps({
@@ -129,15 +130,7 @@ const docTypes = [
               <span v-if="applicant.civil_status">· {{ applicant.civil_status }}</span>
             </div>
           </div>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize"
-                :class="{
-                  'bg-emerald-50 text-emerald-700': applicant.status === 'active',
-                  'bg-emerald-50 text-emerald-700': applicant.status === 'hired',
-                  'bg-red-50 text-red-600':         applicant.status === 'blacklisted',
-                  'bg-slate-100 text-slate-600':    applicant.status === 'withdrawn',
-                }">
-            {{ applicant.status }}
-          </span>
+          <span :class="[badgeBase, statusBadgeClass(applicant.status), 'capitalize']">{{ applicant.status }}</span>
         </div>
       </div>
 

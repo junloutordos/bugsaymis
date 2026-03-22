@@ -2,192 +2,215 @@
   <Head title="Rooms" />
   <AdminLayout title="Rooms">
     <div>
-
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Rooms</h1>
-        <button @click.prevent="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">+ New Room</button>
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Rooms</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Manage campus rooms and spaces</p>
+        </div>
+        <button @click.prevent="openModal()"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          + New Room
+        </button>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
+      <!-- Table Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="mb-4">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search rooms..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
+        <div class="px-5 py-4 border-b border-slate-100">
+          <input v-model="searchQuery" type="text" placeholder="Search rooms..."
+            class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
         </div>
+
         <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="table-fixed w-full border border-gray-200 min-w-[900px]">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Name</th>
-                <th class="px-4 py-3 text-left">Code</th>
-                <th class="px-4 py-3 text-left">Building</th>
-                <th class="px-4 py-3 text-left">Floor</th>
-                <th class="px-4 py-3 text-left">Section</th>
-                <th class="px-4 py-3 text-left">Occupant</th>
-                <th class="px-4 py-3 text-left">Capacity</th>
-                  <th class="px-4 py-3 text-left">Type</th>
-                  <!--<th class="px-4 py-3 text-left">Gender</th>-->
-                  <th class="px-4 py-3 text-left">Remarks</th>
-                <th class="px-4 py-3 text-center">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Code</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Building</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Floor</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Section</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Occupant</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Capacity</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+                <!--<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Gender</th>-->
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Remarks</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="r in filteredRooms" :key="r.id">
-                <td class="px-4 py-3">{{ r.id }}</td>
-                <td class="px-4 py-3">{{ r.name }}</td>
-                <td class="px-4 py-3">{{ r.code ?? '—' }}</td>
-                <td class="px-4 py-3">{{ r.building?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ r.floor ?? '—' }}</td>
-                <td class="px-4 py-3">{{ r.section_name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ r.office?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ r.capacity ?? '—' }}</td>
-                <td class="px-4 py-3">{{ r.room_type ?? '—' }}</td>
-                <!--<td class="px-4 py-3">{{ r.comfort_gender ?? '—' }}</td>-->
-                <td class="px-4 py-3">{{ r.remarks ?? '—' }}</td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-2 justify-center">
-                    <button @click.prevent="openModal(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit">
-                      <PencilSquareIcon class="h-5 w-5" />
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="r in filteredRooms" :key="r.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 font-medium">{{ r.name }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.code ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.building?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.floor ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.section_name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.office?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.capacity ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.room_type ?? '—' }}</td>
+                <!--<td class="px-4 py-3 text-sm text-slate-700">{{ r.comfort_gender ?? '—' }}</td>-->
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.remarks ?? '—' }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-1">
+                    <button @click.prevent="openModal(r)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      <PencilSquareIcon class="h-4 w-4" />
                     </button>
-                    <button @click.prevent="destroy(r)" :disabled="isDeleting" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
-                      <TrashIcon class="h-5 w-5" />
+                    <button @click.prevent="destroy(r)" :disabled="isDeleting"
+                      class="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
+                      <TrashIcon class="h-4 w-4" />
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredRooms.length === 0">
-                <td colspan="11" class="px-4 py-6 text-center text-gray-500">No rooms found.</td>
+                <td colspan="11" class="py-16 text-center text-slate-400 text-sm">No rooms found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Mobile / small screens: card list -->
-        <div v-else class="space-y-3">
-          <div v-for="r in filteredRooms" :key="r.id" class="bg-white border rounded-lg p-4 shadow-sm">
+        <!-- Mobile card list -->
+        <div v-else class="p-4 space-y-3">
+          <div v-for="r in filteredRooms" :key="r.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
             <div class="flex justify-between items-start">
               <div>
-                <div class="text-sm text-gray-500">ID: {{ r.id }}</div>
-                <div class="text-lg font-semibold">{{ r.name }}</div>
-                <div class="text-sm text-gray-600">Code: {{ r.code ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Building: {{ r.building?.name ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Floor: {{ r.floor ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Section: {{ r.section_name ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Occupant: {{ r.office?.name ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Capacity: {{ r.capacity ?? '—' }}</div>
-                <div class="text-sm text-gray-600">Type: {{ r.room_type ?? '—' }}</div>
+                <div class="text-xs text-slate-400">ID: {{ r.id }}</div>
+                <div class="text-sm font-semibold text-slate-800">{{ r.name }}</div>
+                <div class="text-xs text-slate-500 mt-1">Code: {{ r.code ?? '—' }} · Building: {{ r.building?.name ?? '—' }}</div>
+                <div class="text-xs text-slate-500">Floor: {{ r.floor ?? '—' }} · Section: {{ r.section_name ?? '—' }}</div>
+                <div class="text-xs text-slate-500">Occupant: {{ r.office?.name ?? '—' }} · Capacity: {{ r.capacity ?? '—' }}</div>
+                <div class="text-xs text-slate-500">Type: {{ r.room_type ?? '—' }}</div>
               </div>
               <div class="flex flex-col items-end gap-2">
-                <button @click.prevent="openModal(r)" class="px-3 py-1 bg-blue-600 text-white rounded">Edit</button>
-                <button @click.prevent="destroy(r)" :disabled="isDeleting" class="px-3 py-1 bg-red-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
+                <button @click.prevent="openModal(r)"
+                  class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors">Edit</button>
+                <button @click.prevent="destroy(r)" :disabled="isDeleting"
+                  class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
               </div>
             </div>
           </div>
-          <div v-if="filteredRooms.length === 0" class="text-center text-gray-500 py-6">No rooms found.</div>
+          <div v-if="filteredRooms.length === 0" class="py-16 text-center text-slate-400 text-sm">No rooms found.</div>
         </div>
-      <!-- Pagination -->
-      <div class="flex justify-center items-center gap-2 mt-4">
-        <button
-          @click="currentPage--"
-          :disabled="currentPage === 1"
-          class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-        >
-          Prev
-        </button>
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <button
-          @click="currentPage++"
-          :disabled="currentPage === totalPages"
-          class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-        >
-          Next
-        </button>
-      </div>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <span>Page {{ currentPage }} of {{ totalPages }}</span>
+          <div class="flex items-center gap-2">
+            <button @click="currentPage--" :disabled="currentPage === 1"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+              Prev
+            </button>
+            <button @click="currentPage++" :disabled="currentPage === totalPages"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+              Next
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 relative">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
-          <h2 class="text-xl font-semibold mb-4">{{ editingId ? 'Edit Room' : 'New Room' }}</h2>
-          <form @submit.prevent="submitForm" class="space-y-3">
+      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Room' : 'New Room' }}</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <form @submit.prevent="submitForm" class="px-6 py-5 space-y-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Name <span class="text-red-500">*</span></label>
-              <input v-model="form.name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
+              <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
+              <input v-model="form.name" type="text"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                required />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Code</label>
-              <input v-model="form.code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
+              <label class="block text-xs font-medium text-slate-600 mb-1">Code</label>
+              <input v-model="form.code" type="text"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Building</label>
-              <select v-model="form.building_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
+              <select v-model="form.building_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="">Select building</option>
                 <option v-for="b in props.buildings" :key="b.id" :value="b.id">{{ b.name }}</option>
               </select>
             </div>
             <div v-if="selectedBuilding && selectedBuilding.number_of_floors > 0">
-              <label class="block text-sm font-medium text-gray-700">Floor</label>
-              <select v-model="form.floor" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Floor</label>
+              <select v-model="form.floor"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="">Select floor</option>
                 <option v-for="f in floorOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
               </select>
             </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Room Type</label>
-                <select v-model="form.room_type" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                  <option value="">Select room type</option>
-                  <option value="Classroom">Classroom</option>
-                  <option value="Admin">Admin</option>
-                  <option value="Laboratory">Laboratory</option>
-                  <option value="Sports/Recreation">Sports/Recreation</option>
-                  <option value="Assembly">Assembly</option>
-                  <option value="Comfort Room">Comfort Room</option>
-                </select>
-              </div>
-
-              <div v-if="form.room_type === 'Comfort Room'">
-                <label class="block text-sm font-medium text-gray-700">Comfort Room For</label>
-                <select v-model="form.comfort_gender" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                  <option value="">Select</option>
-                  <option value="Female">Female</option>
-                  <option value="Male">Male</option>
-                  <option value="All Gender">All Gender</option>
-                </select>
-              </div>
-
-              <div v-if="form.room_type === 'Classroom'">
-                <label class="block text-sm font-medium text-gray-700">Section</label>
-                <select v-model="form.section_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                  <option value="">Select section</option>
-                  <option v-for="s in sectionsList" :key="s.id" :value="s.id">{{ s.name }}</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Capacity</label>
-                <input v-model.number="form.capacity" type="number" min="0" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" />
-              </div>
-              <div v-if="form.room_type === 'Admin'">
-                <label class="block text-sm font-medium text-gray-700">Occupant (Office)</label>
-                <select v-model="form.office_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                  <option value="">--</option>
-                  <option v-for="o in props.offices" :key="o.id" :value="o.id">{{ o.name }}</option>
-                </select>
-              </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Remarks</label>
-              <textarea v-model="form.remarks" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" rows="3"></textarea>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Room Type</label>
+              <select v-model="form.room_type"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select room type</option>
+                <option value="Classroom">Classroom</option>
+                <option value="Admin">Admin</option>
+                <option value="Laboratory">Laboratory</option>
+                <option value="Sports/Recreation">Sports/Recreation</option>
+                <option value="Assembly">Assembly</option>
+                <option value="Comfort Room">Comfort Room</option>
+              </select>
             </div>
 
-            <div class="flex justify-end space-x-3 pt-4">
-              <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" :disabled="form.processing" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{{ form.processing ? 'Saving…' : 'Save' }}</button>
+            <div v-if="form.room_type === 'Comfort Room'">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Comfort Room For</label>
+              <select v-model="form.comfort_gender"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select</option>
+                <option value="Female">Female</option>
+                <option value="Male">Male</option>
+                <option value="All Gender">All Gender</option>
+              </select>
+            </div>
+
+            <div v-if="form.room_type === 'Classroom'">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Section</label>
+              <select v-model="form.section_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">Select section</option>
+                <option v-for="s in sectionsList" :key="s.id" :value="s.id">{{ s.name }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+              <input v-model.number="form.capacity" type="number" min="0"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div v-if="form.room_type === 'Admin'">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Occupant (Office)</label>
+              <select v-model="form.office_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">--</option>
+                <option v-for="o in props.offices" :key="o.id" :value="o.id">{{ o.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+              <textarea v-model="form.remarks" rows="3"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button type="button" @click="closeModal"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Cancel
+              </button>
+              <button type="submit" :disabled="form.processing"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                {{ form.processing ? 'Saving…' : 'Save' }}
+              </button>
             </div>
           </form>
         </div>

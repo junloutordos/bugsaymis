@@ -122,7 +122,7 @@ const equipmentChecklist = {
     "Test connectivity"
   ],
   "Other": [
-    "Follow manufacturer’s recommended preventive maintenance",
+    "Follow manufacturer's recommended preventive maintenance",
     "Clean, inspect, and test functionality as applicable"
   ]
 }
@@ -262,19 +262,23 @@ const equipmentHistoryMap = computed(() => {
   <Head title="Preventive Maintenance Schedule" />
   <AdminLayout title="Preventive Maintenance Schedule">
 
-    <!-- Export Button -->
-    <div class="flex justify-end gap-2 mb-4">
-      <button 
-        @click="exportPDF" 
-        class="flex items-center gap-1 px-3 py-1 border border-blue-600 rounded text-blue-600 bg-white hover:bg-blue-50"
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-xl font-semibold text-slate-800">PMS Equipment Details</h1>
+        <p class="text-sm text-slate-500 mt-0.5">{{ pms.office_area }} — {{ pms.school_year }}</p>
+      </div>
+      <button
+        @click="exportPDF"
+        class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
       >
-        <ArrowDownTrayIcon class="w-5 h-5" />
-        <span>Export</span>
+        <ArrowDownTrayIcon class="w-4 h-4" />
+        Export PDF
       </button>
     </div>
 
     <!-- Card Display -->
-    <div class="p-8 bg-white rounded-xl shadow border border-gray-300">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
       <div id="pdfContent">
         <!-- Header -->
         <div class="text-center mb-4">
@@ -306,21 +310,21 @@ const equipmentHistoryMap = computed(() => {
             <tr v-for="(eq, i) in equipments" :key="eq.id">
               <td class="border border-black p-1">{{ i + 1 }}</td>
               <td class="border border-black p-1">{{ eq.description }}</td>
-              <td class="border border-black p-1">{{ eq.room || '-' }}</td> <!-- updated -->
+              <td class="border border-black p-1">{{ eq.room || '-' }}</td>
               <td class="border border-black p-1">{{ pms.frequency }}</td>
 
               <!-- PMS history per month -->
               <td v-for="(m, idx) in months" :key="m" class="border border-black p-1 text-center">
                 <!-- PMS history exists -->
-                <span 
-                  v-if="equipmentHistoryMap[eq.id]?.includes(idx)" 
+                <span
+                  v-if="equipmentHistoryMap[eq.id]?.includes(idx)"
                   class="text-blue-600 text-2xl font-bold"
                 >*</span>
 
                 <!-- Scheduled but not yet done -->
-                <span 
-                  v-else-if="monthStatusMap[idx]" 
-                  class="text-green-600 text-2xl font-bold cursor-pointer" 
+                <span
+                  v-else-if="monthStatusMap[idx]"
+                  class="text-green-600 text-2xl font-bold cursor-pointer"
                   @click="openModal(eq, idx)"
                 >✓</span>
               </td>
@@ -328,7 +332,7 @@ const equipmentHistoryMap = computed(() => {
 
             <!-- No equipments fallback -->
             <tr v-if="equipments.length === 0">
-              <td :colspan="months.length + 4" class="border border-black p-1 text-gray-500 text-center">
+              <td :colspan="months.length + 4" class="border border-black p-1 text-slate-500 text-center">
                 No equipments assigned.
               </td>
             </tr>
@@ -337,7 +341,7 @@ const equipmentHistoryMap = computed(() => {
           </table>
         </div>
 
-        <!-- ✅ Legend + Footer + Form Number remain the same -->
+        <!-- Legend -->
         <div class="mt-4 text-xs">
           <p>
             <strong>Legend:</strong> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -348,34 +352,34 @@ const equipmentHistoryMap = computed(() => {
         </div>
 
         <!-- Footer -->
-    <div class="mt-4 border text-sm">
-      <table class="w-full border-collapse">
-        <tbody>
-          <tr>
-            <td class="border border-black px-2 py-2 align-top w-1/4">
-              <p class="mb-2">Prepared By:</p><br />
-              <p class="font-semibold underline text-center uppercase">
-                {{ currentUser?.name || "________________" }}
-              </p>
-              <p class="text-center">
-                {{ currentUser?.position || "________________" }}
-              </p>
-            </td>
-            <td class="border border-black px-2 py-2 w-1/4 align-top">
-              <p>Date: </p>
-            </td>
-            <td class="border border-black px-2 py-2 align-top w-1/4">
-              <p class="mb-2">Noted By:</p><br />
-              <p class="font-semibold underline text-center">ENGR. RAMIL A. SANCHEZ</p>
-              <p class="text-center">Campus Director</p>
-            </td>
-            <td class="border border-black px-2 py-2 w-1/4 align-top">
-              <p>Date: </p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+        <div class="mt-4 border text-sm">
+          <table class="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td class="border border-black px-2 py-2 align-top w-1/4">
+                  <p class="mb-2">Prepared By:</p><br />
+                  <p class="font-semibold underline text-center uppercase">
+                    {{ currentUser?.name || "________________" }}
+                  </p>
+                  <p class="text-center">
+                    {{ currentUser?.position || "________________" }}
+                  </p>
+                </td>
+                <td class="border border-black px-2 py-2 w-1/4 align-top">
+                  <p>Date: </p>
+                </td>
+                <td class="border border-black px-2 py-2 align-top w-1/4">
+                  <p class="mb-2">Noted By:</p><br />
+                  <p class="font-semibold underline text-center">ENGR. RAMIL A. SANCHEZ</p>
+                  <p class="text-center">Campus Director</p>
+                </td>
+                <td class="border border-black px-2 py-2 w-1/4 align-top">
+                  <p>Date: </p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <div class="flex justify-between text-sm mb-4 mt-2">
           <p>PSHS-00-F-GSM-06-Ver02-Rev0-02/01/20</p>
@@ -383,51 +387,57 @@ const equipmentHistoryMap = computed(() => {
       </div>
     </div>
 
-    <!-- Modal -->
-    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
-        <h3 class="text-lg font-semibold mb-4">PMS Checklist</h3>
-        <p class="mb-2"><strong>Equipment:</strong> {{ selectedEquipment.description }}</p>
-        <p class="mb-2"><strong>Month:</strong> {{ months[selectedMonth] }}</p>
-
-        <!-- Checklist -->
-        <div class="mb-4">
-          <label v-for="(item, idx) in checklistItems" :key="idx" class="flex items-center gap-2 mb-1">
-            <input type="checkbox" v-model="checklistStatus[idx]" />
-            <span>{{ item }}</span>
-          </label>
+    <!-- PMS Checklist Modal -->
+    <div v-if="showModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800">PMS Checklist</h3>
+          <button @click="showModal = false"
+            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
         </div>
+        <div class="px-6 py-5 space-y-4">
+          <div class="text-sm text-slate-700 space-y-1">
+            <p><span class="font-medium text-slate-600">Equipment:</span> {{ selectedEquipment.description }}</p>
+            <p><span class="font-medium text-slate-600">Month:</span> {{ months[selectedMonth] }}</p>
+          </div>
 
-        <!-- Additional Inputs -->
-        <div class="mb-4 space-y-2">
-          <div>
-            <label class="block text-sm font-medium">Actual PMS Date:</label>
-            <input type="date" v-model="modalData.actualDate" class="w-full border rounded px-2 py-1" />
+          <!-- Checklist -->
+          <div class="space-y-2">
+            <label v-for="(item, idx) in checklistItems" :key="idx" class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+              <input type="checkbox" v-model="checklistStatus[idx]" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <span>{{ item }}</span>
+            </label>
           </div>
-          <input type="hidden" v-model="modalData.pmsType" />
-          <div>
-            <label class="block text-sm font-medium">Cost of Repair (if any):</label>
-            <input type="number" v-model="modalData.cost" class="w-full border rounded px-2 py-1" min="0" step="0.01" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Remarks:</label>
-            <textarea v-model="modalData.remarks" class="w-full border rounded px-2 py-1"></textarea>
+
+          <!-- Additional Inputs -->
+          <div class="space-y-3 pt-2 border-t border-slate-100">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Actual PMS Date</label>
+              <input type="date" v-model="modalData.actualDate"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <input type="hidden" v-model="modalData.pmsType" />
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Cost of Repair (if any)</label>
+              <input type="number" v-model="modalData.cost" min="0" step="0.01"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+              <textarea v-model="modalData.remarks" rows="2"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
+            </div>
           </div>
         </div>
-
-        <!-- Modal Buttons -->
-        <div class="flex justify-end gap-2">
-          <button 
-            @click="showModal = false" 
-            class="px-4 py-2 border rounded text-gray-700 bg-white hover:bg-gray-100"
-          >
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+          <button @click="showModal = false"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             Cancel
           </button>
-          <button
-            @click="saveActivity"
-            :disabled="isSubmitting"
-            class="px-4 py-2 border border-blue-600 rounded text-blue-600 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button @click="saveActivity" :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
             {{ isSubmitting ? 'Saving…' : 'Save' }}
           </button>
         </div>

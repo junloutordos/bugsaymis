@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({
   placements: { type: Object, required: true },
@@ -106,15 +107,7 @@ const formatDate = (iso) => iso
                 <td class="px-4 py-3 text-sm text-slate-700">{{ p.office?.name ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(p.start_date) }}</td>
                 <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize"
-                        :class="{
-                          'bg-amber-50 text-amber-700':     p.status === 'pending',
-                          'bg-emerald-50 text-emerald-700': p.status === 'active',
-                          'bg-emerald-50 text-emerald-700': p.status === 'completed',
-                          'bg-red-50 text-red-600':         p.status === 'terminated',
-                        }">
-                    {{ p.status }}
-                  </span>
+                  <span :class="[badgeBase, statusBadgeClass(p.status), 'capitalize']">{{ p.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-center">
                   <Link :href="route('recruitment.placements.show', p.id)"

@@ -196,67 +196,67 @@ const monthLabel = computed(() => {
   <AdminLayout title="My Accomplishments">
 
     <!-- ── Toolbar ─────────────────────────────────────────────────────── -->
-    <div class="flex flex-wrap items-center gap-3 mb-4 print:hidden">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3 print:hidden">
       <!-- Month filter -->
       <select v-model="filterMonth" @change="applyFilter"
-        class="rounded-lg border-gray-300 text-sm">
+        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
         <option value="">All months</option>
         <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
       </select>
 
       <button @click="openAdd"
-        class="ml-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+        class="ml-auto inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
         + Add Accomplishment
       </button>
 
       <!-- Monthly report -->
       <div class="flex items-center gap-2">
         <input v-model="reportMonth" type="month"
-          class="rounded-lg border-gray-300 text-sm" />
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
         <button @click="loadReport" :disabled="loadingReport"
-          class="px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
           {{ loadingReport ? "Loading…" : "Monthly Report" }}
         </button>
       </div>
     </div>
 
     <!-- ── Accomplishments table ────────────────────────────────────────── -->
-    <div class="bg-white rounded-xl shadow overflow-x-auto print:hidden">
-      <div v-if="!accomplishments.length" class="p-8 text-center text-gray-400 text-sm">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-x-auto print:hidden">
+      <div v-if="!accomplishments.length" class="py-16 text-center text-slate-400 text-sm">
         No accomplishments found{{ filterMonth ? ` for ${monthLabel}` : "" }}.
       </div>
-      <table v-else class="min-w-full text-sm divide-y divide-gray-200">
-        <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+      <table v-else class="min-w-full text-sm divide-y divide-slate-100">
+        <thead class="bg-slate-50">
           <tr>
-            <th class="px-4 py-3 text-left">Date</th>
-            <th class="px-4 py-3 text-left">Description</th>
-            <th class="px-4 py-3 text-left">Linked IPCR Plan</th>
-            <th class="px-4 py-3 text-left">Photo Proofs</th>
-            <th class="px-4 py-3 text-center">Actions</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Linked IPCR Plan</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Photo Proofs</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
-          <tr v-for="acc in accomplishments" :key="acc.id" class="hover:bg-gray-50">
-            <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-800">
+        <tbody class="divide-y divide-slate-100">
+          <tr v-for="acc in accomplishments" :key="acc.id" class="hover:bg-slate-50/60">
+            <td class="px-4 py-3 whitespace-nowrap font-medium text-slate-800 text-sm">
               {{ new Date(acc.accomplishment_date).toLocaleDateString("en-PH", { year:"numeric", month:"short", day:"numeric" }) }}
             </td>
-            <td class="px-4 py-3 max-w-sm">
+            <td class="px-4 py-3 max-w-sm text-sm text-slate-700">
               <p class="whitespace-pre-wrap break-words">{{ acc.description }}</p>
             </td>
-            <td class="px-4 py-3 text-gray-600 text-xs max-w-xs">
+            <td class="px-4 py-3 text-slate-600 text-xs max-w-xs">
               {{ planLabel(acc) }}
             </td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-1">
                 <span v-for="photo in acc.photos" :key="photo.id" class="flex items-center gap-1">
                   <a v-if="proofUrl(photo)" :href="proofUrl(photo)" target="_blank"
-                    class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                    class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
                     {{ proofIcon(photo) }} {{ proofLabel(photo) }}
                   </a>
                   <button @click="deletePhoto(photo.id)"
                     class="text-red-400 hover:text-red-600 text-xs leading-none" title="Remove">✕</button>
                 </span>
-                <span v-if="!acc.photos.length" class="text-xs text-gray-400">—</span>
+                <span v-if="!acc.photos.length" class="text-xs text-slate-400">—</span>
               </div>
               <button @click="openPhotoModal(acc)"
                 class="mt-1 text-xs text-indigo-600 hover:underline">
@@ -264,14 +264,14 @@ const monthLabel = computed(() => {
               </button>
             </td>
             <td class="px-4 py-3 text-center">
-              <div class="flex justify-center gap-2">
+              <div class="flex justify-center gap-1">
                 <button @click="openEdit(acc)" :disabled="isSubmitting"
-                  class="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Edit
+                  class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50" title="Edit">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 </button>
                 <button @click="deleteAccomplishment(acc.id)" :disabled="isSubmitting"
-                  class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Delete
+                  class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors disabled:opacity-50" title="Delete">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
               </div>
             </td>
@@ -281,160 +281,177 @@ const monthLabel = computed(() => {
     </div>
 
     <!-- ── Add / Edit Modal ─────────────────────────────────────────────── -->
-    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative">
-        <button @click="closeModal" class="absolute top-3 right-4 text-gray-400 hover:text-gray-700 text-xl">✕</button>
-        <h2 class="text-lg font-semibold mb-4">{{ editingId ? "Edit" : "Add" }} Accomplishment</h2>
+    <Teleport to="body">
+    <div v-if="showModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-800">{{ editingId ? "Edit" : "Add" }} Accomplishment</h2>
+          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">✕</button>
+        </div>
 
-        <form @submit.prevent="submitForm" class="space-y-4">
-          <!-- Date -->
-          <div>
-            <label class="text-sm font-medium text-gray-700">Date <span class="text-red-500">*</span></label>
-            <input v-model="form.accomplishment_date" type="date"
-              class="w-full mt-1 rounded-lg border-gray-300 text-sm" required />
-            <p v-if="formErrors.accomplishment_date" class="text-red-500 text-xs mt-1">
-              {{ formErrors.accomplishment_date }}
-            </p>
+        <form @submit.prevent="submitForm">
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date <span class="text-red-500">*</span></label>
+              <input v-model="form.accomplishment_date" type="date" required
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p v-if="formErrors.accomplishment_date" class="text-red-500 text-xs mt-1">
+                {{ formErrors.accomplishment_date }}
+              </p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Linked IPCR Plan</label>
+              <select v-model="form.ipcr_plan_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option value="">— Not linked —</option>
+                <option v-for="p in ipcrPlans" :key="p.id" :value="p.id">{{ p.label }}</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Description <span class="text-red-500">*</span></label>
+              <textarea v-model="form.description" rows="4" required
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+                placeholder="Describe what you accomplished..."></textarea>
+              <p v-if="formErrors.description" class="text-red-500 text-xs mt-1">{{ formErrors.description }}</p>
+            </div>
           </div>
 
-          <!-- IPCR Plan -->
-          <div>
-            <label class="text-sm font-medium text-gray-700">Linked IPCR Plan</label>
-            <select v-model="form.ipcr_plan_id" class="w-full mt-1 rounded-lg border-gray-300 text-sm">
-              <option value="">— Not linked —</option>
-              <option v-for="p in ipcrPlans" :key="p.id" :value="p.id">{{ p.label }}</option>
-            </select>
-          </div>
-
-          <!-- Description -->
-          <div>
-            <label class="text-sm font-medium text-gray-700">Description <span class="text-red-500">*</span></label>
-            <textarea v-model="form.description" rows="4" required
-              class="w-full mt-1 rounded-lg border-gray-300 text-sm"
-              placeholder="Describe what you accomplished..."></textarea>
-            <p v-if="formErrors.description" class="text-red-500 text-xs mt-1">{{ formErrors.description }}</p>
-          </div>
-
-          <div class="flex justify-end gap-2 pt-2">
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
             <button type="button" @click="closeModal"
-              class="px-4 py-2 bg-gray-200 rounded-lg text-sm">Cancel</button>
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
             <button type="submit" :disabled="isSubmitting"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
               {{ isSubmitting ? 'Saving…' : (editingId ? 'Update' : 'Save') }}
             </button>
           </div>
         </form>
       </div>
     </div>
+    </Teleport>
 
     <!-- ── Proof Upload Modal ───────────────────────────────────────────── -->
-    <div v-if="showPhotoModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-        <button @click="closePhotoModal" class="absolute top-3 right-4 text-gray-400 hover:text-gray-700 text-xl">✕</button>
-        <h2 class="text-lg font-semibold mb-1">Add Proof</h2>
-        <p class="text-xs text-gray-400 mb-4">You can upload a file, paste a link, or both at once.</p>
-
-        <p v-if="photoErrors.proof" class="text-red-500 text-xs mb-3">{{ photoErrors.proof }}</p>
-
-        <form @submit.prevent="submitPhoto" class="space-y-4">
+    <Teleport to="body">
+    <div v-if="showPhotoModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <label class="text-sm font-medium text-gray-700">Upload File <span class="text-gray-400 font-normal">(optional)</span></label>
-            <input type="file" accept="image/*,.pdf"
-              @change="photoFile = $event.target.files[0]"
-              class="w-full mt-1 text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700" />
-            <p class="text-xs text-gray-400 mt-1">JPG, PNG, GIF, PDF — max 10 MB.</p>
-            <p v-if="photoErrors.photo" class="text-red-500 text-xs mt-1">{{ photoErrors.photo }}</p>
+            <h2 class="text-base font-semibold text-slate-800">Add Proof</h2>
+            <p class="text-xs text-slate-400 mt-0.5">You can upload a file, paste a link, or both at once.</p>
+          </div>
+          <button @click="closePhotoModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">✕</button>
+        </div>
+
+        <form @submit.prevent="submitPhoto">
+          <div class="px-6 py-5 space-y-4">
+            <p v-if="photoErrors.proof" class="text-red-500 text-xs">{{ photoErrors.proof }}</p>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Upload File <span class="text-slate-400 font-normal">(optional)</span></label>
+              <input type="file" accept="image/*,.pdf"
+                @change="photoFile = $event.target.files[0]"
+                class="w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 file:text-sm" />
+              <p class="text-xs text-slate-400 mt-1">JPG, PNG, GIF, PDF — max 10 MB.</p>
+              <p v-if="photoErrors.photo" class="text-red-500 text-xs mt-1">{{ photoErrors.photo }}</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Google Drive / External Link <span class="text-slate-400 font-normal">(optional)</span></label>
+              <input v-model="driveLink" type="url" placeholder="https://drive.google.com/…"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p v-if="photoErrors.drive_link" class="text-red-500 text-xs mt-1">{{ photoErrors.drive_link }}</p>
+            </div>
           </div>
 
-          <div>
-            <label class="text-sm font-medium text-gray-700">Google Drive / External Link <span class="text-gray-400 font-normal">(optional)</span></label>
-            <input v-model="driveLink" type="url" placeholder="https://drive.google.com/…"
-              class="w-full mt-1 rounded-lg border-gray-300 text-sm" />
-            <p v-if="photoErrors.drive_link" class="text-red-500 text-xs mt-1">{{ photoErrors.drive_link }}</p>
-          </div>
-
-          <div class="flex justify-end gap-2 pt-2">
-            <button type="button" @click="closePhotoModal" class="px-4 py-2 bg-gray-200 rounded-lg text-sm">Cancel</button>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" @click="closePhotoModal"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
             <button type="submit" :disabled="uploading"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
               {{ uploading ? "Uploading…" : "Add Proof" }}
             </button>
           </div>
         </form>
       </div>
     </div>
+    </Teleport>
 
     <!-- ── Monthly Report Modal (screen only) ───────────────────────────── -->
-    <div v-if="showReport" class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center z-50 overflow-y-auto py-8">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl p-8 mx-4">
-
-        <!-- Controls -->
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold">Monthly Accomplishment Report</h2>
+    <Teleport to="body">
+    <div v-if="showReport" class="fixed inset-0 bg-slate-900/60 flex items-start justify-center z-50 overflow-y-auto py-8">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-800">Monthly Accomplishment Report</h2>
           <div class="flex gap-2">
-            <button @click="printReport" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-              🖨 Print
+            <button @click="printReport"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              Print
             </button>
-            <button @click="showReport = false" class="px-4 py-2 bg-gray-200 text-sm rounded-lg">
+            <button @click="showReport = false"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
               Close
             </button>
           </div>
         </div>
 
-        <!-- Preview header -->
-        <div class="text-center mb-4">
-          <p class="font-semibold text-gray-700">
-            {{ reportData?.employee?.name }} — {{ reportData?.employee?.position }}
-          </p>
-          <p class="text-sm text-gray-500 mt-0.5">
-            {{ new Date(reportData?.month + "-01").toLocaleString("default", { month: "long", year: "numeric" }) }}
+        <div class="px-6 py-5">
+          <!-- Preview header -->
+          <div class="text-center mb-4">
+            <p class="font-semibold text-slate-700">
+              {{ reportData?.employee?.name }} — {{ reportData?.employee?.position }}
+            </p>
+            <p class="text-sm text-slate-500 mt-0.5">
+              {{ new Date(reportData?.month + "-01").toLocaleString("default", { month: "long", year: "numeric" }) }}
+            </p>
+          </div>
+
+          <!-- Preview table -->
+          <div class="overflow-x-auto">
+          <table class="w-full text-sm border border-slate-200 min-w-[600px]">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-3 py-2 text-left border border-slate-200 w-28 text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+                <th class="px-3 py-2 text-left border border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">Description</th>
+                <th class="px-3 py-2 text-left border border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">Linked IPCR Plan</th>
+                <th class="px-3 py-2 text-left border border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">Proof</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="acc in reportData?.accomplishments" :key="acc.id" class="border-t border-slate-100 hover:bg-slate-50/60">
+                <td class="px-3 py-2 border border-slate-200 align-top whitespace-nowrap text-sm text-slate-700">
+                  {{ new Date(acc.accomplishment_date).toLocaleDateString("en-PH", { month:"short", day:"numeric" }) }}
+                </td>
+                <td class="px-3 py-2 border border-slate-200 align-top whitespace-pre-wrap text-sm text-slate-700">{{ acc.description }}</td>
+                <td class="px-3 py-2 border border-slate-200 align-top text-xs text-slate-600">
+                  {{ planLabel(acc) }}
+                </td>
+                <td class="px-3 py-2 border border-slate-200 align-top">
+                  <div v-for="photo in acc.photos" :key="photo.id">
+                    <a v-if="proofUrl(photo)" :href="proofUrl(photo)" target="_blank"
+                      class="text-indigo-600 hover:underline text-xs">
+                      {{ proofLabel(photo) }}
+                    </a>
+                  </div>
+                  <span v-if="!acc.photos?.length" class="text-xs text-slate-400">—</span>
+                </td>
+              </tr>
+              <tr v-if="!reportData?.accomplishments?.length">
+                <td colspan="4" class="px-3 py-6 text-center text-slate-400 border border-slate-200">
+                  No accomplishments recorded for this month.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+
+          <p class="text-xs text-slate-400 mt-3">
+            Total: {{ reportData?.accomplishments?.length ?? 0 }} accomplishment(s)
           </p>
         </div>
-
-        <!-- Preview table -->
-        <div class="overflow-x-auto">
-        <table class="w-full text-sm border border-gray-300 min-w-[600px]">
-          <thead class="bg-gray-100 text-gray-700 text-xs uppercase">
-            <tr>
-              <th class="px-3 py-2 text-left border border-gray-300 w-28">Date</th>
-              <th class="px-3 py-2 text-left border border-gray-300">Description</th>
-              <th class="px-3 py-2 text-left border border-gray-300">Linked IPCR Plan</th>
-              <th class="px-3 py-2 text-left border border-gray-300">Proof</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="acc in reportData?.accomplishments" :key="acc.id" class="border-t border-gray-200">
-              <td class="px-3 py-2 border border-gray-300 align-top whitespace-nowrap">
-                {{ new Date(acc.accomplishment_date).toLocaleDateString("en-PH", { month:"short", day:"numeric" }) }}
-              </td>
-              <td class="px-3 py-2 border border-gray-300 align-top whitespace-pre-wrap">{{ acc.description }}</td>
-              <td class="px-3 py-2 border border-gray-300 align-top text-xs text-gray-600">
-                {{ planLabel(acc) }}
-              </td>
-              <td class="px-3 py-2 border border-gray-300 align-top">
-                <div v-for="photo in acc.photos" :key="photo.id">
-                  <a v-if="proofUrl(photo)" :href="proofUrl(photo)" target="_blank"
-                    class="text-blue-600 hover:underline text-xs">
-                    {{ proofLabel(photo) }}
-                  </a>
-                </div>
-                <span v-if="!acc.photos?.length" class="text-xs text-gray-400">—</span>
-              </td>
-            </tr>
-            <tr v-if="!reportData?.accomplishments?.length">
-              <td colspan="4" class="px-3 py-6 text-center text-gray-400 border border-gray-300">
-                No accomplishments recorded for this month.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        </div>
-
-        <p class="text-xs text-gray-400 mt-3">
-          Total: {{ reportData?.accomplishments?.length ?? 0 }} accomplishment(s)
-        </p>
       </div>
     </div>
+    </Teleport>
 
   </AdminLayout>
 

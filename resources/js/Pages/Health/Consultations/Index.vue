@@ -5,6 +5,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { EyeIcon, PrinterIcon, ClockIcon, HeartIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 import { useSubmit } from '@/Composables/useSubmit'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({ consultations: Object, physicianSchedules: Array });
 const page = usePage();
@@ -325,14 +326,6 @@ function confirmDelete(c) {
     }
   })
 }
-const statusBadge = (s) => {
-  if (!s) return 'px-2 py-1 rounded bg-gray-100 text-gray-700';
-  const key = String(s).toLowerCase();
-  if (key === 'scheduled') return 'px-2 py-1 bg-green-100 text-green-700 rounded';
-  if (key === 'pending') return 'px-2 py-1 bg-yellow-100 text-yellow-700 rounded';
-  if (key === 'completed') return 'px-2 py-1 bg-blue-100 text-blue-700 rounded';
-  return 'px-2 py-1 bg-red-100 text-red-700 rounded';
-};
 const openFor = (c) => { openSchedule.value = c; if (scheduleForm.reset) scheduleForm.reset(); };
 const openAppointmentFor = (c = null) => { openAppointment.value = c || true; if (appointmentForm.reset) appointmentForm.reset(); if (hasAnyRole('Nurse', 'Administrator') && appointmentForm.patient_type === 'employee') fetchEmployees(); };
 
@@ -597,7 +590,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
                 <td v-if="!isStaff" class="px-4 py-3 text-sm text-slate-700">{{ c.requestor_data?.section || '—' }}</td>
                 <td v-if="!isStaff" class="px-4 py-3 text-sm text-slate-700">{{ c.requestor_data?.office || '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="statusBadge(c.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">{{ c.status }}</span>
+                  <span :class="[badgeBase, statusBadgeClass(c.status)]">{{ c.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-sm text-slate-700">
                   <div class="flex gap-1">
@@ -646,7 +639,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
               <div><strong>Grade/Section:</strong> <span>{{ c.requestor_data?.grade_level || '—' }} {{ c.requestor_data?.section ? '· ' + c.requestor_data.section : '' }}</span></div>
               <div><strong>Office:</strong> <span>{{ c.requestor_data?.office || '—' }}</span></div>
               <div class="mt-2">
-                <span :class="statusBadge(c.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">{{ c.status }}</span>
+                <span :class="[badgeBase, statusBadgeClass(c.status)]">{{ c.status }}</span>
               </div>
             </div>
             <div class="mt-3 flex flex-wrap gap-2">

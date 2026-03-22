@@ -10,10 +10,7 @@
             <p class="text-sm text-slate-500">Nomination #{{ nomination.id }}</p>
           </div>
         </div>
-        <span :class="statusClass(nomination.status)"
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize">
-          {{ nomination.status }}
-        </span>
+        <span :class="[badgeBase, statusBadgeClass(nomination.status), 'capitalize']">{{ nomination.status }}</span>
       </div>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -205,6 +202,7 @@
 <script setup>
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({ nomination: Object })
 
@@ -224,15 +222,6 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function statusClass(s) {
-  return {
-    pending: 'bg-amber-50 text-amber-700',
-    screened: 'bg-emerald-50 text-emerald-700',
-    evaluated: 'bg-blue-50 text-blue-700',
-    approved: 'bg-emerald-50 text-emerald-700',
-    rejected: 'bg-red-50 text-red-600',
-  }[s] ?? 'bg-slate-100 text-slate-600'
-}
 
 function decisionClass(d) {
   return {

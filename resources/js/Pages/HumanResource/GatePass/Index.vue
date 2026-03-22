@@ -45,9 +45,7 @@
                 <td class="px-4 py-3 text-sm text-slate-700">{{ r.gatepass_timeout || '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ r.destination || '—' }}</td>
                 <td class="px-4 py-3">
-                  <span v-if="r.status && r.status.toLowerCase().includes('approved')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">{{ r.status }}</span>
-                  <span v-else-if="r.status && r.status.toLowerCase().includes('declined')" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600">{{ r.status }}</span>
-                  <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">{{ r.status || '—' }}</span>
+                  <span :class="[badgeBase, statusBadgeClass(r.status)]">{{ r.status || '—' }}</span>
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-1">
@@ -159,6 +157,7 @@ import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { usePage } from '@inertiajs/vue3'
 import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon } from '@heroicons/vue/24/outline'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const page = usePage()
 const rows = computed(() => page.props.rows || [])

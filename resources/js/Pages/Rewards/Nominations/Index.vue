@@ -52,10 +52,7 @@
                 <td class="px-4 py-3 text-sm text-slate-500">{{ n.period ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ n.nominator?.name }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="statusClass(n.status)"
-                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize">
-                    {{ n.status }}
-                  </span>
+                  <span :class="[badgeBase, statusBadgeClass(n.status), 'capitalize']">{{ n.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-xs text-slate-400">{{ formatDate(n.created_at) }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">
@@ -139,6 +136,7 @@
 import { ref, reactive } from 'vue'
 import { Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({
   nominations: Object,
@@ -156,15 +154,6 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function statusClass(s) {
-  return {
-    pending: 'bg-amber-50 text-amber-700',
-    screened: 'bg-emerald-50 text-emerald-700',
-    evaluated: 'bg-blue-50 text-blue-700',
-    approved: 'bg-emerald-50 text-emerald-700',
-    rejected: 'bg-red-50 text-red-600',
-  }[s] ?? 'bg-slate-100 text-slate-600'
-}
 
 const screenModal = ref(false)
 const screenTarget = ref(null)

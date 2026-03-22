@@ -171,115 +171,125 @@ const markComplete = (s) => {
 
     <div class="p-6 space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 class="text-xl font-bold text-gray-800">Training Sessions</h1>
-          <p class="text-sm text-gray-500">Schedule and manage training sessions</p>
+          <h1 class="text-xl font-semibold text-slate-800">Training Sessions</h1>
+          <p class="text-sm text-slate-500">Schedule and manage training sessions</p>
         </div>
         <button @click="openCreate"
-          class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           New Session
         </button>
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
-        <select v-model="programId" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none min-w-[200px]">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <select v-model="programId"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 min-w-[200px]">
           <option value="">All Programs</option>
           <option v-for="p in programs" :key="p.id" :value="p.id">{{ p.title }}</option>
         </select>
-        <select v-model="status" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="status"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Status</option>
           <option value="scheduled">Scheduled</option>
           <option value="ongoing">Ongoing</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <select v-model="mode" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none">
+        <select v-model="mode"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
           <option value="">All Modes</option>
           <option value="face_to_face">Face-to-Face</option>
           <option value="online">Online</option>
           <option value="blended">Blended</option>
         </select>
-        <input v-model="from" type="date" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none" />
-        <input v-model="to"   type="date" :min="from" class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none" />
+        <input v-model="from" type="date"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+        <input v-model="to" type="date" :min="from"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
         <button v-if="programId || status || mode || from || to"
           @click="programId=''; status=''; mode=''; from=''; to=''"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">Clear</button>
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Clear
+        </button>
       </div>
 
       <!-- Table -->
-      <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div v-if="isLoading" class="flex items-center justify-center py-12 text-gray-400 text-sm">Loading…</div>
-        <table v-else class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            <tr>
-              <th class="px-4 py-3 text-left">Program</th>
-              <th class="px-4 py-3 text-left">Date</th>
-              <th class="px-4 py-3 text-left">Time</th>
-              <th class="px-4 py-3 text-left">Venue</th>
-              <th class="px-4 py-3 text-left">Mode</th>
-              <th class="px-4 py-3 text-center">Participants</th>
-              <th class="px-4 py-3 text-left">Status</th>
-              <th class="px-4 py-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr v-if="sessions.data.length === 0">
-              <td colspan="8" class="py-10 text-center text-gray-400">No sessions found.</td>
-            </tr>
-            <tr v-for="s in sessions.data" :key="s.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3">
-                <div class="font-medium text-gray-800">{{ s.program?.title ?? '—' }}</div>
-                <div v-if="s.facilitator" class="text-xs text-gray-500">{{ s.facilitator }}</div>
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-700">{{ fmt(s.session_date) }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-600 text-xs">
-                {{ fmtTime(s.start_time) }} – {{ fmtTime(s.end_time) }}
-              </td>
-              <td class="px-4 py-3 text-gray-600 max-w-[140px] truncate">{{ s.venue ?? '—' }}</td>
-              <td class="px-4 py-3">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', modeColors[s.mode] ?? 'bg-gray-100 text-gray-600']">
-                  {{ modeLabel[s.mode] ?? s.mode }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <span class="font-semibold text-blue-600">{{ s.participants_count }}</span>
-                <span v-if="s.max_participants" class="text-gray-400"> / {{ s.max_participants }}</span>
-              </td>
-              <td class="px-4 py-3">
-                <span :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColors[s.status] ?? 'bg-gray-100 text-gray-600']">
-                  {{ s.status.charAt(0).toUpperCase() + s.status.slice(1) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-1 flex-wrap">
-                  <a :href="route('lnd.sessions.show', s.id)"
-                    class="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50">View</a>
-                  <button @click="openEdit(s)"
-                    class="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Edit</button>
-                  <button v-if="s.status !== 'completed' && s.status !== 'cancelled'"
-                    @click="markComplete(s)"
-                    class="rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50">Complete</button>
-                  <button @click="deleteSession(s)"
-                    class="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50">Delete</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div v-if="isLoading" class="py-16 text-center text-slate-400 text-sm">Loading…</div>
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Program</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Venue</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Mode</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Participants</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-if="sessions.data.length === 0">
+                <td colspan="8" class="py-16 text-center text-slate-400 text-sm">No sessions found.</td>
+              </tr>
+              <tr v-for="s in sessions.data" :key="s.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3">
+                  <div class="font-medium text-slate-800">{{ s.program?.title ?? '—' }}</div>
+                  <div v-if="s.facilitator" class="text-xs text-slate-500">{{ s.facilitator }}</div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-700">{{ fmt(s.session_date) }}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-xs text-slate-600">
+                  {{ fmtTime(s.start_time) }} – {{ fmtTime(s.end_time) }}
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700 max-w-[140px] truncate">{{ s.venue ?? '—' }}</td>
+                <td class="px-4 py-3">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', modeColors[s.mode] ?? 'bg-slate-100 text-slate-600']">
+                    {{ modeLabel[s.mode] ?? s.mode }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span class="font-semibold text-indigo-600 text-sm">{{ s.participants_count }}</span>
+                  <span v-if="s.max_participants" class="text-slate-400 text-sm"> / {{ s.max_participants }}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusColors[s.status] ?? 'bg-slate-100 text-slate-600']">
+                    {{ s.status.charAt(0).toUpperCase() + s.status.slice(1) }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center justify-center gap-1 flex-wrap">
+                    <a :href="route('lnd.sessions.show', s.id)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors text-xs font-medium px-2">View</a>
+                    <button @click="openEdit(s)"
+                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors text-xs font-medium px-2">Edit</button>
+                    <button v-if="s.status !== 'completed' && s.status !== 'cancelled'"
+                      @click="markComplete(s)"
+                      class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 transition-colors text-xs font-medium px-2">Complete</button>
+                    <button @click="deleteSession(s)"
+                      class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors text-xs font-medium px-2">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Pagination -->
-      <div v-if="sessions.last_page > 1" class="flex items-center justify-between text-sm text-gray-600">
+      <div v-if="sessions.last_page > 1"
+        class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
         <span>Showing {{ sessions.from }}–{{ sessions.to }} of {{ sessions.total }}</span>
         <div class="flex gap-1">
           <button v-for="p in sessions.links" :key="p.label"
             @click="p.url && goToPage(new URL(p.url).searchParams.get('page'))"
             :disabled="!p.url"
-            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50 disabled:opacity-40']"
+            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-slate-600']"
             v-html="p.label" />
         </div>
       </div>
@@ -287,22 +297,23 @@ const markComplete = (s) => {
 
     <!-- Create / Edit Modal -->
     <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b px-6 py-4">
-            <h2 class="text-lg font-bold text-gray-800">{{ editingItem ? 'Edit Session' : 'New Training Session' }}</h2>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="w-full max-w-xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">{{ editingItem ? 'Edit Session' : 'New Training Session' }}</h2>
+            <button @click="closeModal"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
           </div>
 
-          <form @submit.prevent="submit" class="p-6 space-y-4">
+          <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
 
             <!-- Program -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Learning Program <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Learning Program <span class="text-red-500">*</span></label>
               <select v-model="form.learning_program_id" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="">— Select program —</option>
                 <option v-for="p in programs" :key="p.id" :value="p.id">{{ p.title }}</option>
               </select>
@@ -310,40 +321,40 @@ const markComplete = (s) => {
 
             <!-- Date -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Session Date <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Session Date <span class="text-red-500">*</span></label>
               <input v-model="form.session_date" type="date" required
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
 
             <!-- Time -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Start Time <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Start Time <span class="text-red-500">*</span></label>
                 <input v-model="form.start_time" type="time" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">End Time <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">End Time <span class="text-red-500">*</span></label>
                 <input v-model="form.end_time" type="time" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Mode + Status -->
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Mode <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Mode <span class="text-red-500">*</span></label>
                 <select v-model="form.mode" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="face_to_face">Face-to-Face</option>
                   <option value="online">Online</option>
                   <option value="blended">Blended</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Status <span class="text-red-500">*</span></label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Status <span class="text-red-500">*</span></label>
                 <select v-model="form.status" required
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none">
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                   <option value="scheduled">Scheduled</option>
                   <option value="ongoing">Ongoing</option>
                   <option value="completed">Completed</option>
@@ -354,35 +365,37 @@ const markComplete = (s) => {
 
             <!-- Venue + Facilitator -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Venue</label>
               <input v-model="form.venue" type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Facilitator</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Facilitator</label>
                 <input v-model="form.facilitator" type="text"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Max Participants</label>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Max Participants</label>
                 <input v-model="form.max_participants" type="number" min="1"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" />
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
               </div>
             </div>
 
             <!-- Remarks -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
               <textarea v-model="form.remarks" rows="2"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none resize-none" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
             </div>
 
-            <div class="flex justify-end gap-3 pt-2">
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button type="button" @click="closeModal"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Cancel
+              </button>
               <button type="submit" :disabled="isSubmitting"
-                class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
                 {{ isSubmitting ? 'Saving…' : (editingItem ? 'Update' : 'Create') }}
               </button>
             </div>

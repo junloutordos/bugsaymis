@@ -1,9 +1,10 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, computed, watch } from "vue";
-import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import Swal from 'sweetalert2'
+import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const props = defineProps({ requests: Array });
 const page = usePage();
@@ -104,7 +105,7 @@ const openUpload = (req) => {
   selectedRequest.value = req;
   proofForm.reset();
   // prefill courier fields if any existing values
-  
+
   proofForm.courier_service_provider = req.courier_service_provider ?? '';
   proofForm.courier_cost = req.courier_cost ?? '';
   proofForm.date_received_by_courier = req.date_received_by_courier ?? '';
@@ -127,278 +128,259 @@ const submitProof = () => {
     }
   });
 };
+
 </script>
 
 <template>
   <Head title="Messengerial" />
   <AdminLayout title="Messengerial">
     <div>
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Messengerial Requests</h1>
-        <button @click.prevent="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">+ New Request</button>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Messengerial Requests</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Track and manage document delivery requests</p>
+        </div>
+        <button @click.prevent="openModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          + New Request
+        </button>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="mb-4">
+        <div class="px-5 py-4 border-b border-slate-100">
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search requests..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Search requests…"
+            class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
         </div>
+
         <!-- Desktop table -->
         <div class="hidden sm:block overflow-x-auto">
-          <table class="table-fixed w-full border border-gray-200">
-          <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
-            <tr>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">#</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Requestor</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Unit</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Purpose</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Destination</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Reference No.</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Consignee</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Contact</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Status</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Package Type(s)</th>
-              <th class="px-4 py-3 text-left whitespace-normal break-words">Delivery</th>
-              <th class="px-4 py-3 text-center whitespace-normal break-words">Action</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 text-sm">
-            <tr v-for="r in filteredRequests" :key="r.id">
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.id }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.requestor }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.unit ?? '—' }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.purpose ?? '—' }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.destination ?? '—' }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.reference_no ?? '—' }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.consignee_name ?? '—' }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">{{ r.consignee_contact ?? '—' }}</td>
-              <td class="px-4 py-3 whitespace-normal break-words">
-                <span :class="[ 'px-3 py-1 text-xs rounded-full font-semibold',
-                  (r.status ?? '').toString().toLowerCase().includes('approved') ? 'bg-green-100 text-green-800' :
-                  (r.status ?? '').toString().toLowerCase().includes('declined') ? 'bg-red-100 text-red-700' :
-                  'bg-gray-100 text-gray-700'
-                ]">{{ r.status }}</span>
-              </td>
-              <td class="px-4 py-3">{{ (Array.isArray(r.messengerial_kinds) ? r.messengerial_kinds.join(', ') : (r.messengerial_kinds || '—')) }}</td>
-              <td class="px-4 py-3">{{ (Array.isArray(r.delivery_methods) ? r.delivery_methods.join(', ') : (r.delivery_methods || '—')) }}</td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center gap-2 justify-center">
-                  <button v-if="canModify(r)" @click.prevent="openModal(r)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="Edit"><PencilSquareIcon class="w-5 h-5"/></button>
-                  <button v-if="canModify(r)" @click.prevent="destroy(r)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" title="Delete"><TrashIcon class="w-5 h-5"/></button>
-                  <!-- Upload proof (Records/Admin) -->
-                  <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" title="Upload Proof"><ArrowUpTrayIcon class="w-5 h-5"/></button>
-                  <!-- View proof (requester/admin/records) -->
-                  <a v-if="r.proof_of_delivery && (
-                      userRole === 'Administrator' ||
-                      userRole === 'Records' ||
-                      ((r.status ?? '').toString().toLowerCase().includes('completed') && (
-                        [r.email, r.requestor_email, r.requester_email, r.user_email].includes(userEmail) ||
-                        ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
-                      ))
-                    )" :href="('/storage/' + r.proof_of_delivery)" target="_blank" class="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700" title="View Proof"><EyeIcon class="w-5 h-5"/></a>
-                  <!-- Print ticket (requester/admin/records) -->
-                  <a v-if="(
-                      (r.status ?? '').toString().toLowerCase().includes('approved') && (
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Unit</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Purpose</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Destination</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Reference No.</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Consignee</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Contact</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Package Type(s)</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Delivery</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="r in filteredRequests" :key="r.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.requestor }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.unit ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.purpose ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.destination ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.reference_no ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.consignee_name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ r.consignee_contact ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">
+                  <span :class="[badgeBase, statusBadgeClass(r.status)]">{{ r.status }}</span>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ (Array.isArray(r.messengerial_kinds) ? r.messengerial_kinds.join(', ') : (r.messengerial_kinds || '—')) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ (Array.isArray(r.delivery_methods) ? r.delivery_methods.join(', ') : (r.delivery_methods || '—')) }}</td>
+                <td class="px-4 py-3 text-center">
+                  <div class="flex items-center gap-1.5 justify-center">
+                    <button v-if="canModify(r)" @click.prevent="openModal(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit"><PencilSquareIcon class="w-4 h-4"/></button>
+                    <button v-if="canModify(r)" @click.prevent="destroy(r)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Delete"><TrashIcon class="w-4 h-4"/></button>
+                    <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 transition-colors" title="Upload Proof"><ArrowUpTrayIcon class="w-4 h-4"/></button>
+                    <a v-if="r.proof_of_delivery && (
                         userRole === 'Administrator' ||
                         userRole === 'Records' ||
-                        [r.email, r.requestor_email, r.requester_email, r.user_email].includes(userEmail) ||
-                        ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
-                      )
-                    )" :href="route('messengerial.print', r.id)" target="_blank" class="p-2 rounded-full bg-green-100 hover:bg-green-200 text-green-700" title="Print"><PrinterIcon class="w-5 h-5"/></a>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="filteredRequests.length === 0">
-              <td colspan="12" class="px-4 py-6 text-center text-gray-500">No messengerial requests found.</td>
-            </tr>
-          </tbody>
+                        ((r.status ?? '').toString().toLowerCase().includes('completed') && (
+                          [r.email, r.requestor_email, r.requester_email, r.user_email].includes(userEmail) ||
+                          ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
+                        ))
+                      )" :href="('/storage/' + r.proof_of_delivery)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Proof"><EyeIcon class="w-4 h-4"/></a>
+                    <a v-if="(
+                        (r.status ?? '').toString().toLowerCase().includes('approved') && (
+                          userRole === 'Administrator' ||
+                          userRole === 'Records' ||
+                          [r.email, r.requestor_email, r.requester_email, r.user_email].includes(userEmail) ||
+                          ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
+                        )
+                      )" :href="route('messengerial.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4"/></a>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="filteredRequests.length === 0">
+                <td colspan="12" class="py-16 text-center text-slate-400 text-sm">No messengerial requests found.</td>
+              </tr>
+            </tbody>
           </table>
         </div>
 
         <!-- Mobile cards -->
-        <div class="sm:hidden space-y-3">
-          <div v-for="r in filteredRequests" :key="r.id" class="border rounded-lg p-3 bg-white shadow-sm">
-            <div class="flex items-start justify-between">
-              <div>
-                <div class="text-sm text-gray-500">Request #{{ r.id }}</div>
-                <div class="font-semibold text-gray-800">{{ r.purpose ?? '—' }}</div>
-                <div class="text-sm text-gray-600">{{ r.requestor }} — {{ r.unit ?? '—' }}</div>
+        <div class="sm:hidden p-4 space-y-3">
+          <div v-for="r in filteredRequests" :key="r.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-xs text-slate-500">Request #{{ r.id }}</p>
+                <p class="text-sm font-semibold text-slate-800 mt-0.5 truncate">{{ r.purpose ?? '—' }}</p>
+                <p class="text-xs text-slate-600 mt-1">{{ r.requestor }} — {{ r.unit ?? '—' }}</p>
               </div>
-              <div class="text-right text-sm">
-                <div class="text-gray-600">{{ r.destination ?? '—' }}</div>
-                <div class="text-gray-500 text-xs">Ref: {{ r.reference_no ?? '—' }}</div>
+              <div class="shrink-0 text-right text-xs text-slate-600">
+                <div>{{ r.destination ?? '—' }}</div>
+                <div class="text-slate-400">Ref: {{ r.reference_no ?? '—' }}</div>
               </div>
             </div>
-
-            <div class="mt-2 text-sm text-gray-700">
-              <div><strong>Consignee:</strong> <span class="ml-1">{{ r.consignee_name ?? '—' }} ({{ r.consignee_contact ?? '—' }})</span></div>
-              <div class="mt-1"><strong>Package:</strong> <span class="ml-1">{{ (Array.isArray(r.messengerial_kinds) ? r.messengerial_kinds.join(', ') : (r.messengerial_kinds || '—')) }}</span></div>
-              <div class="mt-1"><strong>Delivery:</strong> <span class="ml-1">{{ (Array.isArray(r.delivery_methods) ? r.delivery_methods.join(', ') : (r.delivery_methods || '—')) }}</span></div>
-              <div class="mt-1"><strong>Status:</strong> <span class="ml-1">{{ r.status }}</span></div>
+            <div class="mt-2 space-y-1 text-xs text-slate-700">
+              <div><span class="font-medium text-slate-500">Consignee:</span> {{ r.consignee_name ?? '—' }} ({{ r.consignee_contact ?? '—' }})</div>
+              <div><span class="font-medium text-slate-500">Package:</span> {{ (Array.isArray(r.messengerial_kinds) ? r.messengerial_kinds.join(', ') : (r.messengerial_kinds || '—')) }}</div>
+              <div><span class="font-medium text-slate-500">Delivery:</span> {{ (Array.isArray(r.delivery_methods) ? r.delivery_methods.join(', ') : (r.delivery_methods || '—')) }}</div>
+              <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
+                <span :class="[badgeBase, statusBadgeClass(r.status)]">{{ r.status }}</span>
+              </div>
             </div>
-
-            <div class="mt-3 flex items-center gap-2">
-              <button v-if="canModify(r)" @click.prevent="openModal(r)" class="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md"><PencilSquareIcon class="w-4 h-4"/> Edit</button>
-              <button v-if="canModify(r)" @click.prevent="destroy(r)" class="inline-flex items-center gap-2 px-3 py-2 bg-red-100 text-red-700 rounded-md"><TrashIcon class="w-4 h-4"/></button>
-              <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-md"><ArrowUpTrayIcon class="w-4 h-4"/></button>
-              <a v-if="r.proof_of_delivery" :href="('/storage/' + r.proof_of_delivery)" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-md"><EyeIcon class="w-4 h-4"/></a>
-              <a v-if="(r.status ?? '').toString().toLowerCase().includes('approved')" :href="route('messengerial.print', r.id)" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-md"><PrinterIcon class="w-4 h-4"/></a>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <button v-if="canModify(r)" @click.prevent="openModal(r)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PencilSquareIcon class="w-3.5 h-3.5"/> Edit</button>
+              <button v-if="canModify(r)" @click.prevent="destroy(r)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><TrashIcon class="w-3.5 h-3.5"/></button>
+              <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><ArrowUpTrayIcon class="w-3.5 h-3.5"/></button>
+              <a v-if="r.proof_of_delivery" :href="('/storage/' + r.proof_of_delivery)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><EyeIcon class="w-3.5 h-3.5"/></a>
+              <a v-if="(r.status ?? '').toString().toLowerCase().includes('approved')" :href="route('messengerial.print', r.id)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PrinterIcon class="w-3.5 h-3.5"/></a>
             </div>
           </div>
-
-          <div v-if="filteredRequests.length === 0" class="text-center text-gray-500 py-6">No messengerial requests found.</div>
+          <div v-if="filteredRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No messengerial requests found.</div>
         </div>
+
         <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button
-            @click="currentPage--"
-            :disabled="currentPage === 1"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button
-            @click="currentPage++"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+          <div class="flex items-center gap-2">
+            <button @click="currentPage--" :disabled="currentPage === 1"
+                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
+            <button @click="currentPage++" :disabled="currentPage === totalPages"
+                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
+          </div>
         </div>
       </div>
 
-      <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white w-full h-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-md p-4 sm:p-6 relative overflow-auto">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
-          <h2 class="text-xl font-semibold mb-4">New Messengerial Request</h2>
-          <form @submit.prevent="submit" class="space-y-4 max-h-[90vh] overflow-auto">
+      <!-- New Request Modal -->
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-xl sm:max-w-md relative overflow-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">New Messengerial Request</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
+              <XMarkIcon class="w-4 h-4" />
+            </button>
+          </div>
+          <form @submit.prevent="submit" class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Reference No.</label>
-              <input v-model="form.reference_no" type="text" class="mt-1 block w-full rounded border-gray-300" disabled readonly :placeholder="form.reference_no || 'Will be generated upon submission'" />
-              <p v-if="form.errors.reference_no" class="text-red-600 text-sm mt-1">{{ form.errors.reference_no }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Reference No.</label>
+              <input v-model="form.reference_no" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" disabled readonly :placeholder="form.reference_no || 'Will be generated upon submission'" />
+              <p v-if="form.errors.reference_no" class="text-red-600 text-xs mt-1">{{ form.errors.reference_no }}</p>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Consignee Name</label>
-              <input v-model="form.consignee_name" type="text" class="mt-1 block w-full rounded border-gray-300" />
-              <p v-if="form.errors.consignee_name" class="text-red-600 text-sm mt-1">{{ form.errors.consignee_name }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Consignee Name</label>
+              <input v-model="form.consignee_name" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p v-if="form.errors.consignee_name" class="text-red-600 text-xs mt-1">{{ form.errors.consignee_name }}</p>
             </div>
-
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Destination</label>
-                <input v-model="form.destination" type="text" class="mt-1 block w-full rounded border-gray-300" />
-                <p v-if="form.errors.destination" class="text-red-600 text-sm mt-1">{{ form.errors.destination }}</p>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Destination</label>
+                <input v-model="form.destination" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                <p v-if="form.errors.destination" class="text-red-600 text-xs mt-1">{{ form.errors.destination }}</p>
               </div>
-
               <div>
-                <label class="block text-sm font-medium text-gray-700">Consignee Contact No.</label>
-                <input v-model="form.consignee_contact" type="text" class="mt-1 block w-full rounded border-gray-300" />
-                <p v-if="form.errors.consignee_contact" class="text-red-600 text-sm mt-1">{{ form.errors.consignee_contact }}</p>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Consignee Contact No.</label>
+                <input v-model="form.consignee_contact" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                <p v-if="form.errors.consignee_contact" class="text-red-600 text-xs mt-1">{{ form.errors.consignee_contact }}</p>
               </div>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Package Type(s)</label>
-              <select v-model="form.messengerial_kinds" multiple class="mt-1 block w-full rounded border-gray-300">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Package Type(s)</label>
+              <select v-model="form.messengerial_kinds" multiple class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="Letter Envelope">Letter Envelope</option>
                 <option value="Folder or Brown Envelope">Folder or Brown Envelope</option>
                 <option value="Box Small">Box Small</option>
                 <option value="Box Medium">Box Medium</option>
                 <option value="Box Large">Box Large</option>
               </select>
-              <p v-if="form.errors.messengerial_kinds" class="text-red-600 text-sm mt-1">{{ form.errors.messengerial_kinds }}</p>
+              <p v-if="form.errors.messengerial_kinds" class="text-red-600 text-xs mt-1">{{ form.errors.messengerial_kinds }}</p>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Delivery Method(s)</label>
-                <select v-model="form.delivery_methods" multiple class="mt-1 block w-full rounded border-gray-300">
+              <label class="block text-xs font-medium text-slate-600 mb-1">Delivery Method(s)</label>
+              <select v-model="form.delivery_methods" multiple class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
                 <option value="Hand-Carry">Hand-Carry</option>
                 <option value="Courier Services">Courier Services</option>
               </select>
-              <p v-if="form.errors.delivery_methods" class="text-red-600 text-sm mt-1">{{ form.errors.delivery_methods }}</p>
+              <p v-if="form.errors.delivery_methods" class="text-red-600 text-xs mt-1">{{ form.errors.delivery_methods }}</p>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Purpose</label>
-              <input v-model="form.purpose" type="text" class="mt-1 block w-full rounded border-gray-300" />
-              <p v-if="form.errors.purpose" class="text-red-600 text-sm mt-1">{{ form.errors.purpose }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Purpose</label>
+              <input v-model="form.purpose" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p v-if="form.errors.purpose" class="text-red-600 text-xs mt-1">{{ form.errors.purpose }}</p>
             </div>
-
-            <!-- Consignee email removed because delivery methods no longer include email option -->
-
-            <div class="flex justify-end gap-2">
-              <button :disabled="form.processing" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded sm:w-auto disabled:opacity-60 inline-flex items-center justify-center">
-                <span v-if="form.processing" class="inline-flex items-center">
-                  <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                  </svg>
-                  Submitting...
-                </span>
+            <div class="flex justify-end gap-2 pt-2">
+              <button @click.prevent="closeModal" type="button" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+              <button :disabled="form.processing" type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+                <span v-if="form.processing">Submitting…</span>
                 <span v-else>Submit</span>
               </button>
-              <button @click.prevent="closeModal" type="button" class="px-4 py-2 rounded border">Cancel</button>
             </div>
           </form>
         </div>
       </div>
 
       <!-- Upload Proof Modal -->
-      <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white w-full h-full sm:h-auto sm:rounded-xl sm:shadow-lg sm:max-w-md p-4 sm:p-6 relative overflow-auto">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="showUploadModal = false; selectedRequest = null">✕</button>
-          <h2 class="text-xl font-semibold mb-4">Upload Proof of Delivery</h2>
-          <p class="text-sm text-gray-600 mb-3">Request ID: {{ selectedRequest?.id }}</p>
-          <form @submit.prevent="submitProof" class="space-y-4 max-h-[85vh] overflow-auto" enctype="multipart/form-data">
+      <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-xl sm:max-w-md relative overflow-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Upload Proof of Delivery</h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="showUploadModal = false; selectedRequest = null">
+              <XMarkIcon class="w-4 h-4" />
+            </button>
+          </div>
+          <form @submit.prevent="submitProof" class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto" enctype="multipart/form-data">
+            <p class="text-xs text-slate-500">Request ID: {{ selectedRequest?.id }}</p>
             <div>
-              <label class="block text-sm font-medium text-gray-700">Proof (PDF/JPG/PNG)</label>
-              <input type="file" @change="e => proofForm.proof = e.target.files[0]" class="mt-1 block w-full" />
-              <p v-if="proofForm.errors.proof" class="text-red-600 text-sm mt-1">{{ proofForm.errors.proof }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Proof (PDF/JPG/PNG)</label>
+              <input type="file" @change="e => proofForm.proof = e.target.files[0]" class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-700 file:text-sm hover:file:bg-indigo-100" />
+              <p v-if="proofForm.errors.proof" class="text-red-600 text-xs mt-1">{{ proofForm.errors.proof }}</p>
             </div>
-            <!-- RFSF Reference No. removed as requested -->
-
             <div v-if="selectedRequest?.delivery_methods && selectedRequest.delivery_methods.includes('Courier Services')">
               <div>
-                <label class="block text-sm font-medium text-gray-700">Courier Service Provider</label>
-                <input v-model="proofForm.courier_service_provider" type="text" class="mt-1 block w-full rounded border-gray-300" />
-                <p v-if="proofForm.errors.courier_service_provider" class="text-red-600 text-sm mt-1">{{ proofForm.errors.courier_service_provider }}</p>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Courier Service Provider</label>
+                <input v-model="proofForm.courier_service_provider" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                <p v-if="proofForm.errors.courier_service_provider" class="text-red-600 text-xs mt-1">{{ proofForm.errors.courier_service_provider }}</p>
               </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Cost</label>
-                <input v-model="proofForm.courier_cost" type="number" step="0.01" class="mt-1 block w-full rounded border-gray-300" />
-                <p v-if="proofForm.errors.courier_cost" class="text-red-600 text-sm mt-1">{{ proofForm.errors.courier_cost }}</p>
+              <div class="mt-3">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Cost</label>
+                <input v-model="proofForm.courier_cost" type="number" step="0.01" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                <p v-if="proofForm.errors.courier_cost" class="text-red-600 text-xs mt-1">{{ proofForm.errors.courier_cost }}</p>
               </div>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Date Received by Courier</label>
-              <input v-model="proofForm.date_received_by_courier" type="datetime-local" class="mt-1 block w-full rounded border-gray-300" />
-              <p v-if="proofForm.errors.date_received_by_courier" class="text-red-600 text-sm mt-1">{{ proofForm.errors.date_received_by_courier }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date Received by Courier</label>
+              <input v-model="proofForm.date_received_by_courier" type="datetime-local" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p v-if="proofForm.errors.date_received_by_courier" class="text-red-600 text-xs mt-1">{{ proofForm.errors.date_received_by_courier }}</p>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Date Delivered to Addressee</label>
-              <input v-model="proofForm.date_delivered" type="datetime-local" class="mt-1 block w-full rounded border-gray-300" />
-              <p v-if="proofForm.errors.date_delivered" class="text-red-600 text-sm mt-1">{{ proofForm.errors.date_delivered }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date Delivered to Addressee</label>
+              <input v-model="proofForm.date_delivered" type="datetime-local" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <p v-if="proofForm.errors.date_delivered" class="text-red-600 text-xs mt-1">{{ proofForm.errors.date_delivered }}</p>
             </div>
-
             <div>
-              <label class="block text-sm font-medium text-gray-700">Remarks</label>
-              <textarea v-model="proofForm.proof_remarks" class="mt-1 block w-full rounded border-gray-300" rows="3"></textarea>
-              <p v-if="proofForm.errors.proof_remarks" class="text-red-600 text-sm mt-1">{{ proofForm.errors.proof_remarks }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+              <textarea v-model="proofForm.proof_remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="3"></textarea>
+              <p v-if="proofForm.errors.proof_remarks" class="text-red-600 text-xs mt-1">{{ proofForm.errors.proof_remarks }}</p>
             </div>
-            <div class="flex flex-col sm:flex-row gap-2">
-              <button :disabled="proofForm.processing" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded w-full sm:w-auto disabled:opacity-60">{{ proofForm.processing ? 'Uploading...' : 'Upload' }}</button>
-              <button @click.prevent="showUploadModal = false; selectedRequest = null" type="button" class="px-4 py-2 rounded border w-full sm:w-auto">Cancel</button>
+            <div class="flex justify-end gap-2 pt-2">
+              <button @click.prevent="showUploadModal = false; selectedRequest = null" type="button" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+              <button :disabled="proofForm.processing" type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">{{ proofForm.processing ? 'Uploading…' : 'Upload' }}</button>
             </div>
           </form>
         </div>
