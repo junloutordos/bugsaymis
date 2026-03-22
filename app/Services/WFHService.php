@@ -99,6 +99,50 @@ class WFHService
         return $attendance->fresh();
     }
 
+    // ─── Break Out (start of lunch) ───────────────────────────────────────────
+
+    public function breakOut(): WFHAttendance
+    {
+        $user       = Auth::user();
+        $attendance = $this->todayAttendance($user->id);
+
+        if (! $attendance) {
+            throw ValidationException::withMessages(['date' => 'You have not timed in today.']);
+        }
+        if ($attendance->break_out) {
+            throw ValidationException::withMessages(['date' => 'You have already started your break today.']);
+        }
+        if ($attendance->time_out) {
+            throw ValidationException::withMessages(['date' => 'You have already timed out for the day.']);
+        }
+
+        $attendance->update(['break_out' => Carbon::now()]);
+
+        return $attendance->fresh();
+    }
+
+    // ─── Break In (return from lunch) ─────────────────────────────────────────
+
+    public function breakIn(): WFHAttendance
+    {
+        $user       = Auth::user();
+        $attendance = $this->todayAttendance($user->id);
+
+        if (! $attendance?->break_out) {
+            throw ValidationException::withMessages(['date' => 'You have not started a break yet.']);
+        }
+        if ($attendance->break_in) {
+            throw ValidationException::withMessages(['date' => 'You have already returned from your break today.']);
+        }
+        if ($attendance->time_out) {
+            throw ValidationException::withMessages(['date' => 'You have already timed out for the day.']);
+        }
+
+        $attendance->update(['break_in' => Carbon::now()]);
+
+        return $attendance->fresh();
+    }
+
     // ─── Accomplishments ──────────────────────────────────────────────────────
 
     /**
@@ -157,6 +201,13 @@ class WFHService
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
+
+    private function todayAttendance(int $userId): ?WFHAttendance
+    {
+        return WFHAttendance::where('user_id', $userId)
+            ->where('date', Carbon::today()->toDateString())
+            ->first();
+    }
 
     /**
      * Decode a base64 data URI, write it to a temp file, wrap it in an

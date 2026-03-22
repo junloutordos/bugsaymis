@@ -34,6 +34,9 @@ class RolesSeeder extends Seeder
             ['name' => 'GSU Head',           'description' => 'General Services Unit Head.'],
             ['name' => 'Dorm Manager',       'description' => 'Manages dormitory operations.'],
 
+            // ── HR & Payroll ──────────────────────────────────────────────────
+            ['name' => 'Payroll Officer',    'description' => 'Processes, approves, and releases payroll runs.'],
+
             // ── Recruitment ───────────────────────────────────────────────────
             ['name' => 'Recruitment Officer','description' => 'Manages the full recruitment and selection process.'],
             ['name' => 'HRMPSB',             'description' => 'Human Resource Merit Promotion and Selection Board member. Evaluates, interviews, and ranks applicants.'],

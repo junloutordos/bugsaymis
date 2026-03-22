@@ -14,6 +14,8 @@ class WFHAttendance extends Model
         'time_in',
         'time_in_photo_file_id',
         'time_in_photo_link',
+        'break_out',
+        'break_in',
         'time_out',
         'time_out_photo_file_id',
         'time_out_photo_link',
@@ -23,9 +25,11 @@ class WFHAttendance extends Model
     ];
 
     protected $casts = [
-        'date'     => 'date',
-        'time_in'  => 'datetime',
-        'time_out' => 'datetime',
+        'date'      => 'date',
+        'time_in'   => 'datetime',
+        'break_out' => 'datetime',
+        'break_in'  => 'datetime',
+        'time_out'  => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────

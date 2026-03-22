@@ -53,5 +53,11 @@ class DatabaseSeeder extends Seeder
         $this->call(RecruitmentOnboardingSeeder::class);
         $this->call(ApplicationRequirementsSeeder::class);
         $this->call(SalaryGradeSeeder::class);
+
+        // HR & Payroll Module
+        $this->call(LeaveTypesSeeder::class);
+        $this->call(HolidaysSeeder::class);
+        $this->call(AllowanceTypesSeeder::class);
+        $this->call(PayrollPermissionsSeeder::class);
     }
 }
