@@ -272,4 +272,41 @@ class User extends Authenticatable
     {
         return $query->whereHas('roles', fn($q) => $q->where('name', $roleName));
     }
+
+    // ─── HR / Payroll Relationships ────────────────────────────────────────────
+
+    public function employeeProfile()
+    {
+        return $this->hasOne(\App\Models\HR\EmployeeProfile::class);
+    }
+
+    public function employeeSchedules()
+    {
+        return $this->hasMany(\App\Models\HR\EmployeeSchedule::class);
+    }
+
+    public function dtrRecords()
+    {
+        return $this->hasMany(\App\Models\HR\DtrRecord::class);
+    }
+
+    public function leaveCredits()
+    {
+        return $this->hasMany(\App\Models\HR\LeaveCredit::class);
+    }
+
+    public function leaveApplications()
+    {
+        return $this->hasMany(\App\Models\HR\LeaveApplication::class);
+    }
+
+    public function payrollRecords()
+    {
+        return $this->hasMany(\App\Models\Payroll\PayrollRecord::class);
+    }
+
+    public function deductionConfigs()
+    {
+        return $this->hasMany(\App\Models\Payroll\EmployeeDeductionConfig::class);
+    }
 }

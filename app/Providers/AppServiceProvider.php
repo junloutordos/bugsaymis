@@ -85,6 +85,30 @@ class AppServiceProvider extends ServiceProvider
         // Student data management — restricted to Administrators only
         Gate::define('manage-students', fn (User $user) => $user->hasRole('Administrator'));
 
+        // ── Payroll permission gates ───────────────────────────────────────────
+        foreach ([
+            'payroll.view',
+            'payroll.process',
+            'payroll.approve',
+            'payroll.manage',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // ── HR permission gates ────────────────────────────────────────────────
+        foreach ([
+            'hr.leave.view',
+            'hr.leave.file',
+            'hr.leave.approve',
+            'hr.dtr.view',
+            'hr.dtr.manage',
+            'hr.biometric.manage',
+            'hr.employee.view',
+            'hr.employee.manage',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
         Vite::prefetch(concurrency: 3);
 
         // Ensure preload tags for CSS use the correct `as` attribute so browsers

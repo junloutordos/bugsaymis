@@ -60,6 +60,21 @@ class RolePermissionSeeder extends Seeder
             // Rewards — HR manages full PRAISE cycle
             'rewards.view', 'rewards.nominate', 'rewards.evaluate',
             'rewards.approve', 'rewards.manage',
+            // Payroll & DTR module
+            'payroll.view', 'payroll.process',
+            'hr.dtr.view', 'hr.dtr.manage',
+            'hr.biometric.manage',
+            'hr.leave.view', 'hr.leave.approve',
+            'hr.employee.view', 'hr.employee.manage',
+        ]);
+
+        // ── Payroll Officer ───────────────────────────────────────────────────
+        $assign('Payroll Officer', [
+            'payroll.view', 'payroll.process', 'payroll.approve',
+            'hr.dtr.view',
+            'hr.leave.view',
+            'hr.employee.view',
+            'reports.view', 'reports.export',
         ]);
 
         // ── HRMPSB ───────────────────────────────────────────────────────────
@@ -96,6 +111,10 @@ class RolePermissionSeeder extends Seeder
             'hr.gatepass.view', 'hr.gatepass.approve',
             'hr.schedule.view',
             'wfh.view', 'wfh.monitor',
+            'hr.dtr.view',
+            'hr.leave.view', 'hr.leave.approve',
+            'hr.employee.view',
+            'payroll.view',
             'ipcr.view', 'ipcr.approve', 'ipcr.monitor',
             'accomplishments.view',
             'facilities.view', 'facilities.create',
@@ -150,6 +169,9 @@ class RolePermissionSeeder extends Seeder
             'lnd.view', 'lnd.create', 'lnd.evaluate',
             // Rewards — employees can nominate peers and view own recognitions
             'rewards.view', 'rewards.nominate',
+            // Payroll — view own payslip; file own leave
+            'payroll.view',
+            'hr.leave.file',
         ]);
 
         // ── Staff ─────────────────────────────────────────────────────────────
@@ -173,6 +195,9 @@ class RolePermissionSeeder extends Seeder
             'lnd.view', 'lnd.create', 'lnd.evaluate',
             // Rewards — employees can nominate peers and view own recognitions
             'rewards.view', 'rewards.nominate',
+            // Payroll — view own payslip; file own leave
+            'payroll.view',
+            'hr.leave.file',
         ]);
 
         // ── Registrar ─────────────────────────────────────────────────────────

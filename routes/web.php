@@ -940,6 +940,12 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
     Route::post('/time-out', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'timeOut'])
         ->middleware('permission:wfh.time-out')
         ->name('time-out');
+    Route::post('/break-out', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'breakOut'])
+        ->middleware('permission:wfh.time-in')
+        ->name('break-out');
+    Route::post('/break-in', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'breakIn'])
+        ->middleware('permission:wfh.time-in')
+        ->name('break-in');
 
     // Attendance records
     Route::get('/attendance',     [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'myAttendance'])
@@ -1390,6 +1396,101 @@ Route::middleware(['auth'])->prefix('rewards')->name('rewards.')->group(function
         ->name('awards.store');
     Route::patch('/awards/{reward}', [\App\Http\Controllers\Rewards\RewardController::class, 'update'])
         ->name('awards.update');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HR Module Routes
+// ══════════════════════════════════════════════════════════════════════════════
+Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(function () {
+
+    // ── Employee Profiles ─────────────────────────────────────────────────────
+    Route::get('/employees/{user}/profile', [\App\Http\Controllers\HR\EmployeeProfileController::class, 'show'])
+        ->name('employees.profile.show');
+    Route::put('/employees/{user}/profile', [\App\Http\Controllers\HR\EmployeeProfileController::class, 'update'])
+        ->name('employees.profile.update');
+
+    // ── Leave Applications ────────────────────────────────────────────────────
+    Route::get('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'index'])
+        ->name('leave.index');
+    Route::get('/leave/create', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'create'])
+        ->name('leave.create');
+    Route::post('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'store'])
+        ->name('leave.store');
+    Route::get('/leave/{leaveApplication}', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'show'])
+        ->name('leave.show');
+    Route::post('/leave/{leaveApplication}/approve', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'approve'])
+        ->name('leave.approve');
+    Route::post('/leave/{leaveApplication}/cancel', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'cancel'])
+        ->name('leave.cancel');
+
+    // ── Holidays ──────────────────────────────────────────────────────────────
+    Route::get('/holidays', [\App\Http\Controllers\HR\HolidayController::class, 'index'])
+        ->name('holidays.index');
+    Route::post('/holidays', [\App\Http\Controllers\HR\HolidayController::class, 'store'])
+        ->name('holidays.store');
+    Route::put('/holidays/{holiday}', [\App\Http\Controllers\HR\HolidayController::class, 'update'])
+        ->name('holidays.update');
+    Route::delete('/holidays/{holiday}', [\App\Http\Controllers\HR\HolidayController::class, 'destroy'])
+        ->name('holidays.destroy');
+
+    // ── Biometric Logs ────────────────────────────────────────────────────────
+    Route::get('/biometric', [\App\Http\Controllers\HR\BiometricLogController::class, 'index'])
+        ->name('biometric.index');
+    Route::post('/biometric/upload', [\App\Http\Controllers\HR\BiometricLogController::class, 'upload'])
+        ->name('biometric.upload');
+    Route::post('/biometric/{log}/resolve', [\App\Http\Controllers\HR\BiometricLogController::class, 'resolve'])
+        ->name('biometric.resolve');
+
+    // ── DTR Records ───────────────────────────────────────────────────────────
+    Route::get('/dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'index'])
+        ->name('dtr.index');
+    Route::get('/dtr/{user}/show', [\App\Http\Controllers\HR\DtrRecordController::class, 'show'])
+        ->name('dtr.show');
+    Route::post('/dtr/generate', [\App\Http\Controllers\HR\DtrRecordController::class, 'generate'])
+        ->name('dtr.generate');
+    Route::patch('/dtr/{record}/edit', [\App\Http\Controllers\HR\DtrRecordController::class, 'edit'])
+        ->name('dtr.edit');
+    Route::patch('/dtr/{record}/lock', [\App\Http\Controllers\HR\DtrRecordController::class, 'lock'])
+        ->name('dtr.lock');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Payroll Module Routes
+// ══════════════════════════════════════════════════════════════════════════════
+Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->group(function () {
+
+    Route::get('/', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'index'])
+        ->name('index');
+    Route::get('/create', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'create'])
+        ->name('create');
+    Route::post('/', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'store'])
+        ->name('store');
+    Route::get('/{payrollRun}', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'show'])
+        ->name('show');
+    Route::post('/{payrollRun}/process', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'process'])
+        ->name('process');
+    Route::post('/{payrollRun}/approve', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'approve'])
+        ->name('approve');
+    Route::post('/{payrollRun}/release', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'release'])
+        ->name('release');
+    Route::post('/{payrollRun}/cancel', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'cancel'])
+        ->name('cancel');
+
+    // Payslip & Reports
+    Route::get('/{payrollRun}/payslip/{payrollRecord}', [\App\Http\Controllers\Payroll\PayslipController::class, 'download'])
+        ->name('payslip.download');
+    Route::post('/{payrollRun}/payslips/zip', [\App\Http\Controllers\Payroll\PayslipController::class, 'downloadAll'])
+        ->name('payslips.zip');
+    Route::get('/{payrollRun}/reports/register', [\App\Http\Controllers\Payroll\PayslipController::class, 'payrollRegister'])
+        ->name('reports.register');
+    Route::get('/{payrollRun}/reports/deductions', [\App\Http\Controllers\Payroll\PayslipController::class, 'deductionsRegister'])
+        ->name('reports.deductions');
+});
+
+// HR Reports (outside payroll prefix)
+Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(function () {
+    Route::get('/reports/dtr', [\App\Http\Controllers\Payroll\PayslipController::class, 'dtrSummary'])
+        ->name('reports.dtr');
 });
 
 // Development-only: send a test email

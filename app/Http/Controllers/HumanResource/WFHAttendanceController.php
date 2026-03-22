@@ -68,6 +68,30 @@ class WFHAttendanceController extends Controller
         ]);
     }
 
+    // ─── API: Break Out ───────────────────────────────────────────────────────
+
+    public function breakOut()
+    {
+        $attendance = $this->wfhService->breakOut();
+
+        return response()->json([
+            'message'    => 'Break started. Enjoy your lunch!',
+            'attendance' => $attendance,
+        ]);
+    }
+
+    // ─── API: Break In ────────────────────────────────────────────────────────
+
+    public function breakIn()
+    {
+        $attendance = $this->wfhService->breakIn();
+
+        return response()->json([
+            'message'    => 'Welcome back! Break ended.',
+            'attendance' => $attendance,
+        ]);
+    }
+
     // ─── API: My Attendance List ──────────────────────────────────────────────
 
     public function myAttendance(Request $request)

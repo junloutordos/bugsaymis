@@ -122,6 +122,26 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Rewards', 'name' => 'rewards.approve',  'description' => 'Approve or reject nominations (committee / head of office)'],
             ['module' => 'Rewards', 'name' => 'rewards.manage',   'description' => 'Manage reward types and record awards (HR/Admin)'],
 
+            // ── Payroll ───────────────────────────────────────────────────────
+            ['module' => 'Payroll', 'name' => 'payroll.view',           'description' => 'View payroll runs and employee payslips'],
+            ['module' => 'Payroll', 'name' => 'payroll.process',        'description' => 'Compute/process payroll runs'],
+            ['module' => 'Payroll', 'name' => 'payroll.approve',        'description' => 'Approve payroll runs'],
+            ['module' => 'Payroll', 'name' => 'payroll.manage',         'description' => 'Full payroll management (allowance types, configs)'],
+
+            // ── HR — DTR & Biometric (new module) ─────────────────────────────
+            ['module' => 'HR',     'name' => 'hr.dtr.view',            'description' => 'View DTR records for all employees'],
+            ['module' => 'HR',     'name' => 'hr.dtr.manage',          'description' => 'Generate, edit, and lock DTR records'],
+            ['module' => 'HR',     'name' => 'hr.biometric.manage',    'description' => 'Upload and resolve biometric logs'],
+
+            // ── HR — Leave (new module) ────────────────────────────────────────
+            ['module' => 'HR',     'name' => 'hr.leave.view',          'description' => 'View all leave applications'],
+            ['module' => 'HR',     'name' => 'hr.leave.file',          'description' => 'File own leave applications'],
+            ['module' => 'HR',     'name' => 'hr.leave.approve',       'description' => 'Approve or deny leave applications'],
+
+            // ── HR — Employee Profile (payroll context) ────────────────────────
+            ['module' => 'HR',     'name' => 'hr.employee.view',       'description' => 'View employee profiles and salary info'],
+            ['module' => 'HR',     'name' => 'hr.employee.manage',     'description' => 'Edit employee profiles and salary grades'],
+
         ];
 
         foreach ($permissions as $data) {

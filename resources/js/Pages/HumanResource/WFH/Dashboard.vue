@@ -18,7 +18,7 @@
 
           <!-- Timed in or completed -->
           <div v-else class="space-y-4">
-            <!-- Times row -->
+            <!-- Row 1: Time In / Time Out -->
             <div class="grid grid-cols-2 gap-3">
               <!-- Time In card -->
               <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3 flex flex-col items-center gap-2">
@@ -49,10 +49,57 @@
               </div>
             </div>
 
-            <!-- Duration -->
+            <!-- Row 2: Break Out / Break In (shown once timed in) -->
+            <div class="grid grid-cols-2 gap-3">
+              <!-- Break Out card -->
+              <div class="rounded-xl p-3 flex flex-col items-center gap-1 border-2"
+                   :class="attendance.break_out
+                     ? 'bg-amber-50 border-amber-300'
+                     : 'bg-slate-50 border-dashed border-slate-200'">
+                <span class="text-xs font-semibold uppercase tracking-wide"
+                      :class="attendance.break_out ? 'text-amber-600' : 'text-slate-400'">
+                  Break Out
+                </span>
+                <span class="text-sm font-bold"
+                      :class="attendance.break_out ? 'text-amber-700' : 'text-slate-300'">
+                  {{ attendance.break_out ? formatTime(attendance.break_out) : '—' }}
+                </span>
+                <span class="text-[10px] text-slate-400">Lunch start</span>
+              </div>
+
+              <!-- Break In card -->
+              <div class="rounded-xl p-3 flex flex-col items-center gap-1 border-2"
+                   :class="attendance.break_in
+                     ? 'bg-teal-50 border-teal-300'
+                     : 'bg-slate-50 border-dashed border-slate-200'">
+                <span class="text-xs font-semibold uppercase tracking-wide"
+                      :class="attendance.break_in ? 'text-teal-600' : 'text-slate-400'">
+                  Break In
+                </span>
+                <span class="text-sm font-bold"
+                      :class="attendance.break_in ? 'text-teal-700' : 'text-slate-300'">
+                  {{ attendance.break_in ? formatTime(attendance.break_in) : '—' }}
+                </span>
+                <span class="text-[10px] text-slate-400">Lunch end</span>
+              </div>
+            </div>
+
+            <!-- Break duration pill -->
+            <div v-if="attendance.break_out && attendance.break_in"
+                 class="text-center text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-1.5">
+              🍽️ Lunch break: <strong>{{ breakDuration }}</strong>
+            </div>
+
+            <!-- On break indicator -->
+            <div v-else-if="attendance.break_out && !attendance.break_in"
+                 class="text-center text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg py-1.5 animate-pulse">
+              🍽️ Currently on lunch break…
+            </div>
+
+            <!-- Total work duration -->
             <div v-if="attendance.time_out"
                  class="text-center text-sm font-medium text-slate-600 bg-slate-50 rounded-lg py-2">
-              Total Duration: <span class="text-slate-900 font-bold">{{ duration }}</span>
+              Work Duration: <span class="text-slate-900 font-bold">{{ workDuration }}</span>
             </div>
           </div>
         </div>
@@ -102,12 +149,26 @@
       </div>
 
       <!-- Action Buttons -->
-      <div v-if="!showCamera" class="flex gap-4">
+      <div v-if="!showCamera" class="flex flex-wrap gap-3">
         <!-- Time In -->
         <button v-if="!attendance"
                 @click="openCamera('in')"
                 class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           🟢 Time In
+        </button>
+
+        <!-- Break Out (start lunch) — shown after time-in, before break-out, before time-out -->
+        <button v-if="attendance && !attendance.break_out && !attendance.time_out"
+                @click="recordBreak('out')" :disabled="breakLoading"
+                class="flex-1 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
+          🍽️ {{ breakLoading ? 'Saving…' : 'Break Out' }}
+        </button>
+
+        <!-- Break In (return from lunch) — shown after break-out, before break-in, before time-out -->
+        <button v-if="attendance && attendance.break_out && !attendance.break_in && !attendance.time_out"
+                @click="recordBreak('in')" :disabled="breakLoading"
+                class="flex-1 inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
+          ✅ {{ breakLoading ? 'Saving…' : 'Break In' }}
         </button>
 
         <!-- Time Out -->
@@ -151,8 +212,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
-import { Head, usePage } from '@inertiajs/vue3'
+import { ref, computed, onUnmounted, nextTick } from 'vue'
+import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
@@ -173,6 +234,7 @@ const showCamera             = ref(false)
 const cameraMode             = ref('in')   // 'in' | 'out'
 const capturedImage          = ref(null)
 const loading                = ref(false)
+const breakLoading           = ref(false)
 const showAccomplishmentPanel = ref(false)
 
 // Template refs
@@ -181,11 +243,23 @@ const canvasEl = ref(null)
 let mediaStream = null
 
 // ── Computed ──────────────────────────────────────────────────────────────────
-const duration = computed(() => {
-  if (!attendance.value?.time_in || !attendance.value?.time_out) return '—'
-  const ms = new Date(attendance.value.time_out) - new Date(attendance.value.time_in)
+const breakDuration = computed(() => {
+  if (!attendance.value?.break_out || !attendance.value?.break_in) return '—'
+  const ms = new Date(attendance.value.break_in) - new Date(attendance.value.break_out)
   const h  = Math.floor(ms / 3600000)
   const m  = Math.floor((ms % 3600000) / 60000)
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+})
+
+const workDuration = computed(() => {
+  if (!attendance.value?.time_in || !attendance.value?.time_out) return '—'
+  let ms = new Date(attendance.value.time_out) - new Date(attendance.value.time_in)
+  // Subtract lunch break duration if both break times are recorded
+  if (attendance.value.break_out && attendance.value.break_in) {
+    ms -= new Date(attendance.value.break_in) - new Date(attendance.value.break_out)
+  }
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
   return `${h}h ${m}m`
 })
 
@@ -281,6 +355,41 @@ async function confirmCapture() {
   }
 }
 
+// ── Break Out / Break In (no camera needed) ───────────────────────────────────
+async function recordBreak(direction) {
+  if (breakLoading.value) return
+  breakLoading.value = true
+
+  const url = direction === 'out'
+    ? route('hr.wfh.break-out')
+    : route('hr.wfh.break-in')
+
+  const titles = {
+    out: { title: 'Break Out!', text: 'Enjoy your lunch break. 🍽️' },
+    in:  { title: 'Welcome Back!', text: 'Break ended. Back to work! 💪' },
+  }
+
+  try {
+    const { data } = await axios.post(url)
+    attendance.value = data.attendance
+
+    await Swal.fire({
+      icon:  'success',
+      title: titles[direction].title,
+      text:  titles[direction].text,
+      timer: 1800,
+      showConfirmButton: false,
+    })
+  } catch (err) {
+    const msg = err.response?.data?.message
+      ?? err.response?.data?.errors?.date
+      ?? 'Something went wrong.'
+    Swal.fire('Error', Array.isArray(msg) ? msg[0] : msg, 'error')
+  } finally {
+    breakLoading.value = false
+  }
+}
+
 // ── Accomplishment callbacks ──────────────────────────────────────────────────
 function onAccomplishmentSaved(item) {
   localAccomplishments.value.unshift(item)
@@ -312,7 +421,4 @@ function getPosition() {
     navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
   })
 }
-
-// nextTick polyfill (Vue's nextTick used inline)
-import { nextTick } from 'vue'
 </script>

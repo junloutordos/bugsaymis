@@ -509,6 +509,30 @@ const menuItems = [
         permissions: ["hr.gatepass.approve"],
       },
       {
+        label: "Leave Applications",
+        routeName: "hr.leave.index",
+        href: route('hr.leave.index'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "Payroll Officer"],
+        permissions: ["hr.leave.file"],
+      },
+      {
+        label: "DTR Records",
+        routeName: "hr.dtr.index",
+        href: route('hr.dtr.index'),
+        icon: TableCellsIcon,
+        roles: ["Administrator", "HR", "Payroll Officer"],
+        permissions: ["hr.dtr.view"],
+      },
+      {
+        label: "Biometric Logs",
+        routeName: "hr.biometric.index",
+        href: route('hr.biometric.index'),
+        icon: ClockIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["hr.biometric.manage"],
+      },
+      {
         label: "Work From Home",
         routeName: "hr.wfh.index",
         href: route('hr.wfh.index'),
@@ -523,6 +547,22 @@ const menuItems = [
         icon: ChartBarIcon,
         roles: ["Administrator", "HR", "DivisionChief", "OCD"],
         permissions: ["wfh.monitor"],
+      },
+    ],
+  },
+
+  {
+    label: "Payroll",
+    icon: BanknotesIcon,
+    roles: ["Administrator", "HR", "Payroll Officer", "Faculty", "Staff", "DivisionChief"],
+    children: [
+      {
+        label: "Payroll Runs",
+        routeName: "payroll.index",
+        href: route('payroll.index'),
+        icon: CurrencyDollarIcon,
+        roles: ["Administrator", "HR", "Payroll Officer", "Faculty", "Staff", "DivisionChief"],
+        permissions: ["payroll.view"],
       },
     ],
   },
