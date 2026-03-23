@@ -29,6 +29,7 @@ class EmployeeSchedule extends Model
 
     protected $casts = [
         'work_days'              => 'array',
+        'daily_schedules'        => 'array',
         'effective_date'         => 'date',
         'end_date'               => 'date',
         'is_default'             => 'boolean',
@@ -59,10 +60,13 @@ class EmployeeSchedule extends Model
 
     /**
      * Get the active work days as 3-letter abbreviations (Mon, Tue, …).
-     * Defaults to Mon–Fri if not set.
+     * If daily_schedules is set, work days are its keys; otherwise fall back to work_days column.
      */
     public function getWorkDaysArray(): array
     {
+        if (! empty($this->daily_schedules)) {
+            return array_keys($this->daily_schedules);
+        }
         return $this->work_days ?? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     }
 
@@ -71,7 +75,28 @@ class EmployeeSchedule extends Model
      */
     public function isWorkDay(string $date): bool
     {
-        $dow = \Carbon\Carbon::parse($date)->format('D'); // Mon, Tue, …
+        $dow = \Carbon\Carbon::parse($date)->format('D');
         return in_array($dow, $this->getWorkDaysArray());
+    }
+
+    /**
+     * Get the scheduled time_in for a specific date.
+     * Checks daily_schedules first, then falls back to the time_in column.
+     */
+    public function getTimeIn(string $date): ?string
+    {
+        $dow = \Carbon\Carbon::parse($date)->format('D');
+        return $this->daily_schedules[$dow]['time_in']
+            ?? ($this->time_in ? (string) $this->time_in : null);
+    }
+
+    /**
+     * Get the scheduled time_out for a specific date.
+     */
+    public function getTimeOut(string $date): ?string
+    {
+        $dow = \Carbon\Carbon::parse($date)->format('D');
+        return $this->daily_schedules[$dow]['time_out']
+            ?? ($this->time_out ? (string) $this->time_out : null);
     }
 }

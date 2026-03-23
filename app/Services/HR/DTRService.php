@@ -76,9 +76,9 @@ class DTRService
             // Determine day type
             [$dayType, $isWorkDay] = $this->getDayType($dateStr, $date, $schedule, $holidays);
 
-            // If it's a rest day with no punches and no special conditions — skip
+            // Skip rest days entirely — weekend/off-day punches are not counted
             $logsForDay = $allLogs->get($dateStr, collect());
-            if ($dayType === 'rest_day' && $logsForDay->isEmpty()) {
+            if ($dayType === 'rest_day') {
                 continue;
             }
 
@@ -141,13 +141,16 @@ class DTRService
         $date     = $record->work_date->toDateString();
         $schedule = $record->schedule;
 
-        $hoursWorked      = $this->computeHoursWorked(
-            $record->time_in_am, $record->time_out_am,
-            $record->time_in_pm, $record->time_out_pm
-        );
-        $lateMinutes      = $this->computeLateMinutes($record->time_in_am, $date, $schedule);
-        $undertimeMinutes = $this->computeUndertimeMinutes($record->time_out_pm, $date, $schedule);
-        $overtimeMinutes  = $this->computeOvertimeMinutes($record->time_out_pm, $date, $schedule);
+        // Biometric value takes precedence; penned entry fills any null slot.
+        $timeInAm  = $record->time_in_am  ?? $record->penned_time_in_am;
+        $timeOutAm = $record->time_out_am ?? $record->penned_time_out_am;
+        $timeInPm  = $record->time_in_pm  ?? $record->penned_time_in_pm;
+        $timeOutPm = $record->time_out_pm ?? $record->penned_time_out_pm;
+
+        $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
+        $lateMinutes      = $this->computeLateMinutes($timeInAm, $date, $schedule);
+        $undertimeMinutes = $this->computeUndertimeMinutes($timeOutPm, $date, $schedule);
+        $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
 
         $record->update([
             'hours_worked'      => round($hoursWorked, 2),
@@ -189,36 +192,136 @@ class DTRService
             return [null, null, null, null];
         }
 
-        // If log types are explicitly set (not all 'auto'), use pair-matching
+        $sorted = $logs->sortBy('log_datetime')->values();
+
+        // Split all punches into AM (before 12:30) and PM (12:30 and after).
+        // 12:30 is used as the divider because it falls in the middle of the
+        // standard Philippine government noon break (12:00–13:00), ensuring
+        // a lunch-departure punch at e.g. 12:02 stays in the AM bucket while
+        // a post-lunch return at e.g. 12:45 lands in PM.
+        $breakMinutes = $this->getBreakMinutes($dateStr, $schedule);
+
+        $amLogs = $sorted->filter(fn ($l) => $this->logMinutes($l) < $breakMinutes)->values();
+        $pmLogs = $sorted->filter(fn ($l) => $this->logMinutes($l) >= $breakMinutes)->values();
+
         $hasExplicit = $logs->contains(fn ($l) => $l->log_type !== 'auto');
 
         if ($hasExplicit) {
-            $ins  = $logs->where('log_type', 'time_in')->sortBy('log_datetime')->values();
-            $outs = $logs->where('log_type', 'time_out')->sortBy('log_datetime')->values();
+            // Device provides Granding io_status codes:
+            //   Check-In(0)/Break-In(3)/OT-In(4) → log_type = time_in
+            //   Check-Out(1)/Break-Out(2)/OT-Out(5) → log_type = time_out
+            // Within each time-of-day bucket use the type to find in/out.
+            $amIns  = $amLogs->where('log_type', 'time_in')->values();
+            $amOuts = $amLogs->where('log_type', 'time_out')->values();
 
-            $timeInAm  = $ins->get(0)  ? Carbon::parse($ins->get(0)->log_datetime)->format('H:i:s')  : null;
-            $timeOutAm = $outs->get(0) ? Carbon::parse($outs->get(0)->log_datetime)->format('H:i:s') : null;
-            $timeInPm  = $ins->get(1)  ? Carbon::parse($ins->get(1)->log_datetime)->format('H:i:s')  : null;
-            $timeOutPm = $outs->get(1) ? Carbon::parse($outs->get(1)->log_datetime)->format('H:i:s') : null;
+            // Heuristic A — device sends io=0 for break-outs:
+            // A single near-noon "time_in" with no AM time_out logs is actually
+            // a lunch departure. Reclassify as time_out_am.
+            if ($amIns->count() === 1
+                && $amOuts->isEmpty()
+                && $this->logMinutes($amIns->first()) >= ($breakMinutes - 90)
+            ) {
+                $timeInAm  = null;
+                $timeOutAm = $this->firstTime($amIns);
+
+            // Heuristic B — re-tap / bounce after departure:
+            // Employee tapped the device again (time_in) within 5 minutes after
+            // their last AM departure tap (time_out). Treat as noise; keep the
+            // departure time and discard the stray time_in.
+            } elseif ($amIns->count() === 1
+                && $amOuts->isNotEmpty()
+                && ($this->logMinutes($amIns->first()) - $this->logMinutes($amOuts->last())) <= 5
+                && $this->logMinutes($amIns->first()) >= $this->logMinutes($amOuts->last())
+            ) {
+                $timeInAm  = null;
+                $timeOutAm = $this->firstTime($amOuts);
+
+            } else {
+                $timeInAm  = $this->firstTime($amIns);
+                $timeOutAm = $this->firstTime($amOuts);
+            }
+
+            $timeInPm  = $this->firstTime($pmLogs->where('log_type', 'time_in'));
+            $timeOutPm = $this->lastTime($pmLogs->where('log_type', 'time_out'));
         } else {
-            // Sequential position mapping
-            $sorted = $logs->sortBy('log_datetime')->values();
+            // 'auto' logs: use position within each bucket.
+            $timeInAm  = $this->firstTime($amLogs);
+            $timeOutAm = $amLogs->count() > 1 ? $this->lastTime($amLogs) : null;
 
-            $timeInAm  = $sorted->get(0) ? Carbon::parse($sorted->get(0)->log_datetime)->format('H:i:s') : null;
-            $timeOutAm = $sorted->get(1) ? Carbon::parse($sorted->get(1)->log_datetime)->format('H:i:s') : null;
-            $timeInPm  = $sorted->get(2) ? Carbon::parse($sorted->get(2)->log_datetime)->format('H:i:s') : null;
-            $timeOutPm = $sorted->get(3) ? Carbon::parse($sorted->get(3)->log_datetime)->format('H:i:s') : null;
+            if ($pmLogs->count() >= 2) {
+                // At least two PM punches: first = return from lunch, last = end of day
+                $timeInPm  = $this->firstTime($pmLogs);
+                $timeOutPm = $this->lastTime($pmLogs);
+            } elseif ($pmLogs->count() === 1 && $amLogs->isNotEmpty()) {
+                // Single PM punch while AM has activity → end-of-day departure
+                $timeInPm  = null;
+                $timeOutPm = $this->firstTime($pmLogs);
+            } else {
+                // Single PM punch with no AM activity → PM-only half-day arrival
+                $timeInPm  = $this->firstTime($pmLogs);
+                $timeOutPm = null;
+            }
+        }
 
-            // Extra punches → update time_out_pm if later
-            if ($sorted->count() > 4) {
-                $last = Carbon::parse($sorted->last()->log_datetime)->format('H:i:s');
-                if ($last > $timeOutPm) {
-                    $timeOutPm = $last;
+        // Sanity-check ordering.  If out ≤ in it indicates a bounce / double-punch
+        // artifact — the device was tapped twice in quick succession in the wrong
+        // order.  Clear the invalid out rather than storing an impossible sequence.
+        if ($timeInAm && $timeOutAm && $timeOutAm <= $timeInAm) {
+            $timeOutAm = null;
+        }
+        if ($timeInPm && $timeOutPm && $timeOutPm <= $timeInPm) {
+            $timeOutPm = null;
+        }
+
+        return [$timeInAm, $timeOutAm, $timeInPm, $timeOutPm];
+    }
+
+    /**
+     * Split point between AM and PM sessions.
+     * Uses 12:30 (750 min) — the midpoint of the standard noon break — so that
+     * lunch-departure punches (~12:00–12:10) stay in AM and post-lunch returns
+     * (~12:45–13:05) land in PM.  For non-standard shifts whose work midpoint
+     * falls outside the 11:00–13:30 window the schedule midpoint is used instead.
+     */
+    private function getBreakMinutes(string $dateStr, ?EmployeeSchedule $schedule): int
+    {
+        if ($schedule) {
+            $timeIn  = $schedule->getTimeIn($dateStr);
+            $timeOut = $schedule->getTimeOut($dateStr);
+            if ($timeIn && $timeOut) {
+                $mid = intdiv($this->timeStrToMinutes($timeIn) + $this->timeStrToMinutes($timeOut), 2);
+                // Only override the standard 12:30 split for genuinely non-noon shifts
+                if ($mid < 660 || $mid > 810) { // outside 11:00–13:30
+                    return $mid;
                 }
             }
         }
 
-        return [$timeInAm, $timeOutAm, $timeInPm, $timeOutPm];
+        return 750; // 12:30 — midpoint of standard PH noon break
+    }
+
+    private function logMinutes(\App\Models\HR\BiometricLog $log): int
+    {
+        $dt = Carbon::parse($log->log_datetime);
+        return $dt->hour * 60 + $dt->minute;
+    }
+
+    private function timeStrToMinutes(string $time): int
+    {
+        [$h, $m] = explode(':', $time);
+        return (int) $h * 60 + (int) $m;
+    }
+
+    private function firstTime(\Illuminate\Support\Collection $logs): ?string
+    {
+        $log = $logs->first();
+        return $log ? Carbon::parse($log->log_datetime)->format('H:i:s') : null;
+    }
+
+    private function lastTime(\Illuminate\Support\Collection $logs): ?string
+    {
+        $log = $logs->last();
+        return $log ? Carbon::parse($log->log_datetime)->format('H:i:s') : null;
     }
 
     private function computeHoursWorked(
@@ -252,7 +355,12 @@ class DTRService
             return 0;
         }
 
-        $scheduledIn   = Carbon::parse($dateStr . ' ' . $schedule->time_in);
+        $scheduledTimeIn = $schedule->getTimeIn($dateStr);
+        if (! $scheduledTimeIn) {
+            return 0;
+        }
+
+        $scheduledIn   = Carbon::parse($dateStr . ' ' . $scheduledTimeIn);
         $graceDeadline = $scheduledIn->copy()->addMinutes($schedule->grace_period_minutes ?? 15);
         $actualIn      = Carbon::parse($dateStr . ' ' . $timeInAm);
 
@@ -269,7 +377,12 @@ class DTRService
             return 0;
         }
 
-        $scheduledOut = Carbon::parse($dateStr . ' ' . $schedule->time_out);
+        $scheduledTimeOut = $schedule->getTimeOut($dateStr);
+        if (! $scheduledTimeOut) {
+            return 0;
+        }
+
+        $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
         $actualOut    = Carbon::parse($dateStr . ' ' . $timeOutPm);
 
         return max(0, $scheduledOut->diffInMinutes($actualOut, false));
@@ -281,7 +394,12 @@ class DTRService
             return 0;
         }
 
-        $scheduledOut = Carbon::parse($dateStr . ' ' . $schedule->time_out);
+        $scheduledTimeOut = $schedule->getTimeOut($dateStr);
+        if (! $scheduledTimeOut) {
+            return 0;
+        }
+
+        $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
         $actualOut    = Carbon::parse($dateStr . ' ' . $timeOutPm);
 
         if ($actualOut->lte($scheduledOut)) {

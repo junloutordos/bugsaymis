@@ -1453,6 +1453,22 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.edit');
     Route::patch('/dtr/{record}/lock', [\App\Http\Controllers\HR\DtrRecordController::class, 'lock'])
         ->name('dtr.lock');
+    Route::patch('/dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'penned'])
+        ->name('dtr.penned');
+    Route::get('/dtr/{user}/print', [\App\Http\Controllers\HR\DtrRecordController::class, 'printCsc'])
+        ->name('dtr.print');
+
+    // ── Work Schedules ────────────────────────────────────────────────────────
+    Route::get('/schedules', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'index'])
+        ->name('schedules.index');
+    Route::post('/schedules/presets', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'storePreset'])
+        ->name('schedules.presets.store');
+    Route::put('/schedules/presets/{preset}', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'updatePreset'])
+        ->name('schedules.presets.update');
+    Route::delete('/schedules/presets/{preset}', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'destroyPreset'])
+        ->name('schedules.presets.destroy');
+    Route::post('/schedules/assign', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'assign'])
+        ->name('schedules.assign');
 
     // ── Employee 201 Files ──────────────────────────────────────────────────────
     Route::get('/employees/{user}/documents', [EmployeeDocumentController::class, 'index'])

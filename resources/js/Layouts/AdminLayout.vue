@@ -477,12 +477,12 @@ const menuItems = [
         permissions: ["hr.attendance.view"],
       },
       {
-        label: "Schedule",
-        routeName: "schedules.index",
-        href: route("schedules.index"),
-        icon: DocumentTextIcon,
-        roles: ["Administrator", "HR", "Faculty", "Staff"],
-        permissions: ["hr.schedule.view"],
+        label: "Work Schedules",
+        routeName: "hr.schedules.index",
+        href: route("hr.schedules.index"),
+        icon: ClockIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["hr.schedule.manage"],
       },
       {
         label: "Date Parameters",

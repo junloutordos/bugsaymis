@@ -33,10 +33,17 @@ class DtrRecord extends Model
         'processed_by',
         'processed_at',
         'remarks',
+        'penned_time_in_am',
+        'penned_time_out_am',
+        'penned_time_in_pm',
+        'penned_time_out_pm',
+        'penned_remarks',
+        'penned_by',
+        'penned_at',
     ];
 
     protected $casts = [
-        'work_date'      => 'date',
+        'work_date'      => 'date:Y-m-d',
         'hours_worked'   => 'decimal:2',
         'late_minutes'   => 'decimal:2',
         'undertime_minutes' => 'decimal:2',
@@ -44,6 +51,7 @@ class DtrRecord extends Model
         'is_posted'      => 'boolean',
         'is_locked'      => 'boolean',
         'processed_at'   => 'datetime',
+        'penned_at'      => 'datetime',
     ];
 
     public function user(): BelongsTo

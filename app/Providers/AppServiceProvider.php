@@ -105,6 +105,16 @@ class AppServiceProvider extends ServiceProvider
             'hr.biometric.manage',
             'hr.employee.view',
             'hr.employee.manage',
+            'hr.employees.view',
+            'hr.employees.manage',
+            'hr.schedule.view',
+            'hr.schedule.manage',
+            'hr.attendance.view',
+            'hr.pds.view',
+            'hr.pds.manage',
+            'hr.gatepass.view',
+            'hr.gatepass.create',
+            'hr.gatepass.approve',
         ] as $permission) {
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }

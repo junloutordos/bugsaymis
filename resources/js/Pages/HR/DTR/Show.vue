@@ -6,13 +6,18 @@
       <!-- Employee Header -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 class="text-lg font-semibold text-slate-800">{{ employee.name }}</h1>
-            <p class="text-sm text-slate-500">
-              {{ employee.position }} — Badge: {{ employee.badge_id ?? 'N/A' }}
-            </p>
+          <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
+              {{ initials(employee.name) }}
+            </div>
+            <div>
+              <h1 class="text-lg font-semibold text-slate-800">{{ employee.name }}</h1>
+              <p class="text-sm text-slate-500">
+                {{ employee.position || 'No position' }}
+                <span v-if="employee.badge_id" class="ml-1 text-slate-400">· Badge {{ employee.badge_id }}</span>
+              </p>
+            </div>
           </div>
-          <!-- Month navigator -->
           <div class="flex items-center gap-2">
             <button @click="changeMonth(-1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronLeftIcon class="h-4 w-4 text-slate-600" />
@@ -26,96 +31,113 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
-            <button @click="window.print()" class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
-              <PrinterIcon class="h-4 w-4" />
-              Print
+            <button @click="window.print()" class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
+              <PrinterIcon class="h-4 w-4" />Print
             </button>
+            <a :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+              <DocumentTextIcon class="h-4 w-4" />CSC Format
+            </a>
           </div>
         </div>
       </div>
 
       <!-- Summary Stats -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 print:hidden">
-        <div class="bg-emerald-50 rounded-xl border border-emerald-100 p-4 text-center">
-          <p class="text-xs text-emerald-600 font-medium uppercase">Present</p>
-          <p class="text-2xl font-bold text-emerald-700 mt-1">{{ summary.present }}</p>
+      <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 print:hidden">
+        <div class="bg-emerald-50 rounded-xl border border-emerald-100 p-3 text-center">
+          <p class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">Present</p>
+          <p class="text-xl font-bold text-emerald-700 mt-0.5">{{ summary.present }}</p>
         </div>
-        <div class="bg-red-50 rounded-xl border border-red-100 p-4 text-center">
-          <p class="text-xs text-red-500 font-medium uppercase">Absent</p>
-          <p class="text-2xl font-bold text-red-600 mt-1">{{ summary.absent }}</p>
+        <div class="bg-red-50 rounded-xl border border-red-100 p-3 text-center">
+          <p class="text-[10px] text-red-500 font-semibold uppercase tracking-wide">Absent</p>
+          <p class="text-xl font-bold text-red-600 mt-0.5">{{ summary.absent }}</p>
         </div>
-        <div class="bg-amber-50 rounded-xl border border-amber-100 p-4 text-center">
-          <p class="text-xs text-amber-600 font-medium uppercase">Late Days</p>
-          <p class="text-2xl font-bold text-amber-700 mt-1">{{ summary.late_days }}</p>
+        <div class="bg-amber-50 rounded-xl border border-amber-100 p-3 text-center">
+          <p class="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">Half Day</p>
+          <p class="text-xl font-bold text-amber-700 mt-0.5">{{ summary.half_day }}</p>
         </div>
-        <div class="bg-blue-50 rounded-xl border border-blue-100 p-4 text-center">
-          <p class="text-xs text-blue-600 font-medium uppercase">On Leave</p>
-          <p class="text-2xl font-bold text-blue-700 mt-1">{{ summary.on_leave }}</p>
+        <div class="bg-blue-50 rounded-xl border border-blue-100 p-3 text-center">
+          <p class="text-[10px] text-blue-600 font-semibold uppercase tracking-wide">On Leave</p>
+          <p class="text-xl font-bold text-blue-700 mt-0.5">{{ summary.on_leave }}</p>
         </div>
-        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4 text-center">
-          <p class="text-xs text-slate-500 font-medium uppercase">Half Day</p>
-          <p class="text-2xl font-bold text-slate-700 mt-1">{{ summary.half_day }}</p>
+        <div class="bg-violet-50 rounded-xl border border-violet-100 p-3 text-center">
+          <p class="text-[10px] text-violet-600 font-semibold uppercase tracking-wide">Holiday</p>
+          <p class="text-xl font-bold text-violet-700 mt-0.5">{{ summary.holiday }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-          <p class="text-xs text-slate-500 font-medium uppercase">Total Hrs</p>
-          <p class="text-2xl font-bold text-slate-800 mt-1">{{ summary.total_hours }}</p>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+          <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Total Hrs</p>
+          <p class="text-xl font-bold text-slate-800 mt-0.5">{{ summary.total_hours }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-          <p class="text-xs text-slate-500 font-medium uppercase">Late (min)</p>
-          <p class="text-2xl font-bold text-amber-600 mt-1">{{ summary.total_late }}</p>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+          <p class="text-[10px] text-amber-500 font-semibold uppercase tracking-wide">Late (m)</p>
+          <p class="text-xl font-bold text-amber-600 mt-0.5">{{ summary.total_late }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-          <p class="text-xs text-slate-500 font-medium uppercase">Undertime</p>
-          <p class="text-2xl font-bold text-orange-600 mt-1">{{ summary.total_ut }}</p>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+          <p class="text-[10px] text-orange-500 font-semibold uppercase tracking-wide">Undertime</p>
+          <p class="text-xl font-bold text-orange-600 mt-0.5">{{ summary.total_ut }}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-          <p class="text-xs text-slate-500 font-medium uppercase">Overtime</p>
-          <p class="text-2xl font-bold text-emerald-600 mt-1">{{ summary.total_ot }}</p>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+          <p class="text-[10px] text-emerald-500 font-semibold uppercase tracking-wide">Overtime</p>
+          <p class="text-xl font-bold text-emerald-600 mt-0.5">{{ summary.total_ot }}</p>
         </div>
       </div>
 
       <!-- Calendar Grid -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <h2 class="text-sm font-semibold text-slate-700 mb-4">{{ monthLabel }}</h2>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+        <h2 class="text-sm font-semibold text-slate-700 mb-3">{{ monthLabel }}</h2>
 
         <!-- Day headers -->
-        <div class="grid grid-cols-7 gap-1 mb-1">
+        <div class="grid grid-cols-7 mb-1">
           <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d"
-               class="text-center text-xs font-semibold text-slate-400 py-1">
-            {{ d }}
-          </div>
+               class="text-center text-[11px] font-semibold text-slate-400 py-1.5">{{ d }}</div>
         </div>
 
         <!-- Cells -->
         <div class="grid grid-cols-7 gap-1">
-          <!-- Empty padding cells for first day of month -->
-          <div v-for="n in firstDayOfWeek" :key="'pad-' + n" class="min-h-[80px]"></div>
+          <div v-for="n in firstDayOfWeek" :key="'pad-'+n" class="min-h-[76px]"></div>
 
-          <!-- Day cells -->
           <div
             v-for="cell in calendarCells"
             :key="cell.date"
-            :class="[
-              'min-h-[80px] rounded-lg border p-1.5 text-xs relative',
-              cellBg(cell),
-            ]"
+            :class="['min-h-[76px] rounded-lg border p-1.5 text-xs relative flex flex-col', cellBg(cell)]"
           >
-            <div class="font-semibold text-slate-600 mb-1">{{ cell.day }}</div>
+            <!-- Day number -->
+            <span :class="['text-[11px] font-bold leading-none mb-1', cell.isToday ? 'text-indigo-600' : 'text-slate-500']">
+              {{ cell.day }}
+              <span v-if="cell.isToday" class="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 align-middle"></span>
+            </span>
+
             <template v-if="cell.record">
-              <div class="text-[10px] font-mono text-slate-500 leading-tight">
-                <div>{{ fmtTime(cell.record.time_in_am) }}</div>
-                <div>{{ fmtTime(cell.record.time_out_am) }}</div>
-                <div>{{ fmtTime(cell.record.time_in_pm) }}</div>
-                <div>{{ fmtTime(cell.record.time_out_pm) }}</div>
+              <!-- Time punches -->
+              <div class="font-mono text-[9px] text-slate-500 leading-[1.4] space-y-px flex-1">
+                <div v-if="cell.record.time_in_am" class="flex gap-1">
+                  <span class="text-slate-400">in</span>{{ fmtTime(cell.record.time_in_am) }}
+                </div>
+                <div v-if="cell.record.time_out_am" class="flex gap-1">
+                  <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_am) }}
+                </div>
+                <div v-if="cell.record.time_in_pm" class="flex gap-1">
+                  <span class="text-slate-400">in</span>{{ fmtTime(cell.record.time_in_pm) }}
+                </div>
+                <div v-if="cell.record.time_out_pm" class="flex gap-1">
+                  <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_pm) }}
+                </div>
               </div>
-              <!-- Status band -->
-              <div :class="[statusBadge(cell.record.attendance_status), 'absolute bottom-1 left-1 right-1 text-center rounded text-[9px] font-semibold py-0.5']">
-                {{ cell.record.attendance_status?.replace('_', ' ') }}
+              <!-- Status badge -->
+              <div :class="[statusBadge(cell.record.attendance_status), 'mt-auto text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide']">
+                {{ statusLabel(cell.record.attendance_status) }}
               </div>
             </template>
-            <div v-else-if="cell.isWorkDay" class="absolute inset-0 flex items-center justify-center text-red-300 text-[10px] font-medium rounded-lg">
-              ABSENT
-            </div>
+
+            <!-- No record: rest day -->
+            <template v-else-if="!cell.isWorkDay">
+              <span class="text-[9px] text-slate-300 mt-auto text-center">rest</span>
+            </template>
+
+            <!-- No record: work day = absent -->
+            <template v-else>
+              <span class="text-[9px] font-bold text-red-300 mt-auto text-center uppercase tracking-wide">absent</span>
+            </template>
           </div>
         </div>
       </div>
@@ -129,18 +151,18 @@
           <table class="min-w-full divide-y divide-slate-100 text-sm">
             <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Day</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">AM In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">AM Out</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PM In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PM Out</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">AM In</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">AM Out</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PM In</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PM Out</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Hrs</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Late</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">UT</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">OT</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide print:hidden">Actions</th>
+                <th class="px-4 py-3 print:hidden"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -148,23 +170,30 @@
                 <td colspan="12" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
               </tr>
               <tr v-for="r in records" :key="r.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap">{{ r.work_date }}</td>
-                <td class="px-4 py-2.5 text-slate-500 text-xs">{{ getDayName(r.work_date) }}</td>
-                <td class="px-4 py-2.5 font-mono text-slate-600 text-xs">{{ r.time_in_am ?? '—' }}</td>
-                <td class="px-4 py-2.5 font-mono text-slate-600 text-xs">{{ r.time_out_am ?? '—' }}</td>
-                <td class="px-4 py-2.5 font-mono text-slate-600 text-xs">{{ r.time_in_pm ?? '—' }}</td>
-                <td class="px-4 py-2.5 font-mono text-slate-600 text-xs">{{ r.time_out_pm ?? '—' }}</td>
-                <td class="px-4 py-2.5 text-right text-slate-700">{{ r.hours_worked ?? '—' }}</td>
-                <td class="px-4 py-2.5 text-right text-xs" :class="r.late_minutes > 0 ? 'text-amber-600 font-medium' : 'text-slate-400'">{{ r.late_minutes > 0 ? r.late_minutes + 'm' : '—' }}</td>
-                <td class="px-4 py-2.5 text-right text-xs" :class="r.undertime_minutes > 0 ? 'text-orange-600 font-medium' : 'text-slate-400'">{{ r.undertime_minutes > 0 ? r.undertime_minutes + 'm' : '—' }}</td>
-                <td class="px-4 py-2.5 text-right text-xs" :class="r.overtime_minutes > 0 ? 'text-emerald-600 font-medium' : 'text-slate-400'">{{ r.overtime_minutes > 0 ? r.overtime_minutes + 'm' : '—' }}</td>
+                <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
+                <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
+                <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
+                    class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
+                    :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : 'text-slate-200')">
+                  {{ fmtTime(r[f] || r['penned_'+f]) || '–' }}
+                </td>
+                <td class="px-4 py-2.5 text-right text-slate-700 text-xs">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</td>
+                <td class="px-4 py-2.5 text-right text-xs" :class="r.late_minutes > 0 ? 'text-amber-600 font-medium' : 'text-slate-300'">
+                  {{ r.late_minutes > 0 ? r.late_minutes + 'm' : '—' }}
+                </td>
+                <td class="px-4 py-2.5 text-right text-xs" :class="r.undertime_minutes > 0 ? 'text-orange-600 font-medium' : 'text-slate-300'">
+                  {{ r.undertime_minutes > 0 ? r.undertime_minutes + 'm' : '—' }}
+                </td>
+                <td class="px-4 py-2.5 text-right text-xs" :class="r.overtime_minutes > 0 ? 'text-emerald-600 font-medium' : 'text-slate-300'">
+                  {{ r.overtime_minutes > 0 ? r.overtime_minutes + 'm' : '—' }}
+                </td>
                 <td class="px-4 py-2.5">
-                  <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
-                    {{ r.attendance_status?.replace('_', ' ') }}
+                  <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                    {{ statusLabel(r.attendance_status) }}
                   </span>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
-                  <button v-if="!r.is_locked" @click="openEdit(r)" class="text-slate-400 hover:text-indigo-600">
+                  <button v-if="!r.is_locked" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
                     <PencilSquareIcon class="h-4 w-4" />
                   </button>
                   <LockClosedIcon v-else class="h-4 w-4 text-red-300" />
@@ -174,27 +203,49 @@
           </table>
         </div>
       </div>
+
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Edit / Penned Entry Modal -->
     <Teleport to="body">
       <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm print:hidden">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-          <h3 class="text-base font-semibold text-slate-800 mb-1">Edit DTR Record</h3>
-          <p class="text-sm text-slate-400 mb-4">{{ editModal.record?.work_date }}</p>
+          <h3 class="text-base font-semibold text-slate-800 mb-0.5">DTR Record</h3>
+          <p class="text-sm text-slate-400 mb-1">{{ toDateStr(editModal.record?.work_date) }} — {{ getDayName(editModal.record?.work_date) }}</p>
+          <p class="text-[11px] text-slate-400 mb-4">Biometric punches are read-only. Empty slots accept a <span class="text-red-500 font-medium">penned entry</span>.</p>
+
           <div class="grid grid-cols-2 gap-3">
             <div v-for="field in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="field">
-              <label class="block text-xs font-medium text-slate-600 mb-1">{{ field.replace(/_/g,' ').toUpperCase() }}</label>
-              <input v-model="editForm[field]" type="time" step="1" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <label class="block text-xs font-medium mb-1"
+                :class="editModal.record?.[field] ? 'text-slate-500' : 'text-red-500'">
+                {{ fieldLabel(field) }}
+                <span v-if="editModal.record?.[field]" class="font-normal text-slate-400">(biometric)</span>
+                <span v-else class="font-normal text-red-400">(penned)</span>
+              </label>
+              <!-- Biometric value: read-only display -->
+              <div v-if="editModal.record?.[field]"
+                class="w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm font-mono text-slate-400 select-none">
+                {{ fmtTime(editModal.record[field]) }}
+              </div>
+              <!-- Empty slot: penned entry input -->
+              <input v-else
+                v-model="editForm['penned_' + field]"
+                type="time"
+                class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm font-mono text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" />
             </div>
             <div class="col-span-2">
               <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-              <input v-model="editForm.remarks" type="text" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <input v-model="editForm.penned_remarks" type="text" placeholder="Reason for penned entry…"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
             </div>
           </div>
+
           <div class="flex gap-3 justify-end mt-5">
             <button @click="editModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="submitEdit" :disabled="editForm.processing" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">Save</button>
+            <button @click="submitEdit" :disabled="editForm.processing"
+              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">
+              {{ editForm.processing ? 'Saving…' : 'Save' }}
+            </button>
           </div>
         </div>
       </div>
@@ -208,11 +259,8 @@ import { ref, computed, reactive } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PrinterIcon,
-  PencilSquareIcon,
-  LockClosedIcon,
+  ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
+  PencilSquareIcon, LockClosedIcon, DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -224,12 +272,37 @@ const props = defineProps({
 
 const currentMonth = ref(props.month)
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Normalize any date value (ISO string, YYYY-MM-DD, etc.) to YYYY-MM-DD */
+function toDateStr(val) {
+  if (!val) return ''
+  return String(val).slice(0, 10)
+}
+
+function initials(name) {
+  return (name ?? '').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function fmtTime(t) {
+  if (!t) return '—'
+  return String(t).slice(0, 5)
+}
+
+function getDayName(dateVal) {
+  const d = toDateStr(dateVal)
+  if (!d) return ''
+  // Append T00:00:00 only if it's a plain date string to avoid TZ shift
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
+}
+
 // ── Month navigation ───────────────────────────────────────────────────────
-function goMonth () {
+
+function goMonth() {
   router.get(route('hr.dtr.show', props.employee.id), { month: currentMonth.value }, { preserveState: false })
 }
 
-function changeMonth (delta) {
+function changeMonth(delta) {
   const [y, m] = currentMonth.value.split('-').map(Number)
   const d = new Date(y, m - 1 + delta, 1)
   currentMonth.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
@@ -242,6 +315,7 @@ const monthLabel = computed(() => {
 })
 
 // ── Calendar grid ──────────────────────────────────────────────────────────
+
 const firstDayOfWeek = computed(() => {
   const [y, m] = currentMonth.value.split('-').map(Number)
   return new Date(y, m - 1, 1).getDay()
@@ -252,11 +326,15 @@ const daysInMonth = computed(() => {
   return new Date(y, m, 0).getDate()
 })
 
+/** Key records by normalized YYYY-MM-DD */
 const recordMap = computed(() => {
   const map = {}
-  props.records.forEach(r => { map[r.work_date] = r })
+  props.records.forEach(r => { map[toDateStr(r.work_date)] = r })
   return map
 })
+
+const now = new Date()
+const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
 
 const calendarCells = computed(() => {
   const cells = []
@@ -269,18 +347,19 @@ const calendarCells = computed(() => {
       date:      dateStr,
       record:    recordMap.value[dateStr] ?? null,
       isWorkDay: dow >= 1 && dow <= 5,
+      isToday:   dateStr === todayStr,
     })
   }
   return cells
 })
 
-function cellBg (cell) {
-  if (! cell.record) {
-    if (! cell.isWorkDay) return 'bg-slate-50 border-slate-100'
-    return 'bg-red-50/40 border-red-100'
+function cellBg(cell) {
+  if (!cell.record) {
+    if (!cell.isWorkDay) return 'bg-slate-50 border-slate-100'
+    return 'bg-red-50/30 border-red-100'
   }
   const s = cell.record.attendance_status
-  if (s === 'present')    return 'bg-emerald-50/60 border-emerald-100'
+  if (s === 'present')    return 'bg-emerald-50/70 border-emerald-100'
   if (s === 'absent')     return 'bg-red-50 border-red-200'
   if (s === 'half_day')   return 'bg-amber-50 border-amber-200'
   if (s === 'on_leave')   return 'bg-blue-50 border-blue-100'
@@ -288,43 +367,56 @@ function cellBg (cell) {
   return 'bg-white border-slate-100'
 }
 
-function statusBadge (status) {
+function statusBadge(status) {
   return {
-    present:             'bg-emerald-50 text-emerald-700',
-    absent:              'bg-red-50 text-red-600',
-    half_day:            'bg-amber-50 text-amber-700',
-    on_leave:            'bg-blue-50 text-blue-700',
-    holiday:             'bg-violet-50 text-violet-700',
-    on_official_business:'bg-cyan-50 text-cyan-700',
-    suspended:           'bg-slate-100 text-slate-600',
+    present:              'bg-emerald-100 text-emerald-700',
+    absent:               'bg-red-100 text-red-600',
+    half_day:             'bg-amber-100 text-amber-700',
+    on_leave:             'bg-blue-100 text-blue-700',
+    holiday:              'bg-violet-100 text-violet-700',
+    on_official_business: 'bg-cyan-100 text-cyan-700',
   }[status] ?? 'bg-slate-100 text-slate-600'
 }
 
-function fmtTime (t) {
-  if (! t) return '—'
-  return t.slice(0, 5)
+function statusLabel(status) {
+  return {
+    present:              'Present',
+    absent:               'Absent',
+    half_day:             'Half Day',
+    on_leave:             'On Leave',
+    holiday:              'Holiday',
+    on_official_business: 'OB',
+  }[status] ?? (status ?? '').replace(/_/g, ' ')
 }
 
-function getDayName (dateStr) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function fieldLabel(field) {
+  return { time_in_am: 'AM In', time_out_am: 'AM Out', time_in_pm: 'PM In', time_out_pm: 'PM Out' }[field] ?? field
 }
 
-// ── Edit ───────────────────────────────────────────────────────────────────
+// ── Edit / Penned entry ─────────────────────────────────────────────────────
+
 const editModal = reactive({ open: false, record: null })
-const editForm  = useForm({ time_in_am: '', time_out_am: '', time_in_pm: '', time_out_pm: '', remarks: '' })
+const editForm  = useForm({
+  penned_time_in_am: '', penned_time_out_am: '',
+  penned_time_in_pm: '', penned_time_out_pm: '',
+  penned_remarks: '',
+})
 
-function openEdit (record) {
+function openEdit(record) {
   editModal.record = record
   editModal.open   = true
-  editForm.time_in_am  = record.time_in_am  ?? ''
-  editForm.time_out_am = record.time_out_am ?? ''
-  editForm.time_in_pm  = record.time_in_pm  ?? ''
-  editForm.time_out_pm = record.time_out_pm ?? ''
-  editForm.remarks     = record.remarks ?? ''
+  const p = (val) => (fmtTime(val) === '—' ? '' : (fmtTime(val) || ''))
+  editForm.penned_time_in_am  = p(record.penned_time_in_am)
+  editForm.penned_time_out_am = p(record.penned_time_out_am)
+  editForm.penned_time_in_pm  = p(record.penned_time_in_pm)
+  editForm.penned_time_out_pm = p(record.penned_time_out_pm)
+  editForm.penned_remarks     = record.penned_remarks ?? ''
 }
 
-function submitEdit () {
-  editForm.patch(route('hr.dtr.edit', editModal.record.id), {
+function submitEdit() {
+  editForm.patch(route('hr.dtr.penned', editModal.record.id), {
     onSuccess: () => { editModal.open = false },
   })
 }
