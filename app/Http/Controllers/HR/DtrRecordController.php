@@ -4,13 +4,11 @@ namespace App\Http\Controllers\HR;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HR\ManualDtrEditRequest;
-use App\Jobs\HR\GenerateDTRRecords;
 use App\Models\HR\DtrRecord;
 use App\Models\User;
 use App\Services\HR\DTRService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Bus;
 use Inertia\Inertia;
 
 class DtrRecordController extends Controller
@@ -74,7 +72,7 @@ class DtrRecordController extends Controller
         ]);
     }
 
-    public function generate(Request $request)
+    public function generate(Request $request, DTRService $dtrService)
     {
         $this->authorize('hr.dtr.manage');
 
@@ -88,15 +86,11 @@ class DtrRecordController extends Controller
             ? User::where('id', $data['user_id'])->get()
             : User::where('status', 'active')->get();
 
-        $jobs = $users->map(
-            fn ($u) => new GenerateDTRRecords($u->id, $data['date_from'], $data['date_to'])
-        )->all();
+        foreach ($users as $user) {
+            $dtrService->generate($user->id, $data['date_from'], $data['date_to']);
+        }
 
-        Bus::batch($jobs)
-            ->name('DTR Generation ' . $data['date_from'] . ' to ' . $data['date_to'])
-            ->dispatch();
-
-        return back()->with('success', 'DTR generation queued for ' . count($jobs) . ' employee(s).');
+        return back()->with('success', 'DTR generated for ' . $users->count() . ' employee(s).');
     }
 
     public function edit(ManualDtrEditRequest $request, DtrRecord $record)
