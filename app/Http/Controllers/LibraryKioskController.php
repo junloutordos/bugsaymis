@@ -51,18 +51,20 @@ class LibraryKioskController extends Controller
             }
         }
 
-        $attendance = LibraryAttendance::create([
+        $now = Carbon::now('Asia/Manila')->toDateTimeString();
+        $attendanceId = DB::table('library_attendances')->insertGetId([
             'pisay_systemid' => $pisay,
-            'student_id' => $studentId,
-            'student_name' => $studentName,
-            // store scanned time in Philippine Standard Time (Asia/Manila)
-            'scanned_at' => Carbon::now('Asia/Manila'),
+            'student_id'     => $studentId,
+            'student_name'   => $studentName,
+            'scanned_at'     => $now,
+            'created_at'     => $now,
+            'updated_at'     => $now,
         ]);
 
         return response()->json([
-            'ok' => true,
+            'ok'           => true,
             'student_name' => $studentName,
-            'attendance_id' => $attendance->id,
+            'attendance_id' => $attendanceId,
         ]);
     }
 }
