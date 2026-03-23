@@ -1,78 +1,119 @@
 <template>
-  <AdminLayout :title="(currentUser.role && currentUser.role.name === 'DivisionChief') ? 'Pending Gate Pass' : 'Gate Pass'">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">{{ (currentUser.role && currentUser.role.name === 'DivisionChief') ? 'Pending Gate Pass' : 'Gate Pass' }}</h1>
-        <button v-if="!(currentUser.role && currentUser.role.name === 'DivisionChief')" @click="openModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          <PlusIcon class="w-4 h-4" /> New Gatepass
+  <Head title="Gate Pass" />
+  <AdminLayout title="Gate Pass">
+    <div class="space-y-5">
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">
+            {{ isDivisionChief ? 'Division Gate Pass Requests' : 'Gate Pass' }}
+          </h1>
+          <p class="text-sm text-slate-500 mt-0.5">
+            {{ isDivisionChief ? 'Review and act on pending gate pass requests from your division.' : 'Manage your gate pass applications.' }}
+          </p>
+        </div>
+        <button v-if="!isDivisionChief" @click="openAdd"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+          <PlusIcon class="w-4 h-4" /> New Gate Pass
         </button>
       </div>
 
-      <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
-        <input v-model="searchQuery" placeholder="Search..." class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
+      <!-- Status filter tabs -->
+      <div class="flex flex-wrap gap-2">
+        <button v-for="s in statusOptions" :key="s.value"
+                @click="activeStatus = s.value; currentPage = 1"
+                :class="[
+                  'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                  activeStatus === s.value
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                ]">
+          {{ s.label }}
+          <span v-if="s.value !== ''" class="ml-1 opacity-70">({{ countByStatus(s.value) }})</span>
+        </button>
       </div>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="overflow-x-auto rounded-xl border border-slate-100">
+      <!-- Search -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
+        <input v-model="searchQuery" placeholder="Search by name, control no, destination, purpose…"
+               class="w-full sm:w-80 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      </div>
+
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-100 text-sm">
             <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">ID</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Control No</th>
-                <th v-if="!isSelf" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th v-if="!isSelf" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Badge</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Out</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Destination</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Control No.</th>
+                <th v-if="!isSelf" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Time Out / In</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Destination</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th class="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
+              <tr v-if="!paginated.length">
+                <td :colspan="isSelf ? 8 : 9" class="px-4 py-12 text-center text-slate-400 text-sm">No gate passes found.</td>
+              </tr>
               <tr v-for="r in paginated" :key="r.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.controlno || '—' }}</td>
-                <td v-if="!isSelf" class="px-4 py-3 text-sm text-slate-700">{{ r.name || r.employee_name || r.fullname || '—' }}</td>
-                <td v-if="!isSelf" class="px-4 py-3 text-sm text-slate-700">{{ r.badgeNumber || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.gatepass_type || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.gatepass_date || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.gatepass_timein || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.gatepass_timeout || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.destination || '—' }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ r.controlno || '—' }}</td>
+                <td v-if="!isSelf" class="px-4 py-3">
+                  <p class="font-medium text-slate-800">{{ r.name || '—' }}</p>
+                  <p class="text-xs text-slate-400">{{ r.position || '' }}</p>
+                </td>
+                <td class="px-4 py-3 text-slate-700">{{ r.gatepass_type || '—' }}</td>
+                <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ r.gatepass_date || '—' }}</td>
+                <td class="px-4 py-3 text-slate-600 whitespace-nowrap text-xs">
+                  {{ r.gatepass_timeout || '—' }} → {{ r.gatepass_timein || '—' }}
+                </td>
+                <td class="px-4 py-3 text-slate-700 max-w-[160px] truncate">{{ r.destination || '—' }}</td>
+                <td class="px-4 py-3 text-slate-600 max-w-[200px] truncate">{{ r.purpose || '—' }}</td>
                 <td class="px-4 py-3">
                   <span :class="[badgeBase, statusBadgeClass(r.status)]">{{ r.status || '—' }}</span>
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-1">
-                    <template v-if="currentUser.role && currentUser.role.name === 'DivisionChief'">
-                      <button v-if="r.status === 'Pending'" @click="approve(r)" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm" title="Approve">
+                    <!-- Division Chief actions -->
+                    <template v-if="isDivisionChief && r.status === 'Pending'">
+                      <button @click="approveDC(r)"
+                              class="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors">
                         Approve
                       </button>
-                      <button v-if="r.status === 'Pending'" @click="decline(r)" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm" title="Decline">
+                      <button @click="openDecline(r)"
+                              class="px-3 py-1.5 text-xs border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors">
                         Decline
                       </button>
                     </template>
-                    <template v-else>
-                      <button v-if="isSelf ? r.status === 'Pending' : true" @click="edit(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+
+                    <!-- Employee/Admin actions -->
+                    <template v-else-if="!isDivisionChief">
+                      <button v-if="r.status === 'Pending'" @click="openEdit(r)"
+                              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Edit">
                         <PencilSquareIcon class="w-4 h-4" />
                       </button>
-                      <button v-if="(isSelf ? r.status === 'OCD Approved' : (isAdmin ? r.status === 'OCD Approved' : true))" @click="printGatepass(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
+                      <button v-if="r.status === 'OCD Approved'" @click="printGatepass(r)"
+                              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
                         <PrinterIcon class="w-4 h-4" />
                       </button>
-                      <button v-if="isSelf ? r.status === 'Pending' : true" @click="remove(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
+                      <button v-if="r.status === 'Pending' || isAdmin" @click="confirmDelete(r)"
+                              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
                         <TrashIcon class="w-4 h-4" />
                       </button>
                     </template>
+
+                    <!-- View detail button for everyone -->
+                    <button @click="openView(r)"
+                            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                      <EyeIcon class="w-4 h-4" />
+                    </button>
                   </div>
                 </td>
-              </tr>
-              <tr v-if="paginated.length === 0">
-                <td :colspan="isSelf ? 9 : 11" class="py-16 text-center text-slate-400 text-sm">No gate passes found.</td>
               </tr>
             </tbody>
           </table>
@@ -80,237 +121,360 @@
 
         <!-- Pagination -->
         <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="goToPage(currentPage-1)" :disabled="currentPage===1" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
-            <button @click="goToPage(currentPage+1)" :disabled="currentPage>=totalPages" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
+          <span>Page {{ currentPage }} of {{ totalPages }} &bull; {{ filtered.length }} total</span>
+          <div class="flex gap-2">
+            <button @click="currentPage--" :disabled="currentPage === 1"
+                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Prev</button>
+            <button @click="currentPage++" :disabled="currentPage >= totalPages"
+                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Next</button>
           </div>
         </div>
       </div>
 
-      <!-- Modal -->
-      <div v-show="show" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full relative">
+    </div>
+
+    <!-- Add / Edit Modal -->
+    <Teleport to="body">
+      <div v-if="formModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-xl font-semibold text-slate-800">{{ editing ? 'Edit' : 'Add' }} Gate Pass</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Gate Pass' : 'New Gate Pass' }}</h2>
+            <button @click="formModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
           </div>
-          <div class="px-6 py-5">
-            <div class="grid grid-cols-1 gap-3">
-              <label v-if="!isSelf">
-                <span class="block text-xs font-medium text-slate-600 mb-1">Name</span>
-                <input v-model="form.name" readonly placeholder="Name" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 w-full focus:outline-none" />
-              </label>
-              <label v-if="!isSelf">
-                <span class="block text-xs font-medium text-slate-600 mb-1">Position</span>
-                <input v-model="form.position" readonly placeholder="Position" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 w-full focus:outline-none" />
-              </label>
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-red-500">*</span></label>
+              <select v-model="form.gatepass_type"
+                      class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="">— Select type —</option>
+                <option value="Official Business">Official Business</option>
+                <option value="Personal">Personal</option>
+                <option value="Office Time">Office Time</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date <span class="text-red-500">*</span></label>
+              <input v-model="form.gatepass_date" type="date"
+                     class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
               <div>
-                <span class="block text-xs font-medium text-slate-600 mb-1">Type</span>
-                <select v-model="form.gatepass_type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full">
-                  <option value="">-- Select Type --</option>
-                  <option value="Official Business">Official Business</option>
-                  <option value="Personal">Personal</option>
-                  <option value="Office Time">Office Time</option>
-                </select>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Time Out</label>
+                <input v-model="form.gatepass_timeout" type="time"
+                       class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
               <div>
-                <span class="block text-xs font-medium text-slate-600 mb-1">Date</span>
-                <input v-model="form.gatepass_date" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-              <div class="flex gap-2">
-                <div class="flex-1">
-                  <span class="block text-xs font-medium text-slate-600 mb-1">Time In</span>
-                  <input v-model="form.gatepass_timein" type="time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-                </div>
-                <div class="flex-1">
-                  <span class="block text-xs font-medium text-slate-600 mb-1">Time Out</span>
-                  <input v-model="form.gatepass_timeout" type="time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-                </div>
-              </div>
-              <div>
-                <span class="block text-xs font-medium text-slate-600 mb-1">Destination</span>
-                <input v-model="form.destination" placeholder="Destination" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-              </div>
-              <div>
-                <span class="block text-xs font-medium text-slate-600 mb-1">Purpose</span>
-                <input v-model="form.purpose" placeholder="Purpose" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+                <label class="block text-xs font-medium text-slate-600 mb-1">Time In (Return)</label>
+                <input v-model="form.gatepass_timein" type="time"
+                       class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Destination <span class="text-red-500">*</span></label>
+              <input v-model="form.destination" type="text" placeholder="Where are you going?"
+                     class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Purpose <span class="text-red-500">*</span></label>
+              <textarea v-model="form.purpose" rows="3" placeholder="Reason for leaving…"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"></textarea>
+            </div>
           </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="closeModal" :disabled="saving" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button @click="save" :disabled="saving" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              <svg v-if="saving" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-              <span>{{ saving ? 'Saving...' : 'Save' }}</span>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+            <button @click="formModal = false" :disabled="saving"
+                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button @click="saveForm" :disabled="saving"
+                    class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
+              {{ saving ? 'Saving…' : (editingId ? 'Update' : 'Submit') }}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
+
+    <!-- Decline Modal -->
+    <Teleport to="body">
+      <div v-if="declineModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">Decline Gate Pass</h2>
+            <button @click="declineModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+          </div>
+          <div class="px-6 py-5">
+            <p class="text-sm text-slate-600 mb-3">
+              Declining gate pass <span class="font-medium">{{ declineTarget?.controlno }}</span> for <span class="font-medium">{{ declineTarget?.name }}</span>.
+            </p>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Reason <span class="text-red-500">*</span></label>
+            <textarea v-model="declineReason" rows="3" placeholder="Provide a reason for declining…"
+                      class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"></textarea>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+            <button @click="declineModal = false" :disabled="saving"
+                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button @click="submitDecline" :disabled="saving || !declineReason.trim()"
+                    class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
+              {{ saving ? 'Declining…' : 'Confirm Decline' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- View Detail Modal -->
+    <Teleport to="body">
+      <div v-if="viewModal && viewTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-slate-800">Gate Pass Detail</h2>
+              <p class="text-xs text-slate-400 font-mono mt-0.5">{{ viewTarget.controlno || '—' }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span :class="[badgeBase, statusBadgeClass(viewTarget.status)]">{{ viewTarget.status }}</span>
+              <button @click="viewModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-3 text-sm">
+            <div class="grid grid-cols-2 gap-x-6 gap-y-3">
+              <div>
+                <p class="text-xs text-slate-400 mb-0.5">Employee</p>
+                <p class="font-medium text-slate-800">{{ viewTarget.name || '—' }}</p>
+                <p class="text-xs text-slate-400">{{ viewTarget.position || '' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400 mb-0.5">Type</p>
+                <p class="font-medium text-slate-800">{{ viewTarget.gatepass_type || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400 mb-0.5">Date</p>
+                <p class="font-medium text-slate-800">{{ viewTarget.gatepass_date || '—' }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400 mb-0.5">Time Out → In</p>
+                <p class="font-medium text-slate-800">{{ viewTarget.gatepass_timeout || '—' }} → {{ viewTarget.gatepass_timein || '—' }}</p>
+              </div>
+              <div class="col-span-2">
+                <p class="text-xs text-slate-400 mb-0.5">Destination</p>
+                <p class="font-medium text-slate-800">{{ viewTarget.destination || '—' }}</p>
+              </div>
+              <div class="col-span-2">
+                <p class="text-xs text-slate-400 mb-0.5">Purpose</p>
+                <p class="text-slate-700">{{ viewTarget.purpose || '—' }}</p>
+              </div>
+              <div v-if="viewTarget.remarks" class="col-span-2">
+                <p class="text-xs text-slate-400 mb-0.5">Remarks / Decline Reason</p>
+                <p class="text-slate-600 italic">{{ viewTarget.remarks }}</p>
+              </div>
+              <div v-if="viewTarget.date_time_approved">
+                <p class="text-xs text-slate-400 mb-0.5">Date Approved</p>
+                <p class="text-slate-700">{{ viewTarget.date_time_approved }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-between">
+            <button v-if="viewTarget.status === 'OCD Approved'" @click="printGatepass(viewTarget)"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg">
+              <PrinterIcon class="w-4 h-4" /> Print
+            </button>
+            <span v-else></span>
+            <button @click="viewModal = false"
+                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Close</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Delete Confirm Modal -->
+    <Teleport to="body">
+      <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+          <h3 class="text-base font-semibold text-slate-800 mb-2">Delete Gate Pass</h3>
+          <p class="text-sm text-slate-600 mb-5">Remove gate pass <strong>{{ deleteTarget.controlno }}</strong>? This cannot be undone.</p>
+          <div class="flex gap-3 justify-end">
+            <button @click="deleteTarget = null"
+                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button @click="doDelete" :disabled="saving"
+                    class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-colors">Delete</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </AdminLayout>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import Swal from 'sweetalert2'
+import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { usePage } from '@inertiajs/vue3'
-import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon } from '@heroicons/vue/24/outline'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
-const page = usePage()
-const rows = computed(() => page.props.rows || [])
-const divisionChief = computed(() => page.props.divisionChief || null)
-const director = computed(() => page.props.director || null)
-const currentUser = computed(() => page.props.auth?.user || {})
-const isSelf = computed(() => ['Staff', 'Faculty'].includes(currentUser.value.role?.name || ''))
-const isAdmin = computed(() => (currentUser.value.role?.name || '').toLowerCase() === 'administrator')
+const page        = usePage()
+const rows        = computed(() => page.props.rows ?? [])
+const currentUser = computed(() => page.props.auth?.user ?? {})
+const isSelf      = computed(() => ['Staff', 'Faculty'].includes(currentUser.value.role?.name ?? ''))
+const isDivisionChief = computed(() => currentUser.value.role?.name === 'DivisionChief')
+const isAdmin     = computed(() => (currentUser.value.role?.name ?? '').toLowerCase() === 'administrator')
 
-const searchQuery = ref('')
-const currentPage = ref(1)
-const perPage = 10
+// ── Filters ──────────────────────────────────────────────────────────────────
+const statusOptions = [
+  { value: '',                  label: 'All' },
+  { value: 'Pending',           label: 'Pending' },
+  { value: 'Division Approved', label: 'Div. Approved' },
+  { value: 'OCD Approved',      label: 'OCD Approved' },
+  { value: 'Division Declined', label: 'Div. Declined' },
+  { value: 'OCD Declined',      label: 'OCD Declined' },
+]
+const activeStatus = ref('')
+const searchQuery  = ref('')
+const currentPage  = ref(1)
+const perPage      = 10
+
+function countByStatus(status) {
+  return rows.value.filter(r => r.status === status).length
+}
 
 const filtered = computed(() => {
-  const q = (searchQuery.value || '').toLowerCase().trim()
-  if (!q) return rows.value
-  return rows.value.filter(r => [r.controlno, r.badgeNumber, r.name || r.employee_name || r.fullname, r.gatepass_type, r.destination, r.purpose, r.status].join(' ').toLowerCase().includes(q))
+  let list = rows.value
+  if (activeStatus.value) list = list.filter(r => r.status === activeStatus.value)
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(r =>
+      [r.controlno, r.name, r.gatepass_type, r.destination, r.purpose, r.status]
+        .join(' ').toLowerCase().includes(q)
+    )
+  }
+  return list
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / perPage)))
-const paginated = computed(() => {
+const paginated  = computed(() => {
   const start = (currentPage.value - 1) * perPage
   return filtered.value.slice(start, start + perPage)
 })
+watch([searchQuery, activeStatus], () => { currentPage.value = 1 })
 
-function goToPage(n) {
-  if (n < 1) n = 1
-  if (n > totalPages.value) n = totalPages.value
-  currentPage.value = n
+// ── Add / Edit form ───────────────────────────────────────────────────────────
+const formModal = ref(false)
+const editingId = ref(null)
+const saving    = ref(false)
+const form      = ref({ gatepass_type: '', gatepass_date: '', gatepass_timeout: '', gatepass_timein: '', destination: '', purpose: '' })
+
+function openAdd() {
+  editingId.value = null
+  form.value = { gatepass_type: '', gatepass_date: '', gatepass_timeout: '', gatepass_timein: '', destination: '', purpose: '' }
+  formModal.value = true
 }
 
-watch(searchQuery, () => { currentPage.value = 1 })
-
-const show = ref(false)
-const editing = ref(false)
-const saving = ref(false)
-const form = ref({ controlno: '', badgeNumber: '', name: '', position: '', gatepass_type: '', gatepass_timeout: '', gatepass_timein: '', gatepass_date: '', destination: '', purpose: '', status: '' })
-const currentId = ref(null)
-
-function openModal() {
-  editing.value = false
-  form.value = { controlno: '', badgeNumber: currentUser.value.badgeNumber || '', name: currentUser.value.name || currentUser.value.fullname || currentUser.value.first_name || '', position: currentUser.value.position || currentUser.value.job_title || '', gatepass_type: '', gatepass_timeout: '', gatepass_timein: '', gatepass_date: '', destination: '', purpose: '', status: 'Pending' }
-  currentId.value = null
-  show.value = true
-}
-function closeModal() { show.value = false }
-
-function edit(r) {
-  editing.value = true
-  currentId.value = r.id
-  form.value = { controlno: r.controlno, badgeNumber: currentUser.value.badgeNumber || r.badgeNumber || r.badgeID, name: currentUser.value.name || r.name || r.employee_name || r.fullname || '', position: currentUser.value.position || r.position || r.job_title || '', gatepass_type: r.gatepass_type, gatepass_timeout: r.gatepass_timeout, gatepass_timein: r.gatepass_timein, gatepass_date: r.gatepass_date, destination: r.destination, purpose: r.purpose, status: r.status }
-  show.value = true
+function openEdit(r) {
+  editingId.value = r.id
+  form.value = {
+    gatepass_type:    r.gatepass_type    ?? '',
+    gatepass_date:    r.gatepass_date    ?? '',
+    gatepass_timeout: r.gatepass_timeout ?? '',
+    gatepass_timein:  r.gatepass_timein  ?? '',
+    destination:      r.destination      ?? '',
+    purpose:          r.purpose          ?? '',
+  }
+  formModal.value = true
 }
 
-async function save() {
+async function saveForm() {
   if (saving.value) return
   saving.value = true
-  const url = editing.value ? `/hr/gatepass/${currentId.value}` : '/hr/gatepass'
-  const method = editing.value ? 'PUT' : 'POST'
+  const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+  const url    = editingId.value ? `/hr/gatepass/${editingId.value}` : '/hr/gatepass'
+  const method = editingId.value ? 'PUT' : 'POST'
   try {
-    form.value.badgeNumber = currentUser.value.badgeNumber || form.value.badgeNumber
-    if (!editing.value) form.value.status = form.value.status || 'Pending'
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }, body: JSON.stringify(form.value) })
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+      body: JSON.stringify(form.value),
+    })
     if (res.ok) {
-      await Swal.fire({ icon: 'success', title: editing.value ? 'Gate pass updated' : 'Gate pass added', timer: 1200, showConfirmButton: false })
-      location.reload()
+      formModal.value = false
+      router.reload({ only: ['rows'] })
     } else {
-      let text = 'Save failed'
-      if (res.status === 422) {
-        const data = await res.json().catch(() => ({}))
-        text = Object.values(data.errors || {}).flat().join('\n') || text
-      } else {
-        const data = await res.json().catch(() => null)
-        if (data && data.message) text = data.message
-      }
-      Swal.fire({ icon: 'error', title: 'Failed to save', text })
+      const data = await res.json().catch(() => ({}))
+      alert(Object.values(data.errors ?? {}).flat().join('\n') || 'Save failed')
     }
-  } catch (e) { Swal.fire({ icon: 'error', title: 'Save failed', text: e.message || 'Save failed' }) }
+  } catch (e) { alert(e.message || 'Save failed') }
   finally { saving.value = false }
 }
 
-async function remove(r) {
-  const result = await Swal.fire({ title: 'Delete this gate pass?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete', cancelButtonText: 'Cancel' })
-  if (!result.isConfirmed) return
+// ── Delete ────────────────────────────────────────────────────────────────────
+const deleteTarget = ref(null)
+function confirmDelete(r) { deleteTarget.value = r }
+async function doDelete() {
+  if (saving.value) return
+  saving.value = true
+  const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
   try {
-    const res = await fetch(`/hr/gatepass/${r.id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') } })
+    const res = await fetch(`/hr/gatepass/${deleteTarget.value.id}`, {
+      method: 'DELETE',
+      headers: { 'X-CSRF-TOKEN': csrf },
+    })
     if (res.ok) {
-      await Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false })
-      location.reload()
-    } else {
-      let text = 'Delete failed'
-      const data = await res.json().catch(() => null)
-      if (data && data.message) text = data.message
-      Swal.fire({ icon: 'error', title: 'Failed to delete', text })
+      deleteTarget.value = null
+      router.reload({ only: ['rows'] })
     }
-  } catch (e) { Swal.fire({ icon: 'error', title: 'Delete failed', text: e.message || 'Delete failed' }) }
+  } catch (e) { alert(e.message || 'Delete failed') }
+  finally { saving.value = false }
 }
 
+// ── Division Chief approve ────────────────────────────────────────────────────
+async function approveDC(r) {
+  if (saving.value) return
+  saving.value = true
+  const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+  try {
+    const res = await fetch(`/hr/gatepass/${r.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+      body: JSON.stringify({ status: 'Division Approved', date_time_approved: new Date().toISOString() }),
+    })
+    if (res.ok) router.reload({ only: ['rows'] })
+  } catch (e) { alert(e.message || 'Approve failed') }
+  finally { saving.value = false }
+}
+
+// ── Division Chief decline ────────────────────────────────────────────────────
+const declineModal  = ref(false)
+const declineTarget = ref(null)
+const declineReason = ref('')
+
+function openDecline(r) {
+  declineTarget.value = r
+  declineReason.value = ''
+  declineModal.value  = true
+}
+
+async function submitDecline() {
+  if (!declineReason.value.trim() || saving.value) return
+  saving.value = true
+  const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+  try {
+    const res = await fetch(`/hr/gatepass/${declineTarget.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+      body: JSON.stringify({ status: 'Division Declined', decline_reason: declineReason.value, date_time_declined: new Date().toISOString() }),
+    })
+    if (res.ok) {
+      declineModal.value = false
+      router.reload({ only: ['rows'] })
+    }
+  } catch (e) { alert(e.message || 'Decline failed') }
+  finally { saving.value = false }
+}
+
+// ── View detail ───────────────────────────────────────────────────────────────
+const viewModal  = ref(false)
+const viewTarget = ref(null)
+function openView(r) { viewTarget.value = r; viewModal.value = true }
+
+// ── Print ─────────────────────────────────────────────────────────────────────
 function printGatepass(r) {
-  const url = `/hr/gatepass/${r.id}/print`
-  const w = window.open(url, '_blank')
-  if (!w) Swal.fire({ icon: 'error', title: 'Unable to open print window' })
-}
-
-async function approve(r) {
-  const res = await Swal.fire({ title: 'Approve this gate pass?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' })
-  if (!res.isConfirmed) return
-  try {
-    const url = `/hr/gatepass/${r.id}`
-    const body = { status: 'Division Approved', date_time_approved: new Date().toISOString() }
-    const t = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-    const resp = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': t }, body: JSON.stringify(body) })
-    if (resp.ok) {
-      await Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false })
-      location.reload()
-    } else {
-      let text = 'Approve failed'
-      const data = await resp.json().catch(() => null)
-      if (data && data.message) text = data.message
-      Swal.fire({ icon: 'error', title: 'Failed to approve', text })
-    }
-  } catch (e) {
-    Swal.fire({ icon: 'error', title: 'Failed to approve', text: e.message || 'Failed to approve' })
-  }
-}
-
-async function decline(r) {
-  const { value: reason } = await Swal.fire({
-    title: 'Reason for decline',
-    input: 'textarea',
-    inputPlaceholder: 'Enter reason for declining this gate pass...',
-    showCancelButton: true,
-    confirmButtonText: 'Decline',
-    cancelButtonText: 'Cancel',
-    inputAttributes: { 'aria-label': 'Reason for decline' }
-  })
-  if (!reason) return
-  try {
-    const url = `/hr/gatepass/${r.id}`
-    const body = { status: 'Division Declined', decline_reason: reason, date_time_declined: new Date().toISOString() }
-    const t = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-    const resp = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': t }, body: JSON.stringify(body) })
-    if (resp.ok) {
-      await Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false })
-      location.reload()
-    } else {
-      let text = 'Decline failed'
-      const data = await resp.json().catch(() => null)
-      if (data && data.message) text = data.message
-      Swal.fire({ icon: 'error', title: 'Failed to decline', text })
-    }
-  } catch (e) {
-    Swal.fire({ icon: 'error', title: 'Failed to decline', text: e.message || 'Failed to decline' })
-  }
+  window.open(`/hr/gatepass/${r.id}/print`, '_blank')
 }
 </script>

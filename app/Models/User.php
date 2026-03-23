@@ -17,6 +17,7 @@ class User extends Authenticatable
         'name',
         'sex',
         'badge_id',
+        'biometric_id',
         'status',
         'email',
         'password',

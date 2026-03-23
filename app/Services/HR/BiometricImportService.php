@@ -19,16 +19,20 @@ class BiometricImportService
     ];
 
     /**
-     * Parse a ZKTeco .dat / .txt biometric export file and insert into biometric_logs.
+     * Parse a Granding biometric .dat export file.
      *
-     * Supported formats:
-     *   Format A (5+ cols, date and time split):
-     *     employee_id \t YYYY-MM-DD \t HH:MM:SS \t log_code \t device_id
+     * Confirmed format:
+     *   Column 1 — badge / employee number
+     *   Column 2 — date and time  (YYYY-MM-DD HH:MM:SS  or  YYYY/MM/DD HH:MM:SS)
+     *   Column 3 — check-type code (optional)
      *
-     *   Format B (4+ cols, datetime combined):
-     *     employee_id \t YYYY-MM-DD HH:MM:SS \t log_code \t 0 \t device_id
+     * Delimiter: tab or any whitespace. When single-space-delimited, the date
+     * and time arrive as two separate tokens — the parser re-joins them.
      *
-     * Log codes: 0=time_in, 1=time_out, 4=time_in(OT), 5=time_out(OT), else=auto
+     * check_type codes:
+     *   0 / "I"  = Check In        1 / "O"  = Check Out
+     *   2 / "OO" = Break Out        3 / "OI" = Break In
+     *   4        = Overtime In      5        = Overtime Out
      */
     public function parse(string $filePath, string $importBatch, ?string $deviceId = null): array
     {
@@ -47,10 +51,21 @@ class BiometricImportService
         $rows  = [];
         $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
-        foreach ($lines as $line) {
+        // Log first few raw lines to help debug format issues
+        $sampleLines = array_slice($lines, 0, 3);
+        Log::info('BiometricImport sample lines', ['lines' => $sampleLines, 'batch' => $importBatch]);
+
+        foreach ($lines as $lineRaw) {
+            // Strip BOM (UTF-8 BOM: EF BB BF) and trim
+            $line = ltrim($lineRaw, "\xEF\xBB\xBF");
             $line = trim($line);
-            if ($line === '' || ! ctype_digit($line[0])) {
-                // Skip blank or header lines
+
+            if ($line === '') {
+                continue;
+            }
+
+            // Skip header rows — common in Granding CAMS exports
+            if ($this->isHeaderLine($line)) {
                 continue;
             }
 
@@ -75,55 +90,81 @@ class BiometricImportService
         return $this->stats;
     }
 
+    /**
+     * Detect header / non-data lines common in Granding exports.
+     */
+    private function isHeaderLine(string $line): bool
+    {
+        $lower = strtolower($line);
+
+        // Granding CAMS headers
+        if (str_starts_with($lower, 'no.')
+            || str_starts_with($lower, 'enrollment')
+            || str_starts_with($lower, 'userid')
+            || str_starts_with($lower, 'pin')
+            || str_starts_with($lower, 'employee')
+            || str_starts_with($lower, 'date')
+            || str_starts_with($lower, 'name')
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function parseLine(string $line, string $importBatch, ?string $deviceId, array $userMap): ?array
     {
-        $parts = array_map('trim', explode("\t", $line));
+        // ── Step 1: split on tabs only (preserves the datetime's internal space) ─
+        $fields = array_map('trim', explode("\t", $line));
 
-        if (count($parts) < 3) {
+        // Need at least: badge | datetime | ... | check_type
+        if (count($fields) < 2) {
             return null;
         }
 
-        $deviceEmployeeId = $parts[0];
-        $logDatetime      = null;
-        $logCode          = 0;
-        $deviceCol        = $deviceId;
+        $badgeNo  = $fields[0];
+        $dtRaw    = str_replace('/', '-', $fields[1]);  // normalise YYYY/MM/DD → YYYY-MM-DD
+        $rawLogCode = null;
 
-        // Detect format
-        if (count($parts) >= 5 && preg_match('/^\d{4}-\d{2}-\d{2}$/', $parts[1])) {
-            // Format A: emp_id | date | time | log_code | device_id
-            $logDatetime = $parts[1] . ' ' . $parts[2];
-            $logCode     = (int) $parts[3];
-            $deviceCol   = $deviceId ?? ($parts[4] ?? null);
-        } elseif (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $parts[1])) {
-            // Format B: emp_id | datetime | log_code | 0 | device_id
-            $logDatetime = $parts[1];
-            $logCode     = (int) ($parts[2] ?? 0);
-            $deviceCol   = $deviceId ?? ($parts[4] ?? null);
+        // ── Step 2: parse the datetime field ────────────────────────────────────
+        // Expected: "YYYY-MM-DD HH:MM:SS"  or  "YYYY-MM-DD HH:MM"
+        if (! preg_match('/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/', $dtRaw, $dtMatch)) {
+            return null;
+        }
+        $logDatetime = $dtMatch[1] . ' ' . $dtMatch[2];
+
+        // ── Step 3: locate check type ────────────────────────────────────────────
+        // Granding attlog format:
+        //   [badge] [datetime] [verify_type=1] [io_status=0/1] [work_code] [reserved]
+        //
+        // io_status (fields[3]) is the check type: 0=Check-In, 1=Check-Out
+        if (isset($fields[3]) && $fields[3] !== '') {
+            $rawLogCode = $fields[3];
+        } elseif (isset($fields[2]) && $fields[2] !== '') {
+            $rawLogCode = $fields[2];
         } else {
-            return null;
+            $rawLogCode = '0';
         }
 
-        // Validate datetime
+        // ── Step 4: parse datetime ───────────────────────────────────────────────
         try {
-            $dt = Carbon::parse($logDatetime);
+            $fmt = substr_count($logDatetime, ':') === 1 ? 'Y-m-d H:i' : 'Y-m-d H:i:s';
+            $dt  = Carbon::createFromFormat($fmt, $logDatetime);
+            if (! $dt) {
+                return null;
+            }
         } catch (\Throwable) {
             return null;
         }
 
-        $logType = match ($logCode) {
-            0, 4    => 'time_in',
-            1, 5    => 'time_out',
-            default => 'auto',
-        };
-
-        $userId  = $userMap[$deviceEmployeeId] ?? null;
+        $userId = $userMap[$badgeNo] ?? null;
 
         return [
-            'device_employee_id' => $deviceEmployeeId,
+            'device_employee_id' => $badgeNo,
             'user_id'            => $userId,
-            'device_id'          => $deviceCol,
+            'device_id'          => $deviceId,
             'log_datetime'       => $dt->format('Y-m-d H:i:s'),
-            'log_type'           => $logType,
+            'log_type'           => $this->resolveLogType($rawLogCode),
             'source'             => 'biometric',
             'is_resolved'        => $userId !== null,
             'is_duplicate'       => false,
@@ -134,14 +175,34 @@ class BiometricImportService
         ];
     }
 
+    /**
+     * Map raw check-type codes (numeric or Granding letter codes) to log_type.
+     *
+     * Granding codes: 0/"I"=in, 1/"O"=out, 2/"OO"=break-out, 3/"OI"=break-in,
+     *                 4=overtime-in, 5=overtime-out
+     */
+    private function resolveLogType(mixed $raw): string
+    {
+        $s = strtoupper(trim((string) $raw));
+
+        if (in_array($s, ['0', 'I', 'CI', 'IN', '4'], true)) {
+            return 'time_in';
+        }
+        if (in_array($s, ['1', 'O', 'CO', 'OUT', '5'], true)) {
+            return 'time_out';
+        }
+        if (in_array($s, ['2', 'OO', 'BO'], true)) {
+            return 'time_out'; // break out = leaving
+        }
+        if (in_array($s, ['3', 'OI', 'BI'], true)) {
+            return 'time_in';  // break in = returning
+        }
+
+        return 'auto';
+    }
+
     private function batchInsert(array $rows): void
     {
-        // Build lookup of existing records for duplicate detection
-        $keys = array_map(
-            fn ($r) => $r['device_employee_id'] . '|' . $r['log_datetime'] . '|' . ($r['device_id'] ?? ''),
-            $rows
-        );
-
         $existing = DB::table('biometric_logs')
             ->where(function ($q) use ($rows) {
                 foreach ($rows as $r) {
@@ -154,18 +215,17 @@ class BiometricImportService
                     });
                 }
             })
-            ->pluck('log_datetime', 'device_employee_id')
+            ->select('device_employee_id', 'log_datetime')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->device_employee_id . '|' . $r->log_datetime => true])
             ->toArray();
 
         $toInsert = [];
 
         foreach ($rows as $row) {
-            $dupKey = $row['device_employee_id'] . '|' . $row['log_datetime'] . '|' . ($row['device_id'] ?? '');
+            $dupKey = $row['device_employee_id'] . '|' . $row['log_datetime'];
 
-            // Check against DB existing
-            $isDup = isset($existing[$row['device_employee_id']]);
-
-            if ($isDup) {
+            if (isset($existing[$dupKey])) {
                 $this->stats['duplicates']++;
                 continue;
             }
@@ -185,9 +245,6 @@ class BiometricImportService
         }
     }
 
-    /**
-     * Resolve all biometric logs for a given device_employee_id to a user.
-     */
     public function resolveByDeviceId(string $deviceEmployeeId, int $userId): int
     {
         return BiometricLog::where('device_employee_id', $deviceEmployeeId)

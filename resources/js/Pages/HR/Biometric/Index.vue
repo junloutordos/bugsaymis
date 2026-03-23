@@ -36,10 +36,12 @@
               <input
                 type="file"
                 multiple
-                accept=".dat,.txt,.log"
+                accept=".dat,.txt,.log,.DAT"
                 @change="onFilePick"
                 class="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-200 file:text-xs file:font-medium file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100 cursor-pointer"
               />
+              <p v-if="uploadForm.errors['files.0']" class="text-red-500 text-xs mt-1">{{ uploadForm.errors['files.0'] }}</p>
+              <p v-if="uploadForm.errors.files" class="text-red-500 text-xs mt-1">{{ uploadForm.errors.files }}</p>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Device ID <span class="font-normal text-slate-400">(optional)</span></label>
@@ -55,8 +57,11 @@
               :disabled="uploadForm.processing || !uploadForm.files.length"
               class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              <span v-if="uploadForm.processing">Processing…</span>
-              <span v-else>Queue for Import</span>
+              <svg v-if="uploadForm.processing" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+              </svg>
+              <span>{{ uploadForm.processing ? 'Importing…' : 'Import Now' }}</span>
             </button>
           </form>
         </div>
@@ -187,7 +192,7 @@
             >
               <option value="">— Select employee —</option>
               <option v-for="u in users" :key="u.id" :value="u.id">
-                {{ u.name }} <span v-if="u.badge_id">(Badge: {{ u.badge_id }})</span>
+                {{ u.name }}<template v-if="u.badge_id"> (Badge: {{ u.badge_id }})</template>
               </option>
             </select>
           </div>

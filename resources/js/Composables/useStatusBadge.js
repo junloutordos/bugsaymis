@@ -38,6 +38,7 @@ export function statusBadgeClass(status) {
   if ([
     'rejected', 'declined', 'cancelled', 'returned', 'returned for revision',
     'fail', 'failed', 'disqualified', 'lost', 'damaged', 'overdue', 'dropped', 'disposed',
+    'division declined', 'ocd declined',
   ].includes(s)) {
     return 'bg-red-50 text-red-600'
   }

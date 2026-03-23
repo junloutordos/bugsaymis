@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
+use App\Http\Controllers\HR\EmployeeDocumentController;
 
     // Library Borrowings
     Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
@@ -1452,6 +1453,16 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.edit');
     Route::patch('/dtr/{record}/lock', [\App\Http\Controllers\HR\DtrRecordController::class, 'lock'])
         ->name('dtr.lock');
+
+    // ── Employee 201 Files ──────────────────────────────────────────────────────
+    Route::get('/employees/{user}/documents', [EmployeeDocumentController::class, 'index'])
+        ->name('employees.documents.index');
+    Route::post('/employees/{user}/documents', [EmployeeDocumentController::class, 'store'])
+        ->name('employees.documents.store');
+    Route::delete('/documents/{employeeDocument}', [EmployeeDocumentController::class, 'destroy'])
+        ->name('employees.documents.destroy');
+    Route::get('/documents/{employeeDocument}/download', [EmployeeDocumentController::class, 'download'])
+        ->name('employees.documents.download');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1465,6 +1476,16 @@ Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->gr
         ->name('create');
     Route::post('/', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'store'])
         ->name('store');
+    // Allowance Types management (must be before /{payrollRun} wildcard)
+    Route::get('/allowances', [\App\Http\Controllers\HR\AllowanceTypeController::class, 'index'])
+        ->name('allowances.index');
+    Route::post('/allowances', [\App\Http\Controllers\HR\AllowanceTypeController::class, 'store'])
+        ->name('allowances.store');
+    Route::put('/allowances/{allowanceType}', [\App\Http\Controllers\HR\AllowanceTypeController::class, 'update'])
+        ->name('allowances.update');
+    Route::patch('/allowances/{allowanceType}/toggle', [\App\Http\Controllers\HR\AllowanceTypeController::class, 'toggle'])
+        ->name('allowances.toggle');
+
     Route::get('/{payrollRun}', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'show'])
         ->name('show');
     Route::post('/{payrollRun}/process', [\App\Http\Controllers\Payroll\PayrollRunController::class, 'process'])
