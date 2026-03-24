@@ -31,12 +31,9 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
-            <button @click="window.print()" class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
-              <PrinterIcon class="h-4 w-4" />Print
-            </button>
             <a :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
-              <DocumentTextIcon class="h-4 w-4" />CSC Format
+               class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+              <PrinterIcon class="h-4 w-4" />Print
             </a>
           </div>
         </div>
@@ -260,7 +257,7 @@ import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
-  PencilSquareIcon, LockClosedIcon, DocumentTextIcon,
+  PencilSquareIcon, LockClosedIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
