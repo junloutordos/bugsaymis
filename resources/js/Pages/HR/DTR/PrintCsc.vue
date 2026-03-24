@@ -1,139 +1,109 @@
 <template>
   <Head :title="`DTR — ${employee.name} — ${monthLabel}`" />
-  <div class="csc-page">
 
-    <!-- Republic Header -->
-    <div class="text-center mb-2">
-      <p class="text-[10px] tracking-wide">Republic of the Philippines</p>
-      <p class="text-[10px] font-semibold tracking-wide uppercase">{{ agencyName }}</p>
-    </div>
+  <div class="print-root">
+    <div class="copy-pair">
+      <div v-for="copy in 2" :key="copy" class="dtr-card">
 
-    <div class="text-center mb-3">
-      <p class="text-[13px] font-bold tracking-widest uppercase">Daily Time Record</p>
-      <p class="text-[9px] tracking-wide text-gray-500">CS Form No. 48</p>
-    </div>
+        <!-- ── Header ───────────────────────────────── -->
+        <div class="form-no">CIVIL SERVICE FORM NO. 48</div>
+        <div class="form-title">Daily Time Record</div>
+        <div class="emp-name">{{ employee.name?.toUpperCase() }}</div>
+        <div class="emp-period">For the period of: {{ periodLabel }}</div>
 
-    <!-- Employee Info -->
-    <table class="w-full mb-2 text-[10px]">
-      <tr>
-        <td class="w-1/2 pb-1">
-          <span class="font-semibold">Name:</span>
-          <span class="border-b border-black ml-1 pr-16">{{ employee.name }}</span>
-        </td>
-        <td class="w-1/2 pb-1">
-          <span class="font-semibold">Month of:</span>
-          <span class="border-b border-black ml-1 pr-10">{{ monthLabel }}</span>
-        </td>
-      </tr>
-      <tr>
-        <td class="pb-1">
-          <span class="font-semibold">Position/Title:</span>
-          <span class="border-b border-black ml-1 pr-10">{{ employee.position || '' }}</span>
-        </td>
-        <td class="pb-1">
-          <span class="font-semibold">Office/Dept:</span>
-          <span class="border-b border-black ml-1 pr-10">{{ officeName }}</span>
-        </td>
-      </tr>
-    </table>
+        <!-- ── Main Table ────────────────────────────── -->
+        <table class="dtr-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="col-day">Day</th>
+              <th colspan="2">AM</th>
+              <th colspan="2">PM</th>
+              <th colspan="2">OverTime</th>
+              <th colspan="2">Tardy/<br>UnderTime</th>
+            </tr>
+            <tr>
+              <th class="col-time">Time In</th>
+              <th class="col-time">Time Out</th>
+              <th class="col-time">Time In</th>
+              <th class="col-time">Time Out</th>
+              <th class="col-time">Time In</th>
+              <th class="col-time">Time Out</th>
+              <th class="col-num">Hrs.</th>
+              <th class="col-num">Mins.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="day in daysInMonth" :key="day">
+              <td class="col-day">{{ String(day).padStart(2,'0') }}</td>
 
-    <!-- Official Hours note -->
-    <p class="text-[9px] mb-2 italic">
-      Official Hours for Arrival and Departure:
-      <span class="ml-2 not-italic font-medium">{{ officialHours }}</span>
-    </p>
+              <!-- Spanning cell for weekends / holidays -->
+              <template v-if="spanLabel(records[ds(day)], day)">
+                <td colspan="8" class="span-cell">
+                  {{ spanLabel(records[ds(day)], day) }}
+                </td>
+              </template>
 
-    <!-- Main DTR Table -->
-    <table class="w-full border-collapse text-[9.5px] mb-3">
-      <thead>
-        <tr>
-          <th rowspan="2" class="border border-black px-1 py-1 text-center w-[32px]">Day</th>
-          <th colspan="2" class="border border-black px-1 py-1 text-center">A.M.</th>
-          <th colspan="2" class="border border-black px-1 py-1 text-center">P.M.</th>
-          <th colspan="2" class="border border-black px-1 py-1 text-center">UNDERTIME</th>
-        </tr>
-        <tr>
-          <th class="border border-black px-1 py-1 text-center w-[60px]">Arrival</th>
-          <th class="border border-black px-1 py-1 text-center w-[60px]">Departure</th>
-          <th class="border border-black px-1 py-1 text-center w-[60px]">Arrival</th>
-          <th class="border border-black px-1 py-1 text-center w-[60px]">Departure</th>
-          <th class="border border-black px-1 py-1 text-center w-[36px]">Hours</th>
-          <th class="border border-black px-1 py-1 text-center w-[36px]">Minutes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="day in daysInMonth" :key="day">
-          <td class="border border-black text-center font-medium py-[2px]">{{ day }}</td>
-          <template v-if="getRecord(day)">
-            <td v-if="isRestDay(day)" colspan="6" class="border border-black text-center text-[8px] italic text-gray-400">
-              {{ getDayType(day) }}
-            </td>
-            <template v-else>
-              <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
-                  class="border border-black text-center py-[2px]"
-                  :style="!getRecord(day)[f] && getRecord(day)['penned_'+f] ? 'color:red' : ''">
-                {{ fmtTime(getRecord(day)[f] || getRecord(day)['penned_'+f]) }}
+              <!-- Regular work day -->
+              <template v-else>
+                <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
+                    :style="cellStyle(records[ds(day)], f)">
+                  {{ cellText(records[ds(day)], f) }}
+                </td>
+                <td></td><!-- OT In -->
+                <td></td><!-- OT Out -->
+                <td>{{ utH(records[ds(day)]) }}</td>
+                <td>{{ utM(records[ds(day)]) }}</td>
+              </template>
+            </tr>
+
+            <!-- Total -->
+            <tr class="total-row">
+              <td colspan="7" style="text-align:right; padding-right:4px;">TOTAL</td>
+              <td colspan="2" style="font-size:7px;">
+                {{ totalTardyHours }} hour(s) {{ totalTardyMinutes }} min(s)
               </td>
-              <td class="border border-black text-center py-[2px]">{{ undertimeHours(getRecord(day)) }}</td>
-              <td class="border border-black text-center py-[2px]">{{ undertimeMinutes(getRecord(day)) }}</td>
-            </template>
-          </template>
-          <template v-else>
-            <td v-if="isWeekend(day)" colspan="6" class="border border-black text-center text-[8px] italic text-gray-400">
-              {{ getDayOfWeek(day) }}
-            </td>
-            <template v-else>
-              <td class="border border-black text-center py-[2px] text-gray-300"></td>
-              <td class="border border-black text-center py-[2px] text-gray-300"></td>
-              <td class="border border-black text-center py-[2px] text-gray-300"></td>
-              <td class="border border-black text-center py-[2px] text-gray-300"></td>
-              <td class="border border-black text-center py-[2px]"></td>
-              <td class="border border-black text-center py-[2px]"></td>
-            </template>
-          </template>
-        </tr>
+            </tr>
+          </tbody>
+        </table>
 
-        <!-- Totals row -->
-        <tr class="font-semibold">
-          <td colspan="5" class="border border-black text-right pr-2 py-1 text-[9px]">TOTAL UNDERTIME</td>
-          <td class="border border-black text-center py-1">{{ totalUndertimeHours }}</td>
-          <td class="border border-black text-center py-1">{{ totalUndertimeMinutes }}</td>
-        </tr>
-      </tbody>
-    </table>
+        <!-- ── Legend ───────────────────────────────── -->
+        <div class="legend">
+          Legend: [T]-Travel &nbsp; [L]-Leave &nbsp; [A]-Absent &nbsp; [OB]-Official Business
+        </div>
 
-    <!-- Certification -->
-    <div class="text-[9px] mb-5 leading-relaxed">
-      <p class="mb-2">
-        I CERTIFY on my honor that the above is a true and correct report of the hours of work performed,
-        record of which was made daily at the time of arrival at and departure from office.
-      </p>
-      <div class="flex justify-center mt-4">
-        <div class="text-center w-56">
-          <div class="border-b border-black pb-0.5 mb-0.5 min-h-[28px] flex items-end justify-center">
-            <span class="text-[10px] font-semibold">{{ employee.name }}</span>
+        <!-- ── Certification ────────────────────────── -->
+        <div class="certify">
+          I CERTIFY on my honor that the above is a true and correct report of the hours of work
+          performed, record of which was made daily at the time of arrival at and departure from office
+        </div>
+
+        <!-- ── Employee Signature ───────────────────── -->
+        <div class="sig-row supervisor-row">
+          <div class="sig-box">
+            <div class="sig-line">
+              <span class="sig-name sup-name">{{ employee.name }}</span>
+            </div>
+            <div class="sig-label sup-label">{{ empPosition }}</div>
           </div>
-          <p>Signature of Employee</p>
         </div>
-      </div>
-    </div>
 
-    <!-- Verification -->
-    <div class="text-[9px]">
-      <p class="font-semibold mb-3">Verified as to the prescribed office hours:</p>
-      <div class="flex justify-between items-end">
-        <div class="text-center w-48">
-          <div class="border-b border-black mb-0.5 min-h-[28px]"></div>
-          <p>Supervisor/Head of Office</p>
-          <p class="text-[8px] text-gray-500 mt-0.5">Signature over Printed Name</p>
+        <!-- ── Verified / Supervisor ────────────────── -->
+        <div class="verify-label">Verified as to the prescribed office hours</div>
+        <div class="sig-row supervisor-row" style="margin-top:6px;">
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <div v-if="supervisor" class="sig-name sup-name" style="margin-top:1px;">{{ supervisor.name }}</div>
+            <div v-if="supervisor" class="sig-label sup-label">{{ supervisor.position }}</div>
+          </div>
         </div>
-        <div class="text-center w-32">
-          <div class="border-b border-black mb-0.5 min-h-[28px]"></div>
-          <p>Date</p>
-        </div>
-      </div>
-    </div>
 
+        <!-- ── Meta ─────────────────────────────────── -->
+        <div class="meta">
+          Date &amp; Time Printed: {{ printedAt }}
+        </div>
+
+      </div><!-- end .dtr-card -->
+    </div><!-- end .copy-pair -->
   </div>
 </template>
 
@@ -142,126 +112,197 @@ import { computed, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee: Object,
-  records:  Object,   // keyed by YYYY-MM-DD
-  month:    String,
+  employee:          Object,
+  records:           Object,   // keyed by YYYY-MM-DD
+  month:             String,
+  holidays:          Object,   // keyed by YYYY-MM-DD → { name, type }
+  supervisor:        Object,
+  totalTardyHours:   Number,
+  totalTardyMinutes: Number,
 })
 
-const agencyName = 'Philippine Science High School – CRC'
-const officeName = computed(() => props.employee?.employeeProfile?.division ?? '')
+const [yr, mo] = props.month.split('-').map(Number)
 
-const monthLabel = computed(() => {
-  const [y, m] = props.month.split('-')
-  return new Date(+y, +m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+const daysInMonth = computed(() => new Date(yr, mo, 0).getDate())
+
+const monthLabel = computed(() =>
+  new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+)
+
+const periodLabel = computed(() => {
+  const last  = daysInMonth.value
+  const mName = new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long' })
+  return `${mName} 1-${mName} ${last}, ${yr}`
 })
 
-const daysInMonth = computed(() => {
-  const [y, m] = props.month.split('-').map(Number)
-  return new Date(y, m, 0).getDate()
+const printedAt = computed(() => {
+  const n = new Date()
+  const p = v => String(v).padStart(2, '0')
+  return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())} ` +
+         `${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`
 })
 
-// Determine official hours from the first record's schedule
-const officialHours = computed(() => {
-  const first = Object.values(props.records)[0]
-  if (!first?.schedule) return '8:00 AM – 5:00 PM'
-  const s = first.schedule
-  if (s.daily_schedules) {
-    const entries = Object.values(s.daily_schedules)
-    if (entries.length) {
-      const t = entries[0]
-      return `${fmtHuman(t.time_in)} – ${fmtHuman(t.time_out)}`
-    }
-  }
-  return s.time_in && s.time_out ? `${fmtHuman(s.time_in)} – ${fmtHuman(s.time_out)}` : '8:00 AM – 5:00 PM'
-})
+const empPosition = computed(() =>
+  props.employee?.employeeProfile?.position ?? props.employee?.position ?? ''
+)
 
-function dateStr(day) {
-  const [y, m] = props.month.split('-')
-  return `${y}-${m}-${String(day).padStart(2, '0')}`
+// ── Helpers ────────────────────────────────────────────────────────
+
+function ds(day) {
+  return `${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`
 }
 
-function getRecord(day) {
-  return props.records[dateStr(day)] ?? null
+function dow(day) {
+  return new Date(ds(day) + 'T00:00:00').getDay() // 0=Sun, 6=Sat
 }
 
-function getDayOfWeek(day) {
-  return new Date(dateStr(day) + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'long' })
-}
-
-function isWeekend(day) {
-  const dow = new Date(dateStr(day) + 'T00:00:00').getDay()
-  return dow === 0 || dow === 6
-}
-
-function isRestDay(day) {
-  const rec = getRecord(day)
-  return rec && (rec.day_type === 'rest_day' || rec.day_type === 'rest_day_holiday')
-}
-
-function getDayType(day) {
-  const rec = getRecord(day)
-  const map = {
-    rest_day:         getDayOfWeek(day),
-    rest_day_holiday: 'Holiday',
-    holiday_regular:  'Regular Holiday',
-    holiday_special:  'Special Holiday',
-  }
-  return map[rec?.day_type] ?? getDayOfWeek(day)
-}
-
-function fmtTime(t) {
-  if (!t) return ''
-  return String(t).slice(0, 5)
-}
-
-function fmtHuman(t) {
+function fmtTime12(t) {
   if (!t) return ''
   const [h, m] = String(t).slice(0, 5).split(':').map(Number)
   const ampm = h >= 12 ? 'PM' : 'AM'
   const h12  = h % 12 || 12
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+  return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`
 }
 
-function undertimeHours(rec) {
-  if (!rec || rec.undertime_minutes <= 0) return ''
-  return Math.floor(rec.undertime_minutes / 60) || ''
+function spanLabel(rec, day) {
+  const date = ds(day)
+  const h = props.holidays?.[date]
+
+  if (rec) {
+    const dt = rec.day_type
+    if (dt === 'rest_day')         return dow(day) === 0 ? 'SUNDAY' : 'SATURDAY'
+    if (dt === 'rest_day_holiday') return h?.name ?? 'Holiday (Rest Day)'
+    if (dt === 'holiday_regular')  return h?.name ?? 'Regular Holiday'
+    if (dt === 'holiday_special')  return h?.name ?? 'Special Non-Working Holiday'
+    return null
+  }
+
+  if (h) return h.name
+  const d = dow(day)
+  if (d === 0) return 'SUNDAY'
+  if (d === 6) return 'SATURDAY'
+  return null
 }
 
-function undertimeMinutes(rec) {
-  if (!rec || rec.undertime_minutes <= 0) return ''
-  return rec.undertime_minutes % 60 || ''
+function cellText(rec, field) {
+  if (!rec) return ''
+  const val = rec[field] || rec['penned_' + field]
+  if (val) return fmtTime12(val)
+
+  const s = rec.attendance_status
+  const r = (rec.remarks || '').toUpperCase()
+
+  if (s === 'absent')               return 'A'
+  if (s === 'on_official_business') return 'OB'
+  if (s === 'on_leave') {
+    const lt = rec.leave_application?.leave_type?.name ?? ''
+    return lt.toLowerCase().includes('travel') ? 'T' : 'L'
+  }
+  if (r.includes('WFH')) return 'WFH'
+  if (r.includes('OB'))  return 'OB'
+  return ''
 }
 
-const totalUndertimeMinutes = computed(() => {
-  const total = Object.values(props.records).reduce((s, r) => s + (r.undertime_minutes ?? 0), 0)
-  return total % 60 || (total > 0 ? 0 : '')
-})
+function cellStyle(rec, field) {
+  if (!rec) return {}
+  const bio    = rec[field]
+  const penned = rec['penned_' + field]
+  if (!bio && penned) return { color: 'red' }
+  if (!bio && !penned) {
+    const s = rec.attendance_status
+    if (s === 'absent' || s === 'on_official_business') return { color: 'red' }
+    if (s === 'on_leave') return { color: '#CC7700' }
+  }
+  return {}
+}
 
-const totalUndertimeHours = computed(() => {
-  const total = Object.values(props.records).reduce((s, r) => s + (r.undertime_minutes ?? 0), 0)
-  return total >= 60 ? Math.floor(total / 60) : (total > 0 ? 0 : '')
-})
+function utH(rec) {
+  if (!rec || !rec.undertime_minutes) return ''
+  const h = Math.floor(rec.undertime_minutes / 60)
+  return h > 0 ? h : ''
+}
+function utM(rec) {
+  if (!rec || !rec.undertime_minutes) return ''
+  const m = rec.undertime_minutes % 60
+  return m > 0 ? m : ''
+}
 
-onMounted(() => {
-  setTimeout(() => window.print(), 400)
-})
+onMounted(() => setTimeout(() => window.print(), 400))
 </script>
 
 <style>
 * { box-sizing: border-box; }
-body { margin: 0; background: white; }
-.csc-page {
+html, body { margin: 0; padding: 0; background: #fff; }
+
+.print-root {
   font-family: Arial, Helvetica, sans-serif;
-  width: 210mm;
-  min-height: 297mm;
-  padding: 12mm 14mm;
-  margin: 0 auto;
-  background: white;
   color: #000;
+  padding: 6mm;
 }
+
+/* Two-column layout — portrait A4 */
+.copy-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6mm;
+}
+
+/* Individual DTR card */
+.dtr-card { border: 1px solid #000; padding: 5px 7px; font-size: 8px; }
+
+.form-no    { font-size: 7px; font-style: italic; }
+.form-title { font-size: 11px; font-weight: 700; text-align: center; margin: 2px 0; }
+.emp-name   { font-size: 9.5px; font-weight: 700; text-align: center; }
+.emp-period { font-size: 7.5px; margin: 2px 0 3px; }
+
+/* DTR table */
+.dtr-table { width: 100%; border-collapse: collapse; margin-bottom: 3px; }
+.dtr-table th,
+.dtr-table td {
+  border: 1px solid #000;
+  padding: 1px 1px;
+  text-align: center;
+  font-size: 7.5px;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.dtr-table th { font-weight: 700; }
+.col-day  { width: 14px; }
+.col-time { width: 40px; }
+.col-num  { width: 18px; }
+.span-cell { font-size: 7px; }
+.total-row td { font-weight: 700; font-size: 7px; }
+
+/* Footer sections */
+.legend  { font-size: 7px; border-top: 1px solid #ccc; padding-top: 2px; margin-bottom: 3px; }
+.certify { font-size: 7px; line-height: 1.4; margin-bottom: 6px; }
+
+.sig-row  { margin-bottom: 3px; }
+.sig-box  { display: inline-block; width: 70%; }
+.sig-line {
+  border-bottom: 1px solid #000;
+  min-height: 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+}
+.sig-name  { font-weight: 700; font-size: 8px; text-decoration: underline; text-transform: uppercase; }
+.sig-label { font-size: 7px; text-align: center; }
+
+.verify-label { font-size: 7px; margin-top: 3px; }
+.supervisor-row { text-align: center; }
+.supervisor-row .sig-box { display: block; width: 70%; margin: 0 auto; }
+.sup-name  { text-align: center; }
+.sup-label { text-align: center; }
+.meta { font-size: 6.5px; color: #444; border-top: 1px solid #ddd; padding-top: 2px; margin-top: 3px; }
+
+/* PRINT */
 @media print {
-  @page { size: A4 portrait; margin: 8mm; }
-  body { margin: 0; }
-  .csc-page { width: 100%; padding: 0; }
+  @page { size: A4 portrait; margin: 6mm; }
+  body        { margin: 0; }
+  .print-root { padding: 0; }
+  .copy-pair  { gap: 4mm; }
+  .dtr-card   { border-color: #000; }
 }
 </style>

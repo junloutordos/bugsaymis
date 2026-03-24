@@ -70,7 +70,10 @@
                 <td class="px-4 py-3 text-slate-700">{{ r.gatepass_type || '—' }}</td>
                 <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ r.gatepass_date || '—' }}</td>
                 <td class="px-4 py-3 text-slate-600 whitespace-nowrap text-xs">
-                  {{ r.gatepass_timeout || '—' }} → {{ r.gatepass_timein || '—' }}
+                  <div>{{ r.gatepass_timeout || '—' }} → {{ r.gatepass_timein || '—' }}</div>
+                  <div v-if="r.actual_timeout || r.actual_timein" class="text-emerald-600 font-medium mt-0.5">
+                    Actual: {{ r.actual_timeout || '—' }} → {{ r.actual_timein || '—' }}
+                  </div>
                 </td>
                 <td class="px-4 py-3 text-slate-700 max-w-[160px] truncate">{{ r.destination || '—' }}</td>
                 <td class="px-4 py-3 text-slate-600 max-w-[200px] truncate">{{ r.purpose || '—' }}</td>
@@ -96,6 +99,10 @@
                       <button v-if="r.status === 'Pending'" @click="openEdit(r)"
                               class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Edit">
                         <PencilSquareIcon class="w-4 h-4" />
+                      </button>
+                      <button v-if="isAdmin && r.status === 'OCD Approved'" @click="openActual(r)"
+                              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Record Actual Time">
+                        <ClockIcon class="w-4 h-4" />
                       </button>
                       <button v-if="r.status === 'OCD Approved'" @click="printGatepass(r)"
                               class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
@@ -252,6 +259,9 @@
               <div>
                 <p class="text-xs text-slate-400 mb-0.5">Time Out → In</p>
                 <p class="font-medium text-slate-800">{{ viewTarget.gatepass_timeout || '—' }} → {{ viewTarget.gatepass_timein || '—' }}</p>
+                <p v-if="viewTarget.actual_timeout || viewTarget.actual_timein" class="text-xs text-emerald-600 mt-0.5">
+                  Actual: {{ viewTarget.actual_timeout || '—' }} → {{ viewTarget.actual_timein || '—' }}
+                </p>
               </div>
               <div class="col-span-2">
                 <p class="text-xs text-slate-400 mb-0.5">Destination</p>
@@ -284,6 +294,46 @@
       </div>
     </Teleport>
 
+    <!-- Record Actual Time Modal -->
+    <Teleport to="body">
+      <div v-if="actualModal && actualTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-slate-800">Record Actual Time</h2>
+              <p class="text-xs text-slate-400 mt-0.5">{{ actualTarget.name }} — {{ actualTarget.controlno }}</p>
+            </div>
+            <button @click="actualModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+          </div>
+          <div class="px-6 py-5 space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Actual Time Out</label>
+                <input v-model="actualForm.actual_timeout" type="time"
+                       class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Actual Time In</label>
+                <input v-model="actualForm.actual_timein" type="time"
+                       class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+            </div>
+            <p class="text-xs text-slate-400">
+              Requested: <span class="font-mono font-medium text-slate-600">{{ actualTarget.gatepass_timeout || '—' }} → {{ actualTarget.gatepass_timein || '—' }}</span>
+            </p>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+            <button @click="actualModal = false" :disabled="saving"
+                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button @click="submitActual" :disabled="saving"
+                    class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
+              {{ saving ? 'Saving…' : 'Save' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Delete Confirm Modal -->
     <Teleport to="body">
       <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -307,7 +357,7 @@
 import { ref, computed, watch } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 const page        = usePage()
@@ -472,6 +522,41 @@ async function submitDecline() {
 const viewModal  = ref(false)
 const viewTarget = ref(null)
 function openView(r) { viewTarget.value = r; viewModal.value = true }
+
+// ── Record Actual Times (Admin/HR only) ───────────────────────────────────────
+const actualModal  = ref(false)
+const actualTarget = ref(null)
+const actualForm   = ref({ actual_timeout: '', actual_timein: '' })
+
+function openActual(r) {
+  actualTarget.value = r
+  actualForm.value = {
+    actual_timeout: r.actual_timeout ?? '',
+    actual_timein:  r.actual_timein  ?? '',
+  }
+  actualModal.value = true
+}
+
+async function submitActual() {
+  if (saving.value) return
+  saving.value = true
+  const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+  try {
+    const res = await fetch(`/hr/gatepass/${actualTarget.value.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+      body: JSON.stringify(actualForm.value),
+    })
+    if (res.ok) {
+      actualModal.value = false
+      router.reload({ only: ['rows'] })
+    } else {
+      const data = await res.json().catch(() => ({}))
+      alert(Object.values(data.errors ?? {}).flat().join('\n') || 'Save failed')
+    }
+  } catch (e) { alert(e.message || 'Save failed') }
+  finally { saving.value = false }
+}
 
 // ── Print ─────────────────────────────────────────────────────────────────────
 function printGatepass(r) {

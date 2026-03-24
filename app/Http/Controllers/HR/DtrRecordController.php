@@ -40,7 +40,7 @@ class DtrRecordController extends Controller
             ->get();
 
         $userMap = User::whereIn('id', $summaries->pluck('user_id'))
-            ->select('id', 'name', 'badge_id')
+            ->select('id', 'name', 'badge_id', 'emp_category')
             ->get()
             ->keyBy('id');
 
@@ -101,19 +101,116 @@ class DtrRecordController extends Controller
 
         $data = $request->validate([
             'user_id'   => 'nullable|exists:users,id',
+            'category'  => 'nullable|in:all,plantilla,non_plantilla',
             'date_from' => 'required|date',
             'date_to'   => 'required|date|after_or_equal:date_from',
         ]);
 
-        $users = $data['user_id']
-            ? User::where('id', $data['user_id'])->get()
-            : User::where('status', 'active')->get();
+        $query = User::where('status', 'active');
+
+        if (!empty($data['user_id'])) {
+            $query->where('id', $data['user_id']);
+        } elseif (($data['category'] ?? 'all') === 'plantilla') {
+            $query->whereIn('emp_category', ['Plantilla Teaching', 'Plantilla Non-Teaching']);
+        } elseif (($data['category'] ?? 'all') === 'non_plantilla') {
+            $query->whereIn('emp_category', ['COS Teaching', 'COS Non Teaching']);
+        }
+
+        $users = $query->get();
 
         foreach ($users as $user) {
             $dtrService->generate($user->id, $data['date_from'], $data['date_to']);
         }
 
         return back()->with('success', 'DTR generated for ' . $users->count() . ' employee(s).');
+    }
+
+    public function printBatch(Request $request)
+    {
+        $this->authorize('hr.dtr.view');
+
+        // Support explicit date range (non-plantilla) OR month-based (plantilla/all)
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $dateFrom = $request->input('date_from');
+            $dateTo   = $request->input('date_to');
+        } else {
+            $month    = $request->input('month', now()->format('Y-m'));
+            [$y, $m]  = explode('-', $month);
+            $dateFrom = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+            $dateTo   = \Carbon\Carbon::createFromDate($y, $m, 1)->endOfMonth()->format('Y-m-d');
+        }
+
+        // Load holidays for the entire period keyed by date string
+        $holidays = \App\Models\HR\Holiday::where('is_active', true)
+            ->whereBetween('holiday_date', [$dateFrom, $dateTo])
+            ->get()
+            ->keyBy(fn ($h) => \Carbon\Carbon::parse($h->holiday_date)->format('Y-m-d'));
+
+        // Resolve which users to print
+        $usersQuery = User::where('status', 'active')->with('employeeProfile');
+        if ($request->user_id) {
+            $usersQuery->where('id', $request->user_id);
+        } elseif ($request->category) {
+            $categoryMap = [
+                'Plantilla Teaching'     => ['Plantilla Teaching'],
+                'Plantilla Non-Teaching' => ['Plantilla Non-Teaching'],
+                'COS Teaching'           => ['COS Teaching'],
+                'COS Non Teaching'       => ['COS Non Teaching'],
+                'plantilla'              => ['Plantilla Teaching', 'Plantilla Non-Teaching'],
+                'non_plantilla'          => ['COS Teaching', 'COS Non Teaching'],
+            ];
+            if (isset($categoryMap[$request->category])) {
+                $usersQuery->whereIn('emp_category', $categoryMap[$request->category]);
+            }
+        }
+        $users = $usersQuery->orderBy('name')->get();
+
+        // For each user, load their DTR records for the period
+        $employees = $users->map(function ($user) use ($dateFrom, $dateTo, $holidays) {
+            $records = DtrRecord::where('user_id', $user->id)
+                ->whereBetween('work_date', [$dateFrom, $dateTo])
+                ->with(['schedule', 'leaveApplication.leaveType'])
+                ->orderBy('work_date')
+                ->get()
+                ->keyBy(fn ($r) => \Carbon\Carbon::parse($r->work_date)->format('Y-m-d'));
+
+            foreach ($records as $date => $rec) {
+                if (isset($holidays[$date])) {
+                    $rec->holiday_name = $holidays[$date]->name;
+                }
+            }
+
+            $totalLate   = $records->sum('late_minutes');
+            $totalUt     = $records->sum('undertime_minutes');
+            $totalTardy  = $totalLate + $totalUt;
+
+            return [
+                'user'                => $user,
+                'records'             => $records,
+                'total_tardy_hours'   => (int) floor($totalTardy / 60),
+                'total_tardy_minutes' => (int) ($totalTardy % 60),
+            ];
+        })->values();
+
+        // Resolve supervisor: OCD head
+        $supervisor = null;
+        $officeDivision = \Illuminate\Support\Facades\DB::table('divisions')
+            ->where('division_name', 'Office of the Campus Director')
+            ->first();
+        if ($officeDivision?->division_chief_id) {
+            $d = User::find($officeDivision->division_chief_id);
+            if ($d) {
+                $supervisor = ['name' => $d->name, 'position' => $d->position ?? 'OIC - Campus Director'];
+            }
+        }
+
+        return Inertia::render('HR/DTR/PrintBatch', [
+            'employees'  => $employees,
+            'date_from'  => $dateFrom,
+            'date_to'    => $dateTo,
+            'supervisor' => $supervisor,
+            'holidays'   => $holidays->map(fn ($h) => ['name' => $h->name, 'type' => $h->type]),
+        ]);
     }
 
     public function printCsc(Request $request, User $user)
@@ -123,18 +220,56 @@ class DtrRecordController extends Controller
         $month = $request->input('month', now()->format('Y-m'));
         [$y, $m] = explode('-', $month);
 
+        $holidays = \App\Models\HR\Holiday::where('is_active', true)
+            ->whereYear('holiday_date', $y)
+            ->whereMonth('holiday_date', $m)
+            ->get()
+            ->keyBy(fn ($h) => \Carbon\Carbon::parse($h->holiday_date)->format('Y-m-d'));
+
         $records = DtrRecord::where('user_id', $user->id)
             ->whereYear('work_date', $y)
             ->whereMonth('work_date', $m)
-            ->with('schedule')
+            ->with(['schedule', 'leaveApplication.leaveType'])
             ->orderBy('work_date')
             ->get()
             ->keyBy(fn ($r) => \Carbon\Carbon::parse($r->work_date)->format('Y-m-d'));
 
+        // Attach holiday name to records
+        foreach ($records as $date => $rec) {
+            if (isset($holidays[$date])) {
+                $rec->holiday_name = $holidays[$date]->name;
+            }
+        }
+
+        // Supervisor: division chief, fallback to OCD head
+        $supervisor = null;
+        if ($user->division_id) {
+            $division = \Illuminate\Support\Facades\DB::table('divisions')->where('id', $user->division_id)->first();
+            if ($division?->division_chief_id) {
+                $chief = User::find($division->division_chief_id);
+                if ($chief) $supervisor = ['name' => $chief->name, 'position' => $chief->position ?? 'Division Chief'];
+            }
+        }
+        if (!$supervisor) {
+            $ocdDiv = \Illuminate\Support\Facades\DB::table('divisions')->where('division_name', 'Office of the Campus Director')->first();
+            if ($ocdDiv?->division_chief_id) {
+                $d = User::find($ocdDiv->division_chief_id);
+                if ($d) $supervisor = ['name' => $d->name, 'position' => $d->position ?? 'OIC - Campus Director'];
+            }
+        }
+
+        $totalLate  = $records->sum('late_minutes');
+        $totalUt    = $records->sum('undertime_minutes');
+        $totalTardy = $totalLate + $totalUt;
+
         return Inertia::render('HR/DTR/PrintCsc', [
-            'employee' => $user->load('employeeProfile'),
-            'records'  => $records,
-            'month'    => $month,
+            'employee'          => $user->load('employeeProfile'),
+            'records'           => $records,
+            'month'             => $month,
+            'holidays'          => $holidays->map(fn ($h) => ['name' => $h->name, 'type' => $h->type]),
+            'supervisor'        => $supervisor,
+            'totalTardyHours'   => (int) floor($totalTardy / 60),
+            'totalTardyMinutes' => (int) ($totalTardy % 60),
         ]);
     }
 
