@@ -26,6 +26,10 @@
       <div class="sub">Please scan your school ID</div>
       <div id="message" class="message">Ready to scan</div>
       <input id="scanner" class="scanner" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <div id="student-info" style="margin-top:16px;min-height:48px;font-size:18px;color:#a7f3d0;display:none;">
+        <div id="student-id" style="font-size:14px;color:#9ca3af;"></div>
+        <div id="student-name" style="font-weight:bold;"></div>
+      </div>
     </div>
   </div>
 
@@ -33,6 +37,9 @@
     (function(){
       const input = document.getElementById('scanner');
       const message = document.getElementById('message');
+      const studentInfo = document.getElementById('student-info');
+      const studentIdEl = document.getElementById('student-id');
+      const studentNameEl = document.getElementById('student-name');
       const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
       // Focus immediately and keep focus
@@ -59,13 +66,21 @@
           });
           const data = await res.json();
           if (res.ok && data.student_name) {
-            message.textContent = `Welcome, ${data.student_name}`;
+            message.textContent = `Welcome!`;
+            studentIdEl.textContent = `PISAY ID: ${val}`;
+            studentNameEl.textContent = data.student_name.toUpperCase();
+            studentInfo.style.display = 'block';
           } else if (res.ok) {
             message.textContent = `Scan recorded`;
+            studentIdEl.textContent = `PISAY ID: ${val}`;
+            studentNameEl.textContent = 'Unknown Student';
+            studentInfo.style.display = 'block';
           } else if (data && data.error) {
             message.textContent = data.error;
+            studentInfo.style.display = 'none';
           } else {
             message.textContent = 'Error recording scan';
+            studentInfo.style.display = 'none';
           }
         }catch(e){
           message.textContent = 'Network error';
@@ -77,6 +92,9 @@
       function reset(){
         input.value = '';
         message.textContent = 'Ready to scan';
+        studentInfo.style.display = 'none';
+        studentIdEl.textContent = '';
+        studentNameEl.textContent = '';
         focusInput();
       }
 
