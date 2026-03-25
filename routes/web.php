@@ -378,13 +378,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Guidance consultations list (Guidance Services)
     Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
-    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:health.view');
-    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:health.view');
-    Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:health.manage');
-    Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('permission:health.manage');
+    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.view');
+    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.view');
+    Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:guidance.manage');
+    Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('permission:guidance.manage');
     // Save intervention details (Guidance personnel only)
-    Route::get('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'getIntervention'])->name('guidance.consultations.intervention.get')->middleware('permission:health.manage');
-    Route::post('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'intervention'])->name('guidance.consultations.intervention')->middleware('permission:health.manage');
+    Route::get('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'getIntervention'])->name('guidance.consultations.intervention.get')->middleware('permission:guidance.manage');
+    Route::post('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'intervention'])->name('guidance.consultations.intervention')->middleware('permission:guidance.manage');
     Route::get('/work-requests/{workRequest}/print', [WorkRequestController::class, 'print'])
         ->name('work-requests.print')
         ->middleware('permission:facilities.manage');
@@ -880,6 +880,12 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
     Route::get('/monitor/data', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'monitor'])
         ->middleware('permission:wfh.monitor')
         ->name('monitor');
+
+    // Print views
+    Route::get('/print/timelogs',       [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'printTimeLogs'])
+        ->name('print.timelogs');
+    Route::get('/print/accomplishments', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'printAccomplishments'])
+        ->name('print.accomplishments');
 
     // Image proxy — streams Drive photos server-side (no client Google auth needed)
     Route::get('/photo/{fileId}', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'photo'])

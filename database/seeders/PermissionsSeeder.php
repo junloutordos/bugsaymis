@@ -88,6 +88,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Health',   'name' => 'health.view',        'description' => 'View health records'],
             ['module' => 'Health',   'name' => 'health.manage',      'description' => 'Manage clinic records'],
 
+            // ── Guidance ──────────────────────────────────────────────────────
+            ['module' => 'Guidance', 'name' => 'guidance.view',      'description' => 'View guidance consultations'],
+            ['module' => 'Guidance', 'name' => 'guidance.manage',    'description' => 'Manage guidance consultations & interventions'],
+
             // ── Procurement ───────────────────────────────────────────────────
             ['module' => 'Procurement','name' => 'procurement.view',   'description' => 'View procurement records'],
             ['module' => 'Procurement','name' => 'procurement.create', 'description' => 'Create procurement requests'],

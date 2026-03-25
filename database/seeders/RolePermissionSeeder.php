@@ -228,7 +228,7 @@ class RolePermissionSeeder extends Seeder
 
         // ── Guidance ──────────────────────────────────────────────────────────
         $assign('Guidance', [
-            'health.view',
+            'guidance.view', 'guidance.manage',
             'reports.view',
         ]);
 

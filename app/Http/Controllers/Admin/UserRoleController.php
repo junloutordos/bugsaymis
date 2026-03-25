@@ -98,7 +98,9 @@ class UserRoleController extends Controller
      */
     public function rolesList(): JsonResponse
     {
-        $roles = Role::orderBy('name')->get(['id', 'name', 'description']);
+        $roles = Role::with(['permissions' => fn ($q) => $q->select('permissions.id', 'permissions.name', 'permissions.module', 'permissions.description')])
+            ->orderBy('name')
+            ->get(['id', 'name', 'description']);
 
         return response()->json($roles);
     }
