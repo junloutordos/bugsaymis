@@ -13,7 +13,8 @@
       "Bash(npm run:*)",
       "Bash(docker compose exec app php artisan tinker --execute=\":*)",
       "Bash(docker compose:*)",
-      "Bash(ipconfig getifaddr:*)"
+      "Bash(ipconfig getifaddr:*)",
+      "Bash(python3 -m json.tool)"
     ],
     "additionalDirectories": [
       "/Users/junlou/bugsaymis-docker/nginx"

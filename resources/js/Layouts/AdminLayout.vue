@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
@@ -26,6 +26,7 @@ import {
   CurrencyDollarIcon,
   HeartIcon,
   ChatBubbleLeftRightIcon,
+  ChatBubbleOvalLeftEllipsisIcon,
   HomeModernIcon,
   UserIcon,
   CursorArrowRippleIcon,
@@ -68,13 +69,73 @@ function submitVersion() {
   });
 }
 
+// ─── Chat unread badge (Phase 8) ──────────────────────────────────────────
+const chatUnreadCount = ref(0);
+
+async function fetchChatUnread() {
+  try {
+    const res = await window.axios.get('/api/chat/unread-count');
+    chatUnreadCount.value = res.data.unread_count ?? 0;
+  } catch {
+    // silently ignore — badge just won't show
+  }
+}
+
+let chatEchoChannel = null;
+
+function setupChatNotifications() {
+  if (!window.Echo) return;
+
+  const userId = user?.id;
+  if (!userId) return;
+
+  chatEchoChannel = window.Echo.private(`user.${userId}`)
+    .listen('.new.message', (e) => {
+      // Increment badge if not currently on the Chat page
+      if (!route().current('chat.index')) {
+        chatUnreadCount.value += 1;
+      }
+
+      // Browser notification when tab is not focused
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+        const senderName = e.message?.sender_name ?? 'Someone';
+        const body = e.message?.body || '📎 Attachment';
+        new Notification(`New message from ${senderName}`, {
+          body,
+          icon: '/favicon.ico',
+        });
+      }
+    });
+}
+
+// Reset badge when navigating to Chat
+watch(() => route().current('chat.index'), (onChat) => {
+  if (onChat) chatUnreadCount.value = 0;
+});
+
 // Close mobile sidebar on Inertia navigation
 let removeNavListener;
 onMounted(() => {
-  removeNavListener = router.on('navigate', () => { mobileOpen.value = false; });
+  removeNavListener = router.on('navigate', () => {
+    mobileOpen.value = false;
+    // Reset badge when navigating to Chat page
+    if (route().current('chat.index')) chatUnreadCount.value = 0;
+  });
+
+  fetchChatUnread();
+  setupChatNotifications();
+
+  // Request browser notification permission (non-blocking)
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 });
 onUnmounted(() => {
   if (removeNavListener) removeNavListener();
+  if (chatEchoChannel) {
+    window.Echo?.leave(`user.${user?.id}`);
+    chatEchoChannel = null;
+  }
 });
 
 // --- Page + Auth ---
@@ -103,9 +164,11 @@ const isActive = (name) => name && route().current(name); // ✅ check via route
 
 // Return numeric badge from shared Inertia props based on child routeName
 const getBadge = (child) => {
-  // Suppress badges only if the user has no roles beyond Staff/Faculty
-  if (roleNames.length > 0 && roleNames.every(r => r === 'Staff' || r === 'Faculty')) return 0;
   const rn = child?.routeName || null;
+  // Chat badge is available to all roles — check it first
+  if (rn === 'chat.index') return chatUnreadCount.value;
+  // Suppress other badges for Staff/Faculty-only users
+  if (roleNames.length > 0 && roleNames.every(r => r === 'Staff' || r === 'Faculty')) return 0;
   if (!page || !page.props) return 0;
   switch (rn) {
     case 'consultations.index':
@@ -1216,6 +1279,14 @@ const menuItems = [
       },
     ],
   },
+  {
+    label: "Chat",
+    routeName: "chat.index",
+    href: "/chat",
+    icon: ChatBubbleOvalLeftEllipsisIcon,
+    roles: ["Administrator", "Faculty", "Staff"],
+    permissions: [],
+  },
 ];
 
 // --- Filter Menu by Role ---
@@ -1332,6 +1403,7 @@ filteredMenu.value.forEach((item) => {
             :label="item.label"
             :collapsed="collapsed"
             :active="isActive(item.routeName)"
+            :badge="getBadge(item)"
           />
 
           <!-- Group with children -->

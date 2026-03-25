@@ -368,7 +368,8 @@ class DTRService
             return 0;
         }
 
-        return max(0, $actualIn->diffInMinutes($scheduledIn, false));
+        // diffInMinutes($b, false) = (b - a); we need (actualIn - scheduledIn) to be positive when late
+        return max(0, $scheduledIn->diffInMinutes($actualIn, false));
     }
 
     private function computeUndertimeMinutes(?string $timeOutPm, string $dateStr, ?EmployeeSchedule $schedule): float
@@ -385,7 +386,8 @@ class DTRService
         $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
         $actualOut    = Carbon::parse($dateStr . ' ' . $timeOutPm);
 
-        return max(0, $scheduledOut->diffInMinutes($actualOut, false));
+        // diffInMinutes($b, false) = (b - a); we need (scheduledOut - actualOut) to be positive when leaving early
+        return max(0, $actualOut->diffInMinutes($scheduledOut, false));
     }
 
     private function computeOvertimeMinutes(?string $timeOutPm, string $dateStr, ?EmployeeSchedule $schedule): float
@@ -429,7 +431,7 @@ class DTRService
             return 'absent';
         }
 
-        $halfDayThreshold = $schedule ? (($schedule->late_threshold_minutes ?? 240) / 60) : 4;
+        $halfDayThreshold = $schedule ? ($schedule->half_day_hours ?? 4) : 4;
 
         if ($hoursWorked < $halfDayThreshold || $lateMinutes >= ($schedule->late_threshold_minutes ?? 240)) {
             return 'half_day';

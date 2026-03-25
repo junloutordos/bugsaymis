@@ -16,6 +16,11 @@
                 {{ employee.position || 'No position' }}
                 <span v-if="employee.badge_id" class="ml-1 text-slate-400">· Badge {{ employee.badge_id }}</span>
               </p>
+              <p v-if="activeScheduleName" class="text-xs text-indigo-500 mt-0.5">
+                Schedule: <span class="font-medium">{{ activeScheduleName }}</span>
+                <span v-if="activeScheduleTimes" class="ml-1 font-mono text-indigo-400">({{ activeScheduleTimes }})</span>
+              </p>
+              <p v-else class="text-xs text-amber-500 mt-0.5">⚠ No schedule assigned — late & undertime will not be computed</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -120,9 +125,28 @@
                   <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_pm) }}
                 </div>
               </div>
+              <!-- Scheduled time (indigo, below punches) -->
+              <div v-if="cell.schedIn || cell.schedOut"
+                class="font-mono text-[8px] text-indigo-400 leading-tight border-t border-indigo-100 mt-0.5 pt-0.5 text-center">
+                {{ fmtTime(cell.schedIn) }}{{ cell.schedIn && cell.schedOut ? '–' : '' }}{{ fmtTime(cell.schedOut) }}
+              </div>
+
               <!-- Status badge -->
-              <div :class="[statusBadge(cell.record.attendance_status), 'mt-auto text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide']">
+              <div :class="[statusBadge(cell.record.attendance_status), 'mt-1 text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide']">
                 {{ statusLabel(cell.record.attendance_status) }}
+              </div>
+
+              <!-- Late / UT mini chips -->
+              <div v-if="cell.record.late_minutes > 0 || cell.record.undertime_minutes > 0"
+                class="flex gap-0.5 mt-0.5 justify-center flex-wrap">
+                <span v-if="cell.record.late_minutes > 0"
+                  class="text-[7px] font-bold bg-amber-100 text-amber-700 rounded px-1 leading-tight">
+                  L {{ fmtMinutes(cell.record.late_minutes) }}
+                </span>
+                <span v-if="cell.record.undertime_minutes > 0"
+                  class="text-[7px] font-bold bg-orange-100 text-orange-700 rounded px-1 leading-tight">
+                  UT {{ fmtMinutes(cell.record.undertime_minutes) }}
+                </span>
               </div>
             </template>
 
@@ -154,17 +178,19 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">AM Out</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PM In</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PM Out</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-400 uppercase tracking-wide whitespace-nowrap">Sched. In</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-400 uppercase tracking-wide whitespace-nowrap">Sched. Out</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Hrs</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Late</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">UT</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">OT</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-amber-500 uppercase tracking-wide">Late</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-orange-500 uppercase tracking-wide">UT</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-500 uppercase tracking-wide">OT</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                 <th class="px-4 py-3 print:hidden"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-if="!records.length">
-                <td colspan="12" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
+                <td colspan="14" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
               </tr>
               <tr v-for="r in records" :key="r.id" class="hover:bg-slate-50/60">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
@@ -174,15 +200,27 @@
                     :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : 'text-slate-200')">
                   {{ fmtTime(r[f] || r['penned_'+f]) || '–' }}
                 </td>
-                <td class="px-4 py-2.5 text-right text-slate-700 text-xs">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</td>
-                <td class="px-4 py-2.5 text-right text-xs" :class="r.late_minutes > 0 ? 'text-amber-600 font-medium' : 'text-slate-300'">
-                  {{ r.late_minutes > 0 ? r.late_minutes + 'm' : '—' }}
+                <!-- Scheduled times (indigo, derived from employee schedule) -->
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">
+                  {{ fmtTime(r.scheduled_time_in) || '–' }}
                 </td>
-                <td class="px-4 py-2.5 text-right text-xs" :class="r.undertime_minutes > 0 ? 'text-orange-600 font-medium' : 'text-slate-300'">
-                  {{ r.undertime_minutes > 0 ? r.undertime_minutes + 'm' : '—' }}
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">
+                  {{ fmtTime(r.scheduled_time_out) || '–' }}
                 </td>
-                <td class="px-4 py-2.5 text-right text-xs" :class="r.overtime_minutes > 0 ? 'text-emerald-600 font-medium' : 'text-slate-300'">
-                  {{ r.overtime_minutes > 0 ? r.overtime_minutes + 'm' : '—' }}
+                <td class="px-4 py-2.5 text-right text-slate-700 text-xs tabular-nums">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</td>
+                <!-- Late -->
+                <td class="px-4 py-2.5 text-right text-xs tabular-nums" :class="r.late_minutes > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
+                  <span v-if="!r.schedule_name" title="No schedule — late cannot be computed" class="cursor-help text-slate-200">n/a</span>
+                  <span v-else>{{ fmtMinutes(r.late_minutes) }}</span>
+                </td>
+                <!-- Undertime -->
+                <td class="px-4 py-2.5 text-right text-xs tabular-nums" :class="r.undertime_minutes > 0 ? 'text-orange-600 font-semibold' : 'text-slate-300'">
+                  <span v-if="!r.schedule_name" title="No schedule — undertime cannot be computed" class="cursor-help text-slate-200">n/a</span>
+                  <span v-else>{{ fmtMinutes(r.undertime_minutes) }}</span>
+                </td>
+                <!-- Overtime -->
+                <td class="px-4 py-2.5 text-right text-xs tabular-nums" :class="r.overtime_minutes > 0 ? 'text-emerald-600 font-semibold' : 'text-slate-300'">
+                  {{ fmtMinutes(r.overtime_minutes) }}
                 </td>
                 <td class="px-4 py-2.5">
                   <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
@@ -282,8 +320,18 @@ function initials(name) {
 }
 
 function fmtTime(t) {
-  if (!t) return '—'
+  if (!t) return ''
   return String(t).slice(0, 5)
+}
+
+function fmtMinutes(m) {
+  const n = Math.round(Number(m) || 0)
+  if (n <= 0) return '—'
+  const h = Math.floor(n / 60)
+  const r = n % 60
+  if (h > 0 && r > 0) return `${h}h ${r}m`
+  if (h > 0)           return `${h}h`
+  return `${r}m`
 }
 
 function getDayName(dateVal) {
@@ -309,6 +357,21 @@ function changeMonth(delta) {
 const monthLabel = computed(() => {
   const [y, m] = currentMonth.value.split('-')
   return new Date(+y, +m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+})
+
+// Derive active schedule name from the most recent record that has one
+const activeScheduleName = computed(() => {
+  const rec = [...props.records].reverse().find(r => r.schedule_name)
+  return rec?.schedule_name ?? null
+})
+
+const activeScheduleTimes = computed(() => {
+  const rec = [...props.records].reverse().find(r => r.scheduled_time_in || r.scheduled_time_out)
+  if (!rec) return null
+  const i = fmtTime(rec.scheduled_time_in)
+  const o = fmtTime(rec.scheduled_time_out)
+  if (i && o) return `${i} – ${o}`
+  return i || o || null
 })
 
 // ── Calendar grid ──────────────────────────────────────────────────────────
@@ -339,12 +402,17 @@ const calendarCells = computed(() => {
   for (let d = 1; d <= daysInMonth.value; d++) {
     const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`
     const dow = new Date(y, m - 1, d).getDay()
+    const rec = recordMap.value[dateStr] ?? null
     cells.push({
       day:       d,
       date:      dateStr,
-      record:    recordMap.value[dateStr] ?? null,
-      isWorkDay: dow >= 1 && dow <= 5,
+      record:    rec,
+      // A day is a work day if a DTR record was generated for it;
+      // fall back to Mon-Fri for days with no record yet.
+      isWorkDay: rec ? rec.day_type !== 'rest_day' : (dow >= 1 && dow <= 5),
       isToday:   dateStr === todayStr,
+      schedIn:   rec?.scheduled_time_in  ?? null,
+      schedOut:  rec?.scheduled_time_out ?? null,
     })
   }
   return cells

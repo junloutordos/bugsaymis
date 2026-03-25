@@ -310,4 +310,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\Payroll\EmployeeDeductionConfig::class);
     }
+
+    // ─── Chat Relationships ───────────────────────────────────────────────────
+
+    public function conversations()
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_user')
+            ->withPivot(['last_read_at', 'left_at'])
+            ->withTimestamps()
+            ->whereNull('conversation_user.left_at')
+            ->latest('conversations.updated_at');
+    }
+
+    public function sentMessages()
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
 }

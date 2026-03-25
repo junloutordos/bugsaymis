@@ -72,7 +72,16 @@ class DtrRecordController extends Controller
             ->whereMonth('work_date', $m)
             ->with('schedule', 'leaveApplication')
             ->orderBy('work_date')
-            ->get();
+            ->get()
+            ->map(function ($record) {
+                $dateStr  = \Carbon\Carbon::parse($record->work_date)->toDateString();
+                $schedule = $record->schedule;
+                $record->scheduled_time_in  = $schedule?->getTimeIn($dateStr);
+                $record->scheduled_time_out = $schedule?->getTimeOut($dateStr);
+                $record->grace_minutes      = $schedule?->grace_period_minutes;
+                $record->schedule_name      = $schedule?->name;
+                return $record;
+            });
 
         $summary = [
             'present'     => $records->where('attendance_status', 'present')->count(),

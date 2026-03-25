@@ -1500,4 +1500,5 @@ if (app()->environment('local')) {
 | Authentication Routes
 |--------------------------------------------------------------------------
 */
+require __DIR__.'/chat.php';
 require __DIR__.'/auth.php';
