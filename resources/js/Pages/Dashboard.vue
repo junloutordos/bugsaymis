@@ -72,6 +72,12 @@ const props = defineProps({
   monthlyTrends: { type: Object, default: () => ({ labels: [], datasets: [] }) },
   lndStats:     { type: Object, default: () => ({ programs: 0, sessions: 0, tna_pending: 0, idp_pending: 0 }) },
   rewardsStats: { type: Object, default: () => ({ total: 0, pending: 0, approved: 0, awarded_this_year: 0 }) },
+  // GAD / sex-disaggregated
+  ipcrBySex:    { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
+  tnaBySex:     { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
+  idpBySex:     { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
+  rewardsBySex: { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
+  employeesByDivisionWithSex: { type: Array, default: () => [] },
 })
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -126,6 +132,15 @@ const barOptions = {
   scales: {
     x: { grid: { display: false }, ticks: { font: { size: 10 } } },
     y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+  },
+}
+
+const stackedHBarOptions = {
+  ...base,
+  indexAxis: 'y',
+  scales: {
+    x: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
+    y: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
   },
 }
 
@@ -191,15 +206,34 @@ const generalServicesData = computed(() => {
   }
 })
 
-const employeesByDivisionData = computed(() => ({
-  labels: props.employeesByDivision.map(d => d.division),
-  datasets: [{
-    label: 'Employees',
-    data: props.employeesByDivision.map(d => d.count),
-    backgroundColor: p.indigo + 'cc',
-    borderRadius: 4,
-  }],
+const divisionSexData = computed(() => ({
+  labels: props.employeesByDivisionWithSex.map(d => d.name),
+  datasets: [
+    { label: 'Male',   data: props.employeesByDivisionWithSex.map(d => d.male),   backgroundColor: p.blue + 'cc', borderRadius: 4 },
+    { label: 'Female', data: props.employeesByDivisionWithSex.map(d => d.female), backgroundColor: p.rose + 'cc', borderRadius: 4 },
+  ],
 }))
+
+const pct = (n, t) => t > 0 ? Math.round(n / t * 100) : 0
+
+const gadSummaryRows = computed(() => {
+  const libM = props.libraryAttendanceMaleByGrade.reduce((a, b) => a + b, 0)
+  const libF = props.libraryAttendanceFemaleByGrade.reduce((a, b) => a + b, 0)
+  const libT = libM + libF
+  const iT = (props.ipcrBySex.male + props.ipcrBySex.female + props.ipcrBySex.unspecified) || 0
+  const tT = (props.tnaBySex.male  + props.tnaBySex.female  + props.tnaBySex.unspecified)  || 0
+  const dT = (props.idpBySex.male  + props.idpBySex.female  + props.idpBySex.unspecified)  || 0
+  const rT = props.rewardsStats.total || 0
+  return [
+    { label: 'Employees',          total: props.totalEmployees,  male: props.employeeMaleCount,  female: props.employeeFemaleCount,  pctM: pct(props.employeeMaleCount,  props.totalEmployees), pctF: pct(props.employeeFemaleCount,  props.totalEmployees) },
+    { label: 'Students (Enrolled)', total: props.maleCount + props.femaleCount, male: props.maleCount, female: props.femaleCount, pctM: pct(props.maleCount, props.maleCount + props.femaleCount), pctF: pct(props.femaleCount, props.maleCount + props.femaleCount) },
+    { label: 'Library Attendance',  total: libT, male: libM, female: libF, pctM: pct(libM, libT), pctF: pct(libF, libT) },
+    { label: 'IPCR Submissions',    total: iT, male: props.ipcrBySex.male, female: props.ipcrBySex.female, pctM: pct(props.ipcrBySex.male, iT), pctF: pct(props.ipcrBySex.female, iT) },
+    { label: 'TNA Submissions',     total: tT, male: props.tnaBySex.male,  female: props.tnaBySex.female,  pctM: pct(props.tnaBySex.male,  tT), pctF: pct(props.tnaBySex.female,  tT) },
+    { label: 'IDP Submissions',     total: dT, male: props.idpBySex.male,  female: props.idpBySex.female,  pctM: pct(props.idpBySex.male,  dT), pctF: pct(props.idpBySex.female,  dT) },
+    { label: 'Reward Nominations',  total: rT, male: props.rewardsBySex.male, female: props.rewardsBySex.female, pctM: pct(props.rewardsBySex.male, rT), pctF: pct(props.rewardsBySex.female, rT) },
+  ]
+})
 
 const employeeGenderData = computed(() => ({
   labels: ['Male', 'Female'],
@@ -321,6 +355,19 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- ── GAD Banner ───────────────────────────────────────────────────── -->
+      <div class="flex items-center gap-3 rounded-2xl border border-pink-100 bg-gradient-to-r from-blue-50 via-white to-pink-50 px-5 py-3 shadow-sm">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-600 font-bold text-xs">GAD</div>
+        <p class="text-xs text-gray-600">
+          <span class="font-semibold text-gray-800">Gender and Development (RA 9710)</span>
+          — This dashboard presents sex-disaggregated data in compliance with the Magna Carta of Women and DOST/PSHSS GAD requirements.
+        </p>
+        <div class="ml-auto flex shrink-0 items-center gap-3 text-[11px] font-semibold">
+          <span class="flex items-center gap-1.5 text-blue-600"><span class="inline-block h-2.5 w-2.5 rounded-full bg-blue-500"></span>Male</span>
+          <span class="flex items-center gap-1.5 text-pink-600"><span class="inline-block h-2.5 w-2.5 rounded-full bg-pink-500"></span>Female</span>
+        </div>
+      </div>
+
       <!-- ── KPI Strip ────────────────────────────────────────────────────── -->
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
         <div v-for="card in kpiCards" :key="card.label"
@@ -420,22 +467,23 @@ onMounted(() => {
           <!-- HR Analytics -->
           <div class="section-divider">HR Analytics</div>
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div class="card" v-if="employeesByDivision.length">
+            <!-- Stacked sex-disaggregated division chart -->
+            <div class="card" v-if="employeesByDivisionWithSex.length">
               <div class="card-header">
                 <div>
                   <p class="card-title">Employees by Division</p>
-                  <p class="card-sub">Top 10 by headcount</p>
+                  <p class="card-sub">Top 10 — sex-disaggregated (M / F)</p>
                 </div>
               </div>
-              <div class="min-h-[240px]">
-                <Bar :data="employeesByDivisionData" :options="hBarOptions" />
+              <div class="min-h-[260px]">
+                <Bar :data="divisionSexData" :options="stackedHBarOptions" />
               </div>
             </div>
 
             <div class="card">
               <div class="card-header">
                 <div>
-                  <p class="card-title">Employee Gender</p>
+                  <p class="card-title">Employee Sex Breakdown</p>
                   <p class="card-sub">{{ totalEmployees.toLocaleString() }} total employees</p>
                 </div>
               </div>
@@ -447,15 +495,15 @@ onMounted(() => {
                 />
                 <EmptyState v-else text="No gender data" />
               </div>
-              <!-- Gender breakdown pills -->
+              <!-- Sex breakdown pills -->
               <div class="mt-4 grid grid-cols-2 gap-3">
                 <div class="rounded-xl bg-blue-50 px-3 py-2 text-center">
                   <p class="text-lg font-bold text-blue-700">{{ employeeMaleCount.toLocaleString() }}</p>
-                  <p class="text-xs text-blue-500">Male</p>
+                  <p class="text-xs text-blue-500">Male · {{ pct(employeeMaleCount, totalEmployees) }}%</p>
                 </div>
                 <div class="rounded-xl bg-rose-50 px-3 py-2 text-center">
                   <p class="text-lg font-bold text-rose-700">{{ employeeFemaleCount.toLocaleString() }}</p>
-                  <p class="text-xs text-rose-500">Female</p>
+                  <p class="text-xs text-rose-500">Female · {{ pct(employeeFemaleCount, totalEmployees) }}%</p>
                 </div>
               </div>
             </div>
@@ -467,13 +515,23 @@ onMounted(() => {
             <div class="card">
               <div class="card-header">
                 <div>
-                  <p class="card-title">Student Gender</p>
+                  <p class="card-title">Student Sex Breakdown</p>
                   <p class="card-sub">{{ (maleCount + femaleCount).toLocaleString() }} enrolled</p>
                 </div>
               </div>
               <div class="min-h-[200px]">
                 <Doughnut v-if="maleCount + femaleCount > 0" :data="studentGenderData" :options="doughnutOptions" />
                 <EmptyState v-else text="No student data" />
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="rounded-xl bg-blue-50 px-3 py-2 text-center">
+                  <p class="text-lg font-bold text-blue-700">{{ maleCount.toLocaleString() }}</p>
+                  <p class="text-xs text-blue-500">Male · {{ pct(maleCount, maleCount + femaleCount) }}%</p>
+                </div>
+                <div class="rounded-xl bg-rose-50 px-3 py-2 text-center">
+                  <p class="text-lg font-bold text-rose-700">{{ femaleCount.toLocaleString() }}</p>
+                  <p class="text-xs text-rose-500">Female · {{ pct(femaleCount, maleCount + femaleCount) }}%</p>
+                </div>
               </div>
             </div>
 
@@ -487,6 +545,51 @@ onMounted(() => {
               <div class="min-h-[200px]">
                 <Bar :data="libraryAttendanceData" :options="barOptions" />
               </div>
+            </div>
+          </div>
+
+          <!-- GAD Summary Table -->
+          <div class="section-divider">GAD Summary — Sex-Disaggregated Data</div>
+          <div class="card overflow-hidden p-0">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <div>
+                <p class="card-title">Institutional GAD Summary</p>
+                <p class="card-sub">RA 9710 — Magna Carta of Women compliance</p>
+              </div>
+              <span class="rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-pink-600">Sex-Disaggregated</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-gray-100 bg-gray-50">
+                    <th class="px-4 py-2.5 text-left font-semibold text-gray-600">Indicator</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Total</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-blue-600">Male</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-blue-600">% M</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-pink-600">Female</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-pink-600">% F</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500">Distribution</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in gadSummaryRows" :key="row.label"
+                    class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-2.5 font-medium text-gray-800">{{ row.label }}</td>
+                    <td class="px-3 py-2.5 text-right font-bold text-gray-900">{{ row.total.toLocaleString() }}</td>
+                    <td class="px-3 py-2.5 text-right text-blue-700">{{ row.male.toLocaleString() }}</td>
+                    <td class="px-3 py-2.5 text-right text-blue-500 font-medium">{{ row.pctM }}%</td>
+                    <td class="px-3 py-2.5 text-right text-pink-700">{{ row.female.toLocaleString() }}</td>
+                    <td class="px-3 py-2.5 text-right text-pink-500 font-medium">{{ row.pctF }}%</td>
+                    <td class="px-4 py-2.5">
+                      <div v-if="row.total > 0" class="flex h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                        <div class="h-full bg-blue-400 transition-all" :style="{ width: row.pctM + '%' }"></div>
+                        <div class="h-full bg-pink-400 transition-all" :style="{ width: row.pctF + '%' }"></div>
+                      </div>
+                      <span v-else class="text-gray-300">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

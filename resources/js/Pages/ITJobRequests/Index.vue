@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue"
+import { ref, computed, watch, nextTick } from "vue"
 import { Head, usePage, router } from "@inertiajs/vue3"
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue"
@@ -178,6 +178,44 @@ const submitRating = async () => {
     }
   )
 }
+// ── Equipment searchable dropdown ─────────────────────────────────────────────
+const eqSearch     = ref('')
+const eqDropOpen   = ref(false)
+const eqSearchInput = ref(null)
+
+const filteredEquipment = computed(() => {
+  const q = eqSearch.value.toLowerCase().trim()
+  if (!q) return props.ictEquipment ?? []
+  return (props.ictEquipment ?? []).filter(eq => {
+    const str = [eq.room?.name, eq.owner?.name, eq.description, eq.serial_no]
+      .filter(Boolean).join(' ').toLowerCase()
+    return str.includes(q)
+  })
+})
+
+const selectedEquipmentLabel = computed(() => {
+  if (!form.ict_equipment_id) return ''
+  const eq = (props.ictEquipment ?? []).find(e => e.id == form.ict_equipment_id)
+  if (!eq) return ''
+  return [eq.room?.name, eq.owner?.name, eq.description, `(${eq.serial_no})`].filter(Boolean).join(' - ')
+})
+
+function openEqDrop() {
+  eqSearch.value = ''
+  eqDropOpen.value = true
+  nextTick(() => eqSearchInput.value?.focus())
+}
+
+function closeEqDrop() {
+  setTimeout(() => { eqDropOpen.value = false }, 150)
+}
+
+function selectEquipment(eq) {
+  form.ict_equipment_id = eq.id ?? ''
+  eqSearch.value = ''
+  eqDropOpen.value = false
+}
+
 const handleNewRequest = async () => {
   if (hasPendingConfirmation.value) {
     await Swal.fire({
@@ -663,24 +701,65 @@ const handleNewRequest = async () => {
                   />
                 </div>
                 <!-- ICT Equipment (ONLY for Hardware Repair) -->
-                <div v-if="selectedRequest?.category?.toLowerCase().includes('hardware')">
-                  <label class="block text-xs font-medium text-slate-600 mb-1">
-                    Tag ICT Equipment
-                  </label>
+                <div v-if="selectedRequest?.category?.toLowerCase().includes('hardware')" class="relative">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Tag ICT Equipment</label>
 
-                  <select
-                    v-model="form.ict_equipment_id"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                  <!-- Trigger button -->
+                  <button
+                    type="button"
+                    @click="openEqDrop"
+                    class="w-full flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">-- Select Equipment --</option>
-                    <option
-                      v-for="eq in props.ictEquipment"
-                      :key="eq.id"
-                      :value="eq.id"
-                    >
-                      {{ eq.room?.name }} - {{ eq.owner?.name }} - {{ eq.description }} - ({{ eq.serial_no }})
-                    </option>
-                  </select>
+                    <span :class="form.ict_equipment_id ? 'text-slate-800' : 'text-slate-400'" class="truncate">
+                      {{ selectedEquipmentLabel || '-- Select Equipment --' }}
+                    </span>
+                    <svg class="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+
+                  <!-- Dropdown panel -->
+                  <div v-if="eqDropOpen" class="absolute z-40 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <!-- Search input -->
+                    <div class="p-2 border-b border-slate-100">
+                      <input
+                        ref="eqSearchInput"
+                        v-model="eqSearch"
+                        type="text"
+                        placeholder="Search by name, owner, serial no…"
+                        @blur="closeEqDrop"
+                        class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <!-- Options list -->
+                    <ul class="max-h-56 overflow-y-auto py-1">
+                      <li>
+                        <button type="button" @mousedown.prevent="selectEquipment({ id: '' })"
+                          class="w-full text-left px-3 py-2 text-sm text-slate-400 hover:bg-slate-50">
+                          -- Select Equipment --
+                        </button>
+                      </li>
+                      <li v-if="filteredEquipment.length === 0" class="px-3 py-3 text-center text-sm text-slate-400">
+                        No equipment found
+                      </li>
+                      <li v-for="eq in filteredEquipment" :key="eq.id">
+                        <button
+                          type="button"
+                          @mousedown.prevent="selectEquipment(eq)"
+                          class="w-full text-left px-3 py-2 text-sm transition-colors"
+                          :class="form.ict_equipment_id == eq.id
+                            ? 'bg-indigo-50 text-indigo-700 font-medium'
+                            : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'"
+                        >
+                          <span class="font-medium">{{ eq.room?.name ?? '—' }}</span>
+                          <span class="text-slate-500"> · {{ eq.owner?.name ?? '—' }}</span>
+                          <span> · {{ eq.description }}</span>
+                          <span class="text-slate-400 text-xs"> ({{ eq.serial_no }})</span>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
 
               </template>

@@ -485,7 +485,7 @@ class GuidanceConsultationController extends Controller
         ]);
     }
 
-    // ─── Guidance Dashboard ───────────────────────────────────────────────────
+    // ─── Guidance Dashboard (GAD-ready) ──────────────────────────────────────
 
     public function dashboard(Request $request)
     {
@@ -495,48 +495,105 @@ class GuidanceConsultationController extends Controller
         $start = $now->copy()->startOfMonth();
         $end   = $now->copy()->endOfMonth();
 
-        $total      = GuidanceConsultation::count();
-        $thisMonth  = GuidanceConsultation::whereBetween('created_at', [$start, $end])->count();
-        $pending    = GuidanceConsultation::where('status', 'pending')->count();
-        $scheduled  = GuidanceConsultation::where('status', 'scheduled')->count();
+        // ── Resolve sex for every consultation via students table ──────────────
+        // Returns ['male'=>N, 'female'=>N, 'unspecified'=>N] plus a keyed map [id => sex]
+        $allConsultations = GuidanceConsultation::select(
+            'id', 'requestor_id', 'concern', 'status', 'consultation_type', 'created_at'
+        )->get();
 
-        // By status
-        $byStatus = GuidanceConsultation::selectRaw('status, COUNT(*) as cnt')
-            ->groupBy('status')
-            ->pluck('cnt', 'status');
+        // Build requestor_id → sex lookup from students table
+        $requestorIds = $allConsultations->pluck('requestor_id')->filter()->unique()->values();
+        $studentSexMap = DB::table('students')
+            ->whereIn('id', $requestorIds)
+            ->pluck('sex', 'id')           // [student_id => sex]
+            ->map(fn ($s) => $this->normaliseSex($s));
 
-        // By concern (split comma-separated values)
-        $concernCounts = ['Academic' => 0, 'Behavior' => 0, 'Personal / Social' => 0, 'Other' => 0];
-        GuidanceConsultation::select('concern')->get()->each(function ($row) use (&$concernCounts) {
-            $parts = array_map('trim', explode(',', (string) ($row->concern ?? '')));
-            foreach ($parts as $p) {
-                if ($p === '') continue;
-                if (isset($concernCounts[$p])) {
-                    $concernCounts[$p]++;
-                } else {
-                    $concernCounts['Other']++;
-                }
-            }
+        // Attach sex to each consultation row
+        $allConsultations->each(function ($c) use ($studentSexMap) {
+            $c->sex = $studentSexMap->get($c->requestor_id, 'Unspecified');
         });
 
-        // By type
-        $byType = GuidanceConsultation::selectRaw('consultation_type, COUNT(*) as cnt')
-            ->groupBy('consultation_type')
-            ->pluck('cnt', 'consultation_type');
+        // ── Overall stats ──────────────────────────────────────────────────────
+        $total     = $allConsultations->count();
+        $thisMonth = $allConsultations->filter(
+            fn ($c) => Carbon::parse($c->created_at)->between($start, $end)
+        )->count();
+        $pending   = $allConsultations->where('status', 'pending')->count();
+        $scheduled = $allConsultations->where('status', 'scheduled')->count();
 
-        // Monthly trend — last 6 months
-        $trend = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = $now->copy()->subMonths($i);
-            $trend[] = [
-                'label' => $month->format('M Y'),
-                'count' => GuidanceConsultation::whereYear('created_at', $month->year)
-                               ->whereMonth('created_at', $month->month)
-                               ->count(),
+        // ── Sex breakdown ──────────────────────────────────────────────────────
+        $bySex = [
+            'Male'        => $allConsultations->where('sex', 'Male')->count(),
+            'Female'      => $allConsultations->where('sex', 'Female')->count(),
+            'Unspecified' => $allConsultations->where('sex', 'Unspecified')->count(),
+        ];
+
+        $bySexThisMonth = [
+            'Male'        => $allConsultations->where('sex', 'Male')
+                                ->filter(fn ($c) => Carbon::parse($c->created_at)->between($start, $end))->count(),
+            'Female'      => $allConsultations->where('sex', 'Female')
+                                ->filter(fn ($c) => Carbon::parse($c->created_at)->between($start, $end))->count(),
+            'Unspecified' => $allConsultations->where('sex', 'Unspecified')
+                                ->filter(fn ($c) => Carbon::parse($c->created_at)->between($start, $end))->count(),
+        ];
+
+        // ── By status (with sex disaggregation) ───────────────────────────────
+        $statuses = ['pending','scheduled','For Follow-up','For Monitoring','Done Intervention','Refer to School Psychologist'];
+        $byStatus = [];
+        foreach ($statuses as $s) {
+            $group = $allConsultations->where('status', $s);
+            if ($group->count() === 0) continue;
+            $byStatus[$s] = [
+                'total'       => $group->count(),
+                'Male'        => $group->where('sex', 'Male')->count(),
+                'Female'      => $group->where('sex', 'Female')->count(),
+                'Unspecified' => $group->where('sex', 'Unspecified')->count(),
             ];
         }
 
-        // Today's scheduled appointments
+        // ── By concern (with sex disaggregation) ──────────────────────────────
+        $concernKeys = ['Academic', 'Behavior', 'Personal / Social', 'Other'];
+        $byConcern   = array_fill_keys($concernKeys, ['total' => 0, 'Male' => 0, 'Female' => 0, 'Unspecified' => 0]);
+
+        $allConsultations->each(function ($c) use (&$byConcern, $concernKeys) {
+            $parts = array_map('trim', explode(',', (string) ($c->concern ?? '')));
+            foreach ($parts as $p) {
+                if ($p === '') continue;
+                $key = in_array($p, $concernKeys) ? $p : 'Other';
+                $byConcern[$key]['total']++;
+                $byConcern[$key][$c->sex]++;
+            }
+        });
+
+        // ── By consultation type (with sex disaggregation) ────────────────────
+        $byType = [];
+        foreach ($allConsultations->groupBy('consultation_type') as $type => $group) {
+            $byType[$type ?? 'student'] = [
+                'total'       => $group->count(),
+                'Male'        => $group->where('sex', 'Male')->count(),
+                'Female'      => $group->where('sex', 'Female')->count(),
+                'Unspecified' => $group->where('sex', 'Unspecified')->count(),
+            ];
+        }
+
+        // ── Monthly trend (last 6 months, sex disaggregated) ──────────────────
+        $trend = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = $now->copy()->subMonths($i);
+            $group = $allConsultations->filter(
+                fn ($c) => Carbon::parse($c->created_at)->year  === (int) $month->year &&
+                           Carbon::parse($c->created_at)->month === (int) $month->month
+            );
+            $trend[] = [
+                'label'       => $month->format('M Y'),
+                'total'       => $group->count(),
+                'Male'        => $group->where('sex', 'Male')->count(),
+                'Female'      => $group->where('sex', 'Female')->count(),
+                'Unspecified' => $group->where('sex', 'Unspecified')->count(),
+            ];
+        }
+
+        // ── Today's scheduled appointments ────────────────────────────────────
         $today = Carbon::today();
         $todayAppointments = GuidanceConsultation::whereDate('date_time_assigned', $today)
             ->where('status', 'scheduled')
@@ -550,12 +607,22 @@ class GuidanceConsultationController extends Controller
                 'pending'   => $pending,
                 'scheduled' => $scheduled,
             ],
+            'bySex'             => $bySex,
+            'bySexThisMonth'    => $bySexThisMonth,
             'byStatus'          => $byStatus,
-            'byConcern'         => $concernCounts,
+            'byConcern'         => $byConcern,
             'byType'            => $byType,
             'trend'             => $trend,
             'todayAppointments' => $todayAppointments,
         ]);
+    }
+
+    private function normaliseSex(?string $sex): string
+    {
+        $s = strtolower(trim((string) $sex));
+        if (in_array($s, ['male', 'm'])) return 'Male';
+        if (in_array($s, ['female', 'f'])) return 'Female';
+        return 'Unspecified';
     }
 
     // ─── Transaction Report ───────────────────────────────────────────────────

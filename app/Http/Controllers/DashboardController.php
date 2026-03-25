@@ -19,7 +19,7 @@ use App\Models\Consultation;
 use App\Models\LearningProgram;
 use App\Models\TrainingSession;
 use App\Models\TrainingNeed;
-use App\Models\IDP;
+use App\Models\IndividualDevelopmentPlan;
 use App\Models\RewardNomination;
 use App\Models\Reward;
 use Carbon\Carbon;
@@ -256,7 +256,7 @@ class DashboardController extends Controller
                 'programs'    => LearningProgram::count(),
                 'sessions'    => TrainingSession::count(),
                 'tna_pending' => TrainingNeed::where('status', 'pending')->count(),
-                'idp_pending' => IDP::where('status', 'submitted')->count(),
+                'idp_pending' => IndividualDevelopmentPlan::where('status', 'submitted')->count(),
             ];
         } catch (\Throwable $e) {
             logger()->warning('L&D analytics error: ' . $e->getMessage());
@@ -391,6 +391,85 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | GAD / Sex-Disaggregated Analytics (RA 9710)
+        |--------------------------------------------------------------------------
+        */
+        $ipcrBySex    = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $tnaBySex     = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $idpBySex     = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $rewardsBySex = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $employeesByDivisionWithSex = [];
+
+        $normSex = fn (?string $s): string => match (true) {
+            in_array(strtolower(trim((string) $s)), ['male',   'm']) => 'male',
+            in_array(strtolower(trim((string) $s)), ['female', 'f']) => 'female',
+            default => 'unspecified',
+        };
+
+        try {
+            foreach (DB::table('employee_ipcrs')
+                ->join('users', 'employee_ipcrs.user_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $ipcrBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('IPCR by sex: ' . $e->getMessage()); }
+
+        try {
+            foreach (DB::table('training_needs')
+                ->join('users', 'training_needs.employee_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $tnaBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('TNA by sex: ' . $e->getMessage()); }
+
+        try {
+            foreach (DB::table('individual_development_plans')
+                ->join('users', 'individual_development_plans.employee_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $idpBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('IDP by sex: ' . $e->getMessage()); }
+
+        try {
+            foreach (DB::table('reward_nominations')
+                ->join('users', 'reward_nominations.nominee_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $rewardsBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('Rewards by sex: ' . $e->getMessage()); }
+
+        try {
+            $divRows = DB::table('users')
+                ->join('divisions', 'users.division_id', '=', 'divisions.id')
+                ->select(
+                    'divisions.id as div_id',
+                    DB::raw("COALESCE(NULLIF(TRIM(divisions.acronym),''), divisions.division_name) as div_name"),
+                    DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"),
+                    DB::raw('COUNT(*) as cnt')
+                )
+                ->groupBy('divisions.id', 'div_name', 'sex')
+                ->get()
+                ->groupBy('div_id');
+
+            $employeesByDivisionWithSex = $divRows->map(function ($sexRows) use ($normSex) {
+                $m = 0; $f = 0; $u = 0;
+                foreach ($sexRows as $r) {
+                    match ($normSex($r->sex)) {
+                        'male'   => $m += $r->cnt,
+                        'female' => $f += $r->cnt,
+                        default  => $u += $r->cnt,
+                    };
+                }
+                return ['name' => $sexRows->first()->div_name, 'male' => $m, 'female' => $f, 'unspecified' => $u, 'total' => $m + $f + $u];
+            })->values()->sortByDesc('total')->take(10)->values()->toArray();
+        } catch (\Throwable $e) { logger()->warning('Division sex: ' . $e->getMessage()); }
+
+        /*
+        |--------------------------------------------------------------------------
         | Render Dashboard
         |--------------------------------------------------------------------------
         */
@@ -434,6 +513,13 @@ class DashboardController extends Controller
 
             // Rewards
             'rewardsStats' => $rewardsStats,
+
+            // GAD / sex-disaggregated
+            'ipcrBySex'                  => $ipcrBySex,
+            'tnaBySex'                   => $tnaBySex,
+            'idpBySex'                   => $idpBySex,
+            'rewardsBySex'               => $rewardsBySex,
+            'employeesByDivisionWithSex' => $employeesByDivisionWithSex,
         ]);
     }
 }
