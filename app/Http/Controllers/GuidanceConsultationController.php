@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
 // (no explicit JsonResponse type on assign to allow redirects or JSON responses)
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class GuidanceConsultationController extends Controller
 {
@@ -27,41 +28,7 @@ class GuidanceConsultationController extends Controller
 
         $query = GuidanceConsultation::query()->orderByDesc('created_at');
 
-        $items = $query->get()->map(function ($row) {
-            $r = $row->toArray();
-            $r['requestor_name'] = null;
-            $r['assigned_personnel_name'] = null;
-            $r['referred_by_name'] = null;
-            // try to resolve as student first
-            $student = DB::table('students')->where('id', $row->requestor_id)->first();
-            if ($student) {
-                // pick common name columns
-                if (isset($student->lastname) || isset($student->firstname)) {
-                    $last = $student->lastname ?? ($student->last_name ?? null);
-                    $first = $student->firstname ?? ($student->first_name ?? null);
-                    $r['requestor_name'] = trim(($last ? $last . ', ' : '') . ($first ?? '')) ?: ($student->name ?? null);
-                } else {
-                    $r['requestor_name'] = $student->name ?? null;
-                }
-            } else {
-                $userRow = DB::table('users')->where('id', $row->requestor_id)->first();
-                if ($userRow) $r['requestor_name'] = $userRow->name ?? null;
-            }
-
-            // resolve assigned personnel id to name if present
-            if (!empty($row->assigned_personnel)) {
-                $u = DB::table('users')->where('id', $row->assigned_personnel)->first();
-                if ($u) $r['assigned_personnel_name'] = $u->name ?? null;
-            }
-
-            // resolve referred_by user id to name if present
-            if (!empty($row->referred_by) && is_numeric($row->referred_by)) {
-                $referredBy = DB::table('users')->where('id', (int) $row->referred_by)->first();
-                if ($referredBy) $r['referred_by_name'] = $referredBy->name ?? null;
-            }
-
-            return $r;
-        });
+        $items = $query->get()->map(fn ($row) => $this->resolveConsultationRow($row));
 
         return Inertia::render('Guidance/Consultations/Index', [
             'consultations' => $items,
@@ -516,6 +483,149 @@ class GuidanceConsultationController extends Controller
             'followup_date' => $consult->followup_date,
             'consultation' => $consult->toArray(),
         ]);
+    }
+
+    // ─── Guidance Dashboard ───────────────────────────────────────────────────
+
+    public function dashboard(Request $request)
+    {
+        $this->authorizeGuidance($request->user());
+
+        $now   = Carbon::now();
+        $start = $now->copy()->startOfMonth();
+        $end   = $now->copy()->endOfMonth();
+
+        $total      = GuidanceConsultation::count();
+        $thisMonth  = GuidanceConsultation::whereBetween('created_at', [$start, $end])->count();
+        $pending    = GuidanceConsultation::where('status', 'pending')->count();
+        $scheduled  = GuidanceConsultation::where('status', 'scheduled')->count();
+
+        // By status
+        $byStatus = GuidanceConsultation::selectRaw('status, COUNT(*) as cnt')
+            ->groupBy('status')
+            ->pluck('cnt', 'status');
+
+        // By concern (split comma-separated values)
+        $concernCounts = ['Academic' => 0, 'Behavior' => 0, 'Personal / Social' => 0, 'Other' => 0];
+        GuidanceConsultation::select('concern')->get()->each(function ($row) use (&$concernCounts) {
+            $parts = array_map('trim', explode(',', (string) ($row->concern ?? '')));
+            foreach ($parts as $p) {
+                if ($p === '') continue;
+                if (isset($concernCounts[$p])) {
+                    $concernCounts[$p]++;
+                } else {
+                    $concernCounts['Other']++;
+                }
+            }
+        });
+
+        // By type
+        $byType = GuidanceConsultation::selectRaw('consultation_type, COUNT(*) as cnt')
+            ->groupBy('consultation_type')
+            ->pluck('cnt', 'consultation_type');
+
+        // Monthly trend — last 6 months
+        $trend = [];
+        for ($i = 5; $i >= 0; $i--) {
+            $month = $now->copy()->subMonths($i);
+            $trend[] = [
+                'label' => $month->format('M Y'),
+                'count' => GuidanceConsultation::whereYear('created_at', $month->year)
+                               ->whereMonth('created_at', $month->month)
+                               ->count(),
+            ];
+        }
+
+        // Today's scheduled appointments
+        $today = Carbon::today();
+        $todayAppointments = GuidanceConsultation::whereDate('date_time_assigned', $today)
+            ->where('status', 'scheduled')
+            ->get()
+            ->map(fn ($r) => $this->resolveConsultationRow($r));
+
+        return Inertia::render('Guidance/Dashboard', [
+            'stats' => [
+                'total'     => $total,
+                'thisMonth' => $thisMonth,
+                'pending'   => $pending,
+                'scheduled' => $scheduled,
+            ],
+            'byStatus'          => $byStatus,
+            'byConcern'         => $concernCounts,
+            'byType'            => $byType,
+            'trend'             => $trend,
+            'todayAppointments' => $todayAppointments,
+        ]);
+    }
+
+    // ─── Transaction Report ───────────────────────────────────────────────────
+
+    public function transactionReport(Request $request)
+    {
+        $this->authorizeGuidance($request->user());
+
+        $from    = $request->query('from');
+        $to      = $request->query('to');
+        $status  = $request->query('status');
+        $concern = $request->query('concern');
+        $type    = $request->query('type');
+
+        $query = GuidanceConsultation::query()->orderByDesc('created_at');
+
+        if ($from) $query->whereDate('created_at', '>=', $from);
+        if ($to)   $query->whereDate('created_at', '<=', $to);
+        if ($status)  $query->where('status', $status);
+        if ($concern) $query->where('concern', 'like', "%{$concern}%");
+        if ($type)    $query->where('consultation_type', $type);
+
+        $records = $query->get()->map(fn ($r) => $this->resolveConsultationRow($r));
+
+        return Inertia::render('Guidance/Reports/Index', [
+            'records'  => $records,
+            'filters'  => compact('from', 'to', 'status', 'concern', 'type'),
+        ]);
+    }
+
+    // ─── Shared helper ────────────────────────────────────────────────────────
+
+    private function authorizeGuidance($user): void
+    {
+        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
+        if (! (in_array(17, $roleIds) || in_array(1, $roleIds))) {
+            abort(403, 'Forbidden');
+        }
+    }
+
+    private function resolveConsultationRow(GuidanceConsultation $row): array
+    {
+        $r = $row->toArray();
+        $r['requestor_name']          = null;
+        $r['assigned_personnel_name'] = null;
+        $r['referred_by_name']        = null;
+
+        $student = DB::table('students')->where('id', $row->requestor_id)->first();
+        if ($student) {
+            $last  = $student->lastname  ?? ($student->last_name  ?? null);
+            $first = $student->firstname ?? ($student->first_name ?? null);
+            $r['requestor_name'] = ($last || $first)
+                ? trim(($last ? $last . ', ' : '') . ($first ?? ''))
+                : ($student->name ?? null);
+        } else {
+            $u = DB::table('users')->where('id', $row->requestor_id)->first();
+            if ($u) $r['requestor_name'] = $u->name ?? null;
+        }
+
+        if (! empty($row->assigned_personnel)) {
+            $u = DB::table('users')->where('id', $row->assigned_personnel)->first();
+            if ($u) $r['assigned_personnel_name'] = $u->name ?? null;
+        }
+
+        if (! empty($row->referred_by) && is_numeric($row->referred_by)) {
+            $u = DB::table('users')->where('id', (int) $row->referred_by)->first();
+            if ($u) $r['referred_by_name'] = $u->name ?? null;
+        }
+
+        return $r;
     }
 
     /**

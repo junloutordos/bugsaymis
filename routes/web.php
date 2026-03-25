@@ -376,7 +376,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Print view for a single work request (printable slip)
 
-    // Guidance consultations list (Guidance Services)
+    // Guidance — Dashboard & analytics
+    Route::get('/guidance/dashboard', [\App\Http\Controllers\GuidanceConsultationController::class, 'dashboard'])->name('guidance.dashboard')->middleware('permission:guidance.view');
+
+    // Guidance — Transaction report (date-range)
+    Route::get('/guidance/reports', [\App\Http\Controllers\GuidanceConsultationController::class, 'transactionReport'])->name('guidance.reports')->middleware('permission:guidance.view');
+
+    // Guidance — Consultations list
     Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
     Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.view');
     Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.view');
@@ -385,6 +391,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Save intervention details (Guidance personnel only)
     Route::get('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'getIntervention'])->name('guidance.consultations.intervention.get')->middleware('permission:guidance.manage');
     Route::post('/guidance/consultations/{consultation}/intervention', [\App\Http\Controllers\GuidanceConsultationController::class, 'intervention'])->name('guidance.consultations.intervention')->middleware('permission:guidance.manage');
+
+    // Guidance — Session Reports
+    Route::get('/guidance/session-reports', [\App\Http\Controllers\GuidanceSessionReportController::class, 'index'])->name('guidance.session-reports.index')->middleware('permission:guidance.manage');
+    Route::post('/guidance/session-reports', [\App\Http\Controllers\GuidanceSessionReportController::class, 'store'])->name('guidance.session-reports.store')->middleware('permission:guidance.manage');
+    Route::put('/guidance/session-reports/{sessionReport}', [\App\Http\Controllers\GuidanceSessionReportController::class, 'update'])->name('guidance.session-reports.update')->middleware('permission:guidance.manage');
+    Route::get('/guidance/session-reports/{sessionReport}/print', [\App\Http\Controllers\GuidanceSessionReportController::class, 'print'])->name('guidance.session-reports.print')->middleware('permission:guidance.manage');
     Route::get('/work-requests/{workRequest}/print', [WorkRequestController::class, 'print'])
         ->name('work-requests.print')
         ->middleware('permission:facilities.manage');

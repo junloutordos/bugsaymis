@@ -4,14 +4,20 @@
     <template #default>
       <div>
         <!-- Page header -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div>
             <h1 class="text-xl font-semibold text-slate-800">Guidance Consultations</h1>
             <p class="text-sm text-slate-500">Track and manage student consultation records</p>
           </div>
-          <button v-if="canRefer" @click.prevent="openReferralModal" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Add Referral
-          </button>
+          <div class="flex items-center gap-2 text-sm flex-wrap">
+            <Link href="/guidance/dashboard" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Dashboard</Link>
+            <span class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium">Consultations</span>
+            <Link href="/guidance/session-reports" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Session Reports</Link>
+            <Link href="/guidance/reports" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Reports</Link>
+            <button v-if="canRefer" @click.prevent="openReferralModal" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              + Add Referral
+            </button>
+          </div>
         </div>
 
         <!-- Filter bar -->
@@ -84,6 +90,9 @@
                       </span>
                       <button v-if="['For Follow-up','For Monitoring','Done Intervention','Refer to School Psychologist'].includes(c.status)" @click.prevent="openAdmissionSlip(c)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" :title="'Print Admission Slip'" aria-label="Print Admission Slip">
                         <PrinterIcon class="h-4 w-4" />
+                      </button>
+                      <button v-if="canAssign" @click.prevent="openSessionReport(c)" class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 transition-colors" title="Create Session Report" aria-label="Create Session Report">
+                        <DocumentTextIcon class="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -321,6 +330,93 @@
           </div>
         </div>
       </div>
+
+      <!-- Session Report Modal -->
+      <div v-if="showSessionReportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <h2 class="text-base font-semibold text-slate-800">New Counseling Session Report</h2>
+            <button @click="showSessionReportModal = false" class="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+          </div>
+          <form @submit.prevent="submitSessionReport" class="px-6 py-5 space-y-4">
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Date Filed <span class="text-red-500">*</span></label>
+                <input v-model="srForm.date_filed" type="date" required class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">School Year <span class="text-red-500">*</span></label>
+                <input v-model="srForm.school_year" type="text" placeholder="e.g. 2025-2026" required class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+
+            <fieldset class="border border-slate-200 rounded-xl p-4 space-y-3">
+              <legend class="text-xs font-semibold text-slate-600 px-1">I. Client Profile</legend>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
+                <input v-model="srForm.client_name" type="text" required class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Age</label>
+                  <input v-model.number="srForm.client_age" type="number" min="1" max="99" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Sex</label>
+                  <select v-model="srForm.client_sex" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">—</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Batch</label>
+                  <input v-model="srForm.batch" type="text" placeholder="e.g. 2028" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Grade &amp; Section</label>
+                <input v-model="srForm.grade_section" type="text" placeholder="e.g. Grade 11 — Einstein" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </fieldset>
+
+            <fieldset class="border border-slate-200 rounded-xl p-4">
+              <legend class="text-xs font-semibold text-slate-600 px-1">II. Referral Details / Strategies <span class="text-red-500">*</span></legend>
+              <div class="flex flex-wrap gap-4 mt-2">
+                <label v-for="s in srStrategyOptions" :key="s" class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                  <input type="checkbox" :value="s" v-model="srForm.referral_strategies" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                  {{ s }}
+                </label>
+              </div>
+              <p v-if="srStrategyError" class="text-xs text-red-500 mt-1">Please select at least one strategy.</p>
+            </fieldset>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Concern</label>
+              <input v-model="srForm.concern" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Difficulties Presented</label>
+              <textarea v-model="srForm.difficulties_presented" rows="3" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Counselor's Notes</label>
+              <textarea v-model="srForm.counselor_notes" rows="4" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+            </div>
+
+            <p v-if="srError" class="text-sm text-red-600">{{ srError }}</p>
+
+            <div class="flex justify-end gap-3 pt-1">
+              <button type="button" @click="showSessionReportModal = false" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+              <button type="submit" :disabled="srSaving" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                {{ srSaving ? 'Saving…' : 'Create Session Report' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
     </template>
   </AdminLayout>
 </template>
@@ -328,12 +424,14 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import Swal from 'sweetalert2'
-import { Head, usePage, router } from '@inertiajs/vue3'
+import { Head, Link, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ClockIcon, HeartIcon, PencilIcon, CheckCircleIcon, PrinterIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon, HeartIcon, PencilIcon, CheckCircleIcon, PrinterIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ consultations: Array })
 const list = ref(props.consultations || [])
+// Keep list in sync when Inertia does partial reloads
+watch(() => props.consultations, (val) => { list.value = val || [] })
 // keep faculty list sorted alphabetically by name
 const _faculty = (usePage().props.facultyUsers || []).map(u => ({ id: u.id, name: u.name }))
 _faculty.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
@@ -800,5 +898,89 @@ const next = () => { if (page.value<totalPages.value) page.value++ }
 function formatDate(d) {
   if (!d) return '—'
   try { return new Date(d).toLocaleString() } catch (e) { return d }
+}
+
+// ─── Session Report ───────────────────────────────────────────────────────────
+const srStrategyOptions = ['Referral', 'Called-In', 'Walk-In', 'Case Conference', 'Homevisit']
+const showSessionReportModal = ref(false)
+const srSaving = ref(false)
+const srStrategyError = ref(false)
+const srError = ref('')
+const srConsultationId = ref(null)
+
+function currentSchoolYear() {
+  const now = new Date()
+  return now.getMonth() >= 5
+    ? `${now.getFullYear()}-${now.getFullYear() + 1}`
+    : `${now.getFullYear() - 1}-${now.getFullYear()}`
+}
+
+const srForm = ref({})
+
+function openSessionReport(c) {
+  srConsultationId.value = c.id
+  srStrategyError.value = false
+  srError.value = ''
+  // Pre-fill from consultation data where available
+  const strategy = c.consultation_type === 'referred' ? ['Referral'] : ['Walk-In']
+  srForm.value = {
+    date_filed:             new Date().toISOString().slice(0, 10),
+    school_year:            currentSchoolYear(),
+    client_name:            c.requestor_name ?? '',
+    client_age:             null,
+    client_sex:             '',
+    grade_section:          '',
+    batch:                  '',
+    referral_strategies:    strategy,
+    concern:                c.concern ?? '',
+    difficulties_presented: c.brief_description ?? c.description ?? '',
+    counselor_notes:        '',
+  }
+  showSessionReportModal.value = true
+}
+
+async function submitSessionReport() {
+  srStrategyError.value = false
+  srError.value = ''
+
+  if (!srForm.value.referral_strategies.length) {
+    srStrategyError.value = true
+    return
+  }
+
+  const currentUser = usePage().props.auth?.user
+  srSaving.value = true
+  try {
+    const resp = await fetch('/guidance/session-reports', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        ...srForm.value,
+        consultation_id:  srConsultationId.value,
+        accomplished_by:  currentUser?.id,
+      }),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (resp.ok) {
+      showSessionReportModal.value = false
+      Swal.fire({
+        icon: 'success',
+        title: 'Session report created.',
+        html: `CS No: <strong>${data.report?.cs_no ?? ''}</strong><br/><a href="/guidance/session-reports/${data.report?.id}/print" target="_blank" class="text-indigo-600 underline text-sm">Print now</a>`,
+        confirmButtonText: 'OK',
+      })
+    } else {
+      srError.value = data.message ?? 'Failed to save. Please try again.'
+    }
+  } catch {
+    srError.value = 'Network error. Please try again.'
+  } finally {
+    srSaving.value = false
+  }
 }
 </script>

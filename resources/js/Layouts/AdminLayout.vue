@@ -35,6 +35,7 @@ import {
   KeyIcon,
   TableCellsIcon,
   StarIcon,
+  DocumentChartBarIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -1093,14 +1094,37 @@ const menuItems = [
     icon: ChatBubbleLeftRightIcon,
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
     children: [
-
-          {
-            label: "Consultations",
-            routeName: "guidance.consultations.index",
-            href: route('guidance.consultations.index'),
-            icon: ClipboardDocumentListIcon,
-            roles: ["Administrator", "Faculty", "Staff"],
-          },
+      {
+        label: "Dashboard",
+        routeName: "guidance.dashboard",
+        href: "/guidance/dashboard",
+        icon: ChartBarIcon,
+        roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["guidance.view"],
+      },
+      {
+        label: "Consultations",
+        routeName: "guidance.consultations.index",
+        href: route('guidance.consultations.index'),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty", "Staff"],
+      },
+      {
+        label: "Session Reports",
+        routeName: "guidance.session-reports.index",
+        href: "/guidance/session-reports",
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "Staff"],
+        permissions: ["guidance.manage"],
+      },
+      {
+        label: "Transaction Reports",
+        routeName: "guidance.reports",
+        href: "/guidance/reports",
+        icon: DocumentChartBarIcon,
+        roles: ["Administrator", "Staff"],
+        permissions: ["guidance.view"],
+      },
     ],
   },
   {
