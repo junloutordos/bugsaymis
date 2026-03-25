@@ -225,24 +225,21 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, h } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
-// ── Inline sub-component ──────────────────────────────────────────────────────
+// ── Inline sub-component (render fn — no runtime compiler needed) ─────────────
+const colorMap = { indigo: 'text-indigo-600', green: 'text-emerald-600', yellow: 'text-amber-600' }
 const SummaryCard = {
   props: { label: String, value: [Number, String], color: String },
-  template: `
-    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-1">
-      <p class="text-xs font-medium text-slate-500">{{ label }}</p>
-      <p class="text-2xl font-bold" :class="textColor">{{ value }}</p>
-    </div>`,
-  computed: {
-    textColor() {
-      return { indigo: 'text-indigo-600', green: 'text-emerald-600', yellow: 'text-amber-600' }[this.color] ?? 'text-slate-800'
-    },
+  setup(props) {
+    return () => h('div', { class: 'bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-1' }, [
+      h('p', { class: 'text-xs font-medium text-slate-500' }, props.label),
+      h('p', { class: `text-2xl font-bold ${colorMap[props.color] ?? 'text-slate-800'}` }, String(props.value)),
+    ])
   },
 }
 
@@ -276,7 +273,7 @@ const filteredRows = computed(() => {
 async function load(page = 1) {
   loading.value = true
   try {
-    const { data } = await axios.get(route('hr.wfh.monitor'), {
+    const { data } = await axios.get('/hr/wfh/monitor', {
       params: {
         month: filterMonth.value || undefined,
         page,
@@ -312,7 +309,7 @@ onMounted(() => load())
 function driveThumb(url) {
   if (!url) return ''
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/)
-  if (match) return route('hr.wfh.photo', { fileId: match[1] })
+  if (match) return `/hr/wfh/photo/${match[1]}`
   return url
 }
 

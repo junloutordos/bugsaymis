@@ -311,7 +311,7 @@ const menuItems = [
       {
         label: "Roles & Permissions",
         routeName: "admin.roles",
-        href: route("admin.roles"),
+        href: "/admin/roles",
         icon: ShieldCheckIcon,
         roles: ["Administrator"],
         permissions: ["roles.assign"],
@@ -319,7 +319,7 @@ const menuItems = [
       {
         label: "Permissions",
         routeName: "admin.permissions",
-        href: route("admin.permissions"),
+        href: "/admin/permissions",
         icon: KeyIcon,
         roles: ["Administrator"],
         permissions: ["roles.assign"],
@@ -327,7 +327,7 @@ const menuItems = [
       {
         label: "Assign Roles",
         routeName: "admin.assign-roles",
-        href: route("admin.assign-roles"),
+        href: "/admin/assign-roles",
         icon: UserGroupIcon,
         roles: ["Administrator"],
         permissions: ["roles.assign"],

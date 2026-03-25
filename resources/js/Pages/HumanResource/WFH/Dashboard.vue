@@ -207,6 +207,19 @@
         </div>
       </div>
 
+      <!-- Print shortcuts -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4 flex flex-wrap gap-3 items-center">
+        <span class="text-sm font-medium text-slate-600 mr-auto">Print Reports</span>
+        <a :href="`/hr/wfh/print/timelogs?month=${currentMonth}`" target="_blank"
+           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          🖨️ Time Logs
+        </a>
+        <a :href="`/hr/wfh/print/accomplishments?month=${currentMonth}`" target="_blank"
+           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          🖨️ Accomplishments
+        </a>
+      </div>
+
     </div>
   </AdminLayout>
 </template>
@@ -228,6 +241,7 @@ const props = defineProps({
 })
 
 // ── State ─────────────────────────────────────────────────────────────────────
+const currentMonth           = new Date().toISOString().slice(0, 7)
 const attendance             = ref(props.todayAttendance)
 const localAccomplishments   = ref(props.todayAttendance?.accomplishments ?? [])
 const showCamera             = ref(false)

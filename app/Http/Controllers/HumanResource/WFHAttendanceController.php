@@ -230,6 +230,55 @@ class WFHAttendanceController extends Controller
             ->header('Cache-Control', 'private, max-age=3600');
     }
 
+    // ─── Print: Time Logs ─────────────────────────────────────────────────────
+
+    public function printTimeLogs(Request $request)
+    {
+        $user  = Auth::user();
+        $month = $request->input('month', Carbon::now()->format('Y-m'));
+        [$year, $mon] = explode('-', $month);
+
+        $records = WFHAttendance::where('user_id', $user->id)
+            ->whereYear('date', $year)
+            ->whereMonth('date', $mon)
+            ->orderBy('date')
+            ->get();
+
+        return Inertia::render('HumanResource/WFH/PrintTimeLogs', [
+            'employee' => $user->only('id', 'name', 'position', 'badge_id'),
+            'records'  => $records->map(fn ($r) => array_merge($r->toArray(), [
+                'date' => $r->getRawOriginal('date'),
+            ])),
+            'month'    => $month,
+        ]);
+    }
+
+    // ─── Print: Accomplishments ───────────────────────────────────────────────
+
+    public function printAccomplishments(Request $request)
+    {
+        $user  = Auth::user();
+        $month = $request->input('month', Carbon::now()->format('Y-m'));
+        [$year, $mon] = explode('-', $month);
+
+        $records = WFHAttendance::with('accomplishments')
+            ->where('user_id', $user->id)
+            ->whereYear('date', $year)
+            ->whereMonth('date', $mon)
+            ->orderBy('date')
+            ->get()
+            ->filter(fn ($r) => $r->accomplishments->isNotEmpty())
+            ->values();
+
+        return Inertia::render('HumanResource/WFH/PrintAccomplishments', [
+            'employee' => $user->only('id', 'name', 'position', 'badge_id'),
+            'records'  => $records->map(fn ($r) => array_merge($r->toArray(), [
+                'date' => $r->getRawOriginal('date'),
+            ])),
+            'month'    => $month,
+        ]);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private function authorizeViewAttendance(WFHAttendance $attendance): void
