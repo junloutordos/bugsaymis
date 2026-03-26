@@ -35,7 +35,27 @@ class RolePermissionSeeder extends Seeder
             'vehicles.view', 'vehicles.manage',
             'documents.view',
             'reports.view', 'reports.export',
+            'chat.access',
         ]);
+
+        // ── SALN Committee (HRMPSB doubles as committee; also set on HR head) ──
+        // All employee-type roles get saln.create + saln.submit.
+        // HR gets view_all + file. Designated committee members get review + approve.
+        $employeeRoles = [
+            'HR', 'MIS', 'Payroll Officer', 'HRMPSB', 'Recruitment Officer',
+            'DivisionChief', 'OCD', 'PMT', 'Faculty', 'Staff', 'Registrar',
+            'Records', 'Librarian', 'Nurse', 'Guidance', 'GSU Head',
+            'InformationOfficer', 'Dorm Manager',
+        ];
+        foreach ($employeeRoles as $roleName) {
+            $assign($roleName, ['saln.create', 'saln.submit']);
+        }
+
+        // HR gets full filing & reporting access
+        $assign('HR', ['saln.view_all', 'saln.file', 'saln.review', 'saln.approve']);
+
+        // HRMPSB is the designated SALN review committee
+        $assign('HRMPSB', ['saln.review', 'saln.approve']);
 
         // ── HR ────────────────────────────────────────────────────────────────
         $assign('HR', [
@@ -66,6 +86,7 @@ class RolePermissionSeeder extends Seeder
             'hr.biometric.manage',
             'hr.leave.view', 'hr.leave.approve',
             'hr.employee.view', 'hr.employee.manage',
+            'chat.access',
         ]);
 
         // ── Payroll Officer ───────────────────────────────────────────────────
@@ -75,6 +96,7 @@ class RolePermissionSeeder extends Seeder
             'hr.leave.view',
             'hr.employee.view',
             'reports.view', 'reports.export',
+            'chat.access',
         ]);
 
         // ── HRMPSB ───────────────────────────────────────────────────────────
@@ -86,6 +108,7 @@ class RolePermissionSeeder extends Seeder
             'recruitment.rank',
             'hr.view',
             'hr.employees.view',
+            'chat.access',
         ]);
 
         // ── Recruitment Officer ───────────────────────────────────────────────
@@ -101,6 +124,7 @@ class RolePermissionSeeder extends Seeder
             'hr.view',
             'hr.employees.view',
             'reports.view', 'reports.export',
+            'chat.access',
         ]);
 
         // ── DivisionChief ─────────────────────────────────────────────────────
@@ -125,6 +149,7 @@ class RolePermissionSeeder extends Seeder
             'lnd.view', 'lnd.approve', 'lnd.evaluate',
             // Rewards — supervisors can nominate and sit on evaluation/approval panels
             'rewards.view', 'rewards.nominate', 'rewards.evaluate', 'rewards.approve',
+            'chat.access',
         ]);
 
         // ── OCD (Office/Unit Chief Director) ──────────────────────────────────
@@ -139,6 +164,7 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view',
+            'chat.access',
         ]);
 
         // ── PMT ───────────────────────────────────────────────────────────────
@@ -146,6 +172,7 @@ class RolePermissionSeeder extends Seeder
             'ipcr.view', 'ipcr.approve', 'ipcr.monitor',
             'accomplishments.view',
             'reports.view', 'reports.export',
+            'chat.access',
         ]);
 
         // ── Faculty ───────────────────────────────────────────────────────────
@@ -172,6 +199,7 @@ class RolePermissionSeeder extends Seeder
             // Payroll — view own payslip; file own leave
             'payroll.view',
             'hr.leave.file',
+            'chat.access',
         ]);
 
         // ── Staff ─────────────────────────────────────────────────────────────
@@ -198,6 +226,7 @@ class RolePermissionSeeder extends Seeder
             // Payroll — view own payslip; file own leave
             'payroll.view',
             'hr.leave.file',
+            'chat.access',
         ]);
 
         // ── Registrar ─────────────────────────────────────────────────────────
@@ -205,6 +234,7 @@ class RolePermissionSeeder extends Seeder
             'hr.pds.view',
             'documents.view', 'documents.create', 'documents.update',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── Records ───────────────────────────────────────────────────────────
@@ -212,24 +242,28 @@ class RolePermissionSeeder extends Seeder
             'documents.view', 'documents.create', 'documents.update',
             'documents.approve',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── Librarian ─────────────────────────────────────────────────────────
         $assign('Librarian', [
             'library.view', 'library.manage',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── Nurse ─────────────────────────────────────────────────────────────
         $assign('Nurse', [
             'health.view', 'health.manage',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── Guidance ──────────────────────────────────────────────────────────
         $assign('Guidance', [
             'guidance.view', 'guidance.manage',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── GSU Head ──────────────────────────────────────────────────────────
@@ -238,18 +272,21 @@ class RolePermissionSeeder extends Seeder
             'vehicles.view', 'vehicles.manage',
             'procurement.view', 'procurement.create', 'procurement.approve',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── InformationOfficer ────────────────────────────────────────────────
         $assign('InformationOfficer', [
             'documents.view', 'documents.create',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── Dorm Manager ──────────────────────────────────────────────────────
         $assign('Dorm Manager', [
             'facilities.view', 'facilities.manage',
             'reports.view',
+            'chat.access',
         ]);
 
         // ── Student / Parent — very limited read-only ─────────────────────────

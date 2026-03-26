@@ -95,6 +95,18 @@ class AppServiceProvider extends ServiceProvider
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }
 
+        // ── SALN permission gates ──────────────────────────────────────────────
+        foreach ([
+            'saln.create',
+            'saln.submit',
+            'saln.view_all',
+            'saln.review',
+            'saln.approve',
+            'saln.file',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
         // ── HR permission gates ────────────────────────────────────────────────
         foreach ([
             'hr.leave.view',

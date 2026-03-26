@@ -533,6 +533,14 @@ const menuItems = [
         permissions: ["hr.employees.manage"],
       },
       {
+        label: "201 Files",
+        routeName: "hr.twoohone.index",
+        href: route('hr.twoohone.index'),
+        icon: ArchiveBoxIcon,
+        roles: ["Administrator", "HR"],
+        permissions: ["hr.employee.view"],
+      },
+      {
         label: "Attendance Logs",
         routeName: "hr.attendance.index",
         href: route('hr.attendance.index'),
@@ -619,6 +627,47 @@ const menuItems = [
         icon: ChartBarIcon,
         roles: ["Administrator", "HR", "DivisionChief", "OCD"],
         permissions: ["wfh.monitor"],
+      },
+    ],
+  },
+
+  {
+    label: "SALN",
+    icon: DocumentChartBarIcon,
+    roles: [],
+    permissions: ["saln.create", "saln.view_all", "saln.review"],
+    children: [
+      {
+        label: "My SALN",
+        routeName: "saln.index",
+        href: route("saln.index"),
+        icon: DocumentTextIcon,
+        roles: [],
+        permissions: ["saln.create"],
+      },
+      {
+        label: "For Review",
+        routeName: "saln.review.index",
+        href: route("saln.review.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: [],
+        permissions: ["saln.review"],
+      },
+      {
+        label: "All SALN Records",
+        routeName: "saln.hr.index",
+        href: route("saln.hr.index"),
+        icon: TableCellsIcon,
+        roles: [],
+        permissions: ["saln.view_all"],
+      },
+      {
+        label: "Annual Report",
+        routeName: "saln.hr.reports.annual",
+        href: route("saln.hr.reports.annual"),
+        icon: ChartBarIcon,
+        roles: [],
+        permissions: ["saln.view_all"],
       },
     ],
   },
@@ -1284,8 +1333,8 @@ const menuItems = [
     routeName: "chat.index",
     href: "/chat",
     icon: ChatBubbleOvalLeftEllipsisIcon,
-    roles: ["Administrator", "Faculty", "Staff"],
-    permissions: [],
+    roles: [],
+    permissions: ["chat.access"],
   },
 ];
 
@@ -1636,6 +1685,22 @@ filteredMenu.value.forEach((item) => {
           <span v-if="title" class="hidden md:block text-sm font-medium text-gray-700">{{ title }}</span>
         </div>
 
+        <!-- Right: chat + profile -->
+        <div class="flex items-center gap-2">
+
+        <!-- Chat Icon -->
+        <a
+          :href="route('chat.index')"
+          class="relative p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          aria-label="Messenger"
+        >
+          <ChatBubbleLeftRightIcon class="h-5 w-5 text-gray-500" />
+          <span
+            v-if="chatUnreadCount > 0"
+            class="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
+          >{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
+        </a>
+
         <!-- Profile Dropdown -->
         <div class="relative">
           <button
@@ -1674,6 +1739,8 @@ filteredMenu.value.forEach((item) => {
             </button>
           </div>
         </div>
+
+        </div><!-- end right group -->
       </header>
 
       <!-- Page Content -->

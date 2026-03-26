@@ -357,9 +357,9 @@ onMounted(() => {
 
       <!-- ── GAD Banner ───────────────────────────────────────────────────── -->
       <div class="flex items-center gap-3 rounded-2xl border border-pink-100 bg-gradient-to-r from-blue-50 via-white to-pink-50 px-5 py-3 shadow-sm">
-        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-600 font-bold text-xs">GAD</div>
+        <span class="text-2xl shrink-0 text-purple-600">⚧</span>
         <p class="text-xs text-gray-600">
-          <span class="font-semibold text-gray-800">Gender and Development (RA 9710)</span>
+          <span class="font-semibold text-purple-800">Gender and Development Data Ready</span>
           — This dashboard presents sex-disaggregated data in compliance with the Magna Carta of Women and DOST/PSHSS GAD requirements.
         </p>
         <div class="ml-auto flex shrink-0 items-center gap-3 text-[11px] font-semibold">

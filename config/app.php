@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'agency_name' => env('AGENCY_NAME', 'Philippine Science High School - Caraga Region Campus'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

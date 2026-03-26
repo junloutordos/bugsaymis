@@ -1426,6 +1426,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('schedules.assign');
 
     // ── Employee 201 Files ──────────────────────────────────────────────────────
+    Route::get('/201-files', [EmployeeDocumentController::class, 'listEmployees'])
+        ->name('twoohone.index');
     Route::get('/employees/{user}/documents', [EmployeeDocumentController::class, 'index'])
         ->name('employees.documents.index');
     Route::post('/employees/{user}/documents', [EmployeeDocumentController::class, 'store'])
@@ -1501,4 +1503,5 @@ if (app()->environment('local')) {
 |--------------------------------------------------------------------------
 */
 require __DIR__.'/chat.php';
+require __DIR__.'/saln.php';
 require __DIR__.'/auth.php';

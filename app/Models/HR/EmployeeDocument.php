@@ -45,15 +45,22 @@ class EmployeeDocument extends Model
     public function categoryLabel(): string
     {
         return match ($this->category) {
-            'appointment'    => 'Appointment',
-            'pds'            => 'PDS/Personal Data Sheet',
+            'pre_employment' => 'Pre-Employment Requirements',
+            'appointment'    => 'Appointment Papers',
+            'eligibility'    => 'Civil Service Eligibility',
+            'pds'            => 'Personal Data Sheet (CSC Form 212)',
             'service_record' => 'Service Record',
-            'performance'    => 'Performance Ratings',
-            'eligibility'    => 'Eligibility/Civil Service',
-            'training'       => 'Training Certificates',
+            'performance'    => 'Performance Evaluations',
+            'training'       => 'Training & Development',
+            'leave_record'   => 'Leave Records',
+            'rewards'        => 'Rewards & Recognition',
+            'disciplinary'   => 'Disciplinary Actions',
+            'saln'           => 'SALN',
+            'clearance'      => 'Clearances',
+            'other'          => 'Other Documents',
+            // legacy compat
             'medical'        => 'Medical Records',
             'leave'          => 'Leave Records',
-            'other'          => 'Other Documents',
             default          => ucfirst($this->category),
         };
     }

@@ -311,6 +311,13 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\Payroll\EmployeeDeductionConfig::class);
     }
 
+    // ─── SALN Relationships ───────────────────────────────────────────────────
+
+    public function salnRecords()
+    {
+        return $this->hasMany(\App\Models\SALN\SalnRecord::class);
+    }
+
     // ─── Chat Relationships ───────────────────────────────────────────────────
 
     public function conversations()

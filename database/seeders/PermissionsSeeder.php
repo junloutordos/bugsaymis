@@ -146,6 +146,17 @@ class PermissionsSeeder extends Seeder
             ['module' => 'HR',     'name' => 'hr.employee.view',       'description' => 'View employee profiles and salary info'],
             ['module' => 'HR',     'name' => 'hr.employee.manage',     'description' => 'Edit employee profiles and salary grades'],
 
+            // ── SALN ──────────────────────────────────────────────────────────
+            ['module' => 'SALN', 'name' => 'saln.create',   'description' => 'Create and manage own SALN (all employees)'],
+            ['module' => 'SALN', 'name' => 'saln.submit',   'description' => 'Submit SALN for committee review'],
+            ['module' => 'SALN', 'name' => 'saln.review',   'description' => 'Review submitted SALNs as committee member'],
+            ['module' => 'SALN', 'name' => 'saln.approve',  'description' => 'Approve or return SALN (committee head)'],
+            ['module' => 'SALN', 'name' => 'saln.view_all', 'description' => 'View all employee SALNs (HR Office)'],
+            ['module' => 'SALN', 'name' => 'saln.file',     'description' => 'Mark approved SALN as officially filed (HR Office)'],
+
+            // ── Chat ──────────────────────────────────────────────────────────
+            ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],
+
         ];
 
         foreach ($permissions as $data) {

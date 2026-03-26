@@ -19,11 +19,11 @@ use Illuminate\Support\Facades\Route;
 
 // Inertia page — the messenger UI
 Route::get('/chat', [ChatController::class, 'index'])
-    ->middleware(['web', 'auth'])
+    ->middleware(['web', 'auth', 'permission:chat.access'])
     ->name('chat.index');
 
 Route::prefix('api/chat')
-    ->middleware(['web', 'auth'])
+    ->middleware(['web', 'auth', 'permission:chat.access'])
     ->name('chat.')
     ->group(function () {
 

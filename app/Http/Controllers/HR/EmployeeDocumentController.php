@@ -12,21 +12,161 @@ use Inertia\Inertia;
 
 class EmployeeDocumentController extends Controller
 {
+    // ─── CSC PRIME-HRM 201 File Folder Structure ─────────────────────────────
+    // Based on CSC Memorandum Circular No. 3, s. 2001 and PRIME-HRM guidelines.
+
     private array $categories = [
-        ['value' => 'appointment',    'label' => 'Appointment'],
-        ['value' => 'pds',            'label' => 'PDS/Personal Data Sheet'],
-        ['value' => 'service_record', 'label' => 'Service Record'],
-        ['value' => 'performance',    'label' => 'Performance Ratings'],
-        ['value' => 'eligibility',    'label' => 'Eligibility/Civil Service'],
-        ['value' => 'training',       'label' => 'Training Certificates'],
-        ['value' => 'medical',        'label' => 'Medical Records'],
-        ['value' => 'leave',          'label' => 'Leave Records'],
-        ['value' => 'other',          'label' => 'Other Documents'],
+        [
+            'value'       => 'pre_employment',
+            'label'       => 'Pre-Employment Requirements',
+            'folder'      => 'I',
+            'required'    => true,
+            'description' => 'Medical certificate, NBI/police clearance, birth/marriage certificate (PSA), TOR/diploma',
+        ],
+        [
+            'value'       => 'appointment',
+            'label'       => 'Appointment Papers',
+            'folder'      => 'II',
+            'required'    => true,
+            'description' => 'Original appointment, promotions, transfers, renewals, oath of office, assumption of duties',
+        ],
+        [
+            'value'       => 'eligibility',
+            'label'       => 'Civil Service Eligibility',
+            'folder'      => 'III',
+            'required'    => true,
+            'description' => 'CSC eligibility certificate, PRC license, board/bar exam results',
+        ],
+        [
+            'value'       => 'pds',
+            'label'       => 'Personal Data Sheet',
+            'folder'      => 'IV',
+            'required'    => true,
+            'description' => 'CSC Form 212 (latest and updates/amendments)',
+        ],
+        [
+            'value'       => 'service_record',
+            'label'       => 'Service Record',
+            'folder'      => 'V',
+            'required'    => true,
+            'description' => 'Official service record, prior agency service records, money/property clearances',
+        ],
+        [
+            'value'       => 'performance',
+            'label'       => 'Performance Evaluations',
+            'folder'      => 'VI',
+            'required'    => false,
+            'description' => 'IPCR/OPCR ratings, performance improvement plans',
+        ],
+        [
+            'value'       => 'training',
+            'label'       => 'Training & Development',
+            'folder'      => 'VII',
+            'required'    => false,
+            'description' => 'Training certificates (local & abroad), L&D records, scholarship documents',
+        ],
+        [
+            'value'       => 'leave_record',
+            'label'       => 'Leave Records',
+            'folder'      => 'VIII',
+            'required'    => false,
+            'description' => 'Approved leave applications, leave ledger, vacation/sick leave credits',
+        ],
+        [
+            'value'       => 'rewards',
+            'label'       => 'Rewards & Recognition',
+            'folder'      => 'IX',
+            'required'    => false,
+            'description' => 'Awards, citations, commendations, PRAISE recognitions',
+        ],
+        [
+            'value'       => 'disciplinary',
+            'label'       => 'Disciplinary Actions',
+            'folder'      => 'X',
+            'required'    => false,
+            'description' => 'Administrative charges, decisions, sanctions/penalty records',
+        ],
+        [
+            'value'       => 'saln',
+            'label'       => 'SALN',
+            'folder'      => 'XI',
+            'required'    => true,
+            'description' => 'Statement of Assets, Liabilities and Net Worth (initial and annual updates)',
+        ],
+        [
+            'value'       => 'clearance',
+            'label'       => 'Clearances',
+            'folder'      => 'XII',
+            'required'    => false,
+            'description' => 'Money & property clearances, NBI/police renewal clearances',
+        ],
+        [
+            'value'       => 'other',
+            'label'       => 'Other Documents',
+            'folder'      => 'XIII',
+            'required'    => false,
+            'description' => 'Any other HR-related documents not covered by the above folders',
+        ],
     ];
+
+    // ─── List all employees with 201 file completeness ────────────────────────
+
+    public function listEmployees()
+    {
+        $this->authorize('hr.employee.view');
+
+        $requiredCategories = collect($this->categories)
+            ->where('required', true)
+            ->pluck('value')
+            ->toArray();
+
+        $employees = User::with(['employeeProfile', 'roles'])
+            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['Student', 'Parent']))
+            ->where('status', '!=', 'inactive')
+            ->orderBy('name')
+            ->get()
+            ->map(function (User $u) use ($requiredCategories) {
+                $counts = EmployeeDocument::where('user_id', $u->id)
+                    ->selectRaw('category, count(*) as cnt')
+                    ->groupBy('category')
+                    ->pluck('cnt', 'category')
+                    ->toArray();
+
+                $completedRequired = count(array_filter($requiredCategories, fn ($c) => ! empty($counts[$c])));
+                $total             = count($requiredCategories);
+
+                return [
+                    'id'                 => $u->id,
+                    'name'               => $u->name,
+                    'position'           => $u->position,
+                    'division'           => $u->employeeProfile?->division,
+                    'employee_no'        => $u->employeeProfile?->employee_no,
+                    'counts'             => $counts,
+                    'total_docs'         => array_sum($counts),
+                    'completeness'       => $total > 0 ? round($completedRequired / $total * 100) : 0,
+                    'completed_required' => $completedRequired,
+                    'total_required'     => $total,
+                ];
+            });
+
+        return Inertia::render('HR/TwoOOne/Index', [
+            'employees'  => $employees,
+            'categories' => $this->categories,
+            'canManage'  => Auth::user()->hasPermission('hr.employee.manage'),
+        ]);
+    }
+
+    // ─── Per-employee 201 file detail ─────────────────────────────────────────
 
     public function index(User $user)
     {
-        $this->authorize('hr.employee.view');
+        // HR/Admin can view anyone; employees can view their own
+        if (
+            ! Auth::user()->hasPermission('hr.employee.view') &&
+            Auth::id() !== $user->id
+        ) {
+            abort(403);
+        }
 
         $documents = EmployeeDocument::where('user_id', $user->id)
             ->with('uploadedBy:id,name')
@@ -42,22 +182,26 @@ class EmployeeDocumentController extends Controller
         ]);
     }
 
+    // ─── Upload a document ────────────────────────────────────────────────────
+
     public function store(Request $request, User $user)
     {
         $this->authorize('hr.employee.manage');
 
+        $validCategories = collect($this->categories)->pluck('value')->implode(',');
+
         $data = $request->validate([
             'title'         => 'required|string|max:255',
-            'category'      => 'required|in:appointment,pds,service_record,performance,eligibility,training,medical,leave,other',
+            'category'      => 'required|in:' . $validCategories,
             'document_date' => 'nullable|date',
             'description'   => 'nullable|string|max:1000',
             'file'          => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:10240',
         ]);
 
-        $filePath        = null;
+        $filePath         = null;
         $originalFilename = null;
-        $mimeType        = null;
-        $fileSize        = null;
+        $mimeType         = null;
+        $fileSize         = null;
 
         if ($request->hasFile('file')) {
             $file             = $request->file('file');
@@ -83,6 +227,8 @@ class EmployeeDocumentController extends Controller
         return back()->with('success', 'Document uploaded successfully.');
     }
 
+    // ─── Delete ───────────────────────────────────────────────────────────────
+
     public function destroy(EmployeeDocument $employeeDocument)
     {
         $this->authorize('hr.employee.manage');
@@ -96,11 +242,10 @@ class EmployeeDocumentController extends Controller
         return back()->with('success', 'Document deleted successfully.');
     }
 
+    // ─── Download ─────────────────────────────────────────────────────────────
+
     public function download(EmployeeDocument $employeeDocument)
     {
-        $this->authorize('hr.employee.view');
-
-        // Also allow the employee themselves to download their own documents
         if (
             ! Auth::user()->hasPermission('hr.employee.view') &&
             Auth::id() !== $employeeDocument->user_id
