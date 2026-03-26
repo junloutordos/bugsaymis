@@ -1395,6 +1395,12 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     Route::post('/biometric/{log}/resolve', [\App\Http\Controllers\HR\BiometricLogController::class, 'resolve'])
         ->name('biometric.resolve');
 
+    // ── My DTR (employee self-service) ───────────────────────────────────────
+    Route::get('/my-dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'myDtr'])
+        ->name('my-dtr.index');
+    Route::patch('/my-dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'myPenned'])
+        ->name('my-dtr.penned');
+
     // ── DTR Records ───────────────────────────────────────────────────────────
     Route::get('/dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'index'])
         ->name('dtr.index');
@@ -1406,12 +1412,16 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.edit');
     Route::patch('/dtr/{record}/lock', [\App\Http\Controllers\HR\DtrRecordController::class, 'lock'])
         ->name('dtr.lock');
+    Route::post('/dtr/{user}/recompute', [\App\Http\Controllers\HR\DtrRecordController::class, 'recompute'])
+        ->name('dtr.recompute');
     Route::patch('/dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'penned'])
         ->name('dtr.penned');
     Route::get('/dtr/print-batch', [\App\Http\Controllers\HR\DtrRecordController::class, 'printBatch'])
         ->name('dtr.print.batch');
     Route::get('/dtr/{user}/print', [\App\Http\Controllers\HR\DtrRecordController::class, 'printCsc'])
         ->name('dtr.print');
+    Route::get('/dtr/{user}/checklist', [\App\Http\Controllers\HR\DtrRecordController::class, 'printChecklist'])
+        ->name('dtr.checklist');
 
     // ── Work Schedules ────────────────────────────────────────────────────────
     Route::get('/schedules', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'index'])

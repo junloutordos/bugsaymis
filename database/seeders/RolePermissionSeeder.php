@@ -84,6 +84,7 @@ class RolePermissionSeeder extends Seeder
             'payroll.view', 'payroll.process',
             'hr.dtr.view', 'hr.dtr.manage',
             'hr.biometric.manage',
+            'dtr.view_own',
             'hr.leave.view', 'hr.leave.approve',
             'hr.employee.view', 'hr.employee.manage',
             'chat.access',
@@ -136,6 +137,7 @@ class RolePermissionSeeder extends Seeder
             'hr.schedule.view',
             'wfh.view', 'wfh.monitor',
             'hr.dtr.view',
+            'dtr.view_own',
             'hr.leave.view', 'hr.leave.approve',
             'hr.employee.view',
             'payroll.view',
@@ -159,6 +161,7 @@ class RolePermissionSeeder extends Seeder
             'hr.pds.view',
             'hr.gatepass.view', 'hr.gatepass.create',
             'wfh.view', 'wfh.monitor',
+            'dtr.view_own',
             'ipcr.view', 'ipcr.monitor',
             'accomplishments.view',
             'facilities.view', 'facilities.create',
@@ -196,9 +199,10 @@ class RolePermissionSeeder extends Seeder
             'lnd.view', 'lnd.create', 'lnd.evaluate',
             // Rewards — employees can nominate peers and view own recognitions
             'rewards.view', 'rewards.nominate',
-            // Payroll — view own payslip; file own leave
+            // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
             'hr.leave.file',
+            'dtr.view_own',
             'chat.access',
         ]);
 
@@ -223,9 +227,10 @@ class RolePermissionSeeder extends Seeder
             'lnd.view', 'lnd.create', 'lnd.evaluate',
             // Rewards — employees can nominate peers and view own recognitions
             'rewards.view', 'rewards.nominate',
-            // Payroll — view own payslip; file own leave
+            // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
             'hr.leave.file',
+            'dtr.view_own',
             'chat.access',
         ]);
 

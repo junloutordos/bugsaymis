@@ -115,6 +115,7 @@ class AppServiceProvider extends ServiceProvider
             'hr.dtr.view',
             'hr.dtr.manage',
             'hr.biometric.manage',
+            'dtr.view_own',
             'hr.employee.view',
             'hr.employee.manage',
             'hr.employees.view',

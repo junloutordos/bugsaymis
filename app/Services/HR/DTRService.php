@@ -97,8 +97,8 @@ class DTRService
 
             // Compute metrics
             $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
-            $lateMinutes      = $this->computeLateMinutes($timeInAm, $dateStr, $schedule);
-            $undertimeMinutes = $this->computeUndertimeMinutes($timeOutPm, $dateStr, $schedule);
+            $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
+            $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
             $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
 
             // Determine attendance status
@@ -141,6 +141,26 @@ class DTRService
         $date     = $record->work_date->toDateString();
         $schedule = $record->schedule;
 
+        // If no schedule is linked to this record, re-resolve the active schedule
+        // for the employee on this date (covers records generated before a schedule
+        // was assigned, or after a schedule change).
+        if (! $schedule) {
+            $schedule = EmployeeSchedule::where('user_id', $record->user_id)
+                ->activeOnDate($date)
+                ->orderByDesc('effective_date')
+                ->first();
+
+            if (! $schedule) {
+                $schedule = EmployeeSchedule::where('user_id', $record->user_id)
+                    ->where('is_default', true)
+                    ->first();
+            }
+
+            if ($schedule) {
+                $record->schedule_id = $schedule->id;
+            }
+        }
+
         // Biometric value takes precedence; penned entry fills any null slot.
         $timeInAm  = $record->time_in_am  ?? $record->penned_time_in_am;
         $timeOutAm = $record->time_out_am ?? $record->penned_time_out_am;
@@ -148,16 +168,56 @@ class DTRService
         $timeOutPm = $record->time_out_pm ?? $record->penned_time_out_pm;
 
         $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
-        $lateMinutes      = $this->computeLateMinutes($timeInAm, $date, $schedule);
-        $undertimeMinutes = $this->computeUndertimeMinutes($timeOutPm, $date, $schedule);
+        $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $date, $schedule);
+        $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $date, $schedule);
         $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
 
+        // Re-derive attendance status unless it is a protected status that was
+        // set during generation (on_leave, holiday, on_official_business).
+        $protectedStatuses = ['on_leave', 'holiday', 'on_official_business'];
+        if (! in_array($record->attendance_status, $protectedStatuses)) {
+            $hasAnyPunch = $timeInAm || $timeOutAm || $timeInPm || $timeOutPm;
+            if (! $hasAnyPunch) {
+                $attendanceStatus = 'absent';
+            } elseif (
+                $hoursWorked < ($schedule?->half_day_hours ?? 4) ||
+                $lateMinutes >= ($schedule?->late_threshold_minutes ?? 240)
+            ) {
+                $attendanceStatus = 'half_day';
+            } else {
+                $attendanceStatus = 'present';
+            }
+        } else {
+            $attendanceStatus = $record->attendance_status;
+        }
+
         $record->update([
+            'schedule_id'       => $record->schedule_id,
             'hours_worked'      => round($hoursWorked, 2),
             'late_minutes'      => round($lateMinutes, 2),
             'undertime_minutes' => round($undertimeMinutes, 2),
             'overtime_minutes'  => round($overtimeMinutes, 2),
+            'attendance_status' => $attendanceStatus,
         ]);
+    }
+
+    /**
+     * Recompute late/undertime/overtime for all unlocked records of a user
+     * in a given month (or date range) after a schedule has been assigned/changed.
+     */
+    public function recomputeForUser(int $userId, string $dateFrom, string $dateTo): int
+    {
+        $records = DtrRecord::where('user_id', $userId)
+            ->where('is_locked', false)
+            ->whereBetween('work_date', [$dateFrom, $dateTo])
+            ->with('schedule')
+            ->get();
+
+        foreach ($records as $record) {
+            $this->recompute($record->fresh());
+        }
+
+        return $records->count();
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -330,64 +390,140 @@ class DTRService
         ?string $timeInPm,
         ?string $timeOutPm
     ): float {
-        $minutes = 0;
+        $inAm  = $this->floorToMinute($timeInAm);
+        $outAm = $this->floorToMinute($timeOutAm);
+        $inPm  = $this->floorToMinute($timeInPm);
+        $outPm = $this->floorToMinute($timeOutPm);
 
-        if ($timeInAm && $timeOutAm) {
-            $minutes += Carbon::parse($timeInAm)->diffInMinutes(Carbon::parse($timeOutAm));
+        // ── All 4 punches: both sessions are fully known ──────────────────────
+        if ($inAm && $outAm && $inPm && $outPm) {
+            return (
+                Carbon::parse($inAm)->diffInMinutes(Carbon::parse($outAm)) +
+                Carbon::parse($inPm)->diffInMinutes(Carbon::parse($outPm))
+            ) / 60;
         }
 
-        if ($timeInPm && $timeOutPm) {
-            $minutes += Carbon::parse($timeInPm)->diffInMinutes(Carbon::parse($timeOutPm));
+        // ── AM in + AM out + PM out, no PM in ─────────────────────────────────
+        // AM session is known; estimate PM start as AM out + 60 min lunch.
+        if ($inAm && $outAm && ! $inPm && $outPm) {
+            $amMinutes    = Carbon::parse($inAm)->diffInMinutes(Carbon::parse($outAm));
+            $pmStart      = Carbon::parse($outAm)->addMinutes(60);
+            $pmMinutes    = max(0, $pmStart->diffInMinutes(Carbon::parse($outPm), false));
+            return ($amMinutes + $pmMinutes) / 60;
         }
 
-        // If only 2 punches (no explicit break), subtract 1-hour default lunch
-        if (($timeInAm && $timeOutPm) && ! $timeOutAm && ! $timeInPm) {
-            $total = Carbon::parse($timeInAm)->diffInMinutes(Carbon::parse($timeOutPm));
-            $minutes = max(0, $total - 60);
+        // ── AM in + PM out (no AM out), with or without PM in ─────────────────
+        // No AM-out means we can't split sessions — use 2-punch formula.
+        if ($inAm && $outPm && ! $outAm) {
+            $total = Carbon::parse($inAm)->diffInMinutes(Carbon::parse($outPm));
+            return max(0, $total - 60) / 60;
         }
 
-        return $minutes / 60;
+        // ── AM session only ───────────────────────────────────────────────────
+        if ($inAm && $outAm) {
+            return Carbon::parse($inAm)->diffInMinutes(Carbon::parse($outAm)) / 60;
+        }
+
+        // ── PM session only ───────────────────────────────────────────────────
+        if ($inPm && $outPm) {
+            return Carbon::parse($inPm)->diffInMinutes(Carbon::parse($outPm)) / 60;
+        }
+
+        return 0;
     }
 
-    private function computeLateMinutes(?string $timeInAm, string $dateStr, ?EmployeeSchedule $schedule): float
-    {
-        if (! $timeInAm || ! $schedule) {
+    /**
+     * Total late minutes = AM-in late + PM-in late (returning late from lunch).
+     * Seconds are discarded; only full minutes are counted.
+     */
+    private function computeLateMinutes(
+        ?string $timeInAm,
+        ?string $timeInPm,
+        string $dateStr,
+        ?EmployeeSchedule $schedule
+    ): float {
+        if (! $schedule) {
             return 0;
         }
 
-        $scheduledTimeIn = $schedule->getTimeIn($dateStr);
-        if (! $scheduledTimeIn) {
-            return 0;
+        $grace        = max(0, (int) ($schedule->grace_period_minutes ?? 15));
+        $breakMinutes = $this->getBreakMinutes($dateStr, $schedule);
+        $late         = 0.0;
+
+        // ── AM in late ────────────────────────────────────────────────────────
+        if ($timeInAm) {
+            $scheduledTimeIn = $schedule->getTimeIn($dateStr);
+            if ($scheduledTimeIn) {
+                $scheduledIn = Carbon::parse($dateStr . ' ' . $scheduledTimeIn);
+                $actualIn    = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeInAm));
+
+                if ($actualIn->gt($scheduledIn)) {
+                    $graceDeadline = $scheduledIn->copy()->addMinutes($grace);
+                    if ($actualIn->gt($graceDeadline)) {
+                        $late += $scheduledIn->diffInMinutes($actualIn);
+                    }
+                }
+            }
         }
 
-        $scheduledIn   = Carbon::parse($dateStr . ' ' . $scheduledTimeIn);
-        $graceDeadline = $scheduledIn->copy()->addMinutes($schedule->grace_period_minutes ?? 15);
-        $actualIn      = Carbon::parse($dateStr . ' ' . $timeInAm);
+        // ── PM in late (returned late from lunch) ─────────────────────────────
+        // No grace period: any minute past the expected return time is counted.
+        // Expected PM start = break midpoint + 30 min (e.g. 12:30+30 = 13:00).
+        if ($timeInPm) {
+            $lunchEnd    = Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes + 30);
+            $actualInPm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeInPm));
 
-        if ($actualIn->lte($graceDeadline)) {
-            return 0;
+            if ($actualInPm->gt($lunchEnd)) {
+                $late += $lunchEnd->diffInMinutes($actualInPm);
+            }
         }
 
-        // diffInMinutes($b, false) = (b - a); we need (actualIn - scheduledIn) to be positive when late
-        return max(0, $scheduledIn->diffInMinutes($actualIn, false));
+        return $late;
     }
 
-    private function computeUndertimeMinutes(?string $timeOutPm, string $dateStr, ?EmployeeSchedule $schedule): float
-    {
-        if (! $timeOutPm || ! $schedule) {
+    /**
+     * Total undertime minutes = AM-out undertime (left early for lunch)
+     *                         + PM-out undertime (left before end of day).
+     * Seconds are discarded; only full minutes are counted.
+     */
+    private function computeUndertimeMinutes(
+        ?string $timeOutAm,
+        ?string $timeOutPm,
+        string $dateStr,
+        ?EmployeeSchedule $schedule
+    ): float {
+        if (! $schedule) {
             return 0;
         }
 
-        $scheduledTimeOut = $schedule->getTimeOut($dateStr);
-        if (! $scheduledTimeOut) {
-            return 0;
+        $breakMinutes = $this->getBreakMinutes($dateStr, $schedule);
+        $undertime    = 0.0;
+
+        // ── AM out undertime (left before lunch started) ──────────────────────
+        // Expected AM end = break midpoint − 30 min (e.g. 12:30−30 = 12:00).
+        if ($timeOutAm) {
+            $lunchStart   = Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes - 30);
+            $actualOutAm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutAm));
+
+            if ($actualOutAm->lt($lunchStart)) {
+                $undertime += $actualOutAm->diffInMinutes($lunchStart);
+            }
         }
 
-        $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
-        $actualOut    = Carbon::parse($dateStr . ' ' . $timeOutPm);
+        // ── PM out undertime (left before end of day) ─────────────────────────
+        if ($timeOutPm) {
+            $scheduledTimeOut = $schedule->getTimeOut($dateStr);
+            if ($scheduledTimeOut) {
+                $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
+                $actualOutPm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutPm));
 
-        // diffInMinutes($b, false) = (b - a); we need (scheduledOut - actualOut) to be positive when leaving early
-        return max(0, $actualOut->diffInMinutes($scheduledOut, false));
+                if ($actualOutPm->lt($scheduledOut)) {
+                    $undertime += $actualOutPm->diffInMinutes($scheduledOut);
+                }
+            }
+        }
+
+        return $undertime;
     }
 
     private function computeOvertimeMinutes(?string $timeOutPm, string $dateStr, ?EmployeeSchedule $schedule): float
@@ -402,13 +538,26 @@ class DTRService
         }
 
         $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
-        $actualOut    = Carbon::parse($dateStr . ' ' . $timeOutPm);
+        $actualOut    = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutPm));
 
         if ($actualOut->lte($scheduledOut)) {
             return 0;
         }
 
         return $actualOut->diffInMinutes($scheduledOut);
+    }
+
+    /**
+     * Truncate a time string to minute precision, discarding seconds.
+     * '08:00:59' → '08:00:00',  '17:03:22' → '17:03:00'
+     */
+    private function floorToMinute(?string $time): ?string
+    {
+        if (! $time) {
+            return null;
+        }
+        [$h, $m] = explode(':', $time);
+        return sprintf('%02d:%02d:00', (int) $h, (int) $m);
     }
 
     private function getAttendanceStatus(

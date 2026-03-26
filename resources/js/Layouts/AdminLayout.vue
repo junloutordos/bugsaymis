@@ -540,14 +540,7 @@ const menuItems = [
         roles: ["Administrator", "HR"],
         permissions: ["hr.employee.view"],
       },
-      {
-        label: "Attendance Logs",
-        routeName: "hr.attendance.index",
-        href: route('hr.attendance.index'),
-        icon: ClockIcon,
-        roles: ["Administrator", "HR", "Faculty", "Staff"],
-        permissions: ["hr.attendance.view"],
-      },
+      
       {
         label: "Work Schedules",
         routeName: "hr.schedules.index",
@@ -556,14 +549,7 @@ const menuItems = [
         roles: ["Administrator", "HR"],
         permissions: ["hr.schedule.manage"],
       },
-      {
-        label: "Date Parameters",
-        routeName: "hr.date-parameters.index",
-        href: route('hr.date-parameters.index'),
-        icon: ClockIcon,
-        roles: ["Administrator", "HR"],
-        permissions: ["hr.employees.manage"],
-      },
+      
       {
         label: "Gate Pass",
         routeName: "gatepass.index",
@@ -587,6 +573,14 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "Payroll Officer"],
         permissions: ["hr.leave.file"],
+      },
+      {
+        label: "My DTR",
+        routeName: "hr.my-dtr.index",
+        href: route('hr.my-dtr.index'),
+        icon: ClockIcon,
+        roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD"],
+        permissions: ["dtr.view_own"],
       },
       {
         label: "DTR Records",

@@ -209,8 +209,8 @@ function groupedPerms(permissions) {
         </div>
       </div>
 
-      <!-- Right panel -->
-      <div class="w-72 shrink-0 space-y-3">
+      <!-- Right panel: sticky as a whole so preview appearing inside doesn't cause layout shifts -->
+      <div class="w-72 shrink-0 self-start sticky top-4 space-y-3 max-h-[calc(100vh-5rem)] overflow-y-auto">
         <!-- Empty state -->
         <div v-if="!selected" class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 text-center text-slate-400 flex flex-col items-center gap-3">
           <UserCircleIcon class="w-12 h-12 text-slate-200" />
@@ -218,7 +218,7 @@ function groupedPerms(permissions) {
         </div>
 
         <!-- Role assignment card -->
-        <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 sticky top-4">
+        <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
           <!-- User info -->
           <div class="pb-3 mb-3 border-b border-slate-100">
             <p class="font-semibold text-slate-800 truncate">{{ selected.name }}</p>

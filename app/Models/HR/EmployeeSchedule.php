@@ -16,6 +16,7 @@ class EmployeeSchedule extends Model
         'name',
         'schedule_type',
         'work_days',
+        'daily_schedules',
         'time_in',
         'time_out',
         'grace_period_minutes',

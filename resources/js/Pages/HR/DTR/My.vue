@@ -1,6 +1,6 @@
 <template>
-  <Head :title="`DTR — ${employee.name}`" />
-  <AdminLayout :title="`DTR — ${employee.name}`">
+  <Head title="My DTR" />
+  <AdminLayout title="My DTR">
     <div class="space-y-5">
 
       <!-- Employee Header -->
@@ -36,26 +36,26 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
-            <button @click="doRecompute" :disabled="recomputing"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-medium disabled:opacity-50"
-              title="Recompute late/undertime based on current schedule">
-              <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': recomputing }" />
-              {{ recomputing ? 'Recomputing…' : 'Recompute' }}
-            </button>
-            <a :href="route('hr.dtr.checklist', employee.id) + '?month=' + currentMonth" target="_blank"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium">
-              <ClipboardDocumentListIcon class="h-4 w-4" />Checklist
-            </a>
             <a :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+               class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
               <PrinterIcon class="h-4 w-4" />Print
             </a>
           </div>
         </div>
       </div>
 
+      <!-- Flash -->
+      <div v-if="$page.props.flash?.success"
+        class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
+      </div>
+      <div v-if="$page.props.flash?.error"
+        class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <ExclamationCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
+      </div>
+
       <!-- Summary Stats -->
-      <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 print:hidden">
+      <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
         <div class="bg-emerald-50 rounded-xl border border-emerald-100 p-3 text-center">
           <p class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">Present</p>
           <p class="text-xl font-bold text-emerald-700 mt-0.5">{{ summary.present }}</p>
@@ -97,56 +97,55 @@
       <!-- Calendar Grid -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
         <h2 class="text-sm font-semibold text-slate-700 mb-3">{{ monthLabel }}</h2>
-
-        <!-- Day headers -->
         <div class="grid grid-cols-7 mb-1">
           <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d"
                class="text-center text-[11px] font-semibold text-slate-400 py-1.5">{{ d }}</div>
         </div>
-
-        <!-- Cells -->
         <div class="grid grid-cols-7 gap-1">
           <div v-for="n in firstDayOfWeek" :key="'pad-'+n" class="min-h-[76px]"></div>
-
           <div
             v-for="cell in calendarCells"
             :key="cell.date"
             :class="['min-h-[76px] rounded-lg border p-1.5 text-xs relative flex flex-col', cellBg(cell)]"
           >
-            <!-- Day number -->
             <span :class="['text-[11px] font-bold leading-none mb-1', cell.isToday ? 'text-indigo-600' : 'text-slate-500']">
               {{ cell.day }}
               <span v-if="cell.isToday" class="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 align-middle"></span>
             </span>
-
             <template v-if="cell.record">
-              <!-- Time punches -->
               <div class="font-mono text-[9px] text-slate-500 leading-[1.4] space-y-px flex-1">
-                <div v-if="cell.record.time_in_am" class="flex gap-1">
-                  <span class="text-slate-400">in</span>{{ fmtTime(cell.record.time_in_am) }}
+                <div v-if="cell.record.time_in_am || cell.record.penned_time_in_am" class="flex gap-1">
+                  <span class="text-slate-400">in</span>
+                  <span :class="cell.record.time_in_am ? '' : 'text-red-500'">
+                    {{ fmtTime(cell.record.time_in_am || cell.record.penned_time_in_am) }}
+                  </span>
                 </div>
-                <div v-if="cell.record.time_out_am" class="flex gap-1">
-                  <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_am) }}
+                <div v-if="cell.record.time_out_am || cell.record.penned_time_out_am" class="flex gap-1">
+                  <span class="text-slate-400">out</span>
+                  <span :class="cell.record.time_out_am ? '' : 'text-red-500'">
+                    {{ fmtTime(cell.record.time_out_am || cell.record.penned_time_out_am) }}
+                  </span>
                 </div>
-                <div v-if="cell.record.time_in_pm" class="flex gap-1">
-                  <span class="text-slate-400">in</span>{{ fmtTime(cell.record.time_in_pm) }}
+                <div v-if="cell.record.time_in_pm || cell.record.penned_time_in_pm" class="flex gap-1">
+                  <span class="text-slate-400">in</span>
+                  <span :class="cell.record.time_in_pm ? '' : 'text-red-500'">
+                    {{ fmtTime(cell.record.time_in_pm || cell.record.penned_time_in_pm) }}
+                  </span>
                 </div>
-                <div v-if="cell.record.time_out_pm" class="flex gap-1">
-                  <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_pm) }}
+                <div v-if="cell.record.time_out_pm || cell.record.penned_time_out_pm" class="flex gap-1">
+                  <span class="text-slate-400">out</span>
+                  <span :class="cell.record.time_out_pm ? '' : 'text-red-500'">
+                    {{ fmtTime(cell.record.time_out_pm || cell.record.penned_time_out_pm) }}
+                  </span>
                 </div>
               </div>
-              <!-- Scheduled time (indigo, below punches) -->
               <div v-if="cell.schedIn || cell.schedOut"
                 class="font-mono text-[8px] text-indigo-400 leading-tight border-t border-indigo-100 mt-0.5 pt-0.5 text-center">
                 {{ fmtTime(cell.schedIn) }}{{ cell.schedIn && cell.schedOut ? '–' : '' }}{{ fmtTime(cell.schedOut) }}
               </div>
-
-              <!-- Status badge -->
               <div :class="[statusBadge(cell.record.attendance_status), 'mt-1 text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide']">
                 {{ statusLabel(cell.record.attendance_status) }}
               </div>
-
-              <!-- Late / UT mini chips -->
               <div v-if="cell.record.late_minutes > 0 || cell.record.undertime_minutes > 0"
                 class="flex gap-0.5 mt-0.5 justify-center flex-wrap">
                 <span v-if="cell.record.late_minutes > 0"
@@ -159,13 +158,9 @@
                 </span>
               </div>
             </template>
-
-            <!-- No record: rest day -->
             <template v-else-if="!cell.isWorkDay">
               <span class="text-[9px] text-slate-300 mt-auto text-center">rest</span>
             </template>
-
-            <!-- No record: work day = absent -->
             <template v-else>
               <span class="text-[9px] font-bold text-red-300 mt-auto text-center uppercase tracking-wide">absent</span>
             </template>
@@ -175,8 +170,9 @@
 
       <!-- Detail Table -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-slate-700">Detail Records</h2>
+          <p class="text-xs text-slate-400">Click the pencil icon on any row to submit a penned entry for missing time slots.</p>
         </div>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-slate-100 text-sm">
@@ -195,7 +191,7 @@
                 <th class="px-4 py-3 text-right text-xs font-semibold text-orange-500 uppercase tracking-wide">UT</th>
                 <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-500 uppercase tracking-wide">OT</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                <th class="px-4 py-3 print:hidden"></th>
+                <th class="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -210,25 +206,17 @@
                     :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : 'text-slate-200')">
                   {{ fmtTime(r[f] || r['penned_'+f]) || '–' }}
                 </td>
-                <!-- Scheduled times (indigo, derived from employee schedule) -->
-                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">
-                  {{ fmtTime(r.scheduled_time_in) || '–' }}
-                </td>
-                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">
-                  {{ fmtTime(r.scheduled_time_out) || '–' }}
-                </td>
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_in) || '–' }}</td>
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_out) || '–' }}</td>
                 <td class="px-4 py-2.5 text-right text-slate-700 text-xs tabular-nums">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</td>
-                <!-- Late -->
                 <td class="px-4 py-2.5 text-right text-xs tabular-nums" :class="r.late_minutes > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
-                  <span v-if="!r.schedule_name" title="No schedule — late cannot be computed" class="cursor-help text-slate-200">n/a</span>
+                  <span v-if="!r.schedule_name" class="cursor-help text-slate-200" title="No schedule">n/a</span>
                   <span v-else>{{ fmtMinutes(r.late_minutes) }}</span>
                 </td>
-                <!-- Undertime -->
                 <td class="px-4 py-2.5 text-right text-xs tabular-nums" :class="r.undertime_minutes > 0 ? 'text-orange-600 font-semibold' : 'text-slate-300'">
-                  <span v-if="!r.schedule_name" title="No schedule — undertime cannot be computed" class="cursor-help text-slate-200">n/a</span>
+                  <span v-if="!r.schedule_name" class="cursor-help text-slate-200" title="No schedule">n/a</span>
                   <span v-else>{{ fmtMinutes(r.undertime_minutes) }}</span>
                 </td>
-                <!-- Overtime -->
                 <td class="px-4 py-2.5 text-right text-xs tabular-nums" :class="r.overtime_minutes > 0 ? 'text-emerald-600 font-semibold' : 'text-slate-300'">
                   {{ fmtMinutes(r.overtime_minutes) }}
                 </td>
@@ -237,11 +225,15 @@
                     {{ statusLabel(r.attendance_status) }}
                   </span>
                 </td>
-                <td class="px-4 py-2.5 print:hidden">
-                  <button v-if="!r.is_locked" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
+                <td class="px-4 py-2.5">
+                  <!-- Show pencil only if record is not locked AND at least one biometric slot is empty -->
+                  <button v-if="!r.is_locked && hasMissingSlots(r)"
+                    @click="openEdit(r)"
+                    class="text-slate-300 hover:text-indigo-600 transition-colors"
+                    title="Submit penned entry">
                     <PencilSquareIcon class="h-4 w-4" />
                   </button>
-                  <LockClosedIcon v-else class="h-4 w-4 text-red-300" />
+                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
                 </td>
               </tr>
             </tbody>
@@ -251,13 +243,16 @@
 
     </div>
 
-    <!-- Edit / Penned Entry Modal -->
+    <!-- Penned Entry Modal -->
     <Teleport to="body">
-      <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm print:hidden">
+      <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-          <h3 class="text-base font-semibold text-slate-800 mb-0.5">DTR Record</h3>
+          <h3 class="text-base font-semibold text-slate-800 mb-0.5">Submit Penned Entry</h3>
           <p class="text-sm text-slate-400 mb-1">{{ toDateStr(editModal.record?.work_date) }} — {{ getDayName(editModal.record?.work_date) }}</p>
-          <p class="text-[11px] text-slate-400 mb-4">Biometric punches are read-only. Empty slots accept a <span class="text-red-500 font-medium">penned entry</span>.</p>
+          <p class="text-[11px] text-slate-400 mb-4">
+            Biometric punches are read-only. Fill in the <span class="text-red-500 font-medium">empty slots</span> with your actual time.
+            This will be reviewed by HR.
+          </p>
 
           <div class="grid grid-cols-2 gap-3">
             <div v-for="field in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="field">
@@ -265,22 +260,20 @@
                 :class="editModal.record?.[field] ? 'text-slate-500' : 'text-red-500'">
                 {{ fieldLabel(field) }}
                 <span v-if="editModal.record?.[field]" class="font-normal text-slate-400">(biometric)</span>
-                <span v-else class="font-normal text-red-400">(penned)</span>
+                <span v-else class="font-normal text-red-400">(enter penned)</span>
               </label>
-              <!-- Biometric value: read-only display -->
               <div v-if="editModal.record?.[field]"
                 class="w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm font-mono text-slate-400 select-none">
                 {{ fmtTime(editModal.record[field]) }}
               </div>
-              <!-- Empty slot: penned entry input -->
               <input v-else
                 v-model="editForm['penned_' + field]"
                 type="time"
                 class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm font-mono text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" />
             </div>
             <div class="col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-              <input v-model="editForm.penned_remarks" type="text" placeholder="Reason for penned entry…"
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks <span class="text-red-500">*</span></label>
+              <input v-model="editForm.penned_remarks" type="text" placeholder="Reason for penned entry (e.g. biometric malfunction)…"
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
             </div>
           </div>
@@ -289,7 +282,7 @@
             <button @click="editModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
             <button @click="submitEdit" :disabled="editForm.processing"
               class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">
-              {{ editForm.processing ? 'Saving…' : 'Save' }}
+              {{ editForm.processing ? 'Submitting…' : 'Submit Penned Entry' }}
             </button>
           </div>
         </div>
@@ -305,8 +298,7 @@ import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
-  PencilSquareIcon, LockClosedIcon, ArrowPathIcon,
-  ClipboardDocumentListIcon,
+  PencilSquareIcon, LockClosedIcon, CheckCircleIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -318,9 +310,8 @@ const props = defineProps({
 
 const currentMonth = ref(props.month)
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Normalize any date value (ISO string, YYYY-MM-DD, etc.) to YYYY-MM-DD */
 function toDateStr(val) {
   if (!val) return ''
   return String(val).slice(0, 10)
@@ -348,14 +339,17 @@ function fmtMinutes(m) {
 function getDayName(dateVal) {
   const d = toDateStr(dateVal)
   if (!d) return ''
-  // Append T00:00:00 only if it's a plain date string to avoid TZ shift
   return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
 }
 
-// ── Month navigation ───────────────────────────────────────────────────────
+function hasMissingSlots(r) {
+  return !r.time_in_am || !r.time_out_am || !r.time_in_pm || !r.time_out_pm
+}
+
+// ── Month navigation ─────────────────────────────────────────────────────────
 
 function goMonth() {
-  router.get(route('hr.dtr.show', props.employee.id), { month: currentMonth.value }, { preserveState: false })
+  router.get(route('hr.my-dtr.index'), { month: currentMonth.value }, { preserveState: false })
 }
 
 function changeMonth(delta) {
@@ -370,7 +364,6 @@ const monthLabel = computed(() => {
   return new Date(+y, +m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
 })
 
-// Derive active schedule name from the most recent record that has one
 const activeScheduleName = computed(() => {
   const rec = [...props.records].reverse().find(r => r.schedule_name)
   return rec?.schedule_name ?? null
@@ -385,7 +378,7 @@ const activeScheduleTimes = computed(() => {
   return i || o || null
 })
 
-// ── Calendar grid ──────────────────────────────────────────────────────────
+// ── Calendar grid ─────────────────────────────────────────────────────────────
 
 const firstDayOfWeek = computed(() => {
   const [y, m] = currentMonth.value.split('-').map(Number)
@@ -397,7 +390,6 @@ const daysInMonth = computed(() => {
   return new Date(y, m, 0).getDate()
 })
 
-/** Key records by normalized YYYY-MM-DD */
 const recordMap = computed(() => {
   const map = {}
   props.records.forEach(r => { map[toDateStr(r.work_date)] = r })
@@ -418,8 +410,6 @@ const calendarCells = computed(() => {
       day:       d,
       date:      dateStr,
       record:    rec,
-      // A day is a work day if a DTR record was generated for it;
-      // fall back to Mon-Fri for days with no record yet.
       isWorkDay: rec ? rec.day_type !== 'rest_day' : (dow >= 1 && dow <= 5),
       isToday:   dateStr === todayStr,
       schedIn:   rec?.scheduled_time_in  ?? null,
@@ -465,31 +455,11 @@ function statusLabel(status) {
   }[status] ?? (status ?? '').replace(/_/g, ' ')
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function fieldLabel(field) {
   return { time_in_am: 'AM In', time_out_am: 'AM Out', time_in_pm: 'PM In', time_out_pm: 'PM Out' }[field] ?? field
 }
 
-// ── Edit / Penned entry ─────────────────────────────────────────────────────
-
-// ── Recompute ───────────────────────────────────────────────────────────────
-
-const recomputing = ref(false)
-
-function doRecompute() {
-  recomputing.value = true
-  router.post(
-    route('hr.dtr.recompute', props.employee.id),
-    { month: currentMonth.value },
-    {
-      onFinish: () => { recomputing.value = false },
-      preserveScroll: true,
-    }
-  )
-}
-
-// ── Edit / Penned entry ─────────────────────────────────────────────────────
+// ── Penned entry ──────────────────────────────────────────────────────────────
 
 const editModal = reactive({ open: false, record: null })
 const editForm  = useForm({
@@ -501,7 +471,7 @@ const editForm  = useForm({
 function openEdit(record) {
   editModal.record = record
   editModal.open   = true
-  const p = (val) => (fmtTime(val) === '—' ? '' : (fmtTime(val) || ''))
+  const p = (val) => fmtTime(val) || ''
   editForm.penned_time_in_am  = p(record.penned_time_in_am)
   editForm.penned_time_out_am = p(record.penned_time_out_am)
   editForm.penned_time_in_pm  = p(record.penned_time_in_pm)
@@ -510,14 +480,8 @@ function openEdit(record) {
 }
 
 function submitEdit() {
-  editForm.patch(route('hr.dtr.penned', editModal.record.id), {
+  editForm.patch(route('hr.my-dtr.penned', editModal.record.id), {
     onSuccess: () => { editModal.open = false },
   })
 }
 </script>
-
-<style>
-@media print {
-  .print\:hidden { display: none !important; }
-}
-</style>
