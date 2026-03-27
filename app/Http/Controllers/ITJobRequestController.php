@@ -26,8 +26,7 @@ class ITJobRequestController extends Controller
 public function index(Request $request)
 {
     $user    = $request->user();
-    $roles   = array_filter(explode(',', $user->role_id));
-    $isAdmin = isset($roles[0]) && (int) $roles[0] === 1;
+    $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
     $search   = trim($request->query('search', ''));
     $category = trim($request->query('category', ''));
     $status   = trim($request->query('status', ''));
@@ -67,10 +66,7 @@ public function index(Request $request)
         'requests'       => $requests,
         'filters'        => ['search' => $search, 'category' => $category, 'status' => $status, 'per_page' => $perPage],
         'categories'     => ITJobCategory::orderBy('name')->get(['id', 'name']),
-        'divisionChiefs' => User::where(function ($q) {
-            $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
-              ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]);
-        })->select('id', 'name')->orderBy('name')->get(),
+        'divisionChiefs' => User::whereHas('roles', fn ($q) => $q->whereIn('name', ['DivisionChief', 'InformationOfficer']))->select('id', 'name')->orderBy('name')->get(),
         'misPersonnel'   => User::havingRole('MIS')->select('id', 'name')->orderBy('name')->get(),
         'ictEquipment'   => ICTEquipment::with(['room:id,name,code', 'owner:id,name'])
             ->orderBy('description')

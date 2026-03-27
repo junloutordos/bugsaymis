@@ -21,6 +21,7 @@ const props = defineProps({
   divisionChiefs: Array,
   misPersonnel: Array,
   ictEquipment: Array,
+  isAdmin: { type: Boolean, default: false },
 })
 
 // Composable: modal/form/submit logic (pass current page's data)
@@ -40,10 +41,10 @@ const {
   printTable,
 } = useJobRequests(props.requests?.data ?? [])
 
-// Auth info
+// Auth info — use server-resolved isAdmin prop for reliable role check
 const page = usePage()
 const currentUser = page.props.auth?.user ?? null
-const userRole = currentUser?.role?.name ?? null
+const userRole = props.isAdmin ? 'Administrator' : (currentUser?.role?.name ?? null)
 
 function openMISAssessment(request) {
   misAssessment(request)

@@ -473,6 +473,18 @@ const openSignaturePicker = (user) => {
                 />
               </div>
 
+              <!-- Specialization -->
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Specialization</label>
+                <input
+                  v-model="form.specialization"
+                  type="text"
+                  placeholder="e.g. Mathematics, Biology, English"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                />
+                <p class="text-xs text-slate-400 mt-0.5">Used for auto-assignment of teaching loads.</p>
+              </div>
+
               <!-- Division -->
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Division</label>

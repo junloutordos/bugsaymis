@@ -40,6 +40,7 @@ class SubjectController extends Controller
             'code'                => $s->code,
             'name'                => $s->name,
             'description'         => $s->description,
+            'specialization_tags' => $s->specialization_tags,
             'credit_units'        => $s->credit_units,
             'lecture_hours'       => $s->lecture_hours,
             'lab_hours'           => $s->lab_hours,
@@ -63,10 +64,11 @@ class SubjectController extends Controller
         $this->authorize('faculty_loading.subjects');
 
         $data = $request->validate([
-            'code'                => 'required|string|max:20|unique:subjects,code',
-            'name'                => 'required|string|max:150',
-            'description'         => 'nullable|string',
-            'credit_units'        => 'required|integer|min:0',
+            'code'                 => 'required|string|max:20|unique:subjects,code',
+            'name'                 => 'required|string|max:150',
+            'description'          => 'nullable|string',
+            'specialization_tags'  => 'nullable|string|max:500',
+            'credit_units'         => 'required|integer|min:0',
             'lecture_hours'       => 'required|numeric|min:0',
             'lab_hours'           => 'nullable|numeric|min:0',
             'load_units'          => 'required|numeric|min:0',
@@ -88,10 +90,11 @@ class SubjectController extends Controller
         $this->authorize('faculty_loading.subjects');
 
         $data = $request->validate([
-            'code'                => "required|string|max:20|unique:subjects,code,{$subject->id}",
-            'name'                => 'required|string|max:150',
-            'description'         => 'nullable|string',
-            'credit_units'        => 'required|integer|min:0',
+            'code'                 => "required|string|max:20|unique:subjects,code,{$subject->id}",
+            'name'                 => 'required|string|max:150',
+            'description'          => 'nullable|string',
+            'specialization_tags'  => 'nullable|string|max:500',
+            'credit_units'         => 'required|integer|min:0',
             'lecture_hours'       => 'required|numeric|min:0',
             'lab_hours'           => 'nullable|numeric|min:0',
             'load_units'          => 'required|numeric|min:0',

@@ -24,6 +24,7 @@ class User extends Authenticatable
         'password',
         'role_id',
         'position',
+        'specialization',
         'sst_position_id',
         'division_id',
         'office_id',

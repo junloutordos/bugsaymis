@@ -39,6 +39,9 @@ import {
   DocumentChartBarIcon,
   AcademicCapIcon,
   CalendarDaysIcon,
+  SparklesIcon,
+  ScaleIcon,
+  CpuChipIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -740,6 +743,30 @@ const menuItems = [
         icon: ClockIcon,
         roles: [],
         permissions: ["faculty_loading.school_year"],
+      },
+      {
+        label: "AI Dashboard",
+        routeName: "faculty-loading.ai-dashboard",
+        href: route("faculty-loading.ai-dashboard"),
+        icon: CpuChipIcon,
+        roles: [],
+        permissions: ["faculty_loading.manage"],
+      },
+      {
+        label: "AI Schedule Generator",
+        routeName: "faculty-loading.auto-schedule.index",
+        href: route("faculty-loading.auto-schedule.index"),
+        icon: SparklesIcon,
+        roles: [],
+        permissions: ["faculty_loading.manage"],
+      },
+      {
+        label: "Load Balancing",
+        routeName: "faculty-loading.load-balance.index",
+        href: route("faculty-loading.load-balance.index"),
+        icon: ScaleIcon,
+        roles: [],
+        permissions: ["faculty_loading.manage"],
       },
     ],
   },

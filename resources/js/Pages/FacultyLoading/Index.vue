@@ -43,6 +43,14 @@
           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-full font-medium transition-colors">
           <ChartBarIcon class="h-3.5 w-3.5" /> Reports
         </Link>
+        <Link :href="route('faculty-loading.ai-dashboard')"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-full font-medium transition-colors">
+          <CpuChipIcon class="h-3.5 w-3.5" /> AI Optimizer
+        </Link>
+        <Link :href="route('faculty-loading.load-balance.index')"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-full font-medium transition-colors">
+          <ScaleIcon class="h-3.5 w-3.5" /> Load Balance
+        </Link>
       </div>
 
       <!-- Flash -->
@@ -118,7 +126,20 @@
               <td class="px-4 py-3 text-center text-slate-700">{{ load.teaching_units }}</td>
               <td class="px-4 py-3 text-center text-slate-700">{{ load.research_units }}</td>
               <td class="px-4 py-3 text-center text-slate-700">{{ load.admin_units }}</td>
-              <td class="px-4 py-3 text-center font-semibold text-slate-800">{{ load.total_units }}</td>
+              <td class="px-4 py-3 text-center font-semibold text-slate-800">
+                <div class="flex flex-col items-center gap-1">
+                  <span>{{ load.total_units }}</span>
+                  <!-- Mini load bar -->
+                  <div class="w-16 bg-slate-100 rounded-full h-1.5 relative overflow-hidden">
+                    <div class="absolute inset-y-0 w-px bg-slate-400 z-10"
+                      :style="{ left: ((18 / 24) * 100) + '%' }" />
+                    <div class="h-full rounded-full transition-all"
+                      :class="load.load_status === 'overload' ? 'bg-red-400'
+                             : load.load_status === 'underload' ? 'bg-amber-300' : 'bg-emerald-400'"
+                      :style="{ width: Math.min(100, (parseFloat(load.total_units) / 24) * 100) + '%' }" />
+                  </div>
+                </div>
+              </td>
               <td class="px-4 py-3 text-center">
                 <span :class="statusBadge(load.load_status)"
                   class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
@@ -189,7 +210,8 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   BanknotesIcon, BeakerIcon, CalendarIcon, ChartBarIcon, CheckCircleIcon,
-  ClipboardDocumentListIcon, LockClosedIcon, LockOpenIcon, RectangleGroupIcon, UserGroupIcon,
+  ClipboardDocumentListIcon, CpuChipIcon, LockClosedIcon, LockOpenIcon,
+  RectangleGroupIcon, ScaleIcon, UserGroupIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
