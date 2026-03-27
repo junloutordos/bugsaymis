@@ -151,6 +151,7 @@
             <select v-model="termForm.term_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option value="1st_semester">1st Semester</option>
               <option value="2nd_semester">2nd Semester</option>
+              <option value="full_term">Full Term</option>
               <option value="summer">Summer</option>
               <option value="trimester">Trimester</option>
               <option value="quarter">Quarter</option>

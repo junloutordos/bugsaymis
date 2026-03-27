@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\FacultyLoading\AiDashboardController;
+use App\Http\Controllers\FacultyLoading\AutoAssignmentController;
+use App\Http\Controllers\FacultyLoading\AutoScheduleController;
+use App\Http\Controllers\FacultyLoading\LoadBalancingController;
 use App\Http\Controllers\FacultyLoading\ClassroomController;
 use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
 use App\Http\Controllers\FacultyLoading\ClassScheduleController;
@@ -51,6 +55,32 @@ Route::middleware(['web', 'auth', 'verified'])
 
         Route::middleware('permission:faculty_loading.manage')
             ->group(function () {
+                // ── AI Optimization Dashboard ───────────────────────────────────
+                Route::get('/ai-dashboard', [AiDashboardController::class, 'index'])->name('ai-dashboard');
+
+                // ── Auto Assignment ─────────────────────────────────────────────
+                Route::prefix('auto-assign')->name('auto-assign.')->group(function () {
+                    Route::get('/preview', [AutoAssignmentController::class, 'preview'])->name('preview');
+                    Route::post('/apply',  [AutoAssignmentController::class, 'apply'])->name('apply');
+                });
+
+                // ── Load Balancing Optimization ─────────────────────────────────
+                Route::prefix('load-balance')->name('load-balance.')->group(function () {
+                    Route::get('/',          [LoadBalancingController::class, 'index'])->name('index');
+                    Route::get('/analysis',  [LoadBalancingController::class, 'analysis'])->name('analysis');
+                    Route::post('/suggest',  [LoadBalancingController::class, 'suggest'])->name('suggest');
+                    Route::post('/apply',    [LoadBalancingController::class, 'apply'])->name('apply');
+                });
+
+                // ── AI Auto Schedule Generator ──────────────────────────────────
+                Route::prefix('auto-schedule')->name('auto-schedule.')->group(function () {
+                    Route::get('/',                             [AutoScheduleController::class, 'index'])->name('index');
+                    Route::post('/generate',                    [AutoScheduleController::class, 'generate'])->name('generate');
+                    Route::get('/jobs',                         [AutoScheduleController::class, 'jobs'])->name('jobs');
+                    Route::get('/jobs/{aiScheduleJob}',         [AutoScheduleController::class, 'showJob'])->name('jobs.show');
+                    Route::post('/jobs/{aiScheduleJob}/apply',  [AutoScheduleController::class, 'apply'])->name('jobs.apply');
+                });
+
                 // Schedules
                 Route::prefix('schedules')->name('schedules.')->group(function () {
                     Route::get('/',                          [ClassScheduleController::class, 'index'])->name('index');
