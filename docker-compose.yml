@@ -44,6 +44,20 @@ services:
     networks:
       - bugsaymis_network
 
+  soketi:
+    image: quay.io/soketi/soketi:latest-16-alpine
+    container_name: bugsaymis_soketi
+    restart: unless-stopped
+    environment:
+      SOKETI_DEFAULT_APP_ID: bugsaymis
+      SOKETI_DEFAULT_APP_KEY: bugsaymis-app-key
+      SOKETI_DEFAULT_APP_SECRET: bugsaymis-secret
+      SOKETI_DEBUG: 0
+    ports:
+      - "9601:9601"
+    networks:
+      - bugsaymis_network
+
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: bugsaymis_phpmyadmin
