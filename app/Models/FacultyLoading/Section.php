@@ -56,7 +56,7 @@ class Section extends Model
     }
 
     /** Section adviser (via legacy adviser column). */
-    public function adviser(): BelongsTo
+    public function adviserUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'adviser');
     }

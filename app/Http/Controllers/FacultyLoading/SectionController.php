@@ -22,7 +22,7 @@ class SectionController extends Controller
 
         $schoolYearId = $request->input('school_year_id');
 
-        $sections = Section::with(['schoolYear', 'adviser:id,name'])
+        $sections = Section::with(['schoolYear', 'adviserUser:id,name'])
             ->when($schoolYearId, fn ($q) => $q->where('syid', $schoolYearId))
             ->orderBy('levelid')
             ->orderBy('sectionname')
@@ -140,7 +140,7 @@ class SectionController extends Controller
             'strand'       => $s->strand,
             'capacity'     => $s->capacity,
             'is_active'    => $s->is_active,
-            'adviser'      => $s->adviser ? ['id' => $s->adviser->id, 'name' => $s->adviser->name] : null,
+            'adviser'      => $s->adviserUser ? ['id' => $s->adviserUser->id, 'name' => $s->adviserUser->name] : null,
             'school_year'  => $s->schoolYear ? ['id' => $s->schoolYear->id, 'name' => $s->schoolYear->name] : null,
         ];
     }

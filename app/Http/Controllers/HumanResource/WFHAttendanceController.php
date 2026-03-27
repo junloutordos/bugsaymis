@@ -244,12 +244,19 @@ class WFHAttendanceController extends Controller
             ->orderBy('date')
             ->get();
 
+        $division = $user->division_id
+            ? \App\Models\Division::with('divisionchief')->find($user->division_id)
+            : null;
+
         return Inertia::render('HumanResource/WFH/PrintTimeLogs', [
             'employee' => $user->only('id', 'name', 'position', 'badge_id'),
             'records'  => $records->map(fn ($r) => array_merge($r->toArray(), [
                 'date' => $r->getRawOriginal('date'),
             ])),
-            'month'    => $month,
+            'month'      => $month,
+            'chiefName'  => $division?->divisionchief?->name,
+            'chiefPosition' => $division?->divisionchief?->position,
+            'divisionName'  => $division?->division_name,
         ]);
     }
 

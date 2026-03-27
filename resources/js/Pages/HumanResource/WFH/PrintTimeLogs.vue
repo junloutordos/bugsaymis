@@ -1,74 +1,120 @@
 <template>
   <Head :title="`WFH Time Logs — ${employee.name} — ${monthLabel}`" />
 
-  <div class="print-root">
+  <div id="wfh-tl-root">
+    <table id="wfh-tl-wrap">
 
-    <!-- Header -->
-    <div class="report-header">
-      <div class="report-title">WORK FROM HOME TIME LOG</div>
-      <div class="report-subtitle">{{ monthLabel }}</div>
-      <div class="report-emp">{{ employee.name?.toUpperCase() }}</div>
-      <div class="report-pos">{{ employee.position ?? '' }}</div>
-    </div>
-
-    <!-- Table -->
-    <table class="log-table">
+      <!-- Repeating header -->
       <thead>
-        <tr>
-          <th class="col-date">Date</th>
-          <th class="col-day">Day</th>
-          <th class="col-time">Time In</th>
-          <th class="col-time">Break Out</th>
-          <th class="col-time">Break In</th>
-          <th class="col-time">Time Out</th>
-          <th class="col-dur">Work Duration</th>
-          <th class="col-status">Status</th>
-        </tr>
+        <tr><td id="wfh-tl-head">
+          <img src="/images/report_header.jpeg" style="width:100%; display:block;" />
+        </td></tr>
       </thead>
-      <tbody>
-        <tr v-for="rec in records" :key="rec.id">
-          <td class="col-date">{{ fmtDate(rec.date) }}</td>
-          <td class="col-day">{{ fmtDow(rec.date) }}</td>
-          <td class="col-time time-in">{{ fmtTime(rec.time_in) }}</td>
-          <td class="col-time">{{ fmtTime(rec.break_out) }}</td>
-          <td class="col-time">{{ fmtTime(rec.break_in) }}</td>
-          <td class="col-time time-out">{{ fmtTime(rec.time_out) }}</td>
-          <td class="col-dur">{{ calcDuration(rec.time_in, rec.time_out, rec.break_out, rec.break_in) }}</td>
-          <td class="col-status">
-            <span :class="rec.time_out ? 'badge-complete' : 'badge-partial'">
-              {{ rec.time_out ? 'Complete' : 'In Progress' }}
-            </span>
-          </td>
-        </tr>
-        <tr v-if="!records.length">
-          <td colspan="8" class="no-data">No WFH records for this month.</td>
-        </tr>
-      </tbody>
+
+      <!-- Repeating footer -->
       <tfoot>
-        <tr class="total-row">
-          <td colspan="6" style="text-align:right; padding-right:6px;">Total WFH Days:</td>
-          <td colspan="2">{{ records.length }} day(s)</td>
-        </tr>
+        <tr><td id="wfh-tl-foot">
+          <img src="/images/report_footer.jpeg" style="width:100%; display:block;" />
+        </td></tr>
       </tfoot>
+
+      <!-- Body -->
+      <tbody>
+        <tr><td id="wfh-tl-body">
+
+          <!-- Report title -->
+          <div style="text-align:center; margin:10px 0 12px;">
+            <h2 style="font-size:13pt; font-weight:bold; letter-spacing:1px; margin:0;">WORK FROM HOME TIME LOG</h2>
+            <p style="margin:4px 0 0; font-size:10pt;">{{ monthLabel }}</p>
+          </div>
+
+          <!-- Employee info -->
+          <table class="tl-info-table">
+            <thead>
+              <tr>
+                <th>NAME OF THE PERSONNEL</th>
+                <th>POSITION</th>
+                <th>PERIOD COVERED</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ employee.name?.toUpperCase() }}</td>
+                <td>{{ employee.position ?? '—' }}</td>
+                <td>{{ monthLabel }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Time log table -->
+          <table class="tl-table">
+            <thead>
+              <tr>
+                <th class="tl-col-date">Date</th>
+                <th class="tl-col-day">Day</th>
+                <th class="tl-col-time">Time In</th>
+                <th class="tl-col-time">Break Out</th>
+                <th class="tl-col-time">Break In</th>
+                <th class="tl-col-time">Time Out</th>
+                <th class="tl-col-dur">Work Duration</th>
+                <th class="tl-col-status">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="rec in records" :key="rec.id" class="tl-data-row">
+                <td class="tl-col-date">{{ fmtDate(rec.date) }}</td>
+                <td class="tl-col-day">{{ fmtDow(rec.date) }}</td>
+                <td class="tl-col-time tl-time-in">{{ fmtTime(rec.time_in) }}</td>
+                <td class="tl-col-time">{{ fmtTime(rec.break_out) }}</td>
+                <td class="tl-col-time">{{ fmtTime(rec.break_in) }}</td>
+                <td class="tl-col-time tl-time-out">{{ fmtTime(rec.time_out) }}</td>
+                <td class="tl-col-dur">{{ calcDuration(rec.time_in, rec.time_out, rec.break_out, rec.break_in) }}</td>
+                <td class="tl-col-status">
+                  <span :class="rec.time_out ? 'tl-badge-complete' : 'tl-badge-partial'">
+                    {{ rec.time_out ? 'Complete' : 'In Progress' }}
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="!records.length">
+                <td colspan="8" class="tl-no-data">No WFH records for this period.</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="tl-total-row">
+                <td colspan="6" style="text-align:right; padding-right:6px;">Total WFH Days:</td>
+                <td colspan="2">{{ records.length }} day(s)</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <!-- Certification -->
+          <p class="tl-certify">
+            I certify that the above is a true and correct record of my Work From Home attendance.
+          </p>
+
+          <!-- Signature row -->
+          <div class="tl-sig-row">
+            <!-- Employee -->
+            <div class="tl-sig-box">
+              <div class="tl-sig-line">
+                <span class="tl-sig-name">{{ employee.name?.toUpperCase() }}</span>
+              </div>
+              <div class="tl-sig-sub">{{ employee.position ?? 'Employee' }}</div>
+            </div>
+
+            <!-- Division Chief -->
+            <div class="tl-sig-box">
+              <div class="tl-sig-line">
+                <span v-if="chiefName" class="tl-sig-name">{{ chiefName.toUpperCase() }}</span>
+              </div>
+              <div class="tl-sig-sub">{{ chiefPosition ?? 'Division Chief' }}</div>
+              <div v-if="divisionName" class="tl-sig-division">{{ divisionName }}</div>
+            </div>
+          </div>
+
+        </td></tr>
+      </tbody>
     </table>
-
-    <!-- Certification -->
-    <div class="certify">
-      I certify that the above is a true and correct record of my Work From Home attendance.
-    </div>
-
-    <!-- Signature row -->
-    <div class="sig-row">
-      <div class="sig-box">
-        <div class="sig-line">
-          <span class="sig-name">{{ employee.name }}</span>
-        </div>
-        <div class="sig-label">{{ employee.position ?? 'Employee' }}</div>
-      </div>
-    </div>
-
-    <!-- Meta -->
-    <div class="meta">Date &amp; Time Printed: {{ printedAt }}</div>
   </div>
 </template>
 
@@ -77,9 +123,12 @@ import { computed, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee: Object,
-  records:  Array,
-  month:    String,
+  employee:      Object,
+  records:       Array,
+  month:         String,
+  chiefName:     { type: String, default: null },
+  chiefPosition: { type: String, default: null },
+  divisionName:  { type: String, default: null },
 })
 
 const [yr, mo] = props.month.split('-').map(Number)
@@ -88,13 +137,7 @@ const monthLabel = computed(() =>
   new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
 )
 
-const printedAt = computed(() => {
-  const n = new Date(), p = v => String(v).padStart(2, '0')
-  return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`
-})
-
 function parseDate(d) {
-  // Parse YYYY-MM-DD parts directly → no UTC/timezone conversion
   const [y, m, day] = String(d).slice(0, 10).split('-').map(Number)
   return new Date(y, m - 1, day)
 }
@@ -131,66 +174,111 @@ onMounted(() => setTimeout(() => window.print(), 400))
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; }
 
-.print-root {
+#wfh-tl-root {
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
   color: #000;
-  padding: 10mm;
-  font-size: 9px;
 }
 
-.report-header   { text-align: center; margin-bottom: 8px; }
-.report-title    { font-size: 13px; font-weight: 700; letter-spacing: .5px; }
-.report-subtitle { font-size: 10px; color: #444; margin-top: 1px; }
-.report-emp      { font-size: 11px; font-weight: 700; margin-top: 4px; }
-.report-pos      { font-size: 9px; color: #555; }
+#wfh-tl-wrap {
+  width: 100%;
+  border-collapse: collapse;
+}
 
-.log-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-.log-table th,
-.log-table td {
-  border: 1px solid #000;
-  padding: 2px 4px;
+#wfh-tl-head,
+#wfh-tl-foot {
+  padding: 0 0.75in;
+}
+
+#wfh-tl-body {
+  padding: 10px 0.75in;
+  vertical-align: top;
+}
+
+/* ── Info table ── */
+.tl-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.tl-info-table th,
+.tl-info-table td {
+  border: 1.5px solid #000;
+  padding: 4px 6px;
   text-align: center;
-  font-size: 8.5px;
+  font-size: 9pt;
+}
+.tl-info-table th { font-weight: 700; background: #f5f5f5; }
+.tl-info-table td { font-weight: 600; }
+
+/* ── Time log table ── */
+.tl-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 6px;
+}
+.tl-table th,
+.tl-table td {
+  border: 1.5px solid #000;
+  padding: 3px 5px;
+  text-align: center;
+  font-size: 9pt;
   line-height: 1.3;
 }
-.log-table th { font-weight: 700; background: #f0f0f0; }
+.tl-table th { font-weight: 700; background: #f0f0f0; }
 
-.col-date   { width: 80px; text-align: left !important; }
-.col-day    { width: 28px; }
-.col-time   { width: 56px; }
-.col-dur    { width: 54px; }
-.col-status { width: 60px; }
+.tl-col-date   { width: 90px; text-align: left !important; }
+.tl-col-day    { width: 32px; }
+.tl-col-time   { width: 65px; }
+.tl-col-dur    { width: 60px; }
+.tl-col-status { width: 68px; }
 
-.time-in  { color: #065f46; }
-.time-out { color: #1e40af; }
+.tl-time-in    { color: #065f46; }
+.tl-time-out   { color: #1e40af; }
 
-.badge-complete { color: #065f46; font-weight: 600; }
-.badge-partial  { color: #92400e; font-weight: 600; }
+.tl-badge-complete { color: #065f46; font-weight: 600; }
+.tl-badge-partial  { color: #92400e; font-weight: 600; }
 
-.total-row td { font-weight: 700; font-size: 8px; border-top: 2px solid #000; }
+.tl-total-row td {
+  font-weight: 700;
+  font-size: 9pt;
+  border-top: 2px solid #000;
+}
 
-.no-data { color: #aaa; padding: 12px !important; }
+.tl-no-data { color: #aaa; padding: 14px !important; }
 
-.certify { font-size: 8px; margin: 10px 0 6px; line-height: 1.5; }
+/* ── Certification ── */
+.tl-certify {
+  font-size: 9pt;
+  margin: 14px 0 6px;
+  line-height: 1.5;
+}
 
-.sig-row  { margin: 6px 0 4px; }
-.sig-box  { display: inline-block; width: 55%; }
-.sig-line {
+/* ── Signatures ── */
+.tl-sig-row {
+  display: flex;
+  gap: 60px;
+  margin-top: 10px;
+}
+.tl-sig-box  { min-width: 220px; }
+.tl-sig-line {
   border-bottom: 1px solid #000;
-  min-height: 22px;
+  min-height: 30px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 2px;
+  margin-bottom: 3px;
 }
-.sig-name  { font-weight: 700; font-size: 9px; text-decoration: underline; text-transform: uppercase; }
-.sig-label { font-size: 8px; text-align: center; margin-top: 1px; }
+.tl-sig-name     { font-weight: 700; font-size: 9.5pt; text-decoration: underline; }
+.tl-sig-sub      { font-size: 8.5pt; text-align: center; }
+.tl-sig-division { font-size: 8pt; color: #555; text-align: center; margin-top: 1px; }
 
-.meta { font-size: 7px; color: #888; border-top: 1px solid #ddd; padding-top: 2px; margin-top: 6px; }
+/* ── Print ── */
+@page { margin: 0.25in 0 0 0; }
 
 @media print {
-  @page { size: A4 portrait; margin: 10mm; }
-  body        { margin: 0; }
-  .print-root { padding: 0; }
+  body          { margin: 0; }
+  .tl-data-row  { break-inside: avoid; page-break-inside: avoid; }
 }
 </style>
