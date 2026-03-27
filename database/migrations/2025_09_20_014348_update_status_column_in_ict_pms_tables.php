@@ -13,12 +13,12 @@ return new class extends Migration
             $table->string('status')->default('pending')->after('schedule_date');
         });
 
-        // Drop status from ict_pms_equipment
-        Schema::table('ict_pms_equipment', function (Blueprint $table) {
-            if (Schema::hasColumn('ict_pms_equipment', 'status')) {
+        // Drop status from ict_pms_equipment (table may not exist on fresh installs)
+        if (Schema::hasTable('ict_pms_equipment') && Schema::hasColumn('ict_pms_equipment', 'status')) {
+            Schema::table('ict_pms_equipment', function (Blueprint $table) {
                 $table->dropColumn('status');
-            }
-        });
+            });
+        }
     }
 
     public function down()
@@ -30,9 +30,11 @@ return new class extends Migration
             }
         });
 
-        // Re-add status to ict_pms_equipment
-        Schema::table('ict_pms_equipment', function (Blueprint $table) {
-            $table->string('status')->default('pending')->after('equipment_id');
-        });
+        // Re-add status to ict_pms_equipment (table may not exist on fresh installs)
+        if (Schema::hasTable('ict_pms_equipment') && ! Schema::hasColumn('ict_pms_equipment', 'status')) {
+            Schema::table('ict_pms_equipment', function (Blueprint $table) {
+                $table->string('status')->default('pending')->after('equipment_id');
+            });
+        }
     }
 };

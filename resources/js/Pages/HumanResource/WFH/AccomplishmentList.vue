@@ -14,11 +14,13 @@
       >
         <!-- Content -->
         <div class="flex-1 min-w-0 space-y-1">
-          <p class="font-semibold text-slate-800 text-sm truncate">{{ item.title }}</p>
-
-          <p v-if="item.description" class="text-xs text-slate-500 line-clamp-2">
-            {{ item.description }}
-          </p>
+          <div class="flex items-start gap-2 flex-wrap">
+            <p class="text-sm text-slate-800 flex-1">{{ item.description || item.title }}</p>
+            <span v-if="item.time_from || item.time_to"
+              class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 rounded px-1.5 py-0.5 font-medium shrink-0">
+              🕐 {{ item.time_from ? fmtTime(item.time_from) : '—' }} – {{ item.time_to ? fmtTime(item.time_to) : '—' }}
+            </span>
+          </div>
 
           <!-- Proof badge -->
           <div v-if="item.proof_type" class="mt-1">
@@ -114,6 +116,15 @@ async function confirmDelete(item) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtTime(t) {
+  if (!t) return '—'
+  // t may be "HH:MM" or "HH:MM:SS"
+  const [h, m] = t.split(':').map(Number)
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const hh = h % 12 || 12
+  return `${hh}:${String(m).padStart(2, '0')} ${suffix}`
+}
+
 function driveThumb(url) {
   if (!url) return ''
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/)

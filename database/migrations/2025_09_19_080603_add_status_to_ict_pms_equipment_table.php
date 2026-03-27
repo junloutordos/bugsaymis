@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasTable('ict_pms_equipment')) return;
         Schema::table('ict_pms_equipment', function (Blueprint $table) {
             $table->string('status')->default('pending')->after('equipment_id');
         });
@@ -15,6 +16,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasTable('ict_pms_equipment')) return;
         Schema::table('ict_pms_equipment', function (Blueprint $table) {
             $table->dropColumn('status');
         });

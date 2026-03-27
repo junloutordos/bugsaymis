@@ -178,6 +178,27 @@ class RolePermissionSeeder extends Seeder
             'chat.access',
         ]);
 
+        // ── Faculty Loading ───────────────────────────────────────────────────
+        // CID/AUH: manage loads and schedules, manage catalog
+        $assign('CID', [
+            'faculty_loading.view',
+            'faculty_loading.manage',
+            'faculty_loading.reports',
+            'faculty_loading.subjects',
+            'faculty_loading.classrooms',
+            'faculty_loading.school_year',
+        ]);
+
+        // Campus Director: approve overloads + view everything
+        $assign('OCD', [
+            'faculty_loading.view',
+            'faculty_loading.approve',
+            'faculty_loading.reports',
+        ]);
+
+        // Faculty: view own load only
+        $assign('Faculty', ['faculty_loading.view_own']);
+
         // ── Faculty ───────────────────────────────────────────────────────────
         $assign('Faculty', [
             'hr.view',

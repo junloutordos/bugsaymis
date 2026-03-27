@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\FacultyLoading\SstPosition;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -23,6 +24,7 @@ class User extends Authenticatable
         'password',
         'role_id',
         'position',
+        'sst_position_id',
         'division_id',
         'office_id',
         'profile_picture',
@@ -86,6 +88,12 @@ class User extends Authenticatable
     public function ipcrs()
     {
         return $this->hasMany(IPCR::class, 'user_id');
+    }
+
+    /** SST position level (for Faculty Loading overload pay). */
+    public function sstPosition()
+    {
+        return $this->belongsTo(SstPosition::class, 'sst_position_id');
     }
 
     // ─── Permission cache (per-request, cleared on role change) ──────────────

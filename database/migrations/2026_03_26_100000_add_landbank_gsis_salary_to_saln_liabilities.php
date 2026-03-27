@@ -7,6 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'mysql') return;
         DB::statement("ALTER TABLE saln_liabilities MODIFY COLUMN nature ENUM(
             'housing_loan',
             'car_loan',
@@ -24,6 +25,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'mysql') return;
         DB::statement("ALTER TABLE saln_liabilities MODIFY COLUMN nature ENUM(
             'housing_loan',
             'car_loan',

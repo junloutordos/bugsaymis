@@ -257,25 +257,61 @@ class WFHAttendanceController extends Controller
 
     public function printAccomplishments(Request $request)
     {
-        $user  = Auth::user();
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
-        [$year, $mon] = explode('-', $month);
+        $user = Auth::user();
+        $mode = $request->input('mode', 'monthly'); // daily | monthly | range
 
-        $records = WFHAttendance::with('accomplishments')
+        $query = WFHAttendance::with('accomplishments')
             ->where('user_id', $user->id)
-            ->whereYear('date', $year)
-            ->whereMonth('date', $mon)
-            ->orderBy('date')
-            ->get()
+            ->orderBy('date');
+
+        $dateLabel = '';
+
+        if ($mode === 'daily') {
+            $date = $request->input('date', Carbon::today()->toDateString());
+            $query->whereDate('date', $date);
+            $dateLabel = Carbon::parse($date)->toFormattedDateString();
+        } elseif ($mode === 'range') {
+            $dateFrom = $request->input('date_from', Carbon::today()->toDateString());
+            $dateTo   = $request->input('date_to',   Carbon::today()->toDateString());
+            $query->whereBetween('date', [$dateFrom, $dateTo]);
+            $dateLabel = Carbon::parse($dateFrom)->format('M d, Y')
+                       . ' – '
+                       . Carbon::parse($dateTo)->format('M d, Y');
+        } else {
+            $month = $request->input('month', Carbon::now()->format('Y-m'));
+            [$year, $mon] = explode('-', $month);
+            $query->whereYear('date', $year)->whereMonth('date', $mon);
+            $dateLabel = Carbon::createFromDate($year, $mon, 1)->format('F Y');
+        }
+
+        $records = $query->get()
             ->filter(fn ($r) => $r->accomplishments->isNotEmpty())
             ->values();
 
+        // Resolve office & division directly to avoid conflict between
+        // the legacy `office` varchar column and the `office()` relationship.
+        $office   = $user->office_id
+            ? \App\Models\Office::with('unitHeadUser')->find($user->office_id)
+            : null;
+        $division = $user->division_id
+            ? \App\Models\Division::with('divisionchief')->find($user->division_id)
+            : null;
+
         return Inertia::render('HumanResource/WFH/PrintAccomplishments', [
-            'employee' => $user->only('id', 'name', 'position', 'badge_id'),
-            'records'  => $records->map(fn ($r) => array_merge($r->toArray(), [
+            'employee'      => $user->only('id', 'name', 'position', 'badge_id'),
+            'division'      => $division ? [
+                'division_name' => $division->division_name,
+                'chief_name'    => $division->divisionchief?->name,
+            ] : null,
+            'office'        => $office ? [
+                'name'           => $office->name,
+                'unit_head_name' => $office->unitHeadUser?->name,
+            ] : null,
+            'records'    => $records->map(fn ($r) => array_merge($r->toArray(), [
                 'date' => $r->getRawOriginal('date'),
             ])),
-            'month'    => $month,
+            'mode'       => $mode,
+            'dateLabel'  => $dateLabel,
         ]);
     }
 

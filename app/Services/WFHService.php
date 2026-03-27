@@ -167,11 +167,14 @@ class WFHService
             ]);
         }
 
+        $description = $data['description'] ?? null;
         $payload = [
             'wfh_attendance_id' => $attendance->id,
             'user_id'           => $user->id,
-            'title'             => $data['title'],
-            'description'       => $data['description'] ?? null,
+            'title'             => $data['title'] ?? mb_strimwidth($description ?? '', 0, 100, '…'),
+            'description'       => $description,
+            'time_from'         => $data['time_from'] ?? null,
+            'time_to'           => $data['time_to'] ?? null,
             'proof_type'        => $data['proof_type'] ?? null,
             'proof_link'        => $data['proof_link'] ?? null,
         ];

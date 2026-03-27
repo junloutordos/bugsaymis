@@ -263,7 +263,7 @@ class SalnEmployeeTest extends TestCase
                 'kind'                      => 'Residential Lot',
                 'exact_location'            => 'Butuan City, Agusan del Norte',
                 'current_fair_market_value' => 500000,
-                'acquisition_mode'          => 'bought',
+                'acquisition_mode'          => 'purchased',
                 'owner'                     => 'self',
             ])
             ->assertRedirect();
@@ -285,7 +285,7 @@ class SalnEmployeeTest extends TestCase
                 'kind'                      => 'Lot',
                 'exact_location'            => 'Cebu City',
                 'current_fair_market_value' => 1000000,
-                'acquisition_mode'          => 'bought',
+                'acquisition_mode'          => 'purchased',
                 'owner'                     => 'self',
             ]);
 
@@ -305,7 +305,7 @@ class SalnEmployeeTest extends TestCase
                 'kind'                      => 'Lot',
                 'exact_location'            => 'Cebu',
                 'current_fair_market_value' => 100000,
-                'acquisition_mode'          => 'bought',
+                'acquisition_mode'          => 'purchased',
                 'owner'                     => 'self',
             ])
             ->assertForbidden();

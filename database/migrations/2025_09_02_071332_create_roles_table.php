@@ -21,7 +21,8 @@ return new class extends Migration
             // optional: add foreign key
             $table->foreign('role_id')->references('id')->on('roles')->onDelete('set null');
 
-            // drop old enum column
+            // drop old enum column (drop index first for SQLite compatibility)
+            $table->dropIndex('users_role_index');
             $table->dropColumn('role');
         });
     }

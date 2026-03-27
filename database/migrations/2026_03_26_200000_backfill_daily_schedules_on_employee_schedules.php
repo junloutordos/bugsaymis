@@ -12,6 +12,8 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // JOIN UPDATE syntax is MySQL-only; skip on SQLite (test env)
+        if (DB::connection()->getDriverName() !== 'mysql') return;
         DB::statement('
             UPDATE employee_schedules es
             JOIN schedule_presets sp ON es.name = sp.name

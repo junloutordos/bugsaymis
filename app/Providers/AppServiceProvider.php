@@ -95,6 +95,20 @@ class AppServiceProvider extends ServiceProvider
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }
 
+        // ── Faculty Loading permission gates ──────────────────────────────────
+        foreach ([
+            'faculty_loading.view',
+            'faculty_loading.view_own',
+            'faculty_loading.manage',
+            'faculty_loading.approve',
+            'faculty_loading.reports',
+            'faculty_loading.subjects',
+            'faculty_loading.classrooms',
+            'faculty_loading.school_year',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
         // ── SALN permission gates ──────────────────────────────────────────────
         foreach ([
             'saln.create',

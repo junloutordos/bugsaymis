@@ -1,114 +1,163 @@
 <template>
-  <Head :title="`WFH Accomplishments — ${employee.name} — ${monthLabel}`" />
+  <Head :title="`Accomplishment Report — ${employee.name}`" />
 
-  <div class="print-root">
+  <div id="wfh-print-root">
+    <table id="wfh-pt-wrap">
 
-    <!-- Header -->
-    <div class="report-header">
-      <div class="report-title">WORK FROM HOME ACCOMPLISHMENT REPORT</div>
-      <div class="report-subtitle">{{ monthLabel }}</div>
-      <div class="report-emp">{{ employee.name?.toUpperCase() }}</div>
-      <div class="report-pos">{{ employee.position ?? '' }}</div>
-    </div>
+      <!-- Repeating header on every page -->
+      <thead>
+        <tr><td id="wfh-pt-head">
+          <img src="/images/report_header.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </thead>
 
-    <!-- No records -->
-    <div v-if="!records.length" class="no-data">
-      No accomplishments recorded for this month.
-    </div>
+      <!-- Repeating footer on every page -->
+      <tfoot>
+        <tr><td id="wfh-pt-foot">
+          <img src="/images/report_footer.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </tfoot>
 
-    <!-- Per-day sections -->
-    <div v-for="rec in records" :key="rec.id" class="day-block">
-      <div class="day-header">
-        <span class="day-date">{{ fmtDate(rec.date) }}</span>
-        <span class="day-times">
-          Time In: {{ fmtTime(rec.time_in) }} &nbsp;|&nbsp; Time Out: {{ fmtTime(rec.time_out) }}
-        </span>
-      </div>
+      <!-- Body -->
+      <tbody>
+        <tr><td id="wfh-pt-body">
 
-      <table class="acc-table">
-        <thead>
-          <tr>
-            <th class="col-num">#</th>
-            <th class="col-title">Accomplishment</th>
-            <th class="col-desc">Description</th>
-            <th class="col-proof">Proof</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(acc, i) in rec.accomplishments" :key="acc.id">
-            <td class="col-num">{{ i + 1 }}</td>
-            <td class="col-title">{{ acc.title }}</td>
-            <td class="col-desc">{{ acc.description ?? '—' }}</td>
-            <td class="col-proof">
-              <span v-if="acc.proof_type === 'photo' && acc.google_drive_link">📷 Photo attached</span>
-              <span v-else-if="acc.proof_type === 'link' && acc.proof_link">🔗 {{ acc.proof_link }}</span>
-              <span v-else>—</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+          <!-- Report title -->
+          <div style="text-align:center; margin:10px 0 12px;">
+            <h2 style="font-size:13pt; font-weight:bold; letter-spacing:1px; margin:0;">ACCOMPLISHMENT REPORT</h2>
+          </div>
 
-    <!-- Summary -->
-    <div class="summary">
-      Total WFH Days with Accomplishments: {{ records.length }} &nbsp;|&nbsp;
-      Total Accomplishments: {{ totalAccomplishments }}
-    </div>
+          <!-- Personnel info table -->
+          <table class="wfh-info-table">
+            <thead>
+              <tr>
+                <th>NAME OF THE PERSONNEL</th>
+                <th>UNIT/DIVISION</th>
+                <th>DATES</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{{ employee.name?.toUpperCase() }}</td>
+                <td>{{ division?.division_name ?? '—' }}</td>
+                <td>{{ dateLabel }}</td>
+              </tr>
+            </tbody>
+          </table>
 
-    <!-- Certification -->
-    <div class="certify">
-      I certify that the above accomplishments were completed during my Work From Home arrangement.
-    </div>
+          <!-- No records -->
+          <div v-if="!records.length" class="wfh-no-data">
+            No accomplishments recorded for the selected period.
+          </div>
 
-    <!-- Signature -->
-    <div class="sig-row">
-      <div class="sig-box">
-        <div class="sig-line">
-          <span class="sig-name">{{ employee.name }}</span>
-        </div>
-        <div class="sig-label">{{ employee.position ?? 'Employee' }}</div>
-      </div>
-    </div>
+          <!-- Accomplishments table -->
+          <template v-else>
+            <table class="wfh-main-table">
+              <thead>
+                <tr>
+                  <th class="wfh-col-date">DATE</th>
+                  <th class="wfh-col-time">Time</th>
+                  <th class="wfh-col-acc">DETAILED ACCOMPLISHMENTS</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-for="rec in records" :key="rec.id">
+                  <tr v-for="(acc, idx) in rec.accomplishments" :key="acc.id" class="wfh-data-row">
+                    <!-- DATE — spans all rows for this day -->
+                    <td v-if="idx === 0"
+                        :rowspan="rec.accomplishments.length"
+                        class="wfh-col-date wfh-date-cell">
+                      {{ fmtDate(rec.date) }}
+                    </td>
+                    <!-- Time range -->
+                    <td class="wfh-col-time">
+                      <span v-if="acc.time_from || acc.time_to">
+                        {{ acc.time_from ? fmtTime(acc.time_from) : '' }} - {{ acc.time_to ? fmtTime(acc.time_to) : '' }}
+                      </span>
+                      <span v-else>&mdash;</span>
+                    </td>
+                    <!-- Accomplishment text -->
+                    <td class="wfh-col-acc">{{ acc.description || acc.title }}</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
 
-    <!-- Meta -->
-    <div class="meta">Date &amp; Time Printed: {{ printedAt }}</div>
+            <p class="wfh-note">
+              <em>Note: The time may be modified according to your schedule, as long as tasks are properly accounted for in hourly basis.</em>
+            </p>
+          </template>
+
+          <!-- Signatures -->
+          <div class="wfh-sig-section">
+            <p class="wfh-sig-top">Prepared by:</p>
+            <div class="wfh-sig-single">
+              <div class="wfh-sig-name">{{ employee.name?.toUpperCase() }}</div>
+              <div class="wfh-sig-sub">{{ employee.position ?? 'Personnel' }}</div>
+            </div>
+          </div>
+
+          <div class="wfh-sig-section">
+            <p class="wfh-sig-top">Monitored &amp; Reviewed by:</p>
+            <div class="wfh-sig-row">
+              <div class="wfh-sig-box">
+                <div class="wfh-sig-line">
+                  <span v-if="office?.unit_head_name" class="wfh-sig-name-inline">{{ office.unit_head_name.toUpperCase() }}</span>
+                </div>
+                <div class="wfh-sig-sub">Academic/ Unit Head</div>
+                <div v-if="office?.name" class="wfh-sig-office">{{ office.name }}</div>
+              </div>
+              <div class="wfh-sig-box">
+                <div class="wfh-sig-line">
+                  <span v-if="division?.chief_name" class="wfh-sig-name-inline">{{ division.chief_name.toUpperCase() }}</span>
+                </div>
+                <div class="wfh-sig-sub">Division Chief</div>
+                <div v-if="division?.division_name" class="wfh-sig-office">{{ division.division_name }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wfh-sig-section">
+            <p class="wfh-sig-top">Approved by:</p>
+            <div class="wfh-sig-single">
+              <div class="wfh-sig-name">MICHELLE B. FERNANDO, PhD</div>
+              <div class="wfh-sig-sub">Officer-In-Charge, Campus Director</div>
+            </div>
+          </div>
+
+        </td></tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee: Object,
-  records:  Array,
-  month:    String,
-})
-
-const [yr, mo] = props.month.split('-').map(Number)
-
-const monthLabel = computed(() =>
-  new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
-)
-
-const totalAccomplishments = computed(() =>
-  props.records.reduce((s, r) => s + (r.accomplishments?.length ?? 0), 0)
-)
-
-const printedAt = computed(() => {
-  const n = new Date(), p = v => String(v).padStart(2, '0')
-  return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`
+  employee:  Object,
+  division:  { type: Object, default: null },
+  office:    { type: Object, default: null },
+  records:   Array,
+  mode:      { type: String, default: 'monthly' },
+  dateLabel: { type: String, default: '' },
 })
 
 function fmtDate(d) {
   if (!d) return '—'
   const [y, m, day] = String(d).slice(0, 10).split('-').map(Number)
-  return new Date(y, m - 1, day).toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  return new Date(y, m - 1, day).toLocaleDateString('en-PH', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  })
 }
 
-function fmtTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
+function fmtTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const hh = h % 12 || 12
+  return `${hh}:${String(m).padStart(2, '0')} ${suffix}`
 }
 
 onMounted(() => setTimeout(() => window.print(), 400))
@@ -118,81 +167,125 @@ onMounted(() => setTimeout(() => window.print(), 400))
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; }
 
-.print-root {
+#wfh-print-root {
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
   color: #000;
-  padding: 10mm;
-  font-size: 9px;
 }
 
-.report-header   { text-align: center; margin-bottom: 10px; }
-.report-title    { font-size: 13px; font-weight: 700; letter-spacing: .5px; }
-.report-subtitle { font-size: 10px; color: #444; margin-top: 1px; }
-.report-emp      { font-size: 11px; font-weight: 700; margin-top: 4px; }
-.report-pos      { font-size: 9px; color: #555; }
-
-.day-block  { margin-bottom: 10px; page-break-inside: avoid; }
-.day-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #f0f0f0;
-  border: 1px solid #ccc;
-  padding: 3px 6px;
-  font-size: 9px;
-  font-weight: 700;
-  margin-bottom: 0;
+#wfh-pt-wrap {
+  width: 100%;
+  border-collapse: collapse;
 }
-.day-date  { font-size: 9.5px; }
-.day-times { font-size: 8px; color: #555; font-weight: 400; }
 
-.acc-table { width: 100%; border-collapse: collapse; }
-.acc-table th,
-.acc-table td {
-  border: 1px solid #ccc;
-  padding: 3px 5px;
-  font-size: 8.5px;
+#wfh-pt-head,
+#wfh-pt-foot {
+  padding: 0 0.75in;
+}
+
+#wfh-pt-body {
+  padding: 10px 0.75in;
   vertical-align: top;
-  line-height: 1.4;
 }
-.acc-table th { font-weight: 700; background: #fafafa; text-align: center; }
 
-.col-num   { width: 18px; text-align: center; }
-.col-title { width: 30%; font-weight: 600; }
-.col-desc  { width: 40%; }
-.col-proof { width: 20%; font-size: 8px; word-break: break-all; }
+/* ── Personnel info table ── */
+.wfh-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.wfh-info-table th,
+.wfh-info-table td {
+  border: 1.5px solid #000;
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 9pt;
+}
+.wfh-info-table th { font-weight: 700; background: #f5f5f5; }
+.wfh-info-table td { font-weight: 600; }
 
-.no-data { padding: 20px; text-align: center; color: #aaa; font-size: 9px; }
-
-.summary {
-  margin: 8px 0 4px;
-  font-size: 8.5px;
+/* ── Accomplishments table ── */
+.wfh-main-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+.wfh-main-table th,
+.wfh-main-table td {
+  border: 1.5px solid #000;
+  padding: 4px 6px;
+  vertical-align: top;
+  font-size: 9pt;
+  line-height: 1.5;
+}
+.wfh-main-table th {
   font-weight: 700;
-  border-top: 1.5px solid #000;
-  padding-top: 4px;
+  text-align: center;
+  background: #f5f5f5;
 }
 
-.certify { font-size: 8px; margin: 8px 0 6px; line-height: 1.5; }
+.wfh-col-date  { width: 18%; text-align: center; }
+.wfh-col-time  { width: 18%; text-align: center; }
+.wfh-col-acc   { width: 64%; }
+.wfh-date-cell { font-weight: 700; vertical-align: middle; }
 
-.sig-row  { margin: 6px 0 4px; }
-.sig-box  { display: inline-block; width: 55%; }
-.sig-line {
+.wfh-note {
+  font-size: 8pt;
+  margin: 4px 0 18px;
+  line-height: 1.5;
+}
+.wfh-no-data {
+  padding: 20px;
+  text-align: center;
+  color: #aaa;
+  font-size: 9pt;
+  border: 1px solid #ccc;
+  margin-bottom: 14px;
+}
+
+/* ── Signatures ── */
+.wfh-sig-section { margin-bottom: 18px; }
+.wfh-sig-top     { font-size: 9pt; margin-bottom: 22px; }
+
+.wfh-sig-single  { display: inline-block; min-width: 220px; }
+.wfh-sig-name {
+  font-weight: 700;
+  font-size: 10pt;
+  text-decoration: underline;
+  text-transform: uppercase;
   border-bottom: 1px solid #000;
-  min-height: 22px;
+  padding-bottom: 2px;
+  margin-bottom: 3px;
+}
+.wfh-sig-sub { font-size: 8.5pt; }
+
+.wfh-sig-row {
+  display: flex;
+  gap: 60px;
+}
+.wfh-sig-box    { min-width: 200px; }
+.wfh-sig-line   {
+  border-bottom: 1px solid #000;
+  min-height: 30px;
+  margin-bottom: 3px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 2px;
 }
-.sig-name  { font-weight: 700; font-size: 9px; text-decoration: underline; text-transform: uppercase; }
-.sig-label { font-size: 8px; text-align: center; margin-top: 1px; }
+.wfh-sig-name-inline {
+  font-weight: 700;
+  font-size: 9.5pt;
+  text-decoration: underline;
+  text-align: center;
+}
+.wfh-sig-office { font-size: 8pt; color: #555; margin-top: 1px; }
 
-.meta { font-size: 7px; color: #888; border-top: 1px solid #ddd; padding-top: 2px; margin-top: 6px; }
+/* ── Print ── */
+@page { margin: 0.25in 0 0 0; }
 
 @media print {
-  @page { size: A4 portrait; margin: 10mm; }
-  body        { margin: 0; }
-  .print-root { padding: 0; }
-  .day-block  { page-break-inside: avoid; }
+  body           { margin: 0; }
+  .wfh-data-row  { break-inside: avoid; page-break-inside: avoid; }
 }
 </style>

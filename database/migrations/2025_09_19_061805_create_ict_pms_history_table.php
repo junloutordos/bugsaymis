@@ -39,9 +39,11 @@ class CreateIctPmsHistoryTable extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            // Optional foreign keys — enable if those tables exist and your naming matches:
             $table->foreign('ict_pms_id')->references('id')->on('ict_pms')->onDelete('cascade');
-            $table->foreign('equipment_id')->references('id')->on('ict_equipments')->onDelete('set null'); 
+            // ict_equipments table may not exist on fresh installs — skip FK if absent
+            if (Schema::hasTable('ict_equipments')) {
+                $table->foreign('equipment_id')->references('id')->on('ict_equipments')->onDelete('set null');
+            }
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
         });
     }

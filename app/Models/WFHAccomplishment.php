@@ -13,6 +13,8 @@ class WFHAccomplishment extends Model
         'user_id',
         'title',
         'description',
+        'time_from',
+        'time_to',
         'proof_type',
         'proof_link',
         'google_drive_file_id',

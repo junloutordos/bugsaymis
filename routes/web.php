@@ -1514,4 +1514,5 @@ if (app()->environment('local')) {
 */
 require __DIR__.'/chat.php';
 require __DIR__.'/saln.php';
+require __DIR__.'/faculty-loading.php';
 require __DIR__.'/auth.php';

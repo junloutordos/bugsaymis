@@ -59,7 +59,7 @@ class SalnNetWorthTest extends TestCase
             'kind'                      => 'House and Lot',
             'exact_location'            => 'Butuan City',
             'current_fair_market_value' => 2000000,
-            'acquisition_mode'          => 'bought',
+            'acquisition_mode'          => 'purchased',
             'owner'                     => 'self',
         ]);
 

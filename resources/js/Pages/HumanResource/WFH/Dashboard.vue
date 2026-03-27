@@ -214,10 +214,62 @@
            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           🖨️ Time Logs
         </a>
-        <a :href="`/hr/wfh/print/accomplishments?month=${currentMonth}`" target="_blank"
+        <button @click="showPrintModal = true"
            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           🖨️ Accomplishments
-        </a>
+        </button>
+      </div>
+
+      <!-- Print Accomplishments Modal -->
+      <div v-if="showPrintModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+          <h2 class="text-base font-semibold text-slate-800">Print Accomplishments</h2>
+
+          <!-- Mode selector -->
+          <div class="flex gap-3">
+            <label v-for="opt in [{v:'daily',l:'Daily'},{v:'monthly',l:'Monthly'},{v:'range',l:'Date Range'}]" :key="opt.v"
+              class="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
+              <input type="radio" v-model="printMode" :value="opt.v" class="accent-indigo-600" />
+              {{ opt.l }}
+            </label>
+          </div>
+
+          <!-- Daily -->
+          <div v-if="printMode === 'daily'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
+            <input type="date" v-model="printDate"
+              class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+          </div>
+
+          <!-- Monthly -->
+          <div v-if="printMode === 'monthly'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
+            <input type="month" v-model="printMonth"
+              class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+          </div>
+
+          <!-- Date Range -->
+          <div v-if="printMode === 'range'" class="space-y-2">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
+              <input type="date" v-model="printDateFrom"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">To</label>
+              <input type="date" v-model="printDateTo"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 pt-1">
+            <button @click="showPrintModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
+            <a :href="printAccomplishmentsUrl" target="_blank"
+               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              🖨️ Print
+            </a>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -242,6 +294,7 @@ const props = defineProps({
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const currentMonth           = new Date().toISOString().slice(0, 7)
+const today_str              = new Date().toISOString().slice(0, 10)
 const attendance             = ref(props.todayAttendance)
 const localAccomplishments   = ref(props.todayAttendance?.accomplishments ?? [])
 const showCamera             = ref(false)
@@ -250,6 +303,21 @@ const capturedImage          = ref(null)
 const loading                = ref(false)
 const breakLoading           = ref(false)
 const showAccomplishmentPanel = ref(false)
+
+// Print accomplishments modal
+const showPrintModal  = ref(false)
+const printMode       = ref('monthly')
+const printDate       = ref(today_str)
+const printMonth      = ref(currentMonth)
+const printDateFrom   = ref(today_str)
+const printDateTo     = ref(today_str)
+
+const printAccomplishmentsUrl = computed(() => {
+  const base = '/hr/wfh/print/accomplishments'
+  if (printMode.value === 'daily')   return `${base}?mode=daily&date=${printDate.value}`
+  if (printMode.value === 'range')   return `${base}?mode=range&date_from=${printDateFrom.value}&date_to=${printDateTo.value}`
+  return `${base}?mode=monthly&month=${printMonth.value}`
+})
 
 // Template refs
 const videoEl  = ref(null)

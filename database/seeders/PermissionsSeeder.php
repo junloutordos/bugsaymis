@@ -158,6 +158,16 @@ class PermissionsSeeder extends Seeder
             // ── Chat ──────────────────────────────────────────────────────────
             ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],
 
+            // ── Faculty Loading ───────────────────────────────────────────────
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view',        'description' => 'View faculty loads and schedules'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view_own',    'description' => 'Faculty: view own load and schedule'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.manage',      'description' => 'CID/AUH: assign subjects, schedules, classrooms'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.approve',     'description' => 'Campus Director: approve overloads'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.reports',     'description' => 'View faculty load and schedule reports'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.subjects',    'description' => 'Manage subject catalog'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.classrooms',  'description' => 'Manage classroom catalog'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.school_year', 'description' => 'Manage school years and academic terms'],
+
         ];
 
         foreach ($permissions as $data) {

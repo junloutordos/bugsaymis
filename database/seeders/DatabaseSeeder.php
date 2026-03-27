@@ -59,5 +59,15 @@ class DatabaseSeeder extends Seeder
         $this->call(HolidaysSeeder::class);
         $this->call(AllowanceTypesSeeder::class);
         $this->call(PayrollPermissionsSeeder::class);
+
+        // ── Faculty Loading Module ─────────────────────────────────────────────
+        // Order matters: SchoolYear before Sections (FK dependency)
+        $this->call(SchoolYearSeeder::class);       // school_years + academic_terms
+        $this->call(SubjectSeeder::class);           // subjects catalog (44+ PSHS subjects)
+        $this->call(ClassroomSeeder::class);         // classrooms (labs, lecture halls, etc.)
+        $this->call(CommitteeSeeder::class);         // institutional committees
+        $this->call(SstPositionSeeder::class);       // SST I–V position reference data
+        $this->call(SalaryScheduleSeeder::class);    // DBM SSL V 2023 salary schedule (SG 1–33)
+        $this->call(SectionSeeder::class);           // student sections (requires school year)
     }
 }

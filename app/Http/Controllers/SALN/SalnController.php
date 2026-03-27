@@ -127,13 +127,15 @@ class SalnController extends Controller
             'spouse_government_id'  => 'nullable|string|max:100',
         ]);
 
-        // Prevent duplicate
-        $exists = SalnRecord::where('user_id', Auth::id())
+        // Prevent duplicate — redirect to the existing record
+        $existing = SalnRecord::where('user_id', Auth::id())
             ->where('year', $data['year'])
-            ->exists();
+            ->first();
 
-        if ($exists) {
-            return back()->withErrors(['year' => "A SALN record for {$data['year']} already exists."]);
+        if ($existing) {
+            return redirect()
+                ->route('saln.show', $existing->id)
+                ->with('info', "You already have a SALN record for {$data['year']}. Redirected to existing record.");
         }
 
         $saln = SalnRecord::create([
@@ -255,12 +257,12 @@ class SalnController extends Controller
         $data = $request->validate([
             'kind'                      => 'required|string|max:100',
             'exact_location'            => 'required|string|max:500',
-            'assessed_value'            => 'required|numeric|min:0',
+            'assessed_value'            => 'nullable|numeric|min:0',
             'current_fair_market_value' => 'required|numeric|min:0',
             'year_acquired'             => 'nullable|integer|min:1900|max:' . now()->year,
             'acquisition_mode'          => 'required|in:purchased,inherited,gift,others',
             'acquisition_mode_other'    => 'nullable|string|max:100',
-            'acquisition_cost'          => 'required|numeric|min:0',
+            'acquisition_cost'          => 'nullable|numeric|min:0',
             'owner'                     => 'required|in:self,spouse,dependent',
         ]);
 
@@ -278,12 +280,12 @@ class SalnController extends Controller
         $data = $request->validate([
             'kind'                      => 'required|string|max:100',
             'exact_location'            => 'required|string|max:500',
-            'assessed_value'            => 'required|numeric|min:0',
+            'assessed_value'            => 'nullable|numeric|min:0',
             'current_fair_market_value' => 'required|numeric|min:0',
             'year_acquired'             => 'nullable|integer|min:1900|max:' . now()->year,
             'acquisition_mode'          => 'required|in:purchased,inherited,gift,others',
             'acquisition_mode_other'    => 'nullable|string|max:100',
-            'acquisition_cost'          => 'required|numeric|min:0',
+            'acquisition_cost'          => 'nullable|numeric|min:0',
             'owner'                     => 'required|in:self,spouse,dependent',
         ]);
 
@@ -419,7 +421,7 @@ class SalnController extends Controller
             'business_address'          => 'required|string|max:500',
             'nature_of_business'        => 'required|string|max:255',
             'date_acquired'             => 'nullable|date',
-            'acquisition_cost'          => 'required|numeric|min:0',
+            'acquisition_cost'          => 'nullable|numeric|min:0',
             'present_fair_market_value' => 'required|numeric|min:0',
             'owner'                     => 'required|in:self,spouse',
         ]);
@@ -439,7 +441,7 @@ class SalnController extends Controller
             'business_address'          => 'required|string|max:500',
             'nature_of_business'        => 'required|string|max:255',
             'date_acquired'             => 'nullable|date',
-            'acquisition_cost'          => 'required|numeric|min:0',
+            'acquisition_cost'          => 'nullable|numeric|min:0',
             'present_fair_market_value' => 'required|numeric|min:0',
             'owner'                     => 'required|in:self,spouse',
         ]);

@@ -168,30 +168,6 @@ class UserController extends Controller
             'office_id'   => 'nullable|exists:offices,id',
         ]);
 
-        // Normalize role_id input: accept array or comma-separated string
-        $roleInput = $request->input('role_id');
-        $roleIds = [];
-        if (is_array($roleInput)) {
-            $roleIds = array_map('intval', $roleInput);
-        } elseif (is_string($roleInput)) {
-            $roleIds = array_filter(array_map('trim', explode(',', $roleInput)), fn($v) => $v !== '');
-            $roleIds = array_map('intval', $roleIds);
-        } elseif ($roleInput !== null) {
-            $roleIds = [intval($roleInput)];
-        }
-
-        if (empty($roleIds)) {
-            return back()->withErrors(['role_id' => 'Please select at least one role.']);
-        }
-
-        // ensure all provided role ids exist
-        $count = Role::whereIn('id', $roleIds)->count();
-        if ($count !== count($roleIds)) {
-            return back()->withErrors(['role_id' => 'One or more selected roles are invalid.']);
-        }
-
-        $data['role_id'] = implode(',', $roleIds);
-
         User::create($data);
 
         return redirect()->route('users.index')->with('success', 'User created successfully');
@@ -212,30 +188,6 @@ class UserController extends Controller
             'division_id' => 'nullable|exists:divisions,id',
             'office_id'   => 'nullable|exists:offices,id',
         ]);
-
-        // Normalize role_id input
-        $roleInput = $request->input('role_id');
-        $roleIds = [];
-        if (is_array($roleInput)) {
-            $roleIds = array_map('intval', $roleInput);
-        } elseif (is_string($roleInput)) {
-            $roleIds = array_filter(array_map('trim', explode(',', $roleInput)), fn($v) => $v !== '');
-            $roleIds = array_map('intval', $roleIds);
-        } elseif ($roleInput !== null) {
-            $roleIds = [intval($roleInput)];
-        }
-
-        if (empty($roleIds)) {
-            return back()->withErrors(['role_id' => 'Please select at least one role.']);
-        }
-
-        // ensure all provided role ids exist
-        $count = Role::whereIn('id', $roleIds)->count();
-        if ($count !== count($roleIds)) {
-            return back()->withErrors(['role_id' => 'One or more selected roles are invalid.']);
-        }
-
-        $data['role_id'] = implode(',', $roleIds);
 
         $user->update($data);
 

@@ -2,30 +2,40 @@
   <div class="space-y-4">
     <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Add Accomplishment</h4>
 
-    <!-- Title -->
-    <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">Title <span class="text-red-500">*</span></label>
-      <input
-        v-model="form.title"
-        type="text"
-        maxlength="255"
-        placeholder="e.g. Completed project report"
-        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-        :class="{ 'border-red-400': errors.title }"
-      />
-      <p v-if="errors.title" class="text-red-500 text-xs mt-1">{{ errors.title }}</p>
+    <!-- Time Range -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Time From</label>
+        <input
+          v-model="form.time_from"
+          type="time"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Time To</label>
+        <input
+          v-model="form.time_to"
+          type="time"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+          :class="{ 'border-red-400': errors.time_to }"
+        />
+        <p v-if="errors.time_to" class="text-red-500 text-xs mt-1">{{ errors.time_to }}</p>
+      </div>
     </div>
 
-    <!-- Description -->
+    <!-- Accomplishment -->
     <div>
-      <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+      <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment <span class="text-red-500">*</span></label>
       <textarea
         v-model="form.description"
-        rows="3"
+        rows="4"
         maxlength="2000"
-        placeholder="Brief description of what you accomplished…"
+        placeholder="Describe what you accomplished during this time…"
         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full resize-none"
+        :class="{ 'border-red-400': errors.description }"
       />
+      <p v-if="errors.description" class="text-red-500 text-xs mt-1">{{ errors.description }}</p>
     </div>
 
     <!-- Proof Type -->
@@ -120,8 +130,9 @@ const emit = defineEmits(['saved'])
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const form = reactive({
-  title:       '',
   description: '',
+  time_from:   '',
+  time_to:     '',
   proof_type:  '',   // '' | 'photo' | 'link'
   proof_link:  '',
 })
@@ -165,8 +176,8 @@ function clearPhoto() {
 async function submit() {
   errors.value = {}
 
-  if (!form.title.trim()) {
-    errors.value = { title: 'Title is required.' }
+  if (!form.description.trim()) {
+    errors.value = { description: 'Accomplishment is required.' }
     return
   }
   if (form.proof_type === 'link' && !form.proof_link.trim()) {
@@ -182,8 +193,9 @@ async function submit() {
 
   try {
     const fd = new FormData()
-    fd.append('title',       form.title.trim())
     fd.append('description', form.description.trim())
+    if (form.time_from) fd.append('time_from', form.time_from)
+    if (form.time_to)   fd.append('time_to',   form.time_to)
     if (form.proof_type) fd.append('proof_type', form.proof_type)
     if (form.proof_type === 'link')  fd.append('proof_link', form.proof_link.trim())
     if (form.proof_type === 'photo') fd.append('photo', photoFile.value)
@@ -212,8 +224,9 @@ async function submit() {
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 function resetForm() {
-  form.title       = ''
   form.description = ''
+  form.time_from   = ''
+  form.time_to     = ''
   form.proof_type  = ''
   form.proof_link  = ''
   clearPhoto()
