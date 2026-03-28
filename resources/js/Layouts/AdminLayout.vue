@@ -167,6 +167,12 @@ const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
+// Sum badges for all children of a group item (for parent group button)
+const getGroupBadge = (item) => {
+  if (!item.children) return 0;
+  return item.children.reduce((sum, child) => sum + getBadge(child), 0);
+};
+
 // Return numeric badge from shared Inertia props based on child routeName
 const getBadge = (child) => {
   const rn = child?.routeName || null;
@@ -1622,6 +1628,10 @@ filteredMenu.value.forEach((item) => {
                 ]"
               />
               <span v-if="!collapsed" class="flex-1 truncate text-left">{{ item.label }}</span>
+              <span
+                v-if="!collapsed && !expanded[item.label] && getGroupBadge(item) > 0"
+                class="ml-1 shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
+              >{{ getGroupBadge(item) }}</span>
               <ChevronDownIcon
                 v-if="!collapsed"
                 class="h-3.5 w-3.5 ml-1 shrink-0 text-slate-600 transition-transform duration-200"

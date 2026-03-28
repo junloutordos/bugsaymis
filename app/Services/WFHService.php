@@ -179,7 +179,7 @@ class WFHService
             'proof_link'        => $data['proof_link'] ?? null,
         ];
 
-        if ($data['proof_type'] === 'photo' && $photo) {
+        if (($data['proof_type'] ?? null) === 'photo' && $photo) {
             $fileName = "WFH/{$user->id}/{$today}/accomplishment_{$photo->getClientOriginalName()}";
             $uploaded = $this->drive->upload($photo, $fileName);
 
