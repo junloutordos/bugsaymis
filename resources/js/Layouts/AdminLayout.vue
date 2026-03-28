@@ -167,15 +167,9 @@ const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
-<<<<<<< HEAD
-// Sum badges for all children of a group item (for parent group button)
-const getGroupBadge = (item) => {
-  if (!item.children) return 0;
-=======
 // Return aggregate badge count for a group (sum of all children badges)
 const getGroupBadge = (item) => {
   if (!item.children?.length) return 0;
->>>>>>> staging
   return item.children.reduce((sum, child) => sum + getBadge(child), 0);
 };
 
@@ -1635,15 +1629,11 @@ filteredMenu.value.forEach((item) => {
               <span
                 v-if="!collapsed && !expanded[item.label] && getGroupBadge(item) > 0"
                 class="ml-1 shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
-<<<<<<< HEAD
-              >{{ getGroupBadge(item) }}</span>
-=======
               >{{ getGroupBadge(item) > 99 ? '99+' : getGroupBadge(item) }}</span>
               <span
                 v-else-if="collapsed && getGroupBadge(item) > 0"
                 class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-400"
               />
->>>>>>> staging
               <ChevronDownIcon
                 v-if="!collapsed"
                 class="h-3.5 w-3.5 ml-1 shrink-0 text-slate-600 transition-transform duration-200"
