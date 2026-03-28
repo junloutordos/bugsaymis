@@ -86,10 +86,12 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     if ($user->hasRole('DivisionChief')) {
                         $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                        $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                        return ITJobRequest::where('status', 'Pending Division Chief Approval')
-                            ->whereIn('user_id', $userIds)
-                            ->count();
+                        if ($divisionIds->isNotEmpty()) {
+                            $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                            return ITJobRequest::where('status', 'Pending Division Chief Approval')
+                                ->whereIn('user_id', $userIds)
+                                ->count();
+                        }
                     }
                     if ($user->hasRole('OCD')) {
                         return ITJobRequest::where('status', 'Pending OCD Approval')->count();
@@ -105,8 +107,10 @@ class HandleInertiaRequests extends Middleware
                     $user = $request->user();
                     if ($user && $user->hasRole('DivisionChief')) {
                         $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                        $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                        return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                        if ($divisionIds->isNotEmpty()) {
+                            $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                            return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                        }
                     }
                     if ($user && $user->hasRole('GSU Head')) {
                         return VehicleRequest::where('status', 'Pending')->count();
@@ -130,14 +134,16 @@ class HandleInertiaRequests extends Middleware
                     $user = $request->user();
                     if ($user && $user->hasRole('DivisionChief')) {
                         $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
-                        $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
-                        return FacilityRequest::where('status', 'Pending')
-                            ->where(function ($q) use ($userIds, $divisionIds) {
-                                $q->whereIn('requestor_id', $userIds)
-                                  ->orWhereHas('requester', function ($q2) use ($divisionIds) {
-                                      $q2->whereIn('division_id', $divisionIds);
-                                  });
-                            })->count();
+                        if (!empty($divisionIds)) {
+                            $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
+                            return FacilityRequest::where('status', 'Pending')
+                                ->where(function ($q) use ($userIds, $divisionIds) {
+                                    $q->whereIn('requestor_id', $userIds)
+                                      ->orWhereHas('requester', function ($q2) use ($divisionIds) {
+                                          $q2->whereIn('division_id', $divisionIds);
+                                      });
+                                })->count();
+                        }
                     }
                     return FacilityRequest::where('status', 'Pending')->count();
                 } catch (\Throwable $e) {
@@ -150,8 +156,10 @@ class HandleInertiaRequests extends Middleware
                     $user = $request->user();
                     if ($user && $user->hasRole('DivisionChief')) {
                         $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                        $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                        return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                        if ($divisionIds->isNotEmpty()) {
+                            $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                            return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                        }
                     }
                     return ServiceRequest::where('status', 'Pending')->count();
                 } catch (\Throwable $e) {
@@ -166,9 +174,12 @@ class HandleInertiaRequests extends Middleware
                     $db = \Illuminate\Support\Facades\DB::table('gatepass');
                     if ($user && $user->hasRole('DivisionChief')) {
                         $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                        $badgeNumbers = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('badge_id')->filter()->toArray();
-                        if (empty($badgeNumbers)) return 0;
-                        return $db->where('status', 'Pending')->whereIn('badgeNumber', $badgeNumbers)->count();
+                        if ($divisionIds->isNotEmpty()) {
+                            $badgeNumbers = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('badge_id')->filter()->toArray();
+                            if (!empty($badgeNumbers)) {
+                                return $db->where('status', 'Pending')->whereIn('badgeNumber', $badgeNumbers)->count();
+                            }
+                        }
                     }
                     return $db->where('status', 'Pending')->count();
                 } catch (\Throwable $e) {
@@ -181,8 +192,10 @@ class HandleInertiaRequests extends Middleware
                     $user = $request->user();
                     if ($user && $user->hasRole('DivisionChief')) {
                         $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                        $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                        return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
+                        if ($divisionIds->isNotEmpty()) {
+                            $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                            return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
+                        }
                     }
                     return WorkRequest::where('status', 'Pending')->count();
                 } catch (\Throwable $e) {
