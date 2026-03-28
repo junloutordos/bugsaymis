@@ -94,7 +94,8 @@ export function useUsers(props) {
         specialization: user.specialization ?? "",
         division_id: user.division_id ?? "",
         office_id: user.office_id ?? user.office?.id ?? "",
-        emp_category: user.emp_category ?? user.emp_category ?? '' ,
+        emp_category: user.emp_category ?? '',
+        status: user.status ?? 'active',
       }
     } else {
       form.value = {

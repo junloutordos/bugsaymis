@@ -66,25 +66,42 @@ class DashboardController extends Controller
         $employeesByDivision = [];
 
         try {
-            $totalEmployees = User::count();
+            // Base scope: active employees with an assigned employee category
+            $activeEmployeeBase = fn () => User::where('status', '!=', 'inactive')
+                ->whereNotNull('emp_category')
+                ->where('emp_category', '!=', '');
 
-            $facultyRole = Role::where('name', 'Faculty')->first();
-            $staffRole   = Role::where('name', 'Staff')->first();
-            if ($facultyRole) {
-                $facultyCount = User::whereRaw('FIND_IN_SET(?, role_id)', [$facultyRole->id])->count();
-            }
-            if ($staffRole) {
-                $staffCount = User::whereRaw('FIND_IN_SET(?, role_id)', [$staffRole->id])->count();
-            }
+            $totalEmployees = $activeEmployeeBase()->count();
+
+            $facultyCount = $activeEmployeeBase()
+                ->whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
+                ->count();
+
+            $staffCount = $activeEmployeeBase()
+                ->whereHas('roles', fn ($q) => $q->where('roles.name', 'Staff'))
+                ->count();
 
             $activeDivisions     = Division::where('status', 'active')->count();
-            $employeeMaleCount   = User::whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
-            $employeeFemaleCount = User::whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+            $employeeMaleCount   = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $employeeFemaleCount = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
 
-            $divs = Division::withCount('employees')->orderByDesc('employees_count')->take(10)->get();
-            $employeesByDivision = $divs->map(fn ($d) => [
-                'division' => $d->acronym ?: $d->division_name,
-                'count'    => $d->employees_count,
+            $divRows = DB::table('users')
+                ->join('divisions', 'users.division_id', '=', 'divisions.id')
+                ->select(
+                    DB::raw("COALESCE(NULLIF(TRIM(divisions.acronym),''), divisions.division_name) as division"),
+                    DB::raw('COUNT(*) as cnt')
+                )
+                ->where('users.status', '!=', 'inactive')
+                ->whereNotNull('users.emp_category')
+                ->where('users.emp_category', '!=', '')
+                ->groupBy('divisions.id', 'division')
+                ->orderByDesc('cnt')
+                ->take(10)
+                ->get();
+
+            $employeesByDivision = $divRows->map(fn ($d) => [
+                'division' => $d->division,
+                'count'    => (int) $d->cnt,
             ])->values()->toArray();
         } catch (\Throwable $e) {
             logger()->warning('Employee analytics error: ' . $e->getMessage());
@@ -189,12 +206,6 @@ class DashboardController extends Controller
                     'completed' => MessengerialRequest::where('status', 'Completed')->count(),
                     'total'     => MessengerialRequest::count(),
                 ],
-                [
-                    'label'     => 'Consultations',
-                    'pending'   => Consultation::whereIn('status', ['Pending', 'Active'])->count(),
-                    'completed' => Consultation::where('status', 'Completed')->count(),
-                    'total'     => Consultation::count(),
-                ],
             ];
             $totalPendingRequests = (int) collect($requestOverview)->sum('pending');
         } catch (\Throwable $e) {
@@ -222,7 +233,6 @@ class DashboardController extends Controller
                 ['label' => 'Facility Requests', 'model' => FacilityRequest::class],
                 ['label' => 'Service Requests',  'model' => ServiceRequest::class],
                 ['label' => 'Work Requests',     'model' => WorkRequest::class],
-                ['label' => 'Consultations',     'model' => Consultation::class],
             ];
 
             $datasets = [];
@@ -451,6 +461,9 @@ class DashboardController extends Controller
                     DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"),
                     DB::raw('COUNT(*) as cnt')
                 )
+                ->where('users.status', '!=', 'inactive')
+                ->whereNotNull('users.emp_category')
+                ->where('users.emp_category', '!=', '')
                 ->groupBy('divisions.id', 'div_name', 'sex')
                 ->get()
                 ->groupBy('div_id');
