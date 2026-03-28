@@ -9,10 +9,16 @@
           <h1 class="text-xl font-semibold text-slate-800">Class Schedules</h1>
           <p class="text-sm text-slate-500 mt-0.5">Assign and manage faculty class schedules</p>
         </div>
-        <button @click="openForm()"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <PlusIcon class="h-4 w-4" /> Assign Schedule
-        </button>
+        <div class="flex items-center gap-2 shrink-0">
+          <Link :href="route('faculty-loading.auto-schedule.index')"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-medium transition-colors">
+            <SparklesIcon class="h-4 w-4" /> AI Generate
+          </Link>
+          <button @click="openForm()"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+            <PlusIcon class="h-4 w-4" /> Assign Schedule
+          </button>
+        </div>
       </div>
 
       <!-- Flash -->
@@ -216,12 +222,12 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
 import {
   CalendarIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-  MagnifyingGlassIcon, PencilIcon, PlusIcon, TrashIcon,
+  MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({

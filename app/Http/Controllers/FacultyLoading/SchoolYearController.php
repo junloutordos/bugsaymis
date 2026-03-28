@@ -104,7 +104,7 @@ class SchoolYearController extends Controller
 
         $data = $request->validate([
             'name'       => 'required|string|max:50',
-            'term_type'  => 'required|in:1st_semester,2nd_semester,summer,trimester,quarter',
+            'term_type'  => 'required|in:1st_semester,2nd_semester,summer,trimester,quarter,full_term',
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after:start_date',
             'is_current' => 'boolean',
@@ -125,7 +125,7 @@ class SchoolYearController extends Controller
 
         $data = $request->validate([
             'name'       => 'required|string|max:50',
-            'term_type'  => 'required|in:1st_semester,2nd_semester,summer,trimester,quarter',
+            'term_type'  => 'required|in:1st_semester,2nd_semester,summer,trimester,quarter,full_term',
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after:start_date',
             'is_current' => 'boolean',

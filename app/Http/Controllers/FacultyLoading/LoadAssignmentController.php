@@ -43,7 +43,7 @@ class LoadAssignmentController extends Controller
         $terms = AcademicTerm::with('schoolYear')
             ->orderByDesc('start_date')
             ->get()
-            ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
+            ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current, 'school_year_id' => $t->school_year_id]);
 
         $faculty  = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))->orderBy('name')->get(['id', 'name', 'position']);
         $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);

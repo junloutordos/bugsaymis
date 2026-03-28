@@ -16,7 +16,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive'
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -45,7 +45,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive' for the employees list as well
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -72,7 +72,7 @@ class UserController extends Controller
     public function inactiveIndex()
     {
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status')
             ->where('status', 'inactive')
             ->get();
 
@@ -99,12 +99,13 @@ class UserController extends Controller
     public function employeesStore(Request $request)
     {
         $data = $request->validate([
-            'name'        => 'required|string|max:255',
-            'sex'         => 'nullable|in:Male,Female',
-            'position'    => 'nullable|string|max:255',
-            'division_id' => 'nullable|exists:divisions,id',
-            'office_id'   => 'nullable|exists:offices,id',
-            'emp_category' => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
+            'name'           => 'required|string|max:255',
+            'sex'            => 'nullable|in:Male,Female',
+            'position'       => 'nullable|string|max:255',
+            'specialization' => 'nullable|string|max:150',
+            'division_id'    => 'nullable|exists:divisions,id',
+            'office_id'      => 'nullable|exists:offices,id',
+            'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
         ]);
 
         // Generate a placeholder email and password so the user record satisfies existing schema
@@ -156,16 +157,15 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'sex'         => 'nullable|in:Male,Female',
-            'name'        => 'required|string|max:255',
-            'email'       => 'required|email|unique:users,email',
-            'emp_category' => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
-            // badge_id stores biometric ID; allow nullable for existing users
-            // require alpha-numeric, dash or underscore only for formatting
-            'badge_id'    => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
-            'position'    => 'nullable|string|max:255',
-            'division_id' => 'nullable|exists:divisions,id',
-            'office_id'   => 'nullable|exists:offices,id',
+            'sex'            => 'nullable|in:Male,Female',
+            'name'           => 'required|string|max:255',
+            'email'          => 'required|email|unique:users,email',
+            'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
+            'badge_id'       => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
+            'position'       => 'nullable|string|max:255',
+            'specialization' => 'nullable|string|max:150',
+            'division_id'    => 'nullable|exists:divisions,id',
+            'office_id'      => 'nullable|exists:offices,id',
         ]);
 
         User::create($data);
@@ -178,15 +178,15 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $data = $request->validate([
-            'sex'         => 'nullable|in:Male,Female',
-            'name'        => 'required|string|max:255',
-            'email'       => 'required|email|unique:users,email,' . $user->id,
-            'emp_category' => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
-            // allow keeping or changing badge_id; unique except for this user
-            'badge_id'    => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
-            'position'    => 'nullable|string|max:255',
-            'division_id' => 'nullable|exists:divisions,id',
-            'office_id'   => 'nullable|exists:offices,id',
+            'sex'            => 'nullable|in:Male,Female',
+            'name'           => 'required|string|max:255',
+            'email'          => 'required|email|unique:users,email,' . $user->id,
+            'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
+            'badge_id'       => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
+            'position'       => 'nullable|string|max:255',
+            'specialization' => 'nullable|string|max:150',
+            'division_id'    => 'nullable|exists:divisions,id',
+            'office_id'      => 'nullable|exists:offices,id',
         ]);
 
         $user->update($data);

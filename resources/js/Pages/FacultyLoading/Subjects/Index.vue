@@ -116,6 +116,12 @@
             <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
             <textarea v-model="form.description" rows="2" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
           </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Specialization Tags</label>
+            <input v-model="form.specialization_tags" type="text" placeholder="e.g. mathematics, algebra, calculus"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            <p class="text-xs text-slate-400 mt-0.5">Comma-separated keywords used for auto-assignment matching.</p>
+          </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Subject Type *</label>
             <select v-model="form.subject_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -213,7 +219,8 @@ function typeBadge(type) {
 
 const modal = ref(false)
 const form  = useForm({
-  id: null, code: '', name: '', description: '', credit_units: 3, load_units: 3,
+  id: null, code: '', name: '', description: '', specialization_tags: '',
+  credit_units: 3, load_units: 3,
   lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7,
   semester: null, sessions_per_week: 5, minutes_per_session: 60, is_active: true,
 })
@@ -221,6 +228,7 @@ const form  = useForm({
 function openForm(s = null) {
   if (s) {
     Object.assign(form, { id: s.id, code: s.code, name: s.name, description: s.description ?? '',
+      specialization_tags: s.specialization_tags ?? '',
       credit_units: s.credit_units, load_units: s.load_units, lecture_hours: s.lecture_hours,
       lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, grade_level: s.grade_level,
       semester: s.semester, sessions_per_week: s.sessions_per_week,

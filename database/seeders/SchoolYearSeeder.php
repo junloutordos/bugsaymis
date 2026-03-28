@@ -43,7 +43,7 @@ class SchoolYearSeeder extends Seeder
             [
                 'school_year_id' => $syId,
                 'name'           => '1st Semester',
-                'term_type'      => 'first',
+                'term_type'      => '1st_semester',
                 'start_date'     => '2025-06-01',
                 'end_date'       => '2025-10-31',
                 'is_current'     => false,
@@ -51,7 +51,7 @@ class SchoolYearSeeder extends Seeder
             [
                 'school_year_id' => $syId,
                 'name'           => '2nd Semester',
-                'term_type'      => 'second',
+                'term_type'      => '2nd_semester',
                 'start_date'     => '2025-11-01',
                 'end_date'       => '2026-03-31',
                 'is_current'     => true,
@@ -78,7 +78,7 @@ class SchoolYearSeeder extends Seeder
             [
                 'school_year_id' => $syId2,
                 'name'           => '1st Semester',
-                'term_type'      => 'first',
+                'term_type'      => '1st_semester',
                 'start_date'     => '2024-06-01',
                 'end_date'       => '2024-10-31',
                 'is_current'     => false,
@@ -86,7 +86,7 @@ class SchoolYearSeeder extends Seeder
             [
                 'school_year_id' => $syId2,
                 'name'           => '2nd Semester',
-                'term_type'      => 'second',
+                'term_type'      => '2nd_semester',
                 'start_date'     => '2024-11-01',
                 'end_date'       => '2025-03-31',
                 'is_current'     => false,

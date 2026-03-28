@@ -9,10 +9,16 @@
           <h1 class="text-xl font-semibold text-slate-800">Load Assignments</h1>
           <p class="text-sm text-slate-500 mt-0.5">Assign teaching, research, admin and co-curricular loads to faculty</p>
         </div>
-        <button @click="openForm()"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <PlusIcon class="h-4 w-4" /> Add Assignment
-        </button>
+        <div class="flex gap-2">
+          <button @click="openAutoAssign()"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-medium transition-colors shrink-0">
+            <SparklesIcon class="h-4 w-4" /> Auto-Assign
+          </button>
+          <button @click="openForm()"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
+            <PlusIcon class="h-4 w-4" /> Add Assignment
+          </button>
+        </div>
       </div>
 
       <!-- Flash -->
@@ -101,21 +107,13 @@
           </div>
 
           <!-- Term (create only) -->
-          <div v-if="!form.id" class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
-              <select v-model="form.academic_term_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option :value="null">Select term...</option>
-                <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
-              <select v-model="form.school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option :value="null">Select SY...</option>
-                <option v-for="t in terms" :key="'sy-' + t.id" :value="termSchoolYearId(t)">{{ t.label }}</option>
-              </select>
-            </div>
+          <div v-if="!form.id">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
+            <select v-model="form.academic_term_id" @change="onTermChange"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">Select term...</option>
+              <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
           </div>
 
           <!-- Type -->
@@ -170,14 +168,146 @@
       </div>
     </div>
 
+  <!-- ── Auto-Assign Modal ──────────────────────────────────────── -->
+  <div v-if="autoAssign.open" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden">
+
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-full bg-purple-50 flex items-center justify-center">
+            <SparklesIcon class="h-5 w-5 text-purple-500" />
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-slate-800">Auto-Assign Loads</h2>
+            <p class="text-xs text-slate-500">Matches faculty specialization and position to available subjects.</p>
+          </div>
+        </div>
+        <button @click="autoAssign.open = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100">✕</button>
+      </div>
+
+      <!-- Controls -->
+      <div class="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term</label>
+          <select v-model="autoAssign.termId"
+            class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}{{ t.is_current ? ' (current)' : '' }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Faculty (optional)</label>
+          <select v-model="autoAssign.facultyId"
+            class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option :value="null">All Faculty</option>
+            <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </div>
+        <button @click="runPreview" :disabled="autoAssign.loading"
+          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
+          <ArrowPathIcon v-if="autoAssign.loading" class="h-4 w-4 animate-spin" />
+          <MagnifyingGlassIcon v-else class="h-4 w-4" />
+          {{ autoAssign.loading ? 'Generating…' : 'Preview' }}
+        </button>
+      </div>
+
+      <!-- Alert -->
+      <div v-if="autoAssign.error" class="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+        {{ autoAssign.error }}
+      </div>
+
+      <!-- Preview results -->
+      <div v-if="autoAssign.proposals" class="px-6 py-4 space-y-4 max-h-[50vh] overflow-y-auto">
+        <div v-if="autoAssign.proposals.length === 0" class="text-center py-8 text-slate-400 text-sm">
+          No faculty found for the selected term.
+        </div>
+
+        <div v-for="p in autoAssign.proposals" :key="p.faculty_id"
+          class="border rounded-xl overflow-hidden"
+          :class="p.assignments.length ? 'border-purple-100' : 'border-slate-100'">
+
+          <!-- Faculty header -->
+          <div class="px-4 py-2.5 flex items-center justify-between"
+            :class="p.assignments.length ? 'bg-purple-50' : 'bg-slate-50'">
+            <div>
+              <span class="text-sm font-semibold text-slate-800">{{ p.faculty_name }}</span>
+              <span v-if="p.position" class="text-xs text-slate-500 ml-2">{{ p.position }}</span>
+              <span v-if="p.specialization" class="text-xs text-purple-600 ml-2">· {{ p.specialization }}</span>
+            </div>
+            <div class="text-xs text-slate-500">
+              Cap: {{ p.teaching_cap }}u · Already: {{ p.already_assigned }}u
+            </div>
+          </div>
+
+          <!-- No matches -->
+          <div v-if="!p.assignments.length" class="px-4 py-2 text-xs text-slate-400 italic">
+            {{ p.skipped_reason ?? 'No matching subjects' }}
+          </div>
+
+          <!-- Proposed assignments -->
+          <div v-else class="divide-y divide-slate-50">
+            <div v-for="a in p.assignments" :key="a.subject_id"
+              class="px-4 py-2 flex items-center gap-3">
+              <input type="checkbox" :value="{ faculty_id: p.faculty_id, ...a }"
+                v-model="autoAssign.selected"
+                class="rounded text-purple-600 focus:ring-purple-500" />
+              <div class="flex-1 min-w-0">
+                <span class="text-sm font-medium text-slate-700">{{ a.subject_code }}</span>
+                <span class="text-xs text-slate-500 ml-1.5">{{ a.subject_name }}</span>
+                <span v-if="a.grade_level" class="text-xs text-slate-400 ml-1.5">· Gr {{ a.grade_level }}</span>
+              </div>
+              <div class="shrink-0 flex items-center gap-2">
+                <!-- Section picker -->
+                <select v-model="a.section_id"
+                  class="text-xs border border-slate-200 rounded px-2 py-1 focus:ring-1 focus:ring-purple-400">
+                  <option :value="null">No section</option>
+                  <option v-for="s in sections" :key="s.id" :value="s.id">Gr {{ s.levelid }} – {{ s.sectionname }}</option>
+                </select>
+                <span class="text-xs font-semibold text-purple-700 w-10 text-right">{{ a.load_units }}u</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Select/deselect all -->
+        <div v-if="allProposedItems.length" class="flex items-center gap-3 pt-1 text-xs text-slate-500">
+          <button @click="selectAllProposed" class="underline hover:text-slate-700">Select all</button>
+          <button @click="autoAssign.selected = []" class="underline hover:text-slate-700">Deselect all</button>
+          <span>{{ autoAssign.selected.length }} of {{ allProposedItems.length }} selected</span>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+        <p class="text-xs text-slate-400">
+          Only selected assignments will be created. Existing assignments are skipped automatically.
+        </p>
+        <div class="flex gap-3">
+          <button @click="autoAssign.open = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium">Cancel</button>
+          <button @click="applyAutoAssign" :disabled="!autoAssign.selected.length || autoAssign.applying"
+            class="inline-flex items-center gap-2 px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
+            <ArrowPathIcon v-if="autoAssign.applying" class="h-4 w-4 animate-spin" />
+            <CheckIcon v-else class="h-4 w-4" />
+            Apply ({{ autoAssign.selected.length }})
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   </AdminLayout>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
+import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { CheckCircleIcon, ClipboardDocumentListIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowPathIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
+  MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   assignments: { type: Array,  default: () => [] },
@@ -206,9 +336,9 @@ function applyFilters() {
   router.get(route('faculty-loading.assignments.index'), filters, { preserveState: true })
 }
 
-// Derive school_year_id from selected term (terms carry school year info via label)
-function termSchoolYearId(t) {
-  return t.id  // server handles resolution; we pass term id as school_year_id placeholder
+function onTermChange() {
+  const t = props.terms.find(t => t.id === Number(form.academic_term_id))
+  form.school_year_id = t?.school_year_id ?? null
 }
 
 const modal = ref(false)
@@ -240,8 +370,11 @@ function openForm(a = null) {
   } else {
     form.reset()
     form.id = null
-    form.academic_term_id = filters.term_id ?? null
+    form.academic_term_id = filters.term_id ? Number(filters.term_id) : null
     form.load_units = 3
+    // Pre-derive school_year_id from the pre-selected term
+    const t = props.terms.find(t => t.id === form.academic_term_id)
+    form.school_year_id = t?.school_year_id ?? null
   }
   modal.value = true
 }
@@ -252,11 +385,9 @@ function save() {
       onSuccess: () => { modal.value = false },
     })
   } else {
-    // school_year_id: derive from selected term on server if missing; pass term id
-    if (!form.school_year_id && form.academic_term_id) {
-      const t = props.terms.find(t => t.id === form.academic_term_id)
-      form.school_year_id = t?.id ?? form.academic_term_id
-    }
+    // Always re-derive school_year_id from the selected term before submitting
+    const t = props.terms.find(t => t.id === Number(form.academic_term_id))
+    if (t) form.school_year_id = t.school_year_id
     form.post(route('faculty-loading.assignments.store'), {
       onSuccess: () => { modal.value = false },
     })
@@ -280,5 +411,75 @@ function typeBadge(type) {
 
 function typeLabel(type) {
   return assignmentTypes.find(t => t.value === type)?.label ?? type
+}
+
+// ── Auto-Assign ───────────────────────────────────────────────────────────────
+
+const autoAssign = reactive({
+  open:      false,
+  termId:    props.filters.term_id ? Number(props.filters.term_id) : (props.currentTerm?.id ?? null),
+  facultyId: null,
+  loading:   false,
+  applying:  false,
+  error:     null,
+  proposals: null,
+  selected:  [],
+})
+
+const allProposedItems = computed(() => {
+  if (!autoAssign.proposals) return []
+  return autoAssign.proposals.flatMap(p =>
+    p.assignments.map(a => ({ faculty_id: p.faculty_id, ...a }))
+  )
+})
+
+function openAutoAssign() {
+  autoAssign.proposals = null
+  autoAssign.selected  = []
+  autoAssign.error     = null
+  autoAssign.open      = true
+}
+
+function selectAllProposed() {
+  autoAssign.selected = allProposedItems.value.map(item => ({ ...item }))
+}
+
+async function runPreview() {
+  if (!autoAssign.termId || autoAssign.loading) return
+  autoAssign.loading   = true
+  autoAssign.error     = null
+  autoAssign.proposals = null
+  autoAssign.selected  = []
+
+  try {
+    const { data } = await axios.get('/faculty-loading/auto-assign/preview', {
+      params: { academic_term_id: autoAssign.termId, faculty_id: autoAssign.facultyId || undefined },
+    })
+    autoAssign.proposals = data.proposals
+  } catch (err) {
+    autoAssign.error = err.response?.data?.message ?? 'Failed to generate preview.'
+  } finally {
+    autoAssign.loading = false
+  }
+}
+
+async function applyAutoAssign() {
+  if (!autoAssign.selected.length || autoAssign.applying) return
+  autoAssign.applying = true
+  autoAssign.error    = null
+
+  try {
+    const { data } = await axios.post('/faculty-loading/auto-assign/apply', {
+      academic_term_id: autoAssign.termId,
+      selected:         autoAssign.selected,
+    })
+    autoAssign.open = false
+    router.reload({ only: ['assignments'] })
+    alert(data.message)
+  } catch (err) {
+    autoAssign.error = err.response?.data?.message ?? 'Failed to apply assignments.'
+  } finally {
+    autoAssign.applying = false
+  }
 }
 </script>

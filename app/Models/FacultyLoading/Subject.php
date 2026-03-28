@@ -13,6 +13,7 @@ class Subject extends Model
         'code',
         'name',
         'description',
+        'specialization_tags',
         'credit_units',
         'lecture_hours',
         'lab_hours',
