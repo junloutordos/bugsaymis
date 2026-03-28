@@ -657,6 +657,14 @@ const menuItems = [
         permissions: ["faculty_loading.view"],
       },
       {
+        label: "Faculty List",
+        routeName: "faculty-loading.faculty-list",
+        href: route("faculty-loading.faculty-list"),
+        icon: UsersIcon,
+        roles: [],
+        permissions: ["faculty_loading.manage"],
+      },
+      {
         label: "Schedules",
         routeName: "faculty-loading.schedules.index",
         href: route("faculty-loading.schedules.index"),

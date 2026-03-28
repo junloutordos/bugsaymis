@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FacultyLoading\AiDashboardController;
+use App\Http\Controllers\FacultyLoading\FacultyListController;
 use App\Http\Controllers\FacultyLoading\AutoAssignmentController;
 use App\Http\Controllers\FacultyLoading\AutoScheduleController;
 use App\Http\Controllers\FacultyLoading\LoadBalancingController;
@@ -55,6 +56,9 @@ Route::middleware(['web', 'auth', 'verified'])
 
         Route::middleware('permission:faculty_loading.manage')
             ->group(function () {
+                // ── Faculty List ────────────────────────────────────────────────
+                Route::get('/faculty-list', [FacultyListController::class, 'index'])->name('faculty-list');
+
                 // ── AI Optimization Dashboard ───────────────────────────────────
                 Route::get('/ai-dashboard', [AiDashboardController::class, 'index'])->name('ai-dashboard');
 
