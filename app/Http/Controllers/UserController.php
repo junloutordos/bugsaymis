@@ -16,7 +16,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive'
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -45,7 +45,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive' for the employees list as well
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -187,6 +187,7 @@ class UserController extends Controller
             'specialization' => 'nullable|string|max:150',
             'division_id'    => 'nullable|exists:divisions,id',
             'office_id'      => 'nullable|exists:offices,id',
+            'status'         => 'nullable|in:active,inactive',
         ]);
 
         $user->update($data);

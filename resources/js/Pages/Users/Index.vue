@@ -542,6 +542,31 @@ const openSignaturePicker = (user) => {
                 </select>
               </div>
 
+              <!-- Status (edit only) -->
+              <div v-if="modalMode === 'edit'" class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Account Status</label>
+                <div class="rounded-xl border p-4 flex items-start gap-3"
+                  :class="form.status === 'inactive' ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'">
+                  <div class="flex-1">
+                    <p class="text-sm font-medium" :class="form.status === 'inactive' ? 'text-red-800' : 'text-emerald-800'">
+                      {{ form.status === 'inactive' ? 'Inactive' : 'Active' }}
+                    </p>
+                    <p class="text-xs mt-0.5" :class="form.status === 'inactive' ? 'text-red-500' : 'text-emerald-600'">
+                      {{ form.status === 'inactive'
+                        ? 'This user is inactive and will appear in the Inactive Users list.'
+                        : 'This user is active and has access to the system.' }}
+                    </p>
+                  </div>
+                  <button type="button"
+                    @click="form.status = form.status === 'inactive' ? 'active' : 'inactive'"
+                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    :class="form.status === 'inactive' ? 'bg-red-400 focus:ring-red-400' : 'bg-emerald-500 focus:ring-emerald-500'">
+                    <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform"
+                      :class="form.status === 'inactive' ? 'translate-x-5' : 'translate-x-0'" />
+                  </button>
+                </div>
+              </div>
+
               <div class="flex justify-end gap-2 pt-4 sm:col-span-2">
                 <button
                   type="button"
