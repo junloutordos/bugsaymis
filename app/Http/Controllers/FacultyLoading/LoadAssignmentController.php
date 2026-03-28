@@ -45,7 +45,9 @@ class LoadAssignmentController extends Controller
             ->get()
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current, 'school_year_id' => $t->school_year_id]);
 
-        $faculty  = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))->orderBy('name')->get(['id', 'name', 'position']);
+        $faculty  = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
+            ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
+            ->orderBy('name')->get(['id', 'name', 'position']);
         $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
         $sections = DB::table('sections')->orderBy('sectionname')->get(['id', 'sectionname', 'levelid']);
 

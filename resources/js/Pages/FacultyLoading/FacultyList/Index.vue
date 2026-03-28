@@ -77,6 +77,10 @@
               <td class="px-4 py-3 text-slate-400 tabular-nums">{{ (currentPage - 1) * perPage + i + 1 }}</td>
               <td class="px-4 py-3">
                 <div class="font-medium text-slate-800">{{ f.name }}</div>
+                <span v-if="f.on_study_leave"
+                  class="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+                  Study Leave
+                </span>
               </td>
               <td class="px-4 py-3 text-slate-600">{{ f.badge_id || '—' }}</td>
               <td class="px-4 py-3 text-slate-600">{{ f.position || '—' }}</td>
@@ -230,6 +234,27 @@
               </select>
             </div>
 
+            <!-- Study Leave -->
+            <div class="rounded-xl border p-4 flex items-start gap-3"
+              :class="form.on_study_leave ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'">
+              <div class="flex-1">
+                <p class="text-sm font-medium" :class="form.on_study_leave ? 'text-amber-800' : 'text-slate-700'">
+                  On Study Leave
+                </p>
+                <p class="text-xs mt-0.5" :class="form.on_study_leave ? 'text-amber-600' : 'text-slate-400'">
+                  {{ form.on_study_leave
+                    ? 'This faculty is on study leave and will be excluded from load assignments and scheduling.'
+                    : 'Mark this faculty as on study leave to exclude them from load assignments and scheduling.' }}
+                </p>
+              </div>
+              <button type="button" @click="form.on_study_leave = !form.on_study_leave"
+                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                :class="form.on_study_leave ? 'bg-amber-500' : 'bg-slate-300'">
+                <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform"
+                  :class="form.on_study_leave ? 'translate-x-5' : 'translate-x-0'" />
+              </button>
+            </div>
+
             <!-- Footer -->
             <div class="flex justify-end gap-2 pt-2">
               <button type="button" @click="closeEdit"
@@ -318,14 +343,13 @@ const saving    = ref(false)
 
 const form = reactive({
   name:           '',
-  email:          '',
   sex:            '',
-  badge_id:       '',
   position:       '',
   specialization: '',
   division_id:    '',
   office_id:      '',
   emp_category:   '',
+  on_study_leave: false,
 })
 
 const filteredOffices = computed(() =>
@@ -337,14 +361,13 @@ const filteredOffices = computed(() =>
 function openEdit(f) {
   Object.assign(form, {
     name:           f.name           ?? '',
-    email:          f.email          ?? '',
     sex:            f.sex            ?? '',
-    badge_id:       f.badge_id       ?? '',
     position:       f.position       ?? '',
     specialization: f.specialization ?? '',
     division_id:    f.division?.id   ?? '',
     office_id:      f.office?.id     ?? '',
     emp_category:   f.emp_category   ?? '',
+    on_study_leave: f.on_study_leave ?? false,
   })
   editModal.id   = f.id
   editModal.name = f.name
@@ -357,12 +380,11 @@ function closeEdit() {
 
 async function submitEdit() {
   saving.value = true
-  router.put(`/users/${editModal.id}`, { ...form }, {
+  router.put(route('faculty-loading.faculty-list.update', editModal.id), { ...form }, {
     onSuccess: async () => {
       saving.value = false
       closeEdit()
       await Swal.fire('Updated', 'Faculty details have been saved.', 'success')
-      router.reload({ only: ['faculty'] })
     },
     onError: async (errors) => {
       saving.value = false

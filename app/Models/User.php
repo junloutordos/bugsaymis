@@ -31,6 +31,7 @@ class User extends Authenticatable
         'profile_picture',
         'electronic_signature',
         'emp_category',
+        'on_study_leave',
     ];
 
     protected $hidden = [
@@ -43,6 +44,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'on_study_leave'    => 'boolean',
         ];
     }
 
