@@ -58,6 +58,7 @@ Route::middleware(['web', 'auth', 'verified'])
             ->group(function () {
                 // ── Faculty List ────────────────────────────────────────────────
                 Route::get('/faculty-list', [FacultyListController::class, 'index'])->name('faculty-list');
+                Route::put('/faculty-list/{id}', [FacultyListController::class, 'update'])->name('faculty-list.update');
 
                 // ── AI Optimization Dashboard ───────────────────────────────────
                 Route::get('/ai-dashboard', [AiDashboardController::class, 'index'])->name('ai-dashboard');
