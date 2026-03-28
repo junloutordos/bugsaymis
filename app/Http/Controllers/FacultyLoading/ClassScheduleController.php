@@ -46,6 +46,7 @@ class ClassScheduleController extends Controller
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
 
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
+            ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
             ->orderBy('name')
             ->get(['id', 'name', 'position']);
 

@@ -167,9 +167,15 @@ const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
+<<<<<<< HEAD
 // Sum badges for all children of a group item (for parent group button)
 const getGroupBadge = (item) => {
   if (!item.children) return 0;
+=======
+// Return aggregate badge count for a group (sum of all children badges)
+const getGroupBadge = (item) => {
+  if (!item.children?.length) return 0;
+>>>>>>> staging
   return item.children.reduce((sum, child) => sum + getBadge(child), 0);
 };
 
@@ -178,8 +184,6 @@ const getBadge = (child) => {
   const rn = child?.routeName || null;
   // Chat badge is available to all roles — check it first
   if (rn === 'chat.index') return chatUnreadCount.value;
-  // Suppress other badges for Staff/Faculty-only users
-  if (roleNames.length > 0 && roleNames.every(r => r === 'Staff' || r === 'Faculty')) return 0;
   if (!page || !page.props) return 0;
   switch (rn) {
     case 'consultations.index':
@@ -1613,7 +1617,7 @@ filteredMenu.value.forEach((item) => {
           <div v-else>
             <button
               @click="toggleExpand(item.label)"
-              class="group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 border-l-2 border-transparent"
+              class="group relative flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 border-l-2 border-transparent"
               :class="expanded[item.label]
                 ? 'bg-slate-800 text-slate-200 border-l-2 border-indigo-500'
                 : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'"
@@ -1631,7 +1635,15 @@ filteredMenu.value.forEach((item) => {
               <span
                 v-if="!collapsed && !expanded[item.label] && getGroupBadge(item) > 0"
                 class="ml-1 shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
+<<<<<<< HEAD
               >{{ getGroupBadge(item) }}</span>
+=======
+              >{{ getGroupBadge(item) > 99 ? '99+' : getGroupBadge(item) }}</span>
+              <span
+                v-else-if="collapsed && getGroupBadge(item) > 0"
+                class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-400"
+              />
+>>>>>>> staging
               <ChevronDownIcon
                 v-if="!collapsed"
                 class="h-3.5 w-3.5 ml-1 shrink-0 text-slate-600 transition-transform duration-200"
