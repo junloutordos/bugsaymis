@@ -17,7 +17,7 @@ export function statusBadgeClass(status) {
 
   // ── Blue / In-progress ───────────────────────────────────────────────────
   if ([
-    'in progress', 'acted by mis', 'mis assessed the request',
+    'acted by mis', 'mis assessed the request',
     'submitted', 'submitted for rating', 'submitted to pmt',
     'evaluated', 'nominated', 'for review', 'under review',
     'scheduled', 'satisfactory', 'walk-in',
@@ -27,7 +27,7 @@ export function statusBadgeClass(status) {
 
   // ── Amber / Pending ──────────────────────────────────────────────────────
   if ([
-    'pending', 'pending approval', 'pending division chief approval',
+    'in progress','pending', 'pending approval', 'pending division chief approval',
     'pending ocd approval', 'pending fad approval',
     'draft', 'filed', 'needs improvement', 'unsatisfactory', 'under repair',
   ].includes(s)) {
