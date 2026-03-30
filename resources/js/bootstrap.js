@@ -3,6 +3,24 @@ window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
+// ── Laravel Echo + Soketi (Pusher-compatible WebSocket) ───────────────────
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+
+window.Pusher = Pusher;
+
+window.Echo = new Echo({
+    broadcaster:       'pusher',
+    key:               import.meta.env.VITE_PUSHER_APP_KEY,
+    wsHost:            import.meta.env.VITE_PUSHER_HOST       ?? 'localhost',
+    wsPort:            Number(import.meta.env.VITE_PUSHER_PORT ?? 6001),
+    wssPort:           Number(import.meta.env.VITE_PUSHER_PORT ?? 6001),
+    cluster:           import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
+    forceTLS:          (import.meta.env.VITE_PUSHER_SCHEME ?? 'http') === 'https',
+    enabledTransports: ['ws', 'wss'],
+    disableStats:      true,
+});
+
 // Interceptor: capture server error responses for vehicle-requests and show raw body in console
 window.axios.interceptors.response.use(
 	response => response,

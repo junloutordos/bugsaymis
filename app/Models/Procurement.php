@@ -11,7 +11,15 @@ class Procurement extends Model
 {
     protected $table = 'procurements';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'pr_no', 'pr_date', 'purpose', 'fund_source', 'priority', 'remarks',
+        'requested_by', 'status',
+        'approved_by_budget_officer', 'date_approved_budget_officer', 'date_decline_budget_officer',
+        'approved_by_procurement',    'date_approved_procurement',    'date_decline_procurement',
+        'approved_by_division_chief', 'date_approved_division_chief', 'date_decline_division_chief',
+        'ocd_approved_by', 'ocd_approve_date', 'ocd_decline_date',
+        'budget_officer_remarks', 'procurement_remarks', 'division_chief_remarks', 'ocd_remarks',
+    ];
 
     protected $casts = [
         'pr_date' => 'date',

@@ -9,6 +9,13 @@ import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appUrl   = import.meta.env.VITE_APP_URL;
+
+// If the page loaded on the wrong origin (e.g. 8443 instead of 8080),
+// redirect to the correct URL immediately before mounting anything.
+if (appUrl && window.location.origin !== appUrl) {
+    window.location.replace(appUrl + window.location.pathname + window.location.search + window.location.hash);
+}
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

@@ -73,27 +73,27 @@ const formatDate = (val) => {
       <span
         v-for="office in offices"
         :key="office.id"
-        class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700"
       >
         {{ office.name }}
       </span>
     </div>
 
-    <div class="bg-white p-4 rounded-lg shadow">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
 
       <!-- Toolbar -->
-      <div class="flex flex-col sm:flex-row gap-3 mb-4">
+      <div class="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3">
         <input
           v-model="searchQuery"
           @input="resetPage"
           type="text"
           placeholder="Search by employee, title, period, or status..."
-          class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+          class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         />
         <select
           v-model="selectedPeriod"
           @change="resetPage"
-          class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         >
           <option value="">All Periods</option>
           <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
@@ -102,63 +102,64 @@ const formatDate = (val) => {
 
       <!-- Table -->
       <div class="overflow-x-auto">
-        <table class="min-w-full text-sm border-collapse">
-          <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
+        <table class="min-w-full divide-y divide-slate-100 text-sm">
+          <thead class="bg-slate-50">
             <tr>
-              <th class="border px-4 py-2 text-left">Employee</th>
-              <th class="border px-4 py-2 text-left">Office / Unit</th>
-              <th class="border px-4 py-2 text-left">Rating Period</th>
-              <th class="border px-4 py-2 text-left">Title</th>
-              <th class="border px-4 py-2 text-center">Status</th>
-              <th class="border px-4 py-2 text-center">Avg Rating</th>
-              <th class="border px-4 py-2 text-center">Submitted</th>
-              <th class="border px-4 py-2 text-center">Action</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Office / Unit</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg Rating</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="divide-y divide-slate-100">
             <tr v-if="paginated.length === 0">
-              <td colspan="8" class="border px-4 py-6 text-center text-gray-400">
+              <td colspan="8" class="py-16 text-center text-slate-400 text-sm">
                 No IPCRs found for your unit with the selected filters.
               </td>
             </tr>
             <tr
               v-for="ipcr in paginated"
               :key="ipcr.id"
-              class="hover:bg-gray-50"
+              class="hover:bg-slate-50/60"
             >
-              <td class="border px-4 py-2">
-                <div class="font-medium text-gray-800">{{ ipcr.user?.name ?? "—" }}</div>
-                <div class="text-xs text-gray-500">{{ ipcr.user?.position ?? "" }}</div>
+              <td class="px-4 py-3">
+                <div class="font-medium text-slate-800">{{ ipcr.user?.name ?? "—" }}</div>
+                <div class="text-xs text-slate-500">{{ ipcr.user?.position ?? "" }}</div>
               </td>
-              <td class="border px-4 py-2 text-gray-600 text-xs">
+              <td class="px-4 py-3 text-sm text-slate-600 text-xs">
                 {{ ipcr.user?.office?.name ?? "—" }}
               </td>
-              <td class="border px-4 py-2 text-gray-600">{{ ipcr.rating_period ?? "—" }}</td>
-              <td class="border px-4 py-2 text-gray-600">{{ ipcr.title ?? "—" }}</td>
-              <td class="border px-4 py-2 text-center">
+              <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.rating_period ?? "—" }}</td>
+              <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.title ?? "—" }}</td>
+              <td class="px-4 py-3 text-center">
                 <span
                   :class="statusBadge(ipcr.status)"
-                  class="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap"
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap"
                 >
                   {{ ipcr.status }}
                 </span>
               </td>
-              <td class="border px-4 py-2 text-center font-medium">
+              <td class="px-4 py-3 text-center">
                 <template v-if="ipcr.overall_average">
-                  {{ ipcr.overall_average }}
-                  <div class="text-xs text-gray-400">{{ ipcrAdjectivalRating(ipcr.overall_average) }}</div>
+                  <span class="font-semibold text-slate-800">{{ ipcr.overall_average }}</span>
+                  <div class="text-xs text-slate-400">{{ ipcrAdjectivalRating(ipcr.overall_average) }}</div>
                 </template>
-                <span v-else class="text-gray-400">—</span>
+                <span v-else class="text-slate-400">—</span>
               </td>
-              <td class="border px-4 py-2 text-center text-xs text-gray-500">
+              <td class="px-4 py-3 text-center text-xs text-slate-500">
                 {{ formatDate(ipcr.submitted_for_rating_at) }}
               </td>
-              <td class="border px-4 py-2 text-center">
+              <td class="px-4 py-3 text-center">
                 <button
                   @click="viewIPCR(ipcr)"
-                  class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                  title="View"
                 >
-                  <EyeIcon class="w-4 h-4" /> View
+                  <EyeIcon class="w-4 h-4" />
                 </button>
               </td>
             </tr>
@@ -167,25 +168,25 @@ const formatDate = (val) => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 text-sm text-gray-600">
+      <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
         <span>Page {{ currentPage }} of {{ totalPages }} ({{ filtered.length }} records)</span>
         <div class="flex gap-1">
           <button
             @click="goToPage(currentPage - 1)"
             :disabled="currentPage === 1"
-            class="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-100"
+            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 text-sm"
           >&laquo;</button>
           <button
             v-for="p in totalPages"
             :key="p"
             @click="goToPage(p)"
-            :class="p === currentPage ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'"
-            class="px-3 py-1 border rounded"
+            :class="p === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:bg-slate-50 border-slate-200'"
+            class="px-3 py-1.5 border rounded-lg text-sm"
           >{{ p }}</button>
           <button
             @click="goToPage(currentPage + 1)"
             :disabled="currentPage === totalPages"
-            class="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-100"
+            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 text-sm"
           >&raquo;</button>
         </div>
       </div>

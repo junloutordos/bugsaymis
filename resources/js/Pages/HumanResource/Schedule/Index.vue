@@ -2,141 +2,149 @@
   <Head title="Schedule" />
   <AdminLayout title="Schedule">
     <div>
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold">Schedule</h1>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">Schedule</h1>
         <div class="flex items-center gap-2">
-          <button v-if="canCreate" @click="openCreate" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow inline-flex items-center">
-            <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Schedule
+          <button v-if="canCreate" @click="openCreate" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <PlusIcon class="w-4 h-4" /> New Schedule
           </button>
         </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-4">
-          <input v-model="q" @keydown.enter="search" placeholder="Search by time" class="w-full sm:w-1/3 rounded border-gray-300 px-3 py-2" />
-        </div>
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <input v-model="q" @keydown.enter="search" placeholder="Search by time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
+      </div>
 
-        <div class="overflow-x-auto">
-          <div class="hidden sm:block">
-            <table class="min-w-full text-sm">
-              <thead class="bg-gray-100 text-gray-700"><tr>
-                <th class="px-3 py-2">#</th>
-                <th class="px-3 py-2">Badge</th>
-                <th class="px-3 py-2">Mon</th>
-                <th class="px-3 py-2">Tue</th>
-                <th class="px-3 py-2">Wed</th>
-                <th class="px-3 py-2">Thu</th>
-                <th class="px-3 py-2">Fri</th>
-                <th class="px-3 py-2">Sat</th>
-                <th class="px-3 py-2">Sun</th>
-                <th class="px-3 py-2">Actions</th>
-              </tr></thead>
-              <tbody class="divide-y">
-                <tr v-for="s in schedules.data" :key="s.id">
-                  <td class="px-3 py-2">{{ s.id }}</td>
-                  <td class="px-3 py-2">{{ s.badgeNumber }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.m_timein, s.m_timeout) }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.t_timein, s.t_timeout) }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.w_timein, s.w_timeout) }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.th_timein, s.th_timeout) }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.f_timein, s.f_timeout) }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.sat_timein, s.sat_timeout) }}</td>
-                  <td class="px-3 py-2">{{ displayDay(s.sun_timein, s.sun_timeout) }}</td>
-                  <td class="px-3 py-2">
-                      <div class="flex gap-2">
-                        <button v-if="isAdmin" @click.prevent="openEdit(s)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" aria-label="Edit" title="Edit">
-                          <PencilSquareIcon class="w-5 h-5" />
-                        </button>
-                        <button v-if="isAdmin" @click.prevent="confirmDelete(s)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" aria-label="Delete" title="Delete">
-                          <TrashIcon class="w-5 h-5" />
-                        </button>
-                      </div>
-                  </td>
-                </tr>
-                <tr v-if="(schedules.data || []).length === 0"><td colspan="10" class="px-3 py-6 text-center text-gray-500">No schedules found.</td></tr>
-              </tbody>
-            </table>
-          </div>
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-slate-100">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Badge</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Mon</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Tue</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Wed</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Thu</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Fri</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sat</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sun</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="s in schedules.data" :key="s.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ s.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ s.badgeNumber }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.m_timein, s.m_timeout) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.t_timein, s.t_timeout) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.w_timein, s.w_timeout) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.th_timein, s.th_timeout) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.f_timein, s.f_timeout) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.sat_timein, s.sat_timeout) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ displayDay(s.sun_timein, s.sun_timeout) }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex gap-1">
+                    <button v-if="isAdmin" @click.prevent="openEdit(s)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" aria-label="Edit" title="Edit">
+                      <PencilSquareIcon class="w-4 h-4" />
+                    </button>
+                    <button v-if="isAdmin" @click.prevent="confirmDelete(s)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" aria-label="Delete" title="Delete">
+                      <TrashIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="(schedules.data || []).length === 0">
+                <td colspan="10" class="py-16 text-center text-slate-400 text-sm">No schedules found.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-
       </div>
 
       <!-- Modal -->
-      <div v-if="showModal" :class="isSmallScreen ? 'fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 py-6 overflow-y-auto' : 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50'">
-        <div :class="isSmallScreen ? 'bg-white w-full max-w-full max-h-screen relative rounded-none p-4 overflow-y-auto' : 'bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 relative'">
-          <button class="absolute top-3 right-3" @click="closeModal">✕</button>
-          <h3 class="text-lg font-semibold mb-3">{{ editing ? 'Edit' : 'New' }} Schedule</h3>
-          <form @submit.prevent="submit">
-            <div class="space-y-4">
-              <!-- Monday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Monday</div>
-                <input type="time" v-model="form.m_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" placeholder="Time In" />
-                <input type="time" v-model="form.m_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" placeholder="Break Out" />
-                <input type="time" v-model="form.m_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" placeholder="Break In" />
-                <input type="time" v-model="form.m_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" placeholder="Time Out" />
+      <div v-if="showModal" :class="isSmallScreen ? 'fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 py-6 overflow-y-auto' : 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50'">
+        <div :class="isSmallScreen ? 'bg-white w-full max-w-full max-h-screen relative rounded-none p-4 overflow-y-auto' : 'bg-white rounded-2xl shadow-xl w-full max-w-2xl relative'">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">{{ editing ? 'Edit' : 'New' }} Schedule</h3>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+          </div>
+          <div class="px-6 py-5">
+            <form @submit.prevent="submit">
+              <div class="space-y-4">
+                <!-- Monday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Monday</div>
+                  <input type="time" v-model="form.m_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" placeholder="Time In" />
+                  <input type="time" v-model="form.m_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" placeholder="Break Out" />
+                  <input type="time" v-model="form.m_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" placeholder="Break In" />
+                  <input type="time" v-model="form.m_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" placeholder="Time Out" />
+                </div>
+
+                <!-- Tuesday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Tuesday</div>
+                  <input type="time" v-model="form.t_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.t_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.t_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.t_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                </div>
+
+                <!-- Wednesday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Wednesday</div>
+                  <input type="time" v-model="form.w_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.w_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.w_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.w_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                </div>
+
+                <!-- Thursday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Thursday</div>
+                  <input type="time" v-model="form.th_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.th_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.th_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.th_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                </div>
+
+                <!-- Friday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Friday</div>
+                  <input type="time" v-model="form.f_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.f_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.f_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.f_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                </div>
+
+                <!-- Saturday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Saturday</div>
+                  <input type="time" v-model="form.sat_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.sat_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.sat_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.sat_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                </div>
+
+                <!-- Sunday -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div class="w-full sm:w-28 text-sm font-medium text-slate-700">Sunday</div>
+                  <input type="time" v-model="form.sun_timein" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.sun_breakout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.sun_breakin" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                  <input type="time" v-model="form.sun_timeout" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-40" />
+                </div>
               </div>
 
-              <!-- Tuesday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Tuesday</div>
-                <input type="time" v-model="form.t_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.t_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.t_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.t_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
+              <div class="mt-6 flex gap-2">
+                <button :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">{{ editing ? 'Save' : 'Create' }}</button>
+                <button @click.prevent="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
               </div>
-
-              <!-- Wednesday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Wednesday</div>
-                <input type="time" v-model="form.w_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.w_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.w_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.w_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-              </div>
-
-              <!-- Thursday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Thursday</div>
-                <input type="time" v-model="form.th_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.th_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.th_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.th_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-              </div>
-
-              <!-- Friday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Friday</div>
-                <input type="time" v-model="form.f_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.f_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.f_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.f_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-              </div>
-
-              <!-- Saturday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Saturday</div>
-                <input type="time" v-model="form.sat_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.sat_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.sat_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.sat_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-              </div>
-
-              <!-- Sunday -->
-              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <div class="w-full sm:w-28 font-medium">Sunday</div>
-                <input type="time" v-model="form.sun_timein" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.sun_breakout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.sun_breakin" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-                <input type="time" v-model="form.sun_timeout" class="mt-1 block w-full sm:w-40 rounded border-gray-300" />
-              </div>
-            </div>
-
-            <div class="mt-4 flex gap-2">
-              <button :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded">{{ editing ? 'Save' : 'Create' }}</button>
-              <button @click.prevent="closeModal" class="px-4 py-2 rounded border">Cancel</button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
 

@@ -80,6 +80,23 @@ class GoogleDriveService
     }
 
     /**
+     * Download a file's raw content from Google Drive using the service account.
+     * Returns ['content' => string, 'mimeType' => string].
+     */
+    public function download(string $fileId): array
+    {
+        $response = $this->drive->files->get($fileId, [
+            'alt'               => 'media',
+            'supportsAllDrives' => true,
+        ]);
+
+        return [
+            'content'  => $response->getBody()->getContents(),
+            'mimeType' => $response->getHeaderLine('Content-Type') ?: 'image/jpeg',
+        ];
+    }
+
+    /**
      * Delete a file from Google Drive (Shared Drive aware).
      */
     public function delete(string $fileId): void

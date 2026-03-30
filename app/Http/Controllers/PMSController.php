@@ -11,40 +11,63 @@ use Inertia\Inertia;
 
 class PMSController extends Controller
 {
-    public function index()
-{
-    $pmsSchedules = PMS::with([
-        'performedBy:id,name',
-        'equipments' => function ($q) {
-            $q->select(
-                'ict_equipments.id',   // equipment id
-                'description',
-                'room_id',
-                'owner_id',
-                'serial_no',
-                'category'
-            )
-            ->with([
-                'room:id,name,code',   // room for location
-                'owner:id,name',       // owner
-            ]);
-        },
-        'dates',
-    ])->get();
+    public function index(Request $request)
+    {
+        $search    = $request->input('search');
+        $status    = $request->input('status');
+        $frequency = $request->input('frequency');
 
-    $users = User::select('id','name')->orderBy('name')->get();
+        $query = PMS::with([
+            'performedBy:id,name',
+            'equipments' => function ($q) {
+                $q->select(
+                    'ict_equipments.id',
+                    'description',
+                    'room_id',
+                    'owner_id',
+                    'serial_no',
+                    'category'
+                )
+                ->with([
+                    'room:id,name,code',
+                    'owner:id,name',
+                ]);
+            },
+            'dates',
+        ]);
 
-    $equipments = ICTEquipment::with([
-        'room:id,name,code',
-        'owner:id,name',
-    ])->orderBy('description')->get();
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('office_area', 'like', "%{$search}%")
+                  ->orWhere('school_year', 'like', "%{$search}%");
+            });
+        }
 
-    return Inertia::render('ITJobRequests/PMS', [
-        'pmsSchedules' => $pmsSchedules,
-        'users'        => $users,
-        'equipments'   => $equipments,
-    ]);
-}
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        if ($frequency) {
+            $query->where('frequency', $frequency);
+        }
+
+        $pmsSchedules = $query->paginate(15)->withQueryString();
+
+        $users = User::select('id','name')->orderBy('name')->get();
+
+        $equipments = ICTEquipment::with([
+            'room:id,name,code',
+            'owner:id,name',
+        ])->orderBy('description')->get();
+
+        return Inertia::render('ITJobRequests/PMS', [
+            'pmsSchedules' => $pmsSchedules,
+            'users'        => $users,
+            'equipments'   => $equipments,
+            'filters'      => $request->only('search', 'status', 'frequency'),
+        ]);
+    }
 
 
 

@@ -18,6 +18,18 @@ export default function useEquipments(initialEquipments = [], users = []) {
   const showPmsModal = ref(false)
   const selectedPmsHistory = ref([])
 
+  // ADD PMS HISTORY
+  const showAddPmsModal = ref(false)
+  const pmsForm = ref({
+    pms_date: new Date().toISOString().split('T')[0],
+    type: 'PMS',
+    description: '',
+    cost_of_repair: 0,
+    remarks: '',
+  })
+  const pmsFormErrors = ref({})
+  const isSubmittingPms = ref(false)
+
   const emptyForm = () => ({
     category: "",
     owner_id: "",
@@ -110,38 +122,30 @@ export default function useEquipments(initialEquipments = [], users = []) {
     })
   }
 
+  const showLoadingSwal = (title) => {
+    Swal.fire({ title, allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
+  }
+
   const storeEquipment = async () => {
     errors.value = {}
+    showLoadingSwal('Saving equipment...')
     router.post(route("ict-equipments.store"), form.value, {
-      onError: e => errors.value = e,
+      onError: e => { errors.value = e; Swal.close() },
       onSuccess: () => {
         closeModal()
-        getEquipments()
-        Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "New equipment has been added!",
-          timer: 2000,
-          showConfirmButton: false,
-        })
+        Swal.fire({ icon: "success", title: "Success", text: "New equipment has been added!", timer: 2000, showConfirmButton: false })
       }
     })
   }
 
   const updateEquipment = async (id) => {
     errors.value = {}
+    showLoadingSwal('Updating equipment...')
     router.put(route("ict-equipments.update", id), form.value, {
-      onError: e => errors.value = e,
+      onError: e => { errors.value = e; Swal.close() },
       onSuccess: () => {
         closeModal()
-        getEquipments()
-        Swal.fire({
-          icon: "success",
-          title: "Updated",
-          text: "Equipment details have been updated!",
-          timer: 2000,
-          showConfirmButton: false,
-        })
+        Swal.fire({ icon: "success", title: "Updated", text: "Equipment details have been updated!", timer: 2000, showConfirmButton: false })
       }
     })
   }
@@ -166,7 +170,6 @@ export default function useEquipments(initialEquipments = [], users = []) {
 
       router.delete(route("ict-equipments.destroy", id), {
         onSuccess: () => {
-          getEquipments()
           Swal.fire({
             icon: "success",
             title: "Deleted",
@@ -217,6 +220,69 @@ export default function useEquipments(initialEquipments = [], users = []) {
     selectedEquipment.value = eq
     selectedPmsHistory.value = eq.pms_history || []
     showPmsModal.value = true
+  }
+
+  const openAddPmsHistory = (eq) => {
+    selectedEquipment.value = eq
+    pmsForm.value = {
+      pms_date: new Date().toISOString().split('T')[0],
+      type: 'PMS',
+      description: '',
+      cost_of_repair: 0,
+      remarks: '',
+    }
+    pmsFormErrors.value = {}
+    showAddPmsModal.value = true
+  }
+
+  const submitPmsHistory = () => {
+    pmsFormErrors.value = {}
+    isSubmittingPms.value = true
+
+    // Show loading SweetAlert
+    Swal.fire({
+      title: 'Adding PMS History...',
+      text: 'Please wait while we save the information.',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading()
+      }
+    })
+
+    router.post(route('ict-pms-history.store'), {
+      equipment_id: selectedEquipment.value.id,
+      ...pmsForm.value,
+    }, {
+      onSuccess: () => {
+        isSubmittingPms.value = false
+        // Close loading alert and show success
+        Swal.close()
+        showAddPmsModal.value = false
+        Swal.fire({
+          icon: 'success',
+          title: 'Success!',
+          text: 'PMS history has been added successfully.',
+          confirmButtonColor: '#3B82F6',
+        }).then(() => {
+          // Refresh the page to show updated data
+          window.location.reload()
+        })
+      },
+      onError: (errors) => {
+        isSubmittingPms.value = false
+        // Close loading alert and show error
+        Swal.close()
+        pmsFormErrors.value = errors
+        Swal.fire({
+          icon: 'error',
+          title: 'Error!',
+          text: 'Please check the form for errors and try again.',
+          confirmButtonColor: '#EF4444',
+        })
+      }
+    })
   }
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -380,6 +446,12 @@ export default function useEquipments(initialEquipments = [], users = []) {
     showPmsModal,
     selectedPmsHistory,
     openPmsHistory,
+    showAddPmsModal,
+    pmsForm,
+    pmsFormErrors,
+    isSubmittingPms,
+    openAddPmsHistory,
+    submitPmsHistory,
     formatDate,
 
     // CRUD

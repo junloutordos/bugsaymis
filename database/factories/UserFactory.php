@@ -26,11 +26,11 @@ class UserFactory extends Factory
     {
         return [
             'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'email' => fake()->unique()->userName() . '@crc.pshs.edu.ph',
             'email_verified_at' => now(),
             'password' => bcrypt('password'), // or Hash::make()
             'remember_token' => Str::random(10),
-            'role' => 'Administrator', // default
+            'role_id' => null, // roles managed via role_user pivot
         ];
     }
 

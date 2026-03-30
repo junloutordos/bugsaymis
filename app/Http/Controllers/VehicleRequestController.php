@@ -21,12 +21,19 @@ class VehicleRequestController extends Controller
     {
 
         $user = $request->user();
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'OCD']);
 
         $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
 
         if (! $canViewAll) {
-            $requests->where('requestor_id', $user->id);
+            if ($user->hasRole('DivisionChief')) {
+                $requests->where(function ($q) use ($user) {
+                    $q->where('requestor_id', $user->id)
+                      ->orWhere('division_chief_id', $user->id);
+                });
+            } else {
+                $requests->where('requestor_id', $user->id);
+            }
         }
 
         $requests = $requests->get();
@@ -537,5 +544,65 @@ class VehicleRequestController extends Controller
         $vehicleRequest->load(['requester','driver', 'divisionChief']);
 
         return view('vehicle_requests.print_ticket', ['request' => $vehicleRequest]);
+    }
+
+    /* =====================================================
+     | OCD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = VehicleRequest::with('requester:id,name')
+            ->where('status', 'Approved')
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',     'like', "%{$search}%")
+                      ->orWhere('destination','like', "%{$search}%")
+                      ->orWhereHas('requester', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('VehicleRequests/OCDApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function approveByOCDInApp(Request $request, VehicleRequest $vehicleRequest)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $vehicleRequest->update(['status' => 'OCD Approved']);
+
+            try {
+                $requester = $vehicleRequest->requester;
+                if ($requester?->email) {
+                    \Mail::to($requester->email)->send(
+                        new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, $request->user()->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Vehicle OCD approved email failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $vehicleRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by OCD.']);
+
+            try {
+                $requester = $vehicleRequest->requester;
+                if ($requester?->email) {
+                    \Mail::to($requester->email)->send(
+                        new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by OCD.', $request->user()->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Vehicle OCD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'OCD action recorded.');
     }
 }

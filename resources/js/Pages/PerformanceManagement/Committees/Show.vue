@@ -110,112 +110,109 @@ const statusColor = (status) => {
   <AdminLayout :title="committee.name">
     <div>
       <!-- Header -->
-      <div class="flex items-center gap-3 mb-4">
+      <div class="flex items-center gap-3 mb-6">
         <Link :href="route('pm-committees.index')"
-          class="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800">
+          class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 transition-colors">
           <ArrowLeftIcon class="w-4 h-4" /> Back
         </Link>
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800">{{ committee.name }}</h1>
+        <h1 class="text-xl font-semibold text-slate-800">{{ committee.name }}</h1>
       </div>
 
       <!-- Committee Info -->
-      <div class="bg-white rounded-xl shadow p-4 mb-6">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div>
-            <span class="text-gray-500 font-medium">Committee Head:</span>
-            <p class="font-semibold">{{ committee.head?.name ?? "—" }}</p>
+            <span class="text-slate-500 font-medium">Committee Head:</span>
+            <p class="font-semibold text-slate-800 mt-0.5">{{ committee.head?.name ?? "—" }}</p>
           </div>
           <div>
-            <span class="text-gray-500 font-medium">Members:</span>
-            <p class="font-semibold">{{ committee.members?.length ?? 0 }}</p>
+            <span class="text-slate-500 font-medium">Members:</span>
+            <p class="font-semibold text-slate-800 mt-0.5">{{ committee.members?.length ?? 0 }}</p>
           </div>
           <div>
-            <span class="text-gray-500 font-medium">Description:</span>
-            <p>{{ committee.description ?? "—" }}</p>
+            <span class="text-slate-500 font-medium">Description:</span>
+            <p class="text-slate-700 mt-0.5">{{ committee.description ?? "—" }}</p>
           </div>
         </div>
       </div>
 
       <!-- No tagged plans -->
-      <div v-if="!planMemberData?.length" class="bg-white rounded-xl shadow p-8 text-center text-gray-500">
+      <div v-if="!planMemberData?.length" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center text-slate-400 text-sm">
         No WDP plans tagged to this committee yet.
-        <span v-if="canManage"> Edit the committee to tag plans.</span>
+        <span v-if="canManage" class="text-slate-500"> Edit the committee to tag plans.</span>
       </div>
 
       <!-- Plan sections -->
-      <div v-for="entry in planMemberData" :key="entry.plan.id" class="bg-white rounded-xl shadow p-4 mb-6">
-        <h2 class="text-lg font-semibold text-gray-800 mb-1">{{ entry.plan.success_indicator }}</h2>
-        <p class="text-xs text-gray-400 mb-4">Rated by: {{ entry.plan.rated_by || "Division Chief" }}</p>
+      <div v-for="entry in planMemberData" :key="entry.plan.id" class="bg-white rounded-xl border border-slate-100 shadow-sm mb-6">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <h2 class="text-base font-semibold text-slate-800">{{ entry.plan.success_indicator }}</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Rated by: {{ entry.plan.rated_by || "Division Chief" }}</p>
+        </div>
 
-        <div v-if="!entry.members?.length" class="text-sm text-gray-400 italic py-2">
+        <div v-if="!entry.members?.length" class="p-5 text-sm text-slate-400 italic">
           No members in this committee.
         </div>
 
         <div v-else class="overflow-x-auto">
-          <table class="min-w-full border border-gray-200 text-sm">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-3 py-2 text-left">Member</th>
-                <th class="px-3 py-2 text-left">Task / Role</th>
-                <th class="px-3 py-2 text-left">Rating Period</th>
-                <th class="px-3 py-2 text-left">IPCR Status</th>
-                <th class="px-3 py-2 text-left">Accomplishment</th>
-                <th class="px-3 py-2 text-center">Q</th>
-                <th class="px-3 py-2 text-center">E</th>
-                <th class="px-3 py-2 text-center">T</th>
-                <th class="px-3 py-2 text-center">Avg</th>
-                <th class="px-3 py-2 text-center">Rating</th>
-                <th class="px-3 py-2 text-center">Action</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Member</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Task / Role</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">IPCR Status</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accomplishment</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Q</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">E</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">T</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating</th>
+                <th class="px-3 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-slate-100">
               <template v-for="member in entry.members" :key="member.user_id">
-                <!-- Member has IPCR periods -->
                 <template v-if="member.periods.length">
                   <tr
                     v-for="(period, pIdx) in member.periods"
                     :key="`${member.user_id}-${period.ipcr_id}`"
-                    :class="pIdx === 0 ? 'border-t-2 border-gray-300 hover:bg-gray-50' : 'hover:bg-gray-50'"
+                    :class="pIdx === 0 ? 'border-t-2 border-slate-200 hover:bg-slate-50/60' : 'hover:bg-slate-50/60'"
                   >
-                    <!-- Member name/task only on first period row (rowspan) -->
-                    <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top border-r border-gray-200">
-                      <p class="font-medium">{{ member.user_name }}</p>
-                      <p class="text-xs text-gray-400">{{ member.user_position }}</p>
+                    <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top border-r border-slate-100">
+                      <p class="font-medium text-slate-800">{{ member.user_name }}</p>
+                      <p class="text-xs text-slate-400">{{ member.user_position }}</p>
                     </td>
-                    <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top text-gray-600 border-r border-gray-200">
+                    <td v-if="pIdx === 0" :rowspan="member.periods.length" class="px-3 py-2 align-top text-slate-600 border-r border-slate-100 text-sm">
                       {{ member.task || "—" }}
                     </td>
-                    <!-- Period-specific columns -->
-                    <td class="px-3 py-2 text-indigo-700 font-medium whitespace-nowrap">{{ period.rating_period }}</td>
+                    <td class="px-3 py-2 text-sm text-indigo-700 font-medium whitespace-nowrap">{{ period.rating_period }}</td>
                     <td class="px-3 py-2">
-                      <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', statusColor(period.ipcr_status)]">
+                      <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusColor(period.ipcr_status)]">
                         {{ period.ipcr_status ?? "—" }}
                       </span>
                     </td>
-                    <td class="px-3 py-2 max-w-xs">
+                    <td class="px-3 py-2 max-w-xs text-sm text-slate-700">
                       <p class="truncate">{{ period.accomplishment || "—" }}</p>
                       <a v-if="period.mov_link" :href="period.mov_link" target="_blank"
-                        class="text-blue-500 text-xs hover:underline">MOV Link</a>
+                        class="text-indigo-600 text-xs hover:underline">MOV Link</a>
                     </td>
-                    <td class="px-3 py-2 text-center">{{ period.sup_quality ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center">{{ period.sup_efficiency ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center">{{ period.sup_timeliness ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center font-semibold">{{ period.sup_average ?? "—" }}</td>
-                    <td class="px-3 py-2 text-center text-xs">{{ adjectival(period.sup_average) }}</td>
+                    <td class="px-3 py-2 text-center text-sm text-slate-700">{{ period.sup_quality ?? "—" }}</td>
+                    <td class="px-3 py-2 text-center text-sm text-slate-700">{{ period.sup_efficiency ?? "—" }}</td>
+                    <td class="px-3 py-2 text-center text-sm text-slate-700">{{ period.sup_timeliness ?? "—" }}</td>
+                    <td class="px-3 py-2 text-center text-sm font-semibold text-slate-800">{{ period.sup_average ?? "—" }}</td>
+                    <td class="px-3 py-2 text-center text-xs text-slate-600">{{ adjectival(period.sup_average) }}</td>
                     <td class="px-3 py-2 text-center">
-                      <!-- Own: always show Edit for their accomplishment -->
                       <button
                         v-if="authUser?.id == member.user_id && !(isHead || canManage)"
                         @click="openEditModal(entry, member, period)"
-                        class="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700">
+                        class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-2 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
                         Edit
                       </button>
-                      <!-- Head/Manager: Rate if open, Locked if closed -->
                       <template v-else-if="isHead || canManage">
                         <button
                           v-if="period.can_rate"
                           @click="openEditModal(entry, member, period)"
-                          class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
                           Rate
                         </button>
                         <span v-else class="text-xs text-amber-600 italic" title="IPCR is no longer open for rating">
@@ -226,14 +223,13 @@ const statusColor = (status) => {
                   </tr>
                 </template>
 
-                <!-- Member has no IPCR linked to this plan -->
-                <tr v-else :key="`${member.user_id}-no-ipcr`" class="border-t-2 border-gray-300 hover:bg-gray-50">
-                  <td class="px-3 py-2">
-                    <p class="font-medium">{{ member.user_name }}</p>
-                    <p class="text-xs text-gray-400">{{ member.user_position }}</p>
+                <tr v-else :key="`${member.user_id}-no-ipcr`" class="border-t-2 border-slate-200 hover:bg-slate-50/60">
+                  <td class="px-3 py-2 text-sm">
+                    <p class="font-medium text-slate-800">{{ member.user_name }}</p>
+                    <p class="text-xs text-slate-400">{{ member.user_position }}</p>
                   </td>
-                  <td class="px-3 py-2 text-gray-600">{{ member.task || "—" }}</td>
-                  <td colspan="9" class="px-3 py-2 text-center text-xs text-gray-400">No IPCR linked to this plan</td>
+                  <td class="px-3 py-2 text-sm text-slate-600">{{ member.task || "—" }}</td>
+                  <td colspan="9" class="px-3 py-2 text-center text-xs text-slate-400">No IPCR linked to this plan</td>
                 </tr>
               </template>
             </tbody>
@@ -243,63 +239,73 @@ const statusColor = (status) => {
     </div>
 
     <!-- Edit / Rate Modal -->
-    <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 relative">
-        <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-xl" @click="closeModal">✕</button>
-        <h2 class="text-lg font-semibold mb-1">
-          {{ (modalEntry?.isOwn && !modalEntry?.canRate) ? 'Edit Accomplishment' : 'Rate Member' }}
-          — {{ modalEntry?.member?.user_name }}
-        </h2>
-        <p class="text-xs text-gray-400 mb-4">Period: {{ modalEntry?.period?.rating_period }}</p>
-
-        <form @submit.prevent="submitEdit" class="space-y-4">
+    <Teleport to="body">
+    <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <label class="font-medium text-sm">Accomplishment</label>
-            <textarea v-model="editForm.accomplishment" rows="3"
-              :readonly="!modalEntry?.isOwn && !modalEntry?.canRate"
-              class="w-full mt-1 rounded-lg border-gray-300 text-sm"></textarea>
+            <h2 class="text-base font-semibold text-slate-800">
+              {{ (modalEntry?.isOwn && !modalEntry?.canRate) ? 'Edit Accomplishment' : 'Rate Member' }}
+              — {{ modalEntry?.member?.user_name }}
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Period: {{ modalEntry?.period?.rating_period }}</p>
           </div>
-          <div>
-            <label class="font-medium text-sm">MOV Link</label>
-            <input v-model="editForm.mov_link" type="url" placeholder="https://..."
-              :readonly="!modalEntry?.isOwn && !modalEntry?.canRate"
-              class="w-full mt-1 rounded-lg border-gray-300 text-sm" />
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+        </div>
+
+        <form @submit.prevent="submitEdit">
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment</label>
+              <textarea v-model="editForm.accomplishment" rows="3"
+                :readonly="!modalEntry?.isOwn && !modalEntry?.canRate"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">MOV Link</label>
+              <input v-model="editForm.mov_link" type="url" placeholder="https://..."
+                :readonly="!modalEntry?.isOwn && !modalEntry?.canRate"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+
+            <template v-if="modalEntry?.canRate">
+              <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+                <p class="font-semibold text-slate-700 mb-1">Rating Scale:</p>
+                <p>5 — Outstanding &nbsp; 4 — Very Satisfactory &nbsp; 3 — Satisfactory &nbsp; 2 — Unsatisfactory &nbsp; 1 — Poor</p>
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Quality (1–5)</label>
+                  <input v-model.number="editForm.sup_quality" type="number" min="1" max="5" step="0.01"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency (1–5)</label>
+                  <input v-model.number="editForm.sup_efficiency" type="number" min="1" max="5" step="0.01"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Timeliness (1–5)</label>
+                  <input v-model.number="editForm.sup_timeliness" type="number" min="1" max="5" step="0.01"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                </div>
+              </div>
+              <div class="text-sm text-slate-700">
+                Live Average: <strong class="text-indigo-700">{{ liveAvg }}</strong>
+                <span v-if="liveAvg !== '—'" class="ml-2 text-slate-500">— {{ adjectival(liveAvg) }}</span>
+              </div>
+            </template>
           </div>
 
-          <template v-if="modalEntry?.canRate">
-            <div class="text-xs text-gray-500 bg-gray-50 rounded p-2 space-y-0.5">
-              <p class="font-semibold text-gray-700 mb-1">Rating Scale:</p>
-              <p>5 — Outstanding &nbsp; 4 — Very Satisfactory &nbsp; 3 — Satisfactory &nbsp; 2 — Unsatisfactory &nbsp; 1 — Poor</p>
-            </div>
-            <div class="grid grid-cols-3 gap-3">
-              <div>
-                <label class="text-sm font-medium">Quality (1–5)</label>
-                <input v-model.number="editForm.sup_quality" type="number" min="1" max="5" step="0.01"
-                  class="w-full mt-1 rounded-lg border-gray-300 text-sm" />
-              </div>
-              <div>
-                <label class="text-sm font-medium">Efficiency (1–5)</label>
-                <input v-model.number="editForm.sup_efficiency" type="number" min="1" max="5" step="0.01"
-                  class="w-full mt-1 rounded-lg border-gray-300 text-sm" />
-              </div>
-              <div>
-                <label class="text-sm font-medium">Timeliness (1–5)</label>
-                <input v-model.number="editForm.sup_timeliness" type="number" min="1" max="5" step="0.01"
-                  class="w-full mt-1 rounded-lg border-gray-300 text-sm" />
-              </div>
-            </div>
-            <div class="text-sm text-gray-700">
-              Live Average: <strong>{{ liveAvg }}</strong>
-              <span v-if="liveAvg !== '—'" class="ml-2 text-gray-500">— {{ adjectival(liveAvg) }}</span>
-            </div>
-          </template>
-
-          <div class="flex justify-end gap-2 pt-2">
-            <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded text-sm">Cancel</button>
-            <button type="submit" :disabled="isSubmitting" class="px-4 py-2 bg-blue-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" @click="closeModal"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button type="submit" :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
           </div>
         </form>
       </div>
     </div>
+    </Teleport>
   </AdminLayout>
 </template>

@@ -33,70 +33,72 @@ const filteredIPCRs = computed(() => {
 <template>
   <Head title="PMT IPCR Review" />
   <AdminLayout title="PMT IPCR Review">
-    <div>
+    <div class="p-6 space-y-5">
+
       <!-- Header -->
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">IPCR Review — Performance Management Team</h1>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">IPCR Review — Performance Management Team</h1>
       </div>
 
-      <!-- Search -->
-      <div class="bg-white p-4 rounded-xl shadow mb-4">
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
         <input
           v-model="searchQuery"
           type="text"
           placeholder="Search by employee, title, period, division..."
-          class="w-full sm:w-1/2 rounded-lg border-gray-300 shadow-sm focus:ring-purple-500 focus:border-purple-500"
+          class="flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         />
       </div>
 
       <!-- Table -->
-      <div class="overflow-x-auto bg-white p-4 rounded-xl shadow">
-        <table class="min-w-full border border-gray-200 text-center text-sm">
-          <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-            <tr>
-              <th class="px-4 py-3">Employee</th>
-              <th class="px-4 py-3">Division</th>
-              <th class="px-4 py-3">Rating Period</th>
-              <th class="px-4 py-3">Title</th>
-              <th class="px-4 py-3">Overall Avg.</th>
-              <th class="px-4 py-3">Adjectival Rating</th>
-              <th class="px-4 py-3">Status</th>
-              <th class="px-4 py-3">Submitted to PMT</th>
-              <th class="px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <tr v-for="ipcr in filteredIPCRs" :key="ipcr.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 font-medium">{{ ipcr.user?.name ?? '—' }}</td>
-              <td class="px-4 py-3">{{ ipcr.user?.division?.division_name ?? '—' }}</td>
-              <td class="px-4 py-3">{{ ipcr.rating_period }}</td>
-              <td class="px-4 py-3">{{ ipcr.title }}</td>
-              <td class="px-4 py-3 font-semibold">{{ ipcr.overall_average ?? '—' }}</td>
-              <td class="px-4 py-3 font-semibold">{{ adjectivalRating(ipcr.overall_average) }}</td>
-              <td class="px-4 py-3">
-                <span :class="`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusClasses(ipcr.status)}`">
-                  {{ ipcr.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-xs text-gray-500">
-                {{ ipcr.submitted_for_pmtreview_at ?? '—' }}
-              </td>
-              <td class="px-4 py-3">
-                <button
-                  @click="router.visit(route('pmt-ipcr.show', ipcr.id))"
-                  class="p-2 hover:bg-gray-100 rounded"
-                  title="Review IPCR"
-                >
-                  <EyeIcon class="w-5 h-5 text-purple-600" />
-                </button>
-              </td>
-            </tr>
-            <tr v-if="filteredIPCRs.length === 0">
-              <td colspan="9" class="px-4 py-6 text-gray-500">No IPCRs submitted for PMT review.</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Division</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Overall Avg.</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Adjectival Rating</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted to PMT</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="ipcr in filteredIPCRs" :key="ipcr.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 font-medium text-slate-800">{{ ipcr.user?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.user?.division?.division_name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.rating_period }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.title }}</td>
+                <td class="px-4 py-3 text-center font-semibold text-slate-800">{{ ipcr.overall_average ?? '—' }}</td>
+                <td class="px-4 py-3 text-center text-sm text-slate-700">{{ adjectivalRating(ipcr.overall_average) }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span :class="`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClasses(ipcr.status)}`">
+                    {{ ipcr.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-center text-xs text-slate-500">{{ ipcr.submitted_for_pmtreview_at ?? '—' }}</td>
+                <td class="px-4 py-3 text-center">
+                  <button
+                    @click="router.visit(route('pmt-ipcr.show', ipcr.id))"
+                    class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-700 transition-colors"
+                    title="Review IPCR"
+                  >
+                    <EyeIcon class="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="filteredIPCRs.length === 0">
+                <td colspan="9" class="py-16 text-center text-slate-400 text-sm">No IPCRs submitted for PMT review.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
+
     </div>
   </AdminLayout>
 </template>

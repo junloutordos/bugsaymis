@@ -568,9 +568,9 @@ class ConsultationController extends Controller
             if ($request->filled('medicine_given')) $consultation->medicine_given = $request->input('medicine_given');
             if ($request->filled('medicines')) $consultation->medicine_given = $request->input('medicines');
             if ($request->filled('action_taken')) $consultation->action_taken = $request->input('action_taken');
-            if ($request->filled('time_start')) $consultation->time_start = $request->input('time_start');
-            if ($request->filled('time_out')) $consultation->time_out = $request->input('time_out');
-            if ($request->filled('date_attended')) $consultation->date_attended = $request->input('date_attended');
+            if ($request->filled('time_start')) $consultation->time_start = Carbon::parse($request->input('time_start'))->toDateTimeString();
+            if ($request->filled('time_out')) $consultation->time_out = Carbon::parse($request->input('time_out'))->toDateTimeString();
+            if ($request->filled('date_attended')) $consultation->date_attended = Carbon::parse($request->input('date_attended'))->toDateTimeString();
             if ($request->filled('disposition')) $consultation->disposition = $request->input('disposition');
         }
         // Always set nurse who performed the action

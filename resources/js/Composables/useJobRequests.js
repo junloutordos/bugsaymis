@@ -103,9 +103,20 @@ export function useJobRequests(initialRequests = []) {
     form.reset()
   }
 
+  const showLoadingSwal = (title = 'Saving...') => {
+    Swal.fire({
+      title,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => { Swal.showLoading() },
+    })
+  }
+
   // Submit form
   const submitRequest = async () => {
     if (modalMode.value === "create") {
+      showLoadingSwal('Creating request...')
       form.post(route("jobrequests.store"), {
         preserveScroll: true,
         onSuccess: async () => {
@@ -120,6 +131,7 @@ export function useJobRequests(initialRequests = []) {
     }
 
     if (modalMode.value === "update" && form.id) {
+      showLoadingSwal('Updating request...')
       form.put(route("job-requests.update", form.id), {
         preserveScroll: true,
         onSuccess: async () => {
@@ -127,17 +139,23 @@ export function useJobRequests(initialRequests = []) {
           await Swal.fire("Updated", "IT Job Request updated successfully!", "success")
           window.location.reload()
         },
+        onError: async () => {
+          await Swal.fire("Error", "Failed to update request. Please try again.", "error")
+        },
       })
     }
 
     if (modalMode.value === "mis-assessment" && form.id) {
-      //  Use dedicated assessment route
-      router.put(`/job-requests/${form.id}/update`, form.data(), {
+      showLoadingSwal('Saving assessment...')
+      form.put(`/job-requests/${form.id}/update`, {
         preserveScroll: true,
         onSuccess: async () => {
           closeModal()
           await Swal.fire("Success", "MIS Assessment saved!", "success")
           window.location.reload()
+        },
+        onError: async () => {
+          await Swal.fire("Error", "Failed to save assessment. Please try again.", "error")
         },
       })
     }

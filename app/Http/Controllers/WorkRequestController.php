@@ -35,7 +35,8 @@ class WorkRequestController extends Controller
         $user = Auth::user();
         $query = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->orderByDesc('created_at');
 
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief'])
+            || str_contains($user->position ?? '', 'FAD');
 
         if (! $canViewAll) {
             $query->where('requester_id', $user->id);

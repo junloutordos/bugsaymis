@@ -25,52 +25,53 @@ class ITJobRequestController extends Controller
      |=====================================================*/
 public function index(Request $request)
 {
-    $user = $request->user();
+    $user    = $request->user();
+    $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+    $search   = trim($request->query('search', ''));
+    $category = trim($request->query('category', ''));
+    $status   = trim($request->query('status', ''));
+    $perPage  = min((int) $request->query('per_page', 15), 1000);
 
-    $roles = array_filter(explode(',', $user->role_id));
-    $isAdmin = isset($roles[0]) && (int) $roles[0] === 1;
-
-    $requests = ITJobRequest::with([
-        'user:id,name',
-        'divisionChief:id,name',
-        'assignedTo:id,name',
-        'trackingLogs:id,it_job_request_id,status,remarks,created_at',
-
-        // 🔥 THIS IS THE IMPORTANT PART
-        'equipment' => function ($q) {
-            $q->select('id','description','room_id','owner_id')
-              ->with([
-                  'room:id,name,code',
-                  'owner:id,name'
-              ]);
-        }
-    ])
-    ->when(!$isAdmin, fn ($q) => $q->where('user_id', $user->id))
-    ->latest()
-    ->get();
+    $requests = ITJobRequest::select([
+            'id', 'itjr_no', 'title', 'category', 'description', 'status',
+            'user_id', 'divisionchief_id', 'assignedto', 'attendedby',
+            'action_taken', 'created_at', 'updated_at',
+            'mis_assessment', 'expected_completion_date', 'completed_at',
+            'ict_equipment_id', 'rating', 'rating_remarks', 'rated_at',
+        ])
+        ->with([
+            'user:id,name',
+            'divisionChief:id,name',
+            'assignedTo:id,name',
+            'trackingLogs:id,it_job_request_id,status,remarks,created_at',
+            'equipment' => fn($q) => $q->select('id', 'description', 'room_id', 'owner_id')
+                ->with(['room:id,name,code', 'owner:id,name']),
+        ])
+        ->when(!$isAdmin, fn($q) => $q->where('user_id', $user->id))
+        ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+            $inner->where('title', 'like', "%{$search}%")
+                  ->orWhere('category', 'like', "%{$search}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  ->orWhere('itjr_no', 'like', "%{$search}%")
+                  ->orWhere('action_taken', 'like', "%{$search}%")
+                  ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+        }))
+        ->when($category, fn($q) => $q->where('category', $category))
+        ->when($status,   fn($q) => $q->where('status',   $status))
+        ->latest()
+        ->paginate($perPage)
+        ->withQueryString();
 
     return Inertia::render('ITJobRequests/Index', [
-        'requests' => $requests,
-        'categories' => ITJobCategory::orderBy('name')->get(),
-
-        'divisionChiefs' => User::where(function ($q) {
-            $q->orWhereRaw('FIND_IN_SET(?, role_id)', [2])
-              ->orWhereRaw('FIND_IN_SET(?, role_id)', [15]);
-        })->select('id','name')->orderBy('name')->get(),
-
-        'administrators' => User::whereRaw('FIND_IN_SET(?, role_id)', [1])
-            ->select('id','name')->orderBy('name')->get(),
-
-        'ictEquipment' => ICTEquipment::with([
-            'room:id,name,code',
-            'owner:id,name',
-        ])
-        ->orderBy('description')
-        ->get(),
-
-
-
-        'isAdmin' => $isAdmin,
+        'requests'       => $requests,
+        'filters'        => ['search' => $search, 'category' => $category, 'status' => $status, 'per_page' => $perPage],
+        'categories'     => ITJobCategory::orderBy('name')->get(['id', 'name']),
+        'divisionChiefs' => User::whereHas('roles', fn ($q) => $q->whereIn('name', ['DivisionChief', 'InformationOfficer']))->select('id', 'name')->orderBy('name')->get(),
+        'misPersonnel'   => User::havingRole('MIS')->select('id', 'name')->orderBy('name')->get(),
+        'ictEquipment'   => ICTEquipment::with(['room:id,name,code', 'owner:id,name'])
+            ->orderBy('description')
+            ->get(['id', 'description', 'room_id', 'owner_id', 'serial_no']),
+        'isAdmin'        => $isAdmin,
     ]);
 }
 
@@ -94,25 +95,40 @@ public function index(Request $request)
             'assignedto' => 'required|exists:users,id',
         ]);
 
-        // Generate ITJR number
-        $prefix = now()->format('Y-m');
-        $latestSeq = ITJobRequest::where('itjr_no', 'like', "{$prefix}-%")
-            ->select(DB::raw("MAX(CAST(SUBSTRING_INDEX(itjr_no, '-', -1) AS UNSIGNED)) as seq"))
-            ->value('seq');
+        // Duplicate guard: same user submitted identical title+category within the last 30 seconds
+        $isDuplicate = ITJobRequest::where('user_id', $request->user()->id)
+            ->where('title', $validated['title'])
+            ->where('category', $validated['category'])
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->exists();
 
-        $validated['itjr_no'] = sprintf('%s-%04d', $prefix, ($latestSeq ?? 0) + 1);
-        $validated['user_id'] = $request->user()->id;
-        $validated['status'] = 'Pending Division Chief Approval';
+        if ($isDuplicate) {
+            return back()->withErrors(['title' => 'Duplicate request detected. Please wait before submitting again.']);
+        }
 
-        $jobRequest = ITJobRequest::create($validated);
+        $jobRequest = DB::transaction(function () use ($validated, $request) {
+            // Generate ITJR number (inside transaction to prevent race conditions)
+            $prefix = now()->format('Y-m');
+            $latestSeq = ITJobRequest::where('itjr_no', 'like', "{$prefix}-%")
+                ->lockForUpdate()
+                ->select(DB::raw("MAX(CAST(SUBSTRING_INDEX(itjr_no, '-', -1) AS UNSIGNED)) as seq"))
+                ->value('seq');
 
-        // Log creation
-        ITJRTrackingLog::create([
-            'it_job_request_id' => $jobRequest->id,
-            'status' => 'Submitted IT Job Request',
-            'remarks' => 'Request submitted by user.',
-            'updated_by' => $request->user()->id,
-        ]);
+            $validated['itjr_no'] = sprintf('%s-%04d', $prefix, ($latestSeq ?? 0) + 1);
+            $validated['user_id'] = $request->user()->id;
+            $validated['status'] = 'Pending Division Chief Approval';
+
+            $jobRequest = ITJobRequest::create($validated);
+
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'Submitted IT Job Request',
+                'remarks' => 'Request submitted by user.',
+                'updated_by' => $request->user()->id,
+            ]);
+
+            return $jobRequest;
+        });
 
         // Send email to Division Chief with signed approve/decline links
         if ($jobRequest->divisionchief_id) {
@@ -386,37 +402,36 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         ? 'Acted by MIS'
         : 'MIS Assessed the Request';
 
-    // 🔄 Update IT Job Request
-    $jobRequest->update(array_merge($validated, [
-        'status' => $status,
-        'attendedby' => $request->user()->name,
-    ]));
+    DB::transaction(function () use ($jobRequest, $validated, $status, $isActedByMIS, $request) {
+        $jobRequest->update(array_merge($validated, [
+            'status' => $status,
+            'attendedby' => $request->user()->name,
+        ]));
 
-    // 🧾 Tracking log
-    ITJRTrackingLog::create([
-        'it_job_request_id' => $jobRequest->id,
-        'status' => $status,
-        'remarks' => collect($validated)->filter()->implode("\n"),
-        'updated_by' => $request->user()->id,
-    ]);
-
-    // 📘 Save to ICT PMS History (only if acted)
-    if ($isActedByMIS && !empty($validated['ict_equipment_id'])) {
-        ICTPMSHistory::create([
-            'ict_pms_id'     => null,
-            'equipment_id'   => $validated['ict_equipment_id'],
-            'pms_date'       => now()->toDateString(),
-            'description'    => 'IT Job Request Service (' . $jobRequest->itjr_no . ')',
-            'type'           => 'Repair',
-            'cost_of_repair' => 0.00,
-            'remarks'        => $validated['action_taken']
-                                ?? $validated['mis_assessment']
-                                ?? 'Service action from IT Job Request',
-            'created_by'     => $request->user()->id,
+        ITJRTrackingLog::create([
+            'it_job_request_id' => $jobRequest->id,
+            'status' => $status,
+            'remarks' => collect($validated)->filter()->implode("\n"),
+            'updated_by' => $request->user()->id,
         ]);
-    }
 
-    // 📧 NOTIFY REQUESTER
+        if ($isActedByMIS && !empty($validated['ict_equipment_id'])) {
+            ICTPMSHistory::create([
+                'ict_pms_id'     => null,
+                'equipment_id'   => $validated['ict_equipment_id'],
+                'pms_date'       => now()->toDateString(),
+                'description'    => 'IT Job Request Service (' . $jobRequest->itjr_no . ')',
+                'type'           => 'Repair',
+                'cost_of_repair' => 0.00,
+                'remarks'        => $validated['action_taken']
+                                    ?? $validated['mis_assessment']
+                                    ?? 'Service action from IT Job Request',
+                'created_by'     => $request->user()->id,
+            ]);
+        }
+    });
+
+    // 📧 NOTIFY REQUESTER (outside transaction — email failures must not roll back DB changes)
     if ($jobRequest->user && $jobRequest->user->email) {
         try {
             Mail::to($jobRequest->user->email)->send(
@@ -443,24 +458,31 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
     public function confirmCompletion(Request $request, ITJobRequest $jobRequest)
     {
+        // Idempotency: already completed — return early without duplicate entry
+        if ($jobRequest->status === 'Request Completed') {
+            return back()->with('success', 'Request already confirmed.');
+        }
+
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'remarks' => 'nullable|string|max:500',
         ]);
 
-        $jobRequest->update([
-            'status' => 'Request Completed',
-            'rating' => $validated['rating'],
-            'rating_remarks' => $validated['remarks'],
-            'rated_at' => now(),
-        ]);
+        DB::transaction(function () use ($jobRequest, $validated, $request) {
+            $jobRequest->update([
+                'status' => 'Request Completed',
+                'rating' => $validated['rating'],
+                'rating_remarks' => $validated['remarks'],
+                'rated_at' => now(),
+            ]);
 
-        ITJRTrackingLog::create([
-            'it_job_request_id' => $jobRequest->id,
-            'status' => 'Request Completed',
-            'remarks' => 'User confirmed completion and rated the service.',
-            'updated_by' => $request->user()->id,
-        ]);
+            ITJRTrackingLog::create([
+                'it_job_request_id' => $jobRequest->id,
+                'status' => 'Request Completed',
+                'remarks' => 'User confirmed completion and rated the service.',
+                'updated_by' => $request->user()->id,
+            ]);
+        });
 
         return back()->with('success', 'Request confirmed and rated.');
     }
@@ -473,13 +495,28 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             abort(403, 'Unauthorized');
         }
 
-        $requests = ITJobRequest::with('user')
+        $search   = trim($request->query('search', ''));
+        $category = trim($request->query('category', ''));
+        $perPage  = min((int) $request->query('per_page', 15), 50);
+
+        $requests = ITJobRequest::with('user:id,name')
             ->where('divisionchief_id', $user->id)
             ->where('status', 'Pending Division Chief Approval')
-            ->get();
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('title', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhere('itjr_no', 'like', "%{$search}%")
+                      ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->when($category, fn($q) => $q->where('category', $category))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('ITJobRequests/ForApprovalITJR', [
-            'requests' => $requests
+            'requests'   => $requests,
+            'filters'    => ['search' => $search, 'category' => $category],
+            'categories' => ITJobCategory::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -526,12 +563,27 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             abort(403, 'Unauthorized');
         }
 
-        $requests = ITJobRequest::with('user')
+        $search   = trim($request->query('search', ''));
+        $category = trim($request->query('category', ''));
+        $perPage  = min((int) $request->query('per_page', 15), 50);
+
+        $requests = ITJobRequest::with('user:id,name')
             ->where('status', 'Pending OCD Approval')
-            ->get();
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('title', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhere('itjr_no', 'like', "%{$search}%")
+                      ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->when($category, fn($q) => $q->where('category', $category))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
 
         return Inertia::render('ITJobRequests/OCDApprovalITJR', [
-            'requests' => $requests
+            'requests'   => $requests,
+            'filters'    => ['search' => $search, 'category' => $category],
+            'categories' => ITJobCategory::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -568,5 +620,30 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         }
 
         return back()->with('success', 'OCD action recorded!');
+    }
+
+    /* =====================================================
+     | CHECK PENDING "ACTED BY MIS" FOR CURRENT USER
+     |=====================================================*/
+    public function checkPendingActedByMis(Request $request)
+    {
+        $count = ITJobRequest::where('user_id', $request->user()->id)
+            ->where('status', 'Acted by MIS')
+            ->count();
+
+        return response()->json(['has_pending' => $count > 0, 'count' => $count]);
+    }
+
+    /* =====================================================
+     | DESTROY
+     |=====================================================*/
+    public function destroy(ITJobRequest $jobRequest)
+    {
+        DB::transaction(function () use ($jobRequest) {
+            $jobRequest->trackingLogs()->delete();
+            $jobRequest->delete();
+        });
+
+        return back()->with('success', 'IT Job Request deleted successfully.');
     }
 }

@@ -13,23 +13,48 @@ use Mpdf\Mpdf;
 
 class ICTEquipmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $equipments = ICTEquipment::with([
+        $search   = $request->input('search');
+        $category = $request->input('category');
+        $status   = $request->input('status');
+        $perPage  = min((int) $request->query('per_page', 15), 1000);
+
+        $query = ICTEquipment::with([
             'owner',
-            'room', // ✅ ADDED
+            'room',
             'pmsHistory' => function ($q) {
                 $q->orderBy('pms_date', 'desc');
             }
-        ])->get();
+        ]);
 
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                  ->orWhere('serial_no', 'like', "%{$search}%")
+                  ->orWhere('property_no', 'like', "%{$search}%")
+                  ->orWhereHas('owner', fn($q) => $q->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('room', fn($q) => $q->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($category) {
+            $query->where('category', $category);
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        $equipments = $query->paginate($perPage)->withQueryString();
         $users = User::all();
-        $rooms = Room::orderBy('name')->get(); // ✅ ADDED
+        $rooms = Room::orderBy('name')->get();
 
         return Inertia::render('ITJobRequests/ICTEquipments', [
             'equipments' => $equipments,
-            'users' => $users,
-            'rooms' => $rooms, // ✅ ADDED
+            'users'      => $users,
+            'rooms'      => $rooms,
+            'filters'    => $request->only('search', 'category', 'status', 'per_page'),
         ]);
     }
 

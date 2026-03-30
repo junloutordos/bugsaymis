@@ -192,10 +192,13 @@ class EmployeeIPCRController extends Controller
             return $plan;
         });
 
+        $ocdUser = \App\Models\User::havingRole('OCD')->first();
+
         return Inertia::render('PerformanceManagement/EmployeeIPCRShow', [
             'ipcr'       => $ipcr,
             'employee'   => $ipcr->user,
             'supervisor' => $supervisor,
+            'ocdUser'    => $ocdUser ? ['name' => $ocdUser->name, 'position' => $ocdUser->position] : null,
             'plans'      => $plans,
             'workPlans'  => $workPlans,
         ]);

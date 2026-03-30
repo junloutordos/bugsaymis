@@ -186,21 +186,21 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
     <!-- Back -->
     <button
       @click="$inertia.get(route('my-unit-ipcr.index'))"
-      class="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800"
+      class="mb-4 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors"
     >
-      <ArrowLeftIcon class="w-5 h-5" /> Back to My Unit
+      <ArrowLeftIcon class="w-4 h-4" /> Back to My Unit
     </button>
 
     <!-- IPCR card -->
-    <div class="bg-white p-4 rounded-lg shadow mb-4">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4">
       <div class="flex items-start justify-between flex-wrap gap-2">
         <div>
-          <h2 class="text-xl font-semibold">{{ ipcr.title }}</h2>
-          <p class="text-gray-500 text-sm">{{ employee.name }} — {{ employee.position }}</p>
-          <p class="text-gray-500 text-sm">Rating Period: {{ ipcr.rating_period }}</p>
-          <p class="text-xs text-gray-400 mt-0.5">Office: {{ employee.office?.name ?? "—" }}</p>
+          <h2 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h2>
+          <p class="text-slate-500 text-sm mt-0.5">{{ employee.name }} — {{ employee.position }}</p>
+          <p class="text-slate-500 text-sm">Rating Period: {{ ipcr.rating_period }}</p>
+          <p class="text-xs text-slate-400 mt-0.5">Office: {{ employee.office?.name ?? "—" }}</p>
         </div>
-        <span :class="statusBadge(ipcr.status)" class="px-3 py-1 text-sm font-semibold rounded-full self-start">
+        <span :class="statusBadge(ipcr.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium self-start">
           {{ ipcr.status }}
         </span>
       </div>
@@ -213,39 +213,39 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
     </div>
 
     <!-- Plans Table -->
-    <div class="bg-white p-4 rounded-lg shadow overflow-x-auto">
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-x-auto">
       <table class="min-w-full border border-gray-300 text-sm border-collapse">
-        <thead class="bg-gray-100 text-gray-700 text-xs uppercase">
+        <thead class="bg-slate-50 text-slate-700 text-xs uppercase">
           <tr>
-            <th rowspan="2" colspan="2" class="border px-4 py-2 text-center">Output</th>
-            <th rowspan="2" class="border px-4 py-2">Success Indicators</th>
-            <th rowspan="2" class="border px-4 py-2">Accomplishment</th>
-            <th rowspan="2" class="border px-4 py-2">MOV Link</th>
-            <th colspan="4" class="border px-4 py-2 text-center">Rating</th>
+            <th rowspan="2" colspan="2" class="border px-4 py-2 text-center font-semibold text-slate-500 tracking-wide">Output</th>
+            <th rowspan="2" class="border px-4 py-2 font-semibold text-slate-500 tracking-wide">Success Indicators</th>
+            <th rowspan="2" class="border px-4 py-2 font-semibold text-slate-500 tracking-wide">Accomplishment</th>
+            <th rowspan="2" class="border px-4 py-2 font-semibold text-slate-500 tracking-wide">MOV Link</th>
+            <th colspan="4" class="border px-4 py-2 text-center font-semibold text-slate-500 tracking-wide">Rating</th>
           </tr>
           <tr>
-            <th class="border px-4 py-2 text-center">Q</th>
-            <th class="border px-4 py-2 text-center">E</th>
-            <th class="border px-4 py-2 text-center">T</th>
-            <th class="border px-4 py-2 text-center">A</th>
+            <th class="border px-4 py-2 text-center font-semibold text-slate-500 tracking-wide">Q</th>
+            <th class="border px-4 py-2 text-center font-semibold text-slate-500 tracking-wide">E</th>
+            <th class="border px-4 py-2 text-center font-semibold text-slate-500 tracking-wide">T</th>
+            <th class="border px-4 py-2 text-center font-semibold text-slate-500 tracking-wide">A</th>
           </tr>
         </thead>
 
         <tbody>
           <tr v-if="!plans || plans.length === 0">
-            <td colspan="9" class="border px-4 py-6 text-center text-gray-400">No plans assigned to this IPCR.</td>
+            <td colspan="9" class="border px-4 py-16 text-center text-slate-400">No plans assigned to this IPCR.</td>
           </tr>
 
           <template v-for="(outcomes, functionType) in groupedPlansByFunction" :key="functionType">
-            <tr class="bg-gray-300">
-              <td colspan="9" class="px-4 py-2 font-bold text-gray-800 border border-gray-300 uppercase">
+            <tr class="bg-slate-200">
+              <td colspan="9" class="px-4 py-2 font-bold text-slate-700 border border-gray-300 uppercase">
                 {{ functionType }}
               </td>
             </tr>
 
             <template v-for="(subGroups, outcome) in outcomes" :key="outcome">
-              <tr class="bg-gray-200">
-                <td colspan="9" class="px-4 py-2 font-semibold text-gray-700 border border-gray-300">
+              <tr class="bg-slate-100">
+                <td colspan="9" class="px-4 py-2 font-semibold text-slate-600 border border-gray-300">
                   {{ outcome }}
                 </td>
               </tr>
@@ -254,13 +254,13 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                 <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
 
                   <!-- First row of PI group -->
-                  <tr class="hover:bg-gray-50">
+                  <tr class="hover:bg-slate-50/60">
                     <td v-if="Object.keys(pis)[0] === piDesc"
                         :rowspan="Object.values(pis).reduce((t, a) => t + a.length, 0)"
-                        class="px-4 py-2 font-medium text-gray-700 border border-gray-300 text-xs">
+                        class="px-4 py-2 font-medium text-slate-600 border border-gray-300 text-xs">
                       {{ subAbbrev !== '—' ? subAbbrev : '' }}
                     </td>
-                    <td :rowspan="piPlans.length" class="px-4 py-2 border border-gray-300 font-medium text-xs">
+                    <td :rowspan="piPlans.length" class="px-4 py-2 border border-gray-300 font-medium text-slate-700 text-xs">
                       {{ piDesc }}
                     </td>
 
@@ -333,7 +333,7 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
                   </tr>
 
                   <!-- Remaining rows -->
-                  <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-gray-50">
+                  <tr v-for="plan in piPlans.slice(1)" :key="plan.id" class="hover:bg-slate-50/60">
                     <td class="px-4 py-2 border border-gray-300">
                       <div>{{ plan.success_indicator }}</div>
                       <div class="text-xs mt-0.5">
@@ -409,37 +409,37 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
       <!-- Summary table (rated stages) -->
       <div v-if="isAtRatedStage" class="mt-6">
         <table class="min-w-full border text-sm border-collapse">
-          <thead class="bg-gray-100 text-gray-700 text-xs uppercase">
+          <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th rowspan="2" class="border px-4 py-2 text-center w-40">Output</th>
-              <th colspan="4" class="border px-4 py-2 text-center">Rating</th>
-              <th rowspan="2" class="border px-4 py-2 text-center w-24">% Weight</th>
-              <th rowspan="2" class="border px-4 py-2 text-center w-40">Weighted Score</th>
+              <th rowspan="2" class="border px-4 py-2 text-center w-40 font-semibold tracking-wide">Output</th>
+              <th colspan="4" class="border px-4 py-2 text-center font-semibold tracking-wide">Rating</th>
+              <th rowspan="2" class="border px-4 py-2 text-center w-24 font-semibold tracking-wide">% Weight</th>
+              <th rowspan="2" class="border px-4 py-2 text-center w-40 font-semibold tracking-wide">Weighted Score</th>
             </tr>
             <tr>
-              <th class="border px-4 py-2 text-center w-16">Q</th>
-              <th class="border px-4 py-2 text-center w-16">E</th>
-              <th class="border px-4 py-2 text-center w-16">T</th>
-              <th class="border px-4 py-2 text-center w-16">A</th>
+              <th class="border px-4 py-2 text-center w-16 font-semibold tracking-wide">Q</th>
+              <th class="border px-4 py-2 text-center w-16 font-semibold tracking-wide">E</th>
+              <th class="border px-4 py-2 text-center w-16 font-semibold tracking-wide">T</th>
+              <th class="border px-4 py-2 text-center w-16 font-semibold tracking-wide">A</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(row, type) in summaryByFunctionType" :key="type" class="font-medium">
-              <td class="border px-3 py-2">{{ type }}</td>
-              <td class="border px-3 py-2 text-center">{{ row.countQ ? formatAvg(row.totalQ / row.countQ) : "—" }}</td>
-              <td class="border px-3 py-2 text-center">{{ row.countE ? formatAvg(row.totalE / row.countE) : "—" }}</td>
-              <td class="border px-3 py-2 text-center">{{ row.countT ? formatAvg(row.totalT / row.countT) : "—" }}</td>
-              <td class="border px-3 py-2 text-center">{{ row.countA ? formatAvg(row.totalA / row.countA) : "—" }}</td>
-              <td class="border px-3 py-2 text-center">{{ (row.weight * 100).toFixed(0) }}%</td>
-              <td class="border px-3 py-2 text-center">{{ row.countA ? formatAvg((row.totalA / row.countA) * row.weight) : "—" }}</td>
+              <td class="border px-3 py-2 text-slate-700">{{ type }}</td>
+              <td class="border px-3 py-2 text-center text-slate-700">{{ row.countQ ? formatAvg(row.totalQ / row.countQ) : "—" }}</td>
+              <td class="border px-3 py-2 text-center text-slate-700">{{ row.countE ? formatAvg(row.totalE / row.countE) : "—" }}</td>
+              <td class="border px-3 py-2 text-center text-slate-700">{{ row.countT ? formatAvg(row.totalT / row.countT) : "—" }}</td>
+              <td class="border px-3 py-2 text-center text-slate-700">{{ row.countA ? formatAvg(row.totalA / row.countA) : "—" }}</td>
+              <td class="border px-3 py-2 text-center text-slate-700">{{ (row.weight * 100).toFixed(0) }}%</td>
+              <td class="border px-3 py-2 text-center text-slate-700">{{ row.countA ? formatAvg((row.totalA / row.countA) * row.weight) : "—" }}</td>
             </tr>
-            <tr class="bg-gray-50 font-semibold">
-              <td colspan="6" class="border px-3 py-3 text-left">TOTAL</td>
-              <td class="border px-3 py-3 text-center font-bold">{{ finalIPCRRating }}</td>
+            <tr class="bg-slate-50 font-semibold">
+              <td colspan="6" class="border px-3 py-3 text-left text-slate-700">TOTAL</td>
+              <td class="border px-3 py-3 text-center font-bold text-slate-800">{{ finalIPCRRating }}</td>
             </tr>
-            <tr class="bg-gray-50">
-              <td colspan="6" class="border px-3 py-3 text-left font-semibold">Adjectival Rating</td>
-              <td class="border px-3 py-3 text-center font-bold">{{ ipcrAdjectivalRating(finalIPCRRating) }}</td>
+            <tr class="bg-slate-50">
+              <td colspan="6" class="border px-3 py-3 text-left font-semibold text-slate-700">Adjectival Rating</td>
+              <td class="border px-3 py-3 text-center font-bold text-slate-800">{{ ipcrAdjectivalRating(finalIPCRRating) }}</td>
             </tr>
           </tbody>
         </table>
@@ -447,83 +447,104 @@ const isAtRatedStage     = computed(() => ["Submitted for Rating", ...PMT_STAGES
     </div>
 
     <!-- Rate Plan Modal -->
-    <div v-if="isModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg p-6 w-96">
-        <h3 class="text-lg font-semibold mb-4">Rate Accomplishment</h3>
-        <div class="flex flex-col gap-3">
-          <label class="text-sm font-medium">Accomplishment:
-            <textarea v-model="form.accomplishment" rows="2" class="border rounded w-full px-2 py-1 mt-1 text-sm"></textarea>
-          </label>
-          <label class="text-sm font-medium">MOV Link:
-            <input type="text" v-model="form.mov_link" class="border rounded w-full px-2 py-1 mt-1 text-sm" />
-          </label>
-          <div class="flex gap-3">
-            <label class="flex-1 text-sm font-medium">Q (1–5)
-              <input type="number" min="1" max="5" step="0.01" v-model="form.quality" class="border rounded w-full px-2 py-1 mt-1 text-sm" />
-            </label>
-            <label class="flex-1 text-sm font-medium">E (1–5)
-              <input type="number" min="1" max="5" step="0.01" v-model="form.efficiency" class="border rounded w-full px-2 py-1 mt-1 text-sm" />
-            </label>
-            <label class="flex-1 text-sm font-medium">T (1–5)
-              <input type="number" min="1" max="5" step="0.01" v-model="form.timeliness" class="border rounded w-full px-2 py-1 mt-1 text-sm" />
-            </label>
-            <div class="flex-1 text-sm font-medium">Avg
-              <div class="border rounded px-2 py-1 mt-1 text-sm bg-gray-50 text-blue-700 font-semibold text-center">{{ liveAverage }}</div>
+    <Teleport to="body">
+    <div v-if="isModalOpen" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800">Rate Accomplishment</h3>
+          <button @click="isModalOpen = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">✕</button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment</label>
+            <textarea v-model="form.accomplishment" rows="2"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">MOV Link</label>
+            <input type="text" v-model="form.mov_link"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          </div>
+          <div class="grid grid-cols-4 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Q (1–5)</label>
+              <input type="number" min="1" max="5" step="0.01" v-model="form.quality"
+                class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">E (1–5)</label>
+              <input type="number" min="1" max="5" step="0.01" v-model="form.efficiency"
+                class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">T (1–5)</label>
+              <input type="number" min="1" max="5" step="0.01" v-model="form.timeliness"
+                class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Avg</label>
+              <div class="rounded-lg border border-slate-200 px-2 py-2 text-sm bg-slate-50 text-indigo-700 font-semibold text-center">{{ liveAverage }}</div>
             </div>
           </div>
-          <p class="text-xs text-gray-400">5 – Outstanding · 4 – Very Satisfactory · 3 – Satisfactory · 2 – Unsatisfactory · 1 – Poor</p>
+          <p class="text-xs text-slate-400">5 – Outstanding · 4 – Very Satisfactory · 3 – Satisfactory · 2 – Unsatisfactory · 1 – Poor</p>
         </div>
-        <div class="mt-4 flex justify-end gap-2">
-          <button @click="isModalOpen = false" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300 text-sm">Cancel</button>
-          <button @click="saveModal" :disabled="isSubmitting" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save Rating' }}</button>
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+          <button @click="isModalOpen = false"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+          <button @click="saveModal" :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save Rating' }}</button>
         </div>
       </div>
     </div>
+    </Teleport>
 
     <!-- Accomplishments Viewer Modal -->
+    <Teleport to="body">
     <div v-if="accViewerPlan"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
       @click.self="closeAccViewer">
-      <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div class="flex items-start justify-between px-6 py-4 border-b">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="flex items-start justify-between px-6 py-4 border-b border-slate-100">
           <div>
-            <h2 class="text-base font-semibold text-gray-800">Accomplishments</h2>
-            <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+            <h2 class="text-base font-semibold text-slate-800">Accomplishments</h2>
+            <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
           </div>
-          <button @click="closeAccViewer" class="text-gray-400 hover:text-gray-700 text-xl leading-none ml-4">✕</button>
+          <button @click="closeAccViewer" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors ml-4">✕</button>
         </div>
 
         <div class="overflow-y-auto flex-1 px-6 py-4">
           <div v-if="!accViewerPlan.accomplishments?.length"
-            class="text-center text-gray-400 text-sm py-8">
+            class="py-16 text-center text-slate-400 text-sm">
             No accomplishments logged for this plan.
           </div>
           <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
-            class="mb-4 pb-4 border-b border-gray-100 last:border-0">
+            class="mb-4 pb-4 border-b border-slate-100 last:border-0">
             <div class="flex items-center gap-2 mb-1">
-              <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700">
                 {{ formatAccDate(acc.accomplishment_date) }}
               </span>
             </div>
-            <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ acc.description }}</p>
+            <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
             <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
               <a v-for="photo in acc.photos" :key="photo.id"
                 :href="photo.google_drive_link" target="_blank"
-                class="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                📎 {{ photo.file_name || 'Photo' }}
+                class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                {{ photo.file_name || 'Photo' }}
               </a>
             </div>
           </div>
         </div>
 
-        <div class="px-6 py-3 border-t text-right">
-          <span class="text-xs text-gray-400 mr-4">
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+          <span class="text-xs text-slate-400">
             {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
           </span>
-          <button @click="closeAccViewer" class="px-4 py-2 bg-gray-200 rounded-lg text-sm hover:bg-gray-300">Close</button>
+          <button @click="closeAccViewer"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
         </div>
       </div>
     </div>
+    </Teleport>
 
   </AdminLayout>
 </template>

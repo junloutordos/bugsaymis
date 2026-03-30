@@ -31,119 +31,137 @@ const outcomeTypes = ["Strategic Functions", "Core Functions", "Support Function
 <template>
   <Head title="Agency Organizational Outcomes" />
   <AdminLayout title="Agency Organizational Outcome Management">
-    <div>
+    <div class="p-6 space-y-5">
+
       <!-- Header -->
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Organizational Outcomes</h1>
-        <button @click="openModal('create')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">
-          <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Outcome
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">Organizational Outcomes</h1>
+        <button @click="openModal('create')" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <PlusIcon class="w-4 h-4" /> New Outcome
         </button>
       </div>
 
-      <!-- Search -->
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
         <input
           v-model="searchQuery"
           type="text"
           placeholder="Search outcomes..."
-          class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          class="flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         />
+      </div>
 
-        <!-- Outcomes Table -->
-        <div class="overflow-x-auto mt-4">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Outcome</th>
-                <th class="px-4 py-3 text-left">Sub-Outcome</th>
-                <th class="px-4 py-3 text-left">Type</th>
-                <th class="px-4 py-3 text-left">Created At</th>
-                <th class="px-4 py-3 text-center">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Outcome</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sub-Outcome</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created At</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ outcome.id }}</td>
-                <td class="px-4 py-3">{{ outcome.outcome }}</td>
-                <td class="px-4 py-3">{{ outcome.sub_outcome ?? '—' }}</td>
-                <td class="px-4 py-3">{{ outcome.function_type ?? '—' }}</td>
-                <td class="px-4 py-3">{{ new Date(outcome.created_at).toLocaleDateString() }}</td>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.outcome }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.sub_outcome ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.function_type ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(outcome.created_at).toLocaleDateString() }}</td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
-                    <button @click="openModal('view', outcome)" class="p-1 hover:bg-gray-100 rounded">
-                      <EyeIcon class="w-5 h-5 text-blue-600" />
+                    <button @click="openModal('view', outcome)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                      <EyeIcon class="w-4 h-4" />
                     </button>
-                    <button @click="openModal('edit', outcome)" class="p-1 hover:bg-gray-100 rounded">
-                      <PencilSquareIcon class="w-5 h-5 text-yellow-600" />
+                    <button @click="openModal('edit', outcome)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-amber-700 transition-colors">
+                      <PencilSquareIcon class="w-4 h-4" />
                     </button>
-                    <button @click="deleteOutcome(outcome)" class="p-1 hover:bg-gray-100 rounded">
-                      <TrashIcon class="w-5 h-5 text-red-600" />
+                    <button @click="deleteOutcome(outcome)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors">
+                      <TrashIcon class="w-4 h-4" />
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredOutcomes.length===0">
-                <td colspan="6" class="px-4 py-6 text-center text-gray-500">
-                  No outcomes found.
-                </td>
+                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">No outcomes found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <div class="flex items-center gap-1">
+            <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
+            <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
+          </div>
         </div>
       </div>
 
       <!-- Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-          <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeModal">✕</button>
-
-          <h2 class="text-xl font-semibold mb-4">
-            {{ modalMode==='create' ? 'New Outcome' : modalMode==='edit' ? 'Edit Outcome' : 'View Outcome' }}
-          </h2>
+      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">
+              {{ modalMode==='create' ? 'New Outcome' : modalMode==='edit' ? 'Edit Outcome' : 'View Outcome' }}
+            </h2>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" @click="closeModal">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
 
           <!-- VIEW MODE -->
-          <div v-if="modalMode==='view' && selectedOutcome" class="space-y-2">
-            <p>Outcome: <strong>{{ selectedOutcome.outcome }}</strong></p>
-            <p>Sub-Outcome: <strong>{{ selectedOutcome.sub_outcome ?? '—' }}</strong></p>
-            <p>Type: <strong>{{ selectedOutcome.function_type ?? '—' }}</strong></p>
-            <p>Created At: <strong>{{ new Date(selectedOutcome.created_at).toLocaleString() }}</strong></p>
+          <div v-if="modalMode==='view' && selectedOutcome" class="px-6 py-5 space-y-3">
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Outcome</span>
+              <span class="font-medium text-slate-800">{{ selectedOutcome.outcome }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Sub-Outcome</span>
+              <span class="font-medium text-slate-800">{{ selectedOutcome.sub_outcome ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Type</span>
+              <span class="font-medium text-slate-800">{{ selectedOutcome.function_type ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-slate-500">Created At</span>
+              <span class="font-medium text-slate-800">{{ new Date(selectedOutcome.created_at).toLocaleString() }}</span>
+            </div>
           </div>
 
           <!-- CREATE / EDIT FORM -->
-          <form v-else @submit.prevent="submitOutcome" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Outcome</label>
-              <input v-model="form.outcome" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required />
+          <form v-else @submit.prevent="submitOutcome">
+            <div class="px-6 py-5 space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Outcome</label>
+                <input v-model="form.outcome" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Sub-Outcome</label>
+                <input v-model="form.sub_outcome" type="text" placeholder="Optional" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Type</label>
+                <select v-model="form.function_type" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                  <option value="" disabled>Select type</option>
+                  <option v-for="type in outcomeTypes" :key="type" :value="type">{{ type }}</option>
+                </select>
+              </div>
             </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Sub-Outcome</label>
-              <input v-model="form.sub_outcome" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" placeholder="Optional" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Type</label>
-              <select v-model="form.function_type" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm" required>
-                <option value="" disabled>Select type</option>
-                <option v-for="type in outcomeTypes" :key="type" :value="type">{{ type }}</option>
-              </select>
-            </div>
-
-            <div class="flex justify-end space-x-3 pt-4">
-              <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+              <button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
             </div>
           </form>
         </div>
       </div>
+
     </div>
   </AdminLayout>
 </template>

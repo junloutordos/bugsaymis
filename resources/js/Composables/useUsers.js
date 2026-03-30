@@ -24,6 +24,7 @@ export function useUsers(props) {
     badge_id: "",
     role_id: [],
     position: "",
+    specialization: "",
     division_id: "",
     office_id: "",
     emp_category: '',
@@ -90,9 +91,11 @@ export function useUsers(props) {
           ? user.role_id.toString().split(',').map((s) => Number(s.trim()))
           : [],
         position: user.position ?? "",
+        specialization: user.specialization ?? "",
         division_id: user.division_id ?? "",
         office_id: user.office_id ?? user.office?.id ?? "",
-        emp_category: user.emp_category ?? user.emp_category ?? '' ,
+        emp_category: user.emp_category ?? '',
+        status: user.status ?? 'active',
       }
     } else {
       form.value = {
@@ -102,6 +105,7 @@ export function useUsers(props) {
         badge_id: "",
         role_id: [],
         position: "",
+        specialization: "",
         division_id: "",
         office_id: "",
         emp_category: '',

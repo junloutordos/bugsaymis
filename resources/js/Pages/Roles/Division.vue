@@ -79,75 +79,77 @@ const submitUpload = async () => {
   <AdminLayout title="Divisions Management">
     <div>
       <!-- Header -->
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Divisions List</h1>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <h1 class="text-xl font-semibold text-slate-800">Divisions List</h1>
         <button
           @click="openModal('create')"
-          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
         >
-          <PlusIcon class="w-5 h-5 inline-block mr-1" /> New Division
+          <PlusIcon class="w-4 h-4" /> New Division
         </button>
       </div>
 
-      <!-- Search -->
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
         <input
           v-model="searchQuery"
           type="text"
           placeholder="Search divisions..."
-          class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64"
         />
+      </div>
 
-        <!-- Divisions Table -->
-        <div class="overflow-x-auto mt-4">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Division Name</th>
-                <th class="px-4 py-3 text-left">Acronym</th>
-                <th class="px-4 py-3 text-left">Chief</th>
-                <th class="px-4 py-3 text-left">Year Assigned</th>
-                <th class="px-4 py-3 text-left">Status</th>
-                <th class="px-4 py-3 text-left">Created At</th>
-                <th class="px-4 py-3 text-center">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Division Name</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Acronym</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Chief</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Year Assigned</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created At</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="division in filteredDivisions" :key="division.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ division.id }}</td>
-                <td class="px-4 py-3">{{ division.division_name }}</td>
-                <td class="px-4 py-3">{{ division.acronym ?? '—' }}</td>
-                <td class="px-4 py-3">{{ division.divisionchief?.name ?? '—' }}</td>
-                <td class="px-4 py-3">{{ division.year ?? '—' }}</td>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="division in filteredDivisions" :key="division.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ division.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ division.division_name }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ division.acronym ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ division.divisionchief?.name ?? '—' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ division.year ?? '—' }}</td>
                 <td class="px-4 py-3">
                   <span
-                    class="px-2 py-1 rounded text-xs font-medium"
-                    :class="division.status==='active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                    :class="division.status==='active' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'"
                   >
                     {{ division.status }}
                   </span>
                 </td>
-                <td class="px-4 py-3">{{ new Date(division.created_at).toLocaleDateString() }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(division.created_at).toLocaleDateString() }}</td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
-                    <button @click="openModal('view', division)" class="p-1 hover:bg-gray-100 rounded">
-                      <EyeIcon class="w-5 h-5 text-blue-600"/>
+                    <button @click="openModal('view', division)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                      <EyeIcon class="w-4 h-4"/>
                     </button>
-                    <button @click="openModal('edit', division)" class="p-1 hover:bg-gray-100 rounded">
-                      <PencilSquareIcon class="w-5 h-5 text-yellow-600"/>
+                    <button @click="openModal('edit', division)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                      <PencilSquareIcon class="w-4 h-4"/>
                     </button>
-                    <button @click="openUploadModal(division)" class="p-1 hover:bg-gray-100 rounded" title="Upload signature">
-                      <ArrowUpOnSquareIcon class="w-5 h-5 text-green-600"/>
+                    <button @click="openUploadModal(division)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Upload signature">
+                      <ArrowUpOnSquareIcon class="w-4 h-4"/>
                     </button>
-                    <button @click="deleteDivision(division)" class="p-1 hover:bg-gray-100 rounded">
-                      <TrashIcon class="w-5 h-5 text-red-600"/>
+                    <button @click="deleteDivision(division)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors">
+                      <TrashIcon class="w-4 h-4"/>
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="filteredDivisions.length===0">
-                <td colspan="7" class="px-4 py-6 text-center text-gray-500">
+                <td colspan="8" class="py-16 text-center text-slate-400 text-sm">
                   No divisions found.
                 </td>
               </tr>
@@ -156,11 +158,11 @@ const submitUpload = async () => {
         </div>
 
         <!-- Pagination -->
-        <div class="flex justify-center items-center gap-2 mt-4">
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <button
             @click="currentPage--"
             :disabled="currentPage===1"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40"
           >
             Prev
           </button>
@@ -168,149 +170,152 @@ const submitUpload = async () => {
           <button
             @click="currentPage++"
             :disabled="currentPage===totalPages"
-            class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40"
           >
             Next
           </button>
         </div>
       </div>
 
-      <!-- Modal -->
+      <!-- Division Modal -->
       <div
         v-show="showModal"
-        class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 transition-opacity"
+        class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4"
       >
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-          <button
-            class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-            @click="closeModal"
-          >
-            ✕
-          </button>
-
-          <h2 class="text-xl font-semibold mb-4">
-            {{ modalMode==='create' ? 'New Division' : modalMode==='edit' ? 'Edit Division' : 'View Division' }}
-          </h2>
-
-          <!-- VIEW MODE -->
-          <div v-if="modalMode==='view' && selectedDivision" class="space-y-2">
-            <p>Division: <strong>{{ selectedDivision.division_name }}</strong></p>
-            <p>Acronym: <strong>{{ selectedDivision.acronym ?? '—' }}</strong></p>
-            <p>Chief: <strong>{{ selectedDivision.divisionchief?.name ?? '—' }}</strong></p>
-            <p>Year Assigned: <strong>{{ selectedDivision.year ?? '—' }}</strong></p>
-            <p>Status: 
-              <span
-                class="px-2 py-1 rounded text-xs font-medium"
-                :class="selectedDivision.status==='active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-              >
-                {{ selectedDivision.status }}
-              </span>
-            </p>
-            <p>Created At: <strong>{{ new Date(selectedDivision.created_at).toLocaleString() }}</strong></p>
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">
+              {{ modalMode==='create' ? 'New Division' : modalMode==='edit' ? 'Edit Division' : 'View Division' }}
+            </h2>
+            <button
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+              @click="closeModal"
+            >
+              ✕
+            </button>
           </div>
 
-          <!-- CREATE / EDIT FORM -->
-          <form v-else @submit.prevent="submitDivision" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Division Name</label>
-              <input
-                v-model="form.division_name"
-                type="text"
-                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
-                required
-              />
+          <div class="px-6 py-5">
+            <!-- VIEW MODE -->
+            <div v-if="modalMode==='view' && selectedDivision" class="space-y-2 text-sm text-slate-700">
+              <p>Division: <strong>{{ selectedDivision.division_name }}</strong></p>
+              <p>Acronym: <strong>{{ selectedDivision.acronym ?? '—' }}</strong></p>
+              <p>Chief: <strong>{{ selectedDivision.divisionchief?.name ?? '—' }}</strong></p>
+              <p>Year Assigned: <strong>{{ selectedDivision.year ?? '—' }}</strong></p>
+              <p>Status:
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                  :class="selectedDivision.status==='active' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'"
+                >
+                  {{ selectedDivision.status }}
+                </span>
+              </p>
+              <p>Created At: <strong>{{ new Date(selectedDivision.created_at).toLocaleString() }}</strong></p>
             </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Acronym (optional)</label>
-              <input
-                v-model="form.acronym"
-                type="text"
-                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
-                placeholder="e.g. FAD"
-                maxlength="20"
-              />
-            </div>
+            <!-- CREATE / EDIT FORM -->
+            <form v-else @submit.prevent="submitDivision" class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Division Name</label>
+                <input
+                  v-model="form.division_name"
+                  type="text"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                  required
+                />
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Division Chief (optional)</label>
-              <select
-                v-model="form.division_chief_id"
-                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
-              >
-                <option :value="null">— None —</option>
-                <option v-for="user in props.users" :key="user.id" :value="user.id">
-                  {{ user.name }}
-                </option>
-              </select>
-            </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Acronym (optional)</label>
+                <input
+                  v-model="form.acronym"
+                  type="text"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                  placeholder="e.g. FAD"
+                  maxlength="20"
+                />
+              </div>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Year Assigned</label>
-              <input
-                v-model="form.year"
-                type="number"
-                min="1900"
-                max="2100"
-                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
-                placeholder="e.g. 2023"
-              />
-            </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Division Chief (optional)</label>
+                <select
+                  v-model="form.division_chief_id"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                >
+                  <option :value="null">— None —</option>
+                  <option v-for="user in props.users" :key="user.id" :value="user.id">
+                    {{ user.name }}
+                  </option>
+                </select>
+              </div>
 
-            <!-- Status -->
-            <div v-if="modalMode === 'edit'">
-              <label class="block text-sm font-medium text-gray-700">Status</label>
-              <select
-                v-model="form.status"
-                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"
-              >
-                <option value="active">Active</option>
-                <option value="not_active">Not Active</option>
-              </select>
-            </div>
-            <input v-else type="hidden" v-model="form.status" value="active" />
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Year Assigned</label>
+                <input
+                  v-model="form.year"
+                  type="number"
+                  min="1900"
+                  max="2100"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                  placeholder="e.g. 2023"
+                />
+              </div>
 
-            <div class="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                @click="closeModal"
-                class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Save
-              </button>
-            </div>
-          </form>
+              <!-- Status -->
+              <div v-if="modalMode === 'edit'">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+                <select
+                  v-model="form.status"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                >
+                  <option value="active">Active</option>
+                  <option value="not_active">Not Active</option>
+                </select>
+              </div>
+              <input v-else type="hidden" v-model="form.status" value="active" />
 
+              <div class="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  @click="closeModal"
+                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Upload Signature Modal -->
-    <div v-show="showUploadModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-        <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="closeUploadModal">✕</button>
-        <h3 class="text-lg font-semibold mb-4">Upload Electronic Signature</h3>
-        <div class="space-y-4">
+    <div v-show="showUploadModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800">Upload Electronic Signature</h3>
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeUploadModal">✕</button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700">Signature Image (PNG/JPG/SVG)</label>
-            <input type="file" accept="image/*" class="mt-2" @change="onFileChange" />
+            <label class="block text-xs font-medium text-slate-600 mb-1">Signature Image (PNG/JPG/SVG)</label>
+            <input type="file" accept="image/*" class="mt-2 text-sm text-slate-600" @change="onFileChange" />
           </div>
 
-          <div v-if="previewUrl" class="">
-            <p class="text-sm text-gray-600">Preview:</p>
+          <div v-if="previewUrl">
+            <p class="text-xs text-slate-500 mb-1">Preview:</p>
             <img :src="previewUrl" alt="preview" class="h-24 mt-2 object-contain" />
           </div>
-
-          <div class="flex justify-end gap-3">
-            <button @click="closeUploadModal" class="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-            <button @click="submitUpload" :disabled="isUploading" class="px-4 py-2 bg-green-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed">{{ isUploading ? 'Uploading…' : 'Upload' }}</button>
-          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+          <button @click="closeUploadModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+          <button @click="submitUpload" :disabled="isUploading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isUploading ? 'Uploading…' : 'Upload' }}</button>
         </div>
       </div>
     </div>

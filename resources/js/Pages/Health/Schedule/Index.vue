@@ -2,97 +2,126 @@
   <Head title="Schedule" />
   <AdminLayout title="Schedule">
     <div>
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold">Physician Schedule</h1>
-          <div class="flex items-center gap-2">
-            <button @click="openCreate" class="bg-blue-600 text-white px-4 py-2 rounded">New</button>
-          </div>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Physician Schedule</h1>
+          <p class="text-sm text-slate-500">Manage physician availability dates and times</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="openCreate" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            New Schedule
+          </button>
+        </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="mb-4">
-          <input v-model="q" @keydown.enter="search" placeholder="Search by day or time" class="w-full sm:w-1/3 rounded border-gray-300 px-3 py-2" />
-        </div>
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <input v-model="q" @keydown.enter="search" placeholder="Search by day or time" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
+        <button @click="search" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Search
+        </button>
+      </div>
+
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div class="overflow-x-auto">
-          <!-- Desktop / larger screens: table -->
+          <!-- Desktop table -->
           <div class="hidden sm:block">
-            <table class="min-w-full text-sm">
-              <thead class="bg-gray-100 text-gray-700"><tr><th class="px-3 py-2">#</th><th class="px-3 py-2">Date</th><th class="px-3 py-2">Start</th><th class="px-3 py-2">End</th><th class="px-3 py-2">Actions</th></tr></thead>
-              <tbody class="divide-y">
-                <tr v-for="s in schedules.data" :key="s.id">
-                  <td class="px-3 py-2">{{ s.id }}</td>
-                  <td class="px-3 py-2">{{ s.schedule_date || '—' }}</td>
-                  <td class="px-3 py-2">{{ s.time_start }}</td>
-                  <td class="px-3 py-2">{{ s.time_end }}</td>
-                  <td class="px-3 py-2">
-                    <div class="flex gap-2">
-                      <button @click.prevent="openEdit(s)" class="p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700" aria-label="Edit" title="Edit">
+            <table class="min-w-full divide-y divide-slate-100 text-sm">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Start</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">End</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="s in schedules.data" :key="s.id" class="hover:bg-slate-50/60">
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ s.id }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ s.schedule_date || '—' }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ s.time_start }}</td>
+                  <td class="px-4 py-3 text-sm text-slate-700">{{ s.time_end }}</td>
+                  <td class="px-4 py-3">
+                    <div class="flex gap-1">
+                      <button @click.prevent="openEdit(s)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" aria-label="Edit" title="Edit">
                         <PencilSquareIcon class="h-4 w-4" />
                       </button>
-                      <button @click.prevent="confirmDelete(s)" class="p-2 rounded-full bg-red-100 hover:bg-red-200 text-red-700" aria-label="Delete" title="Delete">
+                      <button @click.prevent="confirmDelete(s)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" aria-label="Delete" title="Delete">
                         <TrashIcon class="h-4 w-4" />
                       </button>
                     </div>
                   </td>
                 </tr>
-                <tr v-if="(schedules.data || []).length === 0"><td colspan="5" class="px-3 py-6 text-center text-gray-500">No schedules found.</td></tr>
+                <tr v-if="(schedules.data || []).length === 0">
+                  <td colspan="5" class="py-16 text-center text-slate-400 text-sm">No schedules found.</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Mobile / small screens: stacked cards -->
-          <div class="sm:hidden space-y-3">
-            <div v-for="s in schedules.data" :key="'card-'+s.id" class="bg-white border rounded-lg p-4">
-              <div class="flex justify-between items-center">
+          <!-- Mobile stacked cards -->
+          <div class="sm:hidden divide-y divide-slate-100">
+            <div v-for="s in schedules.data" :key="'card-'+s.id" class="p-4">
+              <div class="flex justify-between items-start">
                 <div>
-                  <div class="text-sm text-gray-600">#{{ s.id }}</div>
-                  <div class="font-medium">{{ s.schedule_date || '—' }}</div>
+                  <div class="text-xs text-slate-500">#{{ s.id }}</div>
+                  <div class="font-medium text-slate-800 mt-0.5">{{ s.schedule_date || '—' }}</div>
+                  <div class="text-sm text-slate-600 mt-1">{{ s.time_start || '—' }} – {{ s.time_end || '—' }}</div>
                 </div>
-                <div class="text-sm text-gray-700 text-right">
-                  <div>Start: {{ s.time_start || '—' }}</div>
-                  <div>End: {{ s.time_end || '—' }}</div>
+                <div class="flex gap-1">
+                  <button @click.prevent="openEdit(s)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                    <PencilSquareIcon class="h-4 w-4" />
+                  </button>
+                  <button @click.prevent="confirmDelete(s)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors">
+                    <TrashIcon class="h-4 w-4" />
+                  </button>
                 </div>
-              </div>
-              <div class="mt-3 flex gap-2">
-                <button @click.prevent="openEdit(s)" class="px-3 py-2 bg-indigo-100 rounded text-sm">Edit</button>
-                <button @click.prevent="confirmDelete(s)" class="px-3 py-2 bg-red-100 rounded text-sm">Delete</button>
               </div>
             </div>
-            <div v-if="(schedules.data || []).length === 0" class="text-center text-gray-500">No schedules found.</div>
+            <div v-if="(schedules.data || []).length === 0" class="py-16 text-center text-slate-400 text-sm">No schedules found.</div>
           </div>
         </div>
 
-        <div class="flex justify-center items-center gap-2 mt-4">
-          <button @click.prevent="goTo(schedules.prev_page_url)" :disabled="!schedules.prev_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
           <span>Page {{ schedules.current_page }} of {{ schedules.last_page }}</span>
-          <button @click.prevent="goTo(schedules.next_page_url)" :disabled="!schedules.next_page_url" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+          <div class="flex gap-2">
+            <button @click.prevent="goTo(schedules.prev_page_url)" :disabled="!schedules.prev_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
+            <button @click.prevent="goTo(schedules.next_page_url)" :disabled="!schedules.next_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+          </div>
         </div>
       </div>
 
       <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-          <button class="absolute top-3 right-3" @click="closeModal">✕</button>
-          <h3 class="text-lg font-semibold mb-3">{{ editing ? 'Edit' : 'New' }} Schedule</h3>
-          <form @submit.prevent="submit">
-            <!-- Day removed: using schedule_date instead -->
-            <div class="mb-3">
-              <label class="block text-sm font-medium">Date</label>
-              <input type="date" v-model="form.schedule_date" class="mt-1 block w-full rounded border-gray-300" />
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">{{ editing ? 'Edit' : 'New' }} Schedule</h3>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
+              <input type="date" v-model="form.schedule_date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
             </div>
-            <div class="mb-3">
-              <label class="block text-sm font-medium">Start</label>
-              <input type="time" v-model="form.time_start" class="mt-1 block w-full rounded border-gray-300" />
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
+              <input type="time" v-model="form.time_start" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
             </div>
-            <div class="mb-3">
-              <label class="block text-sm font-medium">End</label>
-              <input type="time" v-model="form.time_end" class="mt-1 block w-full rounded border-gray-300" />
-            </div>
-            <div class="flex gap-2">
-              <button :disabled="form.processing" class="bg-blue-600 text-white px-4 py-2 rounded">{{ editing ? 'Save' : 'Create' }}</button>
-              <button @click.prevent="closeModal" class="px-4 py-2 rounded border">Cancel</button>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">End Time</label>
+              <input type="time" v-model="form.time_end" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
             </div>
           </form>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <button @click.prevent="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+            <button @click.prevent="submit" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ editing ? 'Save Changes' : 'Create' }}</button>
+          </div>
         </div>
       </div>
 

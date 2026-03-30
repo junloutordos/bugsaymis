@@ -21,7 +21,7 @@ class VehicleRequestSeeder extends Seeder
         }
 
         VehicleRequest::factory()->count(3)->create([
-            'user_id' => $user->id,
+            'requestor_id' => $user->id,
         ]);
     }
 }
