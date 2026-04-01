@@ -334,6 +334,20 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/itjr/{jobRequest}/division-chief/{action}',[ITJobRequestController::class, 'approveByDivisionChief'])->name('itjr.dc.action');
     
 
+    // Division Chief In-App Approval Dashboards
+    Route::get('/vehicle-requests/dc-approval',   [\App\Http\Controllers\VehicleRequestController::class,  'divisionChiefApproval'])->name('vehicle-requests.dc-approval')->middleware('permission:vehicles.dc-approve');
+    Route::get('/facility-requests/dc-approval',  [\App\Http\Controllers\FacilityRequestController::class, 'divisionChiefApproval'])->name('facility-requests.dc-approval')->middleware('permission:facilities.dc-approve');
+    Route::get('/work-requests/dc-approval',      [\App\Http\Controllers\WorkRequestController::class,     'divisionChiefApproval'])->name('work-requests.dc-approval')->middleware('permission:facilities.dc-approve');
+    Route::get('/service-requests/dc-approval',   [\App\Http\Controllers\ServiceRequestController::class,  'divisionChiefApproval'])->name('service-requests.dc-approval')->middleware('permission:facilities.dc-approve');
+
+    // FAD In-App Approval Dashboards
+    Route::get('/facility-requests/fad-approval',                          [\App\Http\Controllers\FacilityRequestController::class, 'fadApproval'])->name('facility-requests.fad-approval')->middleware('permission:facilities.fad-approve');
+    Route::post('/facility-requests/{facilityRequest}/fad-action',         [\App\Http\Controllers\FacilityRequestController::class, 'fadAction'])->name('facility-requests.fad-action')->middleware('permission:facilities.fad-approve');
+    Route::get('/work-requests/fad-approval',                              [\App\Http\Controllers\WorkRequestController::class,     'fadApproval'])->name('work-requests.fad-approval')->middleware('permission:facilities.fad-approve');
+    Route::post('/work-requests/{workRequest}/fad-action',                 [\App\Http\Controllers\WorkRequestController::class,     'fadAction'])->name('work-requests.fad-action')->middleware('permission:facilities.fad-approve');
+    Route::get('/service-requests/fad-approval',                           [\App\Http\Controllers\ServiceRequestController::class,  'fadApproval'])->name('service-requests.fad-approval')->middleware('permission:facilities.fad-approve');
+    Route::post('/service-requests/{serviceRequest}/fad-action',           [\App\Http\Controllers\ServiceRequestController::class,  'fadAction'])->name('service-requests.fad-action')->middleware('permission:facilities.fad-approve');
+
     // OCD Approval Dashboards
     Route::get('/vehicle-requests/ocd-approval', [VehicleRequestController::class, 'ocdApproval'])->name('vehicle-requests.ocd-approval');
     Route::post('/vehicle-requests/{vehicleRequest}/ocd-action', [VehicleRequestController::class, 'approveByOCDInApp'])->name('vehicle-requests.ocd-action');
@@ -1368,6 +1382,10 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.index');
     Route::get('/leave/create', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'create'])
         ->name('leave.create');
+    Route::get('/leave/balance/check', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'checkBalance'])
+        ->name('leave.balance.check');
+    Route::get('/leave-credits/my', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'myCredits'])
+        ->name('leave-credits.my');
     Route::post('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'store'])
         ->name('leave.store');
     Route::get('/leave/{leaveApplication}', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'show'])
@@ -1376,6 +1394,37 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.approve');
     Route::post('/leave/{leaveApplication}/cancel', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'cancel'])
         ->name('leave.cancel');
+    Route::get('/leave/{leaveApplication}/print', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'printForm'])
+        ->name('leave.print');
+
+    // ── Leave Credit Administration (HR only) ─────────────────────────────────
+    Route::get('/leave-credits/initialize', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'initializeIndex'])
+        ->name('leave-credits.initialize');
+    Route::post('/leave-credits/initialize', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'initializeStore'])
+        ->name('leave-credits.initialize.store');
+
+    Route::get('/leave-credits/adjust', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'adjustIndex'])
+        ->name('leave-credits.adjust');
+    Route::post('/leave-credits/adjust', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'adjustStore'])
+        ->name('leave-credits.adjust.store');
+
+    Route::get('/leave-credits/service-credits', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'serviceCreditsIndex'])
+        ->name('leave-credits.service-credits');
+    Route::post('/leave-credits/service-credits/{record}/approve', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'serviceCreditsApprove'])
+        ->name('leave-credits.service-credits.approve');
+    Route::post('/leave-credits/service-credits/{record}/reject', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'serviceCreditsReject'])
+        ->name('leave-credits.service-credits.reject');
+
+    Route::get('/leave-credits/ledger/{user}', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'ledger'])
+        ->name('leave-credits.ledger');
+
+    // ── Leave Credit Reports ───────────────────────────────────────────────────
+    Route::get('/reports/leave-credits/ledger', [\App\Http\Controllers\HR\LeaveCreditReportController::class, 'ledger'])
+        ->name('reports.leave-credits.ledger');
+    Route::get('/reports/leave-credits/accrual', [\App\Http\Controllers\HR\LeaveCreditReportController::class, 'accrual'])
+        ->name('reports.leave-credits.accrual');
+    Route::get('/reports/leave-credits/utilization', [\App\Http\Controllers\HR\LeaveCreditReportController::class, 'utilization'])
+        ->name('reports.leave-credits.utilization');
 
     // ── Holidays ──────────────────────────────────────────────────────────────
     Route::get('/holidays', [\App\Http\Controllers\HR\HolidayController::class, 'index'])
@@ -1398,6 +1447,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     // ── My DTR (employee self-service) ───────────────────────────────────────
     Route::get('/my-dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'myDtr'])
         ->name('my-dtr.index');
+    Route::get('/my-dtr/checklist', [\App\Http\Controllers\HR\DtrRecordController::class, 'myDtrChecklist'])
+        ->name('my-dtr.checklist');
     Route::patch('/my-dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'myPenned'])
         ->name('my-dtr.penned');
 

@@ -33,7 +33,7 @@ class BackupDatabase extends Command
 
         // Build command using escapeshellarg() on every argument to prevent injection
         // Password is passed via --defaults-extra-file to avoid it appearing in process list
-        $cnfContent = "[client]\npassword=" . str_replace('"', '\\"', $dbPass) . "\n";
+        $cnfContent = "[client]\npassword=" . str_replace('"', '\\"', $dbPass) . "\nskip_ssl\n";
         $cnfFile    = tempnam(sys_get_temp_dir(), 'mysqldump_');
         file_put_contents($cnfFile, $cnfContent);
         chmod($cnfFile, 0600);
@@ -63,7 +63,7 @@ class BackupDatabase extends Command
 
         // Keep only last 7 backups
         $files = glob($backupPath . 'backup_*.sql');
-        if (count($files) > 49) {
+        if (count($files) > 7) {
             usort($files, fn($a, $b) => filemtime($a) - filemtime($b));
             $oldFiles = array_slice($files, 0, count($files) - 7);
             foreach ($oldFiles as $file) {

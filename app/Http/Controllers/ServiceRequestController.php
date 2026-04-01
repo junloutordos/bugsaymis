@@ -474,6 +474,103 @@ class ServiceRequestController extends Controller
         return view('service_request_approved', ['serviceRequest' => $serviceRequest, 'already' => false]);
     }
 
+    /* =====================================================
+     | DIVISION CHIEF IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function divisionChiefApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+            abort(403);
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $divisionIds = Division::where('division_chief_id', $user->id)->pluck('id');
+
+        $requests = ServiceRequest::with('requester:id,name,division_id')
+            ->where('status', 'Pending')
+            ->whereHas('requester', fn ($q) => $q->whereIn('division_id', $divisionIds))
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('service_type', 'like', "%{$search}%")
+                      ->orWhere('purposes',   'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('ServiceRequests/DivisionChiefApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    /* =====================================================
+     | FAD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function fadApproval(Request $request)
+    {
+        $user = $request->user();
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        if (! $isFAD) abort(403);
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = ServiceRequest::with('requester:id,name')
+            ->where('status', 'Approved')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('service_type', 'like', "%{$search}%")
+                      ->orWhere('purposes',   'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('ServiceRequests/FADApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function fadAction(Request $request, ServiceRequest $serviceRequest)
+    {
+        $user = $request->user();
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        if (! $isFAD) abort(403);
+
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $serviceRequest->update(['status' => 'FAD Approved']);
+            try {
+                $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
+                $requesterEmail = $requester?->email ?? null;
+                if ($requesterEmail) {
+                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'FAD Approved', null, $user->name, $requester?->name, $requesterEmail));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Service request FAD approved email failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $serviceRequest->update(['status' => 'FAD Declined', 'decline_reason' => 'Declined by FAD Chief.', 'declined_at' => now()]);
+            try {
+                $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
+                $requesterEmail = $requester?->email ?? null;
+                if ($requesterEmail) {
+                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'FAD Declined', 'Declined by FAD Chief.', $user->name, $requester?->name, $requesterEmail));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Service request FAD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'FAD action recorded.');
+    }
+
     public function printTicket(Request $request, ServiceRequest $serviceRequest)
     {
         $user = $request->user();

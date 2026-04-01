@@ -1,7 +1,22 @@
 {
   "permissions": {
     "allow": [
+<<<<<<< HEAD
+      "Bash(python3 -:*)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/UserController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/VehicleRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/MessengerialController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/FacilityRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/WorkRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/ITJobRequestController.php)",
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/DocumentTrackingController.php)",
+      "Bash(git reset --hard df61ce5)"
+=======
       "Bash(php artisan migrate --path=database/migrations/2026_03_12_000002_add_local_path_to_accomplishment_photos.php)",
+<<<<<<< HEAD
+      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/AccomplishmentController.php)"
+>>>>>>> 45810f7c6c35fb23ac377840d5e6d76aff4d145f
+=======
       "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/AccomplishmentController.php)",
       "Bash(php artisan migrate --path=database/migrations/2026_03_13_000001_create_app_versions_table.php)",
       "Bash(php artisan:*)",
@@ -20,6 +35,7 @@
     ],
     "additionalDirectories": [
       "/Users/junlou/bugsaymis-docker/nginx"
+>>>>>>> d5c12d03872d5ca84cb428e6cc35822991d13f05
     ]
   }
 }

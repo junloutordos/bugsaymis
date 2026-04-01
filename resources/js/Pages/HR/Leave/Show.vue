@@ -138,6 +138,16 @@
                 class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
           Review Application
         </button>
+
+        <!-- Print CS Form 6 -->
+        <a :href="route('hr.leave.print', application.id)"
+           target="_blank"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors font-medium">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.75 19.817m0 0a2.25 2.25 0 01-2.244-2.077L3 7.5M6.75 19.817l-1.66-1.24M17.25 19.817l1.66-1.24M17.25 19.817A2.25 2.25 0 0019.494 17.74l1.506-9.746M3 7.5h18M3 7.5l.89-5.5h16.22L21 7.5" />
+          </svg>
+          Print CS Form 6
+        </a>
       </div>
 
       <!-- Approve Modal -->

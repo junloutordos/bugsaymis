@@ -254,83 +254,151 @@ class DTRService
 
         $sorted = $logs->sortBy('log_datetime')->values();
 
-        // Split all punches into AM (before 12:30) and PM (12:30 and after).
-        // 12:30 is used as the divider because it falls in the middle of the
-        // standard Philippine government noon break (12:00–13:00), ensuring
-        // a lunch-departure punch at e.g. 12:02 stays in the AM bucket while
-        // a post-lunch return at e.g. 12:45 lands in PM.
+        // Split all punches into AM (before break midpoint) and PM (break midpoint and after).
+        // 12:30 is the default split — midpoint of the standard PH noon break — so that a
+        // lunch-departure punch at e.g. 12:02 stays in the AM bucket while a post-lunch
+        // return at e.g. 12:45 lands in PM.
         $breakMinutes = $this->getBreakMinutes($dateStr, $schedule);
 
         $amLogs = $sorted->filter(fn ($l) => $this->logMinutes($l) < $breakMinutes)->values();
         $pmLogs = $sorted->filter(fn ($l) => $this->logMinutes($l) >= $breakMinutes)->values();
 
-        $hasExplicit = $logs->contains(fn ($l) => $l->log_type !== 'auto');
-
-        if ($hasExplicit) {
-            // Device provides Granding io_status codes:
-            //   Check-In(0)/Break-In(3)/OT-In(4) → log_type = time_in
-            //   Check-Out(1)/Break-Out(2)/OT-Out(5) → log_type = time_out
-            // Within each time-of-day bucket use the type to find in/out.
-            $amIns  = $amLogs->where('log_type', 'time_in')->values();
-            $amOuts = $amLogs->where('log_type', 'time_out')->values();
-
-            // Heuristic A — device sends io=0 for break-outs:
-            // A single near-noon "time_in" with no AM time_out logs is actually
-            // a lunch departure. Reclassify as time_out_am.
-            if ($amIns->count() === 1
-                && $amOuts->isEmpty()
-                && $this->logMinutes($amIns->first()) >= ($breakMinutes - 90)
-            ) {
-                $timeInAm  = null;
-                $timeOutAm = $this->firstTime($amIns);
-
-            // Heuristic B — re-tap / bounce after departure:
-            // Employee tapped the device again (time_in) within 5 minutes after
-            // their last AM departure tap (time_out). Treat as noise; keep the
-            // departure time and discard the stray time_in.
-            } elseif ($amIns->count() === 1
-                && $amOuts->isNotEmpty()
-                && ($this->logMinutes($amIns->first()) - $this->logMinutes($amOuts->last())) <= 5
-                && $this->logMinutes($amIns->first()) >= $this->logMinutes($amOuts->last())
-            ) {
-                $timeInAm  = null;
-                $timeOutAm = $this->firstTime($amOuts);
-
-            } else {
-                $timeInAm  = $this->firstTime($amIns);
-                $timeOutAm = $this->firstTime($amOuts);
+        // ── Schedule-relative time windows ────────────────────────────────────
+        // Each employee's official schedule defines what counts as a valid
+        // morning arrival (AM-in) vs a valid lunch departure (AM-out).
+        // Defaults assume an 08:00 shift start when no schedule is assigned.
+        //
+        //   AM-in  cutoff : scheduled_start + 60 min  (09:00 for 08:00 shift)
+        //                   Punches at or before this mark the start of the day.
+        //                   Punches after it are treated as late arrivals if no
+        //                   earlier morning punch exists.
+        //
+        //   AM-out window : [scheduled_start + 60 min, 13:00]
+        //                   (09:00–13:00 for 08:00 shift)
+        //                   A punch can only be a lunch departure if it falls
+        //                   within this window AND the AM session is ≥ 30 min.
+        $scheduledInMin = 480; // 08:00 default
+        if ($schedule) {
+            $ti = $schedule->getTimeIn($dateStr);
+            if ($ti) {
+                $scheduledInMin = $this->timeStrToMinutes(substr($ti, 0, 5));
             }
+        }
+        $amInCutoffMin = $scheduledInMin + 60; // e.g. 09:00 for 08:00 shift
+        $amOutMinMin   = $scheduledInMin + 60; // earliest valid lunch departure
+        $amOutMaxMin   = 780;                  // 13:00 hard ceiling
 
-            $timeInPm  = $this->firstTime($pmLogs->where('log_type', 'time_in'));
-            $timeOutPm = $this->lastTime($pmLogs->where('log_type', 'time_out'));
-        } else {
-            // 'auto' logs: use position within each bucket.
-            $timeInAm  = $this->firstTime($amLogs);
-            $timeOutAm = $amLogs->count() > 1 ? $this->lastTime($amLogs) : null;
+        // ── Position-based punch assignment ───────────────────────────────────
+        // We intentionally ignore log_type (the io_status code the device reports)
+        // because employees frequently press the wrong button (e.g. Break-Out
+        // instead of Check-In for their morning arrival).  Chronological position
+        // within each time-of-day bucket is a more reliable signal of intent.
+        //
+        // AM bucket is further split at the AM-in cutoff:
+        //   • Punches ≤ amInCutoffMin → "expected morning window" (pre-cutoff)
+        //   • Punches >  amInCutoffMin → late arrivals (post-cutoff)
+        //
+        // time_in_am  = first punch in pre-cutoff window; falls back to first
+        //               late-AM punch when no pre-cutoff punch exists (genuine
+        //               very-late arrival — still captured as AM-in so that
+        //               lateness is computed correctly).
+        //
+        // time_out_am = last AM punch, accepted only when it falls within the
+        //               AM-out window AND the resulting AM session is ≥ 30 min
+        //               (prevents early double-tap noise from being treated as
+        //               a lunch departure).
+        $earlyAmLogs = $amLogs->filter(fn ($l) => $this->logMinutes($l) <= $amInCutoffMin)->values();
 
-            if ($pmLogs->count() >= 2) {
-                // At least two PM punches: first = return from lunch, last = end of day
-                $timeInPm  = $this->firstTime($pmLogs);
-                $timeOutPm = $this->lastTime($pmLogs);
-            } elseif ($pmLogs->count() === 1 && $amLogs->isNotEmpty()) {
-                // Single PM punch while AM has activity → end-of-day departure
-                $timeInPm  = null;
-                $timeOutPm = $this->firstTime($pmLogs);
-            } else {
-                // Single PM punch with no AM activity → PM-only half-day arrival
-                $timeInPm  = $this->firstTime($pmLogs);
-                $timeOutPm = null;
+        $timeInAm = $earlyAmLogs->isNotEmpty()
+            ? $this->firstTime($earlyAmLogs)   // normal morning arrival
+            : $this->firstTime($amLogs);        // late arrival — no pre-cutoff punch
+
+        $timeOutAm = null;
+        if ($amLogs->count() >= 2) {
+            $lastAm = $this->lastTime($amLogs);
+            $outMin = $this->timeStrToMinutes(substr($lastAm, 0, 5));
+            $inMin  = $timeInAm ? $this->timeStrToMinutes(substr($timeInAm, 0, 5)) : 0;
+
+            $inWindow   = $outMin >= $amOutMinMin && $outMin <= $amOutMaxMin;
+            $longEnough = ($outMin - $inMin) >= 30; // AM session must be at least 30 min
+
+            if ($inWindow && $longEnough) {
+                $timeOutAm = $lastAm;
             }
         }
 
-        // Sanity-check ordering.  If out ≤ in it indicates a bounce / double-punch
-        // artifact — the device was tapped twice in quick succession in the wrong
-        // order.  Clear the invalid out rather than storing an impossible sequence.
+        // ── PM-in cutoff ──────────────────────────────────────────────────────
+        // A post-lunch return punch must happen within a reasonable window after
+        // the break midpoint.  Any punch after this cutoff is clearly an
+        // end-of-day departure, not a return from lunch.
+        //
+        //   PM-in cutoff = break midpoint + 90 min  (14:00 for 12:30 midpoint)
+        //
+        // This prevents 16:00 / 17:00 punches from being mis-classified as
+        // time_in_pm when e.g. an employee taps twice at the end of the day.
+        $pmInCutoffMin = $breakMinutes + 90; // e.g. 14:00 for standard schedule
+
+        // ── PM punch assignment (position-based + schedule-aware) ─────────────
+        if ($pmLogs->count() >= 2) {
+            $firstPmMin = $this->logMinutes($pmLogs->first());
+
+            if ($firstPmMin <= $pmInCutoffMin) {
+                // First PM punch is within the post-lunch return window:
+                // first = return from lunch, last = end of day
+                $timeInPm  = $this->firstTime($pmLogs);
+                $timeOutPm = $this->lastTime($pmLogs);
+            } else {
+                // First PM punch is too late to be a post-lunch return
+                // (e.g. 16:00 / 17:00) — all PM punches are end-of-day taps.
+                $timeInPm  = null;
+                $timeOutPm = $this->lastTime($pmLogs);
+            }
+        } elseif ($pmLogs->count() === 1 && $amLogs->isNotEmpty()) {
+            // Single PM punch with AM activity → end-of-day departure only
+            $timeInPm  = null;
+            $timeOutPm = $this->firstTime($pmLogs);
+        } elseif ($pmLogs->count() === 1) {
+            $firstPmMin = $this->logMinutes($pmLogs->first());
+
+            if ($firstPmMin <= $pmInCutoffMin) {
+                // Within the post-lunch return window and no AM session:
+                // employee arrived for a PM-only half day
+                $timeInPm  = $this->firstTime($pmLogs);
+                $timeOutPm = null;
+            } else {
+                // After the cutoff with no AM session: treat as end-of-day
+                // departure (no PM-in recorded, hours will be 0 unless AM exists)
+                $timeInPm  = null;
+                $timeOutPm = $this->firstTime($pmLogs);
+            }
+        } else {
+            $timeInPm  = null;
+            $timeOutPm = null;
+        }
+
+        // ── Sanity-check ordering ─────────────────────────────────────────────
+        // If out ≤ in it indicates a bounce / double-punch artifact.
+        // Clear the invalid out rather than storing an impossible sequence.
         if ($timeInAm && $timeOutAm && $timeOutAm <= $timeInAm) {
             $timeOutAm = null;
         }
         if ($timeInPm && $timeOutPm && $timeOutPm <= $timeInPm) {
             $timeOutPm = null;
+        }
+
+        // ── Negligible lunch-break correction ────────────────────────────────
+        // If the gap between AM-out and PM-in is less than 15 minutes the
+        // employee likely tapped the device multiple times in quick succession
+        // (or mis-pressed a button immediately after), producing a near-zero
+        // "break".  Drop both split points and treat the day as a continuous
+        // session so hours are computed correctly.
+        if ($timeOutAm && $timeInPm) {
+            $outAmMin = $this->timeStrToMinutes(substr($timeOutAm, 0, 5));
+            $inPmMin  = $this->timeStrToMinutes(substr($timeInPm, 0, 5));
+            if ($inPmMin - $outAmMin < 15) {
+                $timeOutAm = null;
+                $timeInPm  = null;
+            }
         }
 
         return [$timeInAm, $timeOutAm, $timeInPm, $timeOutPm];

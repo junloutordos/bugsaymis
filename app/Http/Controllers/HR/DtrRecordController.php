@@ -151,6 +151,82 @@ class DtrRecordController extends Controller
         ]);
     }
 
+    public function myDtrChecklist(Request $request)
+    {
+        $this->authorize('dtr.view_own');
+
+        $user  = Auth::user();
+        $month = $request->input('month', now()->format('Y-m'));
+        [$y, $m] = explode('-', $month);
+        $firstDay = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+
+        $records = DtrRecord::where('user_id', $user->id)
+            ->whereYear('work_date', $y)
+            ->whereMonth('work_date', $m)
+            ->with(['schedule', 'leaveApplication.leaveType'])
+            ->orderBy('work_date')
+            ->get();
+
+        $schedule = \App\Models\HR\EmployeeSchedule::where('user_id', $user->id)
+            ->activeOnDate($firstDay)
+            ->orderByDesc('effective_date')
+            ->first()
+            ?? \App\Models\HR\EmployeeSchedule::where('user_id', $user->id)
+                ->where('is_default', true)
+                ->first();
+
+        $officialTimes = [];
+        foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as $day) {
+            if (! $schedule) continue;
+            $ds = $schedule->daily_schedules ?? [];
+            if (isset($ds[$day])) {
+                $officialTimes[$day] = [
+                    'time_in'  => $ds[$day]['time_in']  ?? null,
+                    'time_out' => $ds[$day]['time_out'] ?? null,
+                ];
+            } elseif (in_array($day, $schedule->getWorkDaysArray())) {
+                $officialTimes[$day] = [
+                    'time_in'  => $schedule->time_in  ? (string) $schedule->time_in  : null,
+                    'time_out' => $schedule->time_out ? (string) $schedule->time_out : null,
+                ];
+            }
+        }
+
+        $pennedEntries = $records->filter(fn ($r) =>
+            $r->penned_remarks ||
+            $r->penned_time_in_am || $r->penned_time_out_am ||
+            $r->penned_time_in_pm || $r->penned_time_out_pm
+        )->map(function ($r) {
+            $time = $r->penned_time_in_am ?? $r->penned_time_out_am
+                 ?? $r->penned_time_in_pm ?? $r->penned_time_out_pm;
+            return [
+                'date'   => \Carbon\Carbon::parse($r->work_date)->format('m/d/Y'),
+                'time'   => $time,
+                'reason' => $r->penned_remarks ?? '',
+            ];
+        })->values();
+
+        $declaredRows = $records->filter(fn ($r) =>
+            $r->late_minutes > 0 || $r->undertime_minutes > 0 ||
+            $r->attendance_status === 'absent'
+        )->map(function ($r) {
+            if ($r->attendance_status === 'absent') {
+                return ['nature' => 'A', 'date' => \Carbon\Carbon::parse($r->work_date)->format('m/d/Y'), 'minutes' => null, 'reason' => ''];
+            }
+            return ['nature' => 'T', 'date' => \Carbon\Carbon::parse($r->work_date)->format('m/d/Y'), 'minutes' => (int) round((float) $r->late_minutes + (float) $r->undertime_minutes), 'reason' => ''];
+        })->values();
+
+        return Inertia::render('HR/DTR/PrintChecklist', [
+            'employee'      => $user->load('employeeProfile'),
+            'month'         => $month,
+            'officialTimes' => $officialTimes,
+            'pennedEntries' => $pennedEntries,
+            'declaredRows'  => $declaredRows,
+            'absentCount'   => $records->where('attendance_status', 'absent')->count(),
+            'totalTardy'    => (int) round($records->sum(fn ($r) => (float) $r->late_minutes + (float) $r->undertime_minutes)),
+        ]);
+    }
+
     public function myPenned(Request $request, DtrRecord $record)
     {
         $this->authorize('dtr.view_own');
