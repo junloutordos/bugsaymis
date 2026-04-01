@@ -5,6 +5,7 @@ namespace App\Models\HR;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LeaveCredit extends Model
 {
@@ -38,5 +39,12 @@ class LeaveCredit extends Model
     public function leaveType(): BelongsTo
     {
         return $this->belongsTo(LeaveType::class);
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(LeaveCreditTransaction::class, 'user_id', 'user_id')
+                    ->where('leave_type_id', $this->leave_type_id)
+                    ->where('year', $this->year);
     }
 }

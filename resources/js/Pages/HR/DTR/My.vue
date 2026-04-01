@@ -36,9 +36,9 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
-            <a :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank"
+            <a :href="route('hr.my-dtr.checklist') + '?month=' + currentMonth" target="_blank"
                class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
-              <PrinterIcon class="h-4 w-4" />Print
+              <PrinterIcon class="h-4 w-4" />Print Checklist
             </a>
           </div>
         </div>
@@ -203,8 +203,8 @@
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
                     class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
-                    :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : 'text-slate-200')">
-                  {{ fmtTime(r[f] || r['penned_'+f]) || '–' }}
+                    :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200')))">
+                  {{ timeCell(r, f) }}
                 </td>
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_in) || '–' }}</td>
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_out) || '–' }}</td>
@@ -324,6 +324,16 @@ function initials(name) {
 function fmtTime(t) {
   if (!t) return ''
   return String(t).slice(0, 5)
+}
+
+function timeCell(record, field) {
+  const bio    = record[field]
+  const penned = record['penned_' + field]
+  if (bio || penned) return fmtTime(bio || penned)
+  const s = record.attendance_status
+  if (s === 'on_leave')             return 'L'
+  if (s === 'on_official_business') return 'OB'
+  return '–'
 }
 
 function fmtMinutes(m) {

@@ -86,6 +86,8 @@ class RolePermissionSeeder extends Seeder
             'hr.biometric.manage',
             'dtr.view_own',
             'hr.leave.view', 'hr.leave.approve',
+            'hr.leave.credits.view', 'hr.leave.credits.manage',
+            'hr.leave.credits.service', 'hr.leave.credits.reports',
             'hr.employee.view', 'hr.employee.manage',
             'chat.access',
         ]);
@@ -139,12 +141,13 @@ class RolePermissionSeeder extends Seeder
             'hr.dtr.view',
             'dtr.view_own',
             'hr.leave.view', 'hr.leave.approve',
+            'hr.leave.credits.view', 'hr.leave.credits.reports',
             'hr.employee.view',
             'payroll.view',
             'ipcr.view', 'ipcr.approve', 'ipcr.monitor',
             'accomplishments.view',
-            'facilities.view', 'facilities.create',
-            'vehicles.view', 'vehicles.create',
+            'facilities.view', 'facilities.create', 'facilities.dc-approve',
+            'vehicles.view', 'vehicles.create', 'vehicles.dc-approve',
             'documents.view', 'documents.approve',
             'reports.view',
             // L&D — supervisors approve nominations, IDP, and submit behavior evals
@@ -222,7 +225,7 @@ class RolePermissionSeeder extends Seeder
             'rewards.view', 'rewards.nominate',
             // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
-            'hr.leave.file',
+            'hr.leave.file', 'hr.leave.credits.view',
             'dtr.view_own',
             'chat.access',
         ]);
@@ -250,7 +253,7 @@ class RolePermissionSeeder extends Seeder
             'rewards.view', 'rewards.nominate',
             // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
-            'hr.leave.file',
+            'hr.leave.file', 'hr.leave.credits.view',
             'dtr.view_own',
             'chat.access',
         ]);
@@ -300,6 +303,12 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
             'chat.access',
         ]);
+
+        // ── FAD Chief — facilities.fad-approve is manually assigned per user ──
+        // FAD users are identified by position (position LIKE '%FAD%') rather than
+        // a dedicated role. Assign facilities.fad-approve to specific users via
+        // Admin → Roles → Assign Roles, or grant it individually through the
+        // Permissions management UI. No automatic role assignment here.
 
         // ── InformationOfficer ────────────────────────────────────────────────
         $assign('InformationOfficer', [
