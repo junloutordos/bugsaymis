@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
@@ -27,9 +28,12 @@ class GoogleAuthController extends Controller
      */
     public function callback()
     {
+        $ip = request()->ip();
+
         try {
             $googleUser = Socialite::driver('google')->user();
         } catch (\Throwable $e) {
+            Log::channel('security')->warning('Socialite Google callback failed', ['ip' => $ip, 'error' => $e->getMessage()]);
             return redirect()->route('login')
                 ->with('error', 'Google sign-in failed. Please try again.');
         }
@@ -38,6 +42,7 @@ class GoogleAuthController extends Controller
 
         // Enforce PSHS-CRC domain
         if (! str_ends_with($email, '@crc.pshs.edu.ph')) {
+            Log::channel('security')->warning('Socialite login rejected: non-PSHS domain', ['email' => $email, 'ip' => $ip]);
             return redirect()->route('login')
                 ->with('error', 'Only official PSHS-CRC accounts (@crc.pshs.edu.ph) are allowed.');
         }
@@ -55,11 +60,13 @@ class GoogleAuthController extends Controller
 
         // Block inactive accounts
         if (isset($user->status) && $user->status !== 'active') {
+            Log::channel('security')->warning('Socialite login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
             return redirect()->route('login')
                 ->with('error', 'Unable to log in. Contact MIS administrator.');
         }
 
         Auth::login($user, true);
+        Log::channel('security')->info('Socialite login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
         $role = $user->role ?? 'staff';
 
@@ -67,7 +74,9 @@ class GoogleAuthController extends Controller
     }
 
     /**
-     * Legacy Firebase endpoint — kept for backwards compatibility.
+     * Firebase popup callback — called by the frontend after Firebase signs in.
+     * Security: enforces @crc.pshs.edu.ph domain, blocks inactive accounts,
+     * and does NOT create accounts (admin must pre-create users).
      */
     public function login(Request $request)
     {
@@ -77,31 +86,37 @@ class GoogleAuthController extends Controller
             'uid'   => 'required|string',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $email = strtolower(trim($request->email));
+
+        $ip = request()->ip();
+
+        // Enforce PSHS-CRC domain
+        if (! str_ends_with($email, '@crc.pshs.edu.ph')) {
+            Log::channel('security')->warning('Google login rejected: non-PSHS domain', ['email' => $email, 'ip' => $ip]);
+            return response()->json(['success' => false, 'message' => 'Only official PSHS-CRC accounts are allowed.'], 403);
+        }
+
+        // User must already exist — no auto-creation via this endpoint
+        $user = User::where('email', $email)->first();
 
         if (! $user) {
-            $user = User::create([
-                'name'         => $request->name,
-                'email'        => $request->email,
-                'password'     => Hash::make(Str::random(16)),
-                'firebase_uid' => $request->uid,
-                'role'         => 'student',
-            ]);
+            Log::channel('security')->warning('Google login rejected: account not found', ['email' => $email, 'ip' => $ip]);
+            return response()->json(['success' => false, 'message' => 'Account not found. Contact MIS administrator.'], 403);
         }
 
         if (isset($user->status) && $user->status !== 'active') {
-            return response()->json(['success' => false, 'message' => 'Unable to logged in, contact MIS administrator.'], 403);
+            Log::channel('security')->warning('Google login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
+            return response()->json(['success' => false, 'message' => 'Unable to log in. Contact MIS administrator.'], 403);
         }
 
-        Auth::login($user);
+        Auth::login($user, true);
+        Log::channel('security')->info('Google login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
-        $role         = $user->role ?? 'student';
+        $role         = $user->role ?? 'staff';
         $redirectPath = $this->getRedirectPath($role);
 
         return response()->json([
             'success'     => true,
-            'user'        => $user,
-            'role'        => $role,
             'redirect_to' => $redirectPath,
         ]);
     }

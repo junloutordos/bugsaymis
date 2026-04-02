@@ -39,6 +39,12 @@ use App\Http\Controllers\PDSController;
 use App\Http\Controllers\PDSTrainingController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+
+// ── System health check (unauthenticated, internal monitoring) ────────────────
+Route::get('/_status', [\App\Http\Controllers\HealthController::class, 'check'])
+    ->middleware('throttle:30,1')
+    ->name('system.health');
+
 // Data Management - Offices
 Route::middleware(['auth','permission:roles.assign'])->group(function(){
     Route::get('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'index'])->name('offices.index');
@@ -725,7 +731,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     
     Route::middleware(['auth', 'permission:it.requests.manage'])->group(function () {
     Route::get('/job-requests/for-approval', [ITJobRequestController::class, 'forApproval'])
-        ->name('job-requests.for-approval');
+        ->name('it.job-requests.for-approval');
 
     Route::post('/job-requests/{jobRequest}/division-chief-action', [ITJobRequestController::class, 'approveByDivisionChief'])
         ->name('job-requests.division-chief-action');
@@ -1172,7 +1178,7 @@ Route::prefix('jobs')->name('recruitment.public.')->group(function () {
     Route::get('/track', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'trackForm'])
         ->name('track');
     Route::post('/track', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'track'])
-        ->name('track');
+        ->name('track.submit');
     Route::get('/{vacancy}', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'show'])
         ->name('vacancies.show');
     Route::post('/{vacancy}/apply', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'apply'])

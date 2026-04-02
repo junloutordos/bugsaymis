@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -36,6 +37,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ── Password Policy ───────────────────────────────────────────────────
+        // Enforce: min 10 chars, at least 1 letter, 1 number, 1 symbol
+        Password::defaults(fn () =>
+            Password::min(10)
+                ->letters()
+                ->numbers()
+                ->symbols()
+                ->uncompromised()
+        );
+
         // ── WFH Policies ──────────────────────────────────────────────────────
         Gate::policy(WFHAttendance::class, WFHAttendancePolicy::class);
         Gate::policy(WFHAccomplishment::class, WFHAccomplishmentPolicy::class);

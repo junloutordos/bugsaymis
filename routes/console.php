@@ -30,3 +30,9 @@ Schedule::command('hr:dtr:daily')->dailyAt('00:05')->withoutOverlapping();
 // ── Payroll: accrue monthly leave credits on the 1st of each month ───────
 Schedule::command('payroll:accrue-leave')->monthlyOn(1, '00:10')->withoutOverlapping();
 
+// ── Log health check: disk, file sizes, error spikes ─────────────────────
+Schedule::command('log:health')->dailyAt('06:00');
+
+// ── Backup integrity check: verify latest backup each morning ────────────
+Schedule::command('backup:verify')->dailyAt('09:00')->withoutOverlapping();
+
