@@ -7,6 +7,7 @@ use App\Models\HR\DtrRecord;
 use App\Models\HR\EmployeeSchedule;
 use App\Models\HR\Holiday;
 use App\Models\HR\LeaveApplication;
+use App\Models\WFHAttendance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -38,6 +39,12 @@ class DTRService
             ->whereBetween('holiday_date', [$dateFrom, $dateTo])
             ->get()
             ->keyBy(fn ($h) => Carbon::parse($h->holiday_date)->toDateString());
+
+        // Load WFH attendances for this range keyed by date
+        $wfhAttendances = WFHAttendance::where('user_id', $userId)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->get()
+            ->keyBy(fn ($w) => Carbon::parse($w->date)->toDateString());
 
         // Load approved leave applications overlapping the range
         $leaves = LeaveApplication::where('user_id', $userId)
@@ -95,6 +102,15 @@ class DTRService
                 $schedule
             );
 
+            // WFH fallback: when there are no biometric logs for this date but
+            // the employee has a WFH attendance record, use WFH time_in / time_out
+            // as the AM-in and PM-out slots so that hours & late/undertime compute.
+            $wfh = $wfhAttendances->get($dateStr);
+            if ($wfh && $logsForDay->isEmpty()) {
+                $timeInAm  = $wfh->time_in  ? Carbon::parse($wfh->time_in)->format('H:i:s')  : null;
+                $timeOutPm = $wfh->time_out ? Carbon::parse($wfh->time_out)->format('H:i:s') : null;
+            }
+
             // Compute metrics
             $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
             $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
@@ -114,20 +130,21 @@ class DTRService
             DtrRecord::updateOrCreate(
                 ['user_id' => $userId, 'work_date' => $dateStr],
                 [
-                    'schedule_id'        => $schedule?->id,
-                    'time_in_am'         => $timeInAm,
-                    'time_out_am'        => $timeOutAm,
-                    'time_in_pm'         => $timeInPm,
-                    'time_out_pm'        => $timeOutPm,
-                    'hours_worked'       => round($hoursWorked, 2),
-                    'late_minutes'       => round($lateMinutes, 2),
-                    'undertime_minutes'  => round($undertimeMinutes, 2),
-                    'overtime_minutes'   => round($overtimeMinutes, 2),
-                    'day_type'           => $dayType,
-                    'attendance_status'  => $attendanceStatus,
+                    'schedule_id'          => $schedule?->id,
+                    'time_in_am'           => $timeInAm,
+                    'time_out_am'          => $timeOutAm,
+                    'time_in_pm'           => $timeInPm,
+                    'time_out_pm'          => $timeOutPm,
+                    'hours_worked'         => round($hoursWorked, 2),
+                    'late_minutes'         => round($lateMinutes, 2),
+                    'undertime_minutes'    => round($undertimeMinutes, 2),
+                    'overtime_minutes'     => round($overtimeMinutes, 2),
+                    'day_type'             => $dayType,
+                    'attendance_status'    => $attendanceStatus,
                     'leave_application_id' => $leave?->id,
-                    'processed_by'       => Auth::id(),
-                    'processed_at'       => now(),
+                    'wfh_attendance_id'    => ($wfh && $logsForDay->isEmpty()) ? $wfh->id : null,
+                    'processed_by'         => Auth::id(),
+                    'processed_at'         => now(),
                 ]
             );
         }

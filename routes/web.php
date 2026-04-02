@@ -901,6 +901,9 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
     Route::post('/accomplishments',                   [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'store'])
         ->middleware('permission:wfh.accomplishments.create')
         ->name('accomplishments.store');
+    Route::put('/accomplishments/{wfhAccomplishment}',    [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'update'])
+        ->middleware('permission:wfh.accomplishments.create')
+        ->name('accomplishments.update');
     Route::delete('/accomplishments/{wfhAccomplishment}', [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'destroy'])
         ->middleware('permission:wfh.accomplishments.delete')
         ->name('accomplishments.destroy');
@@ -1457,6 +1460,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('my-dtr.checklist');
     Route::patch('/my-dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'myPenned'])
         ->name('my-dtr.penned');
+    Route::post('/my-dtr/submit-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'submitPenned'])
+        ->name('my-dtr.submit-penned');
 
     // ── DTR Records ───────────────────────────────────────────────────────────
     Route::get('/dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'index'])
@@ -1471,6 +1476,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.lock');
     Route::post('/dtr/{user}/recompute', [\App\Http\Controllers\HR\DtrRecordController::class, 'recompute'])
         ->name('dtr.recompute');
+    Route::post('/dtr/{user}/unlock-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'unlockPenned'])
+        ->name('dtr.unlock-penned');
     Route::patch('/dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'penned'])
         ->name('dtr.penned');
     Route::get('/dtr/print-batch', [\App\Http\Controllers\HR\DtrRecordController::class, 'printBatch'])

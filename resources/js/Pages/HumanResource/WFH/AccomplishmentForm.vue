@@ -124,7 +124,7 @@ import Swal from 'sweetalert2'
 
 // ── Props & Emits ─────────────────────────────────────────────────────────────
 const props = defineProps({
-  attendanceId: { type: Number, required: true },
+  attendanceId: { type: Number, default: null },
 })
 const emit = defineEmits(['saved'])
 
@@ -194,6 +194,7 @@ async function submit() {
   try {
     const fd = new FormData()
     fd.append('description', form.description.trim())
+    if (props.attendanceId) fd.append('attendance_id', props.attendanceId)
     if (form.time_from) fd.append('time_from', form.time_from)
     if (form.time_to)   fd.append('time_to',   form.time_to)
     if (form.proof_type) fd.append('proof_type', form.proof_type)

@@ -49,9 +49,8 @@
               </div>
             </div>
 
-            <!-- Row 2: Break Out / Break In (shown once timed in) -->
+            <!-- Row 2: Break Out / Break In -->
             <div class="grid grid-cols-2 gap-3">
-              <!-- Break Out card -->
               <div class="rounded-xl p-3 flex flex-col items-center gap-1 border-2"
                    :class="attendance.break_out
                      ? 'bg-amber-50 border-amber-300'
@@ -67,7 +66,6 @@
                 <span class="text-[10px] text-slate-400">Lunch start</span>
               </div>
 
-              <!-- Break In card -->
               <div class="rounded-xl p-3 flex flex-col items-center gap-1 border-2"
                    :class="attendance.break_in
                      ? 'bg-teal-50 border-teal-300'
@@ -113,7 +111,6 @@
           </h3>
         </div>
         <div class="p-5 space-y-4">
-          <!-- Not yet captured -->
           <div v-if="!capturedImage" class="relative">
             <video ref="videoEl" autoplay playsinline
                    class="w-full rounded-lg bg-black" style="max-height:280px;" />
@@ -123,7 +120,6 @@
             </button>
           </div>
 
-          <!-- Captured preview -->
           <div v-else class="space-y-3">
             <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" alt="Captured photo"
                  style="max-height:280px;object-fit:cover;" />
@@ -143,55 +139,49 @@
             Cancel
           </button>
 
-          <!-- Hidden canvas for getUserMedia snapshot -->
           <canvas ref="canvasEl" class="hidden" />
         </div>
       </div>
 
       <!-- Action Buttons -->
       <div v-if="!showCamera" class="flex flex-wrap gap-3">
-        <!-- Time In -->
         <button v-if="!attendance"
                 @click="openCamera('in')"
                 class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           🟢 Time In
         </button>
 
-        <!-- Break Out (start lunch) — shown after time-in, before break-out, before time-out -->
         <button v-if="attendance && !attendance.break_out && !attendance.time_out"
                 @click="recordBreak('out')" :disabled="breakLoading"
                 class="flex-1 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           🍽️ {{ breakLoading ? 'Saving…' : 'Break Out' }}
         </button>
 
-        <!-- Break In (return from lunch) — shown after break-out, before break-in, before time-out -->
         <button v-if="attendance && attendance.break_out && !attendance.break_in && !attendance.time_out"
                 @click="recordBreak('in')" :disabled="breakLoading"
                 class="flex-1 inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           ✅ {{ breakLoading ? 'Saving…' : 'Break In' }}
         </button>
 
-        <!-- Time Out -->
         <button v-if="attendance && !attendance.time_out"
                 @click="openCamera('out')"
                 class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
           🔵 Time Out
         </button>
 
-        <!-- Already completed -->
         <div v-if="attendance && attendance.time_out"
              class="flex-1 py-3 bg-slate-100 text-slate-500 rounded-xl text-center text-sm font-medium">
           ✅ WFH Day Complete
         </div>
       </div>
 
-      <!-- Accomplishments shortcut -->
+      <!-- Today's Accomplishments -->
       <div v-if="attendance" class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <p class="font-semibold text-slate-800">Accomplishments</p>
+            <p class="font-semibold text-slate-800">Today's Accomplishments</p>
             <p class="text-sm text-slate-400">
-              {{ attendance.accomplishments?.length ?? 0 }} recorded today
+              {{ localAccomplishments.length }} recorded today
             </p>
           </div>
           <button @click="showAccomplishmentPanel = !showAccomplishmentPanel"
@@ -200,10 +190,128 @@
           </button>
         </div>
 
-        <!-- Inline Accomplishment Panel -->
         <div v-if="showAccomplishmentPanel" class="p-5 space-y-4">
           <AccomplishmentForm :attendance-id="attendance.id" @saved="onAccomplishmentSaved" />
-          <AccomplishmentList :items="localAccomplishments" @deleted="onAccomplishmentDeleted" />
+          <AccomplishmentList
+            :items="localAccomplishments"
+            @deleted="onAccomplishmentDeleted"
+            @updated="onAccomplishmentUpdated"
+          />
+        </div>
+      </div>
+
+      <!-- ── My WFH History ──────────────────────────────────────────────────── -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+          <h2 class="text-base font-semibold text-slate-800">My WFH History</h2>
+          <div class="flex items-center gap-2">
+            <input
+              type="month"
+              v-model="historyMonth"
+              @change="loadHistory"
+              class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button @click="loadHistory" :disabled="historyLoading"
+              class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition-colors disabled:opacity-50">
+              {{ historyLoading ? 'Loading…' : 'Refresh' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="divide-y divide-slate-100">
+          <!-- Empty state -->
+          <div v-if="!historyLoading && !historyRecords.length"
+               class="py-12 text-center text-slate-400 text-sm">
+            No WFH records for this month.
+          </div>
+
+          <!-- Loading -->
+          <div v-if="historyLoading" class="py-12 text-center text-slate-400 text-sm">
+            Loading…
+          </div>
+
+          <!-- Records list -->
+          <div
+            v-for="record in historyRecords"
+            :key="record.id"
+          >
+            <!-- Day header row -->
+            <button
+              @click="toggleHistoryRecord(record.id)"
+              class="w-full px-5 py-3 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors text-left"
+            >
+              <div class="flex items-center gap-3">
+                <!-- Date -->
+                <div class="text-center w-10 shrink-0">
+                  <p class="text-xs text-slate-400 leading-none">{{ fmtDayName(record.date) }}</p>
+                  <p class="text-lg font-bold text-slate-800 leading-tight">{{ fmtDayNum(record.date) }}</p>
+                </div>
+
+                <!-- Status pills -->
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5"
+                        :class="record.time_in ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'">
+                    In {{ record.time_in ? fmtShortTime(record.time_in) : '—' }}
+                  </span>
+                  <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5"
+                        :class="record.time_out ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'">
+                    Out {{ record.time_out ? fmtShortTime(record.time_out) : '—' }}
+                  </span>
+                  <span v-if="record.accomplishments?.length"
+                        class="inline-flex items-center gap-1 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">
+                    📝 {{ record.accomplishments.length }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Chevron -->
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 shrink-0 transition-transform"
+                   :class="{ 'rotate-180': expandedHistoryId === record.id }"
+                   fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <!-- Expanded panel -->
+            <div v-if="expandedHistoryId === record.id" class="px-5 pb-5 space-y-4 bg-slate-50/60">
+              <!-- Accomplishments for this day -->
+              <div class="pt-4">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Accomplishments</p>
+                <AccomplishmentList
+                  :items="historyAccomplishments[record.id] ?? record.accomplishments ?? []"
+                  @deleted="(id) => onHistoryAccomplishmentDeleted(record.id, id)"
+                  @updated="(item) => onHistoryAccomplishmentUpdated(record.id, item)"
+                />
+              </div>
+
+              <!-- Add accomplishment for this past day -->
+              <div class="border-t border-slate-200 pt-4">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add Accomplishment</p>
+                <AccomplishmentForm
+                  :attendance-id="record.id"
+                  @saved="(item) => onHistoryAccomplishmentSaved(record.id, item)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="historyMeta && historyMeta.last_page > 1"
+             class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
+          <span>Page {{ historyMeta.current_page }} of {{ historyMeta.last_page }}</span>
+          <div class="flex gap-2">
+            <button @click="loadHistory(historyMeta.current_page - 1)"
+                    :disabled="historyMeta.current_page <= 1"
+                    class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+              ← Prev
+            </button>
+            <button @click="loadHistory(historyMeta.current_page + 1)"
+                    :disabled="historyMeta.current_page >= historyMeta.last_page"
+                    class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+              Next →
+            </button>
+          </div>
         </div>
       </div>
 
@@ -225,7 +333,6 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
           <h2 class="text-base font-semibold text-slate-800">Print Accomplishments</h2>
 
-          <!-- Mode selector -->
           <div class="flex gap-3">
             <label v-for="opt in [{v:'daily',l:'Daily'},{v:'monthly',l:'Monthly'},{v:'range',l:'Date Range'}]" :key="opt.v"
               class="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
@@ -234,21 +341,18 @@
             </label>
           </div>
 
-          <!-- Daily -->
           <div v-if="printMode === 'daily'">
             <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
             <input type="date" v-model="printDate"
               class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
           </div>
 
-          <!-- Monthly -->
           <div v-if="printMode === 'monthly'">
             <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
             <input type="month" v-model="printMonth"
               class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
           </div>
 
-          <!-- Date Range -->
           <div v-if="printMode === 'range'" class="space-y-2">
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
@@ -277,14 +381,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 import AccomplishmentForm from './AccomplishmentForm.vue'
 import AccomplishmentList from './AccomplishmentList.vue'
-
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 const props = defineProps({
@@ -298,13 +401,22 @@ const today_str              = new Date().toISOString().slice(0, 10)
 const attendance             = ref(props.todayAttendance)
 const localAccomplishments   = ref(props.todayAttendance?.accomplishments ?? [])
 const showCamera             = ref(false)
-const cameraMode             = ref('in')   // 'in' | 'out'
+const cameraMode             = ref('in')
 const capturedImage          = ref(null)
 const loading                = ref(false)
 const breakLoading           = ref(false)
 const showAccomplishmentPanel = ref(false)
 
-// Print accomplishments modal
+// History
+const historyMonth           = ref(currentMonth)
+const historyLoading         = ref(false)
+const historyRecords         = ref([])
+const historyMeta            = ref(null)
+const expandedHistoryId      = ref(null)
+// Per-record accomplishment overrides (after add/edit/delete)
+const historyAccomplishments = ref({}) // { [recordId]: Accomplishment[] }
+
+// Print modal
 const showPrintModal  = ref(false)
 const printMode       = ref('monthly')
 const printDate       = ref(today_str)
@@ -336,7 +448,6 @@ const breakDuration = computed(() => {
 const workDuration = computed(() => {
   if (!attendance.value?.time_in || !attendance.value?.time_out) return '—'
   let ms = new Date(attendance.value.time_out) - new Date(attendance.value.time_in)
-  // Subtract lunch break duration if both break times are recorded
   if (attendance.value.break_out && attendance.value.break_in) {
     ms -= new Date(attendance.value.break_in) - new Date(attendance.value.break_out)
   }
@@ -396,13 +507,8 @@ async function confirmCapture() {
   if (!capturedImage.value || loading.value) return
   loading.value = true
 
-  const payload = {
-    photo:     capturedImage.value,
-    latitude:  null,
-    longitude: null,
-  }
+  const payload = { photo: capturedImage.value, latitude: null, longitude: null }
 
-  // Optionally grab geolocation
   try {
     const pos = await getPosition()
     payload.latitude  = pos.coords.latitude
@@ -415,10 +521,10 @@ async function confirmCapture() {
 
   try {
     const { data } = await axios.post(url, payload)
-    attendance.value    = data.attendance
+    attendance.value           = data.attendance
     localAccomplishments.value = data.attendance?.accomplishments ?? []
-    showCamera.value    = false
-    capturedImage.value = null
+    showCamera.value           = false
+    capturedImage.value        = null
 
     await Swal.fire({
       icon:  'success',
@@ -427,6 +533,9 @@ async function confirmCapture() {
       timer: 2000,
       showConfirmButton: false,
     })
+
+    // Refresh history so today's record appears
+    loadHistory()
   } catch (err) {
     const msg = err.response?.data?.message
       ?? err.response?.data?.errors?.date
@@ -437,7 +546,7 @@ async function confirmCapture() {
   }
 }
 
-// ── Break Out / Break In (no camera needed) ───────────────────────────────────
+// ── Break Out / Break In ──────────────────────────────────────────────────────
 async function recordBreak(direction) {
   if (breakLoading.value) return
   breakLoading.value = true
@@ -472,7 +581,7 @@ async function recordBreak(direction) {
   }
 }
 
-// ── Accomplishment callbacks ──────────────────────────────────────────────────
+// ── Today's accomplishment callbacks ──────────────────────────────────────────
 function onAccomplishmentSaved(item) {
   localAccomplishments.value.unshift(item)
   if (attendance.value) {
@@ -482,6 +591,66 @@ function onAccomplishmentSaved(item) {
 
 function onAccomplishmentDeleted(id) {
   localAccomplishments.value = localAccomplishments.value.filter(a => a.id !== id)
+}
+
+function onAccomplishmentUpdated(item) {
+  const idx = localAccomplishments.value.findIndex(a => a.id === item.id)
+  if (idx !== -1) localAccomplishments.value[idx] = item
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+async function loadHistory(page = 1) {
+  historyLoading.value = true
+  try {
+    const { data } = await axios.get(route('hr.wfh.attendance.index'), {
+      params: { month: historyMonth.value, page },
+    })
+    historyRecords.value = data.data
+    historyMeta.value    = data.meta ?? { current_page: data.current_page, last_page: data.last_page }
+    // Reset per-record accomplishments cache when month changes
+    historyAccomplishments.value = {}
+    expandedHistoryId.value = null
+  } catch {
+    Swal.fire('Error', 'Could not load WFH history.', 'error')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function toggleHistoryRecord(id) {
+  expandedHistoryId.value = expandedHistoryId.value === id ? null : id
+}
+
+function onHistoryAccomplishmentSaved(recordId, item) {
+  if (!historyAccomplishments.value[recordId]) {
+    const record = historyRecords.value.find(r => r.id === recordId)
+    historyAccomplishments.value[recordId] = [...(record?.accomplishments ?? [])]
+  }
+  historyAccomplishments.value[recordId].unshift(item)
+
+  // Also update the count in historyRecords
+  const record = historyRecords.value.find(r => r.id === recordId)
+  if (record) record.accomplishments = historyAccomplishments.value[recordId]
+}
+
+function onHistoryAccomplishmentDeleted(recordId, itemId) {
+  if (!historyAccomplishments.value[recordId]) {
+    const record = historyRecords.value.find(r => r.id === recordId)
+    historyAccomplishments.value[recordId] = [...(record?.accomplishments ?? [])]
+  }
+  historyAccomplishments.value[recordId] = historyAccomplishments.value[recordId].filter(a => a.id !== itemId)
+
+  const record = historyRecords.value.find(r => r.id === recordId)
+  if (record) record.accomplishments = historyAccomplishments.value[recordId]
+}
+
+function onHistoryAccomplishmentUpdated(recordId, item) {
+  if (!historyAccomplishments.value[recordId]) {
+    const record = historyRecords.value.find(r => r.id === recordId)
+    historyAccomplishments.value[recordId] = [...(record?.accomplishments ?? [])]
+  }
+  const idx = historyAccomplishments.value[recordId].findIndex(a => a.id === item.id)
+  if (idx !== -1) historyAccomplishments.value[recordId][idx] = item
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -497,10 +666,28 @@ function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
 }
 
+function fmtShortTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+function fmtDayName(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
+}
+
+function fmtDayNum(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr + 'T00:00:00').getDate()
+}
+
 function getPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('No geolocation'))
     navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
   })
 }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+onMounted(() => loadHistory())
 </script>

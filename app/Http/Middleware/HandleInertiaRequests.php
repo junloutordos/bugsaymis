@@ -73,11 +73,20 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
             ],
             // ── Sidebar badge counts — cached 60s to reduce DB queries ────────
-            'consultationsNotificationCount' => function () {
+            'consultationsNotificationCount' => function () use ($request) {
                 try {
-                    return Cache::remember('badge.consultations', 60, fn () =>
-                        Consultation::whereIn('status', ['Pending', 'Active'])->count()
-                    );
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.consultations.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        // Clinic/Nurse/Admin see all pending consultations
+                        if ($user->hasAnyRole(['Administrator', 'Clinic', 'Nurse'])) {
+                            return Consultation::whereIn('status', ['Pending', 'Active'])->count();
+                        }
+                        // All other roles see only their own consultations
+                        return Consultation::whereIn('status', ['Pending', 'Active'])
+                            ->where('requestor_id', $user->id)->count();
+                    });
                 } catch (\Throwable $e) { return 0; }
             },
             'itJobRequestsNotificationCount' => function () use ($request) {
