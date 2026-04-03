@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(npm --version)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(php artisan:*)",
+      "Bash(php -l app/Http/Controllers/HR/OrgUnitController.php)",
+      "Bash(php -l app/Http/Controllers/HR/EmployeeUnitAssignmentController.php)",
+      "Bash(php -l app/Http/Controllers/HR/UnitHeadController.php)",
+      "Bash(php -l app/Http/Controllers/HR/OrganizationalVersionController.php)",
+      "Bash(php -l routes/web.php)",
+      "Bash(do php:*)",
+      "Bash(npm run:*)",
+      "Bash(find /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Models -name \"*.php\" -type f -exec wc -l {} +)"
     ]
   }
 }

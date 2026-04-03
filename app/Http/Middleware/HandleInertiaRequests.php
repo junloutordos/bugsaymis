@@ -45,7 +45,7 @@ class HandleInertiaRequests extends Middleware
     {
         $authUser = $request->user();
         if ($authUser) {
-            $authUser->loadMissing('roles');
+            $authUser->loadMissing(['roles', 'primaryUnitAssignment.unit:id,name,code,type']);
         }
         $userRoles = $authUser ? $authUser->roles : collect();
 
@@ -65,6 +65,14 @@ class HandleInertiaRequests extends Middleware
                         'profile_picture' => $authUser->profile_picture,
                         'electronic_signature' => $authUser->electronic_signature,
                         'permissions' => $authUser->getPermissions(),
+                        'primary_unit' => fn () => $authUser->primaryUnitAssignment?->unit
+                            ? [
+                                'id'         => $authUser->primaryUnitAssignment->unit->id,
+                                'name'       => $authUser->primaryUnitAssignment->unit->name,
+                                'code'       => $authUser->primaryUnitAssignment->unit->code,
+                                'type'       => $authUser->primaryUnitAssignment->unit->type,
+                              ]
+                            : null,
                     ]
                     : null,
             ],

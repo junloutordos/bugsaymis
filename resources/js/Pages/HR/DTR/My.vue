@@ -173,6 +173,8 @@
               <div :class="[statusBadge(cell.record.attendance_status), 'mt-1 text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide']">
                 {{ statusLabel(cell.record.attendance_status) }}
               </div>
+              <div v-if="cell.record.wfh_attendance_id"
+                class="text-[7px] font-bold text-rose-500 text-center leading-tight">WFH</div>
               <div v-if="cell.record.late_minutes > 0 || cell.record.undertime_minutes > 0"
                 class="flex gap-0.5 mt-0.5 justify-center flex-wrap">
                 <span v-if="cell.record.late_minutes > 0"
@@ -279,9 +281,8 @@
                     </span>
                     <!-- WFH badge -->
                     <span v-if="r.wfh_attendance_id"
-                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-600 whitespace-nowrap">
-                      WFH
-                    </span>
+                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
+                          title="Times sourced from WFH attendance log">WFH</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5">
@@ -416,15 +417,15 @@ function hasMissingSlots(r) {
 
 /**
  * Returns CSS class for a time cell in the detail table.
- * Priority: biometric (grey) > penned (red) > WFH (red) > leave/gatepass (red) > empty (light)
+ * Priority: WFH-sourced (rose) > biometric (grey) > penned (red) > WFH fallback (red) > leave/gatepass (red) > empty (light)
  */
 function tableCellClass(r, field) {
-  if (r[field]) return 'text-slate-700'
+  if (r[field]) return r.wfh_attendance_id ? 'text-rose-600 font-medium' : 'text-slate-700'
   if (r['penned_' + field]) return 'text-red-600 font-semibold'
   const dateStr = toDateStr(r.work_date)
-  // WFH fallback shows in AM-in and PM-out
+  // WFH fallback shows in AM-in and PM-out (record exists but biometric slot empty)
   if ((field === 'time_in_am' || field === 'time_out_pm') && props.wfhByDate[dateStr]) {
-    return 'text-red-500 font-semibold'
+    return 'text-rose-500 font-semibold'
   }
   if (r.attendance_status === 'on_leave') return 'text-red-600 font-bold'
   if (r.attendance_status === 'on_official_business') return 'text-red-600 font-bold'
@@ -450,9 +451,9 @@ function tableCellText(r, field) {
  * Calendar cell: WFH color helper for AM-in/PM-out slots.
  */
 function timeColor(record, field, wfhFallback) {
-  if (record[field]) return ''           // biometric — normal color
+  if (record[field]) return record.wfh_attendance_id ? 'text-rose-500' : '' // WFH-sourced = red, biometric = normal
   if (record['penned_' + field]) return 'text-red-500'
-  if (wfhFallback) return 'text-red-500' // WFH fallback
+  if (wfhFallback) return 'text-red-500'
   return 'text-red-500'
 }
 

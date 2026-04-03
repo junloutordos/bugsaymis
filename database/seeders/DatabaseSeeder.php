@@ -60,6 +60,10 @@ class DatabaseSeeder extends Seeder
         $this->call(AllowanceTypesSeeder::class);
         $this->call(PayrollPermissionsSeeder::class);
 
+        // Organizational Structure Module
+        $this->call(OrgStructurePermissionsSeeder::class);
+        $this->call(PshsOrgStructureSeeder::class);
+
         // ── Faculty Loading Module ─────────────────────────────────────────────
         // Order matters: SchoolYear before Sections (FK dependency)
         $this->call(SchoolYearSeeder::class);       // school_years + academic_terms

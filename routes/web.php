@@ -1561,6 +1561,90 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('reports.dtr');
 });
 
+// ── Organizational Structure Module ───────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->group(function () {
+
+    // ── Chart / tree views (read — any authenticated user with org.view) ────────
+    Route::get('/', [\App\Http\Controllers\HR\OrgUnitController::class, 'index'])
+        ->name('index');
+    Route::get('/tree', [\App\Http\Controllers\HR\OrgUnitController::class, 'tree'])
+        ->name('tree');                          // JSON — used by Vue org-chart
+    Route::get('/units', [\App\Http\Controllers\HR\OrgUnitController::class, 'list'])
+        ->name('units.list');                    // JSON — flat paginated list
+    Route::get('/units/{unit}', [\App\Http\Controllers\HR\OrgUnitController::class, 'show'])
+        ->name('units.show');                    // Inertia page
+
+    // ── Unit CRUD (require org.units.* permissions) ─────────────────────────────
+    Route::post('/units', [\App\Http\Controllers\HR\OrgUnitController::class, 'store'])
+        ->name('units.store');
+    Route::put('/units/{unit}', [\App\Http\Controllers\HR\OrgUnitController::class, 'update'])
+        ->name('units.update');
+    Route::patch('/units/{unit}/move', [\App\Http\Controllers\HR\OrgUnitController::class, 'move'])
+        ->name('units.move');
+    Route::delete('/units/{unit}', [\App\Http\Controllers\HR\OrgUnitController::class, 'destroy'])
+        ->name('units.destroy');
+    Route::post('/units/{unit}/restore', [\App\Http\Controllers\HR\OrgUnitController::class, 'restore'])
+        ->name('units.restore');
+
+    // ── Employee assignments ────────────────────────────────────────────────────
+    Route::get('/units/{unit}/assignments', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'index'])
+        ->name('assignments.index');
+    Route::get('/employees/{user}/assignments', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'forEmployee'])
+        ->name('assignments.for-employee');
+    Route::post('/assignments', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'store'])
+        ->name('assignments.store');
+    Route::put('/assignments/{assignment}', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'update'])
+        ->name('assignments.update');
+    Route::patch('/assignments/{assignment}/end', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'end'])
+        ->name('assignments.end');
+    Route::delete('/assignments/{assignment}', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'destroy'])
+        ->name('assignments.destroy');
+
+    // ── Unit heads ──────────────────────────────────────────────────────────────
+    Route::get('/heads', [\App\Http\Controllers\HR\UnitHeadController::class, 'allCurrent'])
+        ->name('heads.all');
+    Route::get('/units/{unit}/heads', [\App\Http\Controllers\HR\UnitHeadController::class, 'index'])
+        ->name('heads.index');
+    Route::post('/heads', [\App\Http\Controllers\HR\UnitHeadController::class, 'store'])
+        ->name('heads.store');
+    Route::put('/heads/{head}', [\App\Http\Controllers\HR\UnitHeadController::class, 'update'])
+        ->name('heads.update');
+    Route::patch('/heads/{head}/end', [\App\Http\Controllers\HR\UnitHeadController::class, 'end'])
+        ->name('heads.end');
+    Route::delete('/heads/{head}', [\App\Http\Controllers\HR\UnitHeadController::class, 'destroy'])
+        ->name('heads.destroy');
+
+    // ── Reports ────────────────────────────────────────────────────────────────
+    Route::get('/reports', [\App\Http\Controllers\HR\OrgUnitController::class, 'reports'])
+        ->name('reports');
+
+    // ── Export & Print ──────────────────────────────────────────────────────────
+    Route::get('/print', [\App\Http\Controllers\HR\OrgExportController::class, 'print'])
+        ->name('print');
+    Route::get('/export/pdf', [\App\Http\Controllers\HR\OrgExportController::class, 'pdf'])
+        ->name('export.pdf');
+    Route::get('/export/units-csv', [\App\Http\Controllers\HR\OrgExportController::class, 'unitsCsv'])
+        ->name('export.units-csv');
+    Route::get('/export/assignments-csv', [\App\Http\Controllers\HR\OrgExportController::class, 'assignmentsCsv'])
+        ->name('export.assignments-csv');
+
+    // ── Structural versioning ───────────────────────────────────────────────────
+    Route::get('/versions', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'index'])
+        ->name('versions.index');
+    Route::get('/versions/current', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'current'])
+        ->name('versions.current');
+    Route::get('/versions/{version}', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'show'])
+        ->name('versions.show');
+    Route::post('/versions', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'store'])
+        ->name('versions.store');
+    Route::post('/versions/{version}/approve', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'approve'])
+        ->name('versions.approve');
+    Route::post('/versions/{version}/activate', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'activate'])
+        ->name('versions.activate');
+    Route::delete('/versions/{version}', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'destroy'])
+        ->name('versions.destroy');
+});
+
 // Development-only: send a test email
 if (app()->environment('local')) {
     Route::get('/dev/send-test-email', function () {
