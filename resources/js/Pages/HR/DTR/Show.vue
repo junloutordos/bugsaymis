@@ -121,7 +121,7 @@
 
             <template v-if="cell.record">
               <!-- Time punches -->
-              <div class="font-mono text-[9px] text-slate-500 leading-[1.4] space-y-px flex-1">
+              <div :class="['font-mono text-[9px] leading-[1.4] space-y-px flex-1', cell.record.wfh_attendance_id ? 'text-rose-500' : 'text-slate-500']">
                 <div v-if="cell.record.time_in_am" class="flex gap-1">
                   <span class="text-slate-400">in</span>{{ fmtTime(cell.record.time_in_am) }}
                 </div>
@@ -135,6 +135,9 @@
                   <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_pm) }}
                 </div>
               </div>
+              <!-- WFH source indicator -->
+              <div v-if="cell.record.wfh_attendance_id"
+                class="text-[7px] font-bold text-rose-500 text-center leading-tight">WFH</div>
               <!-- Scheduled time (indigo, below punches) -->
               <div v-if="cell.schedIn || cell.schedOut"
                 class="font-mono text-[8px] text-indigo-400 leading-tight border-t border-indigo-100 mt-0.5 pt-0.5 text-center">
@@ -207,7 +210,7 @@
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
                     class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
-                    :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200')))">
+                    :class="r.wfh_attendance_id && r[f] ? 'text-rose-600 font-medium' : (r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200'))))">
                   {{ timeCell(r, f) }}
                 </td>
                 <!-- Scheduled times (indigo, derived from employee schedule) -->
@@ -233,9 +236,14 @@
                   {{ fmtMinutes(r.overtime_minutes) }}
                 </td>
                 <td class="px-4 py-2.5">
-                  <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
-                    {{ statusLabel(r.attendance_status) }}
-                  </span>
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                      {{ statusLabel(r.attendance_status) }}
+                    </span>
+                    <span v-if="r.wfh_attendance_id"
+                      class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
+                      title="Times sourced from WFH attendance log">WFH</span>
+                  </div>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
                   <button v-if="!r.is_locked" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">

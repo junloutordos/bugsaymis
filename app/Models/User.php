@@ -93,6 +93,39 @@ class User extends Authenticatable
         return $this->hasMany(IPCR::class, 'user_id');
     }
 
+    // ─── Organizational Unit relationships ────────────────────────────────────
+
+    /** All unit assignments (including historical). */
+    public function unitAssignments()
+    {
+        return $this->hasMany(\App\Models\HR\EmployeeUnitAssignment::class);
+    }
+
+    /** Currently active primary unit assignment. */
+    public function primaryUnitAssignment()
+    {
+        return $this->hasOne(\App\Models\HR\EmployeeUnitAssignment::class)
+            ->where('is_primary', true)
+            ->whereNull('end_date')
+            ->whereNull('deleted_at')
+            ->latest('effective_date');
+    }
+
+    /** The primary organizational unit this employee belongs to. */
+    public function primaryUnit()
+    {
+        return $this->hasOneThrough(
+            \App\Models\OrganizationalUnit::class,
+            \App\Models\HR\EmployeeUnitAssignment::class,
+            'user_id',
+            'id',
+            'id',
+            'organizational_unit_id'
+        )->where('employee_unit_assignments.is_primary', true)
+         ->whereNull('employee_unit_assignments.end_date')
+         ->whereNull('employee_unit_assignments.deleted_at');
+    }
+
     /** SST position level (for Faculty Loading overload pay). */
     public function sstPosition()
     {

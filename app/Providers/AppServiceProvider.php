@@ -161,6 +161,25 @@ class AppServiceProvider extends ServiceProvider
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }
 
+        // ── Org Structure permission gates ─────────────────────────────────────
+        foreach ([
+            'org.view',
+            'org.view_all',
+            'org.units.create',
+            'org.units.update',
+            'org.units.delete',
+            'org.units.manage',
+            'org.assign',
+            'org.assign.manage',
+            'org.heads.manage',
+            'org.versions.view',
+            'org.versions.manage',
+            'org.export',
+            'org.reports',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
         Vite::prefetch(concurrency: 3);
 
         // Ensure preload tags for CSS use the correct `as` attribute so browsers

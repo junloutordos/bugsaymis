@@ -44,6 +44,7 @@ import {
   CpuChipIcon,
   AdjustmentsHorizontalIcon,
   CheckCircleIcon,
+  BuildingLibraryIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -559,6 +560,14 @@ const menuItems = [
         icon: ClockIcon,
         roles: ["Administrator", "HR"],
         permissions: ["hr.schedule.manage"],
+      },
+      {
+        label: "Org Structure",
+        routeName: "hr.org.index",
+        href: route("hr.org.index"),
+        icon: BuildingLibraryIcon,
+        roles: ["Administrator", "HR", "OCD", "DivisionChief", "PMT", "MIS", "Faculty", "Staff"],
+        permissions: ["org.view"],
       },
       
       {

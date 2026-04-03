@@ -124,7 +124,9 @@ class DTRService
                 $dayType,
                 $hoursWorked,
                 $lateMinutes,
-                $schedule
+                $schedule,
+                $timeInAm,
+                $timeOutPm
             );
 
             DtrRecord::updateOrCreate(
@@ -196,6 +198,9 @@ class DTRService
             $hasAnyPunch = $timeInAm || $timeOutAm || $timeInPm || $timeOutPm;
             if (! $hasAnyPunch) {
                 $attendanceStatus = 'absent';
+            } elseif ($timeInAm && $timeOutPm) {
+                // CSC rule: AM arrival + PM departure = full day present
+                $attendanceStatus = 'present';
             } elseif (
                 $hoursWorked < ($schedule?->half_day_hours ?? 4) ||
                 $lateMinutes >= ($schedule?->late_threshold_minutes ?? 240)
@@ -651,7 +656,9 @@ class DTRService
         string $dayType,
         float $hoursWorked,
         float $lateMinutes,
-        ?EmployeeSchedule $schedule
+        ?EmployeeSchedule $schedule,
+        ?string $timeInAm = null,
+        ?string $timeOutPm = null
     ): string {
         if ($leave) {
             return 'on_leave';
@@ -663,6 +670,14 @@ class DTRService
 
         if ($logs->isEmpty()) {
             return 'absent';
+        }
+
+        // CSC Form 48 rule: AM arrival + PM departure = full day present.
+        // This takes precedence over the hours-based threshold so that employees
+        // who tap in once in the morning and once in the afternoon are not
+        // incorrectly flagged as half-day due to schedule mis-configuration.
+        if ($timeInAm && $timeOutPm) {
+            return 'present';
         }
 
         $halfDayThreshold = $schedule ? ($schedule->half_day_hours ?? 4) : 4;
