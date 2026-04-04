@@ -326,14 +326,62 @@
       <!-- Print shortcuts -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4 flex flex-wrap gap-3 items-center">
         <span class="text-sm font-medium text-slate-600 mr-auto">Print Reports</span>
-        <a :href="`/hr/wfh/print/timelogs?month=${currentMonth}`" target="_blank"
+        <button @click="showTimeLogPrintModal = true"
            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           🖨️ Time Logs
-        </a>
+        </button>
         <button @click="showPrintModal = true"
            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           🖨️ Accomplishments
         </button>
+      </div>
+
+      <!-- Print Time Logs Modal -->
+      <div v-if="showTimeLogPrintModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+          <h2 class="text-base font-semibold text-slate-800">Print Time Logs</h2>
+
+          <div class="flex gap-3">
+            <label v-for="opt in [{v:'daily',l:'Daily'},{v:'monthly',l:'Monthly'},{v:'range',l:'Date Range'}]" :key="opt.v"
+              class="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
+              <input type="radio" v-model="tlPrintMode" :value="opt.v" class="accent-indigo-600" />
+              {{ opt.l }}
+            </label>
+          </div>
+
+          <div v-if="tlPrintMode === 'daily'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
+            <input type="date" v-model="tlPrintDate"
+              class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+          </div>
+
+          <div v-if="tlPrintMode === 'monthly'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
+            <input type="month" v-model="tlPrintMonth"
+              class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+          </div>
+
+          <div v-if="tlPrintMode === 'range'" class="space-y-2">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">From</label>
+              <input type="date" v-model="tlPrintDateFrom"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">To</label>
+              <input type="date" v-model="tlPrintDateTo"
+                class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 pt-1">
+            <button @click="showTimeLogPrintModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
+            <a :href="printTimeLogsUrl" target="_blank"
+               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              🖨️ Print
+            </a>
+          </div>
+        </div>
       </div>
 
       <!-- Print Accomplishments Modal -->
@@ -424,7 +472,7 @@ const expandedHistoryId      = ref(null)
 // Per-record accomplishment overrides (after add/edit/delete)
 const historyAccomplishments = ref({}) // { [recordId]: Accomplishment[] }
 
-// Print modal
+// Print modal — Accomplishments
 const showPrintModal  = ref(false)
 const printMode       = ref('monthly')
 const printDate       = ref(today_str)
@@ -437,6 +485,21 @@ const printAccomplishmentsUrl = computed(() => {
   if (printMode.value === 'daily')   return `${base}?mode=daily&date=${printDate.value}`
   if (printMode.value === 'range')   return `${base}?mode=range&date_from=${printDateFrom.value}&date_to=${printDateTo.value}`
   return `${base}?mode=monthly&month=${printMonth.value}`
+})
+
+// Print modal — Time Logs
+const showTimeLogPrintModal = ref(false)
+const tlPrintMode           = ref('monthly')
+const tlPrintDate           = ref(today_str)
+const tlPrintMonth          = ref(currentMonth)
+const tlPrintDateFrom       = ref(today_str)
+const tlPrintDateTo         = ref(today_str)
+
+const printTimeLogsUrl = computed(() => {
+  const base = '/hr/wfh/print/timelogs'
+  if (tlPrintMode.value === 'daily')   return `${base}?mode=daily&date=${tlPrintDate.value}`
+  if (tlPrintMode.value === 'range')   return `${base}?mode=range&date_from=${tlPrintDateFrom.value}&date_to=${tlPrintDateTo.value}`
+  return `${base}?mode=monthly&month=${tlPrintMonth.value}`
 })
 
 // Template refs
