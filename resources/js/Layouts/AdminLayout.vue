@@ -170,42 +170,49 @@ const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
-// Return aggregate badge count for a group (sum of all children badges)
-const getGroupBadge = (item) => {
-  if (!item.children?.length) return 0;
-  return item.children.reduce((sum, child) => sum + getBadge(child), 0);
+// Safely coerce a raw Inertia prop value to a non-negative integer
+const toBadgeInt = (val) => {
+  const n = parseInt(val, 10);
+  return isNaN(n) || n < 0 ? 0 : n;
 };
 
 // Return numeric badge from shared Inertia props based on child routeName
 const getBadge = (child) => {
   const rn = child?.routeName || null;
   // Chat badge is available to all roles — check it first
-  if (rn === 'chat.index') return chatUnreadCount.value;
+  if (rn === 'chat.index') return toBadgeInt(chatUnreadCount.value);
   if (!page || !page.props) return 0;
   switch (rn) {
     case 'consultations.index':
-      return page.props.consultationsNotificationCount || 0;
+      return toBadgeInt(page.props.consultationsNotificationCount);
     case 'jobrequests.index':
-      return page.props.itJobRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.itJobRequestsNotificationCount);
     case 'vehicle-requests.index':
-      return page.props.vehicleRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.vehicleRequestsNotificationCount);
     case 'gatepass.index':
-      return page.props.gatepassNotificationCount || 0;
+      return toBadgeInt(page.props.gatepassNotificationCount);
     case 'messengerial.index':
-      return page.props.messengerialRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.messengerialRequestsNotificationCount);
     case 'facility-requests.index':
-      return page.props.facilityRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.facilityRequestsNotificationCount);
     case 'service-requests.index':
-      return page.props.serviceRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.serviceRequestsNotificationCount);
     case 'work-requests.index':
-      return page.props.workRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.workRequestsNotificationCount);
     case 'library.borrowings.index':
-      return page.props.borrowingsOverdueCount || 0;
+      return toBadgeInt(page.props.borrowingsOverdueCount);
     case 'document-tracking.index':
-      return page.props.documentTrackingNotificationCount || 0;
+      return toBadgeInt(page.props.documentTrackingNotificationCount);
     default:
       return 0;
   }
+};
+
+// Return aggregate badge count for a group (sum of all children badges), capped at 99
+const getGroupBadge = (item) => {
+  if (!item.children?.length) return 0;
+  const total = item.children.reduce((sum, child) => sum + getBadge(child), 0);
+  return Math.min(total, 99);
 };
 
 // --- Profile Modal State ---
@@ -1738,7 +1745,7 @@ filteredMenu.value.forEach((item) => {
               <span
                 v-if="!collapsed && !expanded[item.label] && getGroupBadge(item) > 0"
                 class="ml-1 shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
-              >{{ getGroupBadge(item) > 99 ? '99+' : getGroupBadge(item) }}</span>
+              >{{ getGroupBadge(item) }}</span>
               <span
                 v-else-if="collapsed && getGroupBadge(item) > 0"
                 class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-400"
