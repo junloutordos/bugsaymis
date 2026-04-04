@@ -76,6 +76,10 @@
           <p class="text-[10px] text-violet-600 font-semibold uppercase tracking-wide">Holiday</p>
           <p class="text-xl font-bold text-violet-700 mt-0.5">{{ summary.holiday }}</p>
         </div>
+        <div class="bg-rose-50 rounded-xl border border-rose-100 p-3 text-center">
+          <p class="text-[10px] text-rose-600 font-semibold uppercase tracking-wide">WFH</p>
+          <p class="text-xl font-bold text-rose-700 mt-0.5">{{ summary.wfh ?? 0 }}</p>
+        </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
           <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Total Hrs</p>
           <p class="text-xl font-bold text-slate-800 mt-0.5">{{ summary.total_hours }}</p>
@@ -135,9 +139,6 @@
                   <span class="text-slate-400">out</span>{{ fmtTime(cell.record.time_out_pm) }}
                 </div>
               </div>
-              <!-- WFH source indicator -->
-              <div v-if="cell.record.wfh_attendance_id"
-                class="text-[7px] font-bold text-rose-500 text-center leading-tight">WFH</div>
               <!-- Scheduled time (indigo, below punches) -->
               <div v-if="cell.schedIn || cell.schedOut"
                 class="font-mono text-[8px] text-indigo-400 leading-tight border-t border-indigo-100 mt-0.5 pt-0.5 text-center">
@@ -458,6 +459,7 @@ function cellBg(cell) {
   if (s === 'half_day')   return 'bg-amber-50 border-amber-200'
   if (s === 'on_leave')   return 'bg-blue-50 border-blue-100'
   if (s === 'holiday')    return 'bg-violet-50 border-violet-100'
+  if (s === 'wfh')        return 'bg-rose-50/70 border-rose-100'
   return 'bg-white border-slate-100'
 }
 
@@ -469,6 +471,7 @@ function statusBadge(status) {
     on_leave:             'bg-blue-100 text-blue-700',
     holiday:              'bg-violet-100 text-violet-700',
     on_official_business: 'bg-cyan-100 text-cyan-700',
+    wfh:                  'bg-rose-100 text-rose-700',
   }[status] ?? 'bg-slate-100 text-slate-600'
 }
 
@@ -480,6 +483,7 @@ function statusLabel(status) {
     on_leave:             'On Leave',
     holiday:              'Holiday',
     on_official_business: 'OB',
+    wfh:                  'WFH',
   }[status] ?? (status ?? '').replace(/_/g, ' ')
 }
 

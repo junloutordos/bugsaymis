@@ -253,6 +253,14 @@
                         :class="record.time_in ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'">
                     In {{ record.time_in ? fmtShortTime(record.time_in) : '—' }}
                   </span>
+                  <span v-if="record.break_out"
+                        class="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">
+                    Break Out {{ fmtShortTime(record.break_out) }}
+                  </span>
+                  <span v-if="record.break_in"
+                        class="inline-flex items-center gap-1 text-xs font-medium bg-teal-100 text-teal-700 rounded-full px-2 py-0.5">
+                    Break In {{ fmtShortTime(record.break_in) }}
+                  </span>
                   <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5"
                         :class="record.time_out ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'">
                     Out {{ record.time_out ? fmtShortTime(record.time_out) : '—' }}
@@ -436,21 +444,34 @@ const videoEl  = ref(null)
 const canvasEl = ref(null)
 let mediaStream = null
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+/** Normalize any Laravel date string to ISO 8601 before parsing.
+ *  Handles "2024-01-15 08:00:00" (MySQL) and "2024-01-15T08:00:00.000000Z" (ISO). */
+function toDate(val) {
+  if (!val) return null
+  const d = new Date(String(val).replace(' ', 'T'))
+  return isNaN(d.getTime()) ? null : d
+}
+
 // ── Computed ──────────────────────────────────────────────────────────────────
 const breakDuration = computed(() => {
-  if (!attendance.value?.break_out || !attendance.value?.break_in) return '—'
-  const ms = new Date(attendance.value.break_in) - new Date(attendance.value.break_out)
+  const out = toDate(attendance.value?.break_out)
+  const inn = toDate(attendance.value?.break_in)
+  if (!out || !inn) return '—'
+  const ms = inn - out
   const h  = Math.floor(ms / 3600000)
   const m  = Math.floor((ms % 3600000) / 60000)
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 })
 
 const workDuration = computed(() => {
-  if (!attendance.value?.time_in || !attendance.value?.time_out) return '—'
-  let ms = new Date(attendance.value.time_out) - new Date(attendance.value.time_in)
-  if (attendance.value.break_out && attendance.value.break_in) {
-    ms -= new Date(attendance.value.break_in) - new Date(attendance.value.break_out)
-  }
+  const inn = toDate(attendance.value?.time_in)
+  const out = toDate(attendance.value?.time_out)
+  if (!inn || !out) return '—'
+  let ms = out - inn
+  const bOut = toDate(attendance.value?.break_out)
+  const bIn  = toDate(attendance.value?.break_in)
+  if (bOut && bIn) ms -= bIn - bOut
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   return `${h}h ${m}m`
@@ -661,24 +682,27 @@ function driveThumb(url) {
   return url
 }
 
-function formatTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
+function formatTime(val) {
+  const d = toDate(val)
+  if (!d) return '—'
+  return d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
 }
 
-function fmtShortTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
+function fmtShortTime(val) {
+  const d = toDate(val)
+  if (!d) return '—'
+  return d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
 function fmtDayName(dateStr) {
   if (!dateStr) return ''
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
+  // Slice to 10 chars to get YYYY-MM-DD regardless of whether a time component is appended
+  return new Date(String(dateStr).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
 }
 
 function fmtDayNum(dateStr) {
   if (!dateStr) return ''
-  return new Date(dateStr + 'T00:00:00').getDate()
+  return new Date(String(dateStr).slice(0, 10) + 'T00:00:00').getDate()
 }
 
 function getPosition() {

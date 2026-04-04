@@ -103,12 +103,18 @@ class DTRService
             );
 
             // WFH fallback: when there are no biometric logs for this date but
-            // the employee has a WFH attendance record, use WFH time_in / time_out
-            // as the AM-in and PM-out slots so that hours & late/undertime compute.
+            // the employee has a WFH attendance record, map all four WFH slots
+            // onto the DTR time columns so hours & late/undertime compute correctly.
+            //   time_in   → time_in_am  (morning arrival)
+            //   break_out → time_out_am (lunch departure)
+            //   break_in  → time_in_pm  (return from lunch)
+            //   time_out  → time_out_pm (end of day)
             $wfh = $wfhAttendances->get($dateStr);
             if ($wfh && $logsForDay->isEmpty()) {
-                $timeInAm  = $wfh->time_in  ? Carbon::parse($wfh->time_in)->format('H:i:s')  : null;
-                $timeOutPm = $wfh->time_out ? Carbon::parse($wfh->time_out)->format('H:i:s') : null;
+                $timeInAm  = $wfh->time_in   ? Carbon::parse($wfh->time_in)->format('H:i:s')   : null;
+                $timeOutAm = $wfh->break_out  ? Carbon::parse($wfh->break_out)->format('H:i:s') : null;
+                $timeInPm  = $wfh->break_in   ? Carbon::parse($wfh->break_in)->format('H:i:s')  : null;
+                $timeOutPm = $wfh->time_out   ? Carbon::parse($wfh->time_out)->format('H:i:s')  : null;
             }
 
             // Compute metrics
@@ -117,17 +123,23 @@ class DTRService
             $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
             $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
 
-            // Determine attendance status
-            $attendanceStatus = $this->getAttendanceStatus(
-                $logsForDay,
-                $leave,
-                $dayType,
-                $hoursWorked,
-                $lateMinutes,
-                $schedule,
-                $timeInAm,
-                $timeOutPm
-            );
+            // Determine attendance status.
+            // WFH days (no biometric logs, WFH attendance present) get their own
+            // status so they are never counted as absent.
+            if ($wfh && $logsForDay->isEmpty() && ! $leave) {
+                $attendanceStatus = 'wfh';
+            } else {
+                $attendanceStatus = $this->getAttendanceStatus(
+                    $logsForDay,
+                    $leave,
+                    $dayType,
+                    $hoursWorked,
+                    $lateMinutes,
+                    $schedule,
+                    $timeInAm,
+                    $timeOutPm
+                );
+            }
 
             DtrRecord::updateOrCreate(
                 ['user_id' => $userId, 'work_date' => $dateStr],
@@ -192,8 +204,8 @@ class DTRService
         $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
 
         // Re-derive attendance status unless it is a protected status that was
-        // set during generation (on_leave, holiday, on_official_business).
-        $protectedStatuses = ['on_leave', 'holiday', 'on_official_business'];
+        // set during generation (on_leave, holiday, on_official_business, wfh).
+        $protectedStatuses = ['on_leave', 'holiday', 'on_official_business', 'wfh'];
         if (! in_array($record->attendance_status, $protectedStatuses)) {
             $hasAnyPunch = $timeInAm || $timeOutAm || $timeInPm || $timeOutPm;
             if (! $hasAnyPunch) {

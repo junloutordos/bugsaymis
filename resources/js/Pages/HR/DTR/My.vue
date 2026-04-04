@@ -95,6 +95,10 @@
           <p class="text-[10px] text-violet-600 font-semibold uppercase tracking-wide">Holiday</p>
           <p class="text-xl font-bold text-violet-700 mt-0.5">{{ summary.holiday }}</p>
         </div>
+        <div class="bg-rose-50 rounded-xl border border-rose-100 p-3 text-center">
+          <p class="text-[10px] text-rose-600 font-semibold uppercase tracking-wide">WFH</p>
+          <p class="text-xl font-bold text-rose-700 mt-0.5">{{ summary.wfh ?? 0 }}</p>
+        </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
           <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Total Hrs</p>
           <p class="text-xl font-bold text-slate-800 mt-0.5">{{ summary.total_hours }}</p>
@@ -173,8 +177,6 @@
               <div :class="[statusBadge(cell.record.attendance_status), 'mt-1 text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide']">
                 {{ statusLabel(cell.record.attendance_status) }}
               </div>
-              <div v-if="cell.record.wfh_attendance_id"
-                class="text-[7px] font-bold text-rose-500 text-center leading-tight">WFH</div>
               <div v-if="cell.record.late_minutes > 0 || cell.record.undertime_minutes > 0"
                 class="flex gap-0.5 mt-0.5 justify-center flex-wrap">
                 <span v-if="cell.record.late_minutes > 0"
@@ -547,7 +549,7 @@ const calendarCells = computed(() => {
 })
 
 function cellBg(cell) {
-  if (cell.wfhByDate && !cell.record) return 'bg-indigo-50/60 border-indigo-100'
+  if (cell.wfhByDate && !cell.record) return 'bg-rose-50/60 border-rose-100'
   if (!cell.record) {
     if (!cell.isWorkDay) return 'bg-slate-50 border-slate-100'
     return 'bg-red-50/30 border-red-100'
@@ -558,6 +560,7 @@ function cellBg(cell) {
   if (s === 'half_day')   return 'bg-amber-50 border-amber-200'
   if (s === 'on_leave')   return 'bg-blue-50 border-blue-100'
   if (s === 'holiday')    return 'bg-violet-50 border-violet-100'
+  if (s === 'wfh')        return 'bg-rose-50/70 border-rose-100'
   return 'bg-white border-slate-100'
 }
 
@@ -569,6 +572,7 @@ function statusBadge(status) {
     on_leave:             'bg-blue-100 text-blue-700',
     holiday:              'bg-violet-100 text-violet-700',
     on_official_business: 'bg-cyan-100 text-cyan-700',
+    wfh:                  'bg-rose-100 text-rose-700',
   }[status] ?? 'bg-slate-100 text-slate-600'
 }
 
@@ -580,6 +584,7 @@ function statusLabel(status) {
     on_leave:             'On Leave',
     holiday:              'Holiday',
     on_official_business: 'OB',
+    wfh:                  'WFH',
   }[status] ?? (status ?? '').replace(/_/g, ' ')
 }
 
