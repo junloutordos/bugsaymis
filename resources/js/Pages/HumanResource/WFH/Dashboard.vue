@@ -696,13 +696,16 @@ function fmtShortTime(val) {
 
 function fmtDayName(dateStr) {
   if (!dateStr) return ''
-  // Slice to 10 chars to get YYYY-MM-DD regardless of whether a time component is appended
-  return new Date(String(dateStr).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short' })
+  const d = toDate(dateStr)
+  if (!d) return ''
+  return d.toLocaleDateString('en-PH', { weekday: 'short' })
 }
 
 function fmtDayNum(dateStr) {
   if (!dateStr) return ''
-  return new Date(String(dateStr).slice(0, 10) + 'T00:00:00').getDate()
+  const d = toDate(dateStr)
+  if (!d) return ''
+  return d.getDate()
 }
 
 function getPosition() {
