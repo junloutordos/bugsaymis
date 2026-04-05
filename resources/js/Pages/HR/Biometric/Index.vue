@@ -7,7 +7,7 @@
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 class="text-xl font-semibold text-slate-800">Biometric Logs</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Import and resolve ZKTeco biometric punch records.</p>
+          <p class="text-sm text-slate-500 mt-0.5">Import and resolve biometric punch records.</p>
         </div>
       </div>
 
