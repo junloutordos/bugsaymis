@@ -28,7 +28,7 @@ services:
       MYSQL_DATABASE: bugsaymis
       MYSQL_ROOT_PASSWORD: F9oPkWUZJEf7v1NtbKE0XNrtxF6cTbf
     ports:
-      - "10.10.12.10:3306:3306"   # LAN only — accessible to staging (10.10.11.35), NOT internet
+      - "3306:3306"   # LAN only — accessible to staging (10.10.11.35), NOT internet
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
