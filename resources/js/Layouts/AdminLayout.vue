@@ -1205,7 +1205,7 @@ const menuItems = [
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief", "OCD"],
     children: [
       {
         label: "Docu Track",
@@ -1220,6 +1220,20 @@ const menuItems = [
         href: route("messengerial.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+      },
+      {
+        label: "For Approval — Messengerial",
+        routeName: "messengerial.for-approval",
+        href: route("messengerial.for-approval"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["DivisionChief"],
+      },
+      {
+        label: "OCD Approval — Messengerial",
+        routeName: "messengerial.ocd-approval",
+        href: route("messengerial.ocd-approval"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["OCD"],
       },
     ],
   },

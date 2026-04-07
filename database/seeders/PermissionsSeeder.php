@@ -76,6 +76,13 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Vehicles', 'name' => 'vehicles.manage',        'description' => 'Manage vehicle requests (GSU Head / Admin)'],
             ['module' => 'Vehicles', 'name' => 'vehicles.dc-approve',    'description' => 'Division Chief in-app approval of vehicle requests'],
 
+            // ── Messengerial ──────────────────────────────────────────────────
+            ['module' => 'Messengerial', 'name' => 'messengerial.view',       'description' => 'View messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.create',     'description' => 'Submit messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.manage',     'description' => 'Manage all messengerial requests (Records / Admin)'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.dc-approve', 'description' => 'Division Chief in-app approval of messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.ocd-approve','description' => 'OCD in-app approval of messengerial requests'],
+
             // ── Documents ─────────────────────────────────────────────────────
             ['module' => 'Documents','name' => 'documents.view',     'description' => 'View documents'],
             ['module' => 'Documents','name' => 'documents.create',   'description' => 'Upload documents'],
@@ -93,6 +100,7 @@ class PermissionsSeeder extends Seeder
 
             // ── Guidance ──────────────────────────────────────────────────────
             ['module' => 'Guidance', 'name' => 'guidance.view',      'description' => 'View guidance consultations'],
+            ['module' => 'Guidance', 'name' => 'guidance.refer',     'description' => 'Submit student referrals to guidance office'],
             ['module' => 'Guidance', 'name' => 'guidance.manage',    'description' => 'Manage guidance consultations & interventions'],
 
             // ── Procurement ───────────────────────────────────────────────────
