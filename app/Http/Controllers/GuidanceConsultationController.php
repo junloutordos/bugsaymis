@@ -19,10 +19,7 @@ class GuidanceConsultationController extends Controller
     {
         $user = $request->user();
 
-        // Only allow access to Guidance Services if user's numeric role_id includes 17 (Guidance) or 1 (Administrator)
-        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
-        $allowed = in_array(17, $roleIds) || in_array(1, $roleIds);
-        if (! $allowed) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance', 'Faculty', 'Staff'])) {
             abort(403, 'Forbidden');
         }
 
@@ -191,9 +188,7 @@ class GuidanceConsultationController extends Controller
     public function assign(Request $request, $id)
     {
         $user = $request->user();
-        // numeric role_id check: allow only Administrator (1) or Guidance (17)
-        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
-        if (! ($user && (in_array(1, $roleIds) || in_array(17, $roleIds)))) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
             abort(403, 'Forbidden');
         }
 
@@ -342,8 +337,7 @@ class GuidanceConsultationController extends Controller
     public function intervention(Request $request, $id)
     {
         $user = $request->user();
-        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
-        if (! ($user && (in_array(1, $roleIds) || in_array(17, $roleIds)))) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
             abort(403, 'Forbidden');
         }
 
@@ -456,8 +450,7 @@ class GuidanceConsultationController extends Controller
     public function getIntervention(Request $request, $id)
     {
         $user = $request->user();
-        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
-        if (! ($user && (in_array(1, $roleIds) || in_array(17, $roleIds)))) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
             abort(403, 'Forbidden');
         }
 
@@ -657,8 +650,7 @@ class GuidanceConsultationController extends Controller
 
     private function authorizeGuidance($user): void
     {
-        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
-        if (! (in_array(17, $roleIds) || in_array(1, $roleIds))) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
             abort(403, 'Forbidden');
         }
     }
@@ -701,8 +693,7 @@ class GuidanceConsultationController extends Controller
     public function admissionSlip(Request $request, $id)
     {
         $user = $request->user();
-        $roleIds = array_filter(array_map('intval', array_map('trim', explode(',', $user->role_id ?? ''))));
-        if (! ($user && (in_array(1, $roleIds) || in_array(17, $roleIds)))) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
             abort(403, 'Forbidden');
         }
 
