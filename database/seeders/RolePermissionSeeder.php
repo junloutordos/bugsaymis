@@ -149,6 +149,7 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create', 'facilities.dc-approve',
             'vehicles.view', 'vehicles.create', 'vehicles.dc-approve',
             'documents.view', 'documents.approve',
+            'messengerial.view', 'messengerial.create', 'messengerial.dc-approve',
             'reports.view',
             // L&D — supervisors approve nominations, IDP, and submit behavior evals
             'lnd.view', 'lnd.approve', 'lnd.evaluate',
@@ -170,6 +171,7 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view',
+            'messengerial.view', 'messengerial.ocd-approve',
             'chat.access',
         ]);
 
@@ -218,6 +220,8 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.create',
+            'messengerial.view', 'messengerial.create',
+            'guidance.refer',
             'library.view',
             // L&D — employees view own trainings, submit TNA, manage own IDP
             'lnd.view', 'lnd.create', 'lnd.evaluate',
@@ -246,6 +250,8 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.create',
+            'messengerial.view', 'messengerial.create',
+            'guidance.refer',
             'library.view',
             // L&D — employees view own trainings, submit TNA, manage own IDP
             'lnd.view', 'lnd.create', 'lnd.evaluate',
@@ -270,6 +276,7 @@ class RolePermissionSeeder extends Seeder
         $assign('Records', [
             'documents.view', 'documents.create', 'documents.update',
             'documents.approve',
+            'messengerial.view', 'messengerial.manage',
             'reports.view',
             'chat.access',
         ]);
@@ -290,7 +297,7 @@ class RolePermissionSeeder extends Seeder
 
         // ── Guidance ──────────────────────────────────────────────────────────
         $assign('Guidance', [
-            'guidance.view', 'guidance.manage',
+            'guidance.view', 'guidance.refer', 'guidance.manage',
             'reports.view',
             'chat.access',
         ]);
@@ -299,6 +306,7 @@ class RolePermissionSeeder extends Seeder
         $assign('GSU Head', [
             'facilities.view', 'facilities.manage',
             'vehicles.view', 'vehicles.manage',
+            'messengerial.view', 'messengerial.create',
             'procurement.view', 'procurement.create', 'procurement.approve',
             'reports.view',
             'chat.access',
@@ -325,8 +333,8 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // ── Student / Parent — very limited read-only ─────────────────────────
-        $assign('Student', ['library.view']);
-        $assign('Parent',  ['library.view']);
+        $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
+        $assign('Parent',  ['library.view', 'messengerial.view', 'messengerial.create']);
 
         $this->command->info('Role permissions assigned successfully.');
     }

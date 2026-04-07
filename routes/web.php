@@ -404,8 +404,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Guidance — Consultations list
     Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
-    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.view');
-    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.view');
+    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.refer');
+    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.refer');
     Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:guidance.manage');
     Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('permission:guidance.manage');
     // Save intervention details (Guidance personnel only)
@@ -639,6 +639,22 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'store'])->name('messengerial.store');
     Route::put('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'update'])->name('messengerial.update');
     Route::delete('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'destroy'])->name('messengerial.destroy');
+
+    // Messengerial — Division Chief in-app approval
+    Route::middleware(['auth', 'permission:messengerial.dc-approve'])->group(function () {
+        Route::get('/messengerial/for-approval', [\App\Http\Controllers\MessengerialController::class, 'forApproval'])
+            ->name('messengerial.for-approval');
+        Route::post('/messengerial/{messengerialRequest}/division-chief-action', [\App\Http\Controllers\MessengerialController::class, 'divisionChiefAction'])
+            ->name('messengerial.division-chief-action');
+    });
+
+    // Messengerial — OCD in-app approval
+    Route::middleware(['auth', 'permission:messengerial.ocd-approve'])->group(function () {
+        Route::get('/messengerial/ocd-approval', [\App\Http\Controllers\MessengerialController::class, 'ocdApproval'])
+            ->name('messengerial.ocd-approval');
+        Route::post('/messengerial/{messengerialRequest}/ocd-action', [\App\Http\Controllers\MessengerialController::class, 'ocdAction'])
+            ->name('messengerial.ocd-action');
+    });
 
     // Health Services - Consultations page
     Route::get('/consultations', [\App\Http\Controllers\ConsultationController::class, 'index'])->name('consultations.index');

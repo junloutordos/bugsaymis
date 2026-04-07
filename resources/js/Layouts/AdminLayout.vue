@@ -1205,7 +1205,7 @@ const menuItems = [
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief", "OCD"],
     children: [
       {
         label: "Docu Track",
@@ -1220,6 +1220,20 @@ const menuItems = [
         href: route("messengerial.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+      },
+      {
+        label: "For Approval — Messengerial",
+        routeName: "messengerial.for-approval",
+        href: route("messengerial.for-approval"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["DivisionChief"],
+      },
+      {
+        label: "OCD Approval — Messengerial",
+        routeName: "messengerial.ocd-approval",
+        href: route("messengerial.ocd-approval"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["OCD"],
       },
     ],
   },
@@ -1616,8 +1630,10 @@ const roleIds = (user.role_id || "")
   .filter((n) => !Number.isNaN(n));
 
 
-// Show Guidance Services when role_id includes 17 or 1
-const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1);
+// Show Guidance Services when role_id includes 17 or 1, or by role name
+const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1)
+  || roleNames.includes('Administrator') || roleNames.includes('Guidance')
+  || roleNames.includes('Faculty') || roleNames.includes('Staff');
 // Show Health Statistics Report when role_id includes 16 or 1
 const showHealthStatisticsByRoleId = roleIds.includes(16) || roleIds.includes(1);
 
