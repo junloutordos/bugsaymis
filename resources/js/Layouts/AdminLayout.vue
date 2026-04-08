@@ -1506,7 +1506,7 @@ const menuItems = [
       {
         label: "Refer to Guidance",
         routeName: "guidance.refer",
-        href: route('guidance.refer'),
+        href: "/guidance/refer",
         icon: ClipboardDocumentListIcon,
         permissions: ["guidance.refer"],
       },
