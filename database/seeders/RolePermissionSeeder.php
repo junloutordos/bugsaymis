@@ -229,7 +229,7 @@ class RolePermissionSeeder extends Seeder
             'rewards.view', 'rewards.nominate',
             // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
-            'hr.leave.file', 'hr.leave.credits.view',
+            'hr.leave.view', 'hr.leave.file', 'hr.leave.credits.view',
             'dtr.view_own',
             'chat.access',
         ]);
@@ -259,7 +259,7 @@ class RolePermissionSeeder extends Seeder
             'rewards.view', 'rewards.nominate',
             // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
-            'hr.leave.file', 'hr.leave.credits.view',
+            'hr.leave.view', 'hr.leave.file', 'hr.leave.credits.view',
             'dtr.view_own',
             'chat.access',
         ]);
@@ -312,11 +312,12 @@ class RolePermissionSeeder extends Seeder
             'chat.access',
         ]);
 
-        // ── FAD Chief — facilities.fad-approve is manually assigned per user ──
-        // FAD users are identified by position (position LIKE '%FAD%') rather than
-        // a dedicated role. Assign facilities.fad-approve to specific users via
-        // Admin → Roles → Assign Roles, or grant it individually through the
-        // Permissions management UI. No automatic role assignment here.
+        // ── FAD Chief ─────────────────────────────────────────────────────────
+        $assign('FAD Chief', [
+            'facilities.view', 'facilities.fad-approve',
+            'reports.view',
+            'chat.access',
+        ]);
 
         // ── InformationOfficer ────────────────────────────────────────────────
         $assign('InformationOfficer', [

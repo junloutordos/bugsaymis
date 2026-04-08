@@ -105,8 +105,6 @@
                     >
                       <PrinterIcon class="w-4 h-4" />
                     </a>
-                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve"><CheckIcon class="w-4 h-4"/></button>
-                    <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
                   </div>
                 </td>
               </tr>
@@ -144,8 +142,6 @@
               <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Delete</button>
               <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Mark Completed</button>
               <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Print</a>
-              <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="approveRequest(wr)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Approve</button>
-              <button v-if="hasRole('DivisionChief') && wr.status === 'Pending FAD Approval'" @click.prevent="declineRequest(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Decline</button>
             </div>
           </div>
           <div v-if="filteredWorkRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No work requests found.</div>
@@ -272,7 +268,7 @@
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, CheckIcon, XMarkIcon, PrinterIcon } from '@heroicons/vue/24/outline'
+import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, XMarkIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 
@@ -427,29 +423,6 @@ const destroy = (wr) => {
   })
 }
 
-const approveRequest = (wr) => {
-  Swal.fire({ title: 'Approve this work request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
-    if (!res.isConfirmed) return;
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.post(route('work-requests.approve.inapp', wr.id), {}, {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
-        onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to approve' }) }
-      })
-    })
-  })
-}
-
-const declineRequest = (wr) => {
-  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
-    if (!res.isConfirmed || !res.value) return;
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.post(route('work-requests.decline.inapp', wr.id), { reason: res.value }, {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
-        onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to decline' }) }
-      })
-    })
-  })
-}
 
 // Return CSS classes for status badges
 const statusClass = (s) => {
