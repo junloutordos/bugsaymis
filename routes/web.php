@@ -365,8 +365,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
-    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('permission:vehicles.manage');
-    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('permission:vehicles.manage');
+    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('permission:vehicles.dc-approve');
+    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('permission:vehicles.dc-approve');
     // Vehicle bookings API for calendar
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Facility bookings API for calendar
@@ -381,8 +381,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
-    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('permission:facilities.manage');
-    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('permission:facilities.manage');
+    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
+    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
     // Work Requests (General Services)
     Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('permission:facilities.view');
     Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('permission:facilities.create');
@@ -427,8 +427,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['signed']);
 
     // Authenticated in-app approve/decline
-    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('permission:facilities.manage');
-    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
+    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
 
     Route::get('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showDeclineForm'])
         ->name('work-requests.decline')
@@ -458,8 +458,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
     Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');
     // In-app approval endpoints for Division Chief (named .inapp to avoid collision with signed email routes)
-    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('permission:facilities.manage');
-    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('permission:facilities.manage');
+    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
+    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
     Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
     Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
     // Assets (General Services)
