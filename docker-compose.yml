@@ -53,6 +53,7 @@ services:
       SOKETI_DEFAULT_APP_KEY: bugsaymis-app-key
       SOKETI_DEFAULT_APP_SECRET: bugsaymis-secret
       SOKETI_DEBUG: 0
+      SOKETI_PORT: 9601
     ports:
       - "9601:9601"
     networks:

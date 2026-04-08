@@ -139,15 +139,6 @@ Route::post('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::c
     ->middleware('throttle:20,1')
     ->name('guidance.kiosk.store');
 
-// DTR Upload (Data Management) - front-end page
-Route::get('/data-management/dtr-upload', function () {
-    return Inertia::render('DataManagement/DTRUpload');
-})->name('data.dtr.upload')->middleware(['auth','permission:roles.assign']);
-
-// Endpoint to accept uploaded .dat file and insert attendance rows
-Route::post('/data-management/dtr-upload', [\App\Http\Controllers\DataManagement\DTRUploadController::class, 'store'])
-    ->name('data.dtr.upload.store')
-    ->middleware(['auth','permission:roles.assign']);
 
     // Consultation log printable report (A4 landscape)
     Route::get('/consultations/log/print', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])

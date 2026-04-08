@@ -366,14 +366,6 @@ const menuItems = [
         permissions: ["hr.employees.manage"],
       },
       {
-        label: 'DTR Upload',
-        routeName: 'data.dtr.upload',
-        href: route('data.dtr.upload'),
-        icon: DocumentTextIcon,
-        roles: ['Administrator'],
-        permissions: ["roles.assign"],
-      },
-      {
         label: "User Roles",
         routeName: "roles.index",
         href: route("roles.index"),
@@ -1226,6 +1218,14 @@ const menuItems = [
     icon: ShoppingCartIcon,
     roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
     children: [
+      {
+        label: "PPMP",
+        routeName: null,
+        href: "/ppmp",
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["procurement.view"],
+      },
       {
         label: "Purchase Requests",
         routeName: "procurements.index",
