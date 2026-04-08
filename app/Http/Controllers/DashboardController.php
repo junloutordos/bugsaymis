@@ -63,6 +63,10 @@ class DashboardController extends Controller
         $activeDivisions     = 0;
         $employeeMaleCount   = 0;
         $employeeFemaleCount = 0;
+        $facultyMaleCount    = 0;
+        $facultyFemaleCount  = 0;
+        $staffMaleCount      = 0;
+        $staffFemaleCount    = 0;
         $employeesByDivision = [];
 
         try {
@@ -84,6 +88,14 @@ class DashboardController extends Controller
             $activeDivisions     = Division::where('status', 'active')->count();
             $employeeMaleCount   = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
             $employeeFemaleCount = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+
+            $facultyBase = fn () => $activeEmployeeBase()->whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'));
+            $staffBase   = fn () => $activeEmployeeBase()->whereHas('roles', fn ($q) => $q->where('roles.name', 'Staff'));
+
+            $facultyMaleCount   = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $facultyFemaleCount = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+            $staffMaleCount     = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $staffFemaleCount   = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
 
             $divRows = DB::table('users')
                 ->join('divisions', 'users.division_id', '=', 'divisions.id')
@@ -493,6 +505,10 @@ class DashboardController extends Controller
             'staffCount'          => $staffCount,
             'employeeMaleCount'   => $employeeMaleCount,
             'employeeFemaleCount' => $employeeFemaleCount,
+            'facultyMaleCount'    => $facultyMaleCount,
+            'facultyFemaleCount'  => $facultyFemaleCount,
+            'staffMaleCount'      => $staffMaleCount,
+            'staffFemaleCount'    => $staffFemaleCount,
             'activeDivisions'     => $activeDivisions,
             'employeesByDivision' => $employeesByDivision,
 
