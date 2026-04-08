@@ -2,11 +2,19 @@
 
 namespace App\Models\HR;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LeaveType extends Model
 {
+    use HasFactory;
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\HR\LeaveTypeFactory::new();
+    }
+
     protected $table = 'leave_types';
 
     protected $fillable = [

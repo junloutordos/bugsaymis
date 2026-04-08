@@ -547,6 +547,37 @@ class VehicleRequestController extends Controller
     }
 
     /* =====================================================
+     | DIVISION CHIEF IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function divisionChiefApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+            abort(403);
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = VehicleRequest::with('requester:id,name')
+            ->where('status', 'Pending')
+            ->where('division_chief_id', $user->id)
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',     'like', "%{$search}%")
+                      ->orWhere('destination', 'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('VehicleRequests/DivisionChiefApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    /* =====================================================
      | OCD IN-APP APPROVAL DASHBOARD
      |=====================================================*/
     public function ocdApproval(Request $request)

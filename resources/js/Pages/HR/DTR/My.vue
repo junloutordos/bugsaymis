@@ -23,7 +23,7 @@
               <p v-else class="text-xs text-amber-500 mt-0.5">⚠ No schedule assigned — late & undertime will not be computed</p>
             </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <button @click="changeMonth(-1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronLeftIcon class="h-4 w-4 text-slate-600" />
             </button>
@@ -36,9 +36,9 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
-            <a :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank"
+            <a :href="route('hr.my-dtr.checklist') + '?month=' + currentMonth" target="_blank"
                class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
-              <PrinterIcon class="h-4 w-4" />Print
+              <PrinterIcon class="h-4 w-4" />Print Checklist
             </a>
           </div>
         </div>
@@ -52,6 +52,25 @@
       <div v-if="$page.props.flash?.error"
         class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
+      </div>
+
+      <!-- Submit Penned Entries Banner -->
+      <div v-if="hasPenned && !allSubmitted"
+           class="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-center justify-between gap-4">
+        <div>
+          <p class="text-sm font-semibold text-amber-800">You have pending penned entries</p>
+          <p class="text-xs text-amber-600 mt-0.5">Once you submit, your entries will be locked for review. HR/Admin can unlock if corrections are needed.</p>
+        </div>
+        <button @click="confirmSubmitPenned"
+          class="shrink-0 inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
+          <LockClosedIcon class="h-4 w-4" /> Submit & Lock
+        </button>
+      </div>
+
+      <div v-if="allSubmitted"
+           class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3 text-sm text-emerald-700">
+        <LockClosedIcon class="h-5 w-5 shrink-0 text-emerald-500" />
+        <span>Penned entries for <strong>{{ currentMonth }}</strong> have been submitted and are locked. Contact HR if corrections are needed.</span>
       </div>
 
       <!-- Summary Stats -->
@@ -75,6 +94,10 @@
         <div class="bg-violet-50 rounded-xl border border-violet-100 p-3 text-center">
           <p class="text-[10px] text-violet-600 font-semibold uppercase tracking-wide">Holiday</p>
           <p class="text-xl font-bold text-violet-700 mt-0.5">{{ summary.holiday }}</p>
+        </div>
+        <div class="bg-rose-50 rounded-xl border border-rose-100 p-3 text-center">
+          <p class="text-[10px] text-rose-600 font-semibold uppercase tracking-wide">WFH</p>
+          <p class="text-xl font-bold text-rose-700 mt-0.5">{{ summary.wfh ?? 0 }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
           <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Total Hrs</p>
@@ -114,29 +137,37 @@
             </span>
             <template v-if="cell.record">
               <div class="font-mono text-[9px] text-slate-500 leading-[1.4] space-y-px flex-1">
-                <div v-if="cell.record.time_in_am || cell.record.penned_time_in_am" class="flex gap-1">
+                <!-- AM In -->
+                <div v-if="cell.record.time_in_am || cell.record.penned_time_in_am || cell.wfhIn" class="flex gap-1">
                   <span class="text-slate-400">in</span>
-                  <span :class="cell.record.time_in_am ? '' : 'text-red-500'">
-                    {{ fmtTime(cell.record.time_in_am || cell.record.penned_time_in_am) }}
+                  <span :class="timeColor(cell.record, 'time_in_am', cell.wfhIn)">
+                    {{ fmtTime(cell.record.time_in_am || cell.record.penned_time_in_am || cell.wfhIn) }}
                   </span>
                 </div>
+                <!-- AM Out -->
                 <div v-if="cell.record.time_out_am || cell.record.penned_time_out_am" class="flex gap-1">
                   <span class="text-slate-400">out</span>
                   <span :class="cell.record.time_out_am ? '' : 'text-red-500'">
                     {{ fmtTime(cell.record.time_out_am || cell.record.penned_time_out_am) }}
                   </span>
                 </div>
+                <!-- PM In -->
                 <div v-if="cell.record.time_in_pm || cell.record.penned_time_in_pm" class="flex gap-1">
                   <span class="text-slate-400">in</span>
                   <span :class="cell.record.time_in_pm ? '' : 'text-red-500'">
                     {{ fmtTime(cell.record.time_in_pm || cell.record.penned_time_in_pm) }}
                   </span>
                 </div>
-                <div v-if="cell.record.time_out_pm || cell.record.penned_time_out_pm" class="flex gap-1">
+                <!-- PM Out -->
+                <div v-if="cell.record.time_out_pm || cell.record.penned_time_out_pm || cell.wfhOut" class="flex gap-1">
                   <span class="text-slate-400">out</span>
-                  <span :class="cell.record.time_out_pm ? '' : 'text-red-500'">
-                    {{ fmtTime(cell.record.time_out_pm || cell.record.penned_time_out_pm) }}
+                  <span :class="timeColor(cell.record, 'time_out_pm', cell.wfhOut)">
+                    {{ fmtTime(cell.record.time_out_pm || cell.record.penned_time_out_pm || cell.wfhOut) }}
                   </span>
+                </div>
+                <!-- Leave / Gate Pass label -->
+                <div v-if="cellSpecialLabel(cell)" class="text-red-500 font-bold text-[9px]">
+                  {{ cellSpecialLabel(cell) }}
                 </div>
               </div>
               <div v-if="cell.schedIn || cell.schedOut"
@@ -157,6 +188,14 @@
                   UT {{ fmtMinutes(cell.record.undertime_minutes) }}
                 </span>
               </div>
+            </template>
+            <!-- WFH-only cell (no DTR record but WFH data exists) -->
+            <template v-else-if="wfhByDate[cell.date]">
+              <div class="font-mono text-[9px] text-red-500 leading-[1.4] space-y-px flex-1">
+                <div class="flex gap-1"><span class="text-slate-400">in</span><span>{{ fmtTime(wfhByDate[cell.date].time_in) }}</span></div>
+                <div class="flex gap-1"><span class="text-slate-400">out</span><span>{{ fmtTime(wfhByDate[cell.date].time_out) }}</span></div>
+              </div>
+              <div class="mt-1 text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide bg-indigo-100 text-indigo-700">WFH</div>
             </template>
             <template v-else-if="!cell.isWorkDay">
               <span class="text-[9px] text-slate-300 mt-auto text-center">rest</span>
@@ -201,10 +240,21 @@
               <tr v-for="r in records" :key="r.id" class="hover:bg-slate-50/60">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
-                <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
-                    class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
-                    :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : 'text-slate-200')">
-                  {{ fmtTime(r[f] || r['penned_'+f]) || '–' }}
+                <!-- AM In -->
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_in_am')">
+                  {{ tableCellText(r, 'time_in_am') }}
+                </td>
+                <!-- AM Out -->
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_out_am')">
+                  {{ tableCellText(r, 'time_out_am') }}
+                </td>
+                <!-- PM In -->
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_in_pm')">
+                  {{ tableCellText(r, 'time_in_pm') }}
+                </td>
+                <!-- PM Out -->
+                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_out_pm')">
+                  {{ tableCellText(r, 'time_out_pm') }}
                 </td>
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_in) || '–' }}</td>
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_out) || '–' }}</td>
@@ -221,19 +271,34 @@
                   {{ fmtMinutes(r.overtime_minutes) }}
                 </td>
                 <td class="px-4 py-2.5">
-                  <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
-                    {{ statusLabel(r.attendance_status) }}
-                  </span>
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                      {{ statusLabel(r.attendance_status) }}
+                    </span>
+                    <!-- Gate pass badge -->
+                    <span v-if="gatepassByDate[toDateStr(r.work_date)]"
+                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap"
+                          :title="gatepassByDate[toDateStr(r.work_date)].type">
+                      {{ gatepassByDate[toDateStr(r.work_date)].label }}
+                    </span>
+                    <!-- WFH badge -->
+                    <span v-if="r.wfh_attendance_id"
+                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
+                          title="Times sourced from WFH attendance log">WFH</span>
+                  </div>
                 </td>
                 <td class="px-4 py-2.5">
-                  <!-- Show pencil only if record is not locked AND at least one biometric slot is empty -->
-                  <button v-if="!r.is_locked && hasMissingSlots(r)"
+                  <!-- Penned-submitted lock (employee submitted) -->
+                  <LockClosedIcon v-if="r.penned_submitted_at" class="h-4 w-4 text-amber-400" title="Penned entries submitted — contact HR to unlock" />
+                  <!-- HR lock -->
+                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" title="Record locked by HR" />
+                  <!-- Edit button -->
+                  <button v-else-if="hasMissingSlots(r)"
                     @click="openEdit(r)"
                     class="text-slate-300 hover:text-indigo-600 transition-colors"
                     title="Submit penned entry">
                     <PencilSquareIcon class="h-4 w-4" />
                   </button>
-                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
                 </td>
               </tr>
             </tbody>
@@ -296,16 +361,22 @@
 import { ref, computed, reactive } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import Swal from 'sweetalert2'
+import axios from 'axios'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, CheckCircleIcon, ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  employee: Object,
-  records:  Array,
-  summary:  Object,
-  month:    String,
+  employee:       Object,
+  records:        Array,
+  summary:        Object,
+  month:          String,
+  wfhByDate:      { type: Object, default: () => ({}) },
+  gatepassByDate: { type: Object, default: () => ({}) },
+  hasPenned:      { type: Boolean, default: false },
+  allSubmitted:   { type: Boolean, default: false },
 })
 
 const currentMonth = ref(props.month)
@@ -344,6 +415,60 @@ function getDayName(dateVal) {
 
 function hasMissingSlots(r) {
   return !r.time_in_am || !r.time_out_am || !r.time_in_pm || !r.time_out_pm
+}
+
+/**
+ * Returns CSS class for a time cell in the detail table.
+ * Priority: WFH-sourced (rose) > biometric (grey) > penned (red) > WFH fallback (red) > leave/gatepass (red) > empty (light)
+ */
+function tableCellClass(r, field) {
+  if (r[field]) return r.wfh_attendance_id ? 'text-rose-600 font-medium' : 'text-slate-700'
+  if (r['penned_' + field]) return 'text-red-600 font-semibold'
+  const dateStr = toDateStr(r.work_date)
+  // WFH fallback shows in AM-in and PM-out (record exists but biometric slot empty)
+  if ((field === 'time_in_am' || field === 'time_out_pm') && props.wfhByDate[dateStr]) {
+    return 'text-rose-500 font-semibold'
+  }
+  if (r.attendance_status === 'on_leave') return 'text-red-600 font-bold'
+  if (r.attendance_status === 'on_official_business') return 'text-red-600 font-bold'
+  if (props.gatepassByDate[dateStr]) return 'text-red-500 font-bold'
+  return 'text-slate-200'
+}
+
+function tableCellText(r, field) {
+  if (r[field] || r['penned_' + field]) return fmtTime(r[field] || r['penned_' + field])
+  const dateStr = toDateStr(r.work_date)
+  const wfh = props.wfhByDate[dateStr]
+  if (field === 'time_in_am'  && wfh?.time_in)  return fmtTime(wfh.time_in)
+  if (field === 'time_out_pm' && wfh?.time_out) return fmtTime(wfh.time_out)
+  const gp = props.gatepassByDate[dateStr]
+  if (gp) return gp.label
+  const s = r.attendance_status
+  if (s === 'on_leave')             return 'L'
+  if (s === 'on_official_business') return 'OB'
+  return '–'
+}
+
+/**
+ * Calendar cell: WFH color helper for AM-in/PM-out slots.
+ */
+function timeColor(record, field, wfhFallback) {
+  if (record[field]) return record.wfh_attendance_id ? 'text-rose-500' : '' // WFH-sourced = red, biometric = normal
+  if (record['penned_' + field]) return 'text-red-500'
+  if (wfhFallback) return 'text-red-500'
+  return 'text-red-500'
+}
+
+/**
+ * Returns the special label (L / OB / OT / UT) for a calendar cell.
+ */
+function cellSpecialLabel(cell) {
+  const s  = cell.record?.attendance_status
+  const gp = props.gatepassByDate[cell.date]
+  if (gp) return gp.label
+  if (s === 'on_leave') return 'L'
+  if (s === 'on_official_business') return 'OB'
+  return null
 }
 
 // ── Month navigation ─────────────────────────────────────────────────────────
@@ -406,6 +531,7 @@ const calendarCells = computed(() => {
     const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`
     const dow = new Date(y, m - 1, d).getDay()
     const rec = recordMap.value[dateStr] ?? null
+    const wfh = props.wfhByDate[dateStr] ?? null
     cells.push({
       day:       d,
       date:      dateStr,
@@ -414,12 +540,16 @@ const calendarCells = computed(() => {
       isToday:   dateStr === todayStr,
       schedIn:   rec?.scheduled_time_in  ?? null,
       schedOut:  rec?.scheduled_time_out ?? null,
+      // WFH fallback only when biometric/penned slot is empty
+      wfhIn:  (!rec?.time_in_am  && !rec?.penned_time_in_am  && wfh?.time_in)  ? wfh.time_in  : null,
+      wfhOut: (!rec?.time_out_pm && !rec?.penned_time_out_pm && wfh?.time_out) ? wfh.time_out : null,
     })
   }
   return cells
 })
 
 function cellBg(cell) {
+  if (cell.wfhByDate && !cell.record) return 'bg-rose-50/60 border-rose-100'
   if (!cell.record) {
     if (!cell.isWorkDay) return 'bg-slate-50 border-slate-100'
     return 'bg-red-50/30 border-red-100'
@@ -430,6 +560,7 @@ function cellBg(cell) {
   if (s === 'half_day')   return 'bg-amber-50 border-amber-200'
   if (s === 'on_leave')   return 'bg-blue-50 border-blue-100'
   if (s === 'holiday')    return 'bg-violet-50 border-violet-100'
+  if (s === 'wfh')        return 'bg-rose-50/70 border-rose-100'
   return 'bg-white border-slate-100'
 }
 
@@ -441,6 +572,7 @@ function statusBadge(status) {
     on_leave:             'bg-blue-100 text-blue-700',
     holiday:              'bg-violet-100 text-violet-700',
     on_official_business: 'bg-cyan-100 text-cyan-700',
+    wfh:                  'bg-rose-100 text-rose-700',
   }[status] ?? 'bg-slate-100 text-slate-600'
 }
 
@@ -452,6 +584,7 @@ function statusLabel(status) {
     on_leave:             'On Leave',
     holiday:              'Holiday',
     on_official_business: 'OB',
+    wfh:                  'WFH',
   }[status] ?? (status ?? '').replace(/_/g, ' ')
 }
 
@@ -459,7 +592,29 @@ function fieldLabel(field) {
   return { time_in_am: 'AM In', time_out_am: 'AM Out', time_in_pm: 'PM In', time_out_pm: 'PM Out' }[field] ?? field
 }
 
-// ── Penned entry ──────────────────────────────────────────────────────────────
+// ── Submit Penned Entries ─────────────────────────────────────────────────────
+
+async function confirmSubmitPenned() {
+  const result = await Swal.fire({
+    title:             'Submit Penned Entries?',
+    text:              'Your penned entries for this month will be locked. You will not be able to make further changes unless HR unlocks them.',
+    icon:              'warning',
+    showCancelButton:  true,
+    confirmButtonColor: '#d97706',
+    confirmButtonText: 'Yes, Submit & Lock',
+    cancelButtonText:  'Cancel',
+  })
+  if (!result.isConfirmed) return
+
+  try {
+    await axios.post(route('hr.my-dtr.submit-penned'), { month: currentMonth.value })
+    router.reload({ only: ['records', 'hasPenned', 'allSubmitted'] })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Could not submit penned entries.', 'error')
+  }
+}
+
+// ── Penned entry modal ────────────────────────────────────────────────────────
 
 const editModal = reactive({ open: false, record: null })
 const editForm  = useForm({

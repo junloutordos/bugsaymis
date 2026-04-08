@@ -5,10 +5,14 @@ namespace App\Http\Controllers\HR;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\HR\ManualDtrEditRequest;
 use App\Models\HR\DtrRecord;
+use App\Models\HR\LeaveApplication;
 use App\Models\User;
+use App\Models\WFHAttendance;
 use App\Services\HR\DTRService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DtrRecordController extends Controller
@@ -27,6 +31,7 @@ class DtrRecordController extends Controller
                 SUM(CASE WHEN attendance_status = "half_day" THEN 1 ELSE 0 END) as half_day_count,
                 SUM(CASE WHEN attendance_status = "on_leave" THEN 1 ELSE 0 END) as on_leave_count,
                 SUM(CASE WHEN attendance_status = "holiday"  THEN 1 ELSE 0 END) as holiday_count,
+                SUM(CASE WHEN attendance_status = "wfh"      THEN 1 ELSE 0 END) as wfh_count,
                 SUM(CASE WHEN late_minutes > 0              THEN 1 ELSE 0 END) as late_days,
                 ROUND(SUM(hours_worked), 2)        as total_hours,
                 ROUND(SUM(late_minutes), 0)        as total_late,
@@ -89,6 +94,7 @@ class DtrRecordController extends Controller
             'half_day'    => $records->where('attendance_status', 'half_day')->count(),
             'on_leave'    => $records->where('attendance_status', 'on_leave')->count(),
             'holiday'     => $records->where('attendance_status', 'holiday')->count(),
+            'wfh'         => $records->where('attendance_status', 'wfh')->count(),
             'late_days'   => $records->where('late_minutes', '>', 0)->count(),
             'total_hours' => round($records->sum('hours_worked'), 2),
             'total_late'  => round($records->sum('late_minutes'), 2),
@@ -136,6 +142,7 @@ class DtrRecordController extends Controller
             'half_day'    => $records->where('attendance_status', 'half_day')->count(),
             'on_leave'    => $records->where('attendance_status', 'on_leave')->count(),
             'holiday'     => $records->where('attendance_status', 'holiday')->count(),
+            'wfh'         => $records->where('attendance_status', 'wfh')->count(),
             'late_days'   => $records->where('late_minutes', '>', 0)->count(),
             'total_hours' => round($records->sum('hours_worked'), 2),
             'total_late'  => round($records->sum('late_minutes'), 2),
@@ -143,11 +150,108 @@ class DtrRecordController extends Controller
             'total_ot'    => round($records->sum('overtime_minutes'), 2),
         ];
 
+        $wfhByDate      = $this->loadWfhByDate($user->id, $y, $m);
+        $gatepassByDate = $this->loadGatepassByDate($user->badge_id, $y, $m);
+
+        // Determine whether the employee can submit penned entries this month
+        $hasPenned    = $records->contains(fn ($r) =>
+            $r->penned_time_in_am || $r->penned_time_out_am ||
+            $r->penned_time_in_pm || $r->penned_time_out_pm || $r->penned_remarks
+        );
+        $allSubmitted = $records->isNotEmpty() && $records->every(fn ($r) => $r->penned_submitted_at !== null);
+
         return Inertia::render('HR/DTR/My', [
-            'employee' => $user->load('employeeProfile'),
-            'records'  => $records,
-            'summary'  => $summary,
-            'month'    => $month,
+            'employee'       => $user->load('employeeProfile'),
+            'records'        => $records,
+            'summary'        => $summary,
+            'month'          => $month,
+            'wfhByDate'      => $wfhByDate,
+            'gatepassByDate' => $gatepassByDate,
+            'hasPenned'      => $hasPenned,
+            'allSubmitted'   => $allSubmitted,
+        ]);
+    }
+
+    public function myDtrChecklist(Request $request)
+    {
+        $this->authorize('dtr.view_own');
+
+        $user  = Auth::user();
+        $month = $request->input('month', now()->format('Y-m'));
+        [$y, $m] = explode('-', $month);
+        $firstDay = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+
+        $records = DtrRecord::where('user_id', $user->id)
+            ->whereYear('work_date', $y)
+            ->whereMonth('work_date', $m)
+            ->with(['schedule', 'leaveApplication.leaveType'])
+            ->orderBy('work_date')
+            ->get();
+
+        $schedule = \App\Models\HR\EmployeeSchedule::where('user_id', $user->id)
+            ->activeOnDate($firstDay)
+            ->orderByDesc('effective_date')
+            ->first()
+            ?? \App\Models\HR\EmployeeSchedule::where('user_id', $user->id)
+                ->where('is_default', true)
+                ->first();
+
+        $officialTimes = [];
+        foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as $day) {
+            if (! $schedule) continue;
+            $ds = $schedule->daily_schedules ?? [];
+            if (isset($ds[$day])) {
+                $officialTimes[$day] = [
+                    'time_in'  => $ds[$day]['time_in']  ?? null,
+                    'time_out' => $ds[$day]['time_out'] ?? null,
+                ];
+            } elseif (in_array($day, $schedule->getWorkDaysArray())) {
+                $officialTimes[$day] = [
+                    'time_in'  => $schedule->time_in  ? (string) $schedule->time_in  : null,
+                    'time_out' => $schedule->time_out ? (string) $schedule->time_out : null,
+                ];
+            }
+        }
+
+        $pennedEntries = $records->filter(fn ($r) =>
+            $r->penned_remarks ||
+            $r->penned_time_in_am || $r->penned_time_out_am ||
+            $r->penned_time_in_pm || $r->penned_time_out_pm
+        )->map(function ($r) {
+            $time = $r->penned_time_in_am ?? $r->penned_time_out_am
+                 ?? $r->penned_time_in_pm ?? $r->penned_time_out_pm;
+            return [
+                'date'   => \Carbon\Carbon::parse($r->work_date)->format('m/d/Y'),
+                'time'   => $time,
+                'reason' => $r->penned_remarks ?? '',
+            ];
+        })->values();
+
+        $declaredRows = $records->filter(fn ($r) =>
+            $r->late_minutes > 0 || $r->undertime_minutes > 0 ||
+            $r->attendance_status === 'absent'
+        )->map(function ($r) {
+            if ($r->attendance_status === 'absent') {
+                return ['nature' => 'A', 'date' => \Carbon\Carbon::parse($r->work_date)->format('m/d/Y'), 'minutes' => null, 'reason' => ''];
+            }
+            return ['nature' => 'T', 'date' => \Carbon\Carbon::parse($r->work_date)->format('m/d/Y'), 'minutes' => (int) round((float) $r->late_minutes + (float) $r->undertime_minutes), 'reason' => ''];
+        })->values();
+
+        [$wfhEntries, $gatepassEntries, $leaveEntries] = $this->buildChecklistEntries(
+            $user->id, $user->badge_id, $records, $y, $m
+        );
+
+        return Inertia::render('HR/DTR/PrintChecklist', [
+            'employee'       => $user->load('employeeProfile'),
+            'month'          => $month,
+            'officialTimes'  => $officialTimes,
+            'pennedEntries'  => $pennedEntries,
+            'declaredRows'   => $declaredRows,
+            'wfhEntries'     => $wfhEntries,
+            'gatepassEntries'=> $gatepassEntries,
+            'leaveEntries'   => $leaveEntries,
+            'absentCount'    => $records->where('attendance_status', 'absent')->count(),
+            'totalTardy'     => (int) round($records->sum(fn ($r) => (float) $r->late_minutes + (float) $r->undertime_minutes)),
         ]);
     }
 
@@ -160,6 +264,10 @@ class DtrRecordController extends Controller
 
         if ($record->is_locked) {
             return back()->with('error', 'This DTR record is locked and cannot be edited.');
+        }
+
+        if ($record->penned_submitted_at) {
+            return back()->with('error', 'Penned entries have already been submitted for this record. Contact HR to unlock.');
         }
 
         $validated = $request->validate([
@@ -190,6 +298,55 @@ class DtrRecordController extends Controller
         app(DTRService::class)->recompute($record->fresh());
 
         return back()->with('success', 'Penned entry submitted successfully.');
+    }
+
+    /**
+     * Employee submits all penned entries for the month.
+     * Marks every record in the month as penned_submitted, blocking further
+     * employee edits. HR / Administrator can reset via unlockPenned().
+     */
+    public function submitPenned(Request $request)
+    {
+        $this->authorize('dtr.view_own');
+
+        $user  = Auth::user();
+        $month = $request->input('month', now()->format('Y-m'));
+        [$y, $m] = explode('-', $month);
+
+        $updated = DtrRecord::where('user_id', $user->id)
+            ->whereYear('work_date', $y)
+            ->whereMonth('work_date', $m)
+            ->where('is_locked', false)
+            ->whereNull('penned_submitted_at')
+            ->update([
+                'penned_submitted_at' => now(),
+                'penned_submitted_by' => $user->id,
+            ]);
+
+        return back()->with('success', "Penned entries submitted and locked for {$month}. HR has been notified.");
+    }
+
+    /**
+     * HR / Administrator unlocks penned entries for an employee's month,
+     * allowing them to re-submit corrections.
+     */
+    public function unlockPenned(Request $request, User $user)
+    {
+        $this->authorize('hr.dtr.manage');
+
+        $month = $request->input('month', now()->format('Y-m'));
+        [$y, $m] = explode('-', $month);
+
+        DtrRecord::where('user_id', $user->id)
+            ->whereYear('work_date', $y)
+            ->whereMonth('work_date', $m)
+            ->whereNotNull('penned_submitted_at')
+            ->update([
+                'penned_submitted_at' => null,
+                'penned_submitted_by' => null,
+            ]);
+
+        return back()->with('success', "Penned entries unlocked for {$user->name} — {$month}.");
     }
 
     public function generate(Request $request, DTRService $dtrService)
@@ -457,14 +614,21 @@ class DtrRecordController extends Controller
             fn ($r) => (float) $r->late_minutes + (float) $r->undertime_minutes
         ));
 
+        [$wfhEntries, $gatepassEntries, $leaveEntries] = $this->buildChecklistEntries(
+            $user->id, $user->badge_id, $records, $y, $m
+        );
+
         return Inertia::render('HR/DTR/PrintChecklist', [
-            'employee'      => $user->load('employeeProfile'),
-            'month'         => $month,
-            'officialTimes' => $officialTimes,
-            'pennedEntries' => $pennedEntries,
-            'declaredRows'  => $declaredRows,
-            'absentCount'   => $absentCount,
-            'totalTardy'    => $totalTardy,
+            'employee'        => $user->load('employeeProfile'),
+            'month'           => $month,
+            'officialTimes'   => $officialTimes,
+            'pennedEntries'   => $pennedEntries,
+            'declaredRows'    => $declaredRows,
+            'wfhEntries'      => $wfhEntries,
+            'gatepassEntries' => $gatepassEntries,
+            'leaveEntries'    => $leaveEntries,
+            'absentCount'     => $absentCount,
+            'totalTardy'      => $totalTardy,
         ]);
     }
 
@@ -548,5 +712,116 @@ class DtrRecordController extends Controller
         $record->update(['is_locked' => ! $record->is_locked]);
 
         return back()->with('success', $record->is_locked ? 'Record locked.' : 'Record unlocked.');
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Load WFH attendances for the user/month, keyed by date string.
+     * Returns array of { time_in, time_out } per date.
+     */
+    private function loadWfhByDate(int $userId, int $year, int $month): array
+    {
+        return WFHAttendance::where('user_id', $userId)
+            ->whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->get()
+            ->mapWithKeys(fn ($w) => [
+                Carbon::parse($w->date)->toDateString() => [
+                    'time_in'  => $w->time_in  ? Carbon::parse($w->time_in)->format('H:i:s')  : null,
+                    'time_out' => $w->time_out ? Carbon::parse($w->time_out)->format('H:i:s') : null,
+                ],
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Load approved gate passes for the employee/month, keyed by date string.
+     * Returns array of { label: 'OB'|'OT'|'UT', type: full string, purpose } per date.
+     */
+    private function loadGatepassByDate(?string $badgeId, int $year, int $month): array
+    {
+        if (! $badgeId) {
+            return [];
+        }
+
+        $typeMap = [
+            'official business' => 'OB',
+            'official time'     => 'OT',
+            'undertime'         => 'UT',
+        ];
+
+        $rows = DB::table('gatepass')
+            ->whereRaw("CAST(badgeNumber AS CHAR) = ?", [(string) $badgeId])
+            ->where('status', 'Approved')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $gp) {
+            // gatepass_date is stored as a string; try common formats
+            try {
+                $parsed = Carbon::parse($gp->gatepass_date);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($parsed->year !== $year || $parsed->month !== $month) {
+                continue;
+            }
+            $dateStr = $parsed->toDateString();
+            $label   = $typeMap[strtolower(trim($gp->gatepass_type ?? ''))] ?? 'OB';
+            $result[$dateStr] = [
+                'label'   => $label,
+                'type'    => $gp->gatepass_type ?? '',
+                'purpose' => $gp->purpose ?? '',
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Build the WFH, gate-pass, and leave entry arrays for the PrintChecklist view.
+     */
+    private function buildChecklistEntries(
+        int $userId,
+        ?string $badgeId,
+        \Illuminate\Support\Collection $records,
+        int $year,
+        int $month
+    ): array {
+        // ── WFH entries ───────────────────────────────────────────────────────
+        $wfhByDate = $this->loadWfhByDate($userId, $year, $month);
+        $wfhEntries = [];
+        foreach ($wfhByDate as $dateStr => $w) {
+            $wfhEntries[] = [
+                'date'     => Carbon::parse($dateStr)->format('m/d/Y'),
+                'time_in'  => $w['time_in'],
+                'time_out' => $w['time_out'],
+            ];
+        }
+
+        // ── Gate pass entries ─────────────────────────────────────────────────
+        $gpByDate = $this->loadGatepassByDate($badgeId, $year, $month);
+        $gatepassEntries = [];
+        foreach ($gpByDate as $dateStr => $gp) {
+            $gatepassEntries[] = [
+                'date'    => Carbon::parse($dateStr)->format('m/d/Y'),
+                'label'   => $gp['label'],
+                'type'    => $gp['type'],
+                'purpose' => $gp['purpose'],
+            ];
+        }
+
+        // ── Leave entries ─────────────────────────────────────────────────────
+        $leaveEntries = $records->filter(fn ($r) => $r->attendance_status === 'on_leave')
+            ->map(fn ($r) => [
+                'date'       => Carbon::parse($r->work_date)->format('m/d/Y'),
+                'leave_type' => $r->leaveApplication?->leaveType?->name ?? 'Leave',
+                'code'       => $r->leaveApplication?->leaveType?->code ?? 'L',
+            ])
+            ->values()
+            ->toArray();
+
+        return [$wfhEntries, $gatepassEntries, $leaveEntries];
     }
 }

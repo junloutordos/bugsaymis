@@ -3,6 +3,7 @@
 namespace App\Models\HR;
 
 use App\Models\User;
+use App\Models\WFHAttendance;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -40,6 +41,9 @@ class DtrRecord extends Model
         'penned_remarks',
         'penned_by',
         'penned_at',
+        'penned_submitted_at',
+        'penned_submitted_by',
+        'wfh_attendance_id',
     ];
 
     protected $casts = [
@@ -50,8 +54,9 @@ class DtrRecord extends Model
         'overtime_minutes'  => 'decimal:2',
         'is_posted'      => 'boolean',
         'is_locked'      => 'boolean',
-        'processed_at'   => 'datetime',
-        'penned_at'      => 'datetime',
+        'processed_at'        => 'datetime',
+        'penned_at'           => 'datetime',
+        'penned_submitted_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -72,5 +77,10 @@ class DtrRecord extends Model
     public function processedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
+    }
+
+    public function wfhAttendance(): BelongsTo
+    {
+        return $this->belongsTo(WFHAttendance::class, 'wfh_attendance_id');
     }
 }

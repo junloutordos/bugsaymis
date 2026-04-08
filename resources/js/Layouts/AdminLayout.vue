@@ -42,6 +42,9 @@ import {
   SparklesIcon,
   ScaleIcon,
   CpuChipIcon,
+  AdjustmentsHorizontalIcon,
+  CheckCircleIcon,
+  BuildingLibraryIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -167,42 +170,49 @@ const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
 const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
-// Return aggregate badge count for a group (sum of all children badges)
-const getGroupBadge = (item) => {
-  if (!item.children?.length) return 0;
-  return item.children.reduce((sum, child) => sum + getBadge(child), 0);
+// Safely coerce a raw Inertia prop value to a non-negative integer
+const toBadgeInt = (val) => {
+  const n = parseInt(val, 10);
+  return isNaN(n) || n < 0 ? 0 : n;
 };
 
 // Return numeric badge from shared Inertia props based on child routeName
 const getBadge = (child) => {
   const rn = child?.routeName || null;
   // Chat badge is available to all roles — check it first
-  if (rn === 'chat.index') return chatUnreadCount.value;
+  if (rn === 'chat.index') return toBadgeInt(chatUnreadCount.value);
   if (!page || !page.props) return 0;
   switch (rn) {
     case 'consultations.index':
-      return page.props.consultationsNotificationCount || 0;
+      return toBadgeInt(page.props.consultationsNotificationCount);
     case 'jobrequests.index':
-      return page.props.itJobRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.itJobRequestsNotificationCount);
     case 'vehicle-requests.index':
-      return page.props.vehicleRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.vehicleRequestsNotificationCount);
     case 'gatepass.index':
-      return page.props.gatepassNotificationCount || 0;
+      return toBadgeInt(page.props.gatepassNotificationCount);
     case 'messengerial.index':
-      return page.props.messengerialRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.messengerialRequestsNotificationCount);
     case 'facility-requests.index':
-      return page.props.facilityRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.facilityRequestsNotificationCount);
     case 'service-requests.index':
-      return page.props.serviceRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.serviceRequestsNotificationCount);
     case 'work-requests.index':
-      return page.props.workRequestsNotificationCount || 0;
+      return toBadgeInt(page.props.workRequestsNotificationCount);
     case 'library.borrowings.index':
-      return page.props.borrowingsOverdueCount || 0;
+      return toBadgeInt(page.props.borrowingsOverdueCount);
     case 'document-tracking.index':
-      return page.props.documentTrackingNotificationCount || 0;
+      return toBadgeInt(page.props.documentTrackingNotificationCount);
     default:
       return 0;
   }
+};
+
+// Return aggregate badge count for a group (sum of all children badges), capped at 99
+const getGroupBadge = (item) => {
+  if (!item.children?.length) return 0;
+  const total = item.children.reduce((sum, child) => sum + getBadge(child), 0);
+  return Math.min(total, 99);
 };
 
 // --- Profile Modal State ---
@@ -550,6 +560,14 @@ const menuItems = [
         roles: ["Administrator", "HR"],
         permissions: ["hr.schedule.manage"],
       },
+      {
+        label: "Org Structure",
+        routeName: "hr.org.index",
+        href: route("hr.org.index"),
+        icon: BuildingLibraryIcon,
+        roles: ["Administrator", "HR", "OCD", "DivisionChief", "PMT", "MIS", "Faculty", "Staff"],
+        permissions: ["org.view"],
+      },
       
       {
         label: "Gate Pass",
@@ -574,6 +592,55 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "Payroll Officer"],
         permissions: ["hr.leave.file"],
+      },
+      {
+        label: "My Leave Credits",
+        routeName: "hr.leave-credits.my",
+        href: route('hr.leave-credits.my'),
+        icon: CreditCardIcon,
+        permissions: ["hr.leave.file"],
+      },
+      {
+        label: "Leave Credit Ledger",
+        routeName: "hr.reports.leave-credits.ledger",
+        href: route('hr.reports.leave-credits.ledger'),
+        icon: DocumentChartBarIcon,
+        permissions: ["hr.leave.approve"],
+      },
+      {
+        label: "Monthly Accrual Report",
+        routeName: "hr.reports.leave-credits.accrual",
+        href: route('hr.reports.leave-credits.accrual'),
+        icon: DocumentChartBarIcon,
+        permissions: ["hr.leave.approve"],
+      },
+      {
+        label: "Leave Utilization Report",
+        routeName: "hr.reports.leave-credits.utilization",
+        href: route('hr.reports.leave-credits.utilization'),
+        icon: ChartBarIcon,
+        permissions: ["hr.leave.approve"],
+      },
+      {
+        label: "Initialize Leave Credits",
+        routeName: "hr.leave-credits.initialize",
+        href: route('hr.leave-credits.initialize'),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["hr.leave.approve"],
+      },
+      {
+        label: "Adjust Leave Credits",
+        routeName: "hr.leave-credits.adjust",
+        href: route('hr.leave-credits.adjust'),
+        icon: AdjustmentsHorizontalIcon,
+        permissions: ["hr.leave.approve"],
+      },
+      {
+        label: "Service Credit Approval",
+        routeName: "hr.leave-credits.service-credits",
+        href: route('hr.leave-credits.service-credits'),
+        icon: CheckCircleIcon,
+        permissions: ["hr.leave.approve"],
       },
       {
         label: "My DTR",
@@ -1130,7 +1197,7 @@ const menuItems = [
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief", "OCD"],
     children: [
       {
         label: "Docu Track",
@@ -1146,12 +1213,26 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
       },
+      {
+        label: "For Approval — Messengerial",
+        routeName: "messengerial.for-approval",
+        href: route("messengerial.for-approval"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["DivisionChief"],
+      },
+      {
+        label: "OCD Approval — Messengerial",
+        routeName: "messengerial.ocd-approval",
+        href: route("messengerial.ocd-approval"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["OCD"],
+      },
     ],
   },
   {
     label: "General Services",
     icon: WrenchScrewdriverIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief","OCD"],
     children: [
       {
         label: "Vehicle Request",
@@ -1192,6 +1273,55 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
         permissions: ["facilities.view"],
+      },
+      {
+        label: "DC Approval — Vehicle",
+        routeName: "vehicle-requests.dc-approval",
+        href: route("vehicle-requests.dc-approval"),
+        icon: BookOpenIcon,
+        permissions: ["vehicles.dc-approve"],
+      },
+      {
+        label: "DC Approval — Facility",
+        routeName: "facility-requests.dc-approval",
+        href: route("facility-requests.dc-approval"),
+        icon: BookOpenIcon,
+        permissions: ["facilities.dc-approve"],
+      },
+      {
+        label: "DC Approval — Work Request",
+        routeName: "work-requests.dc-approval",
+        href: route("work-requests.dc-approval"),
+        icon: BookOpenIcon,
+        permissions: ["facilities.dc-approve"],
+      },
+      {
+        label: "DC Approval — Services",
+        routeName: "service-requests.dc-approval",
+        href: route("service-requests.dc-approval"),
+        icon: BookOpenIcon,
+        permissions: ["facilities.dc-approve"],
+      },
+      {
+        label: "FAD Approval — Facility",
+        routeName: "facility-requests.fad-approval",
+        href: route("facility-requests.fad-approval"),
+        icon: BookOpenIcon,
+        permissions: ["facilities.fad-approve"],
+      },
+      {
+        label: "FAD Approval — Work Request",
+        routeName: "work-requests.fad-approval",
+        href: route("work-requests.fad-approval"),
+        icon: BookOpenIcon,
+        permissions: ["facilities.fad-approve"],
+      },
+      {
+        label: "FAD Approval — Services",
+        routeName: "service-requests.fad-approval",
+        href: route("service-requests.fad-approval"),
+        icon: BookOpenIcon,
+        permissions: ["facilities.fad-approve"],
       },
       {
         label: "OCD Approval - Facility",
@@ -1500,8 +1630,10 @@ const roleIds = (user.role_id || "")
   .filter((n) => !Number.isNaN(n));
 
 
-// Show Guidance Services when role_id includes 17 or 1
-const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1);
+// Show Guidance Services when role_id includes 17 or 1, or by role name
+const showGuidanceByRoleId = roleIds.includes(17) || roleIds.includes(1)
+  || roleNames.includes('Administrator') || roleNames.includes('Guidance')
+  || roleNames.includes('Faculty') || roleNames.includes('Staff');
 // Show Health Statistics Report when role_id includes 16 or 1
 const showHealthStatisticsByRoleId = roleIds.includes(16) || roleIds.includes(1);
 
@@ -1629,7 +1761,7 @@ filteredMenu.value.forEach((item) => {
               <span
                 v-if="!collapsed && !expanded[item.label] && getGroupBadge(item) > 0"
                 class="ml-1 shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
-              >{{ getGroupBadge(item) > 99 ? '99+' : getGroupBadge(item) }}</span>
+              >{{ getGroupBadge(item) }}</span>
               <span
                 v-else-if="collapsed && getGroupBadge(item) > 0"
                 class="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-400"

@@ -205,8 +205,9 @@ class EmployeeDocumentController extends Controller
 
         if ($request->hasFile('file')) {
             $file             = $request->file('file');
-            $originalFilename = $file->getClientOriginalName();
-            $mimeType         = $file->getMimeType();
+            // Sanitize filename: strip path separators and null bytes
+            $originalFilename = basename(str_replace(["\0", '..'], '', $file->getClientOriginalName()));
+            $mimeType         = $file->getMimeType(); // server-detected, not client-reported
             $fileSize         = $file->getSize();
             $filePath         = $file->store('hr/201/' . $user->id, 'local');
         }

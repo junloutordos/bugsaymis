@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -36,6 +37,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ── Password Policy ───────────────────────────────────────────────────
+        // Enforce: min 10 chars, at least 1 letter, 1 number, 1 symbol
+        Password::defaults(fn () =>
+            Password::min(10)
+                ->letters()
+                ->numbers()
+                ->symbols()
+                ->uncompromised()
+        );
+
         // ── WFH Policies ──────────────────────────────────────────────────────
         Gate::policy(WFHAttendance::class, WFHAttendancePolicy::class);
         Gate::policy(WFHAccomplishment::class, WFHAccomplishmentPolicy::class);
@@ -126,6 +137,10 @@ class AppServiceProvider extends ServiceProvider
             'hr.leave.view',
             'hr.leave.file',
             'hr.leave.approve',
+            'hr.leave.credits.view',
+            'hr.leave.credits.manage',
+            'hr.leave.credits.service',
+            'hr.leave.credits.reports',
             'hr.dtr.view',
             'hr.dtr.manage',
             'hr.biometric.manage',
@@ -142,6 +157,25 @@ class AppServiceProvider extends ServiceProvider
             'hr.gatepass.view',
             'hr.gatepass.create',
             'hr.gatepass.approve',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // ── Org Structure permission gates ─────────────────────────────────────
+        foreach ([
+            'org.view',
+            'org.view_all',
+            'org.units.create',
+            'org.units.update',
+            'org.units.delete',
+            'org.units.manage',
+            'org.assign',
+            'org.assign.manage',
+            'org.heads.manage',
+            'org.versions.view',
+            'org.versions.manage',
+            'org.export',
+            'org.reports',
         ] as $permission) {
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }

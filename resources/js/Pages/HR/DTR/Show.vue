@@ -76,6 +76,10 @@
           <p class="text-[10px] text-violet-600 font-semibold uppercase tracking-wide">Holiday</p>
           <p class="text-xl font-bold text-violet-700 mt-0.5">{{ summary.holiday }}</p>
         </div>
+        <div class="bg-rose-50 rounded-xl border border-rose-100 p-3 text-center">
+          <p class="text-[10px] text-rose-600 font-semibold uppercase tracking-wide">WFH</p>
+          <p class="text-xl font-bold text-rose-700 mt-0.5">{{ summary.wfh ?? 0 }}</p>
+        </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
           <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Total Hrs</p>
           <p class="text-xl font-bold text-slate-800 mt-0.5">{{ summary.total_hours }}</p>
@@ -121,7 +125,7 @@
 
             <template v-if="cell.record">
               <!-- Time punches -->
-              <div class="font-mono text-[9px] text-slate-500 leading-[1.4] space-y-px flex-1">
+              <div :class="['font-mono text-[9px] leading-[1.4] space-y-px flex-1', cell.record.wfh_attendance_id ? 'text-rose-500' : 'text-slate-500']">
                 <div v-if="cell.record.time_in_am" class="flex gap-1">
                   <span class="text-slate-400">in</span>{{ fmtTime(cell.record.time_in_am) }}
                 </div>
@@ -207,8 +211,8 @@
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
                     class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
-                    :class="r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : 'text-slate-200')">
-                  {{ fmtTime(r[f] || r['penned_'+f]) || '–' }}
+                    :class="r.wfh_attendance_id && r[f] ? 'text-rose-600 font-medium' : (r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200'))))">
+                  {{ timeCell(r, f) }}
                 </td>
                 <!-- Scheduled times (indigo, derived from employee schedule) -->
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">
@@ -233,9 +237,14 @@
                   {{ fmtMinutes(r.overtime_minutes) }}
                 </td>
                 <td class="px-4 py-2.5">
-                  <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
-                    {{ statusLabel(r.attendance_status) }}
-                  </span>
+                  <div class="flex items-center gap-1 flex-wrap">
+                    <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                      {{ statusLabel(r.attendance_status) }}
+                    </span>
+                    <span v-if="r.wfh_attendance_id"
+                      class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
+                      title="Times sourced from WFH attendance log">WFH</span>
+                  </div>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
                   <button v-if="!r.is_locked" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
@@ -333,6 +342,16 @@ function initials(name) {
 function fmtTime(t) {
   if (!t) return ''
   return String(t).slice(0, 5)
+}
+
+function timeCell(record, field) {
+  const bio    = record[field]
+  const penned = record['penned_' + field]
+  if (bio || penned) return fmtTime(bio || penned)
+  const s = record.attendance_status
+  if (s === 'on_leave')             return 'L'
+  if (s === 'on_official_business') return 'OB'
+  return '–'
 }
 
 function fmtMinutes(m) {
@@ -440,6 +459,7 @@ function cellBg(cell) {
   if (s === 'half_day')   return 'bg-amber-50 border-amber-200'
   if (s === 'on_leave')   return 'bg-blue-50 border-blue-100'
   if (s === 'holiday')    return 'bg-violet-50 border-violet-100'
+  if (s === 'wfh')        return 'bg-rose-50/70 border-rose-100'
   return 'bg-white border-slate-100'
 }
 
@@ -451,6 +471,7 @@ function statusBadge(status) {
     on_leave:             'bg-blue-100 text-blue-700',
     holiday:              'bg-violet-100 text-violet-700',
     on_official_business: 'bg-cyan-100 text-cyan-700',
+    wfh:                  'bg-rose-100 text-rose-700',
   }[status] ?? 'bg-slate-100 text-slate-600'
 }
 
@@ -462,6 +483,7 @@ function statusLabel(status) {
     on_leave:             'On Leave',
     holiday:              'Holiday',
     on_official_business: 'OB',
+    wfh:                  'WFH',
   }[status] ?? (status ?? '').replace(/_/g, ' ')
 }
 

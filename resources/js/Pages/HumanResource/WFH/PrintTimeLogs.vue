@@ -1,5 +1,5 @@
 <template>
-  <Head :title="`WFH Time Logs — ${employee.name} — ${monthLabel}`" />
+  <Head :title="`WFH Time Logs — ${employee.name} — ${dateLabel}`" />
 
   <div id="wfh-tl-root">
     <table id="wfh-tl-wrap">
@@ -25,7 +25,7 @@
           <!-- Report title -->
           <div style="text-align:center; margin:10px 0 12px;">
             <h2 style="font-size:13pt; font-weight:bold; letter-spacing:1px; margin:0;">WORK FROM HOME TIME LOG</h2>
-            <p style="margin:4px 0 0; font-size:10pt;">{{ monthLabel }}</p>
+            <p style="margin:4px 0 0; font-size:10pt;">{{ dateLabel }}</p>
           </div>
 
           <!-- Employee info -->
@@ -41,7 +41,7 @@
               <tr>
                 <td>{{ employee.name?.toUpperCase() }}</td>
                 <td>{{ employee.position ?? '—' }}</td>
-                <td>{{ monthLabel }}</td>
+                <td>{{ dateLabel }}</td>
               </tr>
             </tbody>
           </table>
@@ -119,23 +119,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
   employee:      Object,
   records:       Array,
-  month:         String,
+  mode:          { type: String, default: 'monthly' },
+  dateLabel:     { type: String, default: '' },
   chiefName:     { type: String, default: null },
   chiefPosition: { type: String, default: null },
   divisionName:  { type: String, default: null },
 })
-
-const [yr, mo] = props.month.split('-').map(Number)
-
-const monthLabel = computed(() =>
-  new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
-)
 
 function parseDate(d) {
   const [y, m, day] = String(d).slice(0, 10).split('-').map(Number)
@@ -152,15 +147,26 @@ function fmtDow(d) {
   return parseDate(d).toLocaleDateString('en-PH', { weekday: 'short' })
 }
 
+function parseTs(val) {
+  if (!val) return null
+  const d = new Date(String(val).replace(' ', 'T'))
+  return isNaN(d.getTime()) ? null : d
+}
+
 function fmtTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
+  const d = parseTs(iso)
+  if (!d) return '—'
+  return d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
 function calcDuration(inIso, outIso, breakOut, breakIn) {
-  if (!inIso || !outIso) return '—'
-  let ms = new Date(outIso) - new Date(inIso)
-  if (breakOut && breakIn) ms -= (new Date(breakIn) - new Date(breakOut))
+  const inn = parseTs(inIso)
+  const out = parseTs(outIso)
+  if (!inn || !out) return '—'
+  let ms = out - inn
+  const bOut = parseTs(breakOut)
+  const bIn  = parseTs(breakIn)
+  if (bOut && bIn) ms -= (bIn - bOut)
   if (ms < 0) return '—'
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)

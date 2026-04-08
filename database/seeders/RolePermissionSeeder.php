@@ -86,6 +86,8 @@ class RolePermissionSeeder extends Seeder
             'hr.biometric.manage',
             'dtr.view_own',
             'hr.leave.view', 'hr.leave.approve',
+            'hr.leave.credits.view', 'hr.leave.credits.manage',
+            'hr.leave.credits.service', 'hr.leave.credits.reports',
             'hr.employee.view', 'hr.employee.manage',
             'chat.access',
         ]);
@@ -139,13 +141,15 @@ class RolePermissionSeeder extends Seeder
             'hr.dtr.view',
             'dtr.view_own',
             'hr.leave.view', 'hr.leave.approve',
+            'hr.leave.credits.view', 'hr.leave.credits.reports',
             'hr.employee.view',
             'payroll.view',
             'ipcr.view', 'ipcr.approve', 'ipcr.monitor',
             'accomplishments.view',
-            'facilities.view', 'facilities.create',
-            'vehicles.view', 'vehicles.create',
+            'facilities.view', 'facilities.create', 'facilities.dc-approve',
+            'vehicles.view', 'vehicles.create', 'vehicles.dc-approve',
             'documents.view', 'documents.approve',
+            'messengerial.view', 'messengerial.create', 'messengerial.dc-approve',
             'reports.view',
             // L&D — supervisors approve nominations, IDP, and submit behavior evals
             'lnd.view', 'lnd.approve', 'lnd.evaluate',
@@ -167,6 +171,7 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view',
+            'messengerial.view', 'messengerial.ocd-approve',
             'chat.access',
         ]);
 
@@ -215,6 +220,8 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.create',
+            'messengerial.view', 'messengerial.create',
+            'guidance.refer',
             'library.view',
             // L&D — employees view own trainings, submit TNA, manage own IDP
             'lnd.view', 'lnd.create', 'lnd.evaluate',
@@ -222,7 +229,7 @@ class RolePermissionSeeder extends Seeder
             'rewards.view', 'rewards.nominate',
             // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
-            'hr.leave.file',
+            'hr.leave.file', 'hr.leave.credits.view',
             'dtr.view_own',
             'chat.access',
         ]);
@@ -243,6 +250,8 @@ class RolePermissionSeeder extends Seeder
             'facilities.view', 'facilities.create',
             'vehicles.view', 'vehicles.create',
             'documents.view', 'documents.create',
+            'messengerial.view', 'messengerial.create',
+            'guidance.refer',
             'library.view',
             // L&D — employees view own trainings, submit TNA, manage own IDP
             'lnd.view', 'lnd.create', 'lnd.evaluate',
@@ -250,7 +259,7 @@ class RolePermissionSeeder extends Seeder
             'rewards.view', 'rewards.nominate',
             // Payroll — view own payslip; file own leave; view own DTR
             'payroll.view',
-            'hr.leave.file',
+            'hr.leave.file', 'hr.leave.credits.view',
             'dtr.view_own',
             'chat.access',
         ]);
@@ -267,6 +276,7 @@ class RolePermissionSeeder extends Seeder
         $assign('Records', [
             'documents.view', 'documents.create', 'documents.update',
             'documents.approve',
+            'messengerial.view', 'messengerial.manage',
             'reports.view',
             'chat.access',
         ]);
@@ -287,7 +297,7 @@ class RolePermissionSeeder extends Seeder
 
         // ── Guidance ──────────────────────────────────────────────────────────
         $assign('Guidance', [
-            'guidance.view', 'guidance.manage',
+            'guidance.view', 'guidance.refer', 'guidance.manage',
             'reports.view',
             'chat.access',
         ]);
@@ -296,10 +306,17 @@ class RolePermissionSeeder extends Seeder
         $assign('GSU Head', [
             'facilities.view', 'facilities.manage',
             'vehicles.view', 'vehicles.manage',
+            'messengerial.view', 'messengerial.create',
             'procurement.view', 'procurement.create', 'procurement.approve',
             'reports.view',
             'chat.access',
         ]);
+
+        // ── FAD Chief — facilities.fad-approve is manually assigned per user ──
+        // FAD users are identified by position (position LIKE '%FAD%') rather than
+        // a dedicated role. Assign facilities.fad-approve to specific users via
+        // Admin → Roles → Assign Roles, or grant it individually through the
+        // Permissions management UI. No automatic role assignment here.
 
         // ── InformationOfficer ────────────────────────────────────────────────
         $assign('InformationOfficer', [
@@ -316,8 +333,8 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // ── Student / Parent — very limited read-only ─────────────────────────
-        $assign('Student', ['library.view']);
-        $assign('Parent',  ['library.view']);
+        $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
+        $assign('Parent',  ['library.view', 'messengerial.view', 'messengerial.create']);
 
         $this->command->info('Role permissions assigned successfully.');
     }

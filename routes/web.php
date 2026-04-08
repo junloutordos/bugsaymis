@@ -39,6 +39,12 @@ use App\Http\Controllers\PDSController;
 use App\Http\Controllers\PDSTrainingController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
+
+// ── System health check (unauthenticated, internal monitoring) ────────────────
+Route::get('/_status', [\App\Http\Controllers\HealthController::class, 'check'])
+    ->middleware('throttle:30,1')
+    ->name('system.health');
+
 // Data Management - Offices
 Route::middleware(['auth','permission:roles.assign'])->group(function(){
     Route::get('/data-management/offices', [App\Http\Controllers\OfficeController::class, 'index'])->name('offices.index');
@@ -325,6 +331,20 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/itjr/{jobRequest}/division-chief/{action}',[ITJobRequestController::class, 'approveByDivisionChief'])->name('itjr.dc.action');
     
 
+    // Division Chief In-App Approval Dashboards
+    Route::get('/vehicle-requests/dc-approval',   [\App\Http\Controllers\VehicleRequestController::class,  'divisionChiefApproval'])->name('vehicle-requests.dc-approval')->middleware('permission:vehicles.dc-approve');
+    Route::get('/facility-requests/dc-approval',  [\App\Http\Controllers\FacilityRequestController::class, 'divisionChiefApproval'])->name('facility-requests.dc-approval')->middleware('permission:facilities.dc-approve');
+    Route::get('/work-requests/dc-approval',      [\App\Http\Controllers\WorkRequestController::class,     'divisionChiefApproval'])->name('work-requests.dc-approval')->middleware('permission:facilities.dc-approve');
+    Route::get('/service-requests/dc-approval',   [\App\Http\Controllers\ServiceRequestController::class,  'divisionChiefApproval'])->name('service-requests.dc-approval')->middleware('permission:facilities.dc-approve');
+
+    // FAD In-App Approval Dashboards
+    Route::get('/facility-requests/fad-approval',                          [\App\Http\Controllers\FacilityRequestController::class, 'fadApproval'])->name('facility-requests.fad-approval')->middleware('permission:facilities.fad-approve');
+    Route::post('/facility-requests/{facilityRequest}/fad-action',         [\App\Http\Controllers\FacilityRequestController::class, 'fadAction'])->name('facility-requests.fad-action')->middleware('permission:facilities.fad-approve');
+    Route::get('/work-requests/fad-approval',                              [\App\Http\Controllers\WorkRequestController::class,     'fadApproval'])->name('work-requests.fad-approval')->middleware('permission:facilities.fad-approve');
+    Route::post('/work-requests/{workRequest}/fad-action',                 [\App\Http\Controllers\WorkRequestController::class,     'fadAction'])->name('work-requests.fad-action')->middleware('permission:facilities.fad-approve');
+    Route::get('/service-requests/fad-approval',                           [\App\Http\Controllers\ServiceRequestController::class,  'fadApproval'])->name('service-requests.fad-approval')->middleware('permission:facilities.fad-approve');
+    Route::post('/service-requests/{serviceRequest}/fad-action',           [\App\Http\Controllers\ServiceRequestController::class,  'fadAction'])->name('service-requests.fad-action')->middleware('permission:facilities.fad-approve');
+
     // OCD Approval Dashboards
     Route::get('/vehicle-requests/ocd-approval', [VehicleRequestController::class, 'ocdApproval'])->name('vehicle-requests.ocd-approval');
     Route::post('/vehicle-requests/{vehicleRequest}/ocd-action', [VehicleRequestController::class, 'approveByOCDInApp'])->name('vehicle-requests.ocd-action');
@@ -336,8 +356,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Vehicle Requests
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index'])->name('vehicle-requests.index');
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
-    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('permission:vehicles.manage');
-    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('permission:vehicles.manage');
+    Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('permission:vehicles.dc-approve');
+    Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('permission:vehicles.dc-approve');
     // Vehicle bookings API for calendar
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Facility bookings API for calendar
@@ -352,8 +372,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Facility Requests
     Route::get('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'index'])->name('facility-requests.index');
     Route::post('/facility-requests', [\App\Http\Controllers\FacilityRequestController::class, 'store'])->name('facility-requests.store');
-    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('permission:facilities.manage');
-    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('permission:facilities.manage');
+    Route::post('/facility-requests/{facilityRequest}/approve', [\App\Http\Controllers\FacilityRequestController::class, 'approveInApp'])->name('facility-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
+    Route::post('/facility-requests/{facilityRequest}/decline', [\App\Http\Controllers\FacilityRequestController::class, 'declineInApp'])->name('facility-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
     // Work Requests (General Services)
     Route::get('/work-requests', [WorkRequestController::class, 'index'])->name('work-requests.index')->middleware('permission:facilities.view');
     Route::post('/work-requests', [WorkRequestController::class, 'store'])->name('work-requests.store')->middleware('permission:facilities.create');
@@ -375,8 +395,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // Guidance — Consultations list
     Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
-    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.view');
-    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.view');
+    Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.refer');
+    Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.refer');
     Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:guidance.manage');
     Route::get('/guidance/consultations/{consultation}/admission-slip', [\App\Http\Controllers\GuidanceConsultationController::class, 'admissionSlip'])->name('guidance.consultations.admission-slip')->middleware('permission:guidance.manage');
     // Save intervention details (Guidance personnel only)
@@ -398,8 +418,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['signed']);
 
     // Authenticated in-app approve/decline
-    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('permission:facilities.manage');
-    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/approve', [\App\Http\Controllers\WorkRequestController::class, 'approveInApp'])->name('work-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
+    Route::post('/work-requests/{workRequest}/decline', [\App\Http\Controllers\WorkRequestController::class, 'declineInApp'])->name('work-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
 
     Route::get('/work-requests/{workRequest}/decline/{chief}', [\App\Http\Controllers\WorkRequestController::class, 'showDeclineForm'])
         ->name('work-requests.decline')
@@ -429,8 +449,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'index'])->name('service-requests.index');
     Route::post('/service-requests', [\App\Http\Controllers\ServiceRequestController::class, 'store'])->name('service-requests.store');
     // In-app approval endpoints for Division Chief (named .inapp to avoid collision with signed email routes)
-    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('permission:facilities.manage');
-    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('permission:facilities.manage');
+    Route::post('/service-requests/{serviceRequest}/approve', [\App\Http\Controllers\ServiceRequestController::class, 'approveInApp'])->name('service-requests.approve.inapp')->middleware('permission:facilities.dc-approve');
+    Route::post('/service-requests/{serviceRequest}/decline', [\App\Http\Controllers\ServiceRequestController::class, 'declineInApp'])->name('service-requests.decline.inapp')->middleware('permission:facilities.dc-approve');
     Route::put('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'update'])->name('service-requests.update');
     Route::delete('/service-requests/{serviceRequest}', [\App\Http\Controllers\ServiceRequestController::class, 'destroy'])->name('service-requests.destroy');
     // Assets (General Services)
@@ -611,6 +631,22 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::put('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'update'])->name('messengerial.update');
     Route::delete('/messengerial/{messengerialRequest}', [\App\Http\Controllers\MessengerialController::class, 'destroy'])->name('messengerial.destroy');
 
+    // Messengerial — Division Chief in-app approval
+    Route::middleware(['auth', 'permission:messengerial.dc-approve'])->group(function () {
+        Route::get('/messengerial/for-approval', [\App\Http\Controllers\MessengerialController::class, 'forApproval'])
+            ->name('messengerial.for-approval');
+        Route::post('/messengerial/{messengerialRequest}/division-chief-action', [\App\Http\Controllers\MessengerialController::class, 'divisionChiefAction'])
+            ->name('messengerial.division-chief-action');
+    });
+
+    // Messengerial — OCD in-app approval
+    Route::middleware(['auth', 'permission:messengerial.ocd-approve'])->group(function () {
+        Route::get('/messengerial/ocd-approval', [\App\Http\Controllers\MessengerialController::class, 'ocdApproval'])
+            ->name('messengerial.ocd-approval');
+        Route::post('/messengerial/{messengerialRequest}/ocd-action', [\App\Http\Controllers\MessengerialController::class, 'ocdAction'])
+            ->name('messengerial.ocd-action');
+    });
+
     // Health Services - Consultations page
     Route::get('/consultations', [\App\Http\Controllers\ConsultationController::class, 'index'])->name('consultations.index');
     Route::post('/consultations', [\App\Http\Controllers\ConsultationController::class, 'store'])->name('consultations.store');
@@ -702,7 +738,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     
     Route::middleware(['auth', 'permission:it.requests.manage'])->group(function () {
     Route::get('/job-requests/for-approval', [ITJobRequestController::class, 'forApproval'])
-        ->name('job-requests.for-approval');
+        ->name('it.job-requests.for-approval');
 
     Route::post('/job-requests/{jobRequest}/division-chief-action', [ITJobRequestController::class, 'approveByDivisionChief'])
         ->name('job-requests.division-chief-action');
@@ -872,6 +908,9 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
     Route::post('/accomplishments',                   [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'store'])
         ->middleware('permission:wfh.accomplishments.create')
         ->name('accomplishments.store');
+    Route::put('/accomplishments/{wfhAccomplishment}',    [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'update'])
+        ->middleware('permission:wfh.accomplishments.create')
+        ->name('accomplishments.update');
     Route::delete('/accomplishments/{wfhAccomplishment}', [\App\Http\Controllers\HumanResource\WFHAccomplishmentController::class, 'destroy'])
         ->middleware('permission:wfh.accomplishments.delete')
         ->name('accomplishments.destroy');
@@ -1149,7 +1188,7 @@ Route::prefix('jobs')->name('recruitment.public.')->group(function () {
     Route::get('/track', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'trackForm'])
         ->name('track');
     Route::post('/track', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'track'])
-        ->name('track');
+        ->name('track.submit');
     Route::get('/{vacancy}', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'show'])
         ->name('vacancies.show');
     Route::post('/{vacancy}/apply', [\App\Http\Controllers\Recruitment\PublicVacancyController::class, 'apply'])
@@ -1359,6 +1398,10 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.index');
     Route::get('/leave/create', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'create'])
         ->name('leave.create');
+    Route::get('/leave/balance/check', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'checkBalance'])
+        ->name('leave.balance.check');
+    Route::get('/leave-credits/my', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'myCredits'])
+        ->name('leave-credits.my');
     Route::post('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'store'])
         ->name('leave.store');
     Route::get('/leave/{leaveApplication}', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'show'])
@@ -1367,6 +1410,37 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.approve');
     Route::post('/leave/{leaveApplication}/cancel', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'cancel'])
         ->name('leave.cancel');
+    Route::get('/leave/{leaveApplication}/print', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'printForm'])
+        ->name('leave.print');
+
+    // ── Leave Credit Administration (HR only) ─────────────────────────────────
+    Route::get('/leave-credits/initialize', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'initializeIndex'])
+        ->name('leave-credits.initialize');
+    Route::post('/leave-credits/initialize', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'initializeStore'])
+        ->name('leave-credits.initialize.store');
+
+    Route::get('/leave-credits/adjust', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'adjustIndex'])
+        ->name('leave-credits.adjust');
+    Route::post('/leave-credits/adjust', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'adjustStore'])
+        ->name('leave-credits.adjust.store');
+
+    Route::get('/leave-credits/service-credits', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'serviceCreditsIndex'])
+        ->name('leave-credits.service-credits');
+    Route::post('/leave-credits/service-credits/{record}/approve', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'serviceCreditsApprove'])
+        ->name('leave-credits.service-credits.approve');
+    Route::post('/leave-credits/service-credits/{record}/reject', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'serviceCreditsReject'])
+        ->name('leave-credits.service-credits.reject');
+
+    Route::get('/leave-credits/ledger/{user}', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'ledger'])
+        ->name('leave-credits.ledger');
+
+    // ── Leave Credit Reports ───────────────────────────────────────────────────
+    Route::get('/reports/leave-credits/ledger', [\App\Http\Controllers\HR\LeaveCreditReportController::class, 'ledger'])
+        ->name('reports.leave-credits.ledger');
+    Route::get('/reports/leave-credits/accrual', [\App\Http\Controllers\HR\LeaveCreditReportController::class, 'accrual'])
+        ->name('reports.leave-credits.accrual');
+    Route::get('/reports/leave-credits/utilization', [\App\Http\Controllers\HR\LeaveCreditReportController::class, 'utilization'])
+        ->name('reports.leave-credits.utilization');
 
     // ── Holidays ──────────────────────────────────────────────────────────────
     Route::get('/holidays', [\App\Http\Controllers\HR\HolidayController::class, 'index'])
@@ -1389,8 +1463,12 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     // ── My DTR (employee self-service) ───────────────────────────────────────
     Route::get('/my-dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'myDtr'])
         ->name('my-dtr.index');
+    Route::get('/my-dtr/checklist', [\App\Http\Controllers\HR\DtrRecordController::class, 'myDtrChecklist'])
+        ->name('my-dtr.checklist');
     Route::patch('/my-dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'myPenned'])
         ->name('my-dtr.penned');
+    Route::post('/my-dtr/submit-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'submitPenned'])
+        ->name('my-dtr.submit-penned');
 
     // ── DTR Records ───────────────────────────────────────────────────────────
     Route::get('/dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'index'])
@@ -1405,6 +1483,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('dtr.lock');
     Route::post('/dtr/{user}/recompute', [\App\Http\Controllers\HR\DtrRecordController::class, 'recompute'])
         ->name('dtr.recompute');
+    Route::post('/dtr/{user}/unlock-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'unlockPenned'])
+        ->name('dtr.unlock-penned');
     Route::patch('/dtr/{record}/penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'penned'])
         ->name('dtr.penned');
     Route::get('/dtr/print-batch', [\App\Http\Controllers\HR\DtrRecordController::class, 'printBatch'])
@@ -1486,6 +1566,90 @@ Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->gr
 Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(function () {
     Route::get('/reports/dtr', [\App\Http\Controllers\Payroll\PayslipController::class, 'dtrSummary'])
         ->name('reports.dtr');
+});
+
+// ── Organizational Structure Module ───────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->group(function () {
+
+    // ── Chart / tree views (read — any authenticated user with org.view) ────────
+    Route::get('/', [\App\Http\Controllers\HR\OrgUnitController::class, 'index'])
+        ->name('index');
+    Route::get('/tree', [\App\Http\Controllers\HR\OrgUnitController::class, 'tree'])
+        ->name('tree');                          // JSON — used by Vue org-chart
+    Route::get('/units', [\App\Http\Controllers\HR\OrgUnitController::class, 'list'])
+        ->name('units.list');                    // JSON — flat paginated list
+    Route::get('/units/{unit}', [\App\Http\Controllers\HR\OrgUnitController::class, 'show'])
+        ->name('units.show');                    // Inertia page
+
+    // ── Unit CRUD (require org.units.* permissions) ─────────────────────────────
+    Route::post('/units', [\App\Http\Controllers\HR\OrgUnitController::class, 'store'])
+        ->name('units.store');
+    Route::put('/units/{unit}', [\App\Http\Controllers\HR\OrgUnitController::class, 'update'])
+        ->name('units.update');
+    Route::patch('/units/{unit}/move', [\App\Http\Controllers\HR\OrgUnitController::class, 'move'])
+        ->name('units.move');
+    Route::delete('/units/{unit}', [\App\Http\Controllers\HR\OrgUnitController::class, 'destroy'])
+        ->name('units.destroy');
+    Route::post('/units/{unit}/restore', [\App\Http\Controllers\HR\OrgUnitController::class, 'restore'])
+        ->name('units.restore');
+
+    // ── Employee assignments ────────────────────────────────────────────────────
+    Route::get('/units/{unit}/assignments', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'index'])
+        ->name('assignments.index');
+    Route::get('/employees/{user}/assignments', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'forEmployee'])
+        ->name('assignments.for-employee');
+    Route::post('/assignments', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'store'])
+        ->name('assignments.store');
+    Route::put('/assignments/{assignment}', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'update'])
+        ->name('assignments.update');
+    Route::patch('/assignments/{assignment}/end', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'end'])
+        ->name('assignments.end');
+    Route::delete('/assignments/{assignment}', [\App\Http\Controllers\HR\EmployeeUnitAssignmentController::class, 'destroy'])
+        ->name('assignments.destroy');
+
+    // ── Unit heads ──────────────────────────────────────────────────────────────
+    Route::get('/heads', [\App\Http\Controllers\HR\UnitHeadController::class, 'allCurrent'])
+        ->name('heads.all');
+    Route::get('/units/{unit}/heads', [\App\Http\Controllers\HR\UnitHeadController::class, 'index'])
+        ->name('heads.index');
+    Route::post('/heads', [\App\Http\Controllers\HR\UnitHeadController::class, 'store'])
+        ->name('heads.store');
+    Route::put('/heads/{head}', [\App\Http\Controllers\HR\UnitHeadController::class, 'update'])
+        ->name('heads.update');
+    Route::patch('/heads/{head}/end', [\App\Http\Controllers\HR\UnitHeadController::class, 'end'])
+        ->name('heads.end');
+    Route::delete('/heads/{head}', [\App\Http\Controllers\HR\UnitHeadController::class, 'destroy'])
+        ->name('heads.destroy');
+
+    // ── Reports ────────────────────────────────────────────────────────────────
+    Route::get('/reports', [\App\Http\Controllers\HR\OrgUnitController::class, 'reports'])
+        ->name('reports');
+
+    // ── Export & Print ──────────────────────────────────────────────────────────
+    Route::get('/print', [\App\Http\Controllers\HR\OrgExportController::class, 'print'])
+        ->name('print');
+    Route::get('/export/pdf', [\App\Http\Controllers\HR\OrgExportController::class, 'pdf'])
+        ->name('export.pdf');
+    Route::get('/export/units-csv', [\App\Http\Controllers\HR\OrgExportController::class, 'unitsCsv'])
+        ->name('export.units-csv');
+    Route::get('/export/assignments-csv', [\App\Http\Controllers\HR\OrgExportController::class, 'assignmentsCsv'])
+        ->name('export.assignments-csv');
+
+    // ── Structural versioning ───────────────────────────────────────────────────
+    Route::get('/versions', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'index'])
+        ->name('versions.index');
+    Route::get('/versions/current', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'current'])
+        ->name('versions.current');
+    Route::get('/versions/{version}', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'show'])
+        ->name('versions.show');
+    Route::post('/versions', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'store'])
+        ->name('versions.store');
+    Route::post('/versions/{version}/approve', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'approve'])
+        ->name('versions.approve');
+    Route::post('/versions/{version}/activate', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'activate'])
+        ->name('versions.activate');
+    Route::delete('/versions/{version}', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'destroy'])
+        ->name('versions.destroy');
 });
 
 // Development-only: send a test email

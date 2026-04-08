@@ -41,6 +41,38 @@ class WFHAccomplishmentController extends Controller
         ], 201);
     }
 
+    // ─── API: Update ──────────────────────────────────────────────────────────
+
+    public function update(\Illuminate\Http\Request $request, WFHAccomplishment $wfhAccomplishment)
+    {
+        $this->authorizeOwner($wfhAccomplishment);
+
+        $data = $request->validate([
+            'description' => ['required', 'string', 'max:2000'],
+            'time_from'   => ['nullable', 'date_format:H:i'],
+            'time_to'     => ['nullable', 'date_format:H:i'],
+        ]);
+
+        if (! empty($data['time_from']) && ! empty($data['time_to'])
+            && strtotime($data['time_to']) <= strtotime($data['time_from'])) {
+            return response()->json([
+                'errors' => ['time_to' => 'Time To must be after Time From.'],
+            ], 422);
+        }
+
+        $wfhAccomplishment->update([
+            'description' => $data['description'],
+            'title'       => mb_strimwidth($data['description'], 0, 100, '…'),
+            'time_from'   => $data['time_from'] ?? null,
+            'time_to'     => $data['time_to'] ?? null,
+        ]);
+
+        return response()->json([
+            'message'        => 'Accomplishment updated.',
+            'accomplishment' => $wfhAccomplishment->fresh(),
+        ]);
+    }
+
     // ─── API: Destroy ─────────────────────────────────────────────────────────
 
     public function destroy(WFHAccomplishment $wfhAccomplishment)

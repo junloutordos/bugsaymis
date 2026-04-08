@@ -16,9 +16,16 @@ class EmployeeProfileController extends Controller
 
         $profile = $user->employeeProfile()->firstOrNew(['user_id' => $user->id]);
 
+        // Load primary unit assignment for the sidebar/header display
+        $user->load([
+            'employeeProfile.salaryGrade',
+            'primaryUnitAssignment.unit:id,name,code,type',
+        ]);
+
         return Inertia::render('HR/Employees/Profile', [
-            'employee' => $user->load(['employeeProfile.salaryGrade']),
-            'profile'  => $profile,
+            'employee'       => $user,
+            'profile'        => $profile,
+            'primaryUnit'    => $user->primaryUnitAssignment?->unit,
         ]);
     }
 

@@ -16,10 +16,11 @@ class StoreAccomplishmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'       => ['nullable', 'string', 'max:255'],
-            'description' => ['required', 'string', 'max:2000'],
-            'time_from'   => ['nullable', 'date_format:H:i'],
-            'time_to'     => ['nullable', 'date_format:H:i'],
+            'attendance_id' => ['nullable', 'integer', 'exists:wfh_attendances,id'],
+            'title'         => ['nullable', 'string', 'max:255'],
+            'description'   => ['required', 'string', 'max:2000'],
+            'time_from'     => ['nullable', 'date_format:H:i'],
+            'time_to'       => ['nullable', 'date_format:H:i'],
 
             // proof_type drives which proof field is required
             'proof_type'  => ['nullable', Rule::in(['photo', 'link'])],

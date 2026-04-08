@@ -7,6 +7,7 @@ use App\Models\HR\DtrRecord;
 use App\Models\HR\EmployeeSchedule;
 use App\Models\HR\Holiday;
 use App\Models\HR\LeaveApplication;
+use App\Models\WFHAttendance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -38,6 +39,12 @@ class DTRService
             ->whereBetween('holiday_date', [$dateFrom, $dateTo])
             ->get()
             ->keyBy(fn ($h) => Carbon::parse($h->holiday_date)->toDateString());
+
+        // Load WFH attendances for this range keyed by date
+        $wfhAttendances = WFHAttendance::where('user_id', $userId)
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->get()
+            ->keyBy(fn ($w) => Carbon::parse($w->date)->toDateString());
 
         // Load approved leave applications overlapping the range
         $leaves = LeaveApplication::where('user_id', $userId)
@@ -95,39 +102,63 @@ class DTRService
                 $schedule
             );
 
+            // WFH fallback: when there are no biometric logs for this date but
+            // the employee has a WFH attendance record, map all four WFH slots
+            // onto the DTR time columns so hours & late/undertime compute correctly.
+            //   time_in   → time_in_am  (morning arrival)
+            //   break_out → time_out_am (lunch departure)
+            //   break_in  → time_in_pm  (return from lunch)
+            //   time_out  → time_out_pm (end of day)
+            $wfh = $wfhAttendances->get($dateStr);
+            if ($wfh && $logsForDay->isEmpty()) {
+                $timeInAm  = $wfh->time_in   ? Carbon::parse($wfh->time_in)->format('H:i:s')   : null;
+                $timeOutAm = $wfh->break_out  ? Carbon::parse($wfh->break_out)->format('H:i:s') : null;
+                $timeInPm  = $wfh->break_in   ? Carbon::parse($wfh->break_in)->format('H:i:s')  : null;
+                $timeOutPm = $wfh->time_out   ? Carbon::parse($wfh->time_out)->format('H:i:s')  : null;
+            }
+
             // Compute metrics
             $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
             $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
             $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
             $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
 
-            // Determine attendance status
-            $attendanceStatus = $this->getAttendanceStatus(
-                $logsForDay,
-                $leave,
-                $dayType,
-                $hoursWorked,
-                $lateMinutes,
-                $schedule
-            );
+            // Determine attendance status.
+            // WFH days (no biometric logs, WFH attendance present) get their own
+            // status so they are never counted as absent.
+            if ($wfh && $logsForDay->isEmpty() && ! $leave) {
+                $attendanceStatus = 'wfh';
+            } else {
+                $attendanceStatus = $this->getAttendanceStatus(
+                    $logsForDay,
+                    $leave,
+                    $dayType,
+                    $hoursWorked,
+                    $lateMinutes,
+                    $schedule,
+                    $timeInAm,
+                    $timeOutPm
+                );
+            }
 
             DtrRecord::updateOrCreate(
                 ['user_id' => $userId, 'work_date' => $dateStr],
                 [
-                    'schedule_id'        => $schedule?->id,
-                    'time_in_am'         => $timeInAm,
-                    'time_out_am'        => $timeOutAm,
-                    'time_in_pm'         => $timeInPm,
-                    'time_out_pm'        => $timeOutPm,
-                    'hours_worked'       => round($hoursWorked, 2),
-                    'late_minutes'       => round($lateMinutes, 2),
-                    'undertime_minutes'  => round($undertimeMinutes, 2),
-                    'overtime_minutes'   => round($overtimeMinutes, 2),
-                    'day_type'           => $dayType,
-                    'attendance_status'  => $attendanceStatus,
+                    'schedule_id'          => $schedule?->id,
+                    'time_in_am'           => $timeInAm,
+                    'time_out_am'          => $timeOutAm,
+                    'time_in_pm'           => $timeInPm,
+                    'time_out_pm'          => $timeOutPm,
+                    'hours_worked'         => round($hoursWorked, 2),
+                    'late_minutes'         => round($lateMinutes, 2),
+                    'undertime_minutes'    => round($undertimeMinutes, 2),
+                    'overtime_minutes'     => round($overtimeMinutes, 2),
+                    'day_type'             => $dayType,
+                    'attendance_status'    => $attendanceStatus,
                     'leave_application_id' => $leave?->id,
-                    'processed_by'       => Auth::id(),
-                    'processed_at'       => now(),
+                    'wfh_attendance_id'    => ($wfh && $logsForDay->isEmpty()) ? $wfh->id : null,
+                    'processed_by'         => Auth::id(),
+                    'processed_at'         => now(),
                 ]
             );
         }
@@ -173,12 +204,15 @@ class DTRService
         $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
 
         // Re-derive attendance status unless it is a protected status that was
-        // set during generation (on_leave, holiday, on_official_business).
-        $protectedStatuses = ['on_leave', 'holiday', 'on_official_business'];
+        // set during generation (on_leave, holiday, on_official_business, wfh).
+        $protectedStatuses = ['on_leave', 'holiday', 'on_official_business', 'wfh'];
         if (! in_array($record->attendance_status, $protectedStatuses)) {
             $hasAnyPunch = $timeInAm || $timeOutAm || $timeInPm || $timeOutPm;
             if (! $hasAnyPunch) {
                 $attendanceStatus = 'absent';
+            } elseif ($timeInAm && $timeOutPm) {
+                // CSC rule: AM arrival + PM departure = full day present
+                $attendanceStatus = 'present';
             } elseif (
                 $hoursWorked < ($schedule?->half_day_hours ?? 4) ||
                 $lateMinutes >= ($schedule?->late_threshold_minutes ?? 240)
@@ -253,79 +287,118 @@ class DTRService
         }
 
         $sorted = $logs->sortBy('log_datetime')->values();
+        $count  = $sorted->count();
 
-        // Split all punches into AM (before 12:30) and PM (12:30 and after).
-        // 12:30 is used as the divider because it falls in the middle of the
-        // standard Philippine government noon break (12:00–13:00), ensuring
-        // a lunch-departure punch at e.g. 12:02 stays in the AM bucket while
-        // a post-lunch return at e.g. 12:45 lands in PM.
-        $breakMinutes = $this->getBreakMinutes($dateStr, $schedule);
+        // Precompute time-of-day minutes and formatted time strings for each log.
+        $mins  = $sorted->map(fn ($l) => $this->logMinutes($l))->values()->all();
+        $times = $sorted->map(fn ($l) => Carbon::parse($l->log_datetime)->format('H:i:s'))->values()->all();
 
-        $amLogs = $sorted->filter(fn ($l) => $this->logMinutes($l) < $breakMinutes)->values();
-        $pmLogs = $sorted->filter(fn ($l) => $this->logMinutes($l) >= $breakMinutes)->values();
+        // Break midpoint (12:30 default for standard PH shifts) and PM-in cutoff.
+        $breakMinutes  = $this->getBreakMinutes($dateStr, $schedule);
+        $pmInCutoffMin = $breakMinutes + 90; // latest a post-lunch return can occur (e.g. 14:00)
 
-        $hasExplicit = $logs->contains(fn ($l) => $l->log_type !== 'auto');
+        // ── Single punch ──────────────────────────────────────────────────────
+        if ($count === 1) {
+            if ($mins[0] < $breakMinutes) {
+                return [$times[0], null, null, null]; // morning arrival only
+            }
+            if ($mins[0] <= $pmInCutoffMin) {
+                return [null, null, $times[0], null]; // PM half-day arrival
+            }
+            return [null, null, null, $times[0]];     // end-of-day departure only
+        }
 
-        if ($hasExplicit) {
-            // Device provides Granding io_status codes:
-            //   Check-In(0)/Break-In(3)/OT-In(4) → log_type = time_in
-            //   Check-Out(1)/Break-Out(2)/OT-Out(5) → log_type = time_out
-            // Within each time-of-day bucket use the type to find in/out.
-            $amIns  = $amLogs->where('log_type', 'time_in')->values();
-            $amOuts = $amLogs->where('log_type', 'time_out')->values();
+        // ── PM-only session: every punch is at or after the break midpoint ────
+        // Handles employees who have no morning biometric activity (e.g. approved
+        // AM leave, late arrival recorded only for the PM session).
+        if ($mins[0] >= $breakMinutes) {
+            if ($mins[0] <= $pmInCutoffMin) {
+                return [null, null, $times[0], $times[$count - 1]]; // PM arrival + end-of-day
+            }
+            return [null, null, null, $times[$count - 1]]; // late-afternoon departure only
+        }
 
-            // Heuristic A — device sends io=0 for break-outs:
-            // A single near-noon "time_in" with no AM time_out logs is actually
-            // a lunch departure. Reclassify as time_out_am.
-            if ($amIns->count() === 1
-                && $amOuts->isEmpty()
-                && $this->logMinutes($amIns->first()) >= ($breakMinutes - 90)
-            ) {
-                $timeInAm  = null;
-                $timeOutAm = $this->firstTime($amIns);
+        // ── 2+ punches with an AM arrival ─────────────────────────────────────
+        // The first punch is always AM-in; the last punch is always PM-out.
+        // We never use the device's io_status code because employees frequently
+        // press the wrong button (e.g. Break-Out instead of Check-In).
+        $timeInAm  = $times[0];
+        $timeOutPm = $times[$count - 1];
+        $timeOutAm = null;
+        $timeInPm  = null;
 
-            // Heuristic B — re-tap / bounce after departure:
-            // Employee tapped the device again (time_in) within 5 minutes after
-            // their last AM departure tap (time_out). Treat as noise; keep the
-            // departure time and discard the stray time_in.
-            } elseif ($amIns->count() === 1
-                && $amOuts->isNotEmpty()
-                && ($this->logMinutes($amIns->first()) - $this->logMinutes($amOuts->last())) <= 5
-                && $this->logMinutes($amIns->first()) >= $this->logMinutes($amOuts->last())
-            ) {
-                $timeInAm  = null;
-                $timeOutAm = $this->firstTime($amOuts);
+        // Two punches → full day with no lunch-break data available.
+        if ($count === 2) {
+            return [$timeInAm, null, null, $timeOutPm];
+        }
 
-            } else {
-                $timeInAm  = $this->firstTime($amIns);
-                $timeOutAm = $this->firstTime($amOuts);
+        // ── Schedule-relative AM-out window ───────────────────────────────────
+        // A punch qualifies as a lunch departure only if it falls within:
+        //   [scheduledStart + 60 min, breakMidpoint + 30 min]
+        // e.g. [09:00, 13:00] for a standard 08:00 shift.
+        // The AM session must also be at least 30 min long.
+        $scheduledInMin = 480; // 08:00 default
+        if ($schedule) {
+            $ti = $schedule->getTimeIn($dateStr);
+            if ($ti) {
+                $scheduledInMin = $this->timeStrToMinutes(substr($ti, 0, 5));
+            }
+        }
+        $amOutMinMin = $scheduledInMin + 60;  // e.g. 09:00 for an 08:00 shift
+        $amOutMaxMin = $breakMinutes + 30;    // e.g. 13:00 for the standard 12:30 break
+
+        // ── Phase 1: scan middle punches for a lunch-break pair ───────────────
+        // Previous approach: split all punches at 12:30 into AM / PM buckets.
+        // Problem: when AM-out (e.g. 12:05) and PM-in (e.g. 12:08) are both
+        // before 12:30 they both land in the AM bucket — the last AM punch
+        // becomes time_out_am and the actual PM-in is lost.
+        //
+        // New approach: scan chronologically through middle punches (indices
+        // 1 … count−2).  The first punch that falls within the AM-out window
+        // (and satisfies the minimum AM session length) is assigned as AM-out.
+        // If the immediately following middle punch is also within the PM-in
+        // window it becomes PM-in — regardless of whether both are before or
+        // after 12:30.  This correctly handles short lunch gaps of even 1 min.
+        $lunchFound = false;
+        for ($i = 1; $i <= $count - 2; $i++) {
+            $outMin  = $mins[$i];
+            $amInMin = $this->timeStrToMinutes(substr($timeInAm, 0, 5));
+
+            if ($outMin < $amOutMinMin || $outMin > $amOutMaxMin) {
+                continue; // outside the valid departure window
+            }
+            if ($outMin - $amInMin < 30) {
+                continue; // AM session too short to be a real lunch departure
             }
 
-            $timeInPm  = $this->firstTime($pmLogs->where('log_type', 'time_in'));
-            $timeOutPm = $this->lastTime($pmLogs->where('log_type', 'time_out'));
-        } else {
-            // 'auto' logs: use position within each bucket.
-            $timeInAm  = $this->firstTime($amLogs);
-            $timeOutAm = $amLogs->count() > 1 ? $this->lastTime($amLogs) : null;
+            $timeOutAm  = $times[$i];
+            $lunchFound = true;
 
-            if ($pmLogs->count() >= 2) {
-                // At least two PM punches: first = return from lunch, last = end of day
-                $timeInPm  = $this->firstTime($pmLogs);
-                $timeOutPm = $this->lastTime($pmLogs);
-            } elseif ($pmLogs->count() === 1 && $amLogs->isNotEmpty()) {
-                // Single PM punch while AM has activity → end-of-day departure
-                $timeInPm  = null;
-                $timeOutPm = $this->firstTime($pmLogs);
-            } else {
-                // Single PM punch with no AM activity → PM-only half-day arrival
-                $timeInPm  = $this->firstTime($pmLogs);
-                $timeOutPm = null;
+            // Check whether the very next middle punch is a post-lunch return.
+            // Accept any gap ≥ 1 min to accommodate employees with short breaks.
+            $nextIdx = $i + 1;
+            if ($nextIdx <= $count - 2) {
+                $nextMin = $mins[$nextIdx];
+                if ($nextMin > $outMin && $nextMin <= $pmInCutoffMin) {
+                    $timeInPm = $times[$nextIdx];
+                }
+            }
+            break; // stop at the first valid AM-out
+        }
+
+        // ── Phase 2: standalone PM return (no AM-out found) ──────────────────
+        // Employee has a biometric gap at lunch departure but tapped back in.
+        // E.g. [08:00, 13:30, 17:00] → time_in_pm = 13:30.
+        if (! $lunchFound) {
+            for ($i = 1; $i <= $count - 2; $i++) {
+                if ($mins[$i] >= $breakMinutes && $mins[$i] <= $pmInCutoffMin) {
+                    $timeInPm = $times[$i];
+                    break;
+                }
             }
         }
 
-        // Sanity-check ordering.  If out ≤ in it indicates a bounce / double-punch
-        // artifact — the device was tapped twice in quick succession in the wrong
-        // order.  Clear the invalid out rather than storing an impossible sequence.
+        // ── Sanity-check ordering ─────────────────────────────────────────────
         if ($timeInAm && $timeOutAm && $timeOutAm <= $timeInAm) {
             $timeOutAm = null;
         }
@@ -337,11 +410,15 @@ class DTRService
     }
 
     /**
-     * Split point between AM and PM sessions.
-     * Uses 12:30 (750 min) — the midpoint of the standard noon break — so that
-     * lunch-departure punches (~12:00–12:10) stay in AM and post-lunch returns
-     * (~12:45–13:05) land in PM.  For non-standard shifts whose work midpoint
-     * falls outside the 11:00–13:30 window the schedule midpoint is used instead.
+     * Noon break midpoint in minutes from midnight.
+     * Used to:
+     *   • detect PM-only sessions (first punch at or after this point)
+     *   • derive amOutMaxMin  (breakMinutes + 30, e.g. 13:00)
+     *   • derive pmInCutoffMin (breakMinutes + 90, e.g. 14:00)
+     *   • find standalone PM-in punches (Phase 2 of parsePunches)
+     * Defaults to 12:30 (750 min) for standard PH shifts.
+     * For non-standard shifts whose midpoint falls outside 11:00–13:30
+     * the schedule midpoint is used instead.
      */
     private function getBreakMinutes(string $dateStr, ?EmployeeSchedule $schedule): int
     {
@@ -566,7 +643,9 @@ class DTRService
         string $dayType,
         float $hoursWorked,
         float $lateMinutes,
-        ?EmployeeSchedule $schedule
+        ?EmployeeSchedule $schedule,
+        ?string $timeInAm = null,
+        ?string $timeOutPm = null
     ): string {
         if ($leave) {
             return 'on_leave';
@@ -578,6 +657,14 @@ class DTRService
 
         if ($logs->isEmpty()) {
             return 'absent';
+        }
+
+        // CSC Form 48 rule: AM arrival + PM departure = full day present.
+        // This takes precedence over the hours-based threshold so that employees
+        // who tap in once in the morning and once in the afternoon are not
+        // incorrectly flagged as half-day due to schedule mis-configuration.
+        if ($timeInAm && $timeOutPm) {
+            return 'present';
         }
 
         $halfDayThreshold = $schedule ? ($schedule->half_day_hours ?? 4) : 4;

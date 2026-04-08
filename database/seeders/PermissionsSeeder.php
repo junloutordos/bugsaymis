@@ -66,12 +66,22 @@ class PermissionsSeeder extends Seeder
             ['module' => 'IT',       'name' => 'it.equipment.manage','description' => 'Manage ICT equipment & PMS'],
 
             // ── Facilities & Services ─────────────────────────────────────────
-            ['module' => 'Facilities','name' => 'facilities.view',   'description' => 'View facility requests'],
-            ['module' => 'Facilities','name' => 'facilities.create', 'description' => 'Submit facility requests'],
-            ['module' => 'Facilities','name' => 'facilities.manage', 'description' => 'Manage facility requests'],
-            ['module' => 'Vehicles', 'name' => 'vehicles.view',      'description' => 'View vehicle requests'],
-            ['module' => 'Vehicles', 'name' => 'vehicles.create',    'description' => 'Submit vehicle requests'],
-            ['module' => 'Vehicles', 'name' => 'vehicles.manage',    'description' => 'Manage vehicle requests'],
+            ['module' => 'Facilities','name' => 'facilities.view',       'description' => 'View facility requests'],
+            ['module' => 'Facilities','name' => 'facilities.create',     'description' => 'Submit facility requests'],
+            ['module' => 'Facilities','name' => 'facilities.manage',     'description' => 'Manage facility requests (GSU Head / Admin)'],
+            ['module' => 'Facilities','name' => 'facilities.dc-approve', 'description' => 'Division Chief in-app approval of facility, work, and service requests'],
+            ['module' => 'Facilities','name' => 'facilities.fad-approve','description' => 'FAD Chief in-app approval of facility, work, and service requests'],
+            ['module' => 'Vehicles', 'name' => 'vehicles.view',          'description' => 'View vehicle requests'],
+            ['module' => 'Vehicles', 'name' => 'vehicles.create',        'description' => 'Submit vehicle requests'],
+            ['module' => 'Vehicles', 'name' => 'vehicles.manage',        'description' => 'Manage vehicle requests (GSU Head / Admin)'],
+            ['module' => 'Vehicles', 'name' => 'vehicles.dc-approve',    'description' => 'Division Chief in-app approval of vehicle requests'],
+
+            // ── Messengerial ──────────────────────────────────────────────────
+            ['module' => 'Messengerial', 'name' => 'messengerial.view',       'description' => 'View messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.create',     'description' => 'Submit messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.manage',     'description' => 'Manage all messengerial requests (Records / Admin)'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.dc-approve', 'description' => 'Division Chief in-app approval of messengerial requests'],
+            ['module' => 'Messengerial', 'name' => 'messengerial.ocd-approve','description' => 'OCD in-app approval of messengerial requests'],
 
             // ── Documents ─────────────────────────────────────────────────────
             ['module' => 'Documents','name' => 'documents.view',     'description' => 'View documents'],
@@ -90,6 +100,7 @@ class PermissionsSeeder extends Seeder
 
             // ── Guidance ──────────────────────────────────────────────────────
             ['module' => 'Guidance', 'name' => 'guidance.view',      'description' => 'View guidance consultations'],
+            ['module' => 'Guidance', 'name' => 'guidance.refer',     'description' => 'Submit student referrals to guidance office'],
             ['module' => 'Guidance', 'name' => 'guidance.manage',    'description' => 'Manage guidance consultations & interventions'],
 
             // ── Procurement ───────────────────────────────────────────────────
@@ -142,6 +153,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'HR',     'name' => 'hr.leave.view',          'description' => 'View all leave applications'],
             ['module' => 'HR',     'name' => 'hr.leave.file',          'description' => 'File own leave applications'],
             ['module' => 'HR',     'name' => 'hr.leave.approve',       'description' => 'Approve or deny leave applications'],
+
+            // ── HR — Leave Credits ─────────────────────────────────────────────
+            ['module' => 'HR',     'name' => 'hr.leave.credits.view',    'description' => 'View own leave credit balances and transaction history'],
+            ['module' => 'HR',     'name' => 'hr.leave.credits.manage',  'description' => 'Initialize and manually adjust employee leave credits'],
+            ['module' => 'HR',     'name' => 'hr.leave.credits.service', 'description' => 'Approve or reject teaching service credit records'],
+            ['module' => 'HR',     'name' => 'hr.leave.credits.reports', 'description' => 'Access leave credit audit ledger and accrual/utilization reports'],
 
             // ── HR — Employee Profile (payroll context) ────────────────────────
             ['module' => 'HR',     'name' => 'hr.employee.view',       'description' => 'View employee profiles and salary info'],

@@ -234,27 +234,44 @@ class WFHAttendanceController extends Controller
 
     public function printTimeLogs(Request $request)
     {
-        $user  = Auth::user();
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
-        [$year, $mon] = explode('-', $month);
+        $user = Auth::user();
+        $mode = $request->input('mode', 'monthly');
 
-        $records = WFHAttendance::where('user_id', $user->id)
-            ->whereYear('date', $year)
-            ->whereMonth('date', $mon)
-            ->orderBy('date')
-            ->get();
+        $query = WFHAttendance::where('user_id', $user->id)->orderBy('date');
 
+        $dateLabel = '';
+
+        if ($mode === 'daily') {
+            $date = $request->input('date', Carbon::today()->toDateString());
+            $query->whereDate('date', $date);
+            $dateLabel = Carbon::parse($date)->toFormattedDateString();
+        } elseif ($mode === 'range') {
+            $dateFrom = $request->input('date_from', Carbon::today()->toDateString());
+            $dateTo   = $request->input('date_to',   Carbon::today()->toDateString());
+            $query->whereBetween('date', [$dateFrom, $dateTo]);
+            $dateLabel = Carbon::parse($dateFrom)->format('M d, Y')
+                       . ' – '
+                       . Carbon::parse($dateTo)->format('M d, Y');
+        } else {
+            $month = $request->input('month', Carbon::now()->format('Y-m'));
+            [$year, $mon] = explode('-', $month);
+            $query->whereYear('date', $year)->whereMonth('date', $mon);
+            $dateLabel = Carbon::createFromDate($year, $mon, 1)->format('F Y');
+        }
+
+        $records  = $query->get();
         $division = $user->division_id
             ? \App\Models\Division::with('divisionchief')->find($user->division_id)
             : null;
 
         return Inertia::render('HumanResource/WFH/PrintTimeLogs', [
-            'employee' => $user->only('id', 'name', 'position', 'badge_id'),
-            'records'  => $records->map(fn ($r) => array_merge($r->toArray(), [
+            'employee'      => $user->only('id', 'name', 'position', 'badge_id'),
+            'records'       => $records->map(fn ($r) => array_merge($r->toArray(), [
                 'date' => $r->getRawOriginal('date'),
             ])),
-            'month'      => $month,
-            'chiefName'  => $division?->divisionchief?->name,
+            'mode'          => $mode,
+            'dateLabel'     => $dateLabel,
+            'chiefName'     => $division?->divisionchief?->name,
             'chiefPosition' => $division?->divisionchief?->position,
             'divisionName'  => $division?->division_name,
         ]);

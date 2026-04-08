@@ -157,14 +157,26 @@ class WFHService
         $user  = Auth::user();
         $today = Carbon::today()->toDateString();
 
-        $attendance = WFHAttendance::where('user_id', $user->id)
-            ->where('date', $today)
-            ->first();
+        if (! empty($data['attendance_id'])) {
+            $attendance = WFHAttendance::where('id', $data['attendance_id'])
+                ->where('user_id', $user->id)
+                ->first();
 
-        if (! $attendance) {
-            throw ValidationException::withMessages([
-                'date' => 'You must time in before adding accomplishments.',
-            ]);
+            if (! $attendance) {
+                throw ValidationException::withMessages([
+                    'attendance_id' => 'Attendance record not found or does not belong to you.',
+                ]);
+            }
+        } else {
+            $attendance = WFHAttendance::where('user_id', $user->id)
+                ->where('date', $today)
+                ->first();
+
+            if (! $attendance) {
+                throw ValidationException::withMessages([
+                    'date' => 'You must time in before adding accomplishments.',
+                ]);
+            }
         }
 
         $description = $data['description'] ?? null;
@@ -179,8 +191,9 @@ class WFHService
             'proof_link'        => $data['proof_link'] ?? null,
         ];
 
-        if ($data['proof_type'] === 'photo' && $photo) {
-            $fileName = "WFH/{$user->id}/{$today}/accomplishment_{$photo->getClientOriginalName()}";
+        if (($data['proof_type'] ?? null) === 'photo' && $photo) {
+            $dateFolder = $attendance->getRawOriginal('date') ?? $today;
+            $fileName   = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
             $uploaded = $this->drive->upload($photo, $fileName);
 
             $payload['google_drive_file_id'] = $uploaded['file_id'];

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\HR;
 
 use App\Http\Controllers\Controller;
+use App\Models\HR\DtrRecord;
 use App\Models\HR\EmployeeSchedule;
 use App\Models\HR\SchedulePreset;
 use App\Models\User;
+use App\Services\HR\DTRService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -99,7 +101,7 @@ class EmployeeScheduleController extends Controller
      * Bulk-assign a preset to the selected employees.
      * Creates/updates the default employee_schedules row for each.
      */
-    public function assign(Request $request)
+    public function assign(Request $request, DTRService $dtrService)
     {
         $this->authorize('hr.schedule.manage');
 
@@ -120,7 +122,7 @@ class EmployeeScheduleController extends Controller
                 ->update(['end_date' => now()->subDay()->toDateString()]);
 
             // Create new default schedule from preset
-            EmployeeSchedule::create([
+            $newSchedule = EmployeeSchedule::create([
                 'user_id'                => $userId,
                 'name'                   => $preset->name,
                 'schedule_type'          => $preset->schedule_type,
@@ -136,6 +138,25 @@ class EmployeeScheduleController extends Controller
                 'is_default'             => true,
                 'remarks'                => $preset->remarks,
             ]);
+
+            // Recompute any already-generated unlocked DTR records from the
+            // effective date onwards so the new schedule applies immediately
+            // to future months without requiring a re-generate.
+            $latestRecord = DtrRecord::where('user_id', $userId)
+                ->where('work_date', '>=', $data['effective_date'])
+                ->where('is_locked', false)
+                ->orderByDesc('work_date')
+                ->value('work_date');
+
+            if ($latestRecord) {
+                // Stamp the new schedule_id directly, then recompute metrics
+                DtrRecord::where('user_id', $userId)
+                    ->where('work_date', '>=', $data['effective_date'])
+                    ->where('is_locked', false)
+                    ->update(['schedule_id' => $newSchedule->id]);
+
+                $dtrService->recomputeForUser($userId, $data['effective_date'], $latestRecord);
+            }
         }
 
         $count = count($data['user_ids']);

@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   href:      String,
   icon:      [Object, Function],
   label:     String,
@@ -8,6 +10,13 @@ defineProps({
   badge:     { type: [Number, String], default: 0 },
   target:    { type: String, default: null },
 })
+
+const badgeCount = computed(() => {
+  const n = parseInt(props.badge, 10)
+  return isNaN(n) || n <= 0 ? 0 : Math.min(n, 99)
+})
+
+const badgeLabel = computed(() => badgeCount.value > 0 ? String(badgeCount.value) : '')
 </script>
 
 <template>
@@ -34,12 +43,10 @@ defineProps({
     <span v-if="!collapsed" class="flex flex-1 items-center min-w-0">
       <span class="truncate">{{ label }}</span>
       <span
-        v-if="badge"
+        v-if="badgeCount > 0"
         class="ml-auto shrink-0 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-400 text-slate-900"
-      >
-        {{ badge }}
-      </span>
+      >{{ badgeLabel }}</span>
     </span>
-    <span v-else-if="badge" class="mx-auto mt-0.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+    <span v-else-if="badgeCount > 0" class="mx-auto mt-0.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400"></span>
   </a>
 </template>
