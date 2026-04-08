@@ -19,6 +19,7 @@ class LeaveApplication extends Model
         'leave_type_id',
         'date_from',
         'date_to',
+        'dates',
         'days_applied',
         'leave_details',
         'leave_details_specify',
@@ -40,6 +41,7 @@ class LeaveApplication extends Model
     protected $casts = [
         'date_from'           => 'date',
         'date_to'             => 'date',
+        'dates'               => 'array',
         'days_applied'        => 'decimal:2',
         'days_deducted'       => 'decimal:2',
         'is_without_pay'      => 'boolean',

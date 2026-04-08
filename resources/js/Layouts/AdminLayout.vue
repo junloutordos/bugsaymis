@@ -1501,7 +1501,14 @@ const menuItems = [
         routeName: "guidance.consultations.index",
         href: route('guidance.consultations.index'),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["guidance.view"],
+      },
+      {
+        label: "Refer to Guidance",
+        routeName: "guidance.refer",
+        href: route('guidance.refer'),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["guidance.refer"],
       },
       {
         label: "Session Reports",
@@ -1642,7 +1649,6 @@ const filterMenuByRole = (items, userRoleNames) =>
     .filter((item) => {
       // Special-case: Guidance (numeric role_id 17 still used for legacy Guidance role)
       if (item.label === "Guidance Services") return showGuidanceByRoleId;
-      if (item.routeName === 'guidance.consultations.index') return showGuidanceByRoleId;
       // Dashboard visible to Guidance role via numeric ID
       if (item.routeName === 'dashboard' && roleIds.includes(17)) return true;
       // Health stats via numeric ID

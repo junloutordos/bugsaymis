@@ -402,8 +402,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Guidance — Transaction report (date-range)
     Route::get('/guidance/reports', [\App\Http\Controllers\GuidanceConsultationController::class, 'transactionReport'])->name('guidance.reports')->middleware('permission:guidance.view');
 
-    // Guidance — Consultations list
-    Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
+    // Guidance — Consultations list (Guidance / Administrator only)
+    Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index')->middleware('permission:guidance.view');
+    // Guidance — Referral page for Faculty / Staff
+    Route::get('/guidance/refer', [\App\Http\Controllers\GuidanceConsultationController::class, 'referPage'])->name('guidance.refer')->middleware('permission:guidance.refer');
     Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.refer');
     Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.refer');
     Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:guidance.manage');

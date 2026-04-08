@@ -63,16 +63,22 @@ class LeaveApplicationController extends Controller
 
         $data = $request->validate([
             'leave_type_id'         => 'required|exists:leave_types,id',
-            'date_from'             => 'required|date|after_or_equal:today',
-            'date_to'               => 'required|date|after_or_equal:date_from',
+            'dates'                 => 'required|array|min:1',
+            'dates.*'               => 'required|date',
             'leave_details'         => 'nullable|string',
             'leave_details_specify' => 'nullable|string|max:255',
             'reason'                => 'nullable|string|max:1000',
             'supporting_document'   => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
+        // Sort dates and derive date_from / date_to for range queries
+        $sortedDates       = collect($data['dates'])->map(fn($d) => \Carbon\Carbon::parse($d)->toDateString())->sort()->values();
+        $data['date_from'] = $sortedDates->first();
+        $data['date_to']   = $sortedDates->last();
+        $data['dates']     = $sortedDates->all();
+
         $leaveType  = LeaveType::findOrFail($data['leave_type_id']);
-        $days       = $this->computeWorkingDays($data['date_from'], $data['date_to']);
+        $days       = $this->computeWorkingDaysFromDates($data['dates']);
         $user       = Auth::user();
 
         // ── Balance validation before filing ──────────────────────────────────
@@ -331,6 +337,18 @@ class LeaveApplicationController extends Controller
         ]);
     }
 
+    private function computeWorkingDaysFromDates(array $dates): float
+    {
+        $days = 0;
+        foreach ($dates as $d) {
+            $carbon = \Carbon\Carbon::parse($d);
+            if (! $carbon->isWeekend()) {
+                $days++;
+            }
+        }
+        return $days;
+    }
+
     private function computeWorkingDays(string $from, string $to): float
     {
         $start = \Carbon\Carbon::parse($from);
@@ -341,7 +359,6 @@ class LeaveApplicationController extends Controller
             if ($d->isWeekend()) {
                 continue;
             }
-            // TODO Phase 2: exclude public holidays from holidays table
             $days++;
         }
 

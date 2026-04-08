@@ -142,7 +142,21 @@
         <div style="flex:1">
           <div style="display:flex;justify-content:space-between;margin-bottom:8px">
             <div style="width:45%"><strong>Date of Trip:</strong></div>
-            <div style="width:50%;border-bottom:1px solid #000">@if(!empty($request->date_needed)) {{ $request->date_needed }} @else — @endif</div>
+            <div style="width:50%;border-bottom:1px solid #000">
+              @php
+                $allDates = [];
+                if (!empty($request->date_needed_multiple) && is_array($request->date_needed_multiple)) {
+                    foreach ($request->date_needed_multiple as $d) {
+                        try { $allDates[] = \Carbon\Carbon::parse($d)->format('M d, Y'); } catch (\Throwable $e) { $allDates[] = $d; }
+                    }
+                } elseif (!empty($request->date_needed)) {
+                    try { $allDates[] = \Carbon\Carbon::parse($request->date_needed)->format('M d, Y'); } catch (\Throwable $e) { $allDates[] = $request->date_needed; }
+                }
+              @endphp
+              @if(count($allDates) > 0)
+                {{ implode(', ', $allDates) }}
+              @else — @endif
+            </div>
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:8px">
             <div style="width:45%"><strong>No. of Passengers:</strong></div>
@@ -312,7 +326,19 @@
             <div style="flex:1">
               <div style="display:flex;justify-content:space-between;margin-bottom:8px">
                 <div style="width:45%"><strong>Date of Trip:</strong></div>
-                <div style="width:50%;border-bottom:1px solid #000">@if(!empty($request->date_needed)) {{ $request->date_needed }} @else — @endif</div>
+                <div style="width:50%;border-bottom:1px solid #000">
+                  @php
+                    $allDates2 = [];
+                    if (!empty($request->date_needed_multiple) && is_array($request->date_needed_multiple)) {
+                        foreach ($request->date_needed_multiple as $d) {
+                            try { $allDates2[] = \Carbon\Carbon::parse($d)->format('M d, Y'); } catch (\Throwable $e) { $allDates2[] = $d; }
+                        }
+                    } elseif (!empty($request->date_needed)) {
+                        try { $allDates2[] = \Carbon\Carbon::parse($request->date_needed)->format('M d, Y'); } catch (\Throwable $e) { $allDates2[] = $request->date_needed; }
+                    }
+                  @endphp
+                  @if(count($allDates2) > 0) {{ implode(', ', $allDates2) }} @else — @endif
+                </div>
               </div>
               <div style="display:flex;justify-content:space-between;margin-bottom:8px">
                 <div style="width:45%"><strong>No. of Passengers:</strong></div>
@@ -520,7 +546,17 @@
           <tr>
             <td class="tg-pmdb"></td>
             <td class="tg-pmdb">6. Date(s) of Travel</td>
-            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">{{ ($request->date_needed ?? '') }}{{ isset($request->date_end) ? ' to ' . $request->date_end : '' }}</span></td>
+            <td class="tg-pmdb" colspan="2"><span style="font-weight:bold;text-decoration:underline">@php
+                $allDates3 = [];
+                if (!empty($request->date_needed_multiple) && is_array($request->date_needed_multiple)) {
+                    foreach ($request->date_needed_multiple as $d) {
+                        try { $allDates3[] = \Carbon\Carbon::parse($d)->format('M d, Y'); } catch (\Throwable $e) { $allDates3[] = $d; }
+                    }
+                } elseif (!empty($request->date_needed)) {
+                    try { $allDates3[] = \Carbon\Carbon::parse($request->date_needed)->format('M d, Y'); } catch (\Throwable $e) { $allDates3[] = $request->date_needed; }
+                }
+                echo count($allDates3) > 0 ? implode(', ', $allDates3) : '—';
+            @endphp</span></td>
             <td class="tg-pmdb"></td>
           </tr>
           <!-- Recommending Approval and Approval sections -->
