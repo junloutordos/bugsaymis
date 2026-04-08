@@ -34,6 +34,9 @@ class RolesSeeder extends Seeder
             ['name' => 'GSU Head',           'description' => 'General Services Unit Head.'],
             ['name' => 'Dorm Manager',       'description' => 'Manages dormitory operations.'],
 
+            // ── General Services ──────────────────────────────────────────────
+            ['name' => 'FAD Chief',          'description' => 'Finance and Administrative Division Chief. Approves facility, work, and service requests.'],
+
             // ── HR & Payroll ──────────────────────────────────────────────────
             ['name' => 'Payroll Officer',    'description' => 'Processes, approves, and releases payroll runs.'],
 
