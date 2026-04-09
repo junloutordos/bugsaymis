@@ -432,6 +432,14 @@ const menuItems = [
         permissions: ["roles.assign"],
       },
       {
+        label: "Org Structure",
+        routeName: "hr.org.index",
+        href: route("hr.org.index"),
+        icon: BuildingLibraryIcon,
+        roles: ["Administrator"],
+        permissions: ["org.view"],
+      },
+      {
         label: "Buildings",
         routeName: "buildings.index",
         href: route("buildings.index"),
@@ -567,14 +575,6 @@ const menuItems = [
         icon: ClockIcon,
         roles: ["Administrator", "HR"],
         permissions: ["hr.schedule.manage"],
-      },
-      {
-        label: "Org Structure",
-        routeName: "hr.org.index",
-        href: route("hr.org.index"),
-        icon: BuildingLibraryIcon,
-        roles: ["Administrator", "HR", "OCD", "DivisionChief", "PMT", "MIS", "Faculty", "Staff"],
-        permissions: ["org.view"],
       },
       
       {

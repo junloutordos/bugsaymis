@@ -1,51 +1,77 @@
 <script setup>
-import { computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { ref, computed } from 'vue'
+import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   BuildingLibraryIcon,
   UsersIcon,
-  BuildingOfficeIcon,
+  BuildingOffice2Icon,
   ArrowDownTrayIcon,
   PrinterIcon,
   ChartBarIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  stats: { type: Object, required: true },
+  roster:      { type: Array,  default: () => [] },
+  totalCount:  { type: Number, default: 0 },
+  byCategory:  { type: Object, default: () => ({}) },
+  bySex:       { type: Object, default: () => ({}) },
+  generatedAt: { type: String, default: '' },
 })
 
-const TYPE_LABEL = {
-  institution: 'Institution',
-  division:    'Division',
-  department:  'Department',
-  section:     'Section',
-  unit:        'Unit',
-  office:      'Office',
-  committee:   'Committee',
-}
-
-const TYPE_COLOR = {
-  institution: 'bg-violet-100 text-violet-700',
-  division:    'bg-blue-100 text-blue-700',
-  department:  'bg-cyan-100 text-cyan-700',
-  section:     'bg-teal-100 text-teal-700',
-  unit:        'bg-emerald-100 text-emerald-700',
-  office:      'bg-amber-100 text-amber-700',
-  committee:   'bg-pink-100 text-pink-700',
-}
-
-const byTypeList = computed(() =>
-  Object.entries(props.stats.by_type ?? {}).map(([type, data]) => ({
-    type,
-    label: TYPE_LABEL[type] ?? type,
-    colorClass: TYPE_COLOR[type] ?? 'bg-slate-100 text-slate-600',
-    ...data,
-  })).sort((a, b) => b.count - a.count)
+// Expand/collapse state per division
+const expanded = ref(
+  Object.fromEntries(props.roster.map(d => [d.id, true]))
 )
+function toggle(id) {
+  expanded.value[id] = !expanded.value[id]
+}
 
-function openPrint() {
-  window.open(route('hr.org.print'), '_blank')
+// Search
+const search = ref('')
+const filtered = computed(() => {
+  const q = search.value.toLowerCase().trim()
+  if (!q) return props.roster
+
+  return props.roster.map(div => {
+    const offices = div.offices
+      .map(o => ({
+        ...o,
+        employees: o.employees.filter(e =>
+          e.name.toLowerCase().includes(q) ||
+          (e.badge_id ?? '').toLowerCase().includes(q) ||
+          (e.position ?? '').toLowerCase().includes(q)
+        ),
+      }))
+      .filter(o => o.employees.length)
+
+    const unassigned = div.unassigned.filter(e =>
+      e.name.toLowerCase().includes(q) ||
+      (e.badge_id ?? '').toLowerCase().includes(q) ||
+      (e.position ?? '').toLowerCase().includes(q)
+    )
+
+    if (!offices.length && !unassigned.length) return null
+    return { ...div, offices, unassigned }
+  }).filter(Boolean)
+})
+
+function fmtDate(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+function categoryColor(c) {
+  const map = {
+    'Teaching':     'bg-blue-100 text-blue-700',
+    'Non-Teaching': 'bg-amber-100 text-amber-700',
+    'Contractual':  'bg-violet-100 text-violet-700',
+    'COS':          'bg-pink-100 text-pink-700',
+    'JO':           'bg-orange-100 text-orange-700',
+  }
+  return map[c] ?? 'bg-slate-100 text-slate-500'
 }
 </script>
 
@@ -59,26 +85,13 @@ function openPrint() {
         <div>
           <h1 class="text-xl font-semibold text-slate-800 flex items-center gap-2">
             <ChartBarIcon class="h-6 w-6 text-indigo-500" />
-            Org Structure Reports
+            Org Structure Report
           </h1>
-          <p class="text-sm text-slate-500 mt-0.5">Summary statistics and data exports.</p>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Generated {{ fmtDate(generatedAt) }} &bull; {{ totalCount }} active employees
+          </p>
         </div>
-
-        <!-- Export buttons -->
         <div class="flex items-center gap-2 flex-wrap">
-          <button
-            @click="openPrint"
-            class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium"
-          >
-            <PrinterIcon class="h-4 w-4" /> Print Chart
-          </button>
-          <a
-            :href="route('hr.org.export.pdf')"
-            target="_blank"
-            class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg font-medium"
-          >
-            <ArrowDownTrayIcon class="h-4 w-4" /> Download PDF
-          </a>
           <a
             :href="route('hr.org.export.units-csv')"
             class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium"
@@ -91,102 +104,181 @@ function openPrint() {
           >
             <ArrowDownTrayIcon class="h-4 w-4" /> Assignments CSV
           </a>
+          <a
+            :href="route('hr.org.index')"
+            class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium"
+          >
+            ← Org Chart
+          </a>
         </div>
       </div>
 
-      <!-- ── Summary cards ─────────────────────────────────────────────────────── -->
+      <!-- Summary cards -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4">
-          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Units</p>
-          <p class="text-3xl font-bold text-indigo-600 mt-1">{{ stats.total_units }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">{{ stats.active_units }} active</p>
+          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Total Employees</p>
+          <p class="text-3xl font-bold text-indigo-600 mt-1">{{ totalCount }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">active</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4">
-          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Employees Assigned</p>
-          <p class="text-3xl font-bold text-emerald-600 mt-1">{{ stats.total_employees }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">active assignments</p>
+          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Divisions</p>
+          <p class="text-3xl font-bold text-violet-600 mt-1">{{ roster.length }}</p>
+          <p class="text-xs text-slate-500 mt-0.5">active</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4">
-          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Root Units</p>
-          <p class="text-3xl font-bold text-violet-600 mt-1">{{ stats.root_units }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">top-level institutions</p>
+          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">By Category</p>
+          <div class="mt-1 space-y-0.5">
+            <div v-for="(count, cat) in byCategory" :key="cat" class="flex items-center justify-between gap-2">
+              <span class="text-xs text-slate-600 truncate">{{ cat || 'Unset' }}</span>
+              <span class="text-xs font-semibold text-slate-800">{{ count }}</span>
+            </div>
+          </div>
         </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4">
-          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Max Depth</p>
-          <p class="text-3xl font-bold text-amber-600 mt-1">{{ stats.max_depth }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">hierarchy levels</p>
+          <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">By Sex</p>
+          <div class="mt-1 space-y-0.5">
+            <div v-for="(count, sex) in bySex" :key="sex" class="flex items-center justify-between gap-2">
+              <span class="text-xs text-slate-600 capitalize">{{ sex || 'Unset' }}</span>
+              <span class="text-xs font-semibold text-slate-800">{{ count }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Search -->
+      <div class="flex items-center gap-3">
+        <input
+          v-model="search"
+          type="search"
+          placeholder="Search employee, badge ID, or position…"
+          class="w-full max-w-sm border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        <span v-if="search" class="text-xs text-slate-400">
+          Showing results in {{ filtered.length }} division(s)
+        </span>
+      </div>
 
-        <!-- ── By type ───────────────────────────────────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-          <div class="px-5 py-3 border-b border-slate-100">
-            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <BuildingOfficeIcon class="h-4 w-4 text-indigo-400" /> Units by Type
-            </h3>
-          </div>
-          <ul class="divide-y divide-slate-100">
-            <li
-              v-for="row in byTypeList"
-              :key="row.type"
-              class="px-5 py-3 flex items-center gap-3"
-            >
-              <span :class="['text-xs font-semibold px-2 py-0.5 rounded uppercase tracking-wide w-24 text-center', row.colorClass]">
-                {{ row.label }}
+      <!-- Division → Office → Employees -->
+      <div class="space-y-4">
+        <div
+          v-for="div in filtered"
+          :key="div.id"
+          class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden"
+        >
+          <!-- Division header -->
+          <button
+            @click="toggle(div.id)"
+            class="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <BuildingLibraryIcon class="h-5 w-5 text-indigo-400 shrink-0" />
+              <div class="min-w-0">
+                <span class="text-sm font-semibold text-slate-800">{{ div.name }}</span>
+                <span class="ml-2 text-xs font-mono text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded">{{ div.acronym }}</span>
+                <p v-if="div.chief" class="text-xs text-slate-400 mt-0.5 truncate">
+                  Chief: {{ div.chief }}<span v-if="div.chief_pos"> — {{ div.chief_pos }}</span>
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">
+                {{ div.total }} employee{{ div.total !== 1 ? 's' : '' }}
               </span>
-              <div class="flex-1">
-                <!-- Bar -->
-                <div class="w-full bg-slate-100 rounded-full h-1.5 mt-1">
-                  <div
-                    class="bg-indigo-400 h-1.5 rounded-full"
-                    :style="{ width: stats.total_units > 0 ? (row.count / stats.total_units * 100) + '%' : '0%' }"
-                  ></div>
-                </div>
-              </div>
-              <span class="text-sm font-semibold text-slate-700 w-6 text-right">{{ row.count }}</span>
-              <span class="text-xs text-slate-400 w-10 text-right">{{ row.employees }} emp.</span>
-            </li>
-          </ul>
-        </div>
+              <ChevronDownIcon v-if="expanded[div.id]" class="h-4 w-4 text-slate-400" />
+              <ChevronRightIcon v-else class="h-4 w-4 text-slate-400" />
+            </div>
+          </button>
 
-        <!-- ── Top units by employee count ─────────────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-          <div class="px-5 py-3 border-b border-slate-100">
-            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <UsersIcon class="h-4 w-4 text-indigo-400" /> Most Staffed Units
-            </h3>
-          </div>
-          <ul class="divide-y divide-slate-100">
-            <li
-              v-for="(u, i) in stats.top_units"
-              :key="u.id"
-              class="px-5 py-3 flex items-center gap-3"
+          <!-- Offices & employees -->
+          <div v-show="expanded[div.id]">
+
+            <!-- Per-office table -->
+            <div
+              v-for="office in div.offices"
+              :key="office.id"
+              class="border-t border-slate-100"
             >
-              <span class="text-xs text-slate-400 w-5 text-right font-mono">{{ i + 1 }}</span>
-              <div class="flex-1 min-w-0">
-                <a
-                  :href="route('hr.org.units.show', u.id)"
-                  class="text-sm font-medium text-slate-800 hover:text-indigo-600 truncate block"
-                >
-                  {{ u.name }}
-                </a>
-                <p class="text-xs text-slate-400 font-mono">{{ u.code }} · {{ u.type }}</p>
+              <!-- Office sub-header -->
+              <div class="flex items-center gap-2 px-5 py-2.5 bg-slate-50">
+                <BuildingOffice2Icon class="h-4 w-4 text-slate-400 shrink-0" />
+                <span class="text-xs font-semibold text-slate-600 uppercase tracking-wide">{{ office.name }}</span>
+                <span class="text-xs text-slate-400 ml-1">({{ office.employees.length }})</span>
               </div>
-              <span class="text-sm font-semibold text-indigo-600">{{ u.employee_count }}</span>
-            </li>
-            <li v-if="!stats.top_units?.length" class="px-5 py-8 text-center text-sm text-slate-400">
-              No data yet.
-            </li>
-          </ul>
-        </div>
-      </div>
 
-      <!-- ── Quick links ────────────────────────────────────────────────────────── -->
-      <div class="flex flex-wrap gap-3">
-        <a :href="route('hr.org.index')" class="text-sm text-indigo-600 hover:underline">← Back to Org Chart</a>
-        <a :href="route('hr.org.versions.index')" class="text-sm text-indigo-600 hover:underline">Version History →</a>
+              <!-- Employee rows -->
+              <table v-if="office.employees.length" class="w-full text-sm">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Badge ID</th>
+                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+                    <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Sex</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                  <tr
+                    v-for="emp in office.employees"
+                    :key="emp.id"
+                    class="hover:bg-slate-50/70 transition-colors"
+                  >
+                    <td class="px-5 py-2.5 font-medium text-slate-800">{{ emp.name }}</td>
+                    <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ emp.badge_id ?? '—' }}</td>
+                    <td class="px-4 py-2.5 text-slate-600 text-xs">{{ emp.position ?? '—' }}</td>
+                    <td class="px-4 py-2.5">
+                      <span v-if="emp.emp_category" :class="['text-xs px-2 py-0.5 rounded-full font-medium', categoryColor(emp.emp_category)]">
+                        {{ emp.emp_category }}
+                      </span>
+                      <span v-else class="text-xs text-slate-400">—</span>
+                    </td>
+                    <td class="px-4 py-2.5 text-xs text-slate-500 capitalize">{{ emp.sex ?? '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="px-5 py-3 text-xs text-slate-400 italic">No employees assigned to this office.</p>
+            </div>
+
+            <!-- Unassigned to any office -->
+            <div v-if="div.unassigned.length" class="border-t border-amber-100">
+              <div class="flex items-center gap-2 px-5 py-2.5 bg-amber-50">
+                <UsersIcon class="h-4 w-4 text-amber-400 shrink-0" />
+                <span class="text-xs font-semibold text-amber-700 uppercase tracking-wide">No Office/Unit Assigned</span>
+                <span class="text-xs text-amber-500 ml-1">({{ div.unassigned.length }})</span>
+              </div>
+              <table class="w-full text-sm">
+                <tbody class="divide-y divide-slate-50">
+                  <tr
+                    v-for="emp in div.unassigned"
+                    :key="emp.id"
+                    class="hover:bg-amber-50/40"
+                  >
+                    <td class="px-5 py-2.5 font-medium text-slate-800 w-1/3">{{ emp.name }}</td>
+                    <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ emp.badge_id ?? '—' }}</td>
+                    <td class="px-4 py-2.5 text-slate-600 text-xs">{{ emp.position ?? '—' }}</td>
+                    <td class="px-4 py-2.5">
+                      <span v-if="emp.emp_category" :class="['text-xs px-2 py-0.5 rounded-full font-medium', categoryColor(emp.emp_category)]">
+                        {{ emp.emp_category }}
+                      </span>
+                      <span v-else class="text-xs text-slate-400">—</span>
+                    </td>
+                    <td class="px-4 py-2.5 text-xs text-slate-500 capitalize">{{ emp.sex ?? '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Division total footer -->
+            <div class="border-t border-slate-100 px-5 py-2.5 bg-slate-50 flex justify-end">
+              <span class="text-xs text-slate-500 font-medium">
+                Total for {{ div.acronym }}: {{ div.total }} employee{{ div.total !== 1 ? 's' : '' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="!filtered.length" class="text-center text-sm text-slate-400 py-12">
+          No matching employees found.
+        </p>
       </div>
 
     </div>

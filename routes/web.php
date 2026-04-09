@@ -882,6 +882,7 @@ Route::middleware(['auth', 'permission:roles.assign'])
 // HR Employees page
 Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
 Route::middleware(['auth','permission:hr.employees.manage'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
+Route::middleware(['auth','permission:hr.employees.manage'])->patch('/hr/employees/{user}/salary-grade', [UserController::class, 'assignSalaryGrade'])->name('hr.employees.salary-grade');
 
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
@@ -1631,6 +1632,10 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
         ->name('heads.end');
     Route::delete('/heads/{head}', [\App\Http\Controllers\HR\UnitHeadController::class, 'destroy'])
         ->name('heads.destroy');
+
+    // ── Sync from legacy divisions/offices ─────────────────────────────────────
+    Route::post('/sync-legacy', [\App\Http\Controllers\HR\OrgUnitController::class, 'syncFromLegacy'])
+        ->name('sync-legacy');
 
     // ── Reports ────────────────────────────────────────────────────────────────
     Route::get('/reports', [\App\Http\Controllers\HR\OrgUnitController::class, 'reports'])

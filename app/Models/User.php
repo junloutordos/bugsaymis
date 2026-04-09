@@ -32,6 +32,8 @@ class User extends Authenticatable
         'electronic_signature',
         'emp_category',
         'on_study_leave',
+        'salary_grade',
+        'salary_step',
     ];
 
     protected $hidden = [

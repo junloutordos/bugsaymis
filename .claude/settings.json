@@ -1,41 +1,44 @@
 {
   "permissions": {
     "allow": [
-<<<<<<< HEAD
-      "Bash(python3 -:*)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/UserController.php)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/VehicleRequestController.php)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/MessengerialController.php)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/FacilityRequestController.php)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/WorkRequestController.php)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/ITJobRequestController.php)",
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/DocumentTrackingController.php)",
-      "Bash(git reset --hard df61ce5)"
-=======
-      "Bash(php artisan migrate --path=database/migrations/2026_03_12_000002_add_local_path_to_accomplishment_photos.php)",
-<<<<<<< HEAD
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/AccomplishmentController.php)"
->>>>>>> 45810f7c6c35fb23ac377840d5e6d76aff4d145f
-=======
-      "Bash(php -l /Users/junlou/bugsaymis/app/Http/Controllers/AccomplishmentController.php)",
-      "Bash(php artisan migrate --path=database/migrations/2026_03_13_000001_create_app_versions_table.php)",
-      "Bash(php artisan:*)",
-      "Bash(grep -r ziggy resources/js/ --include=*.js --include=*.ts -l)",
-      "Bash(find /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Services -type f -name *.php)",
-      "Bash(grep -l \"pds\\\\|PDS\\\\|personal.*data\" /Users/junlou/bugsaymis-docker/src/bugsaymis/database/migrations/*.php)",
-      "Bash(docker ps:*)",
-      "Bash(docker exec:*)",
-      "Bash(npm run:*)",
-      "Bash(docker compose exec app php artisan tinker --execute=\":*)",
-      "Bash(docker compose:*)",
-      "Bash(ipconfig getifaddr:*)",
-      "Bash(python3 -m json.tool)",
-      "Bash(find /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Http/Controllers/HumanResource -type f -name *.php)",
-      "Bash(find /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Http/Controllers -maxdepth 1 -type f -name *HR* -o -name *HumanResource*)"
+      "Bash(cd /Users/junlou/bugsaymis-docker && docker compose exec php bash -c *)",
+      "Bash(docker compose exec php bash -c *)",
+      "Bash(docker compose *)",
+      "Bash(docker ps*)",
+      "Bash(docker exec *)",
+      "Bash(php artisan*)",
+      "Bash(php -l *)",
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "Bash(npm --version)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add *)",
+      "Bash(git commit*)",
+      "Bash(git branch*)",
+      "Bash(git checkout *)",
+      "Bash(git stash*)",
+      "Bash(python3 *)",
+      "Bash(wc -l *)",
+      "Bash(ipconfig getifaddr*)"
     ],
     "additionalDirectories": [
+      "/Users/junlou/bugsaymis-docker",
       "/Users/junlou/bugsaymis-docker/nginx"
->>>>>>> d5c12d03872d5ca84cb428e6cc35822991d13f05
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/junlou/bugsaymis-docker/src/bugsaymis/.claude/hooks/post-edit-php-lint.sh"
+          }
+        ]
+      }
     ]
   }
 }

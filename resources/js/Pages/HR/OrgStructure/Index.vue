@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppModal from '@/Components/AppModal.vue'
@@ -16,6 +16,7 @@ import {
   PrinterIcon,
   ChartBarIcon,
   ClockIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Props ──────────────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ const props = defineProps({
   tree:            { type: Array,   default: () => [] },
   includeInactive: { type: Boolean, default: false },
   types:           { type: Array,   default: () => [] },
+  divisions:       { type: Array,   default: () => [] },
   can:             { type: Object,  default: () => ({}) },
 })
 
@@ -202,6 +204,24 @@ async function submitDelete() {
   }
 }
 
+// ── Legacy sync ────────────────────────────────────────────────────────────────
+const showLegacyPanel = ref(false)
+const showSyncConfirm = ref(false)
+const syncForm        = useForm({})
+
+const allLinked = computed(() =>
+  props.divisions.every(d => d.is_linked && d.offices.every(o => o.is_linked))
+)
+
+function submitSync() {
+  syncForm.post(route('hr.org.sync-legacy'), {
+    onSuccess: () => {
+      showSyncConfirm.value = false
+      showLegacyPanel.value = false
+    },
+  })
+}
+
 // ── Toggle inactive view ───────────────────────────────────────────────────────
 function toggleInactive() {
   router.get(route('hr.org.index'), { include_inactive: !props.includeInactive ? 1 : 0 }, {
@@ -255,6 +275,21 @@ function toggleInactive() {
           >
             <ClockIcon class="h-4 w-4" />
           </a>
+          <!-- Sync from Divisions & Offices -->
+          <button
+            v-if="can.sync"
+            @click="showLegacyPanel = !showLegacyPanel"
+            :class="[
+              'inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors border',
+              showLegacyPanel
+                ? 'bg-amber-50 border-amber-300 text-amber-700'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+            ]"
+            title="Reconcile with Divisions & Offices"
+          >
+            <ArrowsRightLeftIcon class="h-4 w-4" />
+            <span class="hidden sm:inline">Sync Data</span>
+          </button>
           <button
             v-if="can.create"
             @click="openCreate()"
@@ -271,6 +306,74 @@ function toggleInactive() {
       </div>
       <div v-if="flash.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ flash.error }}
+      </div>
+
+      <!-- ── Inertia flash ────────────────────────────────────────────────────── -->
+      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.success }}
+      </div>
+      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.error }}
+      </div>
+
+      <!-- ── Legacy Data Reconciliation Panel ─────────────────────────────────── -->
+      <div v-if="showLegacyPanel" class="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-4">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <ArrowsRightLeftIcon class="h-4 w-4" />
+              Existing Divisions &amp; Offices
+            </h2>
+            <p class="text-xs text-amber-700 mt-1">
+              These are the canonical divisions and offices used throughout the system (Leave, DTR, Payroll, etc.).
+              Units marked <span class="font-semibold text-emerald-700">linked</span> already have a corresponding org unit.
+              Click <strong>Sync Now</strong> to rebuild the org tree from this data.
+            </p>
+          </div>
+          <button @click="showLegacyPanel = false" class="text-amber-500 hover:text-amber-700 text-xs shrink-0">Close</button>
+        </div>
+
+        <!-- Division list -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div
+            v-for="div in divisions" :key="div.id"
+            class="bg-white rounded-lg border border-amber-200 p-3 space-y-2"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">{{ div.acronym }}</span>
+              <span :class="div.is_linked ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'"
+                    class="text-xs px-2 py-0.5 rounded-full font-medium">
+                {{ div.is_linked ? 'Linked' : 'Not linked' }}
+              </span>
+            </div>
+            <p class="text-xs font-medium text-slate-700 leading-tight">{{ div.name }}</p>
+            <ul class="space-y-1">
+              <li v-for="off in div.offices" :key="off.id" class="flex items-center justify-between gap-1">
+                <span class="text-xs text-slate-600 truncate">{{ off.name }}</span>
+                <span :class="off.is_linked ? 'text-emerald-600' : 'text-red-400'" class="text-xs shrink-0">
+                  {{ off.is_linked ? '✓' : '—' }}
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Summary + Sync button -->
+        <div class="flex items-center justify-between pt-1">
+          <p class="text-xs text-amber-700">
+            <span v-if="allLinked" class="text-emerald-700 font-semibold">All divisions and offices are linked.</span>
+            <span v-else class="font-semibold">Some records are not yet linked to org units.</span>
+            Syncing will rebuild the tree to match exactly.
+          </p>
+          <button
+            v-if="can.sync"
+            @click="showSyncConfirm = true"
+            class="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <ArrowsRightLeftIcon class="h-4 w-4" />
+            Sync Now
+          </button>
+        </div>
       </div>
 
       <!-- ── Main layout: tree + side panel ──────────────────────────────────── -->
@@ -615,6 +718,28 @@ function toggleInactive() {
         <button @click="submitUpdate" :disabled="loading"
           class="text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-60">
           {{ loading ? 'Saving…' : 'Save Changes' }}
+        </button>
+      </template>
+    </AppModal>
+
+    <!-- ── SYNC CONFIRM MODAL ────────────────────────────────────────────────── -->
+    <AppModal :show="showSyncConfirm" title="Sync from Divisions & Offices?" size="sm" @close="showSyncConfirm = false">
+      <p class="text-sm text-slate-600">
+        This will rebuild the organizational tree to match the existing
+        <span class="font-semibold text-slate-800">Divisions</span> and
+        <span class="font-semibold text-slate-800">Offices</span> data.
+      </p>
+      <ul class="mt-3 text-xs text-slate-500 space-y-1 list-disc list-inside">
+        <li>Each Division becomes a top-level branch under PSHS-CRC.</li>
+        <li>Each Office is placed under its Division.</li>
+        <li>Existing org units with no division/office link will be archived.</li>
+        <li>Already-linked units are updated in place (names, status).</li>
+      </ul>
+      <template #footer>
+        <button @click="showSyncConfirm = false" class="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
+        <button @click="submitSync" :disabled="syncForm.processing"
+          class="text-sm px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium disabled:opacity-60">
+          {{ syncForm.processing ? 'Syncing…' : 'Sync Now' }}
         </button>
       </template>
     </AppModal>

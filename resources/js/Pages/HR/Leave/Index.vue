@@ -116,12 +116,13 @@ const canApprove = page.props.auth?.user?.permissions?.includes('hr.leave.approv
 const canFile = page.props.auth?.user?.permissions?.includes('hr.leave.file')
 
 const statusOptions = [
-  { value: '',           label: 'All' },
-  { value: 'pending',    label: 'Pending' },
-  { value: 'forwarded',  label: 'Forwarded' },
-  { value: 'approved',   label: 'Approved' },
-  { value: 'rejected',   label: 'Rejected' },
-  { value: 'cancelled',  label: 'Cancelled' },
+  { value: '',            label: 'All' },
+  { value: 'pending',     label: 'Pending' },
+  { value: 'hr_verified', label: 'For Division Chief' },
+  { value: 'forwarded',   label: 'For Campus Director' },
+  { value: 'approved',    label: 'Approved' },
+  { value: 'rejected',    label: 'Rejected' },
+  { value: 'cancelled',   label: 'Cancelled' },
 ]
 
 function setFilter(status) {
@@ -134,17 +135,25 @@ function goTo(url) {
 
 function statusClass(s) {
   const map = {
-    pending:   'bg-amber-100 text-amber-700',
-    forwarded: 'bg-blue-100 text-blue-700',
-    approved:  'bg-emerald-100 text-emerald-700',
-    rejected:  'bg-red-100 text-red-600',
-    cancelled: 'bg-slate-100 text-slate-500',
+    pending:     'bg-amber-100 text-amber-700',
+    hr_verified: 'bg-violet-100 text-violet-700',
+    forwarded:   'bg-blue-100 text-blue-700',
+    approved:    'bg-emerald-100 text-emerald-700',
+    rejected:    'bg-red-100 text-red-600',
+    cancelled:   'bg-slate-100 text-slate-500',
   }
   return map[s] ?? 'bg-slate-100 text-slate-500'
 }
 
 function statusLabel(s) {
-  const map = { pending: 'Pending', forwarded: 'For HR Approval', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' }
+  const map = {
+    pending:     'Pending',
+    hr_verified: 'For Division Chief',
+    forwarded:   'For Campus Director',
+    approved:    'Approved',
+    rejected:    'Rejected',
+    cancelled:   'Cancelled',
+  }
   return map[s] ?? s
 }
 

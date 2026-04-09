@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
 use App\Models\HR\LeaveType;
+use App\Models\FacultyLoading\SalarySchedule;
 use App\Services\HR\LeaveCreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -116,51 +117,77 @@ class LeaveApplicationController extends Controller
         $this->authorize('hr.leave.view');
 
         return Inertia::render('HR/Leave/Show', [
-            'application' => $leaveApplication->load(['user', 'leaveType', 'divisionChief', 'approvedBy']),
+            'application' => $leaveApplication->load([
+                'user', 'leaveType',
+                'hrOfficer',       // Stage 1
+                'divisionChief',   // Stage 2
+                'approvedBy',      // Stage 3
+            ]),
         ]);
     }
 
+    /**
+     * 3-stage approval workflow:
+     *   Stage 1 — hr_officer   : HR Officer certifies leave credits  (pending      → hr_verified)
+     *   Stage 2 — division_chief: Division Chief recommends           (hr_verified  → forwarded)
+     *   Stage 3 — campus_director: Campus Director final approval     (forwarded    → approved/rejected)
+     */
     public function approve(Request $request, LeaveApplication $leaveApplication)
     {
         $this->authorize('hr.leave.approve');
 
         $data = $request->validate([
-            'action'  => 'required|in:approved,rejected,forwarded',
+            'stage'   => 'required|in:hr_officer,division_chief,campus_director',
+            'action'  => 'required|string',
             'remarks' => 'nullable|string|max:500',
-            'stage'   => 'required|in:division_chief,hr',
         ]);
 
         DB::transaction(function () use ($data, $leaveApplication) {
-            if ($data['stage'] === 'division_chief') {
-                $leaveApplication->update([
-                    'division_chief_id'      => Auth::id(),
-                    'division_chief_action'  => $data['action'],
-                    'division_chief_at'      => now(),
-                    'division_chief_remarks' => $data['remarks'],
-                    'status'                 => $data['action'] === 'forwarded' ? 'forwarded' : $data['action'],
-                ]);
+            switch ($data['stage']) {
 
-                // Restoration when DC rejects a previously-forwarded application
-                if ($data['action'] === 'rejected') {
-                    $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
-                }
-            } else {
-                // HR final action
-                $leaveApplication->update([
-                    'approved_by'      => Auth::id(),
-                    'approval_action'  => $data['action'],
-                    'approved_at'      => now(),
-                    'approval_remarks' => $data['remarks'],
-                    'status'           => $data['action'],
-                ]);
+                case 'hr_officer':
+                    // Valid actions: certified | rejected
+                    abort_unless(in_array($data['action'], ['certified', 'rejected']), 422);
+                    $leaveApplication->update([
+                        'hr_officer_id'      => Auth::id(),
+                        'hr_officer_action'  => $data['action'],
+                        'hr_officer_at'      => now(),
+                        'hr_officer_remarks' => $data['remarks'],
+                        'status'             => $data['action'] === 'certified' ? 'hr_verified' : 'rejected',
+                    ]);
+                    break;
 
-                if ($data['action'] === 'approved') {
-                    // Deduct credits; marks is_without_pay automatically if balance insufficient
-                    $this->credits->applyLeaveDeduction($leaveApplication->id, Auth::id());
-                } elseif ($data['action'] === 'rejected') {
-                    // Restore any credits that were deducted at an earlier stage
-                    $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
-                }
+                case 'division_chief':
+                    // Valid actions: forwarded | rejected
+                    abort_unless(in_array($data['action'], ['forwarded', 'rejected']), 422);
+                    $leaveApplication->update([
+                        'division_chief_id'      => Auth::id(),
+                        'division_chief_action'  => $data['action'],
+                        'division_chief_at'      => now(),
+                        'division_chief_remarks' => $data['remarks'],
+                        'status'                 => $data['action'],
+                    ]);
+                    if ($data['action'] === 'rejected') {
+                        $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
+                    }
+                    break;
+
+                case 'campus_director':
+                    // Valid actions: approved | rejected
+                    abort_unless(in_array($data['action'], ['approved', 'rejected']), 422);
+                    $leaveApplication->update([
+                        'approved_by'      => Auth::id(),
+                        'approval_action'  => $data['action'],
+                        'approved_at'      => now(),
+                        'approval_remarks' => $data['remarks'],
+                        'status'           => $data['action'],
+                    ]);
+                    if ($data['action'] === 'approved') {
+                        $this->credits->applyLeaveDeduction($leaveApplication->id, Auth::id());
+                    } else {
+                        $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
+                    }
+                    break;
             }
         });
 
@@ -173,7 +200,7 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        if (! in_array($leaveApplication->status, ['pending', 'forwarded', 'approved'])) {
+        if (! in_array($leaveApplication->status, ['pending', 'hr_verified', 'forwarded', 'approved'])) {
             return back()->with('error', 'This application cannot be cancelled.');
         }
 
@@ -278,7 +305,20 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        $application = $leaveApplication->load(['user', 'leaveType', 'divisionChief', 'approvedBy']);
+        $application = $leaveApplication->load(['user.division.divisionchief', 'leaveType', 'hrOfficer', 'divisionChief', 'approvedBy']);
+
+        // Resolve monthly salary from salary schedule (salary_grade + salary_step on the user)
+        $monthlySalary = null;
+        $u = $application->user;
+        if ($u && $u->salary_grade) {
+            $row = SalarySchedule::where('is_current', true)
+                ->where('salary_grade', $u->salary_grade)
+                ->where('step', $u->salary_step ?? 1)
+                ->first();
+            if ($row) {
+                $monthlySalary = number_format((float) $row->monthly_rate, 2);
+            }
+        }
 
         // Leave credits for the year of the application
         $year    = \Carbon\Carbon::parse($application->date_from)->year;
@@ -304,13 +344,26 @@ class LeaveApplicationController extends Controller
             ];
         }
 
-        // Certifying officer — division chief who reviewed (or first approver)
+        // Certifying officer (7.A) — HR Officer who certified the leave credits
         $certifyingOfficer = null;
-        if ($application->division_chief_id && $application->divisionChief) {
+        if ($application->hr_officer_id && $application->hrOfficer) {
             $certifyingOfficer = [
-                'name'     => $application->divisionChief->name,
-                'position' => $application->divisionChief->position ?? 'Authorized Officer',
+                'name'     => $application->hrOfficer->name,
+                'position' => $application->hrOfficer->position ?? 'Human Resource Officer',
             ];
+        }
+
+        // Authorized Officer (7.B) — Division Chief of the division the user belongs to
+        $authorizedOfficer = null;
+        $divChief = $application->user?->division?->divisionchief;
+        if ($divChief) {
+            $authorizedOfficer = [
+                'name'     => $divChief->name,
+                'position' => $divChief->position ?? 'Division Chief',
+            ];
+        } elseif ($certifyingOfficer) {
+            // fallback: use the application's reviewing officer
+            $authorizedOfficer = $certifyingOfficer;
         }
 
         // Authorized official — OCD / Campus Director
@@ -333,7 +386,9 @@ class LeaveApplicationController extends Controller
             'application'        => $application,
             'credits'            => $creditsMap,
             'certifyingOfficer'  => $certifyingOfficer,
+            'authorizedOfficer'  => $authorizedOfficer,
             'authorizedOfficial' => $authorizedOfficial,
+            'monthlySalary'      => $monthlySalary,
         ]);
     }
 
