@@ -1668,6 +1668,38 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
         ->name('versions.destroy');
 });
 
+// ── Student Attendance Module ──────────────────────────────────────────────────
+Route::middleware(['auth'])->prefix('student-attendance')->name('student-attendance.')->group(function () {
+
+    // Kiosk scan endpoint — called by the gate scanner Vue page via fetch
+    Route::post('/scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'scan'])
+        ->name('scan');
+
+    // Logs browser — admin/guard views attendance history
+    Route::get('/logs', [\App\Http\Controllers\StudentAttendance\AttendanceLogController::class, 'index'])
+        ->name('logs.index')
+        ->middleware('permission:students.attendance.view');
+
+    // Gate kiosk UI — full-screen scanner page
+    Route::get('/kiosk', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'index'])
+        ->name('kiosk')
+        ->middleware('permission:students.attendance.scan');
+
+    // Parent contacts management
+    Route::get('/parents', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'index'])
+        ->name('parents.index')
+        ->middleware('permission:students.attendance.view');
+    Route::post('/parents', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'store'])
+        ->name('parents.store')
+        ->middleware('permission:students.attendance.view');
+    Route::put('/parents/{parentContact}', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'update'])
+        ->name('parents.update')
+        ->middleware('permission:students.attendance.view');
+    Route::delete('/parents/{parentContact}', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'destroy'])
+        ->name('parents.destroy')
+        ->middleware('permission:students.attendance.view');
+});
+
 // Development-only: send a test email
 if (app()->environment('local')) {
     Route::get('/dev/send-test-email', function () {

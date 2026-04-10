@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\StudentAttendance\ParentContact;
+use App\Models\StudentAttendance\StudentAttendanceLog;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Student extends Model
+{
+    protected $table = 'students';
+
+    // Legacy table has no updated_at
+    const UPDATED_AT = null;
+    public $timestamps = false;
+
+    // Read-only — prevent accidental writes through this model
+    protected $guarded = ['*'];
+
+    // ── Relations ──────────────────────────────────────────────────────────────
+
+    public function attendanceLogs(): HasMany
+    {
+        return $this->hasMany(StudentAttendanceLog::class, 'student_id');
+    }
+
+    public function parentContacts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ParentContact::class,
+            'student_parent_contact',
+            'student_id',
+            'parent_contact_id'
+        )->withPivot('relationship');
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /** Full name formatted as "Lastname, Firstname Middlename" */
+    public function getFullNameAttribute(): string
+    {
+        $middle = $this->middlename ? " {$this->middlename}" : '';
+        return trim("{$this->lastname}, {$this->firstname}{$middle}");
+    }
+
+    /** The barcode value used for gate scanning */
+    public function getBarcodeAttribute(): ?string
+    {
+        return $this->pisaysystemID ?: null;
+    }
+}
