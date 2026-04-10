@@ -13,9 +13,13 @@ use App\Mail\FacilityRequestCreatedMail;
 use App\Models\Division;
 use App\Models\User;
 use App\Models\Facility;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class FacilityRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -406,6 +410,14 @@ class FacilityRequestController extends Controller
         $facilityRequest->status = 'Approved';
         $facilityRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $facilityRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = $user->name ?? null;
@@ -469,6 +481,14 @@ class FacilityRequestController extends Controller
         $facilityRequest->decline_reason = $data['reason'];
         $facilityRequest->declined_at = now();
         $facilityRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $facilityRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;

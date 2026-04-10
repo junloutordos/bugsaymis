@@ -3,6 +3,7 @@
 namespace App\Models\Payroll;
 
 use App\Models\User;
+use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PayrollRun extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasApprovalSnapshots;
 
     protected $table = 'payroll_runs';
 

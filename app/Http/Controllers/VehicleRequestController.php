@@ -11,9 +11,12 @@ use Illuminate\Support\Facades\URL;
 use App\Mail\VehicleRequestCreatedMail;
 use App\Models\User;
 use Carbon\Carbon;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class VehicleRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     /**
      * Display a listing of vehicle requests.
      */
@@ -201,6 +204,14 @@ class VehicleRequestController extends Controller
         $vehicleRequest->status = 'Approved';
         $vehicleRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $vehicleRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         try {
             // Notify all GSU Head users (so GSU handles driver assignment)
             $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
@@ -256,6 +267,14 @@ class VehicleRequestController extends Controller
         $vehicleRequest->decline_reason = $data['reason'];
         $vehicleRequest->declined_at = now();
         $vehicleRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $vehicleRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
                 $requester = $vehicleRequest->requester;
@@ -609,6 +628,14 @@ class VehicleRequestController extends Controller
         if ($request->action === 'approve') {
             $vehicleRequest->update(['status' => 'OCD Approved']);
 
+            $this->snapshots->recordApproval(
+                approvable: $vehicleRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'approved',
+                approver:   $request->user(),
+            );
+
             try {
                 $requester = $vehicleRequest->requester;
                 if ($requester?->email) {
@@ -621,6 +648,14 @@ class VehicleRequestController extends Controller
             }
         } else {
             $vehicleRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by OCD.']);
+
+            $this->snapshots->recordApproval(
+                approvable: $vehicleRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'rejected',
+                approver:   $request->user(),
+            );
 
             try {
                 $requester = $vehicleRequest->requester;

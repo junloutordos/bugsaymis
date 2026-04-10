@@ -3,11 +3,14 @@
 namespace App\Models\FacultyLoading;
 
 use App\Models\User;
+use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OverloadComputation extends Model
 {
+    use HasApprovalSnapshots;
+
     protected $table = 'overload_computations';
 
     protected $fillable = [

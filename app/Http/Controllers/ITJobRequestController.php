@@ -17,9 +17,12 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class ITJobRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     /* =====================================================
      | INDEX
      |=====================================================*/
@@ -539,6 +542,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Approved by Division Chief.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'approved',
+                approver:   $request->user(),
+            );
         } else {
             $jobRequest->update([
                 'status' => 'Rejected by Division Chief',
@@ -550,6 +561,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Rejected by Division Chief.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'rejected',
+                approver:   $request->user(),
+            );
         }
 
         return back()->with('success', 'Division Chief action recorded!');
@@ -606,6 +625,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Request Approved by OCD.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'approved',
+                approver:   $request->user(),
+            );
         } else {
             $jobRequest->update([
                 'status' => 'Rejected by OCD',
@@ -617,6 +644,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Rejected by OCD.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'rejected',
+                approver:   $request->user(),
+            );
         }
 
         return back()->with('success', 'OCD action recorded!');
