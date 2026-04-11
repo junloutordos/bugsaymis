@@ -21,11 +21,18 @@
       "Bash(git stash*)",
       "Bash(python3 *)",
       "Bash(wc -l *)",
-      "Bash(ipconfig getifaddr*)"
+      "Bash(ipconfig getifaddr*)",
+      "Bash(curl -s --max-time 5 -o /dev/null -w \"%{http_code}\" https://oauth2.googleapis.com/)",
+      "Read(//run/systemd/resolve/**)",
+      "Bash(docker network:*)",
+      "Bash(sudo iptables:*)",
+      "Read(//proc/sys/net/ipv4/**)",
+      "Read(//usr/local/bin/**)"
     ],
     "additionalDirectories": [
       "/Users/junlou/bugsaymis-docker",
-      "/Users/junlou/bugsaymis-docker/nginx"
+      "/Users/junlou/bugsaymis-docker/nginx",
+      "/usr/local/bin"
     ]
   },
   "hooks": {

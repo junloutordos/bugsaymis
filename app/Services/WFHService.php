@@ -253,10 +253,26 @@ class WFHService
             true   // test mode — skip is_uploaded_file() check
         );
 
-        $result = $this->drive->upload($uploadedFile, $drivePath);
+        // Try Google Drive first; fall back to local storage if Drive is unreachable
+        try {
+            $result = $this->drive->upload($uploadedFile, $drivePath);
+            @unlink($tmpPath);
+            return $result;
+        } catch (\Throwable $e) {
+            @unlink($tmpPath);
+            logger()->warning('WFH Google Drive upload failed, saving locally', [
+                'path'  => $drivePath,
+                'error' => $e->getMessage(),
+            ]);
 
-        @unlink($tmpPath);
+            // Save to local storage as fallback
+            $localPath = 'wfh-photos/' . $drivePath;
+            \Illuminate\Support\Facades\Storage::put($localPath, $imageData);
 
-        return $result;
+            return [
+                'file_id' => null,
+                'link'    => \Illuminate\Support\Facades\Storage::url($localPath),
+            ];
+        }
     }
 }

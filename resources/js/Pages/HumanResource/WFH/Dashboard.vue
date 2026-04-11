@@ -549,10 +549,22 @@ async function openCamera(mode) {
   await nextTick()
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    // Try front camera first, fall back to any available camera
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    } catch {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    }
     if (videoEl.value) videoEl.value.srcObject = mediaStream
-  } catch {
-    Swal.fire('Camera Error', 'Could not access your camera. Please allow camera permission.', 'error')
+  } catch (err) {
+    const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError'
+    Swal.fire(
+      'Camera Error',
+      denied
+        ? 'Camera permission was denied. Please allow camera access in your browser settings and try again.'
+        : 'Could not access your camera. Make sure no other app is using it and try again.',
+      'error'
+    )
     showCamera.value = false
   }
 }
