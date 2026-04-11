@@ -99,15 +99,23 @@ class ScanController extends Controller
 
     private function buildPayload(object $student, string $type, $scanTime, bool $isDuplicate): array
     {
+        $photoUrl = $student->img
+            ? asset('storage/student-photos/' . $student->img)
+            : null;
+
         return [
             'student_id'   => $student->id,
             'student_name' => trim("{$student->lastname}, {$student->firstname}"),
+            'first_name'   => $student->firstname,
             'barcode'      => $student->pisaysystemID,
+            'year_level'   => $student->batch ?? null,
+            'photo_url'    => $photoUrl,
             'type'         => $type,
             'type_label'   => $type === 'in' ? 'Time In' : 'Time Out',
             'scan_time'    => $scanTime instanceof \Carbon\Carbon
                 ? $scanTime->toIso8601String()
                 : (string) $scanTime,
+            'gate_location' => $student->gate_location ?? null,
             'is_duplicate' => $isDuplicate,
         ];
     }

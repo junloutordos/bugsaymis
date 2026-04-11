@@ -11,6 +11,29 @@ use Illuminate\Support\Facades\DB;
 class StudentApiController extends Controller
 {
     /**
+     * GET /api/mobile/students
+     * Return all students linked to the authenticated parent contact.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $parentContact = ParentContact::where('user_id', $request->user()->id)->first();
+
+        if (! $parentContact) {
+            return response()->json(['data' => []]);
+        }
+
+        $students = DB::table('student_parent_contact as spc')
+            ->join('students as s', 's.id', '=', 'spc.student_id')
+            ->where('spc.parent_contact_id', $parentContact->id)
+            ->select('s.*', 'spc.relationship')
+            ->get()
+            ->map(fn ($s) => array_merge($this->formatStudent($s), ['relationship' => $s->relationship]))
+            ->values();
+
+        return response()->json(['data' => $students]);
+    }
+
+    /**
      * GET /api/mobile/students/{barcode}
      * Look up a student by their pisaysystemID barcode.
      * Used by the parent app before linking a child.

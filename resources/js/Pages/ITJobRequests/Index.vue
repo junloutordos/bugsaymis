@@ -367,6 +367,10 @@ const handleNewRequest = async () => {
                       <EyeIcon class="w-4 h-4"/>
                     </button>
 
+                    <a :href="route('jobrequests.print', req.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                      <PrinterIcon class="w-4 h-4"/>
+                    </a>
+
                     <template v-if="userRole === 'Administrator'">
                       <button @click="openMISAssessment(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
                         <PencilSquareIcon class="w-4 h-4"/>
@@ -427,6 +431,10 @@ const handleNewRequest = async () => {
               >
                 <EyeIcon class="w-4 h-4"/> View
               </button>
+
+              <a :href="route('jobrequests.print', req.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                <PrinterIcon class="w-4 h-4"/>
+              </a>
 
               <template v-if="userRole === 'Administrator'">
                 <button

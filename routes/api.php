@@ -32,6 +32,9 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
         // Update FCM device token (called on app startup / token refresh)
         Route::put('/fcm-token', [AuthController::class, 'updateFcmToken'])->name('fcm-token');
 
+        // List all students linked to this parent
+        Route::get('/students', [StudentApiController::class, 'index'])->name('students.index');
+
         // Look up a student by barcode (for parent to link their child)
         Route::get('/students/{barcode}', [StudentApiController::class, 'findByBarcode'])->name('students.find');
 

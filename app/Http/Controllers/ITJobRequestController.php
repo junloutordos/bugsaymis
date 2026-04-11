@@ -670,6 +670,70 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     }
 
     /* =====================================================
+     | PRINT FORM
+     |=====================================================*/
+    public function printForm(ITJobRequest $jobRequest)
+    {
+        $jobRequest->load(['user.division', 'divisionChief', 'assignedTo']);
+
+        // OCD approver — try the actual approval snapshot first
+        $ocdApprover = null;
+        $ocdSnapshot = DB::table('approval_snapshots')
+            ->where('approvable_type', ITJobRequest::class)
+            ->where('approvable_id', $jobRequest->id)
+            ->where('step', 'REQ_OCD')
+            ->where('action', 'approved')
+            ->latest()
+            ->first();
+
+        if ($ocdSnapshot) {
+            $ocdApprover = User::find($ocdSnapshot->approver_id);
+        }
+
+        // Fall back to the Campus Director (by position) — not the OCD role
+        // which is assigned to MIS staff for workflow purposes
+        if (! $ocdApprover) {
+            $ocdApprover = User::where('position', 'like', '%Campus Director%')
+                ->orWhere('position', 'like', '%OIC%Campus Director%')
+                ->orderByRaw("CASE WHEN position LIKE '%OIC%' THEN 1 ELSE 0 END")
+                ->first();
+        }
+
+        // Default recommendation based on category
+        $defaultRecommendations = [
+            'Hardware Repair'               => 'Repair/Replace defective hardware component(s)',
+            'Hardware Installation'         => 'Install hardware component/peripheral',
+            'Preventive Maintenance'        => 'Internal - Preventive Maintenance',
+            'Software Installation'         => 'Install required software application',
+            'Software Modification'         => 'Modify/Update existing software',
+            'Software Development'          => 'Develop custom software solution',
+            'Network Connection'            => 'Network troubleshooting and connection setup',
+            'Account Access'                => 'Create/Reset/Update user account credentials',
+            'Graphic Design'                => 'Create graphic design and layout',
+            'Technical Assistance on Events'=> 'Provide technical support for the event',
+            'Video Editing/Production'      => 'Edit and produce video content',
+            'Posting to Website'            => 'Upload/Update content on official website',
+            'Posting to Social Media'       => 'Upload/Update content on official social media pages',
+            'Poll Survey Creation'          => 'Create and set up online poll/survey',
+            'DTR Generation'                => 'Generate and issue DTR report',
+            'DTR System Concerns'           => 'Investigate and resolve DTR system issue',
+            'Online Meeting Request'        => 'Set up and facilitate online meeting',
+            'CCTV Footage Review'           => 'Review CCTV footage for specified date/time',
+            'CCTV Footage Retrieval'        => 'Retrieve and export requested CCTV footage',
+            'SIMS Concerns'                 => 'Investigate and resolve SIMS concern',
+            'Document Tracking Concerns'    => 'Investigate and resolve Document Tracking concern',
+            'eNGAS Concerns'                => 'Investigate and resolve eNGAS concern',
+            'Other'                         => 'Provide appropriate technical assistance',
+        ];
+
+        $recommendation = $jobRequest->category
+            ? ($defaultRecommendations[$jobRequest->category] ?? $jobRequest->category)
+            : '—';
+
+        return view('it-job-requests.print', compact('jobRequest', 'ocdApprover', 'recommendation'));
+    }
+
+    /* =====================================================
      | DESTROY
      |=====================================================*/
     public function destroy(ITJobRequest $jobRequest)
