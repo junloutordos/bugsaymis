@@ -12,9 +12,12 @@ use App\Mail\ServiceRequestCreatedMail;
 use App\Mail\ServiceRequestStatusMail;
 use App\Models\Division;
 use App\Models\User;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class ServiceRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     public function index()
     {
         $user = Auth::user();
@@ -229,6 +232,14 @@ class ServiceRequestController extends Controller
         $serviceRequest->status = 'Approved';
         $serviceRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $serviceRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         // Notify requester via email (reuse existing logic)
         try {
             $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
@@ -282,6 +293,14 @@ class ServiceRequestController extends Controller
         $serviceRequest->decline_reason = $data['reason'];
         $serviceRequest->declined_at = now();
         $serviceRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $serviceRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
             $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;

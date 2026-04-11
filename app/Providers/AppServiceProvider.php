@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Events\AttendanceScanEvent;
+use App\Listeners\StudentAttendance\NotifyParentsOnScan;
 use App\Models\Application;
 use App\Models\JobItem;
 use App\Models\Placement;
@@ -95,6 +97,18 @@ class AppServiceProvider extends ServiceProvider
 
         // Student data management — restricted to Administrators only
         Gate::define('manage-students', fn (User $user) => $user->hasRole('Administrator'));
+
+        // ── Student Attendance permission gates ────────────────────────────────
+        foreach ([
+            'students.attendance.view',
+            'students.attendance.scan',
+            'students.attendance.manage',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // ── Student Attendance: notify parents on each gate scan ───────────────
+        Event::listen(AttendanceScanEvent::class, NotifyParentsOnScan::class);
 
         // ── Payroll permission gates ───────────────────────────────────────────
         foreach ([

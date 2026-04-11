@@ -3,12 +3,15 @@
 namespace App\Models\SALN;
 
 use App\Models\User;
+use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SalnRecord extends Model
 {
+    use HasApprovalSnapshots;
+
     protected $table = 'saln_records';
 
     protected $fillable = [

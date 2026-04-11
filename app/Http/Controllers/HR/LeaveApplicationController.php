@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\HR;
 
+use App\Enums\ApprovalStep;
 use App\Http\Controllers\Controller;
 use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
 use App\Models\HR\LeaveType;
 use App\Models\FacultyLoading\SalarySchedule;
+use App\Services\HR\ApprovalService;
 use App\Services\HR\LeaveCreditService;
+use App\Services\SnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +18,11 @@ use Inertia\Inertia;
 
 class LeaveApplicationController extends Controller
 {
-    public function __construct(private LeaveCreditService $credits) {}
+    public function __construct(
+        private LeaveCreditService $credits,
+        private ApprovalService    $approvals,
+        private SnapshotService    $snapshots,
+    ) {}
 
     public function index(Request $request)
     {
@@ -142,54 +149,13 @@ class LeaveApplicationController extends Controller
             'remarks' => 'nullable|string|max:500',
         ]);
 
-        DB::transaction(function () use ($data, $leaveApplication) {
-            switch ($data['stage']) {
-
-                case 'hr_officer':
-                    // Valid actions: certified | rejected
-                    abort_unless(in_array($data['action'], ['certified', 'rejected']), 422);
-                    $leaveApplication->update([
-                        'hr_officer_id'      => Auth::id(),
-                        'hr_officer_action'  => $data['action'],
-                        'hr_officer_at'      => now(),
-                        'hr_officer_remarks' => $data['remarks'],
-                        'status'             => $data['action'] === 'certified' ? 'hr_verified' : 'rejected',
-                    ]);
-                    break;
-
-                case 'division_chief':
-                    // Valid actions: forwarded | rejected
-                    abort_unless(in_array($data['action'], ['forwarded', 'rejected']), 422);
-                    $leaveApplication->update([
-                        'division_chief_id'      => Auth::id(),
-                        'division_chief_action'  => $data['action'],
-                        'division_chief_at'      => now(),
-                        'division_chief_remarks' => $data['remarks'],
-                        'status'                 => $data['action'],
-                    ]);
-                    if ($data['action'] === 'rejected') {
-                        $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
-                    }
-                    break;
-
-                case 'campus_director':
-                    // Valid actions: approved | rejected
-                    abort_unless(in_array($data['action'], ['approved', 'rejected']), 422);
-                    $leaveApplication->update([
-                        'approved_by'      => Auth::id(),
-                        'approval_action'  => $data['action'],
-                        'approved_at'      => now(),
-                        'approval_remarks' => $data['remarks'],
-                        'status'           => $data['action'],
-                    ]);
-                    if ($data['action'] === 'approved') {
-                        $this->credits->applyLeaveDeduction($leaveApplication->id, Auth::id());
-                    } else {
-                        $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
-                    }
-                    break;
-            }
-        });
+        $this->approvals->processLeave(
+            application: $leaveApplication,
+            stage:       $data['stage'],
+            action:      $data['action'],
+            remarks:     $data['remarks'] ?? '',
+            approver:    Auth::user(),
+        );
 
         return back()->with('success', 'Action recorded.');
     }
@@ -344,43 +310,47 @@ class LeaveApplicationController extends Controller
             ];
         }
 
-        // Certifying officer (7.A) — HR Officer who certified the leave credits
-        $certifyingOfficer = null;
-        if ($application->hr_officer_id && $application->hrOfficer) {
-            $certifyingOfficer = [
-                'name'     => $application->hrOfficer->name,
-                'position' => $application->hrOfficer->position ?? 'Human Resource Officer',
-            ];
+        // ── Resolve signatories (snapshot-first, live fallback) ──────────────
+
+        // Fallback: live certifying officer (HR Officer who certified)
+        $liveCertifying = $application->hr_officer_id ? $application->hrOfficer : null;
+
+        // Fallback: live authorized officer (Division Chief of the applicant's division)
+        $liveAuthorized = $application->user?->division?->divisionchief;
+        if (! $liveAuthorized && $application->division_chief_id) {
+            $liveAuthorized = $application->divisionChief;
         }
 
-        // Authorized Officer (7.B) — Division Chief of the division the user belongs to
-        $authorizedOfficer = null;
-        $divChief = $application->user?->division?->divisionchief;
-        if ($divChief) {
-            $authorizedOfficer = [
-                'name'     => $divChief->name,
-                'position' => $divChief->position ?? 'Division Chief',
-            ];
-        } elseif ($certifyingOfficer) {
-            // fallback: use the application's reviewing officer
-            $authorizedOfficer = $certifyingOfficer;
-        }
-
-        // Authorized official — OCD / Campus Director
-        $authorizedOfficial = null;
+        // Fallback: live authorized official (OCD / Campus Director)
+        $liveOfficial = null;
         $ocdDiv = DB::table('divisions')
             ->where('division_name', 'like', '%Campus Director%')
             ->orWhere('acronym', 'OCD')
             ->first();
         if ($ocdDiv?->division_chief_id) {
-            $official = \App\Models\User::find($ocdDiv->division_chief_id);
-            if ($official) {
-                $authorizedOfficial = [
-                    'name'     => $official->name,
-                    'position' => $official->position ?? 'OIC - Campus Director',
-                ];
-            }
+            $liveOfficial = \App\Models\User::find($ocdDiv->division_chief_id);
         }
+        if (! $liveOfficial && $application->approved_by) {
+            $liveOfficial = $application->approvedBy;
+        }
+
+        // Capture signatories into snapshots (idempotent — safe to call every print)
+        $this->snapshots->captureSignatories($application, [
+            ['role_label' => ApprovalStep::SIG_CERTIFYING_OFFICER,  'user' => $liveCertifying],
+            ['role_label' => ApprovalStep::SIG_AUTHORIZED_OFFICER,  'user' => $liveAuthorized],
+            ['role_label' => ApprovalStep::SIG_AUTHORIZED_OFFICIAL, 'user' => $liveOfficial],
+        ]);
+
+        // Resolve final display data from snapshots (with live fallback)
+        $certifyingOfficer  = $this->snapshots->resolveSignatory(
+            $application, ApprovalStep::SIG_CERTIFYING_OFFICER, $liveCertifying
+        );
+        $authorizedOfficer  = $this->snapshots->resolveSignatory(
+            $application, ApprovalStep::SIG_AUTHORIZED_OFFICER, $liveAuthorized
+        );
+        $authorizedOfficial = $this->snapshots->resolveSignatory(
+            $application, ApprovalStep::SIG_AUTHORIZED_OFFICIAL, $liveOfficial
+        );
 
         return Inertia::render('HR/Leave/PrintForm', [
             'application'        => $application,

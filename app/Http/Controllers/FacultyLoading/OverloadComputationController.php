@@ -8,8 +8,10 @@ use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\OverloadComputation;
 use App\Models\FacultyLoading\SalarySchedule;
 use App\Models\FacultyLoading\SstPosition;
+use App\Enums\ApprovalStep;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
+use App\Services\SnapshotService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +21,10 @@ use Inertia\Response;
 
 class OverloadComputationController extends Controller
 {
-    public function __construct(private readonly LoadComputationService $loads) {}
+    public function __construct(
+        private readonly LoadComputationService $loads,
+        private readonly SnapshotService        $snapshots,
+    ) {}
 
     // ── List overload computations ────────────────────────────────────────────
 
@@ -255,6 +260,16 @@ class OverloadComputationController extends Controller
         }
 
         $action = $data['approved'] ? 'approved' : 'rejected';
+
+        $this->snapshots->recordApproval(
+            approvable: $overloadComputation,
+            step:       ApprovalStep::FACULTY_OVERLOAD_APPROVED,
+            sequence:   1,
+            action:     $action,
+            approver:   Auth::user(),
+            remarks:    $data['remarks'] ?? '',
+        );
+
         return back()->with('success', "Overload computation {$action}.");
     }
 

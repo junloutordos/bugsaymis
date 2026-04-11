@@ -1443,6 +1443,38 @@ const menuItems = [
       },
     ],
   },
+  {
+    label: "Gate Attendance",
+    icon: QueueListIcon,
+    roles: ["Administrator"],
+    permissions: ["students.attendance.view"],
+    children: [
+      {
+        label: "Kiosk",
+        routeName: "student-attendance.kiosk",
+        href: route("student-attendance.kiosk"),
+        icon: ComputerDesktopIcon,
+        roles: ["Administrator"],
+        permissions: ["students.attendance.scan"],
+      },
+      {
+        label: "Attendance Logs",
+        routeName: "student-attendance.logs.index",
+        href: route("student-attendance.logs.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator"],
+        permissions: ["students.attendance.view"],
+      },
+      {
+        label: "Parent Contacts",
+        routeName: "student-attendance.parents.index",
+        href: route("student-attendance.parents.index"),
+        icon: UserGroupIcon,
+        roles: ["Administrator"],
+        permissions: ["students.attendance.view"],
+      },
+    ],
+  },
       {
         label: "Health Services",
         icon: HeartIcon,
