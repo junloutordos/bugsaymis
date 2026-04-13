@@ -218,9 +218,16 @@ class PshsOrgStructureSeeder extends Seeder
 
     private function create(array $data): OrganizationalUnit
     {
-        return OrganizationalUnit::firstOrCreate(
-            ['code' => $data['code']],
-            $data
-        );
+        // Include soft-deleted records to avoid duplicate key on unique 'code' column
+        $existing = OrganizationalUnit::withTrashed()->where('code', $data['code'])->first();
+
+        if ($existing) {
+            // Restore if soft-deleted, then update all fields
+            $existing->restore();
+            $existing->fill($data)->save();
+            return $existing->fresh();
+        }
+
+        return OrganizationalUnit::create($data);
     }
 }

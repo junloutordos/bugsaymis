@@ -27,7 +27,9 @@
       "Bash(docker network:*)",
       "Bash(sudo iptables:*)",
       "Read(//proc/sys/net/ipv4/**)",
-      "Read(//usr/local/bin/**)"
+      "Read(//usr/local/bin/**)",
+      "Bash(wait)",
+      "Bash(chmod +x /home/bugsaymis/bugsaymis/scripts/artisan.sh /home/bugsaymis/bugsaymis/scripts/deploy.sh)"
     ],
     "additionalDirectories": [
       "/Users/junlou/bugsaymis-docker",

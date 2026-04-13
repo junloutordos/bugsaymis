@@ -13,7 +13,7 @@ docker run --rm --network host \
 echo "[deploy] Running database migrations..."
 docker exec bugsaymis_app php artisan migrate --force
 
-echo "[deploy] Fixing storage permissions..."
+echo "[deploy] Fixing storage permissions (must run after every artisan call)..."
 docker exec -u root bugsaymis_app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 docker exec -u root bugsaymis_app chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
@@ -29,5 +29,8 @@ docker exec bugsaymis_app php artisan optimize
 
 echo "[deploy] Restarting queue workers..."
 docker exec bugsaymis_app php artisan queue:restart
+
+echo "[deploy] Fixing permissions again after cache rebuild..."
+docker exec -u root bugsaymis_app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 echo "[deploy] Done. Site is up."
