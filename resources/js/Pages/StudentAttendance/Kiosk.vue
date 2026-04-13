@@ -20,6 +20,8 @@ const scanStatus    = ref('')     // 'ok' | 'duplicate' | 'error'
 let resetTimer    = null
 let clockInterval = null
 let scanIdleTimer = null   // fires if no new char arrives within 100 ms
+let cooldownTimer = null   // absorbs scanner double-fire
+const scanCooldown = ref(false)
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 
@@ -81,8 +83,9 @@ function onBarcodeNativeInput(e) {
 // ── Scan ──────────────────────────────────────────────────────────────────────
 
 async function submitScan(barcode) {
-  if (scanning.value) return
+  if (scanning.value || scanCooldown.value) return
   scanning.value = true
+  scanCooldown.value = true
   clearTimeout(resetTimer)
 
   try {
@@ -102,6 +105,9 @@ async function submitScan(barcode) {
     }
   } finally {
     scanning.value = false
+    // Hold cooldown for 2 s to absorb scanner double-fire
+    clearTimeout(cooldownTimer)
+    cooldownTimer = setTimeout(() => { scanCooldown.value = false }, 2000)
     refocusInput()
     // Auto-reset to idle after 4 seconds
     resetTimer = setTimeout(() => {
@@ -147,6 +153,7 @@ onUnmounted(() => {
   clearInterval(clockInterval)
   clearTimeout(resetTimer)
   clearTimeout(scanIdleTimer)
+  clearTimeout(cooldownTimer)
   if (echoChannel) window.Echo?.leaveChannel('attendance')
   document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('click', refocusInput)
@@ -264,7 +271,7 @@ watch(lastScan, () => { photoError.value = false })
       <main class="kiosk-main">
 
         <!-- IDLE STATE -->
-        <transition name="fade" mode="out-in">
+        <transition name="fade">
           <div v-if="!lastScan" key="idle" class="idle-state">
             <div class="clock-block">
               <p class="clock-time">{{ clock }}</p>
@@ -419,6 +426,7 @@ watch(lastScan, () => { photoError.value = false })
 /* ── Main ── */
 .kiosk-main {
   flex: 1;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,6 +434,7 @@ watch(lastScan, () => { photoError.value = false })
 
 /* ── Idle ── */
 .idle-state {
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -470,6 +479,7 @@ watch(lastScan, () => { photoError.value = false })
 
 /* ── Result ── */
 .result-state {
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
