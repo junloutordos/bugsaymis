@@ -1670,23 +1670,22 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
 });
 
 // ── Student Attendance Module ──────────────────────────────────────────────────
-Route::middleware(['auth'])->prefix('student-attendance')->name('student-attendance.')->group(function () {
 
-    // Kiosk scan endpoint — called by the gate scanner Vue page via fetch
+// Public: kiosk UI and scan endpoint — no login required
+Route::prefix('student-attendance')->name('student-attendance.')->group(function () {
+    Route::get('/kiosk', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'index'])
+        ->name('kiosk');
     Route::post('/scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'scan'])
         ->name('scan');
+});
 
-    // Logs browser — admin/guard views attendance history
+// Protected: logs and parent contacts management
+Route::middleware(['auth'])->prefix('student-attendance')->name('student-attendance.')->group(function () {
+
     Route::get('/logs', [\App\Http\Controllers\StudentAttendance\AttendanceLogController::class, 'index'])
         ->name('logs.index')
         ->middleware('permission:students.attendance.view');
 
-    // Gate kiosk UI — full-screen scanner page
-    Route::get('/kiosk', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'index'])
-        ->name('kiosk')
-        ->middleware('permission:students.attendance.scan');
-
-    // Parent contacts management
     Route::get('/parents', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'index'])
         ->name('parents.index')
         ->middleware('permission:students.attendance.view');
