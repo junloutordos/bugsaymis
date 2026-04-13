@@ -100,7 +100,7 @@ class ScanController extends Controller
     private function buildPayload(object $student, string $type, $scanTime, bool $isDuplicate): array
     {
         $photoUrl = $student->img
-            ? asset('storage/student-photos/' . $student->img)
+            ? asset('storage/students_profile_picture/' . $student->img)
             : null;
 
         return [

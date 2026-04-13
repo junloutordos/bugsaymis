@@ -19,6 +19,9 @@ const scanStatus    = ref('')     // 'ok' | 'duplicate' | 'error'
 
 let resetTimer    = null
 let clockInterval = null
+let scanIdleTimer = null   // fires if no new char arrives within 100 ms
+let cooldownTimer = null   // absorbs scanner double-fire
+const scanCooldown = ref(false)
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 
@@ -30,30 +33,59 @@ function updateClock() {
 
 // ── Barcode capture ───────────────────────────────────────────────────────────
 
-function onKeyDown(e) {
-  if (e.ctrlKey || e.altKey || e.metaKey) return
+function flushBuffer() {
+  clearTimeout(scanIdleTimer)
+  scanIdleTimer = null
+  const val = barcodeBuffer.value.trim()
+  barcodeBuffer.value = ''
+  if (barcodeInput.value) barcodeInput.value.value = ''
+  if (val) submitScan(val)
+}
 
-  if (e.key === 'Enter' || e.key === 'Tab') {
+function onKeyDown(e) {
+if (e.ctrlKey || e.altKey || e.metaKey) return
+
+  if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Return') {
     e.preventDefault()
-    if (barcodeBuffer.value.trim()) {
-      submitScan(barcodeBuffer.value.trim())
-      barcodeBuffer.value = ''
-    }
+    flushBuffer()
     return
   }
 
-  if (e.key.length === 1) barcodeBuffer.value += e.key
+  if (e.key.length === 1) {
+    barcodeBuffer.value += e.key
+    // Auto-submit if scanner doesn't send a terminator — 100 ms idle = scan complete
+    clearTimeout(scanIdleTimer)
+    scanIdleTimer = setTimeout(flushBuffer, 100)
+  }
 }
 
 function refocusInput() {
   barcodeInput.value?.focus()
 }
 
+// Fallback: capture via the input's native value in case keydown misses rapid chars
+function onBarcodeNativeInput(e) {
+  const raw = e.target.value
+  if (!raw) return
+  // If scanner appended a newline/CR directly into the input value
+  const trimmed = raw.replace(/[\r\n\t]+$/, '')
+  const hadTerminator = raw !== trimmed
+  barcodeBuffer.value = trimmed
+  e.target.value = trimmed
+  if (hadTerminator && trimmed) {
+    clearTimeout(scanIdleTimer)
+    barcodeBuffer.value = ''
+    e.target.value = ''
+    submitScan(trimmed)
+  }
+}
+
 // ── Scan ──────────────────────────────────────────────────────────────────────
 
 async function submitScan(barcode) {
-  if (scanning.value) return
+  if (scanning.value || scanCooldown.value) return
   scanning.value = true
+  scanCooldown.value = true
   clearTimeout(resetTimer)
 
   try {
@@ -73,6 +105,9 @@ async function submitScan(barcode) {
     }
   } finally {
     scanning.value = false
+    // Hold cooldown for 2 s to absorb scanner double-fire
+    clearTimeout(cooldownTimer)
+    cooldownTimer = setTimeout(() => { scanCooldown.value = false }, 2000)
     refocusInput()
     // Auto-reset to idle after 4 seconds
     resetTimer = setTimeout(() => {
@@ -109,13 +144,18 @@ onMounted(() => {
   clockInterval = setInterval(updateClock, 1000)
   subscribeEcho()
   refocusInput()
+  // Use document-level listener so scanner input is captured regardless of focus
+  document.addEventListener('keydown', onKeyDown)
   document.addEventListener('click', refocusInput)
 })
 
 onUnmounted(() => {
   clearInterval(clockInterval)
   clearTimeout(resetTimer)
+  clearTimeout(scanIdleTimer)
+  clearTimeout(cooldownTimer)
   if (echoChannel) window.Echo?.leaveChannel('attendance')
+  document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('click', refocusInput)
 })
 
@@ -175,16 +215,17 @@ watch(lastScan, () => { photoError.value = false })
 <template>
   <Head title="Attendance Kiosk" />
 
-  <div class="kiosk-root" @keydown="onKeyDown" tabindex="-1">
+  <div class="kiosk-root" tabindex="-1">
 
-    <!-- Hidden barcode capture input -->
+    <!-- Barcode capture input — off-screen but focusable, catches scanner input via both events -->
     <input
       ref="barcodeInput"
-      v-model="barcodeBuffer"
-      @keydown="onKeyDown"
-      class="absolute opacity-0 w-0 h-0 pointer-events-none"
+      class="barcode-capture"
       autocomplete="off"
-      tabindex="-1"
+      autofocus
+      @keydown="onKeyDown"
+      @input="onBarcodeNativeInput"
+      @blur="refocusInput"
     />
 
     <!-- Background photo -->
@@ -230,7 +271,7 @@ watch(lastScan, () => { photoError.value = false })
       <main class="kiosk-main">
 
         <!-- IDLE STATE -->
-        <transition name="fade" mode="out-in">
+        <transition name="fade">
           <div v-if="!lastScan" key="idle" class="idle-state">
             <div class="clock-block">
               <p class="clock-time">{{ clock }}</p>
@@ -303,7 +344,7 @@ watch(lastScan, () => { photoError.value = false })
       <!-- ── Footer ──────────────────────────────────────────────────────── -->
       <footer class="kiosk-footer">
         <p class="text-slate-500 text-xs">© 2026 PSHS-CRC · BugsayMIS</p>
-        <p class="text-slate-600 text-xs">{{ clock }}</p>
+<p class="text-slate-600 text-xs">{{ clock }}</p>
       </footer>
 
     </div>
@@ -311,6 +352,21 @@ watch(lastScan, () => { photoError.value = false })
 </template>
 
 <style scoped>
+/* ── Barcode capture input — off-screen, always focusable ── */
+.barcode-capture {
+  position: fixed;
+  top: -999px;
+  left: -999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+}
+
 /* ── Root ── */
 .kiosk-root {
   position: relative;
@@ -370,6 +426,7 @@ watch(lastScan, () => { photoError.value = false })
 /* ── Main ── */
 .kiosk-main {
   flex: 1;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -377,6 +434,7 @@ watch(lastScan, () => { photoError.value = false })
 
 /* ── Idle ── */
 .idle-state {
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -421,6 +479,7 @@ watch(lastScan, () => { photoError.value = false })
 
 /* ── Result ── */
 .result-state {
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
