@@ -204,10 +204,10 @@ const googleLogin = async () => {
               <text x="406" y="72" font-size="13"  font-weight="bold" fill="#ffffff" font-family="Arial,sans-serif">24 Online</text>
             </g>
             <g class="icard ic2">
-              <rect x="0" y="136" width="116" height="42" rx="10" fill="rgba(10,18,75,0.88)" stroke="#818cf8" stroke-width="1"/>
-              <circle cx="15" cy="157" r="5.5" fill="#34d399" class="led la"/>
-              <text x="26" y="151" font-size="7.5" fill="#a5b4fc" font-family="Arial,sans-serif">System Status</text>
-              <text x="26" y="166" font-size="10"  font-weight="bold" fill="#34d399" font-family="Arial,sans-serif">All Systems OK</text>
+              <rect x="0" y="166" width="116" height="42" rx="10" fill="rgba(10,18,75,0.88)" stroke="#818cf8" stroke-width="1"/>
+              <circle cx="15" cy="187" r="5.5" fill="#34d399" class="led la"/>
+              <text x="26" y="181" font-size="7.5" fill="#a5b4fc" font-family="Arial,sans-serif">System Status</text>
+              <text x="26" y="196" font-size="10"  font-weight="bold" fill="#34d399" font-family="Arial,sans-serif">All Systems OK</text>
             </g>
             <g class="icard ic3">
               <rect x="346" y="328" width="116" height="42" rx="10" fill="rgba(10,18,75,0.88)" stroke="#a78bfa" stroke-width="1"/>
@@ -257,14 +257,14 @@ const googleLogin = async () => {
         <!-- Headline + form -->
         <div class="form-area">
           <h1 class="headline">Welcome back!</h1>
-          <p class="sub">Access the PSHS-CRC centralized<br>management information system.</p>
+          <p class="sub">Access the PSHS-CRC Centralized Management Information System.</p>
 
           <!-- ↓ Google Sign-In — reuses existing googleLogin() handler ↓ -->
           <button @click="googleLogin" :disabled="isLoading" class="gbtn" aria-label="Continue with Google">
             <span class="g-icon-wrap">
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="g-icon" alt="" />
             </span>
-            <span class="g-label">{{ isLoading ? 'Signing in…' : 'Continue with Google' }}</span>
+            <span class="g-label">{{ isLoading ? 'Signing in…' : 'Continue with your PSHS-CRC Official Google Account' }}</span>
             <svg v-if="isLoading" class="g-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
