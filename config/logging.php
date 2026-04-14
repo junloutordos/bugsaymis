@@ -79,6 +79,7 @@ return [
             'level' => 'info',
             'days' => 90,
             'replace_placeholders' => true,
+            'permission' => 0666,
         ],
 
         'slack' => [

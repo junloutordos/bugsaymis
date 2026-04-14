@@ -21,7 +21,11 @@
       "Bash(git stash*)",
       "Bash(python3 *)",
       "Bash(wc -l *)",
-      "Bash(ipconfig getifaddr*)"
+      "Bash(ipconfig getifaddr*)",
+      "Read(//Users/junloe/**)",
+      "Bash(docker -H unix:///var/run/docker.sock compose -f /Users/junloe/bugsaymis-docker/docker-compose.yml exec php bash -c \"chmod 666 /var/www/storage/logs/security-2026-04-14.log && ls -la /var/www/storage/logs/security-2026-04-14.log\")",
+      "Read(//home/bugsaymis/**)",
+      "Read(//opt/**)"
     ],
     "additionalDirectories": [
       "/Users/junlou/bugsaymis-docker",
