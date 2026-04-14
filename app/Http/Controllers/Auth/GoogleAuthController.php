@@ -33,7 +33,7 @@ class GoogleAuthController extends Controller
         try {
             $googleUser = Socialite::driver('google')->user();
         } catch (\Throwable $e) {
-            Log::channel('security')->warning('Socialite Google callback failed', ['ip' => $ip, 'error' => $e->getMessage()]);
+            $this->securityLog('warning', 'Socialite Google callback failed', ['ip' => $ip, 'error' => $e->getMessage()]);
             return redirect()->route('login')
                 ->with('error', 'Google sign-in failed. Please try again.');
         }
@@ -42,7 +42,7 @@ class GoogleAuthController extends Controller
 
         // Enforce PSHS-CRC domain
         if (! str_ends_with($email, '@crc.pshs.edu.ph')) {
-            Log::channel('security')->warning('Socialite login rejected: non-PSHS domain', ['email' => $email, 'ip' => $ip]);
+            $this->securityLog('warning', 'Socialite login rejected: non-PSHS domain', ['email' => $email, 'ip' => $ip]);
             return redirect()->route('login')
                 ->with('error', 'Only official PSHS-CRC accounts (@crc.pshs.edu.ph) are allowed.');
         }
@@ -60,13 +60,13 @@ class GoogleAuthController extends Controller
 
         // Block inactive accounts
         if (isset($user->status) && $user->status !== 'active') {
-            Log::channel('security')->warning('Socialite login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
+            $this->securityLog('warning', 'Socialite login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
             return redirect()->route('login')
                 ->with('error', 'Unable to log in. Contact MIS administrator.');
         }
 
         Auth::login($user, true);
-        Log::channel('security')->info('Socialite login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
+        $this->securityLog('info', 'Socialite login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
         $role = $user->role ?? 'staff';
 
@@ -92,7 +92,7 @@ class GoogleAuthController extends Controller
 
         // Enforce PSHS-CRC domain
         if (! str_ends_with($email, '@crc.pshs.edu.ph')) {
-            Log::channel('security')->warning('Google login rejected: non-PSHS domain', ['email' => $email, 'ip' => $ip]);
+            $this->securityLog('warning', 'Google login rejected: non-PSHS domain', ['email' => $email, 'ip' => $ip]);
             return response()->json(['success' => false, 'message' => 'Only official PSHS-CRC accounts are allowed.'], 403);
         }
 
@@ -100,17 +100,17 @@ class GoogleAuthController extends Controller
         $user = User::where('email', $email)->first();
 
         if (! $user) {
-            Log::channel('security')->warning('Google login rejected: account not found', ['email' => $email, 'ip' => $ip]);
+            $this->securityLog('warning', 'Google login rejected: account not found', ['email' => $email, 'ip' => $ip]);
             return response()->json(['success' => false, 'message' => 'Account not found. Contact MIS administrator.'], 403);
         }
 
         if (isset($user->status) && $user->status !== 'active') {
-            Log::channel('security')->warning('Google login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
+            $this->securityLog('warning', 'Google login rejected: inactive account', ['email' => $email, 'ip' => $ip]);
             return response()->json(['success' => false, 'message' => 'Unable to log in. Contact MIS administrator.'], 403);
         }
 
         Auth::login($user, true);
-        Log::channel('security')->info('Google login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
+        $this->securityLog('info', 'Google login success', ['email' => $email, 'ip' => $ip, 'role' => $user->role ?? 'staff']);
 
         $role         = $user->role ?? 'staff';
         $redirectPath = $this->getRedirectPath($role);
@@ -119,6 +119,20 @@ class GoogleAuthController extends Controller
             'success'     => true,
             'redirect_to' => $redirectPath,
         ]);
+    }
+
+    /**
+     * Write to the security log channel, falling back to the default logger
+     * if the security log file cannot be opened (e.g. wrong ownership from a
+     * root-run cron job creating the daily file first).
+     */
+    protected function securityLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('security')->{$level}($message, $context);
+        } catch (\Throwable $e) {
+            Log::{$level}('[security] ' . $message, $context);
+        }
     }
 
     /**
