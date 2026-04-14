@@ -55,6 +55,10 @@ const props = defineProps({
   staffCount:          { type: Number, default: 0 },
   employeeMaleCount:   { type: Number, default: 0 },
   employeeFemaleCount: { type: Number, default: 0 },
+  facultyMaleCount:    { type: Number, default: 0 },
+  facultyFemaleCount:  { type: Number, default: 0 },
+  staffMaleCount:      { type: Number, default: 0 },
+  staffFemaleCount:    { type: Number, default: 0 },
   activeDivisions:     { type: Number, default: 0 },
   employeesByDivision: { type: Array,  default: () => [] },
   scholarsCount:       { type: Number, default: 0 },
@@ -254,15 +258,16 @@ const libraryAttendanceData = computed(() => ({
 }))
 
 // ── KPI Cards ─────────────────────────────────────────────────────────────────
+// Cards with `male`/`female` fields render a sex-disaggregated split bar.
 const kpiCards = computed(() => [
-  { label: 'Total Employees', value: props.totalEmployees, sub: `${props.activeDivisions} divisions`, icon: UsersIcon,          color: 'bg-blue-500',    text: 'text-blue-600',   bg: 'bg-blue-50'   },
-  { label: 'Faculty',         value: props.facultyCount,   sub: 'Teaching staff',            icon: AcademicCapIcon,     color: 'bg-indigo-500',  text: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { label: 'Staff',           value: props.staffCount,     sub: 'Non-teaching',              icon: UsersIcon,           color: 'bg-violet-500',  text: 'text-violet-600', bg: 'bg-violet-50' },
-  { label: 'Scholars',        value: props.scholarsCount,  sub: `${props.maleCount + props.femaleCount} enrolled`, icon: AcademicCapIcon, color: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
+  { label: 'Total Employees', value: props.totalEmployees, male: props.employeeMaleCount, female: props.employeeFemaleCount, sub: `${props.activeDivisions} divisions`, icon: UsersIcon,          color: 'bg-blue-500',    text: 'text-blue-600',   bg: 'bg-blue-50'   },
+  { label: 'Faculty',         value: props.facultyCount,   male: props.facultyMaleCount,  female: props.facultyFemaleCount,  sub: 'Teaching staff', icon: AcademicCapIcon, color: 'bg-indigo-500',  text: 'text-indigo-600', bg: 'bg-indigo-50' },
+  { label: 'Staff',           value: props.staffCount,     male: props.staffMaleCount,    female: props.staffFemaleCount,    sub: 'Non-teaching',   icon: UsersIcon,       color: 'bg-violet-500',  text: 'text-violet-600', bg: 'bg-violet-50' },
+  { label: 'Students',        value: props.maleCount + props.femaleCount, male: props.maleCount, female: props.femaleCount, sub: `${props.scholarsCount} scholars`, icon: AcademicCapIcon, color: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
   { label: 'Pending Requests',value: props.totalPendingRequests, sub: 'All modules',         icon: ClockIcon,           color: 'bg-amber-500',   text: 'text-amber-600',  bg: 'bg-amber-50'  },
-  { label: 'IPCR For Review', value: props.ipcrForReview,  sub: 'Awaiting review',           icon: DocumentCheckIcon,   color: 'bg-rose-500',    text: 'text-rose-600',   bg: 'bg-rose-50'   },
-  { label: 'L&D Programs',    value: props.lndStats.programs, sub: `${props.lndStats.sessions} sessions`, icon: BookOpenIcon, color: 'bg-teal-500', text: 'text-teal-600',   bg: 'bg-teal-50'   },
-  { label: 'Recognitions',    value: props.rewardsStats.total, sub: `${props.rewardsStats.awarded_this_year} awarded ${new Date().getFullYear()}`, icon: StarIcon, color: 'bg-orange-500', text: 'text-orange-600', bg: 'bg-orange-50' },
+  { label: 'IPCR For Review', value: props.ipcrForReview,  male: props.ipcrBySex.male, female: props.ipcrBySex.female, sub: 'Awaiting review', icon: DocumentCheckIcon,   color: 'bg-rose-500',    text: 'text-rose-600',   bg: 'bg-rose-50'   },
+  { label: 'L&D Programs',    value: props.lndStats.programs, male: props.tnaBySex.male, female: props.tnaBySex.female, sub: `${props.lndStats.sessions} sessions`, icon: BookOpenIcon, color: 'bg-teal-500', text: 'text-teal-600',   bg: 'bg-teal-50'   },
+  { label: 'Recognitions',    value: props.rewardsStats.total, male: props.rewardsBySex.male, female: props.rewardsBySex.female, sub: `${props.rewardsStats.awarded_this_year} awarded ${new Date().getFullYear()}`, icon: StarIcon, color: 'bg-orange-500', text: 'text-orange-600', bg: 'bg-orange-50' },
 ])
 
 // ── Module Quick Stats ────────────────────────────────────────────────────────
@@ -377,7 +382,23 @@ onMounted(() => {
           </div>
           <p class="text-2xl font-bold tracking-tight text-gray-900">{{ card.value.toLocaleString() }}</p>
           <p class="mt-0.5 text-xs font-semibold text-gray-600 leading-tight">{{ card.label }}</p>
-          <p class="text-[10px] text-gray-400 mt-0.5">{{ card.sub }}</p>
+
+          <!-- Sex-disaggregated split bar (shown when card has male/female data) -->
+          <template v-if="card.male !== undefined && card.female !== undefined">
+            <div class="mt-2 flex h-1 overflow-hidden rounded-full bg-slate-100">
+              <div
+                class="bg-blue-400 transition-all duration-300"
+                :style="{ width: (card.male + card.female) > 0 ? `${Math.round(card.male / (card.male + card.female) * 100)}%` : '50%' }"
+              ></div>
+              <div class="flex-1 bg-pink-400"></div>
+            </div>
+            <div class="mt-1 flex justify-between text-[10px] font-medium">
+              <span class="text-blue-500">{{ card.male.toLocaleString() }} M</span>
+              <span class="text-pink-500">F {{ card.female.toLocaleString() }}</span>
+            </div>
+          </template>
+          <p v-else class="text-[10px] text-gray-400 mt-0.5">{{ card.sub }}</p>
+
           <div :class="[card.color, 'absolute bottom-0 left-0 h-0.5 w-full opacity-60']"></div>
         </div>
       </div>

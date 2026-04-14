@@ -8,11 +8,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use App\Models\Permission;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
 
     protected $fillable = [
         'name',
@@ -32,6 +33,8 @@ class User extends Authenticatable
         'electronic_signature',
         'emp_category',
         'on_study_leave',
+        'salary_grade',
+        'salary_step',
     ];
 
     protected $hidden = [

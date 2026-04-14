@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Payroll;
 
+use App\Enums\ApprovalStep;
 use App\Http\Controllers\Controller;
 use App\Jobs\Payroll\ProcessPayrollRun;
 use App\Models\Payroll\PayrollRecord;
 use App\Models\Payroll\PayrollRun;
+use App\Services\SnapshotService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +15,7 @@ use Inertia\Inertia;
 
 class PayrollRunController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     public function index()
     {
         $this->authorize('payroll.view');
@@ -74,6 +77,14 @@ class PayrollRunController extends Controller
             'prepared_by'  => Auth::id(),
         ]);
 
+        $this->snapshots->recordApproval(
+            approvable: $run,
+            step:       ApprovalStep::PAYROLL_PREPARED,
+            sequence:   1,
+            action:     'prepared',
+            approver:   Auth::user(),
+        );
+
         return redirect()->route('payroll.show', $run)->with('success', "Payroll run {$run->control_no} created.");
     }
 
@@ -123,6 +134,15 @@ class PayrollRunController extends Controller
             'approved_at' => now(),
             'remarks'     => $data['remarks'] ?? null,
         ]);
+
+        $this->snapshots->recordApproval(
+            approvable: $payrollRun,
+            step:       ApprovalStep::PAYROLL_APPROVED,
+            sequence:   2,
+            action:     'approved',
+            approver:   Auth::user(),
+            remarks:    $data['remarks'] ?? '',
+        );
 
         // Mark all records as approved
         PayrollRecord::where('payroll_run_id', $payrollRun->id)->update(['status' => 'approved']);

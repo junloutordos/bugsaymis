@@ -82,12 +82,31 @@
           </div>
         </div>
 
-        <!-- Division Chief -->
+        <!-- Stage 1: HR Officer -->
         <div class="flex items-start gap-3">
           <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-               :class="application.division_chief_id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">2</div>
+               :class="application.hr_officer_id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">2</div>
           <div>
-            <p class="text-sm font-medium text-slate-700">Division Chief Review</p>
+            <p class="text-sm font-medium text-slate-700">HR Officer — Certification of Leave Credits</p>
+            <template v-if="application.hr_officer_id">
+              <p class="text-xs text-slate-600">
+                <span :class="actionClass(application.hr_officer_action)" class="font-semibold capitalize">
+                  {{ application.hr_officer_action }}
+                </span>
+                by {{ application.hr_officer?.name }} &bull; {{ fmtDate(application.hr_officer_at) }}
+              </p>
+              <p v-if="application.hr_officer_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.hr_officer_remarks }}"</p>
+            </template>
+            <p v-else class="text-xs text-slate-400">Awaiting HR certification</p>
+          </div>
+        </div>
+
+        <!-- Stage 2: Division Chief -->
+        <div class="flex items-start gap-3">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+               :class="application.division_chief_id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">3</div>
+          <div>
+            <p class="text-sm font-medium text-slate-700">Division Chief — Recommendation</p>
             <template v-if="application.division_chief_id">
               <p class="text-xs text-slate-600">
                 <span :class="actionClass(application.division_chief_action)" class="font-semibold capitalize">
@@ -97,27 +116,27 @@
               </p>
               <p v-if="application.division_chief_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.division_chief_remarks }}"</p>
             </template>
-            <p v-else class="text-xs text-slate-400">Awaiting review</p>
+            <p v-else class="text-xs text-slate-400">Awaiting Division Chief recommendation</p>
           </div>
         </div>
 
-        <!-- HR Final -->
+        <!-- Stage 3: Campus Director -->
         <div class="flex items-start gap-3">
           <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-               :class="application.approved_by ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">3</div>
+               :class="application.approved_by ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">4</div>
           <div>
-            <p class="text-sm font-medium text-slate-700">HR Final Approval</p>
+            <p class="text-sm font-medium text-slate-700">Campus Director — Final Approval</p>
             <template v-if="application.approved_by">
               <p class="text-xs text-slate-600">
                 <span :class="actionClass(application.approval_action)" class="font-semibold capitalize">
                   {{ application.approval_action }}
                 </span>
-                by {{ application.approved_by_user?.name ?? application.approved_by }} &bull; {{ fmtDate(application.approved_at) }}
+                by {{ application.approved_by?.name }} &bull; {{ fmtDate(application.approved_at) }}
               </p>
               <p v-if="application.approval_remarks" class="text-xs text-slate-400 mt-0.5 italic">"{{ application.approval_remarks }}"</p>
             </template>
             <p v-else class="text-xs text-slate-400">
-              {{ application.status === 'forwarded' ? 'Awaiting HR approval' : 'Pending' }}
+              {{ application.status === 'forwarded' ? 'Awaiting Campus Director approval' : 'Pending' }}
             </p>
           </div>
         </div>
@@ -133,7 +152,7 @@
         </button>
 
         <!-- Approve/Reject (Division Chief or HR) -->
-        <button v-if="canApprove && ['pending','forwarded'].includes(application.status)"
+        <button v-if="canApprove && ['pending','hr_verified','forwarded'].includes(application.status)"
                 @click="approveModal = true"
                 class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
           Review Application
@@ -161,8 +180,9 @@
               <label class="block text-xs font-medium text-slate-600 mb-1">Review Stage</label>
               <select v-model="approveForm.stage"
                       class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="division_chief">Division Chief</option>
-                <option value="hr">HR Final Approval</option>
+                <option value="hr_officer">HR Officer — Certification of Leave Credits</option>
+                <option value="division_chief">Division Chief — Recommendation</option>
+                <option value="campus_director">Campus Director — Final Approval</option>
               </select>
             </div>
 
@@ -202,7 +222,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
@@ -216,21 +236,42 @@ const me = page.props.auth?.user
 const canApprove = me?.permissions?.includes('hr.leave.approve')
 const canCancel  = computed(() =>
   props.application.user_id === me?.id &&
-  ['pending', 'forwarded'].includes(props.application.status)
+  ['pending', 'hr_verified', 'forwarded'].includes(props.application.status)
 )
 
 // Approve modal
 const approveModal = ref(false)
-const approveForm  = useForm({
-  stage:   props.application.status === 'forwarded' ? 'hr' : 'division_chief',
-  action:  'forwarded',
+
+function defaultStage() {
+  const s = props.application.status
+  if (s === 'pending')     return 'hr_officer'
+  if (s === 'hr_verified') return 'division_chief'
+  if (s === 'forwarded')   return 'campus_director'
+  return 'hr_officer'
+}
+
+function defaultAction(stage) {
+  if (stage === 'hr_officer')    return 'certified'
+  if (stage === 'division_chief') return 'forwarded'
+  return 'approved'
+}
+
+const approveForm = useForm({
+  stage:   defaultStage(),
+  action:  defaultAction(defaultStage()),
   remarks: '',
 })
 
 const actionOptions = computed(() => {
+  if (approveForm.stage === 'hr_officer') {
+    return [
+      { value: 'certified', label: 'Certify Credits' },
+      { value: 'rejected',  label: 'Reject' },
+    ]
+  }
   if (approveForm.stage === 'division_chief') {
     return [
-      { value: 'forwarded', label: 'Forward to HR' },
+      { value: 'forwarded', label: 'Forward to Campus Director' },
       { value: 'rejected',  label: 'Reject' },
     ]
   }
@@ -238,6 +279,10 @@ const actionOptions = computed(() => {
     { value: 'approved', label: 'Approve' },
     { value: 'rejected', label: 'Reject' },
   ]
+})
+
+watch(() => approveForm.stage, (stage) => {
+  approveForm.action = defaultAction(stage)
 })
 
 function submitApprove() {
@@ -266,17 +311,25 @@ function leaveDetailLabel(v) { return leaveDetailMap[v] ?? v }
 
 function statusClass(s) {
   const map = {
-    pending:   'bg-amber-100 text-amber-700',
-    forwarded: 'bg-blue-100 text-blue-700',
-    approved:  'bg-emerald-100 text-emerald-700',
-    rejected:  'bg-red-100 text-red-600',
-    cancelled: 'bg-slate-100 text-slate-500',
+    pending:     'bg-amber-100 text-amber-700',
+    hr_verified: 'bg-violet-100 text-violet-700',
+    forwarded:   'bg-blue-100 text-blue-700',
+    approved:    'bg-emerald-100 text-emerald-700',
+    rejected:    'bg-red-100 text-red-600',
+    cancelled:   'bg-slate-100 text-slate-500',
   }
   return map[s] ?? 'bg-slate-100 text-slate-500'
 }
 
 function statusLabel(s) {
-  const map = { pending: 'Pending', forwarded: 'For HR Approval', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' }
+  const map = {
+    pending:     'Pending',
+    hr_verified: 'For Division Chief',
+    forwarded:   'For Campus Director',
+    approved:    'Approved',
+    rejected:    'Rejected',
+    cancelled:   'Cancelled',
+  }
   return map[s] ?? s
 }
 

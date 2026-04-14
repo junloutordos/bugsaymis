@@ -15,9 +15,13 @@ use App\Mail\MessengerialRequestRecordsMail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class MessengerialController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -186,6 +190,16 @@ class MessengerialController extends Controller
         $messengerialRequest->status = 'Pending OCD Approval';
         $messengerialRequest->save();
 
+        if ($approver = User::find($chief)) {
+            $this->snapshots->recordApproval(
+                approvable: $messengerialRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'approved',
+                approver:   $approver,
+            );
+        }
+
         return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => false]);
     }
 
@@ -224,6 +238,16 @@ class MessengerialController extends Controller
         $messengerialRequest->decline_reason = $request->input('reason');
         $messengerialRequest->declined_at = now();
         $messengerialRequest->save();
+
+        if ($approver = User::find($chief)) {
+            $this->snapshots->recordApproval(
+                approvable: $messengerialRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'rejected',
+                approver:   $approver,
+            );
+        }
 
         // Notify requester
         try {

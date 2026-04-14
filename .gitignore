@@ -1,5 +1,6 @@
 /.env
 *.log
+storage/*-firebase-adminsdk-*.json
 .DS_Store
 .env
 .env.backup

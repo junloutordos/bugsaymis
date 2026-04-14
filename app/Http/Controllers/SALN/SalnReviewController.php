@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\SALN;
 
+use App\Enums\ApprovalStep;
 use App\Http\Controllers\Controller;
 use App\Models\SALN\SalnRecord;
 use App\Models\User;
+use App\Services\SnapshotService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +15,7 @@ use Inertia\Response;
 
 class SalnReviewController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     // ══════════════════════════════════════════════════════════════════════════
     // SALN COMMITTEE — Review workflow
     // ══════════════════════════════════════════════════════════════════════════
@@ -69,6 +72,13 @@ class SalnReviewController extends Controller
                 'reviewed_by' => Auth::id(),
             ]);
             $saln->logAction(Auth::id(), 'reviewed', $oldStatus, 'under_review');
+            $this->snapshots->recordApproval(
+                approvable: $saln,
+                step:       ApprovalStep::SALN_REVIEWED,
+                sequence:   1,
+                action:     'reviewed',
+                approver:   Auth::user(),
+            );
         }
 
         $saln->load([
@@ -110,6 +120,15 @@ class SalnReviewController extends Controller
         ]);
 
         $saln->logAction(Auth::id(), 'approved', $oldStatus, 'approved', $data['remarks'] ?? null);
+
+        $this->snapshots->recordApproval(
+            approvable: $saln,
+            step:       ApprovalStep::SALN_APPROVED,
+            sequence:   2,
+            action:     'approved',
+            approver:   Auth::user(),
+            remarks:    $data['remarks'] ?? '',
+        );
 
         return redirect()
             ->route('saln.review.index')

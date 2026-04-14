@@ -324,6 +324,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/job-requests/create', [ITJobRequestController::class, 'create'])->name('jobrequests.create');
     Route::post('/job-requests', [ITJobRequestController::class, 'store'])->name('jobrequests.store');
     Route::delete('/job-requests/{jobRequest}', [ITJobRequestController::class, 'destroy'])->name('jobrequests.destroy');
+    Route::get('/job-requests/{jobRequest}/print', [ITJobRequestController::class, 'printForm'])->name('jobrequests.print');
     Route::post('/app-versions', [\App\Http\Controllers\AppVersionController::class, 'store'])->name('app-versions.store');
     Route::post('/it-job-requests/{jobRequest}/confirm',[ITJobRequestController::class, 'confirmCompletion']
 );
@@ -393,8 +394,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Guidance — Transaction report (date-range)
     Route::get('/guidance/reports', [\App\Http\Controllers\GuidanceConsultationController::class, 'transactionReport'])->name('guidance.reports')->middleware('permission:guidance.view');
 
-    // Guidance — Consultations list
-    Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index');
+    // Guidance — Consultations list (Guidance / Administrator only)
+    Route::get('/guidance/consultations', [\App\Http\Controllers\GuidanceConsultationController::class, 'index'])->name('guidance.consultations.index')->middleware('permission:guidance.view');
+    // Guidance — Referral page for Faculty / Staff
+    Route::get('/guidance/refer', [\App\Http\Controllers\GuidanceConsultationController::class, 'referPage'])->name('guidance.refer')->middleware('permission:guidance.refer');
     Route::get('/guidance/students/search', [\App\Http\Controllers\GuidanceConsultationController::class, 'searchStudents'])->name('guidance.students.search')->middleware('permission:guidance.refer');
     Route::post('/guidance/referrals', [\App\Http\Controllers\GuidanceConsultationController::class, 'storeReferral'])->name('guidance.referrals.store')->middleware('permission:guidance.refer');
     Route::post('/guidance/consultations/{consultation}/assign', [\App\Http\Controllers\GuidanceConsultationController::class, 'assign'])->name('guidance.consultations.assign')->middleware('permission:guidance.manage');
@@ -871,6 +874,7 @@ Route::middleware(['auth', 'permission:roles.assign'])
 // HR Employees page
 Route::middleware(['auth','permission:hr.employees.manage'])->get('/hr/employees', [UserController::class, 'employeesIndex'])->name('hr.employees.index');
 Route::middleware(['auth','permission:hr.employees.manage'])->post('/hr/employees', [UserController::class, 'employeesStore'])->name('hr.employees.store');
+Route::middleware(['auth','permission:hr.employees.manage'])->patch('/hr/employees/{user}/salary-grade', [UserController::class, 'assignSalaryGrade'])->name('hr.employees.salary-grade');
 
     // Human Resource attendance viewer (scoped for Staff/Faculty)
     Route::middleware('auth')->get('/human-resource/attendance', [\App\Http\Controllers\HumanResource\AttendanceController::class, 'index'])->name('hr.attendance.index');
@@ -1621,6 +1625,10 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
     Route::delete('/heads/{head}', [\App\Http\Controllers\HR\UnitHeadController::class, 'destroy'])
         ->name('heads.destroy');
 
+    // ── Sync from legacy divisions/offices ─────────────────────────────────────
+    Route::post('/sync-legacy', [\App\Http\Controllers\HR\OrgUnitController::class, 'syncFromLegacy'])
+        ->name('sync-legacy');
+
     // ── Reports ────────────────────────────────────────────────────────────────
     Route::get('/reports', [\App\Http\Controllers\HR\OrgUnitController::class, 'reports'])
         ->name('reports');
@@ -1650,6 +1658,37 @@ Route::middleware(['auth', 'verified'])->prefix('hr/org')->name('hr.org.')->grou
         ->name('versions.activate');
     Route::delete('/versions/{version}', [\App\Http\Controllers\HR\OrganizationalVersionController::class, 'destroy'])
         ->name('versions.destroy');
+});
+
+// ── Student Attendance Module ──────────────────────────────────────────────────
+
+// Public: kiosk UI and scan endpoint — no login required
+Route::prefix('student-attendance')->name('student-attendance.')->group(function () {
+    Route::get('/kiosk', [\App\Http\Controllers\StudentAttendance\KioskController::class, 'index'])
+        ->name('kiosk');
+    Route::post('/scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'scan'])
+        ->name('scan');
+});
+
+// Protected: logs and parent contacts management
+Route::middleware(['auth'])->prefix('student-attendance')->name('student-attendance.')->group(function () {
+
+    Route::get('/logs', [\App\Http\Controllers\StudentAttendance\AttendanceLogController::class, 'index'])
+        ->name('logs.index')
+        ->middleware('permission:students.attendance.view');
+
+    Route::get('/parents', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'index'])
+        ->name('parents.index')
+        ->middleware('permission:students.attendance.view');
+    Route::post('/parents', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'store'])
+        ->name('parents.store')
+        ->middleware('permission:students.attendance.view');
+    Route::put('/parents/{parentContact}', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'update'])
+        ->name('parents.update')
+        ->middleware('permission:students.attendance.view');
+    Route::delete('/parents/{parentContact}', [\App\Http\Controllers\StudentAttendance\ParentContactController::class, 'destroy'])
+        ->name('parents.destroy')
+        ->middleware('permission:students.attendance.view');
 });
 
 // Development-only: send a test email

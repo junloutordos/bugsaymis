@@ -3,13 +3,14 @@
 namespace App\Models\HR;
 
 use App\Models\User;
+use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LeaveApplication extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, HasApprovalSnapshots;
 
     protected $table = 'leave_applications';
 
@@ -19,16 +20,24 @@ class LeaveApplication extends Model
         'leave_type_id',
         'date_from',
         'date_to',
+        'dates',
         'days_applied',
         'leave_details',
         'leave_details_specify',
         'reason',
         'supporting_document',
         'status',
+        // Stage 1 — HR Officer (certifies leave credits)
+        'hr_officer_id',
+        'hr_officer_action',
+        'hr_officer_at',
+        'hr_officer_remarks',
+        // Stage 2 — Division Chief (recommends)
         'division_chief_id',
         'division_chief_action',
         'division_chief_at',
         'division_chief_remarks',
+        // Stage 3 — Campus Director (final approval)
         'approved_by',
         'approval_action',
         'approved_at',
@@ -38,14 +47,16 @@ class LeaveApplication extends Model
     ];
 
     protected $casts = [
-        'date_from'           => 'date',
-        'date_to'             => 'date',
-        'days_applied'        => 'decimal:2',
-        'days_deducted'       => 'decimal:2',
-        'is_without_pay'      => 'boolean',
-        'filed_at'            => 'datetime',
-        'division_chief_at'   => 'datetime',
-        'approved_at'         => 'datetime',
+        'date_from'         => 'date',
+        'date_to'           => 'date',
+        'dates'             => 'array',
+        'days_applied'      => 'decimal:2',
+        'days_deducted'     => 'decimal:2',
+        'is_without_pay'    => 'boolean',
+        'filed_at'          => 'datetime',
+        'hr_officer_at'     => 'datetime',
+        'division_chief_at' => 'datetime',
+        'approved_at'       => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -58,11 +69,19 @@ class LeaveApplication extends Model
         return $this->belongsTo(LeaveType::class);
     }
 
+    /** Stage 1: HR Officer who certified the leave credits */
+    public function hrOfficer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'hr_officer_id');
+    }
+
+    /** Stage 2: Division Chief who recommended */
     public function divisionChief(): BelongsTo
     {
         return $this->belongsTo(User::class, 'division_chief_id');
     }
 
+    /** Stage 3: Campus Director who gave final approval */
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');

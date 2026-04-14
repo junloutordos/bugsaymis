@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Division;
 use App\Models\Office;
+use App\Models\FacultyLoading\SalarySchedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -45,7 +46,9 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive' for the employees list as well
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'created_at')
+            ->select('id', 'name', 'sex', 'email', 'badge_id', 'role_id', 'position', 'specialization',
+                     'division_id', 'office_id', 'profile_picture', 'electronic_signature',
+                     'status', 'emp_category', 'salary_grade', 'salary_step', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -55,15 +58,33 @@ class UserController extends Controller
             ->get();
         $offices = Office::select('id', 'name', 'division_id')->get();
 
+        // Active salary schedule rows for the salary grade assignment modal
+        $salaryGrades = SalarySchedule::where('is_current', true)
+            ->orderBy('salary_grade')
+            ->orderBy('step')
+            ->get(['id', 'salary_grade', 'step', 'monthly_rate', 'schedule_name']);
+
         return Inertia::render('Users/Index', [
-            'users'     => $users,
-            'roles'     => $roles,
-            'divisions' => $divisions,
-            'offices'   => $offices,
-            // pageTitle/headerTitle used by the Vue page to display custom labels
-            'pageTitle' => 'List of Employees',
-            'headerTitle' => 'List of Employees',
+            'users'        => $users,
+            'roles'        => $roles,
+            'divisions'    => $divisions,
+            'offices'      => $offices,
+            'salaryGrades' => $salaryGrades,
+            'pageTitle'    => 'List of Employees',
+            'headerTitle'  => 'List of Employees',
         ]);
+    }
+
+    public function assignSalaryGrade(Request $request, User $user)
+    {
+        $data = $request->validate([
+            'salary_grade' => 'required|integer|min:1|max:33',
+            'salary_step'  => 'required|integer|min:1|max:8',
+        ]);
+
+        $user->update($data);
+
+        return back()->with('success', 'Salary grade updated successfully.');
     }
 
     /**

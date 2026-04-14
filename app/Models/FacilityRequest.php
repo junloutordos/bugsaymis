@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
 
 class FacilityRequest extends Model
 {
-    use HasFactory;
+    use HasFactory, HasApprovalSnapshots;
 
     protected $table = 'facility_requests';
 

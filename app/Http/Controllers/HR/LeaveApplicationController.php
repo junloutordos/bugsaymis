@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers\HR;
 
+use App\Enums\ApprovalStep;
 use App\Http\Controllers\Controller;
 use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
 use App\Models\HR\LeaveType;
+use App\Models\FacultyLoading\SalarySchedule;
+use App\Services\HR\ApprovalService;
 use App\Services\HR\LeaveCreditService;
+use App\Services\SnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +18,11 @@ use Inertia\Inertia;
 
 class LeaveApplicationController extends Controller
 {
-    public function __construct(private LeaveCreditService $credits) {}
+    public function __construct(
+        private LeaveCreditService $credits,
+        private ApprovalService    $approvals,
+        private SnapshotService    $snapshots,
+    ) {}
 
     public function index(Request $request)
     {
@@ -63,16 +71,22 @@ class LeaveApplicationController extends Controller
 
         $data = $request->validate([
             'leave_type_id'         => 'required|exists:leave_types,id',
-            'date_from'             => 'required|date|after_or_equal:today',
-            'date_to'               => 'required|date|after_or_equal:date_from',
+            'dates'                 => 'required|array|min:1',
+            'dates.*'               => 'required|date',
             'leave_details'         => 'nullable|string',
             'leave_details_specify' => 'nullable|string|max:255',
             'reason'                => 'nullable|string|max:1000',
             'supporting_document'   => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
+        // Sort dates and derive date_from / date_to for range queries
+        $sortedDates       = collect($data['dates'])->map(fn($d) => \Carbon\Carbon::parse($d)->toDateString())->sort()->values();
+        $data['date_from'] = $sortedDates->first();
+        $data['date_to']   = $sortedDates->last();
+        $data['dates']     = $sortedDates->all();
+
         $leaveType  = LeaveType::findOrFail($data['leave_type_id']);
-        $days       = $this->computeWorkingDays($data['date_from'], $data['date_to']);
+        $days       = $this->computeWorkingDaysFromDates($data['dates']);
         $user       = Auth::user();
 
         // ── Balance validation before filing ──────────────────────────────────
@@ -110,53 +124,38 @@ class LeaveApplicationController extends Controller
         $this->authorize('hr.leave.view');
 
         return Inertia::render('HR/Leave/Show', [
-            'application' => $leaveApplication->load(['user', 'leaveType', 'divisionChief', 'approvedBy']),
+            'application' => $leaveApplication->load([
+                'user', 'leaveType',
+                'hrOfficer',       // Stage 1
+                'divisionChief',   // Stage 2
+                'approvedBy',      // Stage 3
+            ]),
         ]);
     }
 
+    /**
+     * 3-stage approval workflow:
+     *   Stage 1 — hr_officer   : HR Officer certifies leave credits  (pending      → hr_verified)
+     *   Stage 2 — division_chief: Division Chief recommends           (hr_verified  → forwarded)
+     *   Stage 3 — campus_director: Campus Director final approval     (forwarded    → approved/rejected)
+     */
     public function approve(Request $request, LeaveApplication $leaveApplication)
     {
         $this->authorize('hr.leave.approve');
 
         $data = $request->validate([
-            'action'  => 'required|in:approved,rejected,forwarded',
+            'stage'   => 'required|in:hr_officer,division_chief,campus_director',
+            'action'  => 'required|string',
             'remarks' => 'nullable|string|max:500',
-            'stage'   => 'required|in:division_chief,hr',
         ]);
 
-        DB::transaction(function () use ($data, $leaveApplication) {
-            if ($data['stage'] === 'division_chief') {
-                $leaveApplication->update([
-                    'division_chief_id'      => Auth::id(),
-                    'division_chief_action'  => $data['action'],
-                    'division_chief_at'      => now(),
-                    'division_chief_remarks' => $data['remarks'],
-                    'status'                 => $data['action'] === 'forwarded' ? 'forwarded' : $data['action'],
-                ]);
-
-                // Restoration when DC rejects a previously-forwarded application
-                if ($data['action'] === 'rejected') {
-                    $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
-                }
-            } else {
-                // HR final action
-                $leaveApplication->update([
-                    'approved_by'      => Auth::id(),
-                    'approval_action'  => $data['action'],
-                    'approved_at'      => now(),
-                    'approval_remarks' => $data['remarks'],
-                    'status'           => $data['action'],
-                ]);
-
-                if ($data['action'] === 'approved') {
-                    // Deduct credits; marks is_without_pay automatically if balance insufficient
-                    $this->credits->applyLeaveDeduction($leaveApplication->id, Auth::id());
-                } elseif ($data['action'] === 'rejected') {
-                    // Restore any credits that were deducted at an earlier stage
-                    $this->credits->restoreLeaveCredits($leaveApplication->id, Auth::id());
-                }
-            }
-        });
+        $this->approvals->processLeave(
+            application: $leaveApplication,
+            stage:       $data['stage'],
+            action:      $data['action'],
+            remarks:     $data['remarks'] ?? '',
+            approver:    Auth::user(),
+        );
 
         return back()->with('success', 'Action recorded.');
     }
@@ -167,7 +166,7 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        if (! in_array($leaveApplication->status, ['pending', 'forwarded', 'approved'])) {
+        if (! in_array($leaveApplication->status, ['pending', 'hr_verified', 'forwarded', 'approved'])) {
             return back()->with('error', 'This application cannot be cancelled.');
         }
 
@@ -272,7 +271,20 @@ class LeaveApplicationController extends Controller
             abort(403);
         }
 
-        $application = $leaveApplication->load(['user', 'leaveType', 'divisionChief', 'approvedBy']);
+        $application = $leaveApplication->load(['user.division.divisionchief', 'leaveType', 'hrOfficer', 'divisionChief', 'approvedBy']);
+
+        // Resolve monthly salary from salary schedule (salary_grade + salary_step on the user)
+        $monthlySalary = null;
+        $u = $application->user;
+        if ($u && $u->salary_grade) {
+            $row = SalarySchedule::where('is_current', true)
+                ->where('salary_grade', $u->salary_grade)
+                ->where('step', $u->salary_step ?? 1)
+                ->first();
+            if ($row) {
+                $monthlySalary = number_format((float) $row->monthly_rate, 2);
+            }
+        }
 
         // Leave credits for the year of the application
         $year    = \Carbon\Carbon::parse($application->date_from)->year;
@@ -298,37 +310,68 @@ class LeaveApplicationController extends Controller
             ];
         }
 
-        // Certifying officer — division chief who reviewed (or first approver)
-        $certifyingOfficer = null;
-        if ($application->division_chief_id && $application->divisionChief) {
-            $certifyingOfficer = [
-                'name'     => $application->divisionChief->name,
-                'position' => $application->divisionChief->position ?? 'Authorized Officer',
-            ];
+        // ── Resolve signatories (snapshot-first, live fallback) ──────────────
+
+        // Fallback: live certifying officer (HR Officer who certified)
+        $liveCertifying = $application->hr_officer_id ? $application->hrOfficer : null;
+
+        // Fallback: live authorized officer (Division Chief of the applicant's division)
+        $liveAuthorized = $application->user?->division?->divisionchief;
+        if (! $liveAuthorized && $application->division_chief_id) {
+            $liveAuthorized = $application->divisionChief;
         }
 
-        // Authorized official — OCD / Campus Director
-        $authorizedOfficial = null;
+        // Fallback: live authorized official (OCD / Campus Director)
+        $liveOfficial = null;
         $ocdDiv = DB::table('divisions')
             ->where('division_name', 'like', '%Campus Director%')
             ->orWhere('acronym', 'OCD')
             ->first();
         if ($ocdDiv?->division_chief_id) {
-            $official = \App\Models\User::find($ocdDiv->division_chief_id);
-            if ($official) {
-                $authorizedOfficial = [
-                    'name'     => $official->name,
-                    'position' => $official->position ?? 'OIC - Campus Director',
-                ];
-            }
+            $liveOfficial = \App\Models\User::find($ocdDiv->division_chief_id);
         }
+        if (! $liveOfficial && $application->approved_by) {
+            $liveOfficial = $application->approvedBy;
+        }
+
+        // Capture signatories into snapshots (idempotent — safe to call every print)
+        $this->snapshots->captureSignatories($application, [
+            ['role_label' => ApprovalStep::SIG_CERTIFYING_OFFICER,  'user' => $liveCertifying],
+            ['role_label' => ApprovalStep::SIG_AUTHORIZED_OFFICER,  'user' => $liveAuthorized],
+            ['role_label' => ApprovalStep::SIG_AUTHORIZED_OFFICIAL, 'user' => $liveOfficial],
+        ]);
+
+        // Resolve final display data from snapshots (with live fallback)
+        $certifyingOfficer  = $this->snapshots->resolveSignatory(
+            $application, ApprovalStep::SIG_CERTIFYING_OFFICER, $liveCertifying
+        );
+        $authorizedOfficer  = $this->snapshots->resolveSignatory(
+            $application, ApprovalStep::SIG_AUTHORIZED_OFFICER, $liveAuthorized
+        );
+        $authorizedOfficial = $this->snapshots->resolveSignatory(
+            $application, ApprovalStep::SIG_AUTHORIZED_OFFICIAL, $liveOfficial
+        );
 
         return Inertia::render('HR/Leave/PrintForm', [
             'application'        => $application,
             'credits'            => $creditsMap,
             'certifyingOfficer'  => $certifyingOfficer,
+            'authorizedOfficer'  => $authorizedOfficer,
             'authorizedOfficial' => $authorizedOfficial,
+            'monthlySalary'      => $monthlySalary,
         ]);
+    }
+
+    private function computeWorkingDaysFromDates(array $dates): float
+    {
+        $days = 0;
+        foreach ($dates as $d) {
+            $carbon = \Carbon\Carbon::parse($d);
+            if (! $carbon->isWeekend()) {
+                $days++;
+            }
+        }
+        return $days;
     }
 
     private function computeWorkingDays(string $from, string $to): float
@@ -341,7 +384,6 @@ class LeaveApplicationController extends Controller
             if ($d->isWeekend()) {
                 continue;
             }
-            // TODO Phase 2: exclude public holidays from holidays table
             $days++;
         }
 

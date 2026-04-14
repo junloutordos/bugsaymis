@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage } from "@inertiajs/vue3";
 import { computed } from "vue";
-import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { useVehicleRequests } from "@/Composables/useVehicleRequests";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
@@ -32,7 +32,7 @@ const {
   showModal, editingRequest,
   openModal, closeModal, submit,
   // actions
-  destroy, approveRequest, declineRequest, openPrint,
+  destroy, openPrint,
 } = useVehicleRequests(props.requests || [], props.vehicles || [])
 </script>
 
@@ -114,8 +114,6 @@ const {
                     <button v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" @click.prevent="destroy(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete"><TrashIcon class="w-4 h-4" /></button>
                     <button v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'Approved' && !req.driver" @click.prevent="openAssignDriverModal(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Assign Driver"><UserIcon class="w-4 h-4" /></button>
                     <button v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'OCD Approved'" @click.prevent="openPrint(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4" /></button>
-                    <button v-if="roleName === 'DivisionChief' && req.status === 'Pending'" @click.prevent="approveRequest(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Approve"><CheckIcon class="w-4 h-4" /></button>
-                    <button v-if="roleName === 'DivisionChief' && req.status === 'Pending'" @click.prevent="declineRequest(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>

@@ -17,9 +17,12 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class ITJobRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     /* =====================================================
      | INDEX
      |=====================================================*/
@@ -539,6 +542,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Approved by Division Chief.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'approved',
+                approver:   $request->user(),
+            );
         } else {
             $jobRequest->update([
                 'status' => 'Rejected by Division Chief',
@@ -550,6 +561,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Rejected by Division Chief.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'rejected',
+                approver:   $request->user(),
+            );
         }
 
         return back()->with('success', 'Division Chief action recorded!');
@@ -606,6 +625,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Request Approved by OCD.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'approved',
+                approver:   $request->user(),
+            );
         } else {
             $jobRequest->update([
                 'status' => 'Rejected by OCD',
@@ -617,6 +644,14 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'remarks' => 'Rejected by OCD.',
                 'updated_by' => $request->user()->id,
             ]);
+
+            $this->snapshots->recordApproval(
+                approvable: $jobRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'rejected',
+                approver:   $request->user(),
+            );
         }
 
         return back()->with('success', 'OCD action recorded!');
@@ -632,6 +667,70 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             ->count();
 
         return response()->json(['has_pending' => $count > 0, 'count' => $count]);
+    }
+
+    /* =====================================================
+     | PRINT FORM
+     |=====================================================*/
+    public function printForm(ITJobRequest $jobRequest)
+    {
+        $jobRequest->load(['user.division', 'divisionChief', 'assignedTo']);
+
+        // OCD approver — try the actual approval snapshot first
+        $ocdApprover = null;
+        $ocdSnapshot = DB::table('approval_snapshots')
+            ->where('approvable_type', ITJobRequest::class)
+            ->where('approvable_id', $jobRequest->id)
+            ->where('step', 'REQ_OCD')
+            ->where('action', 'approved')
+            ->latest()
+            ->first();
+
+        if ($ocdSnapshot) {
+            $ocdApprover = User::find($ocdSnapshot->approver_id);
+        }
+
+        // Fall back to the Campus Director (by position) — not the OCD role
+        // which is assigned to MIS staff for workflow purposes
+        if (! $ocdApprover) {
+            $ocdApprover = User::where('position', 'like', '%Campus Director%')
+                ->orWhere('position', 'like', '%OIC%Campus Director%')
+                ->orderByRaw("CASE WHEN position LIKE '%OIC%' THEN 1 ELSE 0 END")
+                ->first();
+        }
+
+        // Default recommendation based on category
+        $defaultRecommendations = [
+            'Hardware Repair'               => 'Repair/Replace defective hardware component(s)',
+            'Hardware Installation'         => 'Install hardware component/peripheral',
+            'Preventive Maintenance'        => 'Internal - Preventive Maintenance',
+            'Software Installation'         => 'Install required software application',
+            'Software Modification'         => 'Modify/Update existing software',
+            'Software Development'          => 'Develop custom software solution',
+            'Network Connection'            => 'Network troubleshooting and connection setup',
+            'Account Access'                => 'Create/Reset/Update user account credentials',
+            'Graphic Design'                => 'Create graphic design and layout',
+            'Technical Assistance on Events'=> 'Provide technical support for the event',
+            'Video Editing/Production'      => 'Edit and produce video content',
+            'Posting to Website'            => 'Upload/Update content on official website',
+            'Posting to Social Media'       => 'Upload/Update content on official social media pages',
+            'Poll Survey Creation'          => 'Create and set up online poll/survey',
+            'DTR Generation'                => 'Generate and issue DTR report',
+            'DTR System Concerns'           => 'Investigate and resolve DTR system issue',
+            'Online Meeting Request'        => 'Set up and facilitate online meeting',
+            'CCTV Footage Review'           => 'Review CCTV footage for specified date/time',
+            'CCTV Footage Retrieval'        => 'Retrieve and export requested CCTV footage',
+            'SIMS Concerns'                 => 'Investigate and resolve SIMS concern',
+            'Document Tracking Concerns'    => 'Investigate and resolve Document Tracking concern',
+            'eNGAS Concerns'                => 'Investigate and resolve eNGAS concern',
+            'Other'                         => 'Provide appropriate technical assistance',
+        ];
+
+        $recommendation = $jobRequest->category
+            ? ($defaultRecommendations[$jobRequest->category] ?? $jobRequest->category)
+            : '—';
+
+        return view('it-job-requests.print', compact('jobRequest', 'ocdApprover', 'recommendation'));
     }
 
     /* =====================================================

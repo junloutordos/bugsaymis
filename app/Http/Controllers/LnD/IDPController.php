@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\LnD;
 
+use App\Enums\ApprovalStep;
 use App\Http\Controllers\Controller;
 use App\Models\IndividualDevelopmentPlan;
 use App\Models\LearningProgram;
 use App\Models\TrainingNeed;
 use App\Models\User;
+use App\Services\SnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -14,6 +16,7 @@ use Inertia\Inertia;
 
 class IDPController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     // ── Index ──────────────────────────────────────────────────────────────────
 
     public function index(Request $request)
@@ -150,6 +153,16 @@ class IDPController extends Controller
             'approved_at'        => $validated['action'] === 'approved' ? now() : null,
             'supervisor_remarks' => $validated['supervisor_remarks'] ?? $iDP->supervisor_remarks,
         ]);
+
+        $snapshotAction = $validated['action'] === 'approved' ? 'approved' : 'rejected';
+        $this->snapshots->recordApproval(
+            approvable: $iDP,
+            step:       ApprovalStep::IDP_APPROVER,
+            sequence:   1,
+            action:     $snapshotAction,
+            approver:   Auth::user(),
+            remarks:    $validated['supervisor_remarks'] ?? '',
+        );
 
         $label = $validated['action'] === 'approved' ? 'approved' : 'returned for revision';
 

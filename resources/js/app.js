@@ -17,6 +17,16 @@ if (appUrl && window.location.origin !== appUrl) {
     window.location.replace(appUrl + window.location.pathname + window.location.search + window.location.hash);
 }
 
+import { router } from '@inertiajs/vue3';
+
+// Reload page on CSRF expiry (419) so the user gets a fresh token
+router.on('invalid', (event) => {
+    if (event.detail.response.status === 419) {
+        event.preventDefault();
+        window.location.reload();
+    }
+});
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) =>

@@ -19,7 +19,7 @@ class GuidanceConsultationController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance', 'Faculty', 'Staff'])) {
+        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
             abort(403, 'Forbidden');
         }
 
@@ -29,9 +29,21 @@ class GuidanceConsultationController extends Controller
 
         return Inertia::render('Guidance/Consultations/Index', [
             'consultations' => $items,
-            // pass list of faculty users for adviser selection
             'facultyUsers' => User::havingRole('Faculty')->select('id','name','email')->get(),
         ]);
+    }
+
+    /**
+     * Dedicated referral submission page for Faculty / Staff.
+     */
+    public function referPage(Request $request)
+    {
+        $user = $request->user();
+        if (! $user || ! $user->hasPermission('guidance.refer')) {
+            abort(403, 'Forbidden');
+        }
+
+        return Inertia::render('Guidance/Refer');
     }
 
     /**

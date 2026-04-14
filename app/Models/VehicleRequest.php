@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class VehicleRequest extends Model
 {
-    use HasFactory;
+    use HasFactory, HasApprovalSnapshots;
 
     protected $fillable = [
         'requestor_id',

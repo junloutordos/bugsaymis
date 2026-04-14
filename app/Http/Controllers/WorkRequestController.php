@@ -17,9 +17,12 @@ use App\Mail\WorkRequestForAssignmentMail;
 use App\Mail\WorkRequestAssignedMail;
 use App\Mail\WorkRequestFADApprovalMail;
 use App\Mail\WorkRequestCompletedMail;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class WorkRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     public function index()
     {
         $divisions = Building::select('id', 'name')->get();
@@ -145,6 +148,14 @@ class WorkRequestController extends Controller
         $workRequest->status = 'Division Approved';
         $workRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $workRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         try {
             $gsuHeadRole3 = \App\Models\Role::where('name', 'GSU Head')->first();
             $gsuHeads = $gsuHeadRole3
@@ -176,6 +187,14 @@ class WorkRequestController extends Controller
         $workRequest->decline_reason = $data['reason'] ?? null;
         $workRequest->declined_at = now();
         $workRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $workRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
             $requester = $workRequest->requester;
@@ -210,6 +229,16 @@ class WorkRequestController extends Controller
         // record who acted (for audit/notifications)
         $workRequest->acted_by_id = $gsu;
         $workRequest->save();
+
+        if ($approver = User::find($gsu)) {
+            $this->snapshots->recordApproval(
+                approvable: $workRequest,
+                step:       ApprovalStep::REQ_GSU,
+                sequence:   2,
+                action:     'approved',
+                approver:   $approver,
+            );
+        }
 
         logger()->info('WorkRequest approved by GSU Head', ['work_request_id' => $workRequest->id, 'gsu_id' => $gsu]);
 
@@ -295,6 +324,16 @@ class WorkRequestController extends Controller
 
         $workRequest->status = 'FAD Approved';
         $workRequest->save();
+
+        if ($approver = User::find($chief)) {
+            $this->snapshots->recordApproval(
+                approvable: $workRequest,
+                step:       ApprovalStep::REQ_FAD,
+                sequence:   3,
+                action:     'approved',
+                approver:   $approver,
+            );
+        }
 
         logger()->info('WorkRequest approved by FAD Chief', ['work_request_id' => $workRequest->id, 'fad_id' => $chief]);
 

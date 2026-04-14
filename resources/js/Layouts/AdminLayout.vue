@@ -424,6 +424,14 @@ const menuItems = [
         permissions: ["roles.assign"],
       },
       {
+        label: "Org Structure",
+        routeName: "hr.org.index",
+        href: route("hr.org.index"),
+        icon: BuildingLibraryIcon,
+        roles: ["Administrator"],
+        permissions: ["org.view"],
+      },
+      {
         label: "Buildings",
         routeName: "buildings.index",
         href: route("buildings.index"),
@@ -559,14 +567,6 @@ const menuItems = [
         icon: ClockIcon,
         roles: ["Administrator", "HR"],
         permissions: ["hr.schedule.manage"],
-      },
-      {
-        label: "Org Structure",
-        routeName: "hr.org.index",
-        href: route("hr.org.index"),
-        icon: BuildingLibraryIcon,
-        roles: ["Administrator", "HR", "OCD", "DivisionChief", "PMT", "MIS", "Faculty", "Staff"],
-        permissions: ["org.view"],
       },
       
       {
@@ -1443,6 +1443,38 @@ const menuItems = [
       },
     ],
   },
+  {
+    label: "Gate Attendance",
+    icon: QueueListIcon,
+    roles: ["Administrator"],
+    permissions: ["students.attendance.view"],
+    children: [
+      {
+        label: "Kiosk",
+        routeName: "student-attendance.kiosk",
+        href: route("student-attendance.kiosk"),
+        icon: ComputerDesktopIcon,
+        roles: ["Administrator"],
+        permissions: ["students.attendance.scan"],
+      },
+      {
+        label: "Attendance Logs",
+        routeName: "student-attendance.logs.index",
+        href: route("student-attendance.logs.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator"],
+        permissions: ["students.attendance.view"],
+      },
+      {
+        label: "Parent Contacts",
+        routeName: "student-attendance.parents.index",
+        href: route("student-attendance.parents.index"),
+        icon: UserGroupIcon,
+        roles: ["Administrator"],
+        permissions: ["students.attendance.view"],
+      },
+    ],
+  },
       {
         label: "Health Services",
         icon: HeartIcon,
@@ -1501,7 +1533,14 @@ const menuItems = [
         routeName: "guidance.consultations.index",
         href: route('guidance.consultations.index'),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["guidance.view"],
+      },
+      {
+        label: "Refer to Guidance",
+        routeName: "guidance.refer",
+        href: "/guidance/refer",
+        icon: ClipboardDocumentListIcon,
+        permissions: ["guidance.refer"],
       },
       {
         label: "Session Reports",
@@ -1642,7 +1681,6 @@ const filterMenuByRole = (items, userRoleNames) =>
     .filter((item) => {
       // Special-case: Guidance (numeric role_id 17 still used for legacy Guidance role)
       if (item.label === "Guidance Services") return showGuidanceByRoleId;
-      if (item.routeName === 'guidance.consultations.index') return showGuidanceByRoleId;
       // Dashboard visible to Guidance role via numeric ID
       if (item.routeName === 'dashboard' && roleIds.includes(17)) return true;
       // Health stats via numeric ID

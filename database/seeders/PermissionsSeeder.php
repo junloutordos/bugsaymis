@@ -172,6 +172,11 @@ class PermissionsSeeder extends Seeder
             ['module' => 'SALN', 'name' => 'saln.view_all', 'description' => 'View all employee SALNs (HR Office)'],
             ['module' => 'SALN', 'name' => 'saln.file',     'description' => 'Mark approved SALN as officially filed (HR Office)'],
 
+            // ── Student Gate Attendance ───────────────────────────────────────
+            ['module' => 'Student Attendance', 'name' => 'students.attendance.view',   'description' => 'View gate attendance logs and parent contacts'],
+            ['module' => 'Student Attendance', 'name' => 'students.attendance.scan',   'description' => 'Operate the gate kiosk scanner'],
+            ['module' => 'Student Attendance', 'name' => 'students.attendance.manage', 'description' => 'Full gate attendance management'],
+
             // ── Chat ──────────────────────────────────────────────────────────
             ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],
 

@@ -1,24 +1,26 @@
 <template>
   <Head :title="`CS Form 6 — ${application.control_no}`" />
 
-  <div class="page">
+  <div id="leave-print-root">
+    <table id="leave-pt-wrap">
 
-    <!-- ── Header ─────────────────────────────────────────────────── -->
-    <div class="form-header">
-      <div class="logo-area">
-        <!-- School seal placeholder -->
-        <div class="seal-circle">PSHS</div>
-      </div>
-      <div class="school-info">
-        <div class="school-name">PHILIPPINE SCIENCE HIGH SCHOOL</div>
-        <div class="school-sub">CARAGA REGION CAMPUS IN BUTUAN CITY</div>
-        <div class="school-dept">DEPARTMENT OF SCIENCE AND TECHNOLOGY</div>
-        <div class="school-slogan">OneDOST4U: Solutions and Opportunities for All</div>
-      </div>
-      <div class="bagong-area">
-        <div class="bagong-box">BAGONG<br>PILIPINAS</div>
-      </div>
-    </div>
+      <!-- Repeating header on every page -->
+      <thead>
+        <tr><td id="leave-pt-head">
+          <img src="/images/report_header.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </thead>
+
+      <!-- Repeating footer on every page -->
+      <tfoot>
+        <tr><td id="leave-pt-foot">
+          <img src="/images/report_footer.jpeg" style="width:100%; display:block;" />
+        </td></tr>
+      </tfoot>
+
+      <!-- Body -->
+      <tbody>
+        <tr><td id="leave-pt-body">
 
     <div class="form-meta-row">
       <div class="form-meta-left">
@@ -41,14 +43,18 @@
         <td class="val font-bold" colspan="3">{{ application.user?.name?.toUpperCase() }}</td>
       </tr>
       <tr>
-        <td class="lbl" style="width:22%">3. DATE OF FILING:</td>
-        <td class="lbl" style="width:40%">4. POSITION:</td>
-        <td class="lbl" colspan="2">5. SALARY:</td>
-      </tr>
-      <tr>
-        <td class="val">{{ fmtDate(application.filed_at ?? application.created_at) }}</td>
-        <td class="val">{{ application.user?.position }}</td>
-        <td class="val" colspan="2">{{ salary }}</td>
+        <td class="lbl-val" style="width:22%">
+          <span class="lbl-inline">3. DATE OF FILING:</span>
+          <span class="val-inline">{{ fmtDate(application.filed_at ?? application.created_at) }}</span>
+        </td>
+        <td class="lbl-val" style="width:40%">
+          <span class="lbl-inline">4. POSITION:</span>
+          <span class="val-inline font-bold" style="text-transform:uppercase">{{ application.user?.position }}</span>
+        </td>
+        <td class="lbl-val" colspan="2">
+          <span class="lbl-inline">5. SALARY:</span>
+          <span class="val-inline font-bold">{{ salary }}</span>
+        </td>
       </tr>
     </table>
 
@@ -134,14 +140,14 @@
           <div class="days-val">{{ application.days_applied }} day(s)</div>
           <div class="lbl-sm mt-6">INCLUSIVE DATES:</div>
           <div class="days-val">{{ inclusiveDates }}</div>
-          <div class="sig-space"></div>
-          <div class="sig-line-el"></div>
-          <div class="sig-lbl">Signature of Applicant</div>
         </td>
         <td class="body-cell" style="padding:4px 6px; vertical-align:top;">
           <div class="lbl-sm">6.D COMMUTATION</div>
           <div class="cb-row mt-1"><span class="cb">☐</span> Not Requested</div>
           <div class="cb-row"><span class="cb">☐</span> Requested</div>
+          <div class="sig-space"></div>
+          <div class="sig-line-el"></div>
+          <div class="sig-lbl">Signature of Applicant</div>
         </td>
       </tr>
     </table>
@@ -199,6 +205,8 @@
               </tr>
             </tbody>
           </table>
+          <div class="sig-space"></div>
+          <div class="sig-space"></div>
           <div class="mt-6 officer-name">{{ certifyingOfficer?.name?.toUpperCase() ?? '' }}</div>
           <div class="sig-lbl">(Authorized Officer)</div>
         </td>
@@ -212,8 +220,11 @@
             <span class="cb">{{ recForDisapproval ? '☑' : '☐' }}</span> For disapproval due to :
           </div>
           <div class="rec-remarks" v-if="recForDisapproval">{{ application.division_chief_remarks || application.approval_remarks }}</div>
-          <div class="sig-line-el mt-12"></div>
-          <div class="sig-lbl">Authorized Officer</div>
+          <div class="disapprove-line mt-6"></div>
+          <div class="disapprove-line mt-6"></div>
+          <div class="disapprove-line mt-6"></div>
+          <div class="mt-12 officer-name">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
+          <div class="sig-lbl">(Authorized Officer)</div>
         </td>
       </tr>
 
@@ -222,30 +233,35 @@
         <td class="body-cell" style="padding:4px 6px; vertical-align:top;">
           <div class="lbl-sm">7.C APPROVED FOR:</div>
           <div class="approved-row">
-            <span class="approved-blank">{{ withPayDays }}</span> days with pay
+            <span>{{ withPayDays }}</span> days with pay
           </div>
           <div class="approved-row">
-            <span class="approved-blank">{{ withoutPayDays }}</span> days without pay
+            <span>{{ withoutPayDays }}</span> days without pay
           </div>
           <div class="approved-row">
-            <span class="approved-blank">_______</span> others (Specify)
+            <span>_______</span> others (Specify)
           </div>
         </td>
         <td class="body-cell" style="padding:4px 6px; vertical-align:top;">
           <div class="lbl-sm">7.D DISAPPROVED DUE TO:</div>
-          <div class="sig-line-el mt-2"></div>
-          <div class="sig-line-el mt-3"></div>
-          <div class="sig-line-el mt-3"></div>
+          <div class="disapprove-line"></div>
+          <div class="disapprove-line"></div>
+          <div class="disapprove-line"></div>
+        </td>
+      </tr>
+
+      <!-- Authorized Official — full width inside the table -->
+      <tr>
+        <td class="body-cell" colspan="2" style="padding:6px 4px; text-align:center; border-top:1px solid #000;">
+          <div class="officer-name">{{ authorizedOfficial?.name?.toUpperCase() ?? '' }}</div>
+          <div class="sig-lbl">(Authorized Official)</div>
         </td>
       </tr>
     </table>
 
-    <!-- Authorized Official (full width) -->
-    <div class="auth-official">
-      <div class="officer-name">{{ authorizedOfficial?.name?.toUpperCase() ?? '' }}</div>
-      <div class="sig-lbl">(Authorized Official)</div>
-    </div>
-
+        </td></tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
@@ -256,8 +272,10 @@ import { Head } from '@inertiajs/vue3'
 const props = defineProps({
   application:        Object,
   credits:            Object,  // { VL: {earned,used,balance}, SL: {...}, ... }
-  certifyingOfficer:  Object,
-  authorizedOfficial: Object,
+  certifyingOfficer:  Object,  // 7.A — certifies leave credits
+  authorizedOfficer:  Object,  // 7.B — Division Chief where user belongs
+  authorizedOfficial: Object,  // bottom — Campus Director / Head of Agency
+  monthlySalary:      { type: String, default: null },
 })
 
 // ── CSC Form 6 leave type definitions (order matches the official form) ──────
@@ -316,6 +334,7 @@ const officeDept = computed(() => {
 })
 
 const salary = computed(() => {
+  if (props.monthlySalary) return props.monthlySalary
   const u = props.application.user
   const s = u?.salary ?? u?.employeeProfile?.monthly_salary
   if (!s) return ''
@@ -347,7 +366,9 @@ const withoutPayDays = computed(() =>
 
 function fmtDate(d) {
   if (!d) return ''
-  return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return ''
+  return dt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 onMounted(() => setTimeout(() => window.print(), 500))
@@ -357,41 +378,24 @@ onMounted(() => setTimeout(() => window.print(), 500))
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvetica, sans-serif; }
 
-.page {
-  width: 210mm;
-  min-height: 297mm;
-  margin: 0 auto;
-  padding: 8mm 10mm;
+#leave-print-root {
   font-size: 8.5pt;
   color: #000;
 }
 
-/* ── Header ───────────────────────────────────────────────────────── */
-.form-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 3px;
+#leave-pt-wrap {
+  width: 100%;
+  border-collapse: collapse;
 }
-.seal-circle {
-  width: 44px; height: 44px;
-  border: 2px solid #000;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 7pt; font-weight: bold;
-  flex-shrink: 0;
+
+#leave-pt-head,
+#leave-pt-foot {
+  padding: 0 0.75in;
 }
-.school-info { flex: 1; text-align: center; }
-.school-name  { font-size: 10pt; font-weight: bold; }
-.school-sub   { font-size: 8pt;  font-weight: bold; }
-.school-dept  { font-size: 7.5pt; }
-.school-slogan{ font-size: 6.5pt; font-style: italic; color: #444; }
-.bagong-box {
-  width: 44px; height: 44px;
-  border: 2px solid #c00;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 6pt; font-weight: bold; text-align: center; line-height: 1.2;
-  color: #c00; flex-shrink: 0;
+
+#leave-pt-body {
+  padding: 10px 0.75in;
+  vertical-align: top;
 }
 
 /* ── Meta row ─────────────────────────────────────────────────────── */
@@ -412,9 +416,12 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
   margin-bottom: 0;
 }
 .top-table td { border: 1px solid #000; padding: 2px 4px; }
-.lbl { font-size: 7.5pt; font-weight: bold; background: #f5f5f5; }
-.val { font-size: 8.5pt; min-height: 16px; }
-.font-bold { font-weight: bold; }
+.lbl { font-size: 7.5pt; font-weight: normal; background: #f5f5f5; }
+.val { font-size: 8.5pt; font-weight: 800; min-height: 16px; }
+.font-bold { font-weight: 800; }
+.lbl-val { padding: 2px 4px; white-space: nowrap; }
+.lbl-inline { font-size: 7.5pt; font-weight: normal; margin-right: 3px; }
+.val-inline { font-size: 8.5pt; font-weight: 800; }
 
 /* ── Section header ───────────────────────────────────────────────── */
 .section-hdr {
@@ -485,16 +492,18 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
 .approved-row { font-size: 8pt; margin-bottom: 3px; display: flex; align-items: baseline; gap: 4px; }
 .approved-blank { display: inline-block; min-width: 40px; border-bottom: 1px solid #000; text-align: center; }
 
-/* ── Authorized official ──────────────────────────────────────────── */
-.auth-official {
-  text-align: center; padding: 6px 0 2px;
-  border-top: 1px solid #000; margin-top: -1px;
+/* ── 7D disapproval lines ─────────────────────────────────────────── */
+.disapprove-line {
+  border-bottom: 1px solid #000;
+  width: 100%;
+  display: block;
+  margin-top: 18px;
 }
 
 /* ── Print overrides ──────────────────────────────────────────────── */
+@page { margin: 0.25in 0 0 0; }
+
 @media print {
-  @page { size: A4 portrait; margin: 8mm 10mm; }
-  html, body { background: #fff; }
-  .page { margin: 0; padding: 0; width: 100%; }
+  body { margin: 0; }
 }
 </style>

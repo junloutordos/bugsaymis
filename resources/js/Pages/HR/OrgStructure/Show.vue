@@ -18,6 +18,7 @@ import {
 const props = defineProps({
   unit:       { type: Object, required: true },
   breadcrumb: { type: String, default: '' },
+  employees:  { type: Array,  default: () => [] },
   can:        { type: Object, default: () => ({}) },
 })
 
@@ -175,6 +176,17 @@ const APPOINTMENT_TYPE_LABELS = {
   job_order:  'Job Order',
   secondment: 'Secondment',
 }
+
+function categoryColor(c) {
+  const map = {
+    'Teaching':     'bg-blue-100 text-blue-700',
+    'Non-Teaching': 'bg-amber-100 text-amber-700',
+    'Contractual':  'bg-violet-100 text-violet-700',
+    'COS':          'bg-pink-100 text-pink-700',
+    'JO':           'bg-orange-100 text-orange-700',
+  }
+  return map[c] ?? 'bg-slate-100 text-slate-500'
+}
 </script>
 
 <template>
@@ -244,7 +256,7 @@ const APPOINTMENT_TYPE_LABELS = {
         <button
           v-for="tab in [
             { key: 'overview',     label: 'Overview',     icon: BuildingOfficeIcon },
-            { key: 'assignments',  label: 'Employees',    icon: UserGroupIcon },
+            { key: 'assignments',  label: `Employees (${employees.length})`, icon: UserGroupIcon },
             { key: 'heads',        label: 'Heads',        icon: UserCircleIcon },
           ]"
           :key="tab.key"
@@ -313,52 +325,48 @@ const APPOINTMENT_TYPE_LABELS = {
         </div>
       </div>
 
-      <!-- ── Tab: Assignments ───────────────────────────────────────────────────── -->
+      <!-- ── Tab: Employees ────────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'assignments'" class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-            <UserGroupIcon class="h-4 w-4 text-indigo-400" /> Current Employees
+            <UserGroupIcon class="h-4 w-4 text-indigo-400" />
+            Employees
+            <span class="text-xs text-slate-400 font-normal">({{ employees.length }})</span>
           </h3>
-          <button
-            v-if="can.assign"
-            @click="openAssignModal"
-            class="text-xs px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-medium"
-          >
-            + Assign
-          </button>
         </div>
-        <div v-if="!unit.active_assignments?.length" class="px-5 py-10 text-center text-sm text-slate-400">
-          No active employee assignments.
+
+        <div v-if="!unit.division_id && !unit.office_id" class="px-5 py-10 text-center text-sm text-slate-400">
+          This unit is not linked to a Division or Office. Run a sync to link it.
+        </div>
+        <div v-else-if="!employees.length" class="px-5 py-10 text-center text-sm text-slate-400">
+          No active employees assigned to this unit.
         </div>
         <table v-else class="w-full text-sm">
           <thead>
-            <tr class="text-xs text-slate-400 uppercase tracking-wide border-b border-slate-100">
-              <th class="px-5 py-3 text-left font-medium">Employee</th>
-              <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Position</th>
-              <th class="px-4 py-3 text-left font-medium hidden md:table-cell">Type</th>
-              <th class="px-4 py-3 text-left font-medium">Since</th>
-              <th class="px-4 py-3"></th>
+            <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
+              <th class="px-5 py-2.5 text-left font-semibold">Name</th>
+              <th class="px-4 py-2.5 text-left font-semibold">Badge ID</th>
+              <th class="px-4 py-2.5 text-left font-semibold hidden sm:table-cell">Position</th>
+              <th class="px-4 py-2.5 text-left font-semibold">Category</th>
+              <th class="px-4 py-2.5 text-left font-semibold hidden md:table-cell">Sex</th>
+              <th v-if="!unit.office_id" class="px-4 py-2.5 text-left font-semibold hidden lg:table-cell">Office/Unit</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="a in unit.active_assignments" :key="a.id" class="hover:bg-slate-50/60">
-              <td class="px-5 py-3">
-                <span class="font-medium text-slate-800">{{ a.user?.name }}</span>
-                <span v-if="a.is_primary" class="ml-1.5 text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-semibold">Primary</span>
+          <tbody class="divide-y divide-slate-50">
+            <tr v-for="emp in employees" :key="emp.id" class="hover:bg-slate-50/60 transition-colors">
+              <td class="px-5 py-2.5 font-medium text-slate-800">{{ emp.name }}</td>
+              <td class="px-4 py-2.5 font-mono text-xs text-slate-500">{{ emp.badge_id ?? '—' }}</td>
+              <td class="px-4 py-2.5 text-slate-600 text-xs hidden sm:table-cell">{{ emp.position ?? '—' }}</td>
+              <td class="px-4 py-2.5">
+                <span v-if="emp.emp_category"
+                  :class="['text-xs px-2 py-0.5 rounded-full font-medium', categoryColor(emp.emp_category)]">
+                  {{ emp.emp_category }}
+                </span>
+                <span v-else class="text-xs text-slate-400">—</span>
               </td>
-              <td class="px-4 py-3 text-slate-600 hidden sm:table-cell">{{ a.position_title ?? '—' }}</td>
-              <td class="px-4 py-3 hidden md:table-cell">
-                <span class="text-xs capitalize text-slate-500">{{ ASSIGNMENT_TYPE_LABELS[a.assignment_type] ?? a.assignment_type }}</span>
-              </td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ a.effective_date }}</td>
-              <td class="px-4 py-3 text-right">
-                <button
-                  v-if="can.assign"
-                  @click="endAssignment(a)"
-                  class="text-xs px-2 py-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
-                >
-                  End
-                </button>
+              <td class="px-4 py-2.5 text-xs text-slate-500 capitalize hidden md:table-cell">{{ emp.sex ?? '—' }}</td>
+              <td v-if="!unit.office_id" class="px-4 py-2.5 text-xs text-slate-500 hidden lg:table-cell">
+                {{ emp.office ?? '—' }}
               </td>
             </tr>
           </tbody>

@@ -4,7 +4,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from "vue"
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
-import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { useSubmit } from "@/Composables/useSubmit";
 
 const props = defineProps({ requests: Object });
@@ -150,25 +150,6 @@ const remove = (id) => {
   })
 };
 
-const approveRequest = (r) => {
-  Swal.fire({ title: 'Approve this request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
-    if (!res.isConfirmed) return;
-    router.post(route('service-requests.approve.inapp', r.id), {}, {
-      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
-      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to approve' }) }
-    })
-  })
-}
-
-const declineRequest = (r) => {
-  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
-    if (!res.isConfirmed || !res.value) return;
-    router.post(route('service-requests.decline.inapp', r.id), { reason: res.value }, {
-      onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
-      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errs || {}).flat().join('\n') || 'Failed to decline' }) }
-    })
-  })
-}
 
 
 const canPrint = (r) => {
@@ -223,8 +204,6 @@ const canPrint = (r) => {
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="openEdit(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><PencilSquareIcon class="w-4 h-4"/></button>
               <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="remove(r.id)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><TrashIcon class="w-4 h-4"/></button>
-              <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="approveRequest(r)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve"><CheckIcon class="w-4 h-4"/></button>
-              <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="declineRequest(r)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
               <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4"/></a>
             </div>
           </div>

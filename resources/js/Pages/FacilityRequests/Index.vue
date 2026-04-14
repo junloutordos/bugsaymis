@@ -2,7 +2,7 @@
 import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
 import axios from "axios";
-import { PencilSquareIcon, TrashIcon, PrinterIcon, CheckIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
@@ -265,29 +265,6 @@ const destroy = (req) => {
   })
 }
 
-const approveRequest = (req) => {
-  Swal.fire({ title: 'Approve this facility request?', icon: 'question', showCancelButton: true, confirmButtonText: 'Approve' }).then(res => {
-    if (!res.isConfirmed) return;
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.post(route('facility-requests.approve.inapp', req.id), {}, {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Approved', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
-        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to approve' }) }
-      })
-    })
-  })
-}
-
-const declineRequest = (req) => {
-  Swal.fire({ title: 'Reason for declining', input: 'text', inputPlaceholder: 'Enter reason', showCancelButton: true }).then(res => {
-    if (!res.isConfirmed || !res.value) return;
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.post(route('facility-requests.decline.inapp', req.id), { reason: res.value }, {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Declined', timer: 1000, showConfirmButton: false }).then(() => window.location.reload()) },
-        onError: () => { Swal.fire({ icon: 'error', title: 'Failed to decline' }) }
-      })
-    })
-  })
-}
 
 const openPrint = (req) => {
   let url;
@@ -448,14 +425,6 @@ const bookingsForDate = (dt) => {
                       class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
                       <PrinterIcon class="w-4 h-4" />
                     </button>
-                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="approveRequest(req)"
-                            class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve">
-                      <CheckIcon class="w-4 h-4"/>
-                    </button>
-                    <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="declineRequest(req)"
-                            class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline">
-                      <XMarkIcon class="w-4 h-4"/>
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -504,14 +473,6 @@ const bookingsForDate = (dt) => {
                 @click.prevent="openPrint(req)"
                 class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                 <PrinterIcon class="w-3.5 h-3.5" /> Print
-              </button>
-              <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="approveRequest(req)"
-                      class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                <CheckIcon class="w-3.5 h-3.5"/> Approve
-              </button>
-              <button v-if="page.props.auth?.user?.role?.name === 'DivisionChief' && req.status === 'Pending'" @click.prevent="declineRequest(req)"
-                      class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                <XMarkIcon class="w-3.5 h-3.5"/> Decline
               </button>
             </div>
           </div>

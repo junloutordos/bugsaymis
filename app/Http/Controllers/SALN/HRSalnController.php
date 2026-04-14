@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\SALN;
 
+use App\Enums\ApprovalStep;
 use App\Http\Controllers\Controller;
 use App\Models\SALN\SalnRecord;
 use App\Models\User;
+use App\Services\SnapshotService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +16,7 @@ use Inertia\Response;
 
 class HRSalnController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     // ══════════════════════════════════════════════════════════════════════════
     // HR OFFICE — Final filing & reports
     // ══════════════════════════════════════════════════════════════════════════
@@ -91,6 +94,14 @@ class HRSalnController extends Controller
         ]);
 
         $saln->logAction(Auth::id(), 'filed', $oldStatus, 'filed');
+
+        $this->snapshots->recordApproval(
+            approvable: $saln,
+            step:       ApprovalStep::SALN_FILED,
+            sequence:   3,
+            action:     'filed',
+            approver:   Auth::user(),
+        );
 
         return back()->with('success', "SALN of {$saln->user->name} ({$saln->year}) marked as filed.");
     }
