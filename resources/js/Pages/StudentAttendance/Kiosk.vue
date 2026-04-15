@@ -100,7 +100,11 @@ async function submitScan(barcode) {
 
   } catch (err) {
     if (err.response?.status === 404) {
-      lastScan.value  = { student_name: 'Unknown ID', barcode, type: null }
+      lastScan.value   = { student_name: 'Unknown ID', barcode, type: null }
+      scanStatus.value = 'error'
+    } else {
+      // Network error, 419 session expiry, 500, etc.
+      lastScan.value   = { student_name: 'Scan Failed', barcode, type: null }
       scanStatus.value = 'error'
     }
   } finally {
