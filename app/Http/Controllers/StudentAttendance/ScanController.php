@@ -69,9 +69,32 @@ class ScanController extends Controller
         }
 
         // ── 4. Determine IN / OUT ─────────────────────────────────────────────
-        // Toggle: if last scan was IN → next is OUT, and vice versa.
-        // First scan of the day (or ever) → IN.
-        $type = ($lastLog && $lastLog->type === 'in') ? 'out' : 'in';
+        // Rules (all scoped to TODAY only — yesterday's unmatched Time In is ignored):
+        //   • No Time In recorded today yet  → Time In  (first scan of the day,
+        //                                      regardless of clock time; also resets
+        //                                      a student who forgot to Time Out the
+        //                                      previous school day)
+        //   • Already has a Time In today    → Time Out (subsequent scan)
+        //   • The 12:00 PM cutoff applies to the Time Out direction:
+        //     scans before noon default to Time In unless already checked in;
+        //     scans from noon onward are always Time Out (student is leaving).
+        $now   = now();
+        $today = $now->toDateString();
+
+        $alreadyInToday = StudentAttendanceLog::where('student_id', $student->id)
+            ->where('type', 'in')
+            ->whereDate('scan_time', $today)
+            ->exists();
+
+        if (! $alreadyInToday) {
+            // First scan of this calendar day → always Time In, even if after noon
+            // (handles late arrivals and the "forgot to Time Out yesterday" reset)
+            $type = 'in';
+        } else {
+            // Student already checked in today; after noon it becomes Time Out.
+            // A second scan before noon is also treated as Time Out (early exit).
+            $type = 'out';
+        }
 
         // ── 5. Record the log (immutable — never update) ──────────────────────
         $log = StudentAttendanceLog::create([
