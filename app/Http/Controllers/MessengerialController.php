@@ -183,14 +183,16 @@ class MessengerialController extends Controller
             abort(403);
         }
 
-        if (in_array($messengerialRequest->status, ['Pending OCD Approval', 'Approved'])) {
+        if ($messengerialRequest->status === 'Approved') {
             return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => true]);
         }
 
-        $messengerialRequest->status = 'Pending OCD Approval';
+        $messengerialRequest->status = 'Approved';
         $messengerialRequest->save();
 
-        if ($approver = User::find($chief)) {
+        $approver = User::find($chief);
+
+        if ($approver) {
             $this->snapshots->recordApproval(
                 approvable: $messengerialRequest,
                 step:       ApprovalStep::REQ_DIVISION_CHIEF,
@@ -198,6 +200,34 @@ class MessengerialController extends Controller
                 action:     'approved',
                 approver:   $approver,
             );
+        }
+
+        // Notify requester
+        try {
+            if ($messengerialRequest->email) {
+                Mail::to($messengerialRequest->email)->send(
+                    new MessengerialRequestStatusMail($messengerialRequest, 'Approved', null, $approver?->name)
+                );
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send messengerial approved notification', ['error' => $e->getMessage()]);
+        }
+
+        // Notify Records users
+        try {
+            $recordsUsers = User::havingRole('Records')->get();
+            $processUrl   = url('/messengerial');
+            foreach ($recordsUsers as $rUser) {
+                if ($rUser->email) {
+                    try {
+                        Mail::to($rUser->email)->send(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
+                    } catch (\Throwable $ee) {
+                        logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage()]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to queue Records notifications', ['error' => $e->getMessage()]);
         }
 
         return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => false]);
@@ -319,72 +349,6 @@ class MessengerialController extends Controller
         $request->validate(['action' => 'required|in:approve,reject']);
 
         if ($request->action === 'approve') {
-            $messengerialRequest->status = 'Pending OCD Approval';
-            $messengerialRequest->save();
-        } else {
-            $request->validate(['reason' => 'nullable|string|max:1000']);
-            $messengerialRequest->status       = 'Declined';
-            $messengerialRequest->decline_reason = $request->input('reason');
-            $messengerialRequest->declined_at  = now();
-            $messengerialRequest->save();
-
-            try {
-                if ($messengerialRequest->email) {
-                    Mail::to($messengerialRequest->email)->send(
-                        new MessengerialRequestStatusMail($messengerialRequest, 'Declined', $messengerialRequest->decline_reason, $user->name)
-                    );
-                }
-            } catch (\Throwable $e) {
-                logger()->error('Failed to send messengerial declined notification', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return back()->with('success', 'Action recorded.');
-    }
-
-    /**
-     * In-app OCD approval page
-     */
-    public function ocdApproval(Request $request)
-    {
-        $user = $request->user();
-        if (! $user->hasRole('OCD') && ! $user->hasRole('Administrator')) {
-            abort(403, 'Unauthorized');
-        }
-
-        $search  = trim($request->query('search', ''));
-        $perPage = min((int) $request->query('per_page', 15), 50);
-
-        $requests = MessengerialRequest::where('status', 'Pending OCD Approval')
-            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
-                $inner->where('purpose', 'like', "%{$search}%")
-                      ->orWhere('requestor', 'like', "%{$search}%")
-                      ->orWhere('reference_no', 'like', "%{$search}%")
-                      ->orWhere('destination', 'like', "%{$search}%");
-            }))
-            ->latest()
-            ->paginate($perPage)
-            ->withQueryString();
-
-        return Inertia::render('Messengerial/OCDApprovalMessengerial', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
-        ]);
-    }
-
-    /**
-     * In-app OCD approve/reject action
-     */
-    public function ocdAction(Request $request, MessengerialRequest $messengerialRequest)
-    {
-        $user = $request->user();
-        if (! $user->hasRole('OCD') && ! $user->hasRole('Administrator')) {
-            abort(403);
-        }
-
-        $request->validate(['action' => 'required|in:approve,reject']);
-
-        if ($request->action === 'approve') {
             $messengerialRequest->status = 'Approved';
             $messengerialRequest->save();
 
@@ -417,9 +381,9 @@ class MessengerialController extends Controller
             }
         } else {
             $request->validate(['reason' => 'nullable|string|max:1000']);
-            $messengerialRequest->status        = 'Declined';
+            $messengerialRequest->status       = 'Declined';
             $messengerialRequest->decline_reason = $request->input('reason');
-            $messengerialRequest->declined_at   = now();
+            $messengerialRequest->declined_at  = now();
             $messengerialRequest->save();
 
             try {

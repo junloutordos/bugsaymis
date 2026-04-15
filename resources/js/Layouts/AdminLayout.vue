@@ -1228,13 +1228,6 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["DivisionChief"],
       },
-      {
-        label: "OCD Approval — Messengerial",
-        routeName: "messengerial.ocd-approval",
-        href: route("messengerial.ocd-approval"),
-        icon: ClipboardDocumentListIcon,
-        roles: ["OCD"],
-      },
     ],
   },
   {
