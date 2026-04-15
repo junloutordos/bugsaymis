@@ -651,14 +651,6 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
             ->name('messengerial.division-chief-action');
     });
 
-    // Messengerial — OCD in-app approval
-    Route::middleware(['auth', 'permission:messengerial.ocd-approve'])->group(function () {
-        Route::get('/messengerial/ocd-approval', [\App\Http\Controllers\MessengerialController::class, 'ocdApproval'])
-            ->name('messengerial.ocd-approval');
-        Route::post('/messengerial/{messengerialRequest}/ocd-action', [\App\Http\Controllers\MessengerialController::class, 'ocdAction'])
-            ->name('messengerial.ocd-action');
-    });
-
     // Health Services - Consultations page
     Route::get('/consultations', [\App\Http\Controllers\ConsultationController::class, 'index'])->name('consultations.index');
     Route::post('/consultations', [\App\Http\Controllers\ConsultationController::class, 'store'])->name('consultations.store');

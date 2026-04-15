@@ -69,7 +69,7 @@ const closeModal = () => {
 const approveRequest = async (id) => {
   const result = await Swal.fire({
     title: "Approve this request?",
-    text: "It will be forwarded to OCD for final approval.",
+    text: "The request will be approved and Records will be notified.",
     icon: "question",
     showCancelButton: true,
     confirmButtonText: "Yes, approve it!",
@@ -81,7 +81,7 @@ const approveRequest = async (id) => {
     isSubmitting.value = true
     Swal.fire({ title: 'Approving...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
     router.post(route('messengerial.division-chief-action', id), { action: 'approve' }, {
-      onSuccess: () => Swal.fire("Approved!", "Request forwarded to OCD for final approval.", "success"),
+      onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
       onFinish: () => { isSubmitting.value = false },
     })
   }
