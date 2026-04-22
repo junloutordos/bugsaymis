@@ -11,16 +11,16 @@ return new class extends Migration
      */
     public function up()
     {
+        if (! Schema::hasTable('ict_equipments')) return;
         Schema::table('ict_equipments', function (Blueprint $table) {
             $table->unsignedBigInteger('room_id')->nullable()->after('status');
-
-            // optional FK
             $table->foreign('room_id')->references('id')->on('rooms')->nullOnDelete();
         });
     }
 
     public function down()
     {
+        if (! Schema::hasTable('ict_equipments')) return;
         Schema::table('ict_equipments', function (Blueprint $table) {
             $table->dropForeign(['room_id']);
             $table->dropColumn('room_id');

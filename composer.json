@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "doctrine/dbal": "^4.4",
+        "google/apiclient": "^2.15",
         "inertiajs/inertia-laravel": "^2.0",
         "kreait/firebase-php": "^5.26",
         "laravel/framework": "^12.0",
@@ -18,11 +19,13 @@
         "maatwebsite/excel": "^3.1",
         "mpdf/mpdf": "^8.2",
         "phpoffice/phpspreadsheet": "^1.30",
+        "fakerphp/faker": "^1.23",
+        "predis/predis": "^3.4",
+        "pusher/pusher-php-server": "*",
         "simplesoftwareio/simple-qrcode": "^4.2",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.23",
         "laravel/breeze": "^2.3",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",

@@ -16,6 +16,12 @@ use App\Models\ServiceRequest;
 use App\Models\WorkRequest;
 use App\Models\MessengerialRequest;
 use App\Models\Consultation;
+use App\Models\LearningProgram;
+use App\Models\TrainingSession;
+use App\Models\TrainingNeed;
+use App\Models\IndividualDevelopmentPlan;
+use App\Models\RewardNomination;
+use App\Models\Reward;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -57,28 +63,57 @@ class DashboardController extends Controller
         $activeDivisions     = 0;
         $employeeMaleCount   = 0;
         $employeeFemaleCount = 0;
+        $facultyMaleCount    = 0;
+        $facultyFemaleCount  = 0;
+        $staffMaleCount      = 0;
+        $staffFemaleCount    = 0;
         $employeesByDivision = [];
 
         try {
-            $totalEmployees = User::count();
+            // Base scope: active employees with an assigned employee category
+            $activeEmployeeBase = fn () => User::where('status', '!=', 'inactive')
+                ->whereNotNull('emp_category')
+                ->where('emp_category', '!=', '');
 
-            $facultyRole = Role::where('name', 'Faculty')->first();
-            $staffRole   = Role::where('name', 'Staff')->first();
-            if ($facultyRole) {
-                $facultyCount = User::whereRaw('FIND_IN_SET(?, role_id)', [$facultyRole->id])->count();
-            }
-            if ($staffRole) {
-                $staffCount = User::whereRaw('FIND_IN_SET(?, role_id)', [$staffRole->id])->count();
-            }
+            $totalEmployees = $activeEmployeeBase()->count();
+
+            $facultyCount = $activeEmployeeBase()
+                ->whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
+                ->count();
+
+            $staffCount = $activeEmployeeBase()
+                ->whereHas('roles', fn ($q) => $q->where('roles.name', 'Staff'))
+                ->count();
 
             $activeDivisions     = Division::where('status', 'active')->count();
-            $employeeMaleCount   = User::whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
-            $employeeFemaleCount = User::whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+            $employeeMaleCount   = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $employeeFemaleCount = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
 
-            $divs = Division::withCount('employees')->orderByDesc('employees_count')->take(10)->get();
-            $employeesByDivision = $divs->map(fn ($d) => [
-                'division' => $d->acronym ?: $d->division_name,
-                'count'    => $d->employees_count,
+            $facultyBase = fn () => $activeEmployeeBase()->whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'));
+            $staffBase   = fn () => $activeEmployeeBase()->whereHas('roles', fn ($q) => $q->where('roles.name', 'Staff'));
+
+            $facultyMaleCount   = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $facultyFemaleCount = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+            $staffMaleCount     = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
+            $staffFemaleCount   = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+
+            $divRows = DB::table('users')
+                ->join('divisions', 'users.division_id', '=', 'divisions.id')
+                ->select(
+                    DB::raw("COALESCE(NULLIF(TRIM(divisions.acronym),''), divisions.division_name) as division"),
+                    DB::raw('COUNT(*) as cnt')
+                )
+                ->where('users.status', '!=', 'inactive')
+                ->whereNotNull('users.emp_category')
+                ->where('users.emp_category', '!=', '')
+                ->groupBy('divisions.id', 'division')
+                ->orderByDesc('cnt')
+                ->take(10)
+                ->get();
+
+            $employeesByDivision = $divRows->map(fn ($d) => [
+                'division' => $d->division,
+                'count'    => (int) $d->cnt,
             ])->values()->toArray();
         } catch (\Throwable $e) {
             logger()->warning('Employee analytics error: ' . $e->getMessage());
@@ -183,12 +218,6 @@ class DashboardController extends Controller
                     'completed' => MessengerialRequest::where('status', 'Completed')->count(),
                     'total'     => MessengerialRequest::count(),
                 ],
-                [
-                    'label'     => 'Consultations',
-                    'pending'   => Consultation::whereIn('status', ['Pending', 'Active'])->count(),
-                    'completed' => Consultation::where('status', 'Completed')->count(),
-                    'total'     => Consultation::count(),
-                ],
             ];
             $totalPendingRequests = (int) collect($requestOverview)->sum('pending');
         } catch (\Throwable $e) {
@@ -216,7 +245,6 @@ class DashboardController extends Controller
                 ['label' => 'Facility Requests', 'model' => FacilityRequest::class],
                 ['label' => 'Service Requests',  'model' => ServiceRequest::class],
                 ['label' => 'Work Requests',     'model' => WorkRequest::class],
-                ['label' => 'Consultations',     'model' => Consultation::class],
             ];
 
             $datasets = [];
@@ -237,6 +265,40 @@ class DashboardController extends Controller
             $monthlyTrends = ['labels' => $monthLabels, 'datasets' => $datasets];
         } catch (\Throwable $e) {
             logger()->warning('Monthly trends error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | L&D Analytics
+        |--------------------------------------------------------------------------
+        */
+        $lndStats = ['programs' => 0, 'sessions' => 0, 'tna_pending' => 0, 'idp_pending' => 0];
+        try {
+            $lndStats = [
+                'programs'    => LearningProgram::count(),
+                'sessions'    => TrainingSession::count(),
+                'tna_pending' => TrainingNeed::where('status', 'pending')->count(),
+                'idp_pending' => IndividualDevelopmentPlan::where('status', 'submitted')->count(),
+            ];
+        } catch (\Throwable $e) {
+            logger()->warning('L&D analytics error: ' . $e->getMessage());
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Rewards & Recognition Analytics
+        |--------------------------------------------------------------------------
+        */
+        $rewardsStats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'awarded_this_year' => 0];
+        try {
+            $rewardsStats = [
+                'total'             => RewardNomination::count(),
+                'pending'           => RewardNomination::where('status', 'pending')->count(),
+                'approved'          => RewardNomination::where('status', 'approved')->count(),
+                'awarded_this_year' => Reward::whereYear('award_date', now()->year)->count(),
+            ];
+        } catch (\Throwable $e) {
+            logger()->warning('Rewards analytics error: ' . $e->getMessage());
         }
 
         /*
@@ -351,6 +413,88 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | GAD / Sex-Disaggregated Analytics (RA 9710)
+        |--------------------------------------------------------------------------
+        */
+        $ipcrBySex    = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $tnaBySex     = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $idpBySex     = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $rewardsBySex = ['male' => 0, 'female' => 0, 'unspecified' => 0];
+        $employeesByDivisionWithSex = [];
+
+        $normSex = fn (?string $s): string => match (true) {
+            in_array(strtolower(trim((string) $s)), ['male',   'm']) => 'male',
+            in_array(strtolower(trim((string) $s)), ['female', 'f']) => 'female',
+            default => 'unspecified',
+        };
+
+        try {
+            foreach (DB::table('employee_ipcrs')
+                ->join('users', 'employee_ipcrs.user_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $ipcrBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('IPCR by sex: ' . $e->getMessage()); }
+
+        try {
+            foreach (DB::table('training_needs')
+                ->join('users', 'training_needs.employee_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $tnaBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('TNA by sex: ' . $e->getMessage()); }
+
+        try {
+            foreach (DB::table('individual_development_plans')
+                ->join('users', 'individual_development_plans.employee_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $idpBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('IDP by sex: ' . $e->getMessage()); }
+
+        try {
+            foreach (DB::table('reward_nominations')
+                ->join('users', 'reward_nominations.nominee_id', '=', 'users.id')
+                ->select(DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"), DB::raw('COUNT(*) as total'))
+                ->groupBy('sex')->get() as $r) {
+                $rewardsBySex[$normSex($r->sex)] += $r->total;
+            }
+        } catch (\Throwable $e) { logger()->warning('Rewards by sex: ' . $e->getMessage()); }
+
+        try {
+            $divRows = DB::table('users')
+                ->join('divisions', 'users.division_id', '=', 'divisions.id')
+                ->select(
+                    'divisions.id as div_id',
+                    DB::raw("COALESCE(NULLIF(TRIM(divisions.acronym),''), divisions.division_name) as div_name"),
+                    DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"),
+                    DB::raw('COUNT(*) as cnt')
+                )
+                ->where('users.status', '!=', 'inactive')
+                ->whereNotNull('users.emp_category')
+                ->where('users.emp_category', '!=', '')
+                ->groupBy('divisions.id', 'div_name', 'sex')
+                ->get()
+                ->groupBy('div_id');
+
+            $employeesByDivisionWithSex = $divRows->map(function ($sexRows) use ($normSex) {
+                $m = 0; $f = 0; $u = 0;
+                foreach ($sexRows as $r) {
+                    match ($normSex($r->sex)) {
+                        'male'   => $m += $r->cnt,
+                        'female' => $f += $r->cnt,
+                        default  => $u += $r->cnt,
+                    };
+                }
+                return ['name' => $sexRows->first()->div_name, 'male' => $m, 'female' => $f, 'unspecified' => $u, 'total' => $m + $f + $u];
+            })->values()->sortByDesc('total')->take(10)->values()->toArray();
+        } catch (\Throwable $e) { logger()->warning('Division sex: ' . $e->getMessage()); }
+
+        /*
+        |--------------------------------------------------------------------------
         | Render Dashboard
         |--------------------------------------------------------------------------
         */
@@ -361,6 +505,10 @@ class DashboardController extends Controller
             'staffCount'          => $staffCount,
             'employeeMaleCount'   => $employeeMaleCount,
             'employeeFemaleCount' => $employeeFemaleCount,
+            'facultyMaleCount'    => $facultyMaleCount,
+            'facultyFemaleCount'  => $facultyFemaleCount,
+            'staffMaleCount'      => $staffMaleCount,
+            'staffFemaleCount'    => $staffFemaleCount,
             'activeDivisions'     => $activeDivisions,
             'employeesByDivision' => $employeesByDivision,
 
@@ -388,6 +536,19 @@ class DashboardController extends Controller
 
             // Monthly trends
             'monthlyTrends' => $monthlyTrends,
+
+            // L&D
+            'lndStats' => $lndStats,
+
+            // Rewards
+            'rewardsStats' => $rewardsStats,
+
+            // GAD / sex-disaggregated
+            'ipcrBySex'                  => $ipcrBySex,
+            'tnaBySex'                   => $tnaBySex,
+            'idpBySex'                   => $idpBySex,
+            'rewardsBySex'               => $rewardsBySex,
+            'employeesByDivisionWithSex' => $employeesByDivisionWithSex,
         ]);
     }
 }

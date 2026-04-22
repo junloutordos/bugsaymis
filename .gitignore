@@ -1,5 +1,6 @@
 /.env
 *.log
+storage/*-firebase-adminsdk-*.json
 .DS_Store
 .env
 .env.backup
@@ -23,3 +24,4 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+storage/app/pshs-crc-dts-19dea47e8396.json

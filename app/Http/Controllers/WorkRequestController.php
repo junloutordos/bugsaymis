@@ -17,9 +17,12 @@ use App\Mail\WorkRequestForAssignmentMail;
 use App\Mail\WorkRequestAssignedMail;
 use App\Mail\WorkRequestFADApprovalMail;
 use App\Mail\WorkRequestCompletedMail;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class WorkRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     public function index()
     {
         $divisions = Building::select('id', 'name')->get();
@@ -35,7 +38,8 @@ class WorkRequestController extends Controller
         $user = Auth::user();
         $query = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->orderByDesc('created_at');
 
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief'])
+            || str_contains($user->position ?? '', 'FAD');
 
         if (! $canViewAll) {
             $query->where('requester_id', $user->id);
@@ -144,6 +148,14 @@ class WorkRequestController extends Controller
         $workRequest->status = 'Division Approved';
         $workRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $workRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         try {
             $gsuHeadRole3 = \App\Models\Role::where('name', 'GSU Head')->first();
             $gsuHeads = $gsuHeadRole3
@@ -175,6 +187,14 @@ class WorkRequestController extends Controller
         $workRequest->decline_reason = $data['reason'] ?? null;
         $workRequest->declined_at = now();
         $workRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $workRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
             $requester = $workRequest->requester;
@@ -209,6 +229,16 @@ class WorkRequestController extends Controller
         // record who acted (for audit/notifications)
         $workRequest->acted_by_id = $gsu;
         $workRequest->save();
+
+        if ($approver = User::find($gsu)) {
+            $this->snapshots->recordApproval(
+                approvable: $workRequest,
+                step:       ApprovalStep::REQ_GSU,
+                sequence:   2,
+                action:     'approved',
+                approver:   $approver,
+            );
+        }
 
         logger()->info('WorkRequest approved by GSU Head', ['work_request_id' => $workRequest->id, 'gsu_id' => $gsu]);
 
@@ -294,6 +324,16 @@ class WorkRequestController extends Controller
 
         $workRequest->status = 'FAD Approved';
         $workRequest->save();
+
+        if ($approver = User::find($chief)) {
+            $this->snapshots->recordApproval(
+                approvable: $workRequest,
+                step:       ApprovalStep::REQ_FAD,
+                sequence:   3,
+                action:     'approved',
+                approver:   $approver,
+            );
+        }
 
         logger()->info('WorkRequest approved by FAD Chief', ['work_request_id' => $workRequest->id, 'fad_id' => $chief]);
 
@@ -431,6 +471,104 @@ class WorkRequestController extends Controller
         }
 
         return view('work_request_declined', ['facilityRequest' => $workRequest, 'reason' => $workRequest->decline_reason]);
+    }
+
+    /* =====================================================
+     | DIVISION CHIEF IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function divisionChiefApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+            abort(403);
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+
+        $workRequests = WorkRequest::with(['requester:id,name', 'division:id,name'])
+            ->where('status', 'Pending')
+            ->where(function ($q) use ($user, $divisionIds) {
+                $q->where('division_chief_id', $user->id)
+                  ->orWhereHas('requester', fn ($r) => $r->whereIn('division_id', $divisionIds));
+            })
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('issue',       'like', "%{$search}%")
+                      ->orWhere('category',  'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('GeneralServices/WorkRequestDivChief', [
+            'workRequests' => $workRequests,
+            'filters'      => ['search' => $search],
+        ]);
+    }
+
+    /* =====================================================
+     | FAD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function fadApproval(Request $request)
+    {
+        $user = $request->user();
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        if (! $isFAD) abort(403);
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $workRequests = WorkRequest::with(['requester:id,name', 'division:id,name'])
+            ->where('status', 'GSU Approved')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('issue',      'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('GeneralServices/WorkRequestFAD', [
+            'workRequests' => $workRequests,
+            'filters'      => ['search' => $search],
+        ]);
+    }
+
+    public function fadAction(Request $request, WorkRequest $workRequest)
+    {
+        $user = $request->user();
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        if (! $isFAD) abort(403);
+
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $workRequest->update(['status' => 'FAD Approved']);
+            try {
+                $requesterEmail = $workRequest->requester?->email ?? null;
+                if ($requesterEmail) {
+                    Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $user->name));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Work request FAD approved email failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $workRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by FAD Chief.', 'declined_at' => now()]);
+            try {
+                $requesterEmail = $workRequest->requester?->email ?? null;
+                if ($requesterEmail) {
+                    Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'Declined', 'Declined by FAD Chief.', $user->name));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Work request FAD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'FAD action recorded.');
     }
 
     public function update(Request $request, WorkRequest $workRequest)

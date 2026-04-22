@@ -66,31 +66,50 @@ async function onFileChange(e) {
 <template>
   <AdminLayout title="DTR Upload">
     <div>
-      <h1 class="text-2xl font-bold mb-4">DTR Upload</h1>
-      <div class="bg-white rounded-xl shadow p-6">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <div>
-            <label class="block text-sm font-medium mb-2">Start Date</label>
-            <input type="date" v-model="startDate" class="mt-1 block w-full border rounded px-2 py-1" />
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">DTR Upload</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Upload daily time record files for processing</p>
+        </div>
+      </div>
+
+      <!-- Upload Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100">
+          <h2 class="text-sm font-semibold text-slate-700">Upload Configuration</h2>
+        </div>
+        <div class="p-5">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
+              <input type="date" v-model="startDate"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
+              <input type="date" v-model="endDate"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Employee Category</label>
+              <select v-model="category"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+                <option>Plantilla Teaching</option>
+                <option>Plantilla Non-Teaching</option>
+                <option>COS Teaching</option>
+                <option>COD Non-Teaching</option>
+                <option>All Category</option>
+              </select>
+            </div>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-2">End Date</label>
-            <input type="date" v-model="endDate" class="mt-1 block w-full border rounded px-2 py-1" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-2">Employee Category</label>
-            <select v-model="category" class="mt-1 block w-full border rounded px-2 py-1">
-              <option>Plantilla Teaching</option>
-              <option>Plantilla Non-Teaching</option>
-              <option>COS Teaching</option>
-              <option>COD Non-Teaching</option>
-              <option>All Category</option>
-            </select>
+            <label class="block text-xs font-medium text-slate-600 mb-2">Select .dat file(s)</label>
+            <input type="file" accept=".dat" multiple @change="onFileChange"
+              class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
+            <!-- Preview removed; success/failure reported via SweetAlert -->
           </div>
         </div>
-        <label class="block text-sm font-medium mb-2">Select .dat file(s)</label>
-        <input type="file" accept=".dat" multiple @change="onFileChange" />
-        <!-- Preview removed; success/failure reported via SweetAlert -->
       </div>
     </div>
   </AdminLayout>

@@ -13,7 +13,9 @@ class LibraryAttendanceController extends Controller
     public function index(Request $request)
     {
         $perPage = 20;
-        $query = LibraryAttendance::query()->orderBy('scanned_at', 'desc');
+        $query = LibraryAttendance::query()
+            ->select('id', 'pisay_systemid', 'student_id', 'student_name', 'scanned_at')
+            ->orderBy('scanned_at', 'desc');
 
         if ($q = $request->input('q')) {
             $query->where(function($qr) use ($q) {

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Middleware;
 use App\Models\Consultation;
 use App\Models\ITJobRequest;
@@ -12,7 +13,9 @@ use App\Models\FacilityRequest;
 use App\Models\ServiceRequest;
 use App\Models\WorkRequest;
 use App\Models\Borrowing;
+use App\Models\Committee;
 use App\Models\DocumentRouting;
+use App\Models\SpecialAssignment;
 use Carbon\Carbon;
 
 class HandleInertiaRequests extends Middleware
@@ -41,7 +44,10 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $authUser = $request->user();
-        $userRoles = $authUser ? $authUser->getRolesCollection() : collect();
+        if ($authUser) {
+            $authUser->loadMissing(['roles', 'primaryUnitAssignment.unit:id,name,code,type']);
+        }
+        $userRoles = $authUser ? $authUser->roles : collect();
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -54,8 +60,19 @@ class HandleInertiaRequests extends Middleware
                         'roleNames' => $userRoles->pluck('name')->toArray(),   // ['Staff', 'DivisionChief']
                         'position' => $authUser->position,
                         'email' => $authUser->email,
+                        // expose numeric/string role ids for client-side checks (may be CSV)
+                        'role_id' => $authUser->role_id ?? $userRoles->pluck('id')->implode(','),
                         'profile_picture' => $authUser->profile_picture,
                         'electronic_signature' => $authUser->electronic_signature,
+                        'permissions' => $authUser->getPermissions(),
+                        'primary_unit' => fn () => $authUser->primaryUnitAssignment?->unit
+                            ? [
+                                'id'         => $authUser->primaryUnitAssignment->unit->id,
+                                'name'       => $authUser->primaryUnitAssignment->unit->name,
+                                'code'       => $authUser->primaryUnitAssignment->unit->code,
+                                'type'       => $authUser->primaryUnitAssignment->unit->type,
+                              ]
+                            : null,
                     ]
                     : null,
             ],
@@ -63,97 +80,223 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
                 'success' => fn () => $request->session()->get('success'),
             ],
-            // Number of consultations that are pending or active (for sidebar badge)
-            'consultationsNotificationCount' => fn () => Consultation::whereIn('status', ['Pending', 'Active'])->count(),
-            // Number of IT job requests with status 'In Progress'
-            'itJobRequestsNotificationCount' => fn () => ITJobRequest::where('status', 'In Progress')->count(),
-            // Number of vehicle requests with status = 'Pending'
+            // ── Sidebar badge counts — cached 60s to reduce DB queries ────────
+            'consultationsNotificationCount' => function () use ($request) {
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.consultations.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        // Clinic/Nurse/Admin see all pending consultations
+                        if ($user->hasAnyRole(['Administrator', 'Clinic', 'Nurse'])) {
+                            return Consultation::whereIn('status', ['Pending', 'Active'])->count();
+                        }
+                        // All other roles see only their own consultations
+                        return Consultation::whereIn('status', ['Pending', 'Active'])
+                            ->where('requestor_id', $user->id)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
+            },
+            'itJobRequestsNotificationCount' => function () use ($request) {
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.it_requests.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        if ($user->hasRole('DivisionChief')) {
+                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                            if ($divisionIds->isNotEmpty()) {
+                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                                return ITJobRequest::where('status', 'Pending Division Chief Approval')
+                                    ->whereIn('user_id', $userIds)->count();
+                            }
+                            return 0;
+                        }
+                        if ($user->hasRole('OCD')) {
+                            return ITJobRequest::where('status', 'Pending OCD Approval')->count();
+                        }
+                        if ($user->hasAnyRole(['MIS', 'Administrator'])) {
+                            return ITJobRequest::whereIn('status', ['In Progress'])->count();
+                        }
+                        // Regular users: only their own in-progress requests
+                        return ITJobRequest::whereIn('status', ['In Progress'])->where('user_id', $user->id)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
+            },
             'vehicleRequestsNotificationCount' => function () use ($request) {
-                $user = $request->user();
-                // DivisionChief: pending requests in their division
-                if ($user && $user->hasRole('DivisionChief')) {
-                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                    return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
-                }
-                // GSU Head: show count of pending vehicle requests
-                if ($user && $user->hasRole('GSU Head')) {
-                    return VehicleRequest::where('status', 'Pending')->count();
-                }
-                // default: pending requests
-                return VehicleRequest::where('status', 'Pending')->count();
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.vehicles.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        if ($user->hasRole('DivisionChief')) {
+                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                            if ($divisionIds->isNotEmpty()) {
+                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                                return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                            }
+                            return 0;
+                        }
+                        if ($user->hasAnyRole(['GSU Head', 'OCD', 'Administrator'])) {
+                            return VehicleRequest::where('status', 'Pending')->count();
+                        }
+                        // Regular users: only their own pending requests
+                        return VehicleRequest::where('status', 'Pending')->where('requestor_id', $user->id)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
             },
-            // Number of messengerial requests with status = 'Pending'
-            'messengerialRequestsNotificationCount' => fn () => MessengerialRequest::where('status', 'Pending')->count(),
-            // Number of facility requests with status = 'Pending'
+            'messengerialRequestsNotificationCount' => function () use ($request) {
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.messengerial.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        if ($user->hasAnyRole(['Records', 'Administrator'])) {
+                            return MessengerialRequest::where('status', 'Pending')->count();
+                        }
+                        // Regular users: only their own requests (matched by email)
+                        return MessengerialRequest::where('status', 'Pending')
+                            ->where('email', $user->email)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
+            },
             'facilityRequestsNotificationCount' => function () use ($request) {
-                $user = $request->user();
-                if ($user && $user->hasRole('DivisionChief')) {
-                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
-                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
-                    return FacilityRequest::where('status', 'Pending')
-                        ->where(function($q) use ($userIds, $divisionIds) {
-                            $q->whereIn('requestor_id', $userIds)
-                              ->orWhereHas('requester', function($q2) use ($divisionIds) {
-                                  $q2->whereIn('division_id', $divisionIds);
-                              });
-                        })->count();
-                }
-                return FacilityRequest::where('status', 'Pending')->count();
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.facility.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        if ($user->hasRole('DivisionChief')) {
+                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
+                            if (!empty($divisionIds)) {
+                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
+                                return FacilityRequest::where('status', 'Pending')
+                                    ->where(function ($q) use ($userIds, $divisionIds) {
+                                        $q->whereIn('requestor_id', $userIds)
+                                          ->orWhereHas('requester', fn ($q2) => $q2->whereIn('division_id', $divisionIds));
+                                    })->count();
+                            }
+                            return 0;
+                        }
+                        if ($user->hasAnyRole(['GSU Head', 'Administrator'])) {
+                            return FacilityRequest::where('status', 'Pending')->count();
+                        }
+                        // Regular users: only their own pending requests
+                        return FacilityRequest::where('status', 'Pending')->where('requestor_id', $user->id)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
             },
-            // Number of service requests with status = 'Pending'
             'serviceRequestsNotificationCount' => function () use ($request) {
-                $user = $request->user();
-                if ($user && $user->hasRole('DivisionChief')) {
-                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                    return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
-                }
-                return ServiceRequest::where('status', 'Pending')->count();
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.service.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        if ($user->hasRole('DivisionChief')) {
+                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                            if ($divisionIds->isNotEmpty()) {
+                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                                return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
+                            }
+                            return 0;
+                        }
+                        if ($user->hasAnyRole(['GSU Head', 'Administrator'])) {
+                            return ServiceRequest::where('status', 'Pending')->count();
+                        }
+                        // Regular users: only their own pending requests
+                        return ServiceRequest::where('status', 'Pending')->where('requestor_id', $user->id)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
             },
-            // Number of gatepasses pending. For DivisionChiefs show only gatepasses
-            // requested by employees in their division(s).
             'gatepassNotificationCount' => function () use ($request) {
-                $user = $request->user();
-                $db = \Illuminate\Support\Facades\DB::table('gatepass');
-                if ($user && ($user->role->name ?? '') === 'DivisionChief') {
-                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                    $badgeNumbers = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('badge_id')->filter()->toArray();
-                    if (empty($badgeNumbers)) return 0;
-                    return $db->where('status', 'Pending')->whereIn('badgeNumber', $badgeNumbers)->count();
-                }
-                return $db->where('status', 'Pending')->count();
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.gatepass.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        $db = \Illuminate\Support\Facades\DB::table('gatepass');
+                        if ($user->hasRole('DivisionChief')) {
+                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                            if ($divisionIds->isNotEmpty()) {
+                                $badgeNumbers = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('badge_id')->filter()->toArray();
+                                if (!empty($badgeNumbers)) {
+                                    return $db->where('status', 'Pending')->whereIn('badgeNumber', $badgeNumbers)->count();
+                                }
+                            }
+                            return 0;
+                        }
+                        if ($user->hasAnyRole(['HR', 'OCD', 'Administrator'])) {
+                            return $db->where('status', 'Pending')->count();
+                        }
+                        // Regular users: only their own gatepass
+                        $badgeId = \App\Models\User::where('id', $user->id)->value('badge_id');
+                        if (!$badgeId) return 0;
+                        return $db->where('status', 'Pending')->where('badgeNumber', $badgeId)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
             },
-            // Number of work requests for the sidebar badge
             'workRequestsNotificationCount' => function () use ($request) {
-                $user = $request->user();
-                // For DivisionChief, show requests waiting for their DivisionChief approval step (Pending FAD Approval)
-                if ($user && $user->hasRole('DivisionChief')) {
-                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                    $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                    return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
-                }
-                // Default behavior: count generic Pending work requests
-                return WorkRequest::where('status', 'Pending')->count();
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.work.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        if ($user->hasRole('DivisionChief')) {
+                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                            if ($divisionIds->isNotEmpty()) {
+                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
+                                return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
+                            }
+                            return 0;
+                        }
+                        if ($user->hasAnyRole(['GSU Head', 'Administrator'])) {
+                            return WorkRequest::where('status', 'Pending')->count();
+                        }
+                        // Regular users: only their own pending requests
+                        return WorkRequest::where('status', 'Pending')->where('requester_id', $user->id)->count();
+                    });
+                } catch (\Throwable $e) { return 0; }
             },
-            // Number of borrowings that are overdue (due_date before today and not yet returned)
-            'borrowingsOverdueCount' => fn () => Borrowing::whereNull('return_date')->whereNotNull('due_date')->whereDate('due_date', '<', Carbon::today())->count(),
-            // Number of document routing steps pending the current user's action
+            'borrowingsOverdueCount' => function () {
+                try {
+                    return Cache::remember('badge.borrowings_overdue', 300, fn () =>
+                        Borrowing::whereNull('return_date')->whereNotNull('due_date')
+                            ->whereDate('due_date', '<', Carbon::today())->count()
+                    );
+                } catch (\Throwable $e) { return 0; }
+            },
             'documentTrackingNotificationCount' => function () use ($request) {
-                $user = $request->user();
-                if (!$user) return 0;
-                return DocumentRouting::where('receiver_id', $user->id)
-                    ->whereIn('status', ['Pending', 'Received'])
-                    ->count();
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    return Cache::remember('badge.documents.u' . $user->id, 60, fn () =>
+                        DocumentRouting::where('receiver_id', $user->id)
+                            ->whereIn('status', ['Pending', 'Received'])->count()
+                    );
+                } catch (\Throwable $e) { return 0; }
             },
-            // App version info from version.json
+            'isPMRater' => function () use ($request) {
+                $user = $request->user();
+                if (!$user) return false;
+                return Cache::remember('badge.pm_rater.u' . $user->id, 300, fn () =>
+                    Committee::where('head_id', $user->id)->exists()
+                        || SpecialAssignment::where('coordinator_id', $user->id)->exists()
+                );
+            },
             'appVersion' => function () {
                 try {
-                    $data = json_decode(file_get_contents(base_path('version.json')), true);
-                    return [
-                        'current' => $data['version'] ?? '1.0.0',
-                        'history' => array_reverse($data['history'] ?? []),
-                    ];
+                    return Cache::remember('app.version', 3600, function () {
+                        $versions = \App\Models\AppVersion::orderBy('date', 'desc')->get();
+                        $current  = $versions->firstWhere('is_current', true) ?? $versions->first();
+                        return [
+                            'current' => $current?->version ?? '1.0.0',
+                            'history' => $versions->map(fn ($v) => [
+                                'version' => $v->version,
+                                'date'    => $v->date->format('Y-m-d'),
+                                'remarks' => $v->remarks,
+                            ])->values()->toArray(),
+                        ];
+                    });
                 } catch (\Throwable $e) {
                     return ['current' => '1.0.0', 'history' => []];
                 }

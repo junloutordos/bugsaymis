@@ -9,7 +9,11 @@ class ProcurementItem extends Model
 {
     protected $table = 'procurement_items';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'procurement_id', 'pr_no', 'ppmp_line_item_no',
+        'item_description', 'unit', 'quantity', 'unit_cost', 'total_cost',
+        'remarks', 'status',
+    ];
 
     public function procurement(): BelongsTo
     {

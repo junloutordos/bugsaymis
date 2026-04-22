@@ -120,32 +120,40 @@ const profilePic = (student) => {
   <Head title="Students" />
   <AdminLayout title="Students">
     <div>
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-2xl font-bold">Students</h1>
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Students</h1>
+          <p class="text-sm text-slate-500">Browse and view student records</p>
+        </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4">
-        <div class="flex items-center justify-between mb-4">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search students..."
-            class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
+      <!-- Filter bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search students..."
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64"
+        />
+      </div>
+
+      <!-- Table card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <!-- Desktop table -->
         <div class="hidden md:block overflow-x-auto">
-          <table class="min-w-full border">
-            <thead class="bg-gray-100 text-sm text-gray-700">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-2">#</th>
-                <th v-for="vf in visibleFields" :key="vf.label" class="px-4 py-2 uppercase">{{ vf.label }}</th>
-                <th class="px-4 py-2 uppercase">ACTIONS</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{{ vf.label }}</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody class="text-sm divide-y">
-              <tr v-for="student in filteredStudents" :key="student.id">
-                <td class="px-4 py-2">{{ student.id }}</td>
-                <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-2">
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="student in filteredStudents" :key="student.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ student.id }}</td>
+                <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-sm text-slate-700">
                   <span v-if="vf.type === 'age'">{{ getAge(student, vf.keys) }}</span>
                   <span v-else>
                     <span v-if="vf.label === 'Last Name' || vf.label === 'First Name' || vf.label === 'Middle Name'">
@@ -154,103 +162,111 @@ const profilePic = (student) => {
                     <span v-else>{{ getFieldValue(student, vf.keys) }}</span>
                   </span>
                 </td>
-                <td class="px-4 py-2">
-                  <button @click="openView(student)" class="p-1 hover:bg-gray-100 rounded" title="View">
-                    <EyeIcon class="w-5 h-5 text-blue-600" />
+                <td class="px-4 py-3">
+                  <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                    <EyeIcon class="w-4 h-4" />
                   </button>
                 </td>
               </tr>
-              <tr v-if="filteredStudents.length === 0"><td :colspan="visibleFields.length + 2" class="px-4 py-6 text-center text-gray-500">No students</td></tr>
+              <tr v-if="filteredStudents.length === 0">
+                <td :colspan="visibleFields.length + 2" class="py-16 text-center text-slate-400 text-sm">No students found.</td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Mobile: card list for small screens -->
-        <div class="md:hidden grid gap-4">
-          <div v-for="student in filteredStudents" :key="student.id" class="bg-white p-4 rounded-lg shadow">
-            <div class="flex items-center justify-between">
+        <!-- Mobile card list -->
+        <div class="md:hidden divide-y divide-slate-100">
+          <div v-for="student in filteredStudents" :key="student.id" class="p-4">
+            <div class="flex items-start justify-between">
               <div>
-                <div class="text-sm text-gray-600">ID: {{ student.id }}</div>
-                <div class="font-medium text-gray-800 mt-1">{{ (getFieldValue(student, ['last_name','lastname','lname']) ?? '').toString().toUpperCase() }}, {{ (getFieldValue(student, ['first_name','firstname','fname']) ?? '').toString().toUpperCase() }}</div>
-                <div class="text-xs text-gray-500 mt-1">PISAY ID: {{ getFieldValue(student, ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id']) }}</div>
-                <div class="text-xs text-gray-500">Age: {{ getAge(student, ['birthday','birthdate','dob']) }} • Sex: {{ getFieldValue(student, ['sex','gender']) }}</div>
+                <div class="text-xs text-slate-500">ID: {{ student.id }}</div>
+                <div class="font-medium text-slate-800 mt-0.5">{{ (getFieldValue(student, ['last_name','lastname','lname']) ?? '').toString().toUpperCase() }}, {{ (getFieldValue(student, ['first_name','firstname','fname']) ?? '').toString().toUpperCase() }}</div>
+                <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ getFieldValue(student, ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id']) }}</div>
+                <div class="text-xs text-slate-500">Age: {{ getAge(student, ['birthday','birthdate','dob']) }} · Sex: {{ getFieldValue(student, ['sex','gender']) }}</div>
               </div>
-              <div class="flex items-center gap-2">
-                <button @click="openView(student)" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-700" title="View">
-                  <EyeIcon class="w-4 h-4" />
-                </button>
-              </div>
+              <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                <EyeIcon class="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div v-if="filteredStudents.length === 0" class="text-center text-gray-500 py-6">No students</div>
+          <div v-if="filteredStudents.length === 0" class="py-16 text-center text-slate-400 text-sm">No students found.</div>
         </div>
 
-        <!-- Simple pagination controls -->
-        <div class="mt-4 flex items-center justify-between">
-          <div class="text-sm text-gray-600">Page {{ currentPage }} of {{ lastPage }}</div>
-          <div class="space-x-2">
-            <button @click.prevent="goTo(prevUrl)" :disabled="!prevUrl" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
-            <button @click.prevent="goTo(nextUrl)" :disabled="!nextUrl" class="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <span>Page {{ currentPage }} of {{ lastPage }}</span>
+          <div class="flex gap-2">
+            <button @click.prevent="goTo(prevUrl)" :disabled="!prevUrl" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
+            <button @click.prevent="goTo(nextUrl)" :disabled="!nextUrl" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
           </div>
         </div>
       </div>
 
-      <!-- Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-black bg-opacity-50 z-50 overflow-auto">
-        <div class="bg-white rounded p-4 w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto shadow-lg">
-          <h3 class="text-lg font-semibold mb-4">{{ editing ? 'Edit Student' : 'New Student' }}</h3>
-          <form :action="editing ? route('students.update', editing) : route('students.store')" method="POST">
+      <!-- Edit/Create Modal -->
+      <div v-show="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50 overflow-auto">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">{{ editing ? 'Edit Student' : 'New Student' }}</h3>
+            <button @click="showModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
+          <form :action="editing ? route('students.update', editing) : route('students.store')" method="POST" class="px-6 py-5">
             <input type="hidden" name="_method" :value="editing ? 'PUT' : 'POST'" />
             <input type="hidden" name="_token" :value="csrfToken" />
 
-            <div class="max-h-[65vh] overflow-auto pr-2">
+            <div class="max-h-[55vh] overflow-auto pr-1">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div v-for="col in columns" :key="col.Field">
-                  <label class="block text-sm font-medium mb-1">{{ col.Field }}</label>
-                  <input :name="col.Field" v-model="form[col.Field]" type="text" class="mt-1 block w-full rounded border-gray-300" />
+                  <label class="block text-xs font-medium text-slate-600 mb-1">{{ col.Field }}</label>
+                  <input :name="col.Field" v-model="form[col.Field]" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
                 </div>
               </div>
             </div>
 
-            <div class="flex justify-end mt-4 space-x-2">
-              <button type="button" @click="showModal = false" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-              <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+            <div class="flex justify-end mt-6 gap-2">
+              <button type="button" @click="showModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+              <button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Save</button>
             </div>
           </form>
         </div>
       </div>
+
       <!-- View Modal -->
-      <div v-show="showViewModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-black bg-opacity-50 z-50 overflow-auto">
-        <div class="bg-white rounded p-4 w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto shadow-lg">
-          <div class="flex items-start justify-between">
-            <h3 class="text-lg font-semibold mb-4">Student Details</h3>
-            <button @click="closeView" class="text-gray-500 hover:text-gray-800">✕</button>
+      <div v-show="showViewModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50 overflow-auto">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-800">Student Details</h3>
+            <button @click="closeView" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+            </button>
           </div>
 
-          <div class="max-h-[75vh] overflow-auto pr-2">
-            <div class="mb-4 flex items-center gap-4">
+          <div class="px-6 py-5 max-h-[70vh] overflow-auto">
+            <div class="mb-5 flex items-center gap-4">
               <div v-if="profilePic(viewStudent)">
-                <img :src="profilePic(viewStudent)" alt="Profile" class="w-32 h-32 object-cover rounded border" />
+                <img :src="profilePic(viewStudent)" alt="Profile" class="w-24 h-24 object-cover rounded-xl border border-slate-200" />
               </div>
-              <div v-else class="w-32 h-32 bg-gray-100 rounded border flex items-center justify-center text-sm text-gray-500">No photo</div>
+              <div v-else class="w-24 h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-xs text-slate-500">No photo</div>
               <div class="flex-1">
-                <div class="text-sm text-gray-700 font-semibold">{{ viewStudent ? ((viewStudent.last_name ?? viewStudent.lastname ?? viewStudent.lname ?? '') + ', ' + (viewStudent.first_name ?? viewStudent.firstname ?? viewStudent.fname ?? '') + (viewStudent.middle_name ? ' ' + (viewStudent.middle_name ?? viewStudent.middlename ?? viewStudent.mname) : '')) : '—' }}</div>
-                <div class="text-xs text-gray-500">PISAY ID: {{ viewStudent ? (viewStudent.pisaysystemID ?? viewStudent.pisay_system_id ?? viewStudent.pisay_id ?? viewStudent.pisayid ?? '—') : '—' }}</div>
+                <div class="text-sm font-semibold text-slate-800">{{ viewStudent ? ((viewStudent.last_name ?? viewStudent.lastname ?? viewStudent.lname ?? '') + ', ' + (viewStudent.first_name ?? viewStudent.firstname ?? viewStudent.fname ?? '') + (viewStudent.middle_name ? ' ' + (viewStudent.middle_name ?? viewStudent.middlename ?? viewStudent.mname) : '')) : '—' }}</div>
+                <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ viewStudent ? (viewStudent.pisaysystemID ?? viewStudent.pisay_system_id ?? viewStudent.pisay_id ?? viewStudent.pisayid ?? '—') : '—' }}</div>
               </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div v-for="col in columns" :key="'view-'+col.Field">
-                <label class="block text-sm font-medium mb-1">{{ col.Field }}</label>
-                <div class="mt-1 block w-full rounded border border-gray-200 bg-gray-50 p-2 text-sm">
+                <label class="block text-xs font-medium text-slate-600 mb-1">{{ col.Field }}</label>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   {{ viewStudent ? (viewStudent[col.Field] ?? '—') : '—' }}
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="flex justify-end mt-4">
-            <button @click="closeView" class="px-4 py-2 bg-gray-300 rounded">Close</button>
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
+            <button @click="closeView" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
           </div>
         </div>
       </div>

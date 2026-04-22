@@ -93,13 +93,17 @@ export default function usePMS(initialSchedules = []) {
     })
   }
 
+  const showLoadingSwal = (title) => {
+    Swal.fire({ title, allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
+  }
+
   const storeSchedule = () => {
     form.schedule_dates = scheduleDates.value.map((d) => ({ date: d.date }))
+    showLoadingSwal('Saving schedule...')
     router.post(route("ict-pms.store"), form, {
-      onError: (e) => (errors.value = e),
+      onError: (e) => { errors.value = e; Swal.close() },
       onSuccess: () => {
         closeModal()
-        getSchedules()
         Swal.fire({ icon: "success", title: "Schedule Added", timer: 2000, showConfirmButton: false })
       },
     })
@@ -107,11 +111,11 @@ export default function usePMS(initialSchedules = []) {
 
   const updateSchedule = (id) => {
     form.schedule_dates = scheduleDates.value.map((d) => ({ date: d.date }))
+    showLoadingSwal('Updating schedule...')
     router.put(route("ict-pms.update", id), form, {
-      onError: (e) => (errors.value = e),
+      onError: (e) => { errors.value = e; Swal.close() },
       onSuccess: () => {
         closeModal()
-        getSchedules()
         Swal.fire({ icon: "success", title: "Schedule Updated", timer: 2000, showConfirmButton: false })
       },
     })
@@ -130,7 +134,6 @@ export default function usePMS(initialSchedules = []) {
       if (result.isConfirmed) {
         router.delete(route("ict-pms.destroy", id), {
           onSuccess: () => {
-            getSchedules()
             Swal.fire({ icon: "success", title: "Deleted", timer: 2000, showConfirmButton: false })
           },
         })

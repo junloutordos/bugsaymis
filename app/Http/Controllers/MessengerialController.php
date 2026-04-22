@@ -15,9 +15,13 @@ use App\Mail\MessengerialRequestRecordsMail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class MessengerialController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -56,7 +60,7 @@ class MessengerialController extends Controller
             $data['unit'] = $user->division->division_name ?? $user->office ?? null;
         }
 
-        $data['status'] = 'Pending';
+        $data['status'] = 'Pending Division Chief Approval';
 
         // Determine unit/division for prefix. Prefer stored `acronym` on divisions table.
         $userUnit = null;
@@ -186,40 +190,44 @@ class MessengerialController extends Controller
         $messengerialRequest->status = 'Approved';
         $messengerialRequest->save();
 
-        // Notify requester via email (approved by Division Chief)
-        try {
-            $requesterEmail = $messengerialRequest->email ?? null;
-            $approverName = null;
-            if ($chief) {
-                $u = User::find($chief);
-                $approverName = $u?->name ?? null;
-            } elseif ($messengerialRequest->division_chief_id) {
-                $u = User::find($messengerialRequest->division_chief_id);
-                $approverName = $u?->name ?? null;
-            }
+        $approver = User::find($chief);
 
-            if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new MessengerialRequestStatusMail($messengerialRequest, 'Approved', null, $approverName));
-            }
-        } catch (\Throwable $e) {
-            logger()->error('Failed to send messengerial request approved notification', ['error' => $e->getMessage()]);
+        if ($approver) {
+            $this->snapshots->recordApproval(
+                approvable: $messengerialRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'approved',
+                approver:   $approver,
+            );
         }
 
-        // Notify Records users so they can process the approved request
+        // Notify requester
+        try {
+            if ($messengerialRequest->email) {
+                Mail::to($messengerialRequest->email)->send(
+                    new MessengerialRequestStatusMail($messengerialRequest, 'Approved', null, $approver?->name)
+                );
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send messengerial approved notification', ['error' => $e->getMessage()]);
+        }
+
+        // Notify Records users
         try {
             $recordsUsers = User::havingRole('Records')->get();
-            $processUrl = url('/messengerial');
+            $processUrl   = url('/messengerial');
             foreach ($recordsUsers as $rUser) {
                 if ($rUser->email) {
                     try {
-                        Mail::to($rUser->email)->send(new \App\Mail\MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
+                        Mail::to($rUser->email)->send(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
                     } catch (\Throwable $ee) {
-                        logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage(), 'email' => $rUser->email]);
+                        logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage()]);
                     }
                 }
             }
         } catch (\Throwable $e) {
-            logger()->error('Failed to queue Records notifications for messengerial request', ['error' => $e->getMessage()]);
+            logger()->error('Failed to queue Records notifications', ['error' => $e->getMessage()]);
         }
 
         return view('messengerial_request_approved', ['messengerialRequest' => $messengerialRequest, 'already' => false]);
@@ -261,6 +269,16 @@ class MessengerialController extends Controller
         $messengerialRequest->declined_at = now();
         $messengerialRequest->save();
 
+        if ($approver = User::find($chief)) {
+            $this->snapshots->recordApproval(
+                approvable: $messengerialRequest,
+                step:       ApprovalStep::REQ_DIVISION_CHIEF,
+                sequence:   1,
+                action:     'rejected',
+                approver:   $approver,
+            );
+        }
+
         // Notify requester
         try {
             $requesterEmail = $messengerialRequest->email ?? null;
@@ -281,6 +299,105 @@ class MessengerialController extends Controller
         }
 
         return view('messengerial_request_declined', ['messengerialRequest' => $messengerialRequest, 'reason' => $messengerialRequest->decline_reason]);
+    }
+
+    /**
+     * In-app Division Chief approval page
+     */
+    public function forApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->hasRole('DivisionChief') && ! $user->hasRole('Administrator')) {
+            abort(403, 'Unauthorized');
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $query = MessengerialRequest::where('status', 'Pending Division Chief Approval');
+        if ($user->hasRole('DivisionChief')) {
+            $query->where('division_chief_id', $user->id);
+        }
+
+        $requests = $query
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose', 'like', "%{$search}%")
+                      ->orWhere('requestor', 'like', "%{$search}%")
+                      ->orWhere('reference_no', 'like', "%{$search}%")
+                      ->orWhere('destination', 'like', "%{$search}%");
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('Messengerial/ForApprovalMessengerial', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    /**
+     * In-app Division Chief approve/reject action
+     */
+    public function divisionChiefAction(Request $request, MessengerialRequest $messengerialRequest)
+    {
+        $user = $request->user();
+        if (! $user->hasRole('DivisionChief') && ! $user->hasRole('Administrator')) {
+            abort(403);
+        }
+
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $messengerialRequest->status = 'Approved';
+            $messengerialRequest->save();
+
+            // Notify requester
+            try {
+                if ($messengerialRequest->email) {
+                    Mail::to($messengerialRequest->email)->send(
+                        new MessengerialRequestStatusMail($messengerialRequest, 'Approved', null, $user->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Failed to send messengerial approved notification', ['error' => $e->getMessage()]);
+            }
+
+            // Notify Records users
+            try {
+                $recordsUsers = User::havingRole('Records')->get();
+                $processUrl   = url('/messengerial');
+                foreach ($recordsUsers as $rUser) {
+                    if ($rUser->email) {
+                        try {
+                            Mail::to($rUser->email)->send(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
+                        } catch (\Throwable $ee) {
+                            logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage()]);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Failed to queue Records notifications', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $request->validate(['reason' => 'nullable|string|max:1000']);
+            $messengerialRequest->status       = 'Declined';
+            $messengerialRequest->decline_reason = $request->input('reason');
+            $messengerialRequest->declined_at  = now();
+            $messengerialRequest->save();
+
+            try {
+                if ($messengerialRequest->email) {
+                    Mail::to($messengerialRequest->email)->send(
+                        new MessengerialRequestStatusMail($messengerialRequest, 'Declined', $messengerialRequest->decline_reason, $user->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Failed to send messengerial declined notification', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'Action recorded.');
     }
 
     public function update(Request $request, MessengerialRequest $messengerialRequest)

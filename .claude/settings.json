@@ -1,0 +1,60 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /Users/junlou/bugsaymis-docker && docker compose exec php bash -c *)",
+      "Bash(docker compose exec php bash -c *)",
+      "Bash(docker compose *)",
+      "Bash(docker ps*)",
+      "Bash(docker exec *)",
+      "Bash(php artisan*)",
+      "Bash(php -l *)",
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "Bash(npm --version)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add *)",
+      "Bash(git commit*)",
+      "Bash(git branch*)",
+      "Bash(git checkout *)",
+      "Bash(git stash*)",
+      "Bash(python3 *)",
+      "Bash(wc -l *)",
+      "Bash(ipconfig getifaddr*)",
+<<<<<<< HEAD
+      "Bash(curl -s --max-time 5 -o /dev/null -w \"%{http_code}\" https://oauth2.googleapis.com/)",
+      "Read(//run/systemd/resolve/**)",
+      "Bash(docker network:*)",
+      "Bash(sudo iptables:*)",
+      "Read(//proc/sys/net/ipv4/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(wait)",
+      "Bash(chmod +x /home/bugsaymis/bugsaymis/scripts/artisan.sh /home/bugsaymis/bugsaymis/scripts/deploy.sh)"
+=======
+      "Read(//Users/junloe/**)",
+      "Bash(docker -H unix:///var/run/docker.sock compose -f /Users/junloe/bugsaymis-docker/docker-compose.yml exec php bash -c \"chmod 666 /var/www/storage/logs/security-2026-04-14.log && ls -la /var/www/storage/logs/security-2026-04-14.log\")",
+      "Read(//home/bugsaymis/**)",
+      "Read(//opt/**)"
+>>>>>>> staging
+    ],
+    "additionalDirectories": [
+      "/Users/junlou/bugsaymis-docker",
+      "/Users/junlou/bugsaymis-docker/nginx",
+      "/usr/local/bin"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/junlou/bugsaymis-docker/src/bugsaymis/.claude/hooks/post-edit-php-lint.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

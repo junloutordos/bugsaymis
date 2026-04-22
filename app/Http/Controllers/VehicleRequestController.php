@@ -11,9 +11,12 @@ use Illuminate\Support\Facades\URL;
 use App\Mail\VehicleRequestCreatedMail;
 use App\Models\User;
 use Carbon\Carbon;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class VehicleRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
     /**
      * Display a listing of vehicle requests.
      */
@@ -21,12 +24,19 @@ class VehicleRequestController extends Controller
     {
 
         $user = $request->user();
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'OCD']);
 
         $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
 
         if (! $canViewAll) {
-            $requests->where('requestor_id', $user->id);
+            if ($user->hasRole('DivisionChief')) {
+                $requests->where(function ($q) use ($user) {
+                    $q->where('requestor_id', $user->id)
+                      ->orWhere('division_chief_id', $user->id);
+                });
+            } else {
+                $requests->where('requestor_id', $user->id);
+            }
         }
 
         $requests = $requests->get();
@@ -194,6 +204,14 @@ class VehicleRequestController extends Controller
         $vehicleRequest->status = 'Approved';
         $vehicleRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $vehicleRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         try {
             // Notify all GSU Head users (so GSU handles driver assignment)
             $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
@@ -249,6 +267,14 @@ class VehicleRequestController extends Controller
         $vehicleRequest->decline_reason = $data['reason'];
         $vehicleRequest->declined_at = now();
         $vehicleRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $vehicleRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
                 $requester = $vehicleRequest->requester;
@@ -537,5 +563,112 @@ class VehicleRequestController extends Controller
         $vehicleRequest->load(['requester','driver', 'divisionChief']);
 
         return view('vehicle_requests.print_ticket', ['request' => $vehicleRequest]);
+    }
+
+    /* =====================================================
+     | DIVISION CHIEF IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function divisionChiefApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+            abort(403);
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = VehicleRequest::with('requester:id,name')
+            ->where('status', 'Pending')
+            ->where('division_chief_id', $user->id)
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',     'like', "%{$search}%")
+                      ->orWhere('destination', 'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('VehicleRequests/DivisionChiefApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    /* =====================================================
+     | OCD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = VehicleRequest::with('requester:id,name')
+            ->where('status', 'Approved')
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',     'like', "%{$search}%")
+                      ->orWhere('destination','like', "%{$search}%")
+                      ->orWhereHas('requester', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('VehicleRequests/OCDApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function approveByOCDInApp(Request $request, VehicleRequest $vehicleRequest)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $vehicleRequest->update(['status' => 'OCD Approved']);
+
+            $this->snapshots->recordApproval(
+                approvable: $vehicleRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'approved',
+                approver:   $request->user(),
+            );
+
+            try {
+                $requester = $vehicleRequest->requester;
+                if ($requester?->email) {
+                    \Mail::to($requester->email)->send(
+                        new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, $request->user()->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Vehicle OCD approved email failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $vehicleRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by OCD.']);
+
+            $this->snapshots->recordApproval(
+                approvable: $vehicleRequest,
+                step:       ApprovalStep::REQ_OCD,
+                sequence:   4,
+                action:     'rejected',
+                approver:   $request->user(),
+            );
+
+            try {
+                $requester = $vehicleRequest->requester;
+                if ($requester?->email) {
+                    \Mail::to($requester->email)->send(
+                        new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by OCD.', $request->user()->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Vehicle OCD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'OCD action recorded.');
     }
 }

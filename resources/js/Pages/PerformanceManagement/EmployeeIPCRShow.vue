@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
+import { useSubmit } from "@/Composables/useSubmit";
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
@@ -12,9 +13,12 @@ const props = defineProps({
   ipcr: Object,
   employee: Object,
   supervisor: Object,
+  ocdUser: { type: Object, default: null },
   plans: Array,
   workPlans: { type: Array, default: () => [] },
 });
+
+const { isSubmitting, submit } = useSubmit();
 
 // ---------- Rating visibility ----------
 const PRE_RATING_STATUSES = ['New Target', 'Draft', 'For Review', 'For Rating', 'Targets Approved', 'Returned for Revision'];
@@ -90,6 +94,21 @@ const formatDateString = (value) => {
   // Format: Month dd, yyyy (e.g. December 11, 2025)
   return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
+
+// ---------- Daily Accomplishments Viewer ----------
+const accViewerPlan = ref(null); // plan whose daily accomplishments we're viewing
+
+function openAccViewer(plan) {
+  accViewerPlan.value = plan;
+}
+function closeAccViewer() {
+  accViewerPlan.value = null;
+}
+
+function formatAccDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
 
 // ---------- Modal / Form State ----------
 const isModalOpen = ref(false);
@@ -278,9 +297,12 @@ const saveModal = async () => {
     self_timeliness: form.value.timeliness,
   };
 
-  router.put(
-    route("employee-ipcr-plan.updateSelfRating", [props.ipcr.id, currentPlan.value.id]),
-    payload,
+  submit(
+    (o) => router.put(
+      route("employee-ipcr-plan.updateSelfRating", [props.ipcr.id, currentPlan.value.id]),
+      payload,
+      o
+    ),
     {
       onSuccess: () => {
         const avg = computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness);
@@ -322,7 +344,7 @@ const submitForReview = () => {
     confirmButtonText: "Yes, submit",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.submitReview", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Submitted!", "Target submitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit target.", "error")
       });
@@ -339,7 +361,7 @@ const submitForRating = () => {
     confirmButtonText: "Submit",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.submitRating", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Submitted!", "Accomplishments submitted for rating.", "success"),
         onError: () => Swal.fire("Error", "Failed to submit accomplishments.", "error")
       });
@@ -479,7 +501,7 @@ const togglePlanSelection = (plan) => {
 };
 
 const submitAddPlans = () => {
-  router.post(
+  submit.post(
     route("employee-ipcr.addPlans", props.ipcr.id),
     { plan_ids: selectedPlans.value },
     {
@@ -504,7 +526,7 @@ const removePlan = (plan) => {
     confirmButtonText: "Yes, remove it!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
+      submit.delete(route("employee-ipcr.removePlan", [props.ipcr.id, plan.id]), {
         onSuccess: () => Swal.fire("Removed!", "Plan removed successfully.", "success"),
         onError: () => Swal.fire("Error", "Failed to remove plan.", "error"),
       });
@@ -521,7 +543,7 @@ const resubmit = () => {
     confirmButtonText: "Yes, resubmit!",
   }).then((result) => {
     if (result.isConfirmed) {
-      router.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
+      submit.post(route("employee-ipcr.resubmit", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Resubmitted!", "IPCR resubmitted for review.", "success"),
         onError: () => Swal.fire("Error", "Failed to resubmit.", "error"),
       });
@@ -534,569 +556,602 @@ const resubmit = () => {
 <template>
   <Head :title="`IPCR #${ipcr.id} Plans`" />
   <AdminLayout :title="`IPCR: ${ipcr.title}`">
-    <div>
-      <!-- Back Button -->
-      <button @click="$inertia.get(route('employee-ipcr.index'))" class="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-800">
-        <ArrowLeftIcon class="w-5 h-5" /> Back to IPCR List
-      </button>
-      
-        
-      
-      <!-- IPCR Details -->
-      <div class="bg-white p-4 rounded-lg shadow mb-4">
-        <h2 class="text-2xl font-semibold">{{ ipcr.title }}</h2>
-        <p class="text-gray-600">Rating Period: {{ ipcr.rating_period }}</p>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-gray-600">Status:</span>
-          <span :class="statusBadgeClass(ipcr.status)" class="px-2 py-1 text-xs font-semibold rounded-full">
+    <div class="p-6 space-y-5">
+
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <button @click="$inertia.get(route('employee-ipcr.index'))"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm mb-3">
+            <ArrowLeftIcon class="w-4 h-4" /> Back to IPCR List
+          </button>
+          <h1 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h1>
+          <p class="text-sm text-slate-500">Rating Period: {{ ipcr.rating_period }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span :class="statusBadgeClass(ipcr.status)"
+            class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
             {{ ipcr.status }}
           </span>
         </div>
-        
-
-        <div class="mt-4 flex justify-end gap-2">
-          <button 
-            v-if="ipcr.status === 'New Target'" 
-            @click="submitForReview" 
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
-          >
-            <!-- Optional icon for submit -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            Submit for Review and Approval
-          </button>
-
-          <button 
-            v-if="ipcr.status === 'Targets Approved'" 
-            @click="submitForRating" 
-            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
-          >
-            <!-- Optional icon for submit -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            Submit for Rating of the Accomplishment
-          </button>
-
-          <button
-            v-if="ipcr.status === 'Returned for Revision'"
-            @click="showAddPlansModal = true"
-            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Plans
-          </button>
-
-          <button
-            v-if="ipcr.status === 'Returned for Revision'"
-            @click="resubmit"
-            class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            Resubmit for Review
-          </button>
-
-          <button
-            v-if="isAtPMTStage || ipcr.status === 'Targets Approved'"
-            @click="printIPCR"
-            class="bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
-            </svg>
-            Print IPCR
-          </button>
-        </div>
-
       </div>
-      
-      <!-- Plans Table -->
-      <div class="bg-white p-4 rounded-lg shadow" id="ipcr-printable">
-        <div v-if="isAtPMTStage || ipcr.status === 'Targets Approved'">
-        <div class="mb-4">
-        <p class="text-l text-center font-semibold mb-2">Individual Performance Commitment and Review (IPCR) <br/>
-        FY {{ ratingYear }}
-        </p>
-        <br/><br/>
-        <p>
-          I, <b class="uppercase">{{ employee.name }}</b> , <b class="uppercase">{{employee.position}}</b> of Philippine Science High School - Caraga Region Campus, commit to deliver 
-          and agree to be rated on the attainment of the following targets in accordance with 
-          the indicated measures for the period <b class="uppercase">{{ ipcr.rating_period }}</b>.
-        </p>
-        </div><br/><br/>
-        <div class="grid grid-cols-10 gap-4 mb-4 text-right">
 
-        <!-- COLUMN 1: Empty / spacer -->
-        <div class="col-span-1"></div>
-        <div class="col-span-1"></div>
-        <div class="col-span-2"></div>
-        
-        <!-- COLUMN 2: Employee Name / Position / Date (bigger) -->
-        <div class="col-span-4 text-center">
-          <p class="font-medium"><b style="text-transform: uppercase;">{{ employee.name }}</b></p>
-          <small class="block">{{ employee.position }}</small>
-          <small class="block">Date: {{ formattedSubmittedForReviewAt }}</small>
+      <!-- IPCR Details Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-slate-800">IPCR Details</h2>
+          <div class="flex flex-wrap items-center gap-2 no-print">
+            <button
+              v-if="ipcr.status === 'New Target'"
+              @click="submitForReview"
+              :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ isSubmitting ? 'Processing…' : 'Submit for Review and Approval' }}
+            </button>
+
+            <button
+              v-if="ipcr.status === 'Targets Approved'"
+              @click="submitForRating"
+              :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ isSubmitting ? 'Processing…' : 'Submit for Rating of the Accomplishment' }}
+            </button>
+
+            <button
+              v-if="ipcr.status === 'Returned for Revision'"
+              @click="showAddPlansModal = true"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Plans
+            </button>
+
+            <button
+              v-if="ipcr.status === 'Returned for Revision'"
+              @click="resubmit"
+              :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ isSubmitting ? 'Processing…' : 'Resubmit for Review' }}
+            </button>
+
+            <button
+              v-if="isAtPMTStage || ipcr.status === 'Targets Approved'"
+              @click="printIPCR"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
+              </svg>
+              Print IPCR
+            </button>
+          </div>
         </div>
+      </div>
 
-        
+      <!-- Plans Table Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm" id="ipcr-printable">
 
-        <!-- COLUMN 4: Rating Scale -->
-        <div class="col-span-2 text-left">
-          <small class="block">5 - Outstanding</small>
-          <small class="block">4 - Very Satisfactory</small>
-          <small class="block">3 - Satisfactory</small>
-          <small class="block">2 - Unsatisfactory</small>
-          <small class="block">1 - Poor</small>
-        </div>
-        
-        </div>
+        <!-- PMT Header Block (printable) -->
+        <div v-if="isAtPMTStage || ipcr.status === 'Targets Approved'" class="p-5">
+          <p class="text-base text-center font-semibold mb-4">
+            Individual Performance Commitment and Review (IPCR)<br/>
+            FY {{ ratingYear }}
+          </p>
+          <p class="text-sm text-slate-700 mb-6">
+            I, <b class="uppercase">{{ employee.name }}</b>, <b class="uppercase">{{ employee.position }}</b> of Philippine Science High School - Caraga Region Campus, commit to deliver
+            and agree to be rated on the attainment of the following targets in accordance with
+            the indicated measures for the period <b class="uppercase">{{ ipcr.rating_period }}</b>.
+          </p>
 
+          <div class="grid grid-cols-10 gap-4 mb-4 text-right">
+            <div class="col-span-4"></div>
+            <div class="col-span-4 text-center">
+              <p class="font-medium"><b class="uppercase">{{ employee.name }}</b></p>
+              <small class="block text-slate-500">{{ employee.position }}</small>
+              <small class="block text-slate-500">Date: {{ formattedSubmittedForReviewAt }}</small>
+            </div>
+            <div class="col-span-2 text-left">
+              <small class="block text-slate-600">5 - Outstanding</small>
+              <small class="block text-slate-600">4 - Very Satisfactory</small>
+              <small class="block text-slate-600">3 - Satisfactory</small>
+              <small class="block text-slate-600">2 - Unsatisfactory</small>
+              <small class="block text-slate-600">1 - Poor</small>
+            </div>
+          </div>
 
-        <table class="min-w-full border text-sm border-collapse">
-          <tr class="font-bold text-gray-800">
-              <td colspan="4" class="border px-3 text-left">Reviewed by:</td>
-              <td colspan="2" class="border px-3 text-left">Date:</td>
-              <td colspan="4" class="border px-3 text-left">Approved by:</td>
-              <td colspan="2" class="border px-3 text-left">Date:</td>
-            </tr>
-            <tr>
-              <td colspan="4" class="border px-3 py-3 text-center">
-                <br/><br/>
-                <b style="text-transform: uppercase;">{{supervisor.name}}</b><br/>
-                <small>{{supervisor.position }}</small>
-              </td>
-              <td colspan="2" class="border px-3 py-3 text-center">
-                <br/>
-                {{ formattedTargetApprovedAt }}
-              </td>
-              <td colspan="4" class="border px-3 py-3 text-center">
-                <br/><br/>
-                <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-                <small>Director III</small>
-              </td>
-              <td colspan="2" class="border px-3 py-3 text-center">
-                <br/>
-                {{ formattedTargetApprovedAt }}
-              </td>
-            </tr>
-            
-        </table>
-
-        </div>
-        <table class="min-w-full border border-gray-300 text-sm border-collapse">
-          <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
-            <tr>
-              <th rowspan="2" colspan="2" class="border px-4 py-2 text-center">Output</th>
-              <th rowspan="2" class="border px-4 py-2">Success Indicators</th>
-              <th rowspan="2" class="border px-4 py-2">Actual Accomplishment</th>
-              <th rowspan="2" class="border px-4 py-2">Means of Verification</th>
-              <th colspan="4" class="border px-4 py-2 text-center">Rating</th>
-              <th rowspan="2" class="border px-4 py-2 text-center">Remarks</th>
-            </tr>
-            <tr>
-              <th class="border px-4 py-2 text-center">Q<sup>1</sup></th>
-              <th class="border px-4 py-2 text-center">E<sup>2</sup></th>
-              <th class="border px-4 py-2 text-center">T<sup>3</sup></th>
-              <th class="border px-4 py-2 text-center">A<sup>4</sup></th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <template v-for="(outcomes, functionType) in groupedPlansByFunction" :key="functionType">
-
-              <!-- FUNCTION TYPE HEADER -->
-              <tr class="bg-gray-300">
-                <td style="text-transform: uppercase;" colspan="10"
-                    class="px-4 py-2 font-bold text-gray-800 border border-gray-300">
-                  {{ functionType }}
+          <div class="overflow-x-auto mb-4">
+            <table class="min-w-full divide-y divide-slate-100 text-sm border-collapse border border-slate-200">
+              <tr class="font-semibold text-slate-700">
+                <td colspan="4" class="border border-slate-200 px-3 py-2 text-left">Reviewed by:</td>
+                <td colspan="2" class="border border-slate-200 px-3 py-2 text-left">Date:</td>
+                <td colspan="4" class="border border-slate-200 px-3 py-2 text-left">Approved by:</td>
+                <td colspan="2" class="border border-slate-200 px-3 py-2 text-left">Date:</td>
+              </tr>
+              <tr>
+                <td colspan="4" class="border border-slate-200 px-3 py-4 text-center">
+                  <br/>
+                  <b class="uppercase">{{ supervisor?.name ?? '—' }}</b><br/>
+                  <small class="text-slate-500">{{ supervisor?.position ?? '' }}</small>
+                </td>
+                <td colspan="2" class="border border-slate-200 px-3 py-4 text-center">
+                  {{ formattedTargetApprovedAt }}
+                </td>
+                <td colspan="4" class="border border-slate-200 px-3 py-4 text-center">
+                  <br/>
+                  <b class="uppercase">{{ ocdUser?.name ?? '—' }}</b><br/>
+                  <small class="text-slate-500">{{ ocdUser?.position ?? '' }}</small>
+                </td>
+                <td colspan="2" class="border border-slate-200 px-3 py-4 text-center">
+                  {{ formattedTargetApprovedAt }}
                 </td>
               </tr>
+            </table>
+          </div>
+        </div>
 
-              <!-- OPTIONAL STRATEGIC FUNCTION HEADERS -->
-              <tr v-if="functionType === 'Strategic Functions'">
-                <td colspan="12" class="px-4 py-2 font-bold text-gray-800 border border-gray-300">
-                  DOST POINT AGENDA
-                </td>
+        <!-- Main Plans Table -->
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm border-collapse border border-slate-200">
+            <thead class="bg-slate-50">
+              <tr>
+                <th rowspan="2" colspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Output</th>
+                <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Success Indicators</th>
+                <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Actual Accomplishment</th>
+                <th rowspan="2" class="border border-slate-200 px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Means of Verification</th>
+                <th colspan="4" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Rating</th>
+                <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Remarks</th>
               </tr>
-              <tr v-if="functionType === 'Strategic Functions'">
-                <td colspan="12" class="px-4 py-2 font-bold text-gray-800 border border-gray-300">
-                  INCREASED IN COMPETITIVENESS OF FILIPINOS IN SCIENCE AND ENGINEERING
-                </td>
+              <tr>
+                <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Q<sup>1</sup></th>
+                <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">E<sup>2</sup></th>
+                <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">T<sup>3</sup></th>
+                <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">A<sup>4</sup></th>
               </tr>
+            </thead>
 
-              <!-- OUTCOMES -->
-              <template v-for="(subGroups, outcome) in outcomes" :key="outcome">
-                <tr class="bg-gray-200">
-                  <td colspan="10"
-                      class="px-4 py-2 font-semibold text-gray-700 border border-gray-300">
-                    {{ outcome }}
+            <tbody class="divide-y divide-slate-100">
+              <template v-for="(outcomes, functionType) in groupedPlansByFunction" :key="functionType">
+
+                <!-- FUNCTION TYPE HEADER -->
+                <tr class="bg-slate-200">
+                  <td colspan="10" class="px-4 py-2 font-bold text-slate-800 border border-slate-300 uppercase">
+                    {{ functionType }}
                   </td>
                 </tr>
 
-                <!-- SUBOUTCOME -->
-                <template v-for="(pis, subAbbrev) in subGroups" :key="subAbbrev">
+                <!-- OPTIONAL STRATEGIC FUNCTION HEADERS -->
+                <tr v-if="functionType === 'Strategic Functions'">
+                  <td colspan="12" class="px-4 py-2 font-semibold text-slate-700 border border-slate-200">
+                    DOST POINT AGENDA
+                  </td>
+                </tr>
+                <tr v-if="functionType === 'Strategic Functions'">
+                  <td colspan="12" class="px-4 py-2 font-semibold text-slate-700 border border-slate-200">
+                    INCREASED IN COMPETITIVENESS OF FILIPINOS IN SCIENCE AND ENGINEERING
+                  </td>
+                </tr>
 
-                  <!-- PERFORMANCE INDICATOR GROUPING -->
-                  <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
+                <!-- OUTCOMES -->
+                <template v-for="(subGroups, outcome) in outcomes" :key="outcome">
+                  <tr class="bg-slate-100">
+                    <td colspan="10" class="px-4 py-2 font-semibold text-slate-700 border border-slate-200">
+                      {{ outcome }}
+                    </td>
+                  </tr>
 
-                    <!-- FIRST ROW of each Performance Indicator group -->
-                    <tr class="hover:bg-gray-50">
+                  <!-- SUBOUTCOME -->
+                  <template v-for="(pis, subAbbrev) in subGroups" :key="subAbbrev">
 
-                      <!-- SubOutcome merged -->
-                      <td v-if="Object.keys(pis)[0] === piDesc"
-                          :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
-                          class="px-4 py-2 font-medium text-gray-700 border border-gray-300">
-                        {{ subAbbrev }}
-                      </td>
+                    <!-- PERFORMANCE INDICATOR GROUPING -->
+                    <template v-for="(piPlans, piDesc) in pis" :key="piDesc">
 
-                      <!-- Performance Indicator merged -->
-                      <td :rowspan="piPlans.length"
-                          class="px-4 py-2 border border-gray-300 font-medium">
-                        {{ piDesc }}
-                      </td>
+                      <!-- FIRST ROW of each Performance Indicator group -->
+                      <tr class="hover:bg-slate-50/60">
 
-                      <!-- FIRST PLAN ROW -->
-                      <td class="px-4 py-2 border border-gray-300">{{ piPlans[0].success_indicator }}</td>
+                        <!-- SubOutcome merged -->
+                        <td v-if="Object.keys(pis)[0] === piDesc"
+                            :rowspan="Object.values(pis).reduce((total, arr) => total + arr.length, 0)"
+                            class="px-4 py-3 text-sm text-slate-700 border border-slate-200 font-medium align-top">
+                          {{ subAbbrev }}
+                        </td>
 
-                      <td class="px-4 py-2 border border-gray-300 cursor-pointer text-blue-600 hover:underline"
-                          @click="openModal(piPlans[0])">
-                        {{ piPlans[0].pivot?.accomplishment || '—' }}
-                      </td>
+                        <!-- Performance Indicator merged -->
+                        <td :rowspan="piPlans.length"
+                            class="px-4 py-3 text-sm text-slate-700 border border-slate-200 font-medium align-top">
+                          {{ piDesc }}
+                        </td>
 
-                      <td class="px-4 py-2 border border-gray-300">
-                        <template v-if="piPlans[0].pivot?.mov_link">
-                          <a :href="piPlans[0].pivot.mov_link" target="_blank"
-                            class="text-blue-600 hover:underline break-all">
-                            {{ piPlans[0].pivot.mov_link }}
-                          </a>
-                        </template>
-                        <span v-else>—</span>
-                      </td>
+                        <!-- FIRST PLAN ROW -->
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">{{ piPlans[0].success_indicator }}</td>
 
-                      <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ piPlans[0].pivot?.sup_quality ?? "—" }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_quality ?? "—" }}</div>
-                          <div>DC: {{ piPlans[0].pivot?.sup_quality ?? "—" }}</div>
-                        </template>
-                      </td>
-
-                      <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_efficiency ?? "—" }}</div>
-                          <div>DC: {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}</div>
-                        </template>
-                      </td>
-
-                      <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_timeliness ?? "—" }}</div>
-                          <div>DC: {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}</div>
-                        </template>
-                      </td>
-
-                      <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ piPlans[0].pivot?.self_average ?? computeAverage(piPlans[0].pivot?.self_quality, piPlans[0].pivot?.self_efficiency, piPlans[0].pivot?.self_timeliness) }}</div>
-                          <div>DC: {{ piPlans[0].pivot?.sup_average ?? computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}</div>
-                        </template>
-                      </td>
-
-                      <td class="px-4 py-2 border border-gray-300">
-                        <div class="flex items-start gap-2">
-                          <span class="flex-1">{{ piPlans[0].pivot?.remarks || "—" }}</span>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          <p class="cursor-pointer text-indigo-600 hover:underline text-sm"
+                             @click="openModal(piPlans[0])">
+                            {{ piPlans[0].pivot?.accomplishment || '—' }}
+                          </p>
                           <button
-                            v-if="ipcr.status === 'Returned for Revision'"
-                            @click="removePlan(piPlans[0])"
-                            class="text-red-600 hover:text-red-800 text-xs shrink-0"
-                            title="Remove plan"
-                          >Remove</button>
-                        </div>
-                      </td>
-                    </tr>
+                            v-if="piPlans[0].accomplishments_count > 0"
+                            @click="openAccViewer(piPlans[0])"
+                            class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100 no-print">
+                            {{ piPlans[0].accomplishments_count }} accomplishment{{ piPlans[0].accomplishments_count > 1 ? 's' : '' }}
+                          </button>
+                          <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
+                        </td>
 
-                    <!-- REMAINING PLAN ROWS under this Performance Indicator -->
-                    <tr v-for="plan in piPlans.slice(1)"
-                        :key="plan.id"
-                        class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          <template v-if="piPlans[0].pivot?.mov_link">
+                            <a :href="piPlans[0].pivot.mov_link" target="_blank"
+                              class="text-indigo-600 hover:underline break-all">
+                              {{ piPlans[0].pivot.mov_link }}
+                            </a>
+                          </template>
+                          <span v-else>—</span>
+                        </td>
 
-                      <td class="px-4 py-2 border border-gray-300">{{ plan.success_indicator }}</td>
+                        <td class="px-4 py-3 text-center text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ piPlans[0].pivot?.sup_quality ?? "—" }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ piPlans[0].pivot?.self_quality ?? "—" }}</div>
+                            <div>DC: {{ piPlans[0].pivot?.sup_quality ?? "—" }}</div>
+                          </template>
+                        </td>
 
-                      <td class="px-4 py-2 border border-gray-300 cursor-pointer text-blue-600 hover:underline"
-                          @click="openModal(plan)">
-                        {{ plan.pivot?.accomplishment || '—' }}
-                      </td>
+                        <td class="px-4 py-3 text-center text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ piPlans[0].pivot?.self_efficiency ?? "—" }}</div>
+                            <div>DC: {{ piPlans[0].pivot?.sup_efficiency ?? "—" }}</div>
+                          </template>
+                        </td>
 
-                      <td class="px-4 py-2 border border-gray-300">
-                        <template v-if="plan.pivot?.mov_link">
-                          <a :href="plan.pivot.mov_link" target="_blank"
-                            class="text-blue-600 hover:underline break-all">
-                            {{ plan.pivot.mov_link }}
-                          </a>
-                        </template>
-                        <span v-else>—</span>
-                      </td>
+                        <td class="px-4 py-3 text-center text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ piPlans[0].pivot?.self_timeliness ?? "—" }}</div>
+                            <div>DC: {{ piPlans[0].pivot?.sup_timeliness ?? "—" }}</div>
+                          </template>
+                        </td>
 
-                      <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ plan.pivot?.sup_quality ?? "—" }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_quality ?? "—" }}</div>
-                          <div>DC: {{ plan.pivot?.sup_quality ?? "—" }}</div>
-                        </template>
-                      </td>
+                        <td class="px-4 py-3 text-center font-medium text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ piPlans[0].pivot?.self_average ?? computeAverage(piPlans[0].pivot?.self_quality, piPlans[0].pivot?.self_efficiency, piPlans[0].pivot?.self_timeliness) }}</div>
+                            <div>DC: {{ piPlans[0].pivot?.sup_average ?? computeAverage(piPlans[0].pivot?.sup_quality, piPlans[0].pivot?.sup_efficiency, piPlans[0].pivot?.sup_timeliness) }}</div>
+                          </template>
+                        </td>
 
-                      <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ plan.pivot?.sup_efficiency ?? "—" }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_efficiency ?? "—" }}</div>
-                          <div>DC: {{ plan.pivot?.sup_efficiency ?? "—" }}</div>
-                        </template>
-                      </td>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          <div class="flex items-start gap-2">
+                            <span class="flex-1">{{ piPlans[0].pivot?.remarks || "—" }}</span>
+                            <button
+                              v-if="ipcr.status === 'Returned for Revision'"
+                              @click="removePlan(piPlans[0])"
+                              class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
+                              title="Remove plan"
+                            >Remove</button>
+                          </div>
+                        </td>
+                      </tr>
 
-                      <td class="px-4 py-2 text-center border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ plan.pivot?.sup_timeliness ?? "—" }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_timeliness ?? "—" }}</div>
-                          <div>DC: {{ plan.pivot?.sup_timeliness ?? "—" }}</div>
-                        </template>
-                      </td>
+                      <!-- REMAINING PLAN ROWS under this Performance Indicator -->
+                      <tr v-for="plan in piPlans.slice(1)"
+                          :key="plan.id"
+                          class="hover:bg-slate-50/60">
 
-                      <td class="px-4 py-2 text-center font-medium border border-gray-300">
-                        <template v-if="!showRatings">—</template>
-                        <template v-else-if="isAtPMTStage">
-                          {{ computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}
-                        </template>
-                        <template v-else>
-                          <div class="text-xs text-gray-400">Self: {{ plan.pivot?.self_average ?? computeAverage(plan.pivot?.self_quality, plan.pivot?.self_efficiency, plan.pivot?.self_timeliness) }}</div>
-                          <div>DC: {{ plan.pivot?.sup_average ?? computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}</div>
-                        </template>
-                      </td>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">{{ plan.success_indicator }}</td>
 
-                      <td class="px-4 py-2 border border-gray-300">
-                        <div class="flex items-start gap-2">
-                          <span class="flex-1">{{ plan.pivot?.remarks || "—" }}</span>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          <p class="cursor-pointer text-indigo-600 hover:underline text-sm"
+                             @click="openModal(plan)">
+                            {{ plan.pivot?.accomplishment || '—' }}
+                          </p>
                           <button
-                            v-if="ipcr.status === 'Returned for Revision'"
-                            @click="removePlan(plan)"
-                            class="text-red-600 hover:text-red-800 text-xs shrink-0"
-                            title="Remove plan"
-                          >Remove</button>
-                        </div>
-                      </td>
+                            v-if="plan.accomplishments_count > 0"
+                            @click="openAccViewer(plan)"
+                            class="mt-1 text-xs text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full hover:bg-indigo-100 no-print">
+                            {{ plan.accomplishments_count }} accomplishment{{ plan.accomplishments_count > 1 ? 's' : '' }}
+                          </button>
+                          <span v-else class="block mt-1 text-xs text-slate-400 italic">No accomplishments</span>
+                        </td>
 
-                    </tr>
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          <template v-if="plan.pivot?.mov_link">
+                            <a :href="plan.pivot.mov_link" target="_blank"
+                              class="text-indigo-600 hover:underline break-all">
+                              {{ plan.pivot.mov_link }}
+                            </a>
+                          </template>
+                          <span v-else>—</span>
+                        </td>
 
+                        <td class="px-4 py-3 text-center text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ plan.pivot?.sup_quality ?? "—" }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ plan.pivot?.self_quality ?? "—" }}</div>
+                            <div>DC: {{ plan.pivot?.sup_quality ?? "—" }}</div>
+                          </template>
+                        </td>
+
+                        <td class="px-4 py-3 text-center text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ plan.pivot?.sup_efficiency ?? "—" }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ plan.pivot?.self_efficiency ?? "—" }}</div>
+                            <div>DC: {{ plan.pivot?.sup_efficiency ?? "—" }}</div>
+                          </template>
+                        </td>
+
+                        <td class="px-4 py-3 text-center text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ plan.pivot?.sup_timeliness ?? "—" }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ plan.pivot?.self_timeliness ?? "—" }}</div>
+                            <div>DC: {{ plan.pivot?.sup_timeliness ?? "—" }}</div>
+                          </template>
+                        </td>
+
+                        <td class="px-4 py-3 text-center font-medium text-sm text-slate-700 border border-slate-200">
+                          <template v-if="!showRatings">—</template>
+                          <template v-else-if="isAtPMTStage">
+                            {{ computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}
+                          </template>
+                          <template v-else>
+                            <div class="text-xs text-slate-400">Self: {{ plan.pivot?.self_average ?? computeAverage(plan.pivot?.self_quality, plan.pivot?.self_efficiency, plan.pivot?.self_timeliness) }}</div>
+                            <div>DC: {{ plan.pivot?.sup_average ?? computeAverage(plan.pivot?.sup_quality, plan.pivot?.sup_efficiency, plan.pivot?.sup_timeliness) }}</div>
+                          </template>
+                        </td>
+
+                        <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
+                          <div class="flex items-start gap-2">
+                            <span class="flex-1">{{ plan.pivot?.remarks || "—" }}</span>
+                            <button
+                              v-if="ipcr.status === 'Returned for Revision'"
+                              @click="removePlan(plan)"
+                              class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
+                              title="Remove plan"
+                            >Remove</button>
+                          </div>
+                        </td>
+
+                      </tr>
+
+                    </template>
                   </template>
                 </template>
               </template>
-            </template>
-          </tbody>
-
-        </table>
+            </tbody>
+          </table>
+        </div>
 
         <!-- Summary Table -->
-        <br/>
-        <div v-if="isAtPMTStage || ipcr.status === 'Targets Approved'">
-        <table class="min-w-full border text-sm border-collapse">
-        <thead class="bg-gray-100 text-gray-700 text-sm uppercase">
-          <tr>
-            <th rowspan="2" class="border px-4 py-2 text-center w-40">Output</th>
-            <th colspan="4" class="border px-4 py-2 text-center">Rating</th>
-            <th rowspan="2" class="border px-4 py-2 text-center w-24">% <br/> Weight</th>
-            <th rowspan="2" class="border px-4 py-2 text-center w-40">Overall Weighted Score</th>
-          </tr>
-
-          <tr>
-            <th class="border px-4 py-2 text-center w-16">Q<sup>1</sup></th>
-            <th class="border px-4 py-2 text-center w-16">E<sup>2</sup></th>
-            <th class="border px-4 py-2 text-center w-16">T<sup>3</sup></th>
-            <th class="border px-4 py-2 text-center w-16">A<sup>4</sup></th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr
-            v-for="(row, type) in summaryByFunctionType"
-            :key="type"
-            class="font-medium"
-          >
-            <!-- Output Type -->
-            <td class="border px-3 py-2">{{ type }}</td>
-
-            <!-- Q/E/T/A averages -->
-            <td class="border px-3 py-2 text-center">
-              {{ row.countQ ? formatAvg(row.totalQ / row.countQ) : "—" }}
-            </td>
-
-            <td class="border px-3 py-2 text-center">
-              {{ row.countE ? formatAvg(row.totalE / row.countE) : "—" }}
-            </td>
-
-            <td class="border px-3 py-2 text-center">
-              {{ row.countT ? formatAvg(row.totalT / row.countT) : "—" }}
-            </td>
-
-            <td class="border px-3 py-2 text-center">
-              {{ row.countA ? formatAvg(row.totalA / row.countA) : "—" }}
-            </td>
-
-            <!-- % Weight -->
-            <td class="border px-3 py-2 text-center">
-              {{ (row.weight * 100).toFixed(0) }}%
-            </td>
-
-            <!-- Weighted Score -->
-            <td class="border px-3 py-2 text-center">
-              {{
-
-                row.countA
-                  ? formatAvg((row.totalA / row.countA) * row.weight)
-                  : "—"
-              }}
-            </td>
-          </tr>
-          <tr class="bg-gray-50 text-gray-800">
-            <td colspan="6" class="border px-3 py-3 text-left">TOTAL</td>
-
-            <td class="border px-3 py-3 text-center font-bold">
-              {{ finalIPCRRating }}
-            </td>
-          </tr>
-          <!-- FINAL RATING ROW -->
-          <tr class="bg-gray-50 text-gray-800">
-            <td colspan="6" class="border px-3 py-3 text-left">Adjectival Rating</td>
-            <td class="border px-3 py-3 text-center font-bold">
-              {{ getAdjectivalRating(finalIPCRRating) }}
-            </td>
-          </tr>
-
-          <tr class="bg-gray-50  text-gray-800">
-            <td colspan="12" class="border px-3 py-3 text-left">Comments and Reccommendations for Development Purposes: <i class="font-bold">{{ ipcr.remarks }}</i></td>
-
-            
-          </tr>
-          
-        </tbody>
-      </table>
-      <table class="min-w-full border text-sm border-collapse">
-        <tr class="text-gray-800">
-            <td colspan="2" class="border px-3 text-left">Discuss with:</td>
-            <td colspan="1" class="border px-3 text-left">Date:</td>
-            <td colspan="3" class="border px-3 text-left">Assessed by:</td>
-            <td colspan="1" class="border px-3 text-left">Date:</td>
-            <td colspan="3" class="border px-3 text-left">Final Rating by:</td>
-            <td colspan="2" class="border px-3 text-left">Date:</td>
-            
-          </tr>
-          <tr>
-            <td colspan="2" class="border px-3 py-3 text-center">
-              <br/><br/>
-              <b style="text-transform: uppercase;">{{ employee.name }}</b><br/>
-              <small>{{ employee.position }}</small>
-            </td>
-            <td colspan="1" class="border px-3 py-3 text-center">
-              <br/><br/>
-              {{ formattedSubmittedForReviewAt }}
-            </td>
-            <td colspan="3" class="border px-3 py-3 text-center">
-              <br/><br/>
-              <b style="text-transform: uppercase;">{{ supervisor.name }}</b><br/>
-              <small>{{supervisor.position}}</small>
-            </td>
-            <td colspan="1" class="border px-3 py-3 text-center">
-              <br/><br/>
-              {{ formattedSubmittedRatingAt }}
-            </td>
-            <td colspan="3" class="border px-3 py-3 text-center">
-              <br/><br/>
-              <b>ENGR. RAMIL A. SANCHEZ</b><br/>
-              <small>Director III</small>
-            </td>
-            <td colspan="2" class="border px-3 py-3 text-center">
-              <br/><br/>
-              ____________________
-            </td>
-          </tr>
-          <tr class="font-bold text-gray-800">
-            <td colspan="12" class="border px-3 text-left"><small><i>Legend: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1 - Effectiveness/Quality &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2 - Efficiency &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3 - Timeliness &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4 - Average</i></small></td>
-          </tr>
-      </table>
-
-      </div>
-      </div>
-
-      <!-- Modal -->
-      <div v-if="isModalOpen" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-96">
-          <h3 class="text-lg font-semibold mb-4">Update Accomplishment</h3>
-          <div class="flex flex-col gap-3">
-            <label>Accomplishment:
-              <input type="text" v-model="form.accomplishment" :disabled="hasSupervisorRating(currentPlan?.pivot)" class="border rounded w-full px-2 py-1"/>
-            </label>
-            <label>MOVs Link:
-              <input type="text" v-model="form.mov_link" :disabled="hasSupervisorRating(currentPlan?.pivot)" class="border rounded w-full px-2 py-1"/>
-            </label>
-            <label>Quality:
-              <input type="number" min="0" max="100" v-model="form.quality" :disabled="hasSupervisorRating(currentPlan?.pivot)" class="border rounded w-full px-2 py-1"/>
-            </label>
-            <label>Efficiency:
-              <input type="number" min="0" max="100" v-model="form.efficiency" :disabled="hasSupervisorRating(currentPlan?.pivot)" class="border rounded w-full px-2 py-1"/>
-            </label>
-            <label>Timeliness:
-              <input type="number" min="0" max="100" v-model="form.timeliness" :disabled="hasSupervisorRating(currentPlan?.pivot)" class="border rounded w-full px-2 py-1"/>
-            </label>
-            <div class="text-sm text-gray-600">Average: <strong>{{ liveAverage }}</strong></div>
-            <div v-if="hasSupervisorRating(currentPlan?.pivot)" class="text-sm text-red-600">
-              Supervisor ratings are present for this plan. Self editing is disabled.
-            </div>
+        <div v-if="isAtPMTStage || ipcr.status === 'Targets Approved'" class="p-5 space-y-4">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-100 text-sm border-collapse border border-slate-200">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Output</th>
+                  <th colspan="4" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Rating</th>
+                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-24">% Weight</th>
+                  <th rowspan="2" class="border border-slate-200 px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Overall Weighted Score</th>
+                </tr>
+                <tr>
+                  <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Q<sup>1</sup></th>
+                  <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">E<sup>2</sup></th>
+                  <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">T<sup>3</sup></th>
+                  <th class="border border-slate-200 px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">A<sup>4</sup></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="(row, type) in summaryByFunctionType" :key="type" class="hover:bg-slate-50/60 font-medium">
+                  <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">{{ type }}</td>
+                  <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">
+                    {{ row.countQ ? formatAvg(row.totalQ / row.countQ) : "—" }}
+                  </td>
+                  <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">
+                    {{ row.countE ? formatAvg(row.totalE / row.countE) : "—" }}
+                  </td>
+                  <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">
+                    {{ row.countT ? formatAvg(row.totalT / row.countT) : "—" }}
+                  </td>
+                  <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">
+                    {{ row.countA ? formatAvg(row.totalA / row.countA) : "—" }}
+                  </td>
+                  <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">
+                    {{ (row.weight * 100).toFixed(0) }}%
+                  </td>
+                  <td class="border border-slate-200 px-3 py-2 text-center text-sm text-slate-700">
+                    {{ row.countA ? formatAvg((row.totalA / row.countA) * row.weight) : "—" }}
+                  </td>
+                </tr>
+                <tr class="bg-slate-50 text-slate-800 font-semibold">
+                  <td colspan="6" class="border border-slate-200 px-3 py-3 text-left text-sm">TOTAL</td>
+                  <td class="border border-slate-200 px-3 py-3 text-center text-sm font-bold">
+                    {{ finalIPCRRating }}
+                  </td>
+                </tr>
+                <tr class="bg-slate-50 text-slate-800">
+                  <td colspan="6" class="border border-slate-200 px-3 py-3 text-left text-sm">Adjectival Rating</td>
+                  <td class="border border-slate-200 px-3 py-3 text-center text-sm font-bold">
+                    {{ getAdjectivalRating(finalIPCRRating) }}
+                  </td>
+                </tr>
+                <tr class="bg-slate-50 text-slate-800">
+                  <td colspan="12" class="border border-slate-200 px-3 py-3 text-left text-sm">
+                    Comments and Recommendations for Development Purposes: <i class="font-semibold">{{ ipcr.remarks }}</i>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div class="mt-4 flex justify-end gap-2">
-            <button @click="closeModal" class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300">Close</button>
-            <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+
+          <!-- Footer Signature Table -->
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-100 text-sm border-collapse border border-slate-200">
+              <tr class="text-slate-700">
+                <td colspan="2" class="border border-slate-200 px-3 py-2 text-left text-xs font-semibold">Discuss with:</td>
+                <td colspan="1" class="border border-slate-200 px-3 py-2 text-left text-xs font-semibold">Date:</td>
+                <td colspan="3" class="border border-slate-200 px-3 py-2 text-left text-xs font-semibold">Assessed by:</td>
+                <td colspan="1" class="border border-slate-200 px-3 py-2 text-left text-xs font-semibold">Date:</td>
+                <td colspan="3" class="border border-slate-200 px-3 py-2 text-left text-xs font-semibold">Final Rating by:</td>
+                <td colspan="2" class="border border-slate-200 px-3 py-2 text-left text-xs font-semibold">Date:</td>
+              </tr>
+              <tr>
+                <td colspan="2" class="border border-slate-200 px-3 py-4 text-center">
+                  <br/>
+                  <b class="uppercase text-slate-800">{{ employee.name }}</b><br/>
+                  <small class="text-slate-500">{{ employee.position }}</small>
+                </td>
+                <td colspan="1" class="border border-slate-200 px-3 py-4 text-center text-sm text-slate-700">
+                  {{ formattedSubmittedForReviewAt }}
+                </td>
+                <td colspan="3" class="border border-slate-200 px-3 py-4 text-center">
+                  <br/>
+                  <b class="uppercase text-slate-800">{{ supervisor?.name ?? '—' }}</b><br/>
+                  <small class="text-slate-500">{{ supervisor?.position ?? '' }}</small>
+                </td>
+                <td colspan="1" class="border border-slate-200 px-3 py-4 text-center text-sm text-slate-700">
+                  {{ formattedSubmittedRatingAt }}
+                </td>
+                <td colspan="3" class="border border-slate-200 px-3 py-4 text-center">
+                  <br/>
+                  <b class="uppercase text-slate-800">{{ ocdUser?.name ?? '—' }}</b><br/>
+                  <small class="text-slate-500">{{ ocdUser?.position ?? '' }}</small>
+                </td>
+                <td colspan="2" class="border border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
+                  ____________________
+                </td>
+              </tr>
+              <tr>
+                <td colspan="12" class="border border-slate-200 px-3 py-2 text-left">
+                  <small class="italic text-slate-500">Legend: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1 - Effectiveness/Quality &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2 - Efficiency &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3 - Timeliness &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4 - Average</small>
+                </td>
+              </tr>
+            </table>
           </div>
         </div>
-      </div>
 
-      <!-- Add Plans Modal (visible when Returned for Revision) -->
-      <div v-if="showAddPlansModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-lg">
-          <h3 class="text-lg font-semibold mb-3">Add Plans</h3>
+      </div>
+    </div>
+  </AdminLayout>
+
+  <!-- Update Accomplishment Modal -->
+  <Teleport to="body">
+    <div v-if="isModalOpen"
+      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      @click.self="closeModal">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800">Update Accomplishment</h3>
+          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment</label>
+            <input type="text" v-model="form.accomplishment" :disabled="hasSupervisorRating(currentPlan?.pivot)"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">MOVs Link</label>
+            <input type="text" v-model="form.mov_link" :disabled="hasSupervisorRating(currentPlan?.pivot)"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Quality</label>
+              <input type="number" min="0" max="100" v-model="form.quality" :disabled="hasSupervisorRating(currentPlan?.pivot)"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency</label>
+              <input type="number" min="0" max="100" v-model="form.efficiency" :disabled="hasSupervisorRating(currentPlan?.pivot)"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Timeliness</label>
+              <input type="number" min="0" max="100" v-model="form.timeliness" :disabled="hasSupervisorRating(currentPlan?.pivot)"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
+            </div>
+          </div>
+          <div class="text-sm text-slate-600">Average: <strong class="text-slate-800">{{ liveAverage }}</strong></div>
+          <div v-if="hasSupervisorRating(currentPlan?.pivot)"
+            class="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs text-red-600">
+            Supervisor ratings are present for this plan. Self editing is disabled.
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+          <button @click="closeModal"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Close
+          </button>
+          <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ isSubmitting ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Add Plans Modal -->
+  <Teleport to="body">
+    <div v-if="showAddPlansModal"
+      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      @click.self="showAddPlansModal = false">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800">Add Plans</h3>
+          <button @click="showAddPlansModal = false; selectedPlans = []; planSearchQuery = ''"
+            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="px-6 py-5">
           <input
             v-model="planSearchQuery"
             type="text"
             placeholder="Search plans..."
-            class="w-full border rounded px-3 py-2 mb-3 text-sm"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 mb-3"
           />
-          <div class="max-h-64 overflow-auto border rounded p-2 space-y-1">
+          <div class="max-h-64 overflow-auto border border-slate-200 rounded-lg p-2 space-y-1">
             <div
               v-for="plan in filteredWorkPlans"
               :key="plan.id"
@@ -1110,29 +1165,86 @@ const resubmit = () => {
                 class="mt-1"
               />
               <label :for="`add-plan-${plan.id}`" class="flex-1 cursor-pointer text-sm">
-                <div class="font-medium">{{ plan.success_indicator }}</div>
-                <div class="text-gray-500">{{ plan.performance_indicator?.description }}</div>
+                <div class="font-medium text-slate-800">{{ plan.success_indicator }}</div>
+                <div class="text-slate-500">{{ plan.performance_indicator?.description }}</div>
               </label>
             </div>
-            <div v-if="filteredWorkPlans.length === 0" class="text-sm text-gray-500 py-2 text-center">
+            <div v-if="filteredWorkPlans.length === 0" class="py-8 text-center text-slate-400 text-sm">
               No additional plans available.
             </div>
           </div>
-          <div class="mt-4 flex justify-end gap-2">
-            <button
-              @click="showAddPlansModal = false; selectedPlans = []; planSearchQuery = ''"
-              class="px-4 py-2 border rounded bg-gray-200 hover:bg-gray-300 text-sm"
-            >Cancel</button>
-            <button
-              @click="submitAddPlans"
-              :disabled="!selectedPlans.length"
-              class="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700 text-sm disabled:opacity-50"
-            >Add Selected</button>
-          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+          <button
+            @click="showAddPlansModal = false; selectedPlans = []; planSearchQuery = ''"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >Cancel</button>
+          <button
+            @click="submitAddPlans"
+            :disabled="!selectedPlans.length || isSubmitting"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >{{ isSubmitting ? 'Adding…' : 'Add Selected' }}</button>
         </div>
       </div>
     </div>
-  </AdminLayout>
+  </Teleport>
+
+  <!-- Daily Accomplishments Viewer Modal -->
+  <Teleport to="body">
+    <div v-if="accViewerPlan"
+      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      @click.self="closeAccViewer">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-semibold text-slate-800">Accomplishments</h2>
+            <p class="text-xs text-slate-500 mt-0.5 line-clamp-2">{{ accViewerPlan.success_indicator }}</p>
+          </div>
+          <button @click="closeAccViewer"
+            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="overflow-y-auto flex-1 px-6 py-4">
+          <div v-if="!accViewerPlan.accomplishments?.length"
+            class="py-16 text-center text-slate-400 text-sm">
+            No accomplishments logged for this plan.
+          </div>
+
+          <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
+            class="mb-4 pb-4 border-b border-slate-100 last:border-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700">
+                {{ formatAccDate(acc.accomplishment_date) }}
+              </span>
+            </div>
+            <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
+            <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+              <a v-for="photo in acc.photos" :key="photo.id"
+                :href="photo.google_drive_link" target="_blank"
+                class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                {{ photo.file_name || 'Photo' }}
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+          <span class="text-xs text-slate-400">
+            {{ accViewerPlan.accomplishments_count }} accomplishment(s) total
+          </span>
+          <button @click="closeAccViewer"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
 </template>
 
 <style>

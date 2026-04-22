@@ -2,56 +2,76 @@
   <Head title="Audit Logs" />
   <AdminLayout title="Audit Logs">
     <div>
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-800 truncate">Audit Logs</h1>
+      <!-- Page Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Audit Logs</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Track all system activity and changes</p>
+        </div>
       </div>
 
-      <div class="bg-white rounded-xl shadow p-4 mb-4">
-        <!-- Search -->
-        <div class="flex items-center gap-2">
-          <input v-model="search" type="text" placeholder="Search audit logs..." class="w-full sm:w-1/2 md:w-1/3 rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-          <button v-if="search" @click="clearSearch" class="ml-2 px-3 py-1 rounded border">Clear</button>
-        </div>
+      <!-- Filter Bar -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+        <input v-model="search" type="text" placeholder="Search audit logs..."
+          class="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+        <button v-if="search" @click="clearSearch"
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Clear
+        </button>
+      </div>
 
-        <div class="overflow-x-auto mt-4">
-          <table class="min-w-full border border-gray-200">
-            <thead class="bg-gray-100 text-gray-700 uppercase text-sm">
+      <!-- Table Card -->
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left">#</th>
-                <th class="px-4 py-3 text-left">Time</th>
-                <th class="px-4 py-3 text-left">User</th>
-                <th class="px-4 py-3 text-left">Action</th>
-                <th class="px-4 py-3 text-left">Target</th>
-                <th class="px-4 py-3 text-left">Details</th>
-                <th class="px-4 py-3 text-left">IP</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">User</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Target</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Details</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">IP</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200 text-sm">
-              <tr v-for="log in auditLogs.data" :key="log.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3">{{ log.id }}</td>
-                <td class="px-4 py-3">{{ new Date(log.created_at).toLocaleString() }}</td>
-                <td class="px-4 py-3">{{ log.user?.name ?? 'System' }}</td>
-                <td class="px-4 py-3">{{ log.action }}</td>
-                <td class="px-4 py-3">{{ log.auditable_type ? log.auditable_type.split('\\').pop() + ' #' + (log.auditable_id ?? '') : '' }}</td>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="log in auditLogs.data" :key="log.id" class="hover:bg-slate-50/60">
+                <td class="px-4 py-3 text-sm text-slate-700">{{ log.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ new Date(log.created_at).toLocaleString() }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ log.user?.name ?? 'System' }}</td>
                 <td class="px-4 py-3">
-                  <div v-if="log.old_values" class="text-xs text-gray-700">Old: <pre class="text-xs">{{ JSON.stringify(log.old_values) }}</pre></div>
-                  <div v-if="log.new_values" class="text-xs text-gray-700">New: <pre class="text-xs">{{ JSON.stringify(log.new_values) }}</pre></div>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
+                    {{ log.action }}
+                  </span>
                 </td>
-                <td class="px-4 py-3">{{ log.ip_address }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ log.auditable_type ? log.auditable_type.split('\\').pop() + ' #' + (log.auditable_id ?? '') : '' }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 max-w-xs">
+                  <div v-if="log.old_values" class="text-xs text-slate-500 mb-0.5">Old: <pre class="inline">{{ JSON.stringify(log.old_values) }}</pre></div>
+                  <div v-if="log.new_values" class="text-xs text-slate-500">New: <pre class="inline">{{ JSON.stringify(log.new_values) }}</pre></div>
+                </td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ log.ip_address }}</td>
               </tr>
 
               <tr v-if="!auditLogs.data || auditLogs.data.length === 0">
-                <td colspan="7" class="px-4 py-6 text-center text-gray-500">No audit logs found.</td>
+                <td colspan="7" class="py-16 text-center text-slate-400 text-sm">No audit logs found.</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <!-- Pagination -->
-        <div class="mt-4">
-          <div class="flex justify-center items-center gap-2">
-            <button v-if="auditLogs.prev_page_url" @click="goto(auditLogs.prev_page_url)" class="bg-blue-600 text-white px-4 py-2 rounded">Previous</button>
-            <button v-if="auditLogs.next_page_url" @click="goto(auditLogs.next_page_url)" class="bg-blue-600 text-white px-4 py-2 rounded">Next</button>
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <span>Showing {{ auditLogs.data?.length ?? 0 }} entries</span>
+          <div class="flex items-center gap-2">
+            <button v-if="auditLogs.prev_page_url" @click="goto(auditLogs.prev_page_url)"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              Previous
+            </button>
+            <button v-if="auditLogs.next_page_url" @click="goto(auditLogs.next_page_url)"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -99,6 +119,5 @@ function clearSearch() {
 </script>
 
 <style scoped>
-.btn { @apply bg-blue-600 text-white px-3 py-1 rounded; }
 pre { white-space: pre-wrap; word-break: break-word; }
 </style>

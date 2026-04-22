@@ -11,28 +11,30 @@ class RoleMiddleware
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     * @param  string  $roles
+     * Usage:
+     *   ->middleware('role:Administrator')
+     *   ->middleware('role:Administrator|HR')   // any of these roles
+     *
+     * SuperAdmins (Administrator) always pass.
      */
     public function handle(Request $request, Closure $next, string $roles): Response
     {
         $user = $request->user();
 
         if (! $user) {
-            abort(403, 'Unauthorized');
+            abort(403, 'Unauthorized.');
         }
 
-        // Accept both comma and pipe separators
-        $rolesArray = preg_split('/[,\|]/', $roles);
+        if ($user->isSuperAdmin()) {
+            return $next($request);
+        }
 
-        // Check if the user has ANY of the allowed roles (supports multiple roles per user)
-        $userRoleNames = $user->getRolesCollection()->pluck('name')->toArray();
+        $allowed = preg_split('/[,\|]/', $roles);
 
-        if (empty(array_intersect($userRoleNames, $rolesArray))) {
-            abort(403, 'Unauthorized');
+        if (! $user->hasAnyRole($allowed)) {
+            abort(403, 'Unauthorized.');
         }
 
         return $next($request);
     }
-
 }

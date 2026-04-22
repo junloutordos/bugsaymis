@@ -13,13 +13,18 @@ use App\Mail\FacilityRequestCreatedMail;
 use App\Models\Division;
 use App\Models\User;
 use App\Models\Facility;
+use App\Enums\ApprovalStep;
+use App\Services\SnapshotService;
 
 class FacilityRequestController extends Controller
 {
+    public function __construct(private SnapshotService $snapshots) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
-        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head']);
+        $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief', 'OCD'])
+            || str_contains($user->position ?? '', 'FAD');
 
         $requestsQuery = FacilityRequest::latest();
 
@@ -46,9 +51,7 @@ class FacilityRequestController extends Controller
             return $ra;
         });
 
-        // Provide MIS users for optional auto-assignment when requesting IT assistance
-        // Select users whose position contains the phrase 'MIS Staff'
-        $misUsers = User::whereRaw('position LIKE ?', ['%MIS Staff%'])->select('id','name','position')->orderBy('name')->get();
+        $misUsers = User::havingRole('MIS')->select('id', 'name', 'position')->orderBy('name')->get();
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
@@ -407,6 +410,14 @@ class FacilityRequestController extends Controller
         $facilityRequest->status = 'Approved';
         $facilityRequest->save();
 
+        $this->snapshots->recordApproval(
+            approvable: $facilityRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'approved',
+            approver:   $user,
+        );
+
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = $user->name ?? null;
@@ -470,6 +481,14 @@ class FacilityRequestController extends Controller
         $facilityRequest->decline_reason = $data['reason'];
         $facilityRequest->declined_at = now();
         $facilityRequest->save();
+
+        $this->snapshots->recordApproval(
+            approvable: $facilityRequest,
+            step:       ApprovalStep::REQ_DIVISION_CHIEF,
+            sequence:   1,
+            action:     'rejected',
+            approver:   $user,
+        );
 
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;
@@ -924,5 +943,161 @@ class FacilityRequestController extends Controller
         }
 
         return view('facility_requests.print_ticket', ['request' => $facilityRequest]);
+    }
+
+    /* =====================================================
+     | DIVISION CHIEF IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function divisionChiefApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+            abort(403);
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        // Get division IDs where this user is chief
+        $divisionIds = Division::where('division_chief_id', $user->id)->pluck('id');
+
+        $requests = FacilityRequest::with('requester:id,name,division_id')
+            ->where('status', 'Pending')
+            ->whereHas('requester', fn ($q) => $q->whereIn('division_id', $divisionIds))
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('activity', 'like', "%{$search}%")
+                      ->orWhere('purpose',  'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('FacilityRequests/DivisionChiefApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    /* =====================================================
+     | FAD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function fadApproval(Request $request)
+    {
+        $user = $request->user();
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        if (! $isFAD) abort(403);
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = FacilityRequest::with('requester:id,name')
+            ->where('status', 'Approved')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('activity', 'like', "%{$search}%")
+                      ->orWhere('purpose',  'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('FacilityRequests/FADApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function fadAction(Request $request, FacilityRequest $facilityRequest)
+    {
+        $user = $request->user();
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        if (! $isFAD) abort(403);
+
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $facilityRequest->update(['status' => 'FAD Approved']);
+            try {
+                $requesterEmail = $facilityRequest->requester?->email ?? null;
+                if ($requesterEmail) {
+                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'FAD Approved', null, $user->name));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Facility FAD approved email failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $facilityRequest->update(['status' => 'FAD Declined', 'decline_reason' => 'Declined by FAD Chief.', 'declined_at' => now()]);
+            try {
+                $requesterEmail = $facilityRequest->requester?->email ?? null;
+                if ($requesterEmail) {
+                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'FAD Declined', 'Declined by FAD Chief.', $user->name));
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Facility FAD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'FAD action recorded.');
+    }
+
+    /* =====================================================
+     | OCD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = FacilityRequest::with('requester:id,name')
+            ->where('status', 'Approved')
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('activity', 'like', "%{$search}%")
+                      ->orWhere('purpose',  'like', "%{$search}%")
+                      ->orWhereHas('requester', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('FacilityRequests/OCDApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function approveByOCDInApp(Request $request, FacilityRequest $facilityRequest)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $facilityRequest->update(['status' => 'OCD Approved']);
+
+            try {
+                $requesterEmail = $facilityRequest->requester?->email ?? $facilityRequest->email;
+                if ($requesterEmail) {
+                    \Mail::to($requesterEmail)->send(
+                        new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Approved', null, $request->user()->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Facility OCD approved email failed', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $facilityRequest->update(['status' => 'OCD Declined']);
+
+            try {
+                $requesterEmail = $facilityRequest->requester?->email ?? $facilityRequest->email;
+                if ($requesterEmail) {
+                    \Mail::to($requesterEmail)->send(
+                        new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Declined', null, $request->user()->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Facility OCD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'OCD action recorded.');
     }
 }

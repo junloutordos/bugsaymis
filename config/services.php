@@ -35,4 +35,22 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id'     => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect'      => env('GOOGLE_REDIRECT_URI'),
+    ],
+
+    'google_drive' => [
+        'credentials' => env('GOOGLE_DRIVE_CREDENTIALS'),   // path to service-account JSON
+        'folder_id'   => env('GOOGLE_DRIVE_FOLDER_ID'),     // shared Drive folder ID
+    ],
+
+    'firebase' => [
+        // Absolute path to the Firebase service-account JSON file.
+        // Used for FCM push notifications to parent mobile devices.
+        // Set FIREBASE_CREDENTIALS=/path/to/service-account.json in .env
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
 ];

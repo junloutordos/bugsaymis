@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Committee;
+use App\Models\Office;
+use App\Models\SpecialAssignment;
 use App\Models\WorkDistributionPlan;
 use App\Models\PerformanceIndicator;
 use App\Models\User;
@@ -13,9 +16,18 @@ class WorkDistributionPlanController extends Controller
     public function index()
     {
         return Inertia::render('PerformanceManagement/WorkDistributionPlans', [
-            'plans' => WorkDistributionPlan::with(['performanceIndicator', 'personnel'])->latest()->get(),
-            'indicators' => PerformanceIndicator::all(),
-            'users' => User::select('id', 'name')->get(),
+            'plans'       => WorkDistributionPlan::with([
+                                'performanceIndicator',
+                                'personnel',
+                                'offices',
+                                'committees.head',
+                                'specialAssignments.coordinator',
+                            ])->latest()->get(),
+            'indicators'  => PerformanceIndicator::all(),
+            'users'       => User::select('id', 'name')->get(),
+            'offices'     => Office::select('id', 'name', 'unit_head', 'division_id')->orderBy('name')->get(),
+            'committees'  => Committee::with('head')->orderBy('name')->get(['id', 'name', 'head_id']),
+            'assignments' => SpecialAssignment::with('coordinator')->orderBy('name')->get(['id', 'name', 'coordinator_id']),
         ]);
     }
 
@@ -23,14 +35,24 @@ class WorkDistributionPlanController extends Controller
     {
         $validated = $request->validate([
             'performance_indicator_id' => 'required|exists:performance_indicators,id',
-            'success_indicator' => 'required|string',
-            'office_involved' => 'nullable|string',
-            'rated_by' => 'nullable|string',
+            'success_indicator'        => 'required|string',
+            'rated_by'                 => 'nullable|string',
+            'office_ids'               => 'nullable|array',
+            'committee_ids'            => 'nullable|array',
+            'assignment_ids'           => 'nullable|array',
+            'free_text_involved'       => 'nullable|string',
         ]);
 
+        [$officeIds, $committeeIds, $assignmentIds] = $this->extractIds($request);
+        $validated['office_involved']    = $this->buildOfficeInvolved($officeIds, $committeeIds, $assignmentIds, $validated['free_text_involved'] ?? null);
+        $validated['free_text_involved'] = $validated['free_text_involved'] ?? null;
+        unset($validated['office_ids'], $validated['committee_ids'], $validated['assignment_ids']);
 
         $plan = WorkDistributionPlan::create($validated);
-        $plan->personnel()->sync($validated['personnel_ids'] ?? []);
+        $plan->personnel()->sync($request->input('personnel_ids', []));
+        $plan->offices()->sync(array_filter($officeIds, fn($id) => $id !== 'all'));
+        $plan->committees()->sync($committeeIds);
+        $plan->specialAssignments()->sync($assignmentIds);
 
         return redirect()->back();
     }
@@ -41,20 +63,67 @@ class WorkDistributionPlanController extends Controller
 
         $validated = $request->validate([
             'performance_indicator_id' => 'required|exists:performance_indicators,id',
-            'success_indicator' => 'required|string',
-            'office_involved' => 'nullable|string',
-            'rated_by' => 'nullable|string',
+            'success_indicator'        => 'required|string',
+            'rated_by'                 => 'nullable|string',
+            'office_ids'               => 'nullable|array',
+            'committee_ids'            => 'nullable|array',
+            'assignment_ids'           => 'nullable|array',
+            'free_text_involved'       => 'nullable|string',
         ]);
 
+        [$officeIds, $committeeIds, $assignmentIds] = $this->extractIds($request);
+        $validated['office_involved']    = $this->buildOfficeInvolved($officeIds, $committeeIds, $assignmentIds, $validated['free_text_involved'] ?? null);
+        $validated['free_text_involved'] = $validated['free_text_involved'] ?? null;
+        unset($validated['office_ids'], $validated['committee_ids'], $validated['assignment_ids']);
+
         $workDistributionPlan->update($validated);
+        $workDistributionPlan->personnel()->sync($request->input('personnel_ids', []));
+        $workDistributionPlan->offices()->sync(array_filter($officeIds, fn($id) => $id !== 'all'));
+        $workDistributionPlan->committees()->sync($committeeIds);
+        $workDistributionPlan->specialAssignments()->sync($assignmentIds);
 
         return redirect()->back();
     }
-
 
     public function destroy(WorkDistributionPlan $workDistributionPlan)
     {
         $workDistributionPlan->delete();
         return back()->with('success', 'WDP deleted successfully');
+    }
+
+    private function extractIds(Request $request): array
+    {
+        $officeIds      = $request->input('office_ids', []) ?? [];
+        $committeeIds   = $request->input('committee_ids', []) ?? [];
+        $assignmentIds  = $request->input('assignment_ids', []) ?? [];
+        return [$officeIds, $committeeIds, $assignmentIds];
+    }
+
+    private function buildOfficeInvolved(array $officeIds, array $committeeIds, array $assignmentIds, ?string $freeText): ?string
+    {
+        $parts = [];
+
+        if (in_array('all', $officeIds)) {
+            $parts[] = 'All Offices';
+        } elseif (!empty($officeIds)) {
+            $names = Office::whereIn('id', $officeIds)->orderBy('name')->pluck('name');
+            if ($names->isNotEmpty()) $parts[] = $names->join(', ');
+        }
+
+        if (!empty($committeeIds)) {
+            $names = Committee::whereIn('id', $committeeIds)->orderBy('name')->pluck('name');
+            if ($names->isNotEmpty()) $parts[] = $names->join(', ');
+        }
+
+        if (!empty($assignmentIds)) {
+            $names = SpecialAssignment::whereIn('id', $assignmentIds)->orderBy('name')->pluck('name');
+            if ($names->isNotEmpty()) $parts[] = $names->join(', ');
+        }
+
+        if (!empty($freeText)) {
+            $parts[] = $freeText;
+        }
+
+        return !empty($parts) ? implode(', ', $parts) : null;
     }
 }

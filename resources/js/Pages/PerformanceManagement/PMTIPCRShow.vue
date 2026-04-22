@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "@heroicons/vue/24/outline"
 import { computed } from "vue"
 import { router } from "@inertiajs/vue3"
 import Swal from "sweetalert2"
+import { useSubmit } from "@/Composables/useSubmit"
 import { ipcrStatusClass } from "@/Composables/ipcrStatusClass"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
 
@@ -13,6 +14,7 @@ const props = defineProps({
   plans:      Array,
   employee:   Object,
   supervisor: Object,
+  isOCD:      { type: Boolean, default: false },
 })
 
 // ---------- Status badge ----------
@@ -171,6 +173,8 @@ const adjectivalColorClass = (avg) => {
 }
 
 // ---------- Actions ----------
+const { isSubmitting, submit } = useSubmit()
+
 const approvIPCR = () => {
   Swal.fire({
     title: "Approve IPCR?",
@@ -181,9 +185,27 @@ const approvIPCR = () => {
     confirmButtonText: "Yes, approve!",
   }).then(result => {
     if (result.isConfirmed) {
-      router.post(route("pmt-ipcr.approve", props.ipcr.id), {}, {
+      submit.post(route("pmt-ipcr.approve", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Approved!", "IPCR has been approved by PMT.", "success"),
         onError:   () => Swal.fire("Error", "Failed to approve IPCR.", "error"),
+      })
+    }
+  })
+}
+
+const directorSign = () => {
+  Swal.fire({
+    title: "Sign IPCR as Director?",
+    text: "This will apply your electronic signature and mark the IPCR as Director Signed.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#059669",
+    confirmButtonText: "Yes, sign!",
+  }).then(result => {
+    if (result.isConfirmed) {
+      submit.post(route("pmt-ipcr.directorSign", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire("Signed!", "IPCR has been signed by the Director.", "success"),
+        onError:   () => Swal.fire("Error", "Failed to sign IPCR.", "error"),
       })
     }
   })
@@ -199,7 +221,7 @@ const returnForRevision = () => {
     confirmButtonText: "Yes, return it!",
   }).then(result => {
     if (result.isConfirmed) {
-      router.post(route("pmt-ipcr.return", props.ipcr.id), {}, {
+      submit.post(route("pmt-ipcr.return", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Returned!", "IPCR has been returned. The Division Chief will forward this to the employee.", "success"),
         onError:   () => Swal.fire("Error", "Failed to return IPCR.", "error"),
       })
@@ -218,31 +240,31 @@ const printIPCR = () => window.print()
       <!-- Back -->
       <button
         @click="router.visit(route('pmt-ipcr.index'))"
-        class="mb-4 flex items-center gap-2 text-purple-600 hover:text-purple-800"
+        class="mb-4 inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors"
       >
-        <ArrowLeftIcon class="w-5 h-5" /> Back to PMT Review List
+        <ArrowLeftIcon class="w-4 h-4" /> Back to PMT Review List
       </button>
 
       <!-- IPCR Details Card (retained outside printable area) -->
-      <div class="bg-white p-5 rounded-xl shadow mb-4 no-print">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4 no-print">
         <div class="flex flex-wrap justify-between items-start gap-4">
           <div>
-            <h2 class="text-xl font-bold">{{ ipcr.title }}</h2>
-            <p class="text-gray-500 text-sm mt-1">Rating Period: {{ ipcr.rating_period }}</p>
-            <p class="text-gray-500 text-sm">Employee: <strong>{{ employee?.name }}</strong> — {{ employee?.position }}</p>
-            <p class="text-gray-500 text-sm">Division: {{ employee?.division?.name ?? '—' }}</p>
+            <h2 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h2>
+            <p class="text-slate-500 text-sm mt-1">Rating Period: {{ ipcr.rating_period }}</p>
+            <p class="text-slate-500 text-sm">Employee: <strong>{{ employee?.name }}</strong> — {{ employee?.position }}</p>
+            <p class="text-slate-500 text-sm">Division: {{ employee?.division?.name ?? '—' }}</p>
           </div>
           <div class="flex flex-col items-end gap-3">
-            <span :class="`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusClasses(ipcr.status)}`">
+            <span :class="`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClasses(ipcr.status)}`">
               {{ ipcr.status }}
             </span>
-            <span class="text-xs text-gray-400">Submitted to PMT: {{ ipcr.submitted_for_pmtreview_at ?? '—' }}</span>
+            <span class="text-xs text-slate-400">Submitted to PMT: {{ ipcr.submitted_for_pmtreview_at ?? '—' }}</span>
             <div class="text-right">
-              <div class="text-2xl font-bold text-gray-800">{{ finalIPCRRating }}</div>
-              <div :class="`inline-block mt-1 px-3 py-1 rounded-full text-sm font-semibold ${adjectivalColorClass(finalIPCRRating)}`">
+              <div class="text-2xl font-bold text-slate-800">{{ finalIPCRRating }}</div>
+              <div :class="`inline-flex items-center mt-1 px-3 py-1 rounded-full text-sm font-semibold ${adjectivalColorClass(finalIPCRRating)}`">
                 {{ getAdjectivalRating(finalIPCRRating) }}
               </div>
-              <div class="text-xs text-gray-400 mt-1">Overall Weighted Rating</div>
+              <div class="text-xs text-slate-400 mt-1">Overall Weighted Rating</div>
             </div>
           </div>
         </div>
@@ -250,15 +272,27 @@ const printIPCR = () => window.print()
         <!-- Action buttons -->
         <div class="mt-4 flex flex-wrap gap-2">
           <button v-if="ipcr.status === 'Submitted to PMT'" @click="approvIPCR"
-            class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg shadow">
-            Approve
+            :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ isSubmitting ? 'Processing…' : 'Approve' }}
           </button>
           <button v-if="ipcr.status === 'Submitted to PMT'" @click="returnForRevision"
-            class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg shadow">
-            Return for Revision
+            :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
           </button>
+          <button v-if="isOCD && ipcr.status === 'Approved by PMT'" @click="directorSign"
+            :disabled="isSubmitting"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ isSubmitting ? 'Processing…' : 'Director Sign' }}
+          </button>
+          <div v-if="ipcr.status === 'Director Signed' && ipcr.director_signature"
+            class="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
+            <img :src="ipcr.director_signature" alt="Director Signature" class="h-10 object-contain" />
+            <span>Signed by Director</span>
+          </div>
           <button @click="printIPCR"
-            class="bg-gray-100 hover:bg-gray-200 text-gray-700 border px-4 py-2 rounded-lg">
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             Print / View PDF
           </button>
         </div>

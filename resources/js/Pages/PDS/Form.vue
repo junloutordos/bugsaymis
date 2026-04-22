@@ -1,6 +1,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useForm, router } from '@inertiajs/vue3'
+import { useSubmit } from '@/Composables/useSubmit'
 import {
   PlusIcon,
   TrashIcon,
@@ -15,6 +16,7 @@ import Swal from 'sweetalert2'
 const props = defineProps({
   pds: { type: Object, default: null },
 })
+const { isSubmitting: isUploading, submit: submitUpload } = useSubmit()
 
 function exportPDF(pdsId) {
   router.get(`/pds/${pdsId}/export-pdf`, {}, { target: '_blank' })
@@ -351,7 +353,7 @@ const uploadTrainingCSV = () => {
   const formData = new FormData()
   formData.append('file', csvFile.value)
 
-  router.post(route('pds.trainings.upload-csv', props.pds.id), formData, {
+  submitUpload.post(route('pds.trainings.upload-csv', props.pds.id), formData, {
     forceFormData: true,
     preserveScroll: true,
     onSuccess: (page) => {
@@ -394,40 +396,44 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
 <template>
   <AdminLayout title="Personal Data Sheet">
-    <div class="max-w-7xl mx-auto p-6">
-      <div class="bg-white shadow rounded-lg p-6">
-
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-6">
-          <h1 class="text-2xl font-bold">Personal Data Sheet</h1>
-
-          <div class="flex gap-2">
-            <button v-if="props.pds && !editMode" @click="editMode = true" class="btn-icon">
-              <PencilSquareIcon class="h-5 w-5 text-white" />
-            </button>
-            <!-- 
-            <button
-              v-if="props.pds && !editMode"
-              class="btn-icon bg-green-600"
-              @click="exportPDF(props.pds.id)"
-            >
-              <PrinterIcon class="h-5 w-5 text-white" />
-            </button>
-          -->
-            <button v-if="props.pds && !editMode" @click="exportPDS(props.pds.id)" class="btn-icon bg-indigo-600">
-              <DocumentArrowDownIcon class="h-5 w-5 text-white" />
-            </button>
-          </div>
+    <div class="max-w-7xl mx-auto">
+      <!-- Page header -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-slate-800">Personal Data Sheet</h1>
+          <p class="text-sm text-slate-500">Manage your personal information for civil service records</p>
         </div>
+        <div class="flex gap-2">
+          <button v-if="props.pds && !editMode" @click="editMode = true" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <PencilSquareIcon class="h-4 w-4" />
+            Edit
+          </button>
+          <!--
+          <button
+            v-if="props.pds && !editMode"
+            class="btn-icon bg-green-600"
+            @click="exportPDF(props.pds.id)"
+          >
+            <PrinterIcon class="h-5 w-5 text-white" />
+          </button>
+        -->
+          <button v-if="props.pds && !editMode" @click="exportPDS(props.pds.id)" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <DocumentArrowDownIcon class="h-4 w-4" />
+            Export
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
 
         <!-- Tabs -->
-        <div class="border-b mb-6 flex gap-4">
+        <div class="border-b border-slate-200 mb-6 flex gap-1">
           <button
             v-for="tab in tabs"
             :key="tab.id"
             @click="activeTab = tab.id"
-            class="px-4 py-2 font-semibold border-b-2"
-            :class="activeTab === tab.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400'"
+            class="px-4 py-2 text-sm font-semibold border-b-2 transition-colors"
+            :class="activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'"
           >
             {{ tab.label }}
           </button>
@@ -847,16 +853,16 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         </h2>
 
         <!-- CSV Upload & Download (Only in Edit Mode) -->
-        <div v-if="editMode" class="mb-6 p-4 border-2 border-dashed border-green-500 rounded-lg bg-green-50 flex flex-col md:flex-row items-center gap-4">
-          
+        <div v-if="editMode" class="mb-6 p-4 border-2 border-dashed border-emerald-300 rounded-xl bg-emerald-50 flex flex-col md:flex-row items-center gap-4">
+
           <!-- File Input -->
           <div class="flex-1">
-            <label class="block text-sm font-medium text-green-700 mb-1">Upload Trainings CSV</label>
+            <label class="block text-xs font-medium text-emerald-700 mb-1">Upload Trainings CSV</label>
             <input
               type="file"
               accept=".csv"
               @change="handleTrainingCSV"
-              class="block w-full text-sm text-green-900 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-500 file:text-white hover:file:bg-green-600"
+              class="block w-full text-sm text-emerald-900 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
             />
           </div>
 
@@ -866,15 +872,16 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             <button
               type="button"
               @click="uploadTrainingCSV"
-              class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded shadow"
+              :disabled="isUploading"
+              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Upload Trainings CSV
+              {{ isUploading ? 'Uploading…' : 'Upload Trainings CSV' }}
             </button>
 
             <!-- Download Template -->
             <a
-              :href="route('pds.trainings.download-template')" 
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow flex items-center gap-2"
+              :href="route('pds.trainings.download-template')"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
               download
             >
               Download Template
@@ -1329,9 +1336,9 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         </div>
 
         <!-- Submit -->
-        <div v-if="editMode" class="pt-6 flex justify-end">
-          <button @click="submit" class="btn-success">
-            {{ props.pds ? 'Update PDS' : 'Save PDS' }}
+        <div v-if="editMode" class="pt-6 flex justify-end gap-2 border-t border-slate-100">
+          <button @click="submit" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ form.processing ? 'Saving…' : (props.pds ? 'Update PDS' : 'Save PDS') }}
           </button>
         </div>
 
@@ -1341,7 +1348,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 </template>
 
 <style scoped>
-.input { @apply border rounded px-3 py-2 w-full; }
-.btn-icon { @apply bg-blue-600 p-2 rounded flex items-center justify-center; }
-.btn-success { @apply bg-green-600 text-white px-6 py-2 rounded; }
+.input { @apply rounded-lg border border-slate-200 bg-white px-3 py-2 w-full text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400; }
+.btn-icon { @apply bg-indigo-600 p-2 rounded-lg flex items-center justify-center; }
+.btn-success { @apply bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors; }
 </style>

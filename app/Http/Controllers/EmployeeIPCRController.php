@@ -2,10 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\IPCRCreatedMail;
+use App\Mail\IPCRSubmittedForRatingMail;
+use App\Mail\IPCRSubmittedForReviewMail;
+use App\Models\Division;
 use App\Models\EmployeeIPCR;
 use App\Models\IPCRRatingPeriod;
+use App\Models\User;
 use App\Models\WorkDistributionPlan;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class EmployeeIPCRController extends Controller
@@ -47,12 +54,25 @@ class EmployeeIPCRController extends Controller
             'remarks'       => 'nullable|string',
         ]);
 
-        EmployeeIPCR::create([
+        $ipcr = EmployeeIPCR::create([
             'user_id'       => auth()->id(),
             'rating_period' => $data['rating_period'],
             'title'         => $data['title'],
             'status'        => 'New Target',
             'remarks'       => $data['remarks'] ?? null,
+        ]);
+
+        $dc = $this->resolveDivisionChief(auth()->user());
+        if ($dc) {
+            $ipcr->load('user');
+            Mail::to($dc->email)->send(new IPCRCreatedMail($ipcr, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_created',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $ipcr->id,
+            'new_values'     => ['title' => $ipcr->title, 'rating_period' => $ipcr->rating_period],
         ]);
 
         return redirect()->back()->with('success', 'IPCR Target Created.');
@@ -71,6 +91,19 @@ class EmployeeIPCRController extends Controller
         ]);
 
         $employeeIPCR->update($data);
+
+        $dc = $this->resolveDivisionChief(auth()->user());
+        if ($dc) {
+            $employeeIPCR->load('user');
+            Mail::to($dc->email)->send(new IPCRCreatedMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_updated',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['title' => $employeeIPCR->title, 'status' => $employeeIPCR->status],
+        ]);
 
         return redirect()->back()->with('success', 'IPCR Target Updated.');
     }
@@ -138,11 +171,35 @@ class EmployeeIPCRController extends Controller
             ? \App\Models\User::havingRole('OCD')->first()
             : ($ipcr->user->division->divisionchief ?? null);
 
+        // Load all pivot IDs for this IPCR (keyed by plan_id)
+        $ipcrPlanIds = \App\Models\EmployeeIPCRPlan::where('ipcr_id', $ipcr->id)
+            ->pluck('id', 'plan_id');
+
+        // Load all daily accomplishments for those pivots in one query
+        $accomplishmentsByPivot = \App\Models\Accomplishment::with('photos')
+            ->whereIn('ipcr_plan_id', $ipcrPlanIds->values())
+            ->orderBy('accomplishment_date', 'desc')
+            ->get()
+            ->groupBy('ipcr_plan_id');
+
+        // Append accomplishments + count to each plan
+        $plans = $ipcr->plans->map(function ($plan) use ($ipcrPlanIds, $accomplishmentsByPivot) {
+            $pivotId                   = $ipcrPlanIds[$plan->id] ?? null;
+            $accs                      = $pivotId ? ($accomplishmentsByPivot[$pivotId] ?? collect()) : collect();
+            $plan->ipcr_plan_id        = $pivotId;
+            $plan->accomplishments     = $accs->values();
+            $plan->accomplishments_count = $accs->count();
+            return $plan;
+        });
+
+        $ocdUser = \App\Models\User::havingRole('OCD')->first();
+
         return Inertia::render('PerformanceManagement/EmployeeIPCRShow', [
             'ipcr'       => $ipcr,
             'employee'   => $ipcr->user,
             'supervisor' => $supervisor,
-            'plans'      => $ipcr->plans,
+            'ocdUser'    => $ocdUser ? ['name' => $ocdUser->name, 'position' => $ocdUser->position] : null,
+            'plans'      => $plans,
             'workPlans'  => $workPlans,
         ]);
     }
@@ -192,11 +249,32 @@ class EmployeeIPCRController extends Controller
     }
 
 
+    private function resolveDivisionChief(User $employee): ?User
+    {
+        $divisionId = $employee->division_id;
+        if (!$divisionId) return null;
+        $chiefId = Division::where('id', $divisionId)->value('division_chief_id');
+        return $chiefId ? User::find($chiefId) : null;
+    }
+
     public function submitForReview(EmployeeIPCR $employeeIPCR)
     {
         $employeeIPCR->update([
             'status' => 'For Review',
             'submitted_for_review_at' => now(),
+        ]);
+
+        $employeeIPCR->load('user');
+        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        if ($dc) {
+            Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_submitted_for_review',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'For Review'],
         ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
@@ -208,6 +286,19 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->update([
             'status' => 'Submitted for Rating',
             'submitted_for_rating_at' => now(),
+        ]);
+
+        $employeeIPCR->load('user');
+        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        if ($dc) {
+            Mail::to($dc->email)->send(new IPCRSubmittedForRatingMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_submitted_for_rating',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'Submitted for Rating'],
         ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
@@ -248,6 +339,19 @@ class EmployeeIPCRController extends Controller
         $employeeIPCR->update([
             'status' => 'For Review',
             'submitted_for_review_at' => now(),
+        ]);
+
+        $employeeIPCR->load('user');
+        $dc = $this->resolveDivisionChief($employeeIPCR->user);
+        if ($dc) {
+            Mail::to($dc->email)->send(new IPCRSubmittedForReviewMail($employeeIPCR, $dc->name));
+        }
+
+        AuditLogger::log([
+            'action'         => 'ipcr_resubmitted',
+            'auditable_type' => EmployeeIPCR::class,
+            'auditable_id'   => $employeeIPCR->id,
+            'new_values'     => ['status' => 'For Review'],
         ]);
 
         return to_route('employee-ipcr.show', $employeeIPCR->id)
