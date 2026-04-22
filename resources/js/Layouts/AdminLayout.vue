@@ -1350,11 +1350,11 @@ const menuItems = [
     children: [
       {
         label: "PPMP",
-        routeName: null,
+        routeName: "ppmp.index",
         href: "/ppmp",
         icon: DocumentTextIcon,
         roles: ["Administrator", "Faculty", "Staff"],
-        permissions: ["procurement.view"],
+        permissions: ["ppmp.create", "ppmp.view_all"],
       },
       {
         label: "Purchase Requests",
