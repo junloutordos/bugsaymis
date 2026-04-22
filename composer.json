@@ -21,7 +21,7 @@
         "phpoffice/phpspreadsheet": "^1.30",
         "fakerphp/faker": "^1.23",
         "predis/predis": "^3.4",
-        "pusher/pusher-php-server": "*",
+        "pusher/pusher-php-server": "^7.2",
         "simplesoftwareio/simple-qrcode": "^4.2",
         "tightenco/ziggy": "^2.0"
     },

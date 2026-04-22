@@ -10,6 +10,8 @@ use App\Models\Placement;
 use App\Models\User;
 use App\Models\WFHAccomplishment;
 use App\Models\WFHAttendance;
+use App\Models\PPMP\Ppmp;
+use App\Policies\PpmpPolicy;
 use App\Policies\Recruitment\ApplicationPolicy;
 use App\Policies\Recruitment\JobItemPolicy;
 use App\Policies\Recruitment\PlacementPolicy;
@@ -54,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(WFHAccomplishment::class, WFHAccomplishmentPolicy::class);
 
         // ── Recruitment Policies ───────────────────────────────────────────────
+        Gate::policy(Ppmp::class, PpmpPolicy::class);
         Gate::policy(JobItem::class, JobItemPolicy::class);
         Gate::policy(Application::class, ApplicationPolicy::class);
         Gate::policy(Placement::class, PlacementPolicy::class);
@@ -130,6 +133,19 @@ class AppServiceProvider extends ServiceProvider
             'faculty_loading.subjects',
             'faculty_loading.classrooms',
             'faculty_loading.school_year',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
+        }
+
+        // ── PPMP permission gates ──────────────────────────────────────────────
+        foreach ([
+            'ppmp.create',
+            'ppmp.submit',
+            'ppmp.review',
+            'ppmp.approve',
+            'ppmp.consolidate',
+            'ppmp.export',
+            'ppmp.view_all',
         ] as $permission) {
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }

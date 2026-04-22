@@ -11,10 +11,10 @@ window.Pusher = Pusher;
 
 window.Echo = new Echo({
     broadcaster:       'pusher',
-    key:               import.meta.env.VITE_PUSHER_APP_KEY,
+    key:               import.meta.env.VITE_PUSHER_APP_KEY || 'bugsaymis-app-key',
     wsHost:            import.meta.env.VITE_PUSHER_HOST       ?? 'localhost',
-    wsPort:            Number(import.meta.env.VITE_PUSHER_PORT ?? 6001),
-    wssPort:           Number(import.meta.env.VITE_PUSHER_PORT ?? 6001),
+    wsPort:            Number(import.meta.env.VITE_PUSHER_PORT ?? 9601),
+    wssPort:           Number(import.meta.env.VITE_PUSHER_PORT ?? 9601),
     cluster:           import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
     forceTLS:          (import.meta.env.VITE_PUSHER_SCHEME ?? 'http') === 'https',
     enabledTransports: ['ws', 'wss'],
