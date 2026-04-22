@@ -25,3 +25,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 storage/app/pshs-crc-dts-19dea47e8396.json
+
+# PPMP design & planning docs (not for production)
+/inception/
+/construction/
+/plan.md

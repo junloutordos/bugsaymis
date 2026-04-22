@@ -40,6 +40,129 @@ class HealthStatisticsController extends Controller
 
         $consultations = $query->get();
 
+        // Build distinct diseases list and counts by age for students and employees
+        $diseases = [];
+        foreach ($consultations as $c) {
+            $rawDisease = trim((string)($c->concern ?? $c->reason ?? ''));
+            if ($rawDisease === '') $rawDisease = 'Unspecified';
+            $dname = ucwords(strtolower($rawDisease));
+
+            if (!isset($diseases[$dname])) {
+                $diseases[$dname] = ['students' => [], 'employees' => []];
+            }
+
+            // determine if requestor is a student
+            $isStudent = false;
+            if (!empty($c->requestor_type) && $c->requestor_type === 'student') {
+                $isStudent = true;
+            } elseif (!empty($c->requestor_id)) {
+                // quick existence check in students table
+                $isStudent = (bool) DB::table('students')->where('id', $c->requestor_id)->exists();
+            }
+
+            $person = null;
+            if ($isStudent) {
+                $person = !empty($c->requestor_id) ? DB::table('students')->where('id', $c->requestor_id)->first() : null;
+            } else {
+                $person = !empty($c->requestor_id) ? DB::table('users')->where('id', $c->requestor_id)->first() : null;
+            }
+
+            // try to detect birthdate column and compute age
+            $birth = null;
+            if ($person) {
+                foreach (['birthdate','birth_date','dob','date_of_birth'] as $col) {
+                    if (isset($person->$col) && !empty($person->$col)) { $birth = $person->$col; break; }
+                }
+            }
+            if (empty($birth) && Schema::hasColumn('consultations', 'birthdate') && isset($c->birthdate)) {
+                $birth = $c->birthdate;
+            }
+
+            $age = null;
+            try { if ($birth) $age = Carbon::parse($birth)->age; } catch (\Throwable $e) { }
+
+            // determine sex
+            $sex = null;
+            if ($person && isset($person->sex)) $sex = $person->sex;
+            if (empty($sex) && Schema::hasColumn('consultations', 'sex') && isset($c->sex)) $sex = $c->sex;
+            $normSex = null;
+            if (!empty($sex)) {
+                $s = strtolower(trim((string)$sex));
+                if (in_array($s, ['m','male'])) $normSex = 'Male';
+                elseif (in_array($s, ['f','female'])) $normSex = 'Female';
+            }
+
+            $bucket = $age !== null ? (string) $age : 'Unknown';
+            $groupKey = $isStudent ? 'students' : 'employees';
+
+            if (!isset($diseases[$dname][$groupKey][$bucket])) {
+                $diseases[$dname][$groupKey][$bucket] = ['Male' => 0, 'Female' => 0, 'Total' => 0];
+            }
+            if ($normSex) {
+                $diseases[$dname][$groupKey][$bucket][$normSex]++;
+            } else {
+                // increment total for unknown sex
+                $diseases[$dname][$groupKey][$bucket]['Total']++;
+            }
+            // recompute total
+            $diseases[$dname][$groupKey][$bucket]['Total'] =
+                ($diseases[$dname][$groupKey][$bucket]['Male'] ?? 0) +
+                ($diseases[$dname][$groupKey][$bucket]['Female'] ?? 0) +
+                ($diseases[$dname][$groupKey][$bucket]['Total'] ?? 0);
+        }
+
+        // normalize into array for the view, sort ages numerically when possible
+        $diseasesData = [];
+        foreach ($diseases as $name => $data) {
+            // sort numeric keys, keep 'Unknown' at end
+            $skeys = array_filter(array_keys($data['students']), fn($k) => $k !== 'Unknown');
+            sort($skeys, SORT_NUMERIC);
+            $students = [];
+            foreach ($skeys as $k) $students[$k] = $data['students'][$k];
+            if (isset($data['students']['Unknown'])) $students['Unknown'] = $data['students']['Unknown'];
+
+            $ekeys = array_filter(array_keys($data['employees']), fn($k) => $k !== 'Unknown');
+            sort($ekeys, SORT_NUMERIC);
+            $employees = [];
+            foreach ($ekeys as $k) $employees[$k] = $data['employees'][$k];
+            if (isset($data['employees']['Unknown'])) $employees['Unknown'] = $data['employees']['Unknown'];
+
+            $diseasesData[] = ['name' => $name, 'students' => $students, 'employees' => $employees];
+        }
+
+        // Build a summarized table per disease: student/employee male/female/total
+        $diseaseSummary = [];
+        foreach ($diseasesData as $d) {
+            $sm = $sf = $st = 0;
+            foreach ($d['students'] as $age => $row) {
+                $sm += $row['Male'] ?? 0;
+                $sf += $row['Female'] ?? 0;
+                $st += $row['Total'] ?? (($row['Male'] ?? 0) + ($row['Female'] ?? 0));
+            }
+
+            $em = $ef = $et = 0;
+            foreach ($d['employees'] as $age => $row) {
+                $em += $row['Male'] ?? 0;
+                $ef += $row['Female'] ?? 0;
+                $et += $row['Total'] ?? (($row['Male'] ?? 0) + ($row['Female'] ?? 0));
+            }
+
+            $total = $st + $et;
+            $diseaseSummary[] = [
+                'name' => $d['name'],
+                'students_male' => $sm,
+                'students_female' => $sf,
+                'students_total' => $st,
+                'employees_male' => $em,
+                'employees_female' => $ef,
+                'employees_total' => $et,
+                'total' => $total,
+            ];
+        }
+
+        // sort by total desc
+        usort($diseaseSummary, function ($a, $b) { return $b['total'] <=> $a['total']; });
+
         // Map free-text reasons into analyzed categories
         $mapReason = function ($text) {
             $t = strtolower(trim($text ?? ''));
@@ -170,6 +293,8 @@ class HealthStatisticsController extends Controller
             'studentFemale' => $studentFemale,
             'start' => $start,
             'end' => $end,
+            'diseasesData' => $diseasesData,
+            'diseaseSummary' => $diseaseSummary,
         ]);
     }
 }

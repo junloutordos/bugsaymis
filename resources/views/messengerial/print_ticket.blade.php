@@ -180,7 +180,7 @@
 
         <div class="row">
             <div class="label">Remarks:</div>
-            <div class="value">{{ $request->proof_remarks ?? '' }}</div>
+            <div class="value">@if($request->purpose)Purpose: {{ $request->purpose }}.@endif @if($request->consignee_name)Consignee: {{ $request->consignee_name }}.@endif @if($request->proof_remarks) {{ $request->proof_remarks }}@endif</div>
         </div>
 
     </div>
@@ -205,7 +205,7 @@
 
     <!-- NOTE -->
     <div class="note">
-        <strong>Note:</strong> “Date Delivered to Addressee” and signature in the “Received by” portion
+        <strong>Note:</strong> "Date Delivered to Addressee" and signature in the "Received by" portion
         are applicable for hand-carried documents only. For delivery through courier service,
         photocopy of official receipt shall be attached to this form.
     </div>
@@ -277,7 +277,7 @@
 
         <div class="row">
             <div class="label">Remarks:</div>
-            <div class="value">{{ $request->proof_remarks ?? '' }}</div>
+            <div class="value">@if($request->purpose)Purpose: {{ $request->purpose }}.@endif @if($request->consignee_name)Consignee: {{ $request->consignee_name }}.@endif @if($request->proof_remarks) {{ $request->proof_remarks }}@endif</div>
         </div>
 
     </div>
@@ -302,7 +302,7 @@
 
     <!-- NOTE -->
     <div class="note">
-        <strong>Note:</strong> “Date Delivered to Addressee” and signature in the “Received by” portion
+        <strong>Note:</strong> "Date Delivered to Addressee" and signature in the "Received by" portion
         are applicable for hand-carried documents only. For delivery through courier service,
         photocopy of official receipt shall be attached to this form.
     </div>
