@@ -6,7 +6,9 @@
       "Bash(npm run *)",
       "Bash(php artisan*)",
       "Bash(php -l *)",
-      "Bash(cd /Users/junlou/bugsaymis-docker && docker compose exec php bash -c *)"
+      "Bash(cd /Users/junlou/bugsaymis-docker && docker compose exec php bash -c *)",
+      "Bash(curl -sk -X POST https://localhost/student-attendance/scan -H 'Content-Type: application/json' -H 'X-Requested-With: XMLHttpRequest' -d '{\"barcode\":\"13-2020-5-0\",\"gate_location\":\"main_gate\",\"source\":\"gate_scanner\"}')",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }
