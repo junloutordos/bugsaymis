@@ -533,7 +533,7 @@ const menuItems = [
     {
       label: "Human Resource",
       icon: UserGroupIcon,
-      roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
+      roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD"],
       children: [
       {
         label: "My PDS",
