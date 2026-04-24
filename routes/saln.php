@@ -97,6 +97,17 @@ Route::middleware(['web', 'auth', 'verified', 'permission:saln.create'])
             [SalnController::class, 'destroyRelative'])
             ->name('relatives.destroy');
 
+        // ── Section: Unmarried Children Below 18 ─────────────────────────────
+        Route::post('/{saln}/children',
+            [SalnController::class, 'storeChild'])
+            ->name('children.store');
+        Route::put('/{saln}/children/{child}',
+            [SalnController::class, 'updateChild'])
+            ->name('children.update');
+        Route::delete('/{saln}/children/{child}',
+            [SalnController::class, 'destroyChild'])
+            ->name('children.destroy');
+
     });
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -42,10 +42,16 @@
             </div>
             <!-- Day breakdown -->
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-              <div v-for="(times, day) in currentSchedule.daily_schedules" :key="day"
-                class="bg-slate-50 rounded-lg px-3 py-2">
-                <p class="text-xs font-semibold text-slate-600">{{ day }}</p>
-                <p class="text-xs text-slate-500 font-mono mt-0.5">{{ times.time_in }} – {{ times.time_out }}</p>
+              <div v-for="entry in sortedDailySchedules(currentSchedule.daily_schedules)" :key="entry.day"
+                :class="['rounded-lg px-3 py-2', entry.work_from_home ? 'bg-blue-50' : 'bg-slate-50']">
+                <div class="flex items-center gap-1.5">
+                  <p class="text-xs font-semibold text-slate-600">{{ entry.day }}</p>
+                  <span v-if="entry.work_from_home"
+                    class="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                    <HomeIcon class="h-2.5 w-2.5" /> WFH
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 font-mono mt-0.5">{{ entry.time_in }} – {{ entry.time_out }}</p>
               </div>
             </div>
           </div>
@@ -111,12 +117,12 @@
                 class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Copy Mon to all active days</button>
             </div>
             <div class="border border-slate-200 rounded-lg overflow-hidden">
-              <div class="grid grid-cols-[80px_1fr_1fr] bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                <span>Day</span><span>Time In</span><span>Time Out</span>
+              <div class="grid grid-cols-[80px_1fr_1fr_72px] bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                <span>Day</span><span>Time In</span><span>Time Out</span><span class="text-center">WFH</span>
               </div>
               <div v-for="d in allDays" :key="d"
-                class="grid grid-cols-[80px_1fr_1fr] items-center px-3 py-2 border-t border-slate-100"
-                :class="submitForm.daily_schedules[d] ? 'bg-white' : 'bg-slate-50/60 opacity-60'">
+                class="grid grid-cols-[80px_1fr_1fr_72px] items-center px-3 py-2 border-t border-slate-100"
+                :class="submitForm.daily_schedules[d] ? (submitForm.daily_schedules[d].work_from_home ? 'bg-blue-50' : 'bg-white') : 'bg-slate-50/60 opacity-60'">
                 <label class="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" :checked="!!submitForm.daily_schedules[d]"
                     @change="toggleDay(d)"
@@ -133,6 +139,18 @@
                   type="time"
                   class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                 <span v-else></span>
+                <div class="flex justify-center">
+                  <button v-if="submitForm.daily_schedules[d]"
+                    type="button"
+                    @click="submitForm.daily_schedules[d].work_from_home = !submitForm.daily_schedules[d].work_from_home"
+                    :class="['inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full transition-colors',
+                      submitForm.daily_schedules[d].work_from_home
+                        ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        : 'bg-slate-100 text-slate-400 hover:bg-slate-200']">
+                    <HomeIcon class="h-3 w-3" />
+                    {{ submitForm.daily_schedules[d].work_from_home ? 'WFH' : '' }}
+                  </button>
+                </div>
               </div>
             </div>
             <p v-if="submitForm.errors.daily_schedules" class="text-red-500 text-xs mt-1">{{ submitForm.errors.daily_schedules }}</p>
@@ -200,7 +218,7 @@ import { ref, computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
-  ClockIcon, CheckCircleIcon, PlusCircleIcon, DocumentTextIcon,
+  ClockIcon, CheckCircleIcon, PlusCircleIcon, DocumentTextIcon, HomeIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -221,11 +239,11 @@ const submitForm = useForm({
   preset_id:       null,
   name:            '',
   daily_schedules: {
-    Mon: { time_in: '08:00', time_out: '17:00' },
-    Tue: { time_in: '08:00', time_out: '17:00' },
-    Wed: { time_in: '08:00', time_out: '17:00' },
-    Thu: { time_in: '08:00', time_out: '17:00' },
-    Fri: { time_in: '08:00', time_out: '17:00' },
+    Mon: { time_in: '08:00', time_out: '17:00', work_from_home: false },
+    Tue: { time_in: '08:00', time_out: '17:00', work_from_home: false },
+    Wed: { time_in: '08:00', time_out: '17:00', work_from_home: false },
+    Thu: { time_in: '08:00', time_out: '17:00', work_from_home: false },
+    Fri: { time_in: '08:00', time_out: '17:00', work_from_home: false },
   },
   effective_date:  today,
   remarks:         '',
@@ -248,7 +266,7 @@ function toggleDay(day) {
     const firstActive = Object.values(submitForm.daily_schedules)[0]
     submitForm.daily_schedules = {
       ...submitForm.daily_schedules,
-      [day]: { time_in: firstActive?.time_in ?? '08:00', time_out: firstActive?.time_out ?? '17:00' },
+      [day]: { time_in: firstActive?.time_in ?? '08:00', time_out: firstActive?.time_out ?? '17:00', work_from_home: false },
     }
   }
 }
@@ -261,7 +279,7 @@ function copyFirstToAll() {
   const updated = {}
   for (const d of allDays) {
     if (submitForm.daily_schedules[d]) {
-      updated[d] = { ...first }
+      updated[d] = { time_in: first.time_in, time_out: first.time_out, work_from_home: submitForm.daily_schedules[d].work_from_home ?? false }
     }
   }
   submitForm.daily_schedules = updated
@@ -280,6 +298,15 @@ function cancelSubmission() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function sortedDailySchedules(dailySchedules) {
+  if (!dailySchedules) return []
+  return DAY_ORDER
+    .filter(d => d in dailySchedules)
+    .map(d => ({ day: d, ...dailySchedules[d] }))
+}
+
 function formatDays(days) {
   if (!days?.length) return 'Mon–Fri'
   if (days.length === 5 && !days.includes('Sat') && !days.includes('Sun')) return 'Mon–Fri'
@@ -289,14 +316,19 @@ function formatDays(days) {
 
 function formatDaysWithTimes(dailySchedules) {
   if (!dailySchedules || !Object.keys(dailySchedules).length) return '—'
-  const groups = {}
+  const officeGroups = {}
+  const wfhDays = []
   for (const [day, t] of Object.entries(dailySchedules)) {
-    const key = `${t.time_in}–${t.time_out}`
-    if (!groups[key]) groups[key] = []
-    groups[key].push(day)
+    if (t.work_from_home) {
+      wfhDays.push(day)
+    } else {
+      const key = `${t.time_in}–${t.time_out}`
+      if (!officeGroups[key]) officeGroups[key] = []
+      officeGroups[key].push(day)
+    }
   }
-  return Object.entries(groups)
-    .map(([times, days]) => `${formatDays(days)}: ${times}`)
-    .join(' | ')
+  const parts = Object.entries(officeGroups).map(([times, days]) => `${formatDays(days)}: ${times}`)
+  if (wfhDays.length) parts.push(`${formatDays(wfhDays)}: WFH`)
+  return parts.join(' | ')
 }
 </script>
