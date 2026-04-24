@@ -349,8 +349,6 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // OCD Approval Dashboards
     Route::get('/vehicle-requests/ocd-approval', [VehicleRequestController::class, 'ocdApproval'])->name('vehicle-requests.ocd-approval');
     Route::post('/vehicle-requests/{vehicleRequest}/ocd-action', [VehicleRequestController::class, 'approveByOCDInApp'])->name('vehicle-requests.ocd-action');
-    Route::get('/facility-requests/ocd-approval', [\App\Http\Controllers\FacilityRequestController::class, 'ocdApproval'])->name('facility-requests.ocd-approval');
-    Route::post('/facility-requests/{facilityRequest}/ocd-action', [\App\Http\Controllers\FacilityRequestController::class, 'approveByOCDInApp'])->name('facility-requests.ocd-action');
     Route::get('/hr/gatepass/ocd-approval', [\App\Http\Controllers\HumanResource\GatePassController::class, 'ocdApproval'])->name('gatepass.ocd-approval');
     Route::post('/hr/gatepass/{id}/ocd-action', [\App\Http\Controllers\HumanResource\GatePassController::class, 'approveByOCDInApp'])->name('gatepass.ocd-action');
 
@@ -544,6 +542,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/facility-requests/{facilityRequest}/fad/decline/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'submitFadDecline'])
         ->name('facility-requests.fad.decline.submit')
         ->middleware(['signed']);
+
 
     // Service Requests: Division chief approve/decline via signed links
     Route::get('/service-requests/{serviceRequest}/approve/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByDivisionChief'])
@@ -1490,7 +1489,7 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     Route::get('/dtr/{user}/checklist', [\App\Http\Controllers\HR\DtrRecordController::class, 'printChecklist'])
         ->name('dtr.checklist');
 
-    // ── Work Schedules ────────────────────────────────────────────────────────
+    // ── Work Schedules — HR Admin ─────────────────────────────────────────────
     Route::get('/schedules', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'index'])
         ->name('schedules.index');
     Route::post('/schedules/presets', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'storePreset'])
@@ -1501,6 +1500,18 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('schedules.presets.destroy');
     Route::post('/schedules/assign', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'assign'])
         ->name('schedules.assign');
+    Route::post('/schedules/{schedule}/approve', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'approveSubmission'])
+        ->name('schedules.approve');
+    Route::post('/schedules/{schedule}/reject', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'rejectSubmission'])
+        ->name('schedules.reject');
+
+    // ── Work Schedules — Employee Self-Service ────────────────────────────────
+    Route::get('/schedules/my', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'mySchedule'])
+        ->name('schedules.my');
+    Route::post('/schedules/submit', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'submit'])
+        ->name('schedules.submit');
+    Route::delete('/schedules/{schedule}/cancel', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'cancelSubmission'])
+        ->name('schedules.cancel');
 
     // ── Employee 201 Files ──────────────────────────────────────────────────────
     Route::get('/201-files', [EmployeeDocumentController::class, 'listEmployees'])

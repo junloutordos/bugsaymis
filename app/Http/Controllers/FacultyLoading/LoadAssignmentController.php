@@ -29,36 +29,77 @@ class LoadAssignmentController extends Controller
         $this->authorize('faculty_loading.manage');
 
         $currentTerm = AcademicTerm::where('is_current', true)->first();
-        $termId      = $request->input('term_id', $currentTerm?->id);
-        $facultyId   = $request->input('faculty_id');
+        $termId      = (int) $request->input('term_id', $currentTerm?->id);
 
-        $assignments = LoadAssignment::with(['faculty:id,name', 'subject:id,code,name', 'academicTerm.schoolYear'])
-            ->when($termId,    fn ($q) => $q->where('academic_term_id', $termId))
-            ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId))
+        // All assignments for the term, grouped by faculty
+        $rawAssignments = LoadAssignment::with(['faculty:id,name,position', 'subject:id,code,name,subject_type,grade_level'])
+            ->where('academic_term_id', $termId)
             ->orderBy('user_id')
             ->orderBy('assignment_type')
+            ->orderBy('id')
+            ->get();
+
+        // Faculty load records for the term (for load status / lock info)
+        $facultyLoads = FacultyLoad::where('academic_term_id', $termId)
             ->get()
-            ->map(fn ($a) => $this->mapAssignment($a));
+            ->keyBy('user_id');
+
+        // Group into one entry per faculty
+        $byFaculty = $rawAssignments
+            ->groupBy('user_id')
+            ->map(function ($rows, $userId) use ($facultyLoads) {
+                $first = $rows->first();
+                $fl    = $facultyLoads->get($userId);
+
+                $teaching      = $rows->where('assignment_type', 'teaching');
+                $nonTeaching   = $rows->where('assignment_type', '!=', 'teaching');
+
+                return [
+                    'faculty_id'       => $userId,
+                    'faculty_name'     => $first->faculty?->name ?? '—',
+                    'position'         => $first->faculty?->position ?? null,
+                    'teaching_units'   => (float) $teaching->sum('load_units'),
+                    'other_units'      => (float) $nonTeaching->sum('load_units'),
+                    'total_units'      => (float) $rows->sum('load_units'),
+                    'load_status'      => $fl?->load_status ?? null,
+                    'is_locked'        => (bool) ($fl?->is_locked ?? false),
+                    'assignment_count' => $rows->count(),
+                    'assignments'      => $rows->map(fn ($a) => $this->mapAssignment($a))->values()->all(),
+                ];
+            })
+            ->sortBy('faculty_name')
+            ->values();
 
         $terms = AcademicTerm::with('schoolYear')
             ->orderByDesc('start_date')
             ->get()
             ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current, 'school_year_id' => $t->school_year_id]);
 
-        $faculty  = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
+        $faculty = User::where('status', '<>', 'inactive')
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
             ->orderBy('name')->get(['id', 'name', 'position']);
-        $subjects = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
-        $sections = DB::table('sections')->orderBy('sectionname')->get(['id', 'sectionname', 'levelid']);
+
+        $subjects = Subject::active()
+            ->orderBy('grade_level')
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'subject_type', 'load_units', 'grade_level']);
+
+        $currentSyId = SchoolYear::where('is_current', true)->value('id');
+        $sections = DB::table('sections')
+            ->where('school_year_id', $currentSyId)
+            ->where('is_active', true)
+            ->orderBy('levelid')
+            ->orderBy('sectionname')
+            ->get(['id', 'sectionname', 'levelid']);
 
         return Inertia::render('FacultyLoading/Assignments/Index', [
-            'assignments' => $assignments,
-            'terms'       => $terms,
-            'faculty'     => $faculty,
-            'subjects'    => $subjects,
-            'sections'    => $sections,
-            'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
-            'filters'     => $request->only(['term_id', 'faculty_id']),
+            'facultyLoads' => $byFaculty,
+            'terms'        => $terms,
+            'faculty'      => $faculty,
+            'subjects'     => $subjects,
+            'sections'     => $sections,
+            'currentTerm'  => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
+            'filters'      => $request->only(['term_id']),
         ]);
     }
 

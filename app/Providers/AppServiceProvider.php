@@ -128,11 +128,16 @@ class AppServiceProvider extends ServiceProvider
             'faculty_loading.view',
             'faculty_loading.view_own',
             'faculty_loading.manage',
+            'faculty_loading.load_assignments',
             'faculty_loading.approve',
             'faculty_loading.reports',
             'faculty_loading.subjects',
             'faculty_loading.classrooms',
             'faculty_loading.school_year',
+            'faculty_loading.setup',
+            'faculty_loading.vacancies',
+            'faculty_loading.training',
+            'faculty_loading.training.verify',
         ] as $permission) {
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }

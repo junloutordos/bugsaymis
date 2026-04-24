@@ -52,6 +52,11 @@ class ClassSchedule extends Model
         return $this->belongsTo(Classroom::class);
     }
 
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
+    }
+
     public function schoolYear(): BelongsTo
     {
         return $this->belongsTo(SchoolYear::class);

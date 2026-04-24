@@ -32,9 +32,9 @@ return new class extends Migration
             return;
         }
 
-        // sections.id is INT (signed) — align our columns before adding FKs
-        DB::statement('ALTER TABLE class_schedules MODIFY section_id INT NOT NULL');
-        DB::statement('ALTER TABLE load_assignments MODIFY section_id INT NULL');
+        // sections.id is INT UNSIGNED — align our columns before adding FKs
+        DB::statement('ALTER TABLE class_schedules MODIFY section_id INT UNSIGNED NOT NULL');
+        DB::statement('ALTER TABLE load_assignments MODIFY section_id INT UNSIGNED NULL');
 
         // 1. class_schedules.section_id → sections.id
         Schema::table('class_schedules', function (Blueprint $table) {

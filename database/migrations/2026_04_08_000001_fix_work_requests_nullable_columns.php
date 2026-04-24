@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (! Schema::hasColumn('work_requests', 'expected_completion_date')) {
+            return;
+        }
+
         Schema::table('work_requests', function (Blueprint $table) {
             $table->date('expected_completion_date')->nullable()->change();
         });
@@ -15,6 +19,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasColumn('work_requests', 'expected_completion_date')) {
+            return;
+        }
+
         Schema::table('work_requests', function (Blueprint $table) {
             $table->date('expected_completion_date')->nullable(false)->change();
         });

@@ -3,6 +3,7 @@
 namespace App\Models\FacultyLoading;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subject extends Model
@@ -23,6 +24,7 @@ class Subject extends Model
         'semester',
         'sessions_per_week',
         'minutes_per_session',
+        'academic_unit_id',
         'is_active',
     ];
 
@@ -36,6 +38,11 @@ class Subject extends Model
         'minutes_per_session' => 'integer',
         'is_active'           => 'boolean',
     ];
+
+    public function academicUnit(): BelongsTo
+    {
+        return $this->belongsTo(AcademicUnit::class);
+    }
 
     public function loadAssignments(): HasMany
     {

@@ -184,14 +184,19 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // ── Faculty Loading ───────────────────────────────────────────────────
-        // CID/AUH: manage loads and schedules, manage catalog
+        // CID/AUH: manage loads and schedules, manage catalog, setup
         $assign('CID', [
             'faculty_loading.view',
             'faculty_loading.manage',
+            'faculty_loading.load_assignments',
             'faculty_loading.reports',
             'faculty_loading.subjects',
             'faculty_loading.classrooms',
             'faculty_loading.school_year',
+            'faculty_loading.setup',
+            'faculty_loading.vacancies',
+            'faculty_loading.training',
+            'faculty_loading.training.verify',
         ]);
 
         // Campus Director: approve overloads + view everything
@@ -199,6 +204,8 @@ class RolePermissionSeeder extends Seeder
             'faculty_loading.view',
             'faculty_loading.approve',
             'faculty_loading.reports',
+            'faculty_loading.vacancies',
+            'faculty_loading.training',
         ]);
 
         // Faculty: view own load only

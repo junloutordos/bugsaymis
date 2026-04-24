@@ -25,6 +25,8 @@ class EmployeeSchedule extends Model
         'effective_date',
         'end_date',
         'is_default',
+        'status',
+        'rejection_reason',
         'remarks',
     ];
 
