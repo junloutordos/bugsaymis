@@ -279,13 +279,14 @@ class EmployeeScheduleController extends Controller
         }
 
         $data = $request->validate([
-            'preset_id'                  => 'nullable|exists:schedule_presets,id',
-            'name'                       => 'required|string|max:100',
-            'daily_schedules'            => 'required|array|min:1',
-            'daily_schedules.*.time_in'  => 'required|date_format:H:i',
-            'daily_schedules.*.time_out' => 'required|date_format:H:i',
-            'effective_date'             => 'required|date|after_or_equal:today',
-            'remarks'                    => 'nullable|string|max:255',
+            'preset_id'                         => 'nullable|exists:schedule_presets,id',
+            'name'                              => 'required|string|max:100',
+            'daily_schedules'                   => 'required|array|min:1',
+            'daily_schedules.*.time_in'         => 'required|date_format:H:i',
+            'daily_schedules.*.time_out'        => 'required|date_format:H:i',
+            'daily_schedules.*.work_from_home'  => 'nullable|boolean',
+            'effective_date'                    => 'required|date|after_or_equal:today',
+            'remarks'                           => 'nullable|string|max:255',
         ]);
 
         $validDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

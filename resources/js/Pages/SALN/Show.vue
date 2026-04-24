@@ -131,6 +131,45 @@
             </form>
           </div>
 
+          <!-- ── Children section (inside Personal Info tab) ── -->
+          <div v-if="activeTab === 'header'" class="mt-6 border-t border-slate-100 pt-5">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-700">Unmarried Children Below 18 in Declarant's Household</h2>
+                <p class="text-xs text-slate-400 mt-0.5">As required by CSC SALN Form No. SALN-1</p>
+              </div>
+              <button v-if="saln.is_editable" @click="showAddChild = true"
+                class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+                + Add Child
+              </button>
+            </div>
+
+            <div v-if="saln.children.length === 0" class="py-6 text-center text-slate-400 text-sm bg-slate-50 rounded-lg">
+              No children declared.
+            </div>
+            <table v-else class="w-full text-sm">
+              <thead>
+                <tr class="text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
+                  <th class="pb-2 text-left">Name of Child</th>
+                  <th class="pb-2 text-center w-16">Age</th>
+                  <th v-if="saln.is_editable" class="pb-2 w-20"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                <tr v-for="c in saln.children" :key="c.id" class="group">
+                  <td class="py-2.5 font-medium text-slate-800">{{ c.name }}</td>
+                  <td class="py-2.5 text-center text-slate-600">{{ c.age }}</td>
+                  <td v-if="saln.is_editable" class="py-2.5 text-right">
+                    <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
+                      <button @click="openEditChild(c)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
+                      <button @click="deleteChild(c.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <!-- ── Tab: Real Properties ── -->
           <SectionTable v-if="activeTab === 'real'" :editable="saln.is_editable"
             title="Real Properties"
@@ -385,6 +424,28 @@
         <BusinessInterestForm :form="businessForm" />
       </FormModal>
 
+      <!-- Add / Edit Child -->
+      <FormModal v-if="showAddChild || editingChild"
+        :title="editingChild ? 'Edit Child' : 'Add Child'"
+        @close="closeChildModal" @save="saveChild">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Name of Child <span class="text-red-500">*</span></label>
+            <input v-model="childForm.name" type="text" maxlength="255" placeholder="Full name"
+              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              :class="{ 'border-red-400': childForm.errors.name }" />
+            <p v-if="childForm.errors.name" class="text-xs text-red-500 mt-1">{{ childForm.errors.name }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Age <span class="text-red-500">*</span></label>
+            <input v-model.number="childForm.age" type="number" min="0" max="17" placeholder="0–17"
+              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              :class="{ 'border-red-400': childForm.errors.age }" />
+            <p v-if="childForm.errors.age" class="text-xs text-red-500 mt-1">{{ childForm.errors.age }}</p>
+          </div>
+        </div>
+      </FormModal>
+
       <!-- Add / Edit Relative -->
       <FormModal v-if="showAddRelative || editingRelative"
         :title="editingRelative ? 'Edit Relative' : 'Add Relative'"
@@ -422,7 +483,7 @@ const props = defineProps({ saln: Object, canManage: Boolean })
 const activeTab = ref('header')
 
 const tabs = computed(() => [
-  { key: 'header',      label: 'Personal Info' },
+  { key: 'header',      label: 'Personal Info',       count: props.saln.children.length || undefined },
   { key: 'real',        label: 'Real Properties',    count: props.saln.real_properties.length },
   { key: 'personal',    label: 'Personal Properties',count: props.saln.personal_properties.length },
   { key: 'liabilities', label: 'Liabilities',        count: props.saln.liabilities.length },
@@ -556,6 +617,29 @@ function closeBusinessModal() { showAddBusiness.value = false; editingBusiness.v
 function deleteBusiness(id) {
   if (confirm('Remove this business interest?'))
     router.delete(route('saln.business-interests.destroy', [props.saln.id, id]))
+}
+
+// ── Children ──────────────────────────────────────────────────────────────────
+const showAddChild  = ref(false)
+const editingChild  = ref(null)
+const childForm     = useForm({ name: '', age: '' })
+
+function openEditChild(c) {
+  editingChild.value = c
+  childForm.name = c.name
+  childForm.age  = c.age
+}
+function saveChild() {
+  if (editingChild.value) {
+    childForm.put(route('saln.children.update', [props.saln.id, editingChild.value.id]), { onSuccess: closeChildModal })
+  } else {
+    childForm.post(route('saln.children.store', props.saln.id), { onSuccess: closeChildModal })
+  }
+}
+function closeChildModal() { showAddChild.value = false; editingChild.value = null; childForm.reset() }
+function deleteChild(id) {
+  if (confirm('Remove this child?'))
+    router.delete(route('saln.children.destroy', [props.saln.id, id]))
 }
 
 // ── Relatives ─────────────────────────────────────────────────────────────────
