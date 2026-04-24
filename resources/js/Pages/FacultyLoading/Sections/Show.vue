@@ -14,8 +14,6 @@
             <h1 class="text-xl font-semibold text-slate-800">{{ section.full_label }}</h1>
             <p class="text-sm text-slate-500 mt-0.5">
               {{ section.school_year?.name }}
-              <span v-if="section.strand" class="mx-1 text-slate-300">·</span>
-              <span v-if="section.strand">{{ section.strand }}</span>
               <span v-if="section.section_code" class="mx-1 text-slate-300">·</span>
               <span v-if="section.section_code" class="font-mono text-xs">{{ section.section_code }}</span>
             </p>
