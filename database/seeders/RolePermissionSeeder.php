@@ -184,8 +184,8 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // ── Faculty Loading ───────────────────────────────────────────────────
-        // CID/AUH: manage loads and schedules, manage catalog, setup
-        $assign('CID', [
+        // CID Chief: manage loads and schedules, manage catalog, setup
+        $assign('CID Chief', [
             'faculty_loading.view',
             'faculty_loading.manage',
             'faculty_loading.load_assignments',
