@@ -39,19 +39,19 @@ class SectionSeeder extends Seeder
         $syId = $schoolYear->id;
 
         $sectionsByGrade = [
-            7  => ['Newton',    'Curie',       'Einstein',  'Darwin',  'Mendel'],
-            8  => ['Archimedes','Bohr',         'Planck',    'Faraday', 'Lorentz'],
-            9  => ['Heisenberg','Schrodinger',  'Feynman',   'Dirac',   'Pauling'],
-            10 => ['Gauss',     'Euler',        'Riemann',   'Cauchy',  'Fourier'],
-            11 => ['Bernoulli', 'Lagrange',     'Laplace',   'Hamilton','Maxwell'],
-            12 => ['Turing',    'Babbage',      'Lovelace',  'Shannon', 'Knuth'],
+            7  => ['Aquamarine', 'Opal',     'Turquoise', 'Sapphire'],
+            8  => ['Anthurium',  'Carnation','Sunflower', 'Daffodil'],
+            9  => ['Calcium',    'Lithium',  'Sodium',    'Barium'],
+            10 => ['Electron',   'Graviton', 'Proton',    'Neutron'],
+            11 => ['Mars',       'Mercury',  'Venus',     'Del Mundo'],
+            12 => ['Orosa',      'Zara'],
         ];
 
         $inserted = 0;
 
         foreach ($sectionsByGrade as $grade => $names) {
             foreach ($names as $name) {
-                $code = 'G' . $grade . '-' . strtoupper($name);
+                $code = 'G' . $grade . '-' . strtoupper(str_replace(' ', '_', $name));
 
                 DB::table('sections')->updateOrInsert(
                     [
@@ -60,11 +60,11 @@ class SectionSeeder extends Seeder
                         'sectionname' => $name,
                     ],
                     [
-                        'section_code' => $code,
-                        'strand'       => null,
-                        'capacity'     => 45,
-                        'adviser'      => null,
-                        'is_active'    => true,
+                        'school_year_id' => $syId,
+                        'section_code'   => $code,
+                        'capacity'       => 30,
+                        'adviser'        => null,
+                        'is_active'      => true,
                     ]
                 );
                 $inserted++;

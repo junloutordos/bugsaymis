@@ -53,7 +53,6 @@
               <tr class="text-xs text-slate-400 uppercase tracking-wide">
                 <th class="px-4 py-2 text-left">Name</th>
                 <th class="px-4 py-2 text-left">Code</th>
-                <th class="px-4 py-2 text-left">Strand</th>
                 <th class="px-4 py-2 text-center">Capacity</th>
                 <th class="px-4 py-2 text-left">Home Room</th>
                 <th class="px-4 py-2 text-left">Adviser</th>
@@ -66,7 +65,6 @@
                 :class="{ 'opacity-50': !s.is_active }">
                 <td class="px-4 py-3 font-medium text-slate-800">{{ s.sectionname }}</td>
                 <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ s.section_code ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ s.strand ?? '—' }}</td>
                 <td class="px-4 py-3 text-center text-slate-600">{{ s.capacity ?? '—' }}</td>
                 <td class="px-4 py-3 text-slate-600 text-xs">
                   <span v-if="s.classroom" class="font-medium">{{ s.classroom.name }}</span>
@@ -123,12 +121,6 @@
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Section Code</label>
             <input v-model="form.section_code" type="text" placeholder="e.g. G7-A"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Strand (SHS)</label>
-            <input v-model="form.strand" type="text" placeholder="e.g. STEM"
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
           </div>
 
@@ -252,7 +244,6 @@ const form = useForm({
   sectionname: '',
   levelid: 7,
   section_code: '',
-  strand: 'STEM',
   capacity: 30,
   classroom_id: null,
   recess_start: '',
@@ -271,7 +262,6 @@ function openForm(s = null) {
       sectionname: s.sectionname,
       levelid: s.levelid,
       section_code: s.section_code ?? '',
-      strand: s.strand ?? '',
       capacity: s.capacity ?? null,
       classroom_id: s.classroom_id ?? null,
       recess_start: s.recess_start ?? '',
@@ -286,7 +276,6 @@ function openForm(s = null) {
     form.reset()
     form.id = null
     form.levelid = 7
-    form.strand = 'STEM'
     form.capacity = 30
     form.classroom_id = null
     form.recess_start = ''
