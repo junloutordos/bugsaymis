@@ -181,14 +181,19 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],
 
             // ── Faculty Loading ───────────────────────────────────────────────
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view',        'description' => 'View faculty loads and schedules'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view_own',    'description' => 'Faculty: view own load and schedule'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.manage',      'description' => 'CID/AUH: assign subjects, schedules, classrooms'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.approve',     'description' => 'Campus Director: approve overloads'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.reports',     'description' => 'View faculty load and schedule reports'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.subjects',    'description' => 'Manage subject catalog'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.classrooms',  'description' => 'Manage classroom catalog'],
-            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.school_year', 'description' => 'Manage school years and academic terms'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view',              'description' => 'View faculty loads and schedules'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.view_own',        'description' => 'Faculty: view own load and schedule'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.manage',          'description' => 'CID/AUH: assign subjects, schedules, classrooms'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.load_assignments','description' => 'Assign/revoke designation load assignments'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.approve',         'description' => 'Campus Director: approve overloads'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.reports',         'description' => 'View faculty load and schedule reports'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.subjects',        'description' => 'Manage subject catalog'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.classrooms',      'description' => 'Manage classroom catalog'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.school_year',     'description' => 'Manage school years and academic terms'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.setup',           'description' => 'Manage academic units and designation reference data'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.vacancies',       'description' => 'View and manage faculty vacancy slots'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.training',        'description' => 'Manage training and L&D records'],
+            ['module' => 'Faculty Loading', 'name' => 'faculty_loading.training.verify', 'description' => 'Verify or reject training records'],
 
         ];
 

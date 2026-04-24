@@ -7,7 +7,7 @@
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 class="text-xl font-semibold text-slate-800">Work Schedules</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Define schedule presets and assign them to employees.</p>
+          <p class="text-sm text-slate-500 mt-0.5">Review employee submissions and manage schedule presets.</p>
         </div>
         <button @click="openAddPreset"
           class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm">
@@ -21,6 +21,53 @@
       </div>
       <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm">
         {{ $page.props.flash.error }}
+      </div>
+
+      <!-- ── Pending Submissions ──────────────────────────────────────────── -->
+      <div class="bg-white rounded-xl border border-amber-200 shadow-sm">
+        <div class="px-5 py-4 border-b border-amber-100 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <ClockIcon class="h-4 w-4 text-amber-500" /> Pending Schedule Submissions
+          </h2>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+            :class="pendingSubmissions.length ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'">
+            {{ pendingSubmissions.length }} pending
+          </span>
+        </div>
+
+        <div v-if="!pendingSubmissions.length" class="px-5 py-10 text-center text-slate-400 text-sm">
+          No pending submissions. Employees can submit schedule requests from their My Work Schedule page.
+        </div>
+
+        <div v-else class="divide-y divide-slate-100">
+          <div v-for="sub in pendingSubmissions" :key="sub.id"
+            class="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <p class="font-medium text-slate-800 text-sm">{{ sub.user?.name ?? '—' }}</p>
+                <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{{ sub.user?.emp_category ?? '—' }}</span>
+              </div>
+              <p class="text-sm text-slate-700 mt-0.5">{{ sub.name }}</p>
+              <p class="text-xs text-slate-500 mt-0.5">
+                {{ formatDaysWithTimes(sub.daily_schedules) }}
+              </p>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Effective: <span class="font-medium text-slate-600">{{ sub.effective_date }}</span>
+                <template v-if="sub.remarks"> · {{ sub.remarks }}</template>
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button @click="approveSubmission(sub)"
+                class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                <CheckCircleIcon class="h-3.5 w-3.5" /> Approve
+              </button>
+              <button @click="openReject(sub)"
+                class="inline-flex items-center gap-1.5 border border-red-200 hover:bg-red-50 text-red-600 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                <XCircleIcon class="h-3.5 w-3.5" /> Reject
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -66,6 +113,7 @@
             <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
               <UserGroupIcon class="h-4 w-4 text-indigo-500" /> Assign Schedule to Employees
             </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Force-assign a schedule to employees directly, bypassing the submission flow.</p>
           </div>
 
           <div class="px-5 py-4 space-y-4">
@@ -75,7 +123,7 @@
               <select v-model="assignForm.preset_id"
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value="">— Choose a preset —</option>
-                <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }} ({{ p.time_in }} – {{ p.time_out }})</option>
+                <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.name }}</option>
               </select>
             </div>
 
@@ -167,21 +215,19 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Schedule</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Time</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Work Days</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Work Days / Times</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Effective</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr v-if="!assignments.length">
-                <td colspan="6" class="px-4 py-10 text-center text-slate-400 text-sm">No schedules assigned yet.</td>
+                <td colspan="5" class="px-4 py-10 text-center text-slate-400 text-sm">No schedules assigned yet.</td>
               </tr>
               <tr v-for="a in assignments" :key="a.id" class="hover:bg-slate-50/60">
                 <td class="px-4 py-3 font-medium text-slate-800">{{ a.user?.name ?? '—' }}</td>
                 <td class="px-4 py-3 text-slate-500 text-xs">{{ a.user?.emp_category ?? '—' }}</td>
                 <td class="px-4 py-3 text-slate-700">{{ a.name }}</td>
-                <td class="px-4 py-3 font-mono text-slate-600 text-xs">{{ a.time_in }} – {{ a.time_out }}</td>
-                <td class="px-4 py-3 text-slate-600 text-xs">{{ formatDays(a.work_days) }}</td>
+                <td class="px-4 py-3 text-slate-600 text-xs">{{ formatDaysWithTimes(a.daily_schedules) }}</td>
                 <td class="px-4 py-3 text-slate-500 text-xs">{{ a.effective_date }}</td>
               </tr>
             </tbody>
@@ -283,6 +329,30 @@
       </div>
     </Teleport>
 
+    <!-- Reject Modal -->
+    <Teleport to="body">
+      <div v-if="rejectModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+          <div class="px-6 py-4 border-b border-slate-100">
+            <h3 class="text-base font-semibold text-slate-800">Reject Schedule Submission</h3>
+            <p class="text-sm text-slate-500 mt-0.5">{{ rejectModal.submission?.user?.name }}</p>
+          </div>
+          <div class="px-6 py-4">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Reason (optional)</label>
+            <textarea v-model="rejectForm.reason" rows="3" placeholder="e.g. Schedule conflicts with department requirements…"
+              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+            <button @click="rejectModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button @click="submitReject" :disabled="rejectForm.processing"
+              class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-colors">
+              {{ rejectForm.processing ? 'Rejecting…' : 'Reject' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </AdminLayout>
 </template>
 
@@ -292,17 +362,40 @@ import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   PlusIcon, ClockIcon, PencilSquareIcon, TrashIcon,
-  UserGroupIcon, TableCellsIcon, CheckCircleIcon,
+  UserGroupIcon, TableCellsIcon, CheckCircleIcon, XCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  presets:     Array,
-  employees:   Object,   // keyed by emp_category
-  categories:  Array,
-  assignments: Array,
+  presets:             Array,
+  employees:           Object,   // keyed by emp_category
+  categories:          Array,
+  assignments:         Array,
+  pendingSubmissions:  Array,
 })
 
 const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+// ── Pending Submissions ───────────────────────────────────────────────────────
+
+function approveSubmission(sub) {
+  if (!confirm(`Approve the schedule submission for ${sub.user?.name}?`)) return
+  useForm({}).post(route('hr.schedules.approve', sub.id))
+}
+
+const rejectModal = reactive({ open: false, submission: null })
+const rejectForm  = useForm({ reason: '' })
+
+function openReject(sub) {
+  rejectModal.submission = sub
+  rejectForm.reason      = ''
+  rejectModal.open       = true
+}
+
+function submitReject() {
+  rejectForm.post(route('hr.schedules.reject', rejectModal.submission.id), {
+    onSuccess: () => { rejectModal.open = false },
+  })
+}
 
 // ── Preset Modal ──────────────────────────────────────────────────────────────
 
@@ -332,7 +425,6 @@ function toggleDay(day) {
     delete updated[day]
     presetForm.daily_schedules = updated
   } else {
-    // Copy times from the first active day as default
     const firstActive = Object.values(presetForm.daily_schedules)[0]
     presetForm.daily_schedules = {
       ...presetForm.daily_schedules,
@@ -400,7 +492,6 @@ function deletePreset(preset) {
 
 const selectedCategory = ref('')
 
-// Flatten employees object into array for display
 const allEmployees = computed(() => Object.values(props.employees).flat())
 
 const filteredEmployees = computed(() =>
@@ -440,7 +531,6 @@ function formatDays(days) {
 
 function formatDaysWithTimes(dailySchedules) {
   if (!dailySchedules || !Object.keys(dailySchedules).length) return '—'
-  // Group days by identical time_in/time_out
   const groups = {}
   for (const [day, t] of Object.entries(dailySchedules)) {
     const key = `${t.time_in}–${t.time_out}`
@@ -452,7 +542,6 @@ function formatDaysWithTimes(dailySchedules) {
     .join(' | ')
 }
 
-// Map employee id → current schedule name
 const assignmentMap = computed(() => {
   const m = {}
   for (const a of props.assignments) {

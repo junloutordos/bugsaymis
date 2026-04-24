@@ -3,9 +3,11 @@
 namespace App\Models\FacultyLoading;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\FacultyLoading\Classroom;
 
 /**
  * Represents a student section/class at PSHS.
@@ -23,6 +25,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Section extends Model
 {
+    use HasFactory;
+
     protected $table    = 'sections';
     protected $keyType  = 'int';       // INT primary key (not BigInt)
     public    $timestamps = false;     // legacy table has no timestamps
@@ -33,18 +37,26 @@ class Section extends Model
         'section_code',
         'strand',
         'capacity',
+        'classroom_id',
+        'recess_start',
+        'recess_end',
+        'lunch_start',
+        'lunch_end',
         'adviser',
         'syid',
         'is_active',
         'permission',
         'asstadviser',
+        'school_year_id',
     ];
 
     protected $casts = [
-        'levelid'   => 'integer',
-        'syid'      => 'integer',
-        'capacity'  => 'integer',
-        'is_active' => 'boolean',
+        'levelid'        => 'integer',
+        'syid'           => 'integer',
+        'school_year_id' => 'integer',
+        'capacity'       => 'integer',
+        'classroom_id'   => 'integer',
+        'is_active'      => 'boolean',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────────
@@ -55,10 +67,22 @@ class Section extends Model
         return $this->belongsTo(SchoolYear::class, 'syid');
     }
 
+    /** School year (via new FL FK column). */
+    public function flSchoolYear(): BelongsTo
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
+    }
+
     /** Section adviser (via legacy adviser column). */
     public function adviserUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'adviser');
+    }
+
+    /** Home classroom for this section (used by the schedule generator). */
+    public function classroom(): BelongsTo
+    {
+        return $this->belongsTo(Classroom::class);
     }
 
     public function classSchedules(): HasMany

@@ -298,8 +298,10 @@ class DTRService
         $pmInCutoffMin = $breakMinutes + 90; // latest a post-lunch return can occur (e.g. 14:00)
 
         // ── Single punch ──────────────────────────────────────────────────────
+        // Noon (12:00 = 720 min) is the hard cutoff for AM_IN:
+        // a single punch at or after noon is a PM arrival, never a morning arrival.
         if ($count === 1) {
-            if ($mins[0] < $breakMinutes) {
+            if ($mins[0] < 720) {
                 return [$times[0], null, null, null]; // morning arrival only
             }
             if ($mins[0] <= $pmInCutoffMin) {
@@ -308,14 +310,22 @@ class DTRService
             return [null, null, null, $times[0]];     // end-of-day departure only
         }
 
-        // ── PM-only session: every punch is at or after the break midpoint ────
-        // Handles employees who have no morning biometric activity (e.g. approved
-        // AM leave, late arrival recorded only for the PM session).
-        if ($mins[0] >= $breakMinutes) {
+        // ── No morning session: first punch is at noon or later ───────────────
+        // The employee has no morning biometric activity (e.g. approved AM leave,
+        // late/afternoon-only arrival).  A first punch at or after noon is NEVER
+        // placed in AM_IN regardless of the schedule's break midpoint.
+        if ($mins[0] >= 720) {
             if ($mins[0] <= $pmInCutoffMin) {
+                // With 3+ punches: the noon-ish punch may be a lunch departure
+                // (AM_OUT) and the immediately following punch the afternoon return
+                // (PM_IN).  Detect this pattern only when a distinct PM_OUT exists.
+                if ($count >= 3 && $mins[1] <= $pmInCutoffMin && $mins[1] > $mins[0]) {
+                    return [null, $times[0], $times[1], $times[$count - 1]]; // AM_OUT + PM_IN + PM_OUT
+                }
                 return [null, null, $times[0], $times[$count - 1]]; // PM arrival + end-of-day
             }
-            return [null, null, null, $times[$count - 1]]; // late-afternoon departure only
+            // First punch is after the PM-in window — treat last punch as PM_OUT.
+            return [null, null, null, $times[$count - 1]];
         }
 
         // ── 2+ punches with an AM arrival ─────────────────────────────────────

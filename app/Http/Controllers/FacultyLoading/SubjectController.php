@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
+use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\Subject;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +37,35 @@ class SubjectController extends Controller
             $query->where('is_active', $request->boolean('active'));
         }
 
-        $subjects = $query->orderBy('grade_level')->orderBy('code')->get()->map(fn ($s) => [
+        $subjectList = $query->orderBy('grade_level')->orderBy('code')->get();
+
+        // Terms for the filter dropdown
+        $terms = AcademicTerm::orderByDesc('start_date')
+            ->get()
+            ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
+
+        $currentTermId = AcademicTerm::where('is_current', true)->value('id');
+        $termId        = (int) $request->input('term_id', $currentTermId);
+
+        // For the selected term, get all teaching assignments grouped by subject_id
+        // Collect distinct faculty per subject (a subject can be taught by the same faculty
+        // across multiple sections, so we deduplicate by user_id).
+        $assignmentsBySubject = collect();
+        if ($termId) {
+            $assignmentsBySubject = LoadAssignment::with('faculty:id,name')
+                ->where('assignment_type', 'teaching')
+                ->where('academic_term_id', $termId)
+                ->whereIn('subject_id', $subjectList->pluck('id'))
+                ->get()
+                ->groupBy('subject_id')
+                ->map(fn ($rows) => $rows
+                    ->unique('user_id')
+                    ->map(fn ($a) => ['id' => $a->user_id, 'name' => $a->faculty?->name ?? '—'])
+                    ->values()
+                );
+        }
+
+        $subjects = $subjectList->map(fn ($s) => [
             'id'                  => $s->id,
             'code'                => $s->code,
             'name'                => $s->name,
@@ -51,11 +81,14 @@ class SubjectController extends Controller
             'sessions_per_week'   => $s->sessions_per_week,
             'minutes_per_session' => $s->minutes_per_session,
             'is_active'           => $s->is_active,
+            'faculty'             => $assignmentsBySubject->get($s->id, collect())->all(),
         ]);
 
         return Inertia::render('FacultyLoading/Subjects/Index', [
-            'subjects' => $subjects,
-            'filters'  => $request->only(['search', 'grade_level', 'subject_type', 'active']),
+            'subjects'      => $subjects,
+            'terms'         => $terms,
+            'currentTermId' => $termId,
+            'filters'       => $request->only(['search', 'grade_level', 'subject_type', 'active', 'term_id']),
         ]);
     }
 

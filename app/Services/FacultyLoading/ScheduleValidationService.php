@@ -4,6 +4,7 @@ namespace App\Services\FacultyLoading;
 
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\FacultyLoad;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 
 /**
@@ -92,13 +93,22 @@ class ScheduleValidationService
         $errors    = array_merge($errors,   $loadCheck['errors']);
         $warnings  = array_merge($warnings, $loadCheck['warnings']);
 
-        // ── 5. Classroom availability ────────────────────────────────────────
+        // ── 5. Section break-time check ──────────────────────────────────────
+        $section = Section::find($data['section_id']);
+        if ($section) {
+            $breakError = $this->checkBreakTimeConflict($section, $data['start_time'], $data['end_time']);
+            if ($breakError) {
+                $errors[] = $breakError;
+            }
+        }
+
+        // ── 6. Classroom availability ────────────────────────────────────────
         $classroom = Classroom::find($data['classroom_id']);
         if ($classroom && ! $classroom->is_available) {
             $errors[] = "Classroom '{$classroom->name}' is currently marked as unavailable.";
         }
 
-        // ── 6. Subject–room type compatibility ──────────────────────────────
+        // ── 7. Subject–room type compatibility ──────────────────────────────
         if ($classroom) {
             $subject = Subject::find($data['subject_id']);
             if ($subject) {
@@ -183,6 +193,26 @@ class ScheduleValidationService
         }
 
         return ['errors' => $errors, 'warnings' => $warnings];
+    }
+
+    /**
+     * Block if the proposed time overlaps with the section's recess or lunch break.
+     */
+    private function checkBreakTimeConflict(Section $section, string $start, string $end): ?string
+    {
+        if ($section->recess_start && $section->recess_end) {
+            if ($this->conflicts->timesOverlap($start, $end, $section->recess_start, $section->recess_end)) {
+                return "Schedule ({$start}–{$end}) overlaps with the section's recess break ({$section->recess_start}–{$section->recess_end}).";
+            }
+        }
+
+        if ($section->lunch_start && $section->lunch_end) {
+            if ($this->conflicts->timesOverlap($start, $end, $section->lunch_start, $section->lunch_end)) {
+                return "Schedule ({$start}–{$end}) overlaps with the section's lunch break ({$section->lunch_start}–{$section->lunch_end}).";
+            }
+        }
+
+        return null;
     }
 
     /**
