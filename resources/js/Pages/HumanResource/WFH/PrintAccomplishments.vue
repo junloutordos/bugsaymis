@@ -120,8 +120,8 @@
           <div class="wfh-sig-section">
             <p class="wfh-sig-top">Approved by:</p>
             <div class="wfh-sig-single">
-              <div class="wfh-sig-name">MICHELLE B. FERNANDO, PhD</div>
-              <div class="wfh-sig-sub">Officer-In-Charge, Campus Director</div>
+              <div class="wfh-sig-name">{{ approvedBy?.name?.toUpperCase() ?? '—' }}</div>
+              <div class="wfh-sig-sub">{{ approvedBy?.position ?? 'Campus Director' }}</div>
             </div>
           </div>
 
@@ -136,12 +136,13 @@ import { onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee:  Object,
-  division:  { type: Object, default: null },
-  office:    { type: Object, default: null },
-  records:   Array,
-  mode:      { type: String, default: 'monthly' },
-  dateLabel: { type: String, default: '' },
+  employee:   Object,
+  division:   { type: Object, default: null },
+  office:     { type: Object, default: null },
+  approvedBy: { type: Object, default: null },
+  records:    Array,
+  mode:       { type: String, default: 'monthly' },
+  dateLabel:  { type: String, default: '' },
 })
 
 function fmtDate(d) {
