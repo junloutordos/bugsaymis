@@ -47,6 +47,7 @@ import {
   BuildingLibraryIcon,
   IdentificationIcon,
   UserPlusIcon,
+  UserCircleIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -1212,6 +1213,28 @@ const menuItems = [
     ],
   },
   {
+    label: "Activity Management",
+    icon: CalendarDaysIcon,
+    roles: ["Administrator", "Faculty", "Staff", "Student", "HR", "DivisionChief", "OCD"],
+    children: [
+      {
+        label: "Activities",
+        routeName: "ams.activities.index",
+        href: route("ams.activities.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: [],
+        permissions: ["activities.manage"],
+      },
+      {
+        label: "My Activities",
+        routeName: "ams.my-activities.index",
+        href: route("ams.my-activities.index"),
+        icon: UserCircleIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+      },
+    ],
+  },
+  {
     label: "Supply & Property",
     icon: ShoppingCartIcon,
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
@@ -1471,6 +1494,8 @@ const menuItems = [
       },
     ],
   },
+
+  
 
   {
     type: "section",
