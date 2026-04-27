@@ -156,6 +156,15 @@ class MessengerialController extends Controller
             }
         }
 
+        // Override: if requestor is from OCD division, route to OCD user instead of division chief
+        if ($user && $this->isOcdDivision($user)) {
+            $ocdUser = User::havingRole('OCD')->first();
+            if ($ocdUser && $ocdUser->email) {
+                $chiefEmail = $ocdUser->email;
+                $chiefUser  = $ocdUser;
+            }
+        }
+
         if ($chiefEmail) {
             if ($chiefUser) {
                 $mr->division_chief_id = $chiefUser->id;
@@ -307,7 +316,7 @@ class MessengerialController extends Controller
     public function forApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasRole('DivisionChief') && ! $user->hasRole('Administrator')) {
+        if (! $user->hasAnyRole(['DivisionChief', 'OCD', 'Administrator'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -315,7 +324,9 @@ class MessengerialController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 50);
 
         $query = MessengerialRequest::where('status', 'Pending Division Chief Approval');
-        if ($user->hasRole('DivisionChief')) {
+        if ($user->hasRole('DivisionChief') || $user->hasRole('OCD')) {
+            // Division Chief sees their own assigned requests;
+            // OCD sees requests assigned to them (from OCD division requestors)
             $query->where('division_chief_id', $user->id);
         }
 
@@ -342,8 +353,15 @@ class MessengerialController extends Controller
     public function divisionChiefAction(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        if (! $user->hasRole('DivisionChief') && ! $user->hasRole('Administrator')) {
+        if (! $user->hasAnyRole(['DivisionChief', 'OCD', 'Administrator'])) {
             abort(403);
+        }
+
+        // OCD and DivisionChief can only act on requests assigned to them
+        if ($user->hasAnyRole(['DivisionChief', 'OCD']) && ! $user->hasRole('Administrator')) {
+            if ((int) $messengerialRequest->division_chief_id !== $user->id) {
+                abort(403);
+            }
         }
 
         $request->validate(['action' => 'required|in:approve,reject']);
@@ -471,6 +489,28 @@ class MessengerialController extends Controller
             'divisionChiefName' => $divisionChiefName,
             'requestorSignature' => $requestorSignature,
         ]);
+    }
+
+    /**
+     * Returns true if the given user belongs to the Office of the Campus Director.
+     * Matches by OCD role, division acronym, or division name.
+     */
+    private function isOcdDivision(User $user): bool
+    {
+        if ($user->hasRole('OCD')) {
+            return true;
+        }
+
+        $division = $user->division;
+        if (! $division) {
+            return false;
+        }
+
+        if (strtolower(trim($division->acronym ?? '')) === 'ocd') {
+            return true;
+        }
+
+        return str_contains(strtolower($division->division_name ?? ''), 'campus director');
     }
 
     /**
