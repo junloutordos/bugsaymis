@@ -5,6 +5,7 @@ namespace App\Http\Controllers\HumanResource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WFH\TimeInRequest;
 use App\Http\Requests\WFH\TimeOutRequest;
+use App\Models\User;
 use App\Models\WFHAttendance;
 use App\Services\GoogleDriveService;
 use App\Services\WFHService;
@@ -321,6 +322,8 @@ class WFHAttendanceController extends Controller
             ? \App\Models\Division::with('divisionchief')->find($user->division_id)
             : null;
 
+        $ocdUser = User::havingRole('OCD')->first();
+
         return Inertia::render('HumanResource/WFH/PrintAccomplishments', [
             'employee'      => $user->only('id', 'name', 'position', 'badge_id'),
             'division'      => $division ? [
@@ -330,6 +333,10 @@ class WFHAttendanceController extends Controller
             'office'        => $office ? [
                 'name'           => $office->name,
                 'unit_head_name' => $office->unitHeadUser?->name,
+            ] : null,
+            'approvedBy'    => $ocdUser ? [
+                'name'     => $ocdUser->name,
+                'position' => $ocdUser->position ?? 'Campus Director',
             ] : null,
             'records'    => $records->map(fn ($r) => array_merge($r->toArray(), [
                 'date' => $r->getRawOriginal('date'),
