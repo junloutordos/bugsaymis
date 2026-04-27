@@ -177,6 +177,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Student Attendance', 'name' => 'students.attendance.scan',   'description' => 'Operate the gate kiosk scanner'],
             ['module' => 'Student Attendance', 'name' => 'students.attendance.manage', 'description' => 'Full gate attendance management'],
 
+            // ── Activity Management System (AMS) ─────────────────────────────
+            ['module' => 'AMS', 'name' => 'activities.manage',  'description' => 'Create and manage own activities, participants, and certificates'],
+            ['module' => 'AMS', 'name' => 'activities.view_all','description' => 'View all activities read-only (HR Office)'],
+
             // ── Chat ──────────────────────────────────────────────────────────
             ['module' => 'Chat',   'name' => 'chat.access',            'description' => 'Access the real-time messaging module'],
 
