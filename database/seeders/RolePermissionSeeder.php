@@ -340,6 +340,20 @@ class RolePermissionSeeder extends Seeder
             'chat.access',
         ]);
 
+        // ── Activity Management System ─────────────────────────────────────────
+        // All staff can create and manage their own activities
+        $amsStaffRoles = [
+            'MIS', 'Payroll Officer', 'HRMPSB', 'Recruitment Officer',
+            'DivisionChief', 'OCD', 'PMT', 'CID Chief', 'Faculty', 'Staff', 'Registrar',
+            'Records', 'Librarian', 'Nurse', 'Guidance', 'GSU Head', 'FAD Chief',
+            'InformationOfficer', 'Dorm Manager',
+        ];
+        foreach ($amsStaffRoles as $roleName) {
+            $assign($roleName, ['activities.manage']);
+        }
+        // HR sees all activities (read-only) and can also create their own
+        $assign('HR', ['activities.manage', 'activities.view_all']);
+
         // ── Student / Parent — very limited read-only ─────────────────────────
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
         $assign('Parent',  ['library.view', 'messengerial.view', 'messengerial.create']);
