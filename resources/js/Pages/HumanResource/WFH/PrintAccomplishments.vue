@@ -97,7 +97,7 @@
             </div>
           </div>
 
-          <div class="wfh-sig-section">
+          <div v-if="!isOcdDivision" class="wfh-sig-section">
             <p class="wfh-sig-top">Monitored &amp; Reviewed by:</p>
             <div class="wfh-sig-row">
               <div class="wfh-sig-box">
@@ -136,13 +136,14 @@ import { onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee:   Object,
-  division:   { type: Object, default: null },
-  office:     { type: Object, default: null },
-  approvedBy: { type: Object, default: null },
-  records:    Array,
-  mode:       { type: String, default: 'monthly' },
-  dateLabel:  { type: String, default: '' },
+  employee:      Object,
+  division:      { type: Object, default: null },
+  office:        { type: Object, default: null },
+  approvedBy:    { type: Object, default: null },
+  isOcdDivision: { type: Boolean, default: false },
+  records:       Array,
+  mode:          { type: String, default: 'monthly' },
+  dateLabel:     { type: String, default: '' },
 })
 
 function fmtDate(d) {
