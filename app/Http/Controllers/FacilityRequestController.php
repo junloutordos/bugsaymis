@@ -921,4 +921,44 @@ class FacilityRequestController extends Controller
 
         return back()->with('success', 'FAD action recorded.');
     }
+
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = FacilityRequest::with('requester:id,name')
+            ->where('status', 'Approved')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('activity', 'like', "%{$search}%")
+                      ->orWhere('purpose',  'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('FacilityRequests/OCDApproval', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function ocdAction(Request $request, FacilityRequest $facilityRequest)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $facilityRequest->update(['status' => 'OCD Approved']);
+        } else {
+            $request->validate(['reason' => 'nullable|string|max:1000']);
+            $facilityRequest->update([
+                'status'         => 'Declined',
+                'decline_reason' => $request->input('reason') ?? 'Declined by OCD.',
+                'declined_at'    => now(),
+            ]);
+        }
+
+        return back()->with('success', 'OCD action recorded.');
+    }
 }

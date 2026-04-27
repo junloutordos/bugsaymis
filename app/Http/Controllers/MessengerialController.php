@@ -582,4 +582,44 @@ class MessengerialController extends Controller
 
         return redirect()->route('messengerial.index')->with('success', 'Proof uploaded and request marked completed.');
     }
+
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = MessengerialRequest::where('status', 'Approved')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',      'like', "%{$search}%")
+                      ->orWhere('requestor',   'like', "%{$search}%")
+                      ->orWhere('reference_no','like', "%{$search}%")
+                      ->orWhere('destination', 'like', "%{$search}%");
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('Messengerial/OCDApprovalMessengerial', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function ocdAction(Request $request, MessengerialRequest $messengerialRequest)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $messengerialRequest->update(['status' => 'OCD Approved']);
+        } else {
+            $request->validate(['reason' => 'nullable|string|max:1000']);
+            $messengerialRequest->update([
+                'status'         => 'Declined',
+                'decline_reason' => $request->input('reason') ?? 'Declined by OCD.',
+                'declined_at'    => now(),
+            ]);
+        }
+
+        return back()->with('success', 'OCD action recorded.');
+    }
 }

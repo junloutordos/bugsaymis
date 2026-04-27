@@ -349,6 +349,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // OCD Approval Dashboards
     Route::get('/vehicle-requests/ocd-approval', [VehicleRequestController::class, 'ocdApproval'])->name('vehicle-requests.ocd-approval');
     Route::post('/vehicle-requests/{vehicleRequest}/ocd-action', [VehicleRequestController::class, 'approveByOCDInApp'])->name('vehicle-requests.ocd-action');
+    Route::get('/facility-requests/ocd-approval', [\App\Http\Controllers\FacilityRequestController::class, 'ocdApproval'])->name('facility-requests.ocd-approval');
+    Route::post('/facility-requests/{facilityRequest}/ocd-action', [\App\Http\Controllers\FacilityRequestController::class, 'ocdAction'])->name('facility-requests.ocd-action');
+    Route::get('/messengerial/ocd-approval', [\App\Http\Controllers\MessengerialController::class, 'ocdApproval'])->name('messengerial.ocd-approval');
+    Route::post('/messengerial/{messengerialRequest}/ocd-action', [\App\Http\Controllers\MessengerialController::class, 'ocdAction'])->name('messengerial.ocd-action');
     Route::get('/hr/gatepass/ocd-approval', [\App\Http\Controllers\HumanResource\GatePassController::class, 'ocdApproval'])->name('gatepass.ocd-approval');
     Route::post('/hr/gatepass/{id}/ocd-action', [\App\Http\Controllers\HumanResource\GatePassController::class, 'approveByOCDInApp'])->name('gatepass.ocd-action');
 
