@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { CheckCircleIcon, XCircleIcon, EyeIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
@@ -10,16 +10,18 @@ const props = defineProps({
   filters: Object,
 })
 
-const search      = ref(props.filters?.search ?? '')
-const status      = ref(props.filters?.status ?? 'pending')
-const isLoading   = ref(false)
+const search       = ref(props.filters?.search ?? '')
+const status       = ref(props.filters?.status ?? 'pending')
+const isLoading    = ref(false)
 const isSubmitting = ref(false)
-let debounce      = null
+let debounce       = null
 
-const showModal     = ref(false)
-const selectedRecord = ref(null)
-const rejectRemarks = ref('')
+// ── Reject modal ──────────────────────────────────────────────────────────────
+const showRejectModal = ref(false)
+const selectedRecord  = ref(null)
+const rejectRemarks   = ref('')
 
+// ── Status filter / search ────────────────────────────────────────────────────
 const statusOptions = [
   { label: 'Pending',  value: 'pending'  },
   { label: 'Approved', value: 'approved' },
@@ -45,10 +47,11 @@ const applyFilters = (immediate = false) => {
 
 const setStatus = (s) => { status.value = s; applyFilters(true) }
 
+// ── Approve ───────────────────────────────────────────────────────────────────
 const approve = async (record) => {
   const res = await Swal.fire({
     title: 'Approve this service credit?',
-    html: `<b>${record.user?.name}</b> — ${record.days_equivalent} day(s) on ${record.service_date}`,
+    html: `<b>${record.user?.name}</b> — ${Number(record.days_equivalent).toFixed(2)} day(s) on ${fmtDate(record.service_date)}`,
     icon: 'question', showCancelButton: true,
     confirmButtonText: 'Yes, approve', reverseButtons: true,
   })
@@ -58,24 +61,26 @@ const approve = async (record) => {
   Swal.fire({ title: 'Approving…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
   router.post(route('hr.leave-credits.service-credits.approve', record.id), {}, {
     onSuccess: () => Swal.fire('Approved!', 'Service credit approved.', 'success'),
-    onError: (e)  => Swal.fire('Error', Object.values(e)[0], 'error'),
-    onFinish: ()  => { isSubmitting.value = false },
+    onError:   (e) => Swal.fire('Error', Object.values(e)[0], 'error'),
+    onFinish:  ()  => { isSubmitting.value = false },
   })
 }
 
-const openReject = (record) => { selectedRecord.value = record; rejectRemarks.value = ''; showModal.value = true }
-const closeModal = () => { showModal.value = false; selectedRecord.value = null }
+// ── Reject ────────────────────────────────────────────────────────────────────
+const openReject  = (record) => { selectedRecord.value = record; rejectRemarks.value = ''; showRejectModal.value = true }
+const closeReject = () => { showRejectModal.value = false; selectedRecord.value = null }
 
 const submitReject = () => {
   if (!rejectRemarks.value.trim()) return Swal.fire('Remarks Required', 'Enter a reason for rejection.', 'warning')
   isSubmitting.value = true
   router.post(route('hr.leave-credits.service-credits.reject', selectedRecord.value.id), { remarks: rejectRemarks.value }, {
-    onSuccess: () => { Swal.fire('Rejected', 'Service credit rejected.', 'info'); closeModal() },
-    onError: (e)  => Swal.fire('Error', Object.values(e)[0], 'error'),
-    onFinish: ()  => { isSubmitting.value = false },
+    onSuccess: () => { Swal.fire('Rejected', 'Service credit rejected.', 'info'); closeReject() },
+    onError:   (e) => Swal.fire('Error', Object.values(e)[0], 'error'),
+    onFinish:  ()  => { isSubmitting.value = false },
   })
 }
 
+// ── Pagination ────────────────────────────────────────────────────────────────
 const pageData   = computed(() => props.records?.data ?? [])
 const totalPages = computed(() => props.records?.last_page ?? 1)
 const curPage    = computed(() => props.records?.current_page ?? 1)
@@ -91,6 +96,7 @@ const goToPage = (p) => {
   })
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const serviceTypeLabel = (t) => ({
   extra_teaching_load: 'Extra Teaching Load',
   committee_work:      'Committee Work',
@@ -106,16 +112,25 @@ const statusClass = (s) => ({
   consumed: 'bg-blue-100 text-blue-700',
   expired:  'bg-slate-100 text-slate-500',
 })[s] ?? 'bg-slate-100 text-slate-600'
+
+const fmtDate = (d) => {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+}
 </script>
 
 <template>
-  <Head title="Service Credit Approval" />
-  <AdminLayout title="Service Credit Approval">
+  <Head title="Service Credit Records" />
+  <AdminLayout title="Service Credit Records">
     <div class="space-y-5">
 
       <div>
-        <h1 class="text-xl font-semibold text-slate-800">Service Credit Approval</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Review and approve service credit earning records submitted by Teaching personnel.</p>
+        <h1 class="text-xl font-semibold text-slate-800">Service Credit Records</h1>
+        <p class="text-sm text-slate-500 mt-0.5">
+          Review and approve service credit earning records submitted by Teaching personnel.
+          To initialize existing records, use
+          <a :href="route('hr.leave-credits.initialize')" class="text-indigo-600 underline hover:text-indigo-800">Initialize Leave Credits</a>.
+        </p>
       </div>
 
       <!-- Flash -->
@@ -162,13 +177,13 @@ const statusClass = (s) => ({
             <tbody class="divide-y divide-slate-100">
               <tr v-for="rec in pageData" :key="rec.id" class="hover:bg-slate-50/60">
                 <td class="px-4 py-3 font-medium text-slate-800">{{ rec.user?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ rec.service_date }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ fmtDate(rec.service_date) }}</td>
                 <td class="px-4 py-3 text-slate-600">{{ serviceTypeLabel(rec.service_type) }}</td>
                 <td class="px-4 py-3 text-right text-slate-600">{{ rec.hours_rendered }}h</td>
-                <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ rec.days_equivalent }}</td>
-                <td class="px-4 py-3 text-slate-500 text-xs">{{ rec.expires_at ?? '—' }}</td>
+                <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ Number(rec.days_equivalent).toFixed(2) }}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs">{{ rec.expires_at ? fmtDate(rec.expires_at) : '—' }}</td>
                 <td class="px-4 py-3">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-medium', statusClass(rec.status)]">
+                  <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize', statusClass(rec.status)]">
                     {{ rec.status }}
                   </span>
                 </td>
@@ -203,19 +218,19 @@ const statusClass = (s) => ({
       </div>
     </div>
 
-    <!-- Reject modal -->
-    <div v-if="showModal && selectedRecord" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+    <!-- ── Reject modal ─────────────────────────────────────────────────────── -->
+    <div v-if="showRejectModal && selectedRecord" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">Reject Service Credit</h2>
-          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
+          <button @click="closeReject" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
         <div class="px-6 py-5 space-y-3 text-sm text-slate-700">
           <p><span class="font-medium">Employee:</span> {{ selectedRecord.user?.name }}</p>
-          <p><span class="font-medium">Service date:</span> {{ selectedRecord.service_date }} — {{ serviceTypeLabel(selectedRecord.service_type) }}</p>
-          <p><span class="font-medium">Days:</span> {{ selectedRecord.days_equivalent }}</p>
+          <p><span class="font-medium">Service date:</span> {{ fmtDate(selectedRecord.service_date) }} — {{ serviceTypeLabel(selectedRecord.service_type) }}</p>
+          <p><span class="font-medium">Days:</span> {{ Number(selectedRecord.days_equivalent).toFixed(2) }}</p>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Reason for rejection <span class="text-red-500">*</span></label>
             <textarea v-model="rejectRemarks" rows="3" maxlength="500"
@@ -224,7 +239,7 @@ const statusClass = (s) => ({
           </div>
         </div>
         <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="closeModal" class="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium">Cancel</button>
+          <button @click="closeReject" class="px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium">Cancel</button>
           <button @click="submitReject" :disabled="isSubmitting"
                   class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50">
             {{ isSubmitting ? 'Rejecting…' : 'Reject' }}
@@ -232,5 +247,6 @@ const statusClass = (s) => ({
         </div>
       </div>
     </div>
+
   </AdminLayout>
 </template>
