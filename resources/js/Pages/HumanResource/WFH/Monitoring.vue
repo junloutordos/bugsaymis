@@ -250,7 +250,6 @@ const expanded    = ref(null)
 const filterMonth = ref(currentMonth())
 const searchQuery = ref('')
 const meta        = ref({ current_page: 1, last_page: 1 })
-let   currentPage = 1
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 const summary = computed(() => ({
@@ -259,29 +258,22 @@ const summary = computed(() => ({
   incomplete: rows.value.filter(r => !r.time_out).length,
 }))
 
-// ── Filtered rows (client-side name search) ───────────────────────────────────
-const filteredRows = computed(() => {
-  if (!searchQuery.value.trim()) return rows.value
-  const q = searchQuery.value.toLowerCase()
-  return rows.value.filter(r => r.user?.name?.toLowerCase().includes(q))
-})
-
-// Override rows in template with filtered (re-bind template rows → filteredRows)
-// Note: the table iterates `rows` but we reassign via computed; simpler to use filteredRows directly.
+// Rows is already the server-filtered result; template iterates it directly.
+const filteredRows = computed(() => rows.value)
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load(page = 1) {
   loading.value = true
   try {
-    const { data } = await axios.get('/hr/wfh/monitor', {
+    const { data } = await axios.get('/hr/wfh/monitor/data', {
       params: {
-        month: filterMonth.value || undefined,
+        month:  filterMonth.value || undefined,
+        search: searchQuery.value.trim() || undefined,
         page,
       },
     })
     rows.value     = data.data ?? []
     meta.value     = { current_page: data.current_page, last_page: data.last_page }
-    currentPage    = data.current_page
     expanded.value = null
   } catch (err) {
     if (err.response?.status === 403) {
