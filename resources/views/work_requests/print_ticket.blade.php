@@ -50,6 +50,10 @@
         <div style="margin-top:8px">Signature Over Printed Name</div>
       </div>
       <div class="col">
+        <div><strong>Date of Request</strong></div>
+        <div class="box">{{ $workRequest->created_at ? $workRequest->created_at->format('F j, Y') : '—' }}</div>
+      </div>
+      <div class="col">
         <div><strong>Expected Completion Date</strong></div>
         <div class="box">{{ $workRequest->expected_completion_date ? \Carbon\Carbon::parse($workRequest->expected_completion_date)->format('F j, Y') : '—' }}</div>
       </div>

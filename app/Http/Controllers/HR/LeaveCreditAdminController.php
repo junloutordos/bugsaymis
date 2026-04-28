@@ -9,6 +9,7 @@ use App\Models\HR\LeaveType;
 use App\Models\HR\ServiceCreditRecord;
 use App\Models\User;
 use App\Services\HR\LeaveCreditService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -39,12 +40,13 @@ class LeaveCreditAdminController extends Controller
         }
 
         return Inertia::render('HR/Leave/Credits/Initialize', [
-            'employees'  => $query->paginate(20)->withQueryString(),
-            'leaveTypes' => LeaveType::where('is_active', true)
-                ->whereIn('code', ['VL', 'SL', 'CTO'])
+            'employees'       => $query->paginate(20)->withQueryString(),
+            'leaveTypes'      => LeaveType::where('is_active', true)
+                ->whereIn('code', ['VL', 'SL', 'CTO', 'WL'])
                 ->orderBy('sort_order')
                 ->get(['id', 'code', 'name']),
-            'filters'    => $request->only('search'),
+            'filters'         => $request->only('search'),
+            'specialChiefIds' => $this->credits->specialDivisionChiefIds(),
         ]);
     }
 
@@ -64,6 +66,8 @@ class LeaveCreditAdminController extends Controller
             'balances.*.amount'          => 'required|numeric|min:0',
             'remarks'  => 'required|string|max:500',
             'force'    => 'boolean',
+            // Optional service credit opening balance (Teaching only — days, not hours)
+            'sc_balance' => 'nullable|numeric|min:0.5|max:999',
         ]);
 
         $values = collect($data['balances'])
@@ -71,19 +75,48 @@ class LeaveCreditAdminController extends Controller
             ->pluck('amount', 'leave_type_code')
             ->all();
 
-        if (empty($values)) {
-            return back()->with('error', 'At least one balance must be greater than 0.');
+        $hasLeaveCredits  = ! empty($values);
+        $hasServiceCredit = isset($data['sc_balance']) && $data['sc_balance'] > 0;
+
+        if (! $hasLeaveCredits && ! $hasServiceCredit) {
+            return back()->with('error', 'Enter at least one leave balance or a service credit record.');
         }
 
         try {
-            $this->credits->initializeLeaveCredits(
-                userId:     $data['user_id'],
-                values:     $values,
-                remarks:    $data['remarks'],
-                year:       $data['year'],
-                force:      $data['force'] ?? false,
-                recordedBy: Auth::id(),
-            );
+            if ($hasLeaveCredits) {
+                $this->credits->initializeLeaveCredits(
+                    userId:     $data['user_id'],
+                    values:     $values,
+                    remarks:    $data['remarks'],
+                    year:       $data['year'],
+                    force:      $data['force'] ?? false,
+                    recordedBy: Auth::id(),
+                );
+            }
+
+            if ($hasServiceCredit) {
+                $user = User::findOrFail($data['user_id']);
+                if (! in_array($user->emp_category, ['Plantilla Teaching', 'COS Teaching'])) {
+                    return back()->with('error', 'Service credits are for Teaching personnel only.');
+                }
+
+                $days      = (float) $data['sc_balance'];
+                $yearStart = Carbon::create($data['year'], 1, 1)->toDateString();
+
+                // Created directly as approved — opening balance, no pending stage
+                ServiceCreditRecord::create([
+                    'user_id'         => $data['user_id'],
+                    'service_date'    => $yearStart,
+                    'service_type'    => 'other',
+                    'hours_rendered'  => $days * 8,
+                    'days_equivalent' => $days,
+                    'status'          => 'approved',
+                    'approved_by'     => Auth::id(),
+                    'approved_at'     => now()->toDateString(),
+                    'expires_at'      => Carbon::create($data['year'], 12, 31)->toDateString(),
+                    'remarks'         => 'Opening balance — ' . $data['year'] . '. ' . ($data['remarks'] ?? ''),
+                ]);
+            }
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
