@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
 use App\Models\HR\LeaveType;
+use App\Models\HR\ServiceCreditRecord;
 use App\Models\FacultyLoading\SalarySchedule;
 use App\Services\HR\ApprovalService;
 use App\Services\HR\LeaveCreditService;
@@ -219,15 +220,63 @@ class LeaveApplicationController extends Controller
             ->get(['id', 'control_no', 'leave_type_id', 'date_from', 'date_to',
                    'days_applied', 'days_deducted', 'is_without_pay', 'status']);
 
+        $isTeaching = $this->credits->isTeaching(Auth::user());
+
+        // Service credit records (Teaching only) — all statuses, all years
+        $serviceRecords = $isTeaching
+            ? ServiceCreditRecord::where('user_id', $userId)
+                ->orderByDesc('service_date')
+                ->get(['id', 'service_date', 'service_type', 'hours_rendered',
+                       'days_equivalent', 'status', 'expires_at', 'remarks',
+                       'approved_at'])
+                ->toArray()
+            : [];
+
         return Inertia::render('HR/Leave/MyCredits', [
-            'balances'     => $balances,
-            'creditRows'   => $creditRows,
-            'transactions' => $transactions,
-            'applications' => $applications,
-            'year'         => $year,
-            'years'        => range(now()->year, max(now()->year - 5, 2024)),
-            'isTeaching'   => $this->credits->isTeaching(Auth::user()),
+            'balances'       => $balances,
+            'creditRows'     => $creditRows,
+            'transactions'   => $transactions,
+            'applications'   => $applications,
+            'serviceRecords' => $serviceRecords,
+            'year'           => $year,
+            'years'          => range(now()->year, max(now()->year - 5, 2024)),
+            'isTeaching'     => $isTeaching,
         ]);
+    }
+
+    /**
+     * POST /leave-credits/my/service-credits
+     * Faculty submits a service credit earning record (status = pending).
+     */
+    public function myServiceCreditsStore(Request $request)
+    {
+        $this->authorize('hr.leave.credits.view');
+
+        $user = Auth::user();
+        if (! $this->credits->isTeaching($user)) {
+            abort(403, 'Service credits are for Teaching personnel only.');
+        }
+
+        $data = $request->validate([
+            'service_date'   => 'required|date|before_or_equal:today',
+            'service_type'   => 'required|in:extra_teaching_load,committee_work,school_activity,special_assignment,other',
+            'hours_rendered' => 'required|numeric|min:4|max:24',
+            'remarks'        => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $this->credits->addServiceCredits(
+                userId:        Auth::id(),
+                hoursRendered: (float) $data['hours_rendered'],
+                serviceType:   $data['service_type'],
+                serviceDate:   $data['service_date'],
+                remarks:       $data['remarks'] ?? '',
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Service credit record submitted and is pending HR approval.');
     }
 
     // ── Real-time balance check (AJAX) ────────────────────────────────────────

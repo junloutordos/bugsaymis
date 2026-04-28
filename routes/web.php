@@ -1397,6 +1397,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.balance.check');
     Route::get('/leave-credits/my', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'myCredits'])
         ->name('leave-credits.my');
+    Route::post('/leave-credits/my/service-credits', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'myServiceCreditsStore'])
+        ->name('leave-credits.my.service-credits.store');
     Route::post('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'store'])
         ->name('leave.store');
     Route::get('/leave/{leaveApplication}', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'show'])
