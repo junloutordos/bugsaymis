@@ -131,13 +131,12 @@ class WFHAttendanceController extends Controller
         return Inertia::render('HumanResource/WFH/Monitoring');
     }
 
-    // ─── API: Monitoring (Unit Head / Division Chief) ─────────────────────────
+    // ─── API: Monitoring (HR / Administrator / Division Chief / OCD) ─────────────
 
     public function monitor(Request $request)
     {
         $user = Auth::user();
-
-        $this->authorizeMonitor($user);
+        $user->loadMissing('roles');
 
         $query = WFHAttendance::with([
                 'user:id,name,position,division_id,office_id',
@@ -145,15 +144,15 @@ class WFHAttendanceController extends Controller
             ])
             ->orderByDesc('date');
 
-        // HR / Administrator sees all records
-        // DivisionChief sees their division; OCD sees their office/unit
-        if (! $user->hasAnyRole(['HR', 'Administrator'])) {
+        // Administrator (SuperAdmin) and HR see ALL records across the campus.
+        // DivisionChief sees only their division; OCD sees only their office.
+        if (! ($user->isSuperAdmin() || $user->hasRole('HR'))) {
             if ($user->hasRole('DivisionChief')) {
-                $query->whereHas('user', fn($q) =>
+                $query->whereHas('user', fn ($q) =>
                     $q->where('division_id', $user->division_id)
                 );
             } elseif ($user->hasRole('OCD')) {
-                $query->whereHas('user', fn($q) =>
+                $query->whereHas('user', fn ($q) =>
                     $q->where('office_id', $user->office_id)
                 );
             }
@@ -166,6 +165,12 @@ class WFHAttendanceController extends Controller
 
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->query('user_id'));
+        }
+
+        if ($request->filled('search')) {
+            $query->whereHas('user', fn ($q) =>
+                $q->where('name', 'like', '%' . $request->query('search') . '%')
+            );
         }
 
         return response()->json($query->paginate(30));
