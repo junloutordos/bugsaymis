@@ -2,6 +2,7 @@
 
 namespace App\Services\HR;
 
+use App\Models\Division;
 use App\Models\HR\LeaveApplication;
 use App\Models\HR\LeaveCredit;
 use App\Models\HR\LeaveCreditTransaction;
@@ -20,6 +21,9 @@ class LeaveCreditService
     // VL and SL monthly accrual rate for Non-Teaching staff (CSC Rule XVI)
     private const MONTHLY_ACCRUAL = 1.25;
 
+    // Division acronyms whose teaching chiefs also earn VL/SL (special case)
+    private const SPECIAL_CHIEF_DIVISIONS = ['SSD', 'CID'];
+
     // ── Employee Type Helpers ─────────────────────────────────────────────────
 
     public function isTeaching(User $user): bool
@@ -30,6 +34,39 @@ class LeaveCreditService
     public function isNonTeaching(User $user): bool
     {
         return ! $this->isTeaching($user);
+    }
+
+    /**
+     * Teaching faculty who are the active division chief of SSD or CID.
+     * Special case: they earn VL + SL in addition to their teaching benefits.
+     */
+    public function isSpecialDivisionChief(User $user): bool
+    {
+        if (! $this->isTeaching($user)) {
+            return false;
+        }
+
+        return Division::whereIn('acronym', self::SPECIAL_CHIEF_DIVISIONS)
+            ->where('division_chief_id', $user->id)
+            ->where('status', 'active')
+            ->exists();
+    }
+
+    /**
+     * Return the set of special division chief user IDs for SSD and CID.
+     * Used by controllers to pass the list to the frontend.
+     */
+    public function specialDivisionChiefIds(): array
+    {
+        $chiefIds = Division::whereIn('acronym', self::SPECIAL_CHIEF_DIVISIONS)
+            ->where('status', 'active')
+            ->pluck('division_chief_id')
+            ->toArray();
+
+        return User::whereIn('id', $chiefIds)
+            ->whereIn('emp_category', self::TEACHING_CATEGORIES)
+            ->pluck('id')
+            ->toArray();
     }
 
     // ── 1. getEmployeeLeaveBalance ────────────────────────────────────────────
@@ -66,13 +103,13 @@ class LeaveCreditService
             ];
         }
 
-        // Teaching staff: aggregate approved service credits not yet consumed
+        // Teaching staff: aggregate approved service credits not yet consumed (separate from CTO)
         if ($this->isTeaching($user)) {
             $serviceDays = ServiceCreditRecord::active()
                 ->where('user_id', $userId)
                 ->sum('days_equivalent');
 
-            $balances['CTO'] = ['balance' => (float) $serviceDays, 'is_service_credit' => true];
+            $balances['SC'] = ['balance' => (float) $serviceDays, 'is_service_credit' => true];
         }
 
         return $balances;
@@ -175,10 +212,15 @@ class LeaveCreditService
         $vlType = LeaveType::where('code', 'VL')->firstOrFail();
         $slType = LeaveType::where('code', 'SL')->firstOrFail();
 
-        // Only Non-Teaching personnel accrue VL/SL monthly
-        $users = User::whereNotNull('emp_category')
+        // Non-Teaching personnel + Teaching faculty who are SSD/CID division chiefs
+        $specialChiefIds = $this->specialDivisionChiefIds();
+        $nonTeaching     = User::whereNotNull('emp_category')
             ->whereNotIn('emp_category', self::TEACHING_CATEGORIES)
             ->get();
+        $specialChiefs   = $specialChiefIds
+            ? User::whereIn('id', $specialChiefIds)->get()
+            : collect();
+        $users = $nonTeaching->merge($specialChiefs);
 
         $count = 0;
 
@@ -215,7 +257,7 @@ class LeaveCreditService
             }
         });
 
-        Log::info("LeaveCreditService: accrued credits for {$count} non-teaching employees ({$year}-{$month}).");
+        Log::info("LeaveCreditService: accrued credits for {$count} employees (non-teaching + special chiefs) ({$year}-{$month}).");
 
         return $count;
     }

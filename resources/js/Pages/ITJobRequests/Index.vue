@@ -6,7 +6,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import {
   EyeIcon,
   PencilSquareIcon,
-  PrinterIcon,
+  DocumentArrowDownIcon,
   TrashIcon,
   ArrowDownTrayIcon
 } from "@heroicons/vue/24/outline"
@@ -367,8 +367,8 @@ const handleNewRequest = async () => {
                       <EyeIcon class="w-4 h-4"/>
                     </button>
 
-                    <a :href="route('jobrequests.print', req.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                      <PrinterIcon class="w-4 h-4"/>
+                    <a :href="route('jobrequests.print', req.id)" target="_blank" title="Download PDF" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                      <DocumentArrowDownIcon class="w-4 h-4"/>
                     </a>
 
                     <template v-if="userRole === 'Administrator'">
@@ -432,8 +432,8 @@ const handleNewRequest = async () => {
                 <EyeIcon class="w-4 h-4"/> View
               </button>
 
-              <a :href="route('jobrequests.print', req.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                <PrinterIcon class="w-4 h-4"/>
+              <a :href="route('jobrequests.print', req.id)" target="_blank" title="Download PDF" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                <DocumentArrowDownIcon class="w-4 h-4"/>
               </a>
 
               <template v-if="userRole === 'Administrator'">
@@ -692,6 +692,15 @@ const handleNewRequest = async () => {
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
                     required
                   />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Recommendation</label>
+                  <textarea
+                    v-model="form.recommendation"
+                    rows="2"
+                    placeholder="e.g. Repair/Replace defective hardware component(s)"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                  ></textarea>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-slate-600 mb-1">Action Taken</label>
