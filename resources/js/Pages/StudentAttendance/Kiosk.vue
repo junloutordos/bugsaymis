@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import axios from 'axios'
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   gateLocations: { type: Object, default: () => ({}) },
@@ -233,7 +234,7 @@ watch(lastScan, () => { photoError.value = false })
     />
 
     <!-- Background photo -->
-    <div class="kiosk-bg" />
+    <div class="kiosk-bg" :style="{ backgroundImage: `url(${storageUrl('bg.jpg')})` }" />
 
     <!-- Static dark overlay -->
     <div class="kiosk-overlay-static" />
@@ -386,7 +387,7 @@ watch(lastScan, () => { photoError.value = false })
 .kiosk-bg {
   position: absolute;
   inset: 0;
-  background-image: url('/storage/bg.jpg');
+  /* background-image set via inline style using S3 URL */
   background-size: cover;
   background-position: center;
   opacity: 1;

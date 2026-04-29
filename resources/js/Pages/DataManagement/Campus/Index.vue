@@ -29,7 +29,7 @@
           <!-- Logo Section -->
           <div class="flex-shrink-0">
             <div class="w-32 h-32 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center overflow-hidden">
-              <img v-if="campus.logo" :src="`/storage/${campus.logo}`" alt="Campus Logo" class="w-full h-full object-cover" />
+              <img v-if="campus.logo" :src="storageUrl(campus.logo)" alt="Campus Logo" class="w-full h-full object-cover" />
               <div v-else class="text-slate-400 text-center">
                 <svg class="w-10 h-10 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
@@ -201,6 +201,7 @@
 import { Head, usePage, useForm, router as inertiaRouter } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { storageUrl } from "@/Composables/useStorage.js"
 import Swal from 'sweetalert2'
 
 const props = defineProps({ campus: Object })
@@ -238,7 +239,7 @@ const openModal = (c = null) => {
     form.email = c.email ?? ''
     form.website = c.website ?? ''
     form.facebook = c.facebook ?? ''
-    logoPreview.value = c.logo ? `/storage/${c.logo}` : ''
+    logoPreview.value = storageUrl(c.logo) ?? ''
   } else {
     form.reset()
     logoPreview.value = ''

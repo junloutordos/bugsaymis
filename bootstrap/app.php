@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         apiPrefix: 'api',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust all proxies so HTTPS is detected correctly behind Cloudflare → ALB
+        $middleware->trustProxies(at: '*');
+
         // Kiosk scan endpoint is a long-running, unauthenticated public POST — exempt from CSRF
         // so it keeps working after the browser session expires (kiosk runs all day).
         $middleware->validateCsrfTokens(except: [

@@ -2,6 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useForm, router } from '@inertiajs/vue3'
 import { useSubmit } from '@/Composables/useSubmit'
+import { storageUrl } from "@/Composables/useStorage.js"
 import {
   PlusIcon,
   TrashIcon,
@@ -1330,7 +1331,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <!-- Display existing photo if editing -->
         <div v-if="form.other_info.path_passport_photo && typeof form.other_info.path_passport_photo === 'string'" class="mt-2">
-            <img :src="`/storage/${form.other_info.path_passport_photo}`" alt="Passport Photo" class="h-32 w-32 object-cover rounded border" />
+            <img :src="storageUrl(form.other_info.path_passport_photo)" alt="Passport Photo" class="h-32 w-32 object-cover rounded border" />
         </div>
         </section>
         </div>

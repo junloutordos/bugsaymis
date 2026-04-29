@@ -3,6 +3,7 @@ import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { ref, onMounted, computed, watch } from 'vue'
 import { EyeIcon } from "@heroicons/vue/24/outline"
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   students: Object,
@@ -111,7 +112,7 @@ const profilePic = (student) => {
   const fname = student.img ?? student.image ?? student.photo ?? null
   if (!fname) return null
   // public storage path (storage/app/public -> public/storage)
-  return `/storage/students_profile_picture/${encodeURIComponent(fname)}`
+  return storageUrl(`students_profile_picture/${encodeURIComponent(fname)}`)
 }
 
 </script>

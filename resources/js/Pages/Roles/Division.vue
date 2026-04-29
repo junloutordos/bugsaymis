@@ -3,6 +3,7 @@ import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, ArrowUpOnSquareIcon } from "@heroicons/vue/24/outline"
 import { useDivisions } from "@/Composables/useDivisions.js"
+import { storageUrl } from "@/Composables/useStorage.js"
 import { ref } from 'vue'
 import { useSubmit } from "@/Composables/useSubmit"
 
@@ -41,7 +42,7 @@ const openUploadModal = (division) => {
   uploadDivision.value = division
   showUploadModal.value = true
   uploadFile.value = null
-  previewUrl.value = division.signature_path ? `/storage/${division.signature_path}` : null
+  previewUrl.value = storageUrl(division.signature_path)
 }
 
 const closeUploadModal = () => {
