@@ -49,3 +49,9 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
         Route::get('/attendance/{studentId}/today', [AttendanceApiController::class, 'today'])->name('attendance.today');
     });
 });
+
+
+// ALB health check — always returns 200
+Route::get('/_ping', function () {
+    return response()->json(['status' => 'ok'], 200);
+});
