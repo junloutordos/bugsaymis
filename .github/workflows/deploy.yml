@@ -1,0 +1,53 @@
+name: CRCMIS Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR: 971422671747.dkr.ecr.ap-southeast-1.amazonaws.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push app
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t $ECR/crcmis/app:${{ github.sha }} \
+            -t $ECR/crcmis/app:latest \
+            --push .
+
+      - name: Build and push nginx
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t $ECR/crcmis/nginx:${{ github.sha }} \
+            -t $ECR/crcmis/nginx:latest \
+            -f nginx/Dockerfile \
+            --push ./nginx
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster crcmis-prod \
+            --service crcmis-prod-service \
+            --force-new-deployment
+
+      - name: Wait for stable deployment
+        run: |
+          aws ecs wait services-stable \
+            --cluster crcmis-prod \
+            --services crcmis-prod-service
