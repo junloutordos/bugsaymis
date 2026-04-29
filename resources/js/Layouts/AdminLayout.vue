@@ -45,6 +45,9 @@ import {
   AdjustmentsHorizontalIcon,
   CheckCircleIcon,
   BuildingLibraryIcon,
+  IdentificationIcon,
+  UserPlusIcon,
+  UserCircleIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -376,14 +379,6 @@ const menuItems = [
         permissions: ["hr.employees.manage"],
       },
       {
-        label: 'DTR Upload',
-        routeName: 'data.dtr.upload',
-        href: route('data.dtr.upload'),
-        icon: DocumentTextIcon,
-        roles: ['Administrator'],
-        permissions: ["roles.assign"],
-      },
-      {
         label: "User Roles",
         routeName: "roles.index",
         href: route("roles.index"),
@@ -541,7 +536,7 @@ const menuItems = [
     {
       label: "Human Resource",
       icon: UserGroupIcon,
-      roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
+      roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD"],
       children: [
       {
         label: "My PDS",
@@ -575,6 +570,13 @@ const menuItems = [
         icon: ClockIcon,
         roles: ["Administrator", "HR"],
         permissions: ["hr.schedule.manage"],
+      },
+      {
+        label: "My Work Schedule",
+        routeName: "hr.schedules.my",
+        href: route("hr.schedules.my"),
+        icon: ClockIcon,
+        roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD", "Payroll Officer"],
       },
       
       {
@@ -1176,14 +1178,6 @@ const menuItems = [
         permissions: ["facilities.fad-approve"],
       },
       {
-        label: "OCD Approval - Facility",
-        routeName: "facility-requests.ocd-approval",
-        href: route("facility-requests.ocd-approval"),
-        icon: BookOpenIcon,
-        roles: ["OCD"],
-        permissions: ["facilities.manage"],
-      },
-      {
         label: "OCD Approval - Vehicle",
         routeName: "vehicle-requests.ocd-approval",
         href: route("vehicle-requests.ocd-approval"),
@@ -1201,12 +1195,42 @@ const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
     children: [
       {
+        label: "PPMP",
+        routeName: "ppmp.index",
+        href: "/ppmp",
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "Faculty", "Staff"],
+        permissions: ["ppmp.create", "ppmp.view_all"],
+      },
+      {
         label: "Purchase Requests",
         routeName: "procurements.index",
         href: route("procurements.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff"],
         permissions: ["procurement.view"],
+      },
+    ],
+  },
+  {
+    label: "Activity Management",
+    icon: CalendarDaysIcon,
+    roles: ["Administrator", "Faculty", "Staff", "Student", "HR", "DivisionChief", "OCD"],
+    children: [
+      {
+        label: "Activities",
+        routeName: "ams.activities.index",
+        href: route("ams.activities.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: [],
+        permissions: ["activities.manage"],
+      },
+      {
+        label: "My Activities",
+        routeName: "ams.my-activities.index",
+        href: route("ams.my-activities.index"),
+        icon: UserCircleIcon,
+        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
       },
     ],
   },
@@ -1280,8 +1304,11 @@ const menuItems = [
       "faculty_loading.view_own", "faculty_loading.view",
       "faculty_loading.manage", "faculty_loading.school_year",
       "faculty_loading.approve", "faculty_loading.reports",
+      "faculty_loading.setup", "faculty_loading.vacancies",
+      "faculty_loading.training",
     ],
     children: [
+      // ── Personal ────────────────────────────────────────────────────────────
       {
         label: "My Load",
         routeName: "faculty-loading.my-load",
@@ -1290,6 +1317,7 @@ const menuItems = [
         roles: [],
         permissions: ["faculty_loading.view_own"],
       },
+      // ── Overview ────────────────────────────────────────────────────────────
       {
         label: "Faculty Loads",
         routeName: "faculty-loading.index",
@@ -1306,27 +1334,29 @@ const menuItems = [
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
+      // ── Role Assignments ────────────────────────────────────────────────────
       {
-        label: "Schedules",
-        routeName: "faculty-loading.schedules.index",
-        href: route("faculty-loading.schedules.index"),
-        icon: CalendarDaysIcon,
+        label: "Supervisory",
+        routeName: "faculty-loading.supervisory.index",
+        href: route("faculty-loading.supervisory.index"),
+        icon: ShieldCheckIcon,
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
+      {
+        label: "Sections",
+        routeName: "faculty-loading.sections.index",
+        href: route("faculty-loading.sections.index"),
+        icon: TableCellsIcon,
+        roles: [],
+        permissions: ["faculty_loading.manage"],
+      },
+      // ── Load Management ─────────────────────────────────────────────────────
       {
         label: "Load Assignments",
         routeName: "faculty-loading.assignments.index",
         href: route("faculty-loading.assignments.index"),
         icon: ClipboardDocumentListIcon,
-        roles: [],
-        permissions: ["faculty_loading.manage"],
-      },
-      {
-        label: "Committee Assignments",
-        routeName: "faculty-loading.committee-assignments.index",
-        href: route("faculty-loading.committee-assignments.index"),
-        icon: QueueListIcon,
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
@@ -1339,61 +1369,22 @@ const menuItems = [
         permissions: ["faculty_loading.manage"],
       },
       {
-        label: "Sections",
-        routeName: "faculty-loading.sections.index",
-        href: route("faculty-loading.sections.index"),
-        icon: TableCellsIcon,
+        label: "Committee Assignments",
+        routeName: "faculty-loading.committee-assignments.index",
+        href: route("faculty-loading.committee-assignments.index"),
+        icon: QueueListIcon,
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
       {
-        label: "Overload Pay",
-        routeName: "faculty-loading.overload-computations.index",
-        href: route("faculty-loading.overload-computations.index"),
-        icon: BanknotesIcon,
+        label: "Schedules",
+        routeName: "faculty-loading.schedules.index",
+        href: route("faculty-loading.schedules.index"),
+        icon: CalendarDaysIcon,
         roles: [],
-        permissions: ["faculty_loading.approve"],
+        permissions: ["faculty_loading.manage"],
       },
-      {
-        label: "Salary Schedules",
-        routeName: "faculty-loading.salary-schedules.index",
-        href: route("faculty-loading.salary-schedules.index"),
-        icon: CurrencyDollarIcon,
-        roles: [],
-        permissions: ["faculty_loading.approve"],
-      },
-      {
-        label: "Reports",
-        routeName: "faculty-loading.reports.loads",
-        href: route("faculty-loading.reports.loads"),
-        icon: ChartBarIcon,
-        roles: [],
-        permissions: ["faculty_loading.reports"],
-      },
-      {
-        label: "Subjects",
-        routeName: "faculty-loading.subjects.index",
-        href: route("faculty-loading.subjects.index"),
-        icon: BookOpenIcon,
-        roles: [],
-        permissions: ["faculty_loading.subjects"],
-      },
-      {
-        label: "Classrooms",
-        routeName: "faculty-loading.classrooms.index",
-        href: route("faculty-loading.classrooms.index"),
-        icon: TableCellsIcon,
-        roles: [],
-        permissions: ["faculty_loading.classrooms"],
-      },
-      {
-        label: "School Years",
-        routeName: "faculty-loading.school-years.index",
-        href: route("faculty-loading.school-years.index"),
-        icon: ClockIcon,
-        roles: [],
-        permissions: ["faculty_loading.school_year"],
-      },
+      // ── AI Tools ────────────────────────────────────────────────────────────
       {
         label: "AI Dashboard",
         routeName: "faculty-loading.ai-dashboard",
@@ -1418,8 +1409,93 @@ const menuItems = [
         roles: [],
         permissions: ["faculty_loading.manage"],
       },
+      // ── Approval & Finance ──────────────────────────────────────────────────
+      {
+        label: "Overload Pay",
+        routeName: "faculty-loading.overload-computations.index",
+        href: route("faculty-loading.overload-computations.index"),
+        icon: BanknotesIcon,
+        roles: [],
+        permissions: ["faculty_loading.approve"],
+      },
+      {
+        label: "Salary Schedules",
+        routeName: "faculty-loading.salary-schedules.index",
+        href: route("faculty-loading.salary-schedules.index"),
+        icon: CurrencyDollarIcon,
+        roles: [],
+        permissions: ["faculty_loading.approve"],
+      },
+      {
+        label: "Reports",
+        routeName: "faculty-loading.reports.loads",
+        href: route("faculty-loading.reports.loads"),
+        icon: ChartBarIcon,
+        roles: [],
+        permissions: ["faculty_loading.reports"],
+      },
+      // ── Catalog Setup ───────────────────────────────────────────────────────
+      {
+        label: "School Years",
+        routeName: "faculty-loading.school-years.index",
+        href: route("faculty-loading.school-years.index"),
+        icon: ClockIcon,
+        roles: [],
+        permissions: ["faculty_loading.school_year"],
+      },
+      {
+        label: "Academic Units",
+        routeName: "faculty-loading.academic-units.index",
+        href: route("faculty-loading.academic-units.index"),
+        icon: BuildingLibraryIcon,
+        roles: [],
+        permissions: ["faculty_loading.setup"],
+      },
+      {
+        label: "Designations",
+        routeName: "faculty-loading.designations.index",
+        href: route("faculty-loading.designations.index"),
+        icon: IdentificationIcon,
+        roles: [],
+        permissions: ["faculty_loading.setup"],
+      },
+      {
+        label: "Subjects",
+        routeName: "faculty-loading.subjects.index",
+        href: route("faculty-loading.subjects.index"),
+        icon: BookOpenIcon,
+        roles: [],
+        permissions: ["faculty_loading.subjects"],
+      },
+      {
+        label: "Classrooms",
+        routeName: "faculty-loading.classrooms.index",
+        href: route("faculty-loading.classrooms.index"),
+        icon: TableCellsIcon,
+        roles: [],
+        permissions: ["faculty_loading.classrooms"],
+      },
+      // ── Records ─────────────────────────────────────────────────────────────
+      {
+        label: "Faculty Vacancies",
+        routeName: "faculty-loading.vacancies.index",
+        href: route("faculty-loading.vacancies.index"),
+        icon: UserPlusIcon,
+        roles: [],
+        permissions: ["faculty_loading.vacancies"],
+      },
+      {
+        label: "Training Records",
+        routeName: "faculty-loading.training-records.index",
+        href: route("faculty-loading.training-records.index"),
+        icon: AcademicCapIcon,
+        roles: [],
+        permissions: ["faculty_loading.training"],
+      },
     ],
   },
+
+  
 
   {
     type: "section",

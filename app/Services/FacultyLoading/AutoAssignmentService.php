@@ -55,9 +55,8 @@ class AutoAssignmentService
         }
         $facultyList = $facultyQuery->orderBy('name')->get();
 
-        // --- Existing DB assignments for the term ---
+        // --- All existing DB assignments for the term (all types) ---
         $existingByFaculty = LoadAssignment::where('academic_term_id', $termId)
-            ->where('assignment_type', 'teaching')
             ->get()
             ->groupBy('user_id');
 
@@ -77,7 +76,8 @@ class AutoAssignmentService
 
         // --- Shared tracking state ---
 
-        // Set of "subject_id:section_id" pairs already assigned in the DB
+        // Set of "subject_id:section_id" pairs already assigned in the DB (section-based subjects)
+        // Elective subjects already assigned are tracked separately as "elec:{subject_id}"
         $takenPairs = [];
         LoadAssignment::where('academic_term_id', $termId)
             ->where('assignment_type', 'teaching')
@@ -86,6 +86,18 @@ class AutoAssignmentService
             ->select('subject_id', 'section_id')
             ->get()
             ->each(fn ($a) => $takenPairs["{$a->subject_id}:{$a->section_id}"] = true);
+
+        // Track electives (no section) already assigned in the DB
+        $electiveIds = $subjects->where('subject_type', 'elective')->pluck('id')->all();
+        if (! empty($electiveIds)) {
+            LoadAssignment::where('academic_term_id', $termId)
+                ->where('assignment_type', 'teaching')
+                ->whereNull('section_id')
+                ->whereIn('subject_id', $electiveIds)
+                ->pluck('subject_id')
+                ->unique()
+                ->each(fn ($id) => $takenPairs["elec:{$id}"] = true);
+        }
 
         // Count of distinct subjects already assigned per section in the DB
         $sectionLoad = [];
@@ -97,24 +109,47 @@ class AutoAssignmentService
             ->get()
             ->each(fn ($r) => $sectionLoad[(int) $r->section_id] = (int) $r->cnt);
 
+        // --- Coverage gaps: detect uncovered section×subject slots BEFORE proposals ---
+        $coverageGaps = $this->buildCoverageGaps($subjects, $sectionsByGrade, $takenPairs);
+
         // --- Build proposals ---
         $proposals = [];
 
         foreach ($facultyList as $faculty) {
-            $cap          = $this->teachingCap($faculty->position);
-            $alreadyUnits = (float) $existingByFaculty->get($faculty->id, collect())->sum('load_units');
-            $remaining    = max(0, $cap - $alreadyUnits);
+            $allExisting      = $existingByFaculty->get($faculty->id, collect());
+            $teachingExisting = $allExisting->where('assignment_type', 'teaching');
+
+            $teachingCap      = $this->teachingCap($faculty->position);
+            $totalExisting    = (float) $allExisting->sum('load_units');
+            $teachingExistingU = (float) $teachingExisting->sum('load_units');
+
+            // Remaining teaching capacity is the tighter of:
+            //   (a) position teaching cap minus existing teaching load
+            //   (b) full-load threshold minus ALL existing loads (teaching + admin + research + etc.)
+            $remainingByTeachingCap = max(0, $teachingCap - $teachingExistingU);
+            $remainingByTotalCap    = max(0, LoadComputationService::FULL_LOAD_THRESHOLD - $totalExisting);
+            $remaining              = min($remainingByTeachingCap, $remainingByTotalCap);
+
+            // Breakdown of non-teaching loads for display
+            $nonTeachingBreakdown = $allExisting
+                ->where('assignment_type', '!=', 'teaching')
+                ->groupBy('assignment_type')
+                ->map(fn ($items) => (float) $items->sum('load_units'))
+                ->toArray();
 
             if ($remaining <= 0) {
                 $proposals[] = [
-                    'faculty_id'       => $faculty->id,
-                    'faculty_name'     => $faculty->name,
-                    'position'         => $faculty->position,
-                    'specialization'   => $faculty->specialization,
-                    'teaching_cap'     => $cap,
-                    'already_assigned' => $alreadyUnits,
-                    'assignments'      => [],
-                    'skipped_reason'   => 'Already at or over teaching cap',
+                    'faculty_id'            => $faculty->id,
+                    'faculty_name'          => $faculty->name,
+                    'position'              => $faculty->position,
+                    'specialization'        => $faculty->specialization,
+                    'teaching_cap'          => $teachingCap,
+                    'total_cap'             => LoadComputationService::FULL_LOAD_THRESHOLD,
+                    'already_teaching'      => $teachingExistingU,
+                    'already_total'         => $totalExisting,
+                    'non_teaching_loads'    => $nonTeachingBreakdown,
+                    'assignments'           => [],
+                    'skipped_reason'        => 'No remaining capacity (teaching or total load cap reached)',
                 ];
                 continue;
             }
@@ -123,21 +158,24 @@ class AutoAssignmentService
                 $faculty,
                 $subjects,
                 $remaining,
-                $existingByFaculty->get($faculty->id, collect()),
+                $teachingExisting,     // pass only teaching assignments for subject dedup
                 $sectionsByGrade,
-                $takenPairs,   // passed by reference — updated as assignments are made
-                $sectionLoad,  // passed by reference — updated as assignments are made
+                $takenPairs,
+                $sectionLoad,
             );
 
             $proposals[] = [
-                'faculty_id'       => $faculty->id,
-                'faculty_name'     => $faculty->name,
-                'position'         => $faculty->position,
-                'specialization'   => $faculty->specialization,
-                'teaching_cap'     => $cap,
-                'already_assigned' => $alreadyUnits,
-                'assignments'      => $matched,
-                'skipped_reason'   => empty($matched) ? 'No matching subjects found for specialization' : null,
+                'faculty_id'         => $faculty->id,
+                'faculty_name'       => $faculty->name,
+                'position'           => $faculty->position,
+                'specialization'     => $faculty->specialization,
+                'teaching_cap'       => $teachingCap,
+                'total_cap'          => LoadComputationService::FULL_LOAD_THRESHOLD,
+                'already_teaching'   => $teachingExistingU,
+                'already_total'      => $totalExisting,
+                'non_teaching_loads' => $nonTeachingBreakdown,
+                'assignments'        => $matched,
+                'skipped_reason'     => empty($matched) ? 'No matching subjects found for specialization' : null,
             ];
         }
 
@@ -161,8 +199,9 @@ class AutoAssignmentService
                 'label'          => $term->full_label,
                 'school_year_id' => $term->school_year_id,
             ],
-            'proposals' => $proposals,
-            'sections'  => $allSections,
+            'proposals'      => $proposals,
+            'sections'       => $allSections,
+            'coverage_gaps'  => $coverageGaps,
         ];
     }
 
@@ -176,10 +215,15 @@ class AutoAssignmentService
         $skipped = 0;
 
         foreach ($selected as $item) {
-            // Skip duplicates
+            // Skip duplicates — check by faculty + subject + section
+            $sectionId = $item['section_id'] ?? null;
             $exists = LoadAssignment::where('academic_term_id', $termId)
                 ->where('user_id', $item['faculty_id'])
                 ->where('subject_id', $item['subject_id'])
+                ->where(fn ($q) => $sectionId === null
+                    ? $q->whereNull('section_id')
+                    : $q->where('section_id', $sectionId)
+                )
                 ->exists();
 
             if ($exists) { $skipped++; continue; }
@@ -214,12 +258,14 @@ class AutoAssignmentService
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /**
-     * Score and greedily fill a faculty's remaining load with matching subjects,
-     * auto-assigning the best available section to each.
+     * Score and greedily fill a faculty's remaining load with matching subjects.
      *
-     * $takenPairs and $sectionLoad are passed by reference so the state is shared
-     * across all faculty in the same preview run (prevents two faculty from being
-     * assigned the exact same subject+section combination).
+     * When a subject is matched, the faculty is assigned to ALL uncovered sections
+     * at that grade level — not just one. This reflects real-world practice where
+     * one teacher handles a subject across all sections of a year level.
+     *
+     * $takenPairs and $sectionLoad are passed by reference so state is shared
+     * across all faculty (prevents two faculty being assigned the same subject+section).
      */
     private function matchSubjects(
         User       $faculty,
@@ -236,9 +282,10 @@ class AutoAssignmentService
         $assigned          = [];
         $unitsSoFar        = 0.0;
 
-        // Score all candidate subjects
+        // Score candidate subjects — only those with at least one uncovered section slot
         $scored = $subjects
             ->filter(fn ($s) => ! in_array($s->id, $alreadySubjectIds))
+            ->filter(fn ($s) => $this->hasUncoveredSection($s, $sectionsByGrade, $takenPairs))
             ->map(fn ($s) => [
                 'subject' => $s,
                 'score'   => $this->scoreMatch($facultyTags, $s),
@@ -250,33 +297,57 @@ class AutoAssignmentService
         foreach ($scored as $item) {
             $subject = $item['subject'];
             $units   = (float) $subject->load_units;
+            $grade   = (int) $subject->grade_level;
 
-            // Skip if it would exceed the remaining cap
-            if ($unitsSoFar + $units > $remaining + 0.01) continue;
+            if ($grade === 0 || $subject->subject_type === 'elective') {
+                // Elective or cross-grade subject: single assignment with no section
+                // (offered to self-selecting students across all sections)
+                if ($unitsSoFar + $units > $remaining + 0.01) continue;
 
-            // Find the best section for this subject
-            $section = $this->bestSection($subject, $sectionsByGrade, $takenPairs, $sectionLoad);
+                $gradeLabel = $grade === 0 ? 'G11 & G12' : "Grade {$grade}";
 
-            $assigned[] = [
-                'subject_id'    => $subject->id,
-                'subject_code'  => $subject->code,
-                'subject_name'  => $subject->name,
-                'load_units'    => $units,
-                'grade_level'   => $subject->grade_level,
-                'match_score'   => $item['score'],
-                'section_id'    => $section['id'],
-                'section_label' => $section['label'],
-                'section_auto'  => $section['auto'],
-            ];
+                $assigned[] = [
+                    'subject_id'    => $subject->id,
+                    'subject_code'  => $subject->code,
+                    'subject_name'  => $subject->name,
+                    'load_units'    => $units,
+                    'grade_level'   => $grade,
+                    'match_score'   => $item['score'],
+                    'section_id'    => null,
+                    'section_label' => "Elective — {$gradeLabel} (across sections)",
+                    'section_auto'  => false,
+                ];
+                $takenPairs["elec:{$subject->id}"] = true;
+                $unitsSoFar         += $units;
+                $alreadySubjectIds[] = $subject->id;
+            } else {
+                // Graded subject: assign to every uncovered section at this grade level
+                $uncovered = $this->uncoveredSectionsForSubject($subject, $sectionsByGrade, $takenPairs);
+                if (empty($uncovered)) continue;
 
-            // Update shared tracking so subsequent assignments don't conflict
-            if ($section['id']) {
-                $takenPairs["{$subject->id}:{$section['id']}"] = true;
-                $sectionLoad[$section['id']] = ($sectionLoad[$section['id']] ?? 0) + 1;
+                // Trim to however many sections fit within the remaining cap
+                $maxFit   = (int) floor(($remaining - $unitsSoFar + 0.01) / $units);
+                if ($maxFit === 0) continue;
+                $toAssign = array_slice($uncovered, 0, $maxFit);
+
+                foreach ($toAssign as $section) {
+                    $assigned[] = [
+                        'subject_id'    => $subject->id,
+                        'subject_code'  => $subject->code,
+                        'subject_name'  => $subject->name,
+                        'load_units'    => $units,
+                        'grade_level'   => $grade,
+                        'match_score'   => $item['score'],
+                        'section_id'    => $section->id,
+                        'section_label' => "Grade {$section->levelid} — {$section->sectionname}",
+                        'section_auto'  => true,
+                    ];
+                    $takenPairs["{$subject->id}:{$section->id}"] = true;
+                    $sectionLoad[$section->id] = ($sectionLoad[$section->id] ?? 0) + 1;
+                    $unitsSoFar += $units;
+                }
+                $alreadySubjectIds[] = $subject->id;
             }
-
-            $unitsSoFar          += $units;
-            $alreadySubjectIds[]  = $subject->id;
 
             if ($unitsSoFar >= $remaining - 0.01) break;
         }
@@ -285,47 +356,22 @@ class AutoAssignmentService
     }
 
     /**
-     * Pick the best available section for a subject.
-     *
-     * Rules (in priority order):
-     *  1. Section grade level must match the subject's grade level.
-     *  2. The subject must not already be assigned to that section (avoids
-     *     the same subject being taught twice in the same class by two teachers).
-     *  3. Among valid candidates, prefer the section with the fewest existing
-     *     subject assignments (load-balance across sections).
+     * Return all uncovered sections for a regular graded subject.
+     * Elective subjects and cross-grade subjects (grade=0) never have sections.
      */
-    private function bestSection(
-        Subject    $subject,
-        Collection $sectionsByGrade,
-        array      $takenPairs,
-        array      $sectionLoad,
-    ): array
+    private function uncoveredSectionsForSubject(Subject $subject, Collection $sectionsByGrade, array $takenPairs): array
     {
-        $grade = $subject->grade_level;
+        $grade = (int) $subject->grade_level;
 
-        // Cross-grade / elective subjects (grade_level = 0): skip auto-assignment
-        if ($grade === 0) {
-            return ['id' => null, 'label' => null, 'auto' => false];
+        if ($grade === 0 || $subject->subject_type === 'elective') {
+            return []; // handled separately as a single no-section assignment
         }
 
-        $candidates = $sectionsByGrade
+        return $sectionsByGrade
             ->get($grade, collect())
-            ->filter(fn ($s) => ! isset($takenPairs["{$subject->id}:{$s->id}"]));
-
-        if ($candidates->isEmpty()) {
-            return ['id' => null, 'label' => null, 'auto' => false];
-        }
-
-        // Pick the least-loaded section
-        $best = $candidates
-            ->sortBy(fn ($s) => $sectionLoad[$s->id] ?? 0)
-            ->first();
-
-        return [
-            'id'    => $best->id,
-            'label' => "Grade {$best->levelid} — {$best->sectionname}",
-            'auto'  => true,
-        ];
+            ->filter(fn ($s) => ! isset($takenPairs["{$subject->id}:{$s->id}"]))
+            ->values()
+            ->all();
     }
 
     /**
@@ -374,6 +420,92 @@ class AutoAssignmentService
             if (str_contains($lower, $keyword)) return (float) $cap;
         }
         return self::DEFAULT_CAP;
+    }
+
+    /**
+     * Returns true if the subject has at least one uncovered slot.
+     *
+     * - Elective subjects (any subject_type='elective') and cross-grade subjects
+     *   (grade_level=0) have a single slot tracked as "elec:{id}" — uncovered
+     *   when that key is absent from takenPairs.
+     * - Regular graded subjects are uncovered when at least one section at their
+     *   grade level has no assignment yet.
+     */
+    private function hasUncoveredSection(Subject $subject, Collection $sectionsByGrade, array $takenPairs): bool
+    {
+        $grade = $subject->grade_level;
+
+        if ($grade === 0 || $subject->subject_type === 'elective') {
+            return ! isset($takenPairs["elec:{$subject->id}"]);
+        }
+
+        $sections = $sectionsByGrade->get($grade, collect());
+
+        if ($sections->isEmpty()) {
+            return false;
+        }
+
+        foreach ($sections as $section) {
+            if (! isset($takenPairs["{$subject->id}:{$section->id}"])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Build the full list of uncovered subject slots for the current term.
+     *
+     * - Regular graded subjects → one entry per section that has no assignment yet.
+     * - Elective subjects (any grade) → one entry with section_id=null if not yet assigned.
+     * - Cross-grade subjects (grade_level=0) → same as electives.
+     */
+    private function buildCoverageGaps(Collection $subjects, Collection $sectionsByGrade, array $takenPairs): array
+    {
+        $gaps = [];
+
+        // --- Section-based gaps (regular graded, non-elective subjects) ---
+        foreach ($sectionsByGrade as $grade => $sections) {
+            $gradeSubjects = $subjects->filter(
+                fn ($s) => $s->grade_level === (int) $grade && $s->subject_type !== 'elective'
+            );
+
+            foreach ($sections as $section) {
+                foreach ($gradeSubjects as $subject) {
+                    if (! isset($takenPairs["{$subject->id}:{$section->id}"])) {
+                        $gaps[] = [
+                            'grade'        => (int) $grade,
+                            'section_id'   => $section->id,
+                            'section_name' => $section->sectionname,
+                            'subject_id'   => $subject->id,
+                            'subject_code' => $subject->code,
+                            'subject_name' => $subject->name,
+                            'is_elective'  => false,
+                        ];
+                    }
+                }
+            }
+        }
+
+        // --- Elective gaps (no section — offered across all sections) ---
+        $electives = $subjects->filter(fn ($s) => $s->subject_type === 'elective' || $s->grade_level === 0);
+        foreach ($electives as $subject) {
+            if (! isset($takenPairs["elec:{$subject->id}"])) {
+                $gradeLabel = $subject->grade_level === 0 ? 'G11 & G12' : "Grade {$subject->grade_level}";
+                $gaps[] = [
+                    'grade'        => (int) $subject->grade_level,
+                    'section_id'   => null,
+                    'section_name' => "Across sections ({$gradeLabel})",
+                    'subject_id'   => $subject->id,
+                    'subject_code' => $subject->code,
+                    'subject_name' => $subject->name,
+                    'is_elective'  => true,
+                ];
+            }
+        }
+
+        return $gaps;
     }
 
     private function findOrCreateLoad(int $userId, int $schoolYearId, int $termId)

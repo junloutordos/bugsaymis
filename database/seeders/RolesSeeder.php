@@ -22,6 +22,7 @@ class RolesSeeder extends Seeder
             ['name' => 'DivisionChief',      'description' => 'Division Chief. Approves requests and monitors division performance.'],
 
             // ── Academic ──────────────────────────────────────────────────────
+            ['name' => 'CID Chief',          'description' => 'Curriculum and Instruction Division Chief. Full access to Faculty Loading module.'],
             ['name' => 'Faculty',            'description' => 'Teaching staff with access to academic modules.'],
             ['name' => 'Staff',              'description' => 'Non-teaching staff with standard operational access.'],
             ['name' => 'Registrar',          'description' => 'Manages student records and registration.'],

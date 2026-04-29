@@ -9,6 +9,7 @@ use App\Models\SALN\SalnPersonalProperty;
 use App\Models\SALN\SalnLiability;
 use App\Models\SALN\SalnBusinessInterest;
 use App\Models\SALN\SalnRelative;
+use App\Models\SALN\SalnChild;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -167,6 +168,7 @@ class SalnController extends Controller
             'liabilities',
             'businessInterests',
             'relatives',
+            'children',
             'reviews.actor:id,name',
             'reviewer:id,name',
             'approver:id,name',
@@ -543,6 +545,49 @@ class SalnController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // SECTION: Unmarried Children Below 18 in Declarant's Household
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public function storeChild(Request $request, SalnRecord $saln): RedirectResponse
+    {
+        $this->authorizeEdit($saln);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'age'  => 'required|integer|min:0|max:17',
+        ]);
+
+        $saln->children()->create($data);
+
+        return back()->with('success', 'Child added.');
+    }
+
+    public function updateChild(Request $request, SalnRecord $saln, SalnChild $child): RedirectResponse
+    {
+        $this->authorizeEdit($saln);
+        abort_unless($child->saln_record_id === $saln->id, 404);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'age'  => 'required|integer|min:0|max:17',
+        ]);
+
+        $child->update($data);
+
+        return back()->with('success', 'Child updated.');
+    }
+
+    public function destroyChild(SalnRecord $saln, SalnChild $child): RedirectResponse
+    {
+        $this->authorizeEdit($saln);
+        abort_unless($child->saln_record_id === $saln->id, 404);
+
+        $child->delete();
+
+        return back()->with('success', 'Child removed.');
+    }
+
     /** Serialize a full SALN record for Inertia. */
     private function formatRecord(SalnRecord $saln): array
     {
@@ -577,6 +622,7 @@ class SalnController extends Controller
             'liabilities'               => $saln->liabilities,
             'business_interests'        => $saln->businessInterests,
             'relatives'                 => $saln->relatives,
+            'children'                  => $saln->children,
             'reviews'                   => $saln->reviews->map(fn ($r) => [
                 'id'          => $r->id,
                 'action'      => $r->action,

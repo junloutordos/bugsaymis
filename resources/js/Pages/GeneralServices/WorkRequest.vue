@@ -31,6 +31,7 @@
             <thead class="bg-slate-50">
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Created</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Issue</th>
                 <th v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
@@ -46,6 +47,7 @@
             <tbody class="divide-y divide-slate-100">
               <tr v-for="wr in filteredWorkRequests" :key="wr.id" class="hover:bg-slate-50/60">
                 <td class="px-4 py-3 text-sm text-slate-700">{{ wr.id }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ wr.issue ?? '—' }}</td>
                 <td v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ wr.requester?.name ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ wr.description ?? '—' }}</td>
@@ -109,7 +111,7 @@
                 </td>
               </tr>
               <tr v-if="filteredWorkRequests.length === 0">
-                <td :colspan="(hasAnyRole('Administrator','GSU Head','DivisionChief') ? 11 : 10)" class="py-16 text-center text-slate-400 text-sm">No work requests found.</td>
+                <td :colspan="(hasAnyRole('Administrator','GSU Head','DivisionChief') ? 12 : 11)" class="py-16 text-center text-slate-400 text-sm">No work requests found.</td>
               </tr>
             </tbody>
           </table>
@@ -120,7 +122,7 @@
           <div v-for="wr in filteredWorkRequests" :key="wr.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
-                <p class="text-xs text-slate-500">Request #{{ wr.id }}</p>
+                <p class="text-xs text-slate-500">Request #{{ wr.id }} &bull; {{ wr.created_at ? new Date(wr.created_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '—' }}</p>
                 <p class="text-sm font-semibold text-slate-800 mt-0.5 truncate">{{ wr.issue ?? '—' }}</p>
                 <p v-if="hasAnyRole('Administrator','GSU Head','DivisionChief')" class="text-xs text-slate-600 mt-1">Requestor: {{ wr.requester?.name ?? '—' }}</p>
                 <p class="text-xs text-slate-600">{{ wr.description ?? '—' }}</p>

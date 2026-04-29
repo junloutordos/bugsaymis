@@ -120,8 +120,9 @@ class AutoScheduleController extends Controller
             ]);
 
             return response()->json([
-                'job'     => $this->serializeJob($job->fresh(), true),
-                'warning' => $result['warning'] ?? null,
+                'job'                 => $this->serializeJob($job->fresh(), true),
+                'conflict_suggestions' => $result['conflict_suggestions'] ?? [],
+                'warning'             => $result['warning'] ?? null,
             ]);
 
         } catch (Throwable $e) {
@@ -153,7 +154,9 @@ class AutoScheduleController extends Controller
             return response()->json(['message' => 'Job is not in a completed state.'], 422);
         }
 
-        $schedules = $aiScheduleJob->generated_schedules;
+        // Allow the client to supply locally-patched schedules (e.g. after applying
+        // conflict-resolution suggestions).  Fall back to the stored schedules.
+        $schedules = $request->input('schedules') ?? $aiScheduleJob->generated_schedules;
         if (empty($schedules)) {
             return response()->json(['message' => 'No schedules to apply.'], 422);
         }

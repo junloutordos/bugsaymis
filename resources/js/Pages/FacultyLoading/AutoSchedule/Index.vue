@@ -129,8 +129,8 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
             <p class="text-2xl font-bold"
-              :class="result.hard_conflicts > 0 ? 'text-red-600' : 'text-emerald-600'">
-              {{ result.hard_conflicts }}
+              :class="liveConflictCount > 0 ? 'text-red-600' : 'text-emerald-600'">
+              {{ liveConflictCount }}
             </p>
             <p class="text-xs text-slate-500 mt-1">Hard Conflicts</p>
           </div>
@@ -150,23 +150,125 @@
           </div>
         </div>
 
-        <!-- Conflict warning -->
-        <div v-if="result.hard_conflicts > 0"
+        <!-- Conflict-free success -->
+        <div v-if="liveConflictCount === 0" class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0" />
+          <p class="text-sm font-semibold text-emerald-800">Conflict-free schedule generated!</p>
+        </div>
+
+        <!-- ── Conflict Resolution Panel ──────────────────────────────── -->
+        <div v-else-if="conflictSuggestions.length > 0" class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 bg-red-50 border-b border-red-200 flex items-center gap-2">
+            <ExclamationTriangleIcon class="h-5 w-5 text-red-500 shrink-0" />
+            <div>
+              <p class="text-sm font-semibold text-red-800">
+                {{ liveConflictCount }} hard conflict(s) detected — Suggested Fixes
+              </p>
+              <p class="text-xs text-red-600 mt-0.5">
+                Click "Use This Fix" to apply an alternative. Fixes update the preview and will be saved when you click "Save as Tentative".
+              </p>
+            </div>
+          </div>
+
+          <div class="divide-y divide-slate-100">
+            <div v-for="(c, ci) in conflictSuggestions" :key="ci"
+              :class="['px-5 py-4', isConflictResolved(c) ? 'opacity-40' : '']">
+
+              <!-- Conflict header -->
+              <div class="flex items-center gap-2 mb-3">
+                <span :class="conflictTypeBadge(c.type)">{{ c.type }}</span>
+                <span class="text-sm font-medium text-slate-700">
+                  {{ c.entity_label }} — {{ c.day }}
+                </span>
+                <span v-if="isConflictResolved(c)"
+                  class="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                  <CheckCircleIcon class="h-3.5 w-3.5" /> Resolved
+                </span>
+              </div>
+
+              <!-- The two conflicting slots -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div class="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs space-y-0.5">
+                  <p class="font-semibold text-slate-700">{{ c.subject_a }}</p>
+                  <p class="text-slate-500">{{ c.faculty_a }}</p>
+                  <p class="text-red-600 font-medium">{{ c.day }} {{ c.time_a }}</p>
+                </div>
+                <div class="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs space-y-0.5">
+                  <p class="font-semibold text-slate-700">{{ c.subject_b }}</p>
+                  <p class="text-slate-500">{{ c.faculty_b }}</p>
+                  <p class="text-red-600 font-medium">{{ c.day }} {{ c.time_b }}</p>
+                </div>
+              </div>
+
+              <!-- Alternatives -->
+              <div v-if="c.alternatives_a.length || c.alternatives_b.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                <!-- Alternatives for slot A -->
+                <div v-if="c.alternatives_a.length">
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                    Move "{{ c.subject_a }}" to:
+                  </p>
+                  <div class="space-y-1.5">
+                    <div v-for="(alt, ai) in c.alternatives_a" :key="ai"
+                      class="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5">
+                      <div class="text-xs">
+                        <span class="font-semibold text-slate-700">{{ alt.day }}</span>
+                        <span class="text-slate-500 ml-1">{{ fmtTime(alt.start_time) }}–{{ fmtTime(alt.end_time) }}</span>
+                        <span class="text-slate-400 ml-1">· {{ alt.classroom_name }}</span>
+                      </div>
+                      <button @click="applyFix(c.req_id_a, alt, ci)"
+                        class="text-xs text-emerald-700 hover:text-emerald-900 font-semibold ml-2 shrink-0">
+                        Use This Fix
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Alternatives for slot B -->
+                <div v-if="c.alternatives_b.length">
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                    Move "{{ c.subject_b }}" to:
+                  </p>
+                  <div class="space-y-1.5">
+                    <div v-for="(alt, bi) in c.alternatives_b" :key="bi"
+                      class="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-1.5">
+                      <div class="text-xs">
+                        <span class="font-semibold text-slate-700">{{ alt.day }}</span>
+                        <span class="text-slate-500 ml-1">{{ fmtTime(alt.start_time) }}–{{ fmtTime(alt.end_time) }}</span>
+                        <span class="text-slate-400 ml-1">· {{ alt.classroom_name }}</span>
+                      </div>
+                      <button @click="applyFix(c.req_id_b, alt, ci)"
+                        class="text-xs text-emerald-700 hover:text-emerald-900 font-semibold ml-2 shrink-0">
+                        Use This Fix
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- No alternatives available -->
+                <div v-if="!c.alternatives_a.length && !c.alternatives_b.length"
+                  class="sm:col-span-2 text-xs text-slate-400 italic">
+                  No automatic alternatives found. Fix this manually in the Schedules module after saving.
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Conflict warning (no suggestions) -->
+        <div v-else-if="liveConflictCount > 0"
           class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
           <ExclamationTriangleIcon class="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
           <div>
             <p class="text-sm font-semibold text-amber-800">
-              {{ result.hard_conflicts }} hard conflict(s) remain
+              {{ liveConflictCount }} hard conflict(s) remain
             </p>
             <p class="text-xs text-amber-700 mt-0.5">
               Try increasing population size or max generations, then re-run.
               You can still save and fix conflicts manually in the Schedules module.
             </p>
           </div>
-        </div>
-        <div v-else class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0" />
-          <p class="text-sm font-semibold text-emerald-800">Conflict-free schedule generated!</p>
         </div>
 
         <!-- Schedule preview table -->
@@ -321,6 +423,7 @@ import {
   ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 
+
 const props = defineProps({
   schoolYears: Array,
   recentJobs:  Array,
@@ -365,9 +468,11 @@ if (currentSY) {
 
 // ── Generation ──────────────────────────────────────────────────────────────
 
-const generating = ref(false)
-const result     = ref(null)   // the job object returned from the API
-const alert      = reactive({ type: '', message: '' })
+const generating         = ref(false)
+const result             = ref(null)   // the job object returned from the API
+const conflictSuggestions = ref([])    // suggestions returned alongside the job
+const resolvedConflicts  = ref(new Set()) // indices of conflicts user has fixed
+const alert              = reactive({ type: '', message: '' })
 
 function clearAlert() {
   alert.type    = ''
@@ -376,8 +481,10 @@ function clearAlert() {
 
 async function runGenerate() {
   if (!canGenerate.value || generating.value) return
-  generating.value = true
-  result.value     = null
+  generating.value    = true
+  result.value        = null
+  conflictSuggestions.value = []
+  resolvedConflicts.value   = new Set()
   clearAlert()
 
   try {
@@ -389,7 +496,8 @@ async function runGenerate() {
       max_generations:  form.max_generations,
     })
 
-    result.value = data.job
+    result.value             = data.job
+    conflictSuggestions.value = data.conflict_suggestions ?? []
 
     if (data.warning) {
       alert.type    = 'warning'
@@ -404,6 +512,49 @@ async function runGenerate() {
   } finally {
     generating.value = false
   }
+}
+
+// ── Conflict resolution ──────────────────────────────────────────────────────
+
+/** Live conflict count based on the current (possibly patched) schedule entries. */
+const liveConflictCount = computed(() => {
+  if (!result.value?.schedules) return 0
+  return result.value.schedules.filter(s => hasConflict(s)).length > 0
+    ? result.value.schedules.filter(s => hasConflict(s)).length
+    : 0
+})
+
+function isConflictResolved(conflict) {
+  return resolvedConflicts.value.has(conflict.req_id_a) || resolvedConflicts.value.has(conflict.req_id_b)
+}
+
+function conflictTypeBadge(type) {
+  const map = {
+    faculty: 'inline-flex text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium',
+    room:    'inline-flex text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium',
+    section: 'inline-flex text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium',
+  }
+  return map[type] ?? 'inline-flex text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full'
+}
+
+/**
+ * Apply a conflict-resolution suggestion: patch the matching schedule entry
+ * in-place (local only; included in the apply POST payload automatically).
+ */
+function applyFix(reqId, alt, conflictIndex) {
+  if (!result.value?.schedules) return
+
+  const entry = result.value.schedules.find(s => s._req_id === reqId)
+  if (!entry) return
+
+  entry.day_of_week     = alt.day
+  entry.start_time      = alt.start_time
+  entry.end_time        = alt.end_time
+  entry.classroom_id    = alt.classroom_id
+  entry._classroom_name = alt.classroom_name
+  entry._classroom_code = alt.classroom_code
+
+  resolvedConflicts.value.add(reqId)
 }
 
 // ── Preview / Filters ───────────────────────────────────────────────────────
@@ -455,8 +606,10 @@ async function applySchedules() {
   clearAlert()
 
   try {
+    // Send local (possibly patched) schedules so conflict fixes are persisted
     const { data } = await axios.post(
-      `/faculty-loading/auto-schedule/jobs/${result.value.id}/apply`
+      `/faculty-loading/auto-schedule/jobs/${result.value.id}/apply`,
+      { schedules: result.value.schedules }
     )
     alert.type    = 'success'
     alert.message = data.message
@@ -469,7 +622,9 @@ async function applySchedules() {
 }
 
 function discardResult() {
-  result.value = null
+  result.value             = null
+  conflictSuggestions.value = []
+  resolvedConflicts.value   = new Set()
   clearAlert()
 }
 
@@ -478,11 +633,13 @@ function discardResult() {
 const recentJobs = ref(props.recentJobs ?? [])
 
 function loadJob(job) {
-  // Load a past job result into the preview panel
+  // Load a past job result into the preview panel (no conflict suggestions for history)
   axios.get(`/faculty-loading/auto-schedule/jobs/${job.id}`)
     .then(({ data }) => {
-      result.value = data
-      form.academic_term_id = data.academic_term_id
+      result.value              = data
+      conflictSuggestions.value = []
+      resolvedConflicts.value   = new Set()
+      form.academic_term_id     = data.academic_term_id
     })
     .catch(() => {
       alert.type    = 'error'

@@ -53,8 +53,8 @@
               <tr class="text-xs text-slate-400 uppercase tracking-wide">
                 <th class="px-4 py-2 text-left">Name</th>
                 <th class="px-4 py-2 text-left">Code</th>
-                <th class="px-4 py-2 text-left">Strand</th>
                 <th class="px-4 py-2 text-center">Capacity</th>
+                <th class="px-4 py-2 text-left">Home Room</th>
                 <th class="px-4 py-2 text-left">Adviser</th>
                 <th class="px-4 py-2 text-center">Status</th>
                 <th class="px-4 py-2"></th>
@@ -65,8 +65,11 @@
                 :class="{ 'opacity-50': !s.is_active }">
                 <td class="px-4 py-3 font-medium text-slate-800">{{ s.sectionname }}</td>
                 <td class="px-4 py-3 text-slate-500 font-mono text-xs">{{ s.section_code ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ s.strand ?? '—' }}</td>
                 <td class="px-4 py-3 text-center text-slate-600">{{ s.capacity ?? '—' }}</td>
+                <td class="px-4 py-3 text-slate-600 text-xs">
+                  <span v-if="s.classroom" class="font-medium">{{ s.classroom.name }}</span>
+                  <span v-else class="text-slate-400 italic">No room</span>
+                </td>
                 <td class="px-4 py-3 text-slate-600">{{ s.adviser?.name ?? '—' }}</td>
                 <td class="px-4 py-3 text-center">
                   <span :class="s.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'"
@@ -76,6 +79,10 @@
                 </td>
                 <td class="px-4 py-3 text-right">
                   <div class="flex items-center justify-end gap-1">
+                    <Link :href="route('faculty-loading.sections.show', s.id)"
+                      class="p-1.5 text-slate-400 hover:text-emerald-600 rounded" title="View detail">
+                      <EyeIcon class="h-4 w-4" />
+                    </Link>
                     <button @click="openForm(s)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
                       <PencilIcon class="h-4 w-4" />
                     </button>
@@ -118,15 +125,48 @@
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Strand (SHS)</label>
-            <input v-model="form.strand" type="text" placeholder="e.g. STEM"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-
-          <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
             <input v-model.number="form.capacity" type="number" min="1" max="60"
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+          </div>
+
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Home Room</label>
+            <select v-model.number="form.classroom_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">No fixed room</option>
+              <option v-for="r in classrooms" :key="r.id" :value="r.id">
+                {{ r.name }}<template v-if="r.code"> ({{ r.code }})</template>
+              </option>
+            </select>
+            <p class="text-xs text-slate-400 mt-1">Used by the schedule generator to fix all classes to this room.</p>
+          </div>
+
+          <!-- Break times -->
+          <div class="col-span-2 pt-1">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Break Times</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Recess Start</label>
+                <input v-model="form.recess_start" type="time"
+                  class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Recess End</label>
+                <input v-model="form.recess_end" type="time"
+                  class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Lunch Start</label>
+                <input v-model="form.lunch_start" type="time"
+                  class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Lunch End</label>
+                <input v-model="form.lunch_end" type="time"
+                  class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </div>
+            </div>
           </div>
 
           <div class="col-span-2">
@@ -167,19 +207,20 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { CheckCircleIcon, PencilIcon, PlusIcon, RectangleGroupIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { CheckCircleIcon, EyeIcon, PencilIcon, PlusIcon, RectangleGroupIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   sections:    { type: Array,  default: () => [] },
   schoolYears: { type: Array,  default: () => [] },
   faculty:     { type: Array,  default: () => [] },
+  classrooms:  { type: Array,  default: () => [] },
   filters:     { type: Object, default: () => ({}) },
 })
 
 const filters = reactive({
-  school_year_id: props.filters.school_year_id ?? null,
+  school_year_id: props.filters.school_year_id ?? null,   // controller always supplies current year default
 })
 
 function applyFilters() {
@@ -203,8 +244,12 @@ const form = useForm({
   sectionname: '',
   levelid: 7,
   section_code: '',
-  strand: '',
-  capacity: null,
+  capacity: 30,
+  classroom_id: null,
+  recess_start: '',
+  recess_end: '',
+  lunch_start: '',
+  lunch_end: '',
   adviser: null,
   syid: null,
   is_active: true,
@@ -217,8 +262,12 @@ function openForm(s = null) {
       sectionname: s.sectionname,
       levelid: s.levelid,
       section_code: s.section_code ?? '',
-      strand: s.strand ?? '',
       capacity: s.capacity ?? null,
+      classroom_id: s.classroom_id ?? null,
+      recess_start: s.recess_start ?? '',
+      recess_end: s.recess_end ?? '',
+      lunch_start: s.lunch_start ?? '',
+      lunch_end: s.lunch_end ?? '',
       adviser: s.adviser?.id ?? null,
       syid: null,
       is_active: s.is_active,
@@ -227,6 +276,12 @@ function openForm(s = null) {
     form.reset()
     form.id = null
     form.levelid = 7
+    form.capacity = 30
+    form.classroom_id = null
+    form.recess_start = ''
+    form.recess_end = ''
+    form.lunch_start = ''
+    form.lunch_end = ''
     form.is_active = true
     const currentSy = props.schoolYears.find(sy => sy.is_current)
     form.syid = currentSy?.id ?? null

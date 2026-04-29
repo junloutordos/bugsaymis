@@ -156,6 +156,15 @@ class MessengerialController extends Controller
             }
         }
 
+        // Override: if requestor is from OCD division, route to OCD user instead of division chief
+        if ($user && $this->isOcdDivision($user)) {
+            $ocdUser = User::havingRole('OCD')->first();
+            if ($ocdUser && $ocdUser->email) {
+                $chiefEmail = $ocdUser->email;
+                $chiefUser  = $ocdUser;
+            }
+        }
+
         if ($chiefEmail) {
             if ($chiefUser) {
                 $mr->division_chief_id = $chiefUser->id;
@@ -307,7 +316,7 @@ class MessengerialController extends Controller
     public function forApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasRole('DivisionChief') && ! $user->hasRole('Administrator')) {
+        if (! $user->hasAnyRole(['DivisionChief', 'OCD', 'Administrator'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -315,7 +324,9 @@ class MessengerialController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 50);
 
         $query = MessengerialRequest::where('status', 'Pending Division Chief Approval');
-        if ($user->hasRole('DivisionChief')) {
+        if ($user->hasRole('DivisionChief') || $user->hasRole('OCD')) {
+            // Division Chief sees their own assigned requests;
+            // OCD sees requests assigned to them (from OCD division requestors)
             $query->where('division_chief_id', $user->id);
         }
 
@@ -342,8 +353,15 @@ class MessengerialController extends Controller
     public function divisionChiefAction(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        if (! $user->hasRole('DivisionChief') && ! $user->hasRole('Administrator')) {
+        if (! $user->hasAnyRole(['DivisionChief', 'OCD', 'Administrator'])) {
             abort(403);
+        }
+
+        // OCD and DivisionChief can only act on requests assigned to them
+        if ($user->hasAnyRole(['DivisionChief', 'OCD']) && ! $user->hasRole('Administrator')) {
+            if ((int) $messengerialRequest->division_chief_id !== $user->id) {
+                abort(403);
+            }
         }
 
         $request->validate(['action' => 'required|in:approve,reject']);
@@ -474,6 +492,28 @@ class MessengerialController extends Controller
     }
 
     /**
+     * Returns true if the given user belongs to the Office of the Campus Director.
+     * Matches by OCD role, division acronym, or division name.
+     */
+    private function isOcdDivision(User $user): bool
+    {
+        if ($user->hasRole('OCD')) {
+            return true;
+        }
+
+        $division = $user->division;
+        if (! $division) {
+            return false;
+        }
+
+        if (strtolower(trim($division->acronym ?? '')) === 'ocd') {
+            return true;
+        }
+
+        return str_contains(strtolower($division->division_name ?? ''), 'campus director');
+    }
+
+    /**
      * Upload proof of delivery (only Records and Administrator)
      */
     public function uploadProof(Request $request, MessengerialRequest $messengerialRequest)
@@ -541,5 +581,45 @@ class MessengerialController extends Controller
         }
 
         return redirect()->route('messengerial.index')->with('success', 'Proof uploaded and request marked completed.');
+    }
+
+    public function ocdApproval(Request $request)
+    {
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = MessengerialRequest::where('status', 'Approved')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',      'like', "%{$search}%")
+                      ->orWhere('requestor',   'like', "%{$search}%")
+                      ->orWhere('reference_no','like', "%{$search}%")
+                      ->orWhere('destination', 'like', "%{$search}%");
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('Messengerial/OCDApprovalMessengerial', [
+            'requests' => $requests,
+            'filters'  => ['search' => $search],
+        ]);
+    }
+
+    public function ocdAction(Request $request, MessengerialRequest $messengerialRequest)
+    {
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            $messengerialRequest->update(['status' => 'OCD Approved']);
+        } else {
+            $request->validate(['reason' => 'nullable|string|max:1000']);
+            $messengerialRequest->update([
+                'status'         => 'Declined',
+                'decline_reason' => $request->input('reason') ?? 'Declined by OCD.',
+                'declined_at'    => now(),
+            ]);
+        }
+
+        return back()->with('success', 'OCD action recorded.');
     }
 }

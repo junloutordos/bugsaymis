@@ -145,15 +145,6 @@ Route::post('/guidance/kiosk', [\App\Http\Controllers\GuidanceKioskController::c
     ->middleware('throttle:20,1')
     ->name('guidance.kiosk.store');
 
-// DTR Upload (Data Management) - front-end page
-Route::get('/data-management/dtr-upload', function () {
-    return Inertia::render('DataManagement/DTRUpload');
-})->name('data.dtr.upload')->middleware(['auth','permission:roles.assign']);
-
-// Endpoint to accept uploaded .dat file and insert attendance rows
-Route::post('/data-management/dtr-upload', [\App\Http\Controllers\DataManagement\DTRUploadController::class, 'store'])
-    ->name('data.dtr.upload.store')
-    ->middleware(['auth','permission:roles.assign']);
 
     // Consultation log printable report (A4 landscape)
     Route::get('/consultations/log/print', [\App\Http\Controllers\ConsultationController::class, 'logPrint'])
@@ -359,7 +350,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/vehicle-requests/ocd-approval', [VehicleRequestController::class, 'ocdApproval'])->name('vehicle-requests.ocd-approval');
     Route::post('/vehicle-requests/{vehicleRequest}/ocd-action', [VehicleRequestController::class, 'approveByOCDInApp'])->name('vehicle-requests.ocd-action');
     Route::get('/facility-requests/ocd-approval', [\App\Http\Controllers\FacilityRequestController::class, 'ocdApproval'])->name('facility-requests.ocd-approval');
-    Route::post('/facility-requests/{facilityRequest}/ocd-action', [\App\Http\Controllers\FacilityRequestController::class, 'approveByOCDInApp'])->name('facility-requests.ocd-action');
+    Route::post('/facility-requests/{facilityRequest}/ocd-action', [\App\Http\Controllers\FacilityRequestController::class, 'ocdAction'])->name('facility-requests.ocd-action');
+    Route::get('/messengerial/ocd-approval', [\App\Http\Controllers\MessengerialController::class, 'ocdApproval'])->name('messengerial.ocd-approval');
+    Route::post('/messengerial/{messengerialRequest}/ocd-action', [\App\Http\Controllers\MessengerialController::class, 'ocdAction'])->name('messengerial.ocd-action');
     Route::get('/hr/gatepass/ocd-approval', [\App\Http\Controllers\HumanResource\GatePassController::class, 'ocdApproval'])->name('gatepass.ocd-approval');
     Route::post('/hr/gatepass/{id}/ocd-action', [\App\Http\Controllers\HumanResource\GatePassController::class, 'approveByOCDInApp'])->name('gatepass.ocd-action');
 
@@ -553,6 +546,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/facility-requests/{facilityRequest}/fad/decline/{chief}', [\App\Http\Controllers\FacilityRequestController::class, 'submitFadDecline'])
         ->name('facility-requests.fad.decline.submit')
         ->middleware(['signed']);
+
 
     // Service Requests: Division chief approve/decline via signed links
     Route::get('/service-requests/{serviceRequest}/approve/{chief}', [\App\Http\Controllers\ServiceRequestController::class, 'approveByDivisionChief'])
@@ -1407,6 +1401,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('leave.balance.check');
     Route::get('/leave-credits/my', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'myCredits'])
         ->name('leave-credits.my');
+    Route::post('/leave-credits/my/service-credits', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'myServiceCreditsStore'])
+        ->name('leave-credits.my.service-credits.store');
     Route::post('/leave', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'store'])
         ->name('leave.store');
     Route::get('/leave/{leaveApplication}', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'show'])
@@ -1499,7 +1495,7 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     Route::get('/dtr/{user}/checklist', [\App\Http\Controllers\HR\DtrRecordController::class, 'printChecklist'])
         ->name('dtr.checklist');
 
-    // ── Work Schedules ────────────────────────────────────────────────────────
+    // ── Work Schedules — HR Admin ─────────────────────────────────────────────
     Route::get('/schedules', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'index'])
         ->name('schedules.index');
     Route::post('/schedules/presets', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'storePreset'])
@@ -1510,6 +1506,18 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('schedules.presets.destroy');
     Route::post('/schedules/assign', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'assign'])
         ->name('schedules.assign');
+    Route::post('/schedules/{schedule}/approve', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'approveSubmission'])
+        ->name('schedules.approve');
+    Route::post('/schedules/{schedule}/reject', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'rejectSubmission'])
+        ->name('schedules.reject');
+
+    // ── Work Schedules — Employee Self-Service ────────────────────────────────
+    Route::get('/schedules/my', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'mySchedule'])
+        ->name('schedules.my');
+    Route::post('/schedules/submit', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'submit'])
+        ->name('schedules.submit');
+    Route::delete('/schedules/{schedule}/cancel', [\App\Http\Controllers\HR\EmployeeScheduleController::class, 'cancelSubmission'])
+        ->name('schedules.cancel');
 
     // ── Employee 201 Files ──────────────────────────────────────────────────────
     Route::get('/201-files', [EmployeeDocumentController::class, 'listEmployees'])
@@ -1710,4 +1718,6 @@ if (app()->environment('local')) {
 require __DIR__.'/chat.php';
 require __DIR__.'/saln.php';
 require __DIR__.'/faculty-loading.php';
+require __DIR__.'/ams.php';
+require __DIR__.'/ppmp.php';
 require __DIR__.'/auth.php';

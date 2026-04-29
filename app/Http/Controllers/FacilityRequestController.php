@@ -324,41 +324,23 @@ class FacilityRequestController extends Controller
 
     /**
      * Approve facility request via signed link from Division Chief
+     * DC approval → Pending FAD Approval (FAD is next)
      */
     public function approveByDivisionChief(Request $request, FacilityRequest $facilityRequest, $chief)
     {
-        // Signed middleware ensures URL integrity. Verify the chief in the link matches the assigned approver when present.
         $assignedChiefId = $facilityRequest->requester?->division?->division_chief_id ?? null;
         if ($assignedChiefId && (int) $assignedChiefId !== (int) $chief) {
             abort(403);
         }
-        if ($facilityRequest->status === 'Approved') {
+
+        if (in_array($facilityRequest->status, ['Pending FAD Approval', 'Approved'])) {
             return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
         }
 
-        $facilityRequest->status = 'Approved';
+        $facilityRequest->status = 'Pending FAD Approval';
         $facilityRequest->save();
 
-        // Notify requester via email (approved by Division Chief)
-        try {
-            $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = null;
-            if ($chief) {
-                $u = \App\Models\User::find($chief);
-                $approverName = $u?->name ?? null;
-            } elseif ($assignedChiefId) {
-                $u = \App\Models\User::find($assignedChiefId);
-                $approverName = $u?->name ?? null;
-            }
-
-            if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
-            }
-        } catch (\Throwable $e) {
-            logger()->error('Failed to send facility request approved notification', ['error' => $e->getMessage()]);
-        }
-
-        // Notify FAD Chief users with signed approve/decline links (Division Chief approved -> FAD reviews)
+        // Notify FAD Chief users with signed approve/decline links
         try {
             $fadUsers = \App\Models\User::select('id','email','position')
                         ->where('position', 'like', '%FAD%')
@@ -405,9 +387,11 @@ class FacilityRequestController extends Controller
                 abort(403);
             }
         }
-        if ($facilityRequest->status === 'Approved') return back()->with('success', 'Already approved');
+        if (in_array($facilityRequest->status, ['Pending FAD Approval', 'Approved'])) {
+            return back()->with('success', 'Already forwarded for FAD approval.');
+        }
 
-        $facilityRequest->status = 'Approved';
+        $facilityRequest->status = 'Pending FAD Approval';
         $facilityRequest->save();
 
         $this->snapshots->recordApproval(
@@ -417,16 +401,6 @@ class FacilityRequestController extends Controller
             action:     'approved',
             approver:   $user,
         );
-
-        try {
-            $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = $user->name ?? null;
-            if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
-            }
-        } catch (\Throwable $e) {
-            logger()->error('Failed to send facility request approved notification', ['error' => $e->getMessage()]);
-        }
 
         // Notify FAD Chief users for next-level approval/decline
         try {
@@ -510,7 +484,7 @@ class FacilityRequestController extends Controller
             abort(403);
         }
 
-        if ($facilityRequest->status === 'Approved') {
+        if (in_array($facilityRequest->status, ['Pending FAD Approval', 'Approved'])) {
             return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
         }
 
@@ -531,7 +505,7 @@ class FacilityRequestController extends Controller
             'reason' => 'required|string|max:1000',
         ]);
 
-        if (in_array($facilityRequest->status, ['Approved','Declined'])) {
+        if (in_array($facilityRequest->status, ['Pending FAD Approval', 'Approved', 'Declined'])) {
             $reason = $facilityRequest->decline_reason ?? '—';
             return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $reason]);
         }
@@ -564,63 +538,23 @@ class FacilityRequestController extends Controller
     }
 
     /**
-     * Approve facility request by OCD via signed link
-     */
-    public function approveByOCD(Request $request, FacilityRequest $facilityRequest, $ocd)
-    {
-        if ($facilityRequest->status === 'OCD Approved') {
-            return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
-        }
-
-        $facilityRequest->status = 'OCD Approved';
-        $facilityRequest->save();
-
-        // Notify requester
-        try {
-            $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = null;
-            if ($ocd) {
-                $u = \App\Models\User::find($ocd);
-                $approverName = $u?->name ?? 'Office of the Campus Director';
-            } else {
-                $approverName = 'Office of the Campus Director';
-            }
-
-            if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Approved', null, $approverName));
-            }
-        } catch (\Throwable $e) {
-            logger()->error('Failed to send facility request OCD approved notification', ['error' => $e->getMessage()]);
-        }
-
-        return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => false]);
-    }
-
-    /**
      * Approve facility request by GSU Head via signed link
      */
     public function approveByGSU(Request $request, FacilityRequest $facilityRequest, $gsu)
     {
-        if ($facilityRequest->status === 'OCD Approved') {
+        if ($facilityRequest->status === 'Approved') {
             return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
         }
 
-        $facilityRequest->status = 'OCD Approved';
+        $facilityRequest->status = 'Approved';
         $facilityRequest->save();
 
-        // Notify requester
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = null;
-            if ($gsu) {
-                $u = \App\Models\User::find($gsu);
-                $approverName = $u?->name ?? 'GSU Head';
-            } else {
-                $approverName = 'GSU Head';
-            }
+            $approverName   = $gsu ? (\App\Models\User::find($gsu)?->name ?? 'GSU Head') : 'GSU Head';
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Approved', null, $approverName));
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request GSU approved notification', ['error' => $e->getMessage()]);
@@ -631,7 +565,7 @@ class FacilityRequestController extends Controller
 
     public function showGsuDeclineForm(Request $request, FacilityRequest $facilityRequest, $gsu)
     {
-        if ($facilityRequest->status === 'OCD Approved') {
+        if ($facilityRequest->status === 'Approved') {
             return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
         }
 
@@ -647,12 +581,12 @@ class FacilityRequestController extends Controller
             'reason' => 'required|string|max:1000',
         ]);
 
-        if (in_array($facilityRequest->status, ['Approved','Declined','OCD Approved','OCD Declined'])) {
+        if (in_array($facilityRequest->status, ['Approved', 'Declined'])) {
             $reason = $facilityRequest->decline_reason ?? '—';
             return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $reason]);
         }
 
-        $facilityRequest->status = 'OCD Declined';
+        $facilityRequest->status = 'Declined';
         $facilityRequest->decline_reason = $request->input('reason');
         $facilityRequest->declined_at = now();
         $facilityRequest->save();
@@ -679,30 +613,24 @@ class FacilityRequestController extends Controller
     }
 
     /**
-     * Approve facility request by FAD Chief via signed link
+     * Approve facility request by FAD Chief via signed link — final approval
      */
     public function approveByFAD(Request $request, FacilityRequest $facilityRequest, $chief)
     {
-        if ($facilityRequest->status === 'FAD Approved') {
+        if ($facilityRequest->status === 'Approved') {
             return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
         }
 
-        $facilityRequest->status = 'FAD Approved';
+        $facilityRequest->status = 'Approved';
         $facilityRequest->save();
 
-        // Notify requester that FAD approved
+        // Notify requester — fully approved
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = null;
-            if ($chief) {
-                $u = \App\Models\User::find($chief);
-                $approverName = $u?->name ?? 'FAD Chief';
-            } else {
-                $approverName = 'FAD Chief';
-            }
+            $approverName = $chief ? (\App\Models\User::find($chief)?->name ?? 'FAD Chief') : 'FAD Chief';
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'FAD Approved', null, $approverName));
+                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request FAD approved notification', ['error' => $e->getMessage()]);
@@ -713,7 +641,7 @@ class FacilityRequestController extends Controller
 
     public function showFadDeclineForm(Request $request, FacilityRequest $facilityRequest, $chief)
     {
-        if ($facilityRequest->status === 'FAD Approved') {
+        if ($facilityRequest->status === 'Approved') {
             return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
         }
 
@@ -729,12 +657,12 @@ class FacilityRequestController extends Controller
             'reason' => 'required|string|max:1000',
         ]);
 
-        if (in_array($facilityRequest->status, ['Approved','Declined','FAD Approved','FAD Declined'])) {
+        if (in_array($facilityRequest->status, ['Approved', 'Declined'])) {
             $reason = $facilityRequest->decline_reason ?? '—';
             return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $reason]);
         }
 
-        $facilityRequest->status = 'FAD Declined';
+        $facilityRequest->status = 'Declined';
         $facilityRequest->decline_reason = $request->input('reason');
         $facilityRequest->declined_at = now();
         $facilityRequest->save();
@@ -759,55 +687,6 @@ class FacilityRequestController extends Controller
         return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $facilityRequest->decline_reason]);
     }
 
-    public function showOcdDeclineForm(Request $request, FacilityRequest $facilityRequest, $ocd)
-    {
-        if ($facilityRequest->status === 'OCD Approved') {
-            return view('facility_request_approved', ['facilityRequest' => $facilityRequest, 'already' => true]);
-        }
-
-        $postAction = route('facility-requests.ocd.decline.submit', ['facilityRequest' => $facilityRequest->id, 'ocd' => $ocd])
-            . '?' . $request->getQueryString();
-
-        return view('facility_request_decline', ['facilityRequest' => $facilityRequest, 'postAction' => $postAction]);
-    }
-
-    public function submitOcdDecline(Request $request, FacilityRequest $facilityRequest, $ocd)
-    {
-        $request->validate([
-            'reason' => 'required|string|max:1000',
-        ]);
-
-        if (in_array($facilityRequest->status, ['Approved','Declined','OCD Approved','OCD Declined'])) {
-            $reason = $facilityRequest->decline_reason ?? '—';
-            return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $reason]);
-        }
-
-        $facilityRequest->status = 'OCD Declined';
-        $facilityRequest->decline_reason = $request->input('reason');
-        $facilityRequest->declined_at = now();
-        $facilityRequest->save();
-
-        // Notify requester
-        try {
-            $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = null;
-            if ($ocd) {
-                $u = \App\Models\User::find($ocd);
-                $approverName = $u?->name ?? 'Office of the Campus Director';
-            } else {
-                $approverName = 'Office of the Campus Director';
-            }
-
-            if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
-            }
-        } catch (\Throwable $e) {
-            logger()->error('Failed to send facility request OCD declined notification', ['error' => $e->getMessage()]);
-        }
-
-        return view('facility_request_declined', ['facilityRequest' => $facilityRequest, 'reason' => $facilityRequest->decline_reason]);
-    }
-
     public function destroy(FacilityRequest $facilityRequest)
     {
         $isAdmin = auth()->user()->hasRole('Administrator');
@@ -818,11 +697,11 @@ class FacilityRequestController extends Controller
 
     /**
      * Return JSON bookings for calendar display.
-     * Includes both 'Approved' and 'OCD Approved' requests and expands multi-day ranges.
+     * Includes Approved requests and expands multi-day ranges.
      */
     public function bookings(Request $request)
     {
-        $rows = FacilityRequest::whereIn('status', ['Approved', 'OCD Approved'])
+        $rows = FacilityRequest::where('status', 'Approved')
             ->get();
 
         $out = [];
@@ -937,8 +816,7 @@ class FacilityRequestController extends Controller
             abort(403);
         }
 
-        // Allow printing when OCD has approved or when FAD has approved
-        if (! in_array($facilityRequest->status, ['OCD Approved', 'FAD Approved'])) {
+        if ($facilityRequest->status !== 'Approved') {
             abort(403, 'Request not ready for printing');
         }
 
@@ -992,7 +870,7 @@ class FacilityRequestController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 50);
 
         $requests = FacilityRequest::with('requester:id,name')
-            ->where('status', 'Approved')
+            ->where('status', 'Pending FAD Approval')
             ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
                 $inner->where('activity', 'like', "%{$search}%")
                       ->orWhere('purpose',  'like', "%{$search}%")
@@ -1017,21 +895,24 @@ class FacilityRequestController extends Controller
         $request->validate(['action' => 'required|in:approve,reject']);
 
         if ($request->action === 'approve') {
-            $facilityRequest->update(['status' => 'FAD Approved']);
+            $facilityRequest->update(['status' => 'Approved']);
+
+            // Notify requester — FAD is the final approver
             try {
                 $requesterEmail = $facilityRequest->requester?->email ?? null;
                 if ($requesterEmail) {
-                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'FAD Approved', null, $user->name));
+                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $user->name));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Facility FAD approved email failed', ['error' => $e->getMessage()]);
             }
         } else {
-            $facilityRequest->update(['status' => 'FAD Declined', 'decline_reason' => 'Declined by FAD Chief.', 'declined_at' => now()]);
+            $request->validate(['reason' => 'nullable|string|max:1000']);
+            $facilityRequest->update(['status' => 'Declined', 'decline_reason' => $request->input('reason') ?? 'Declined by FAD Chief.', 'declined_at' => now()]);
             try {
                 $requesterEmail = $facilityRequest->requester?->email ?? null;
                 if ($requesterEmail) {
-                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'FAD Declined', 'Declined by FAD Chief.', $user->name));
+                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason, $user->name));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Facility FAD declined email failed', ['error' => $e->getMessage()]);
@@ -1041,9 +922,6 @@ class FacilityRequestController extends Controller
         return back()->with('success', 'FAD action recorded.');
     }
 
-    /* =====================================================
-     | OCD IN-APP APPROVAL DASHBOARD
-     |=====================================================*/
     public function ocdApproval(Request $request)
     {
         $search  = trim($request->query('search', ''));
@@ -1051,10 +929,10 @@ class FacilityRequestController extends Controller
 
         $requests = FacilityRequest::with('requester:id,name')
             ->where('status', 'Approved')
-            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
                 $inner->where('activity', 'like', "%{$search}%")
                       ->orWhere('purpose',  'like', "%{$search}%")
-                      ->orWhereHas('requester', fn($u) => $u->where('name', 'like', "%{$search}%"));
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
             }))
             ->latest()
             ->paginate($perPage)
@@ -1066,36 +944,19 @@ class FacilityRequestController extends Controller
         ]);
     }
 
-    public function approveByOCDInApp(Request $request, FacilityRequest $facilityRequest)
+    public function ocdAction(Request $request, FacilityRequest $facilityRequest)
     {
         $request->validate(['action' => 'required|in:approve,reject']);
 
         if ($request->action === 'approve') {
             $facilityRequest->update(['status' => 'OCD Approved']);
-
-            try {
-                $requesterEmail = $facilityRequest->requester?->email ?? $facilityRequest->email;
-                if ($requesterEmail) {
-                    \Mail::to($requesterEmail)->send(
-                        new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Approved', null, $request->user()->name)
-                    );
-                }
-            } catch (\Throwable $e) {
-                logger()->error('Facility OCD approved email failed', ['error' => $e->getMessage()]);
-            }
         } else {
-            $facilityRequest->update(['status' => 'OCD Declined']);
-
-            try {
-                $requesterEmail = $facilityRequest->requester?->email ?? $facilityRequest->email;
-                if ($requesterEmail) {
-                    \Mail::to($requesterEmail)->send(
-                        new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'OCD Declined', null, $request->user()->name)
-                    );
-                }
-            } catch (\Throwable $e) {
-                logger()->error('Facility OCD declined email failed', ['error' => $e->getMessage()]);
-            }
+            $request->validate(['reason' => 'nullable|string|max:1000']);
+            $facilityRequest->update([
+                'status'         => 'Declined',
+                'decline_reason' => $request->input('reason') ?? 'Declined by OCD.',
+                'declined_at'    => now(),
+            ]);
         }
 
         return back()->with('success', 'OCD action recorded.');

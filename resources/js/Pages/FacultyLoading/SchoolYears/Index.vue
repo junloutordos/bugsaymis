@@ -44,8 +44,22 @@
               class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
               {{ sy.status }}
             </span>
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+              :class="workflowClass(sy.workflow_status)">
+              {{ sy.workflow_status ?? 'draft' }}
+            </span>
           </div>
           <div class="flex items-center gap-2">
+            <button v-if="sy.workflow_status !== 'archived'"
+              @click="advanceSy(sy)"
+              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium border border-indigo-200 hover:bg-indigo-50 px-2 py-1 rounded transition-colors">
+              Advance →
+            </button>
+            <button v-if="sy.workflow_status !== 'archived'"
+              @click="archiveSy(sy)"
+              class="text-xs text-slate-500 hover:text-slate-700 font-medium border border-slate-200 hover:bg-slate-50 px-2 py-1 rounded transition-colors">
+              Archive
+            </button>
             <button @click="openTermForm(sy)"
               class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1">
               <PlusIcon class="h-3.5 w-3.5" /> Add Term
@@ -233,6 +247,27 @@ function deleteSy(sy) {
   if (! confirm(`Delete S.Y. ${sy.name}?`)) return
   useForm({}).delete(route('faculty-loading.school-years.destroy', sy.id))
 }
+
+function advanceSy(sy) {
+  const next = { draft: 'proposed', proposed: 'approved', approved: 'published', published: 'archived' }[sy.workflow_status]
+  if (! next) return
+  if (! confirm(`Advance S.Y. ${sy.name} from '${sy.workflow_status}' to '${next}'?`)) return
+  useForm({}).post(route('faculty-loading.school-years.advance', sy.id))
+}
+
+function archiveSy(sy) {
+  if (! confirm(`Archive S.Y. ${sy.name}? This cannot be undone if there are no active loads.`)) return
+  useForm({}).post(route('faculty-loading.school-years.archive', sy.id))
+}
+
+const WORKFLOW_CLASSES = {
+  draft:     'bg-slate-100 text-slate-500',
+  proposed:  'bg-yellow-100 text-yellow-700',
+  approved:  'bg-blue-100 text-blue-700',
+  published: 'bg-emerald-100 text-emerald-700',
+  archived:  'bg-slate-200 text-slate-500',
+}
+const workflowClass = (s) => WORKFLOW_CLASSES[s] ?? 'bg-slate-100 text-slate-500'
 
 // ── Term CRUD ────────────────────────────────────────────────────────────────
 const termModal    = ref(false)

@@ -39,6 +39,12 @@
           <option value="research">Research</option>
           <option value="special">Special</option>
         </select>
+        <select v-model="filters.term_id" @change="applyFilters"
+          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option v-for="t in terms" :key="t.id" :value="t.id">
+            {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
+          </option>
+        </select>
       </div>
 
       <!-- Empty -->
@@ -58,6 +64,7 @@
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Units</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Lec/Lab hrs</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assigned Faculty</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th class="px-4 py-3"></th>
             </tr>
@@ -75,6 +82,15 @@
               </td>
               <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ s.load_units }}</td>
               <td class="px-4 py-3 text-center text-slate-500">{{ s.lecture_hours }} / {{ s.lab_hours ?? 0 }}</td>
+              <td class="px-4 py-3">
+                <div v-if="s.faculty && s.faculty.length" class="flex flex-wrap gap-1">
+                  <span v-for="f in s.faculty" :key="f.id"
+                    class="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 text-xs font-medium">
+                    {{ f.name }}
+                  </span>
+                </div>
+                <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
+              </td>
               <td class="px-4 py-3 text-center">
                 <span :class="s.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'"
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
@@ -197,11 +213,18 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { BookOpenIcon, CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  subjects: { type: Array,  default: () => [] },
-  filters:  { type: Object, default: () => ({}) },
+  subjects:      { type: Array,  default: () => [] },
+  terms:         { type: Array,  default: () => [] },
+  currentTermId: { type: Number, default: null },
+  filters:       { type: Object, default: () => ({}) },
 })
 
-const filters = reactive({ search: props.filters.search ?? '', grade_level: props.filters.grade_level ?? 'all', subject_type: props.filters.subject_type ?? 'all' })
+const filters = reactive({
+  search:       props.filters.search       ?? '',
+  grade_level:  props.filters.grade_level  ?? 'all',
+  subject_type: props.filters.subject_type ?? 'all',
+  term_id:      props.filters.term_id      ?? props.currentTermId,
+})
 
 function applyFilters() {
   router.get(route('faculty-loading.subjects.index'), filters, { preserveState: true })

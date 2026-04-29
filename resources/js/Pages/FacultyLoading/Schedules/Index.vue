@@ -7,7 +7,7 @@
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 class="text-xl font-semibold text-slate-800">Class Schedules</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Assign and manage faculty class schedules</p>
+          <p class="text-sm text-slate-500 mt-0.5">Weekly timetable by section</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <Link :href="route('faculty-loading.auto-schedule.index')"
@@ -22,10 +22,12 @@
       </div>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success"
+        class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
-      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm space-y-1">
+      <div v-if="Object.keys($page.props.errors ?? {}).length"
+        class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm space-y-1">
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
       </div>
 
@@ -37,77 +39,163 @@
             {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
           </option>
         </select>
-        <select v-model="filters.faculty_id" @change="applyFilters"
+        <select v-model="filters.section_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-          <option :value="null">All Faculty</option>
-          <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+          <option :value="null">All Sections</option>
+          <option v-for="sec in sections" :key="sec.id" :value="sec.id">
+            Grade {{ sec.levelid }} — {{ sec.sectionname }}
+          </option>
         </select>
       </div>
 
-      <!-- Empty -->
-      <div v-if="schedules.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
+      <!-- Empty state -->
+      <div v-if="schedules.length === 0"
+        class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
         <CalendarIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
         <p class="text-sm font-medium text-slate-500">No schedules found</p>
-        <p class="text-xs text-slate-400 mt-1">Assign a schedule to get started.</p>
+        <p class="text-xs text-slate-400 mt-1">Assign a schedule or use AI Generate to get started.</p>
       </div>
 
-      <!-- Week view grouped by day -->
-      <div v-else class="space-y-4">
-        <div v-for="day in daysWithSchedules" :key="day"
+      <!-- Calendar cards per section -->
+      <div v-else class="space-y-6">
+        <div v-for="sectionId in sectionsWithSchedules" :key="sectionId"
           class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-            <h3 class="text-sm font-semibold text-slate-700">{{ day }}</h3>
+
+          <!-- Section header -->
+          <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
+                Grade {{ bySection[sectionId][0].grade_level }}
+              </span>
+              <h3 class="text-sm font-semibold text-slate-800">
+                {{ bySection[sectionId][0].section_name }}
+              </h3>
+              <span class="text-xs text-slate-400">· {{ bySection[sectionId].length }} slot(s)</span>
+            </div>
+            <button @click="openForm({ section_id: sectionId })"
+              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md font-medium transition-colors">
+              <PlusIcon class="h-3 w-3" /> Add
+            </button>
           </div>
-          <table class="min-w-full divide-y divide-slate-50 text-sm">
-            <thead>
-              <tr class="text-xs text-slate-400 uppercase tracking-wide">
-                <th class="px-4 py-2 text-left">Time</th>
-                <th class="px-4 py-2 text-left">Faculty</th>
-                <th class="px-4 py-2 text-left">Subject</th>
-                <th class="px-4 py-2 text-left">Section</th>
-                <th class="px-4 py-2 text-left">Room</th>
-                <th class="px-4 py-2 text-center">Status</th>
-                <th class="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              <tr v-for="s in byDay[day]" :key="s.id" class="hover:bg-slate-50/50">
-                <td class="px-4 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">
-                  {{ fmtTime(s.start_time) }} – {{ fmtTime(s.end_time) }}
-                </td>
-                <td class="px-4 py-3 text-slate-800 font-medium">{{ s.faculty?.name ?? '—' }}</td>
-                <td class="px-4 py-3">
-                  <p class="text-slate-800">{{ s.subject?.name ?? '—' }}</p>
-                  <p class="text-xs text-slate-400 font-mono">{{ s.subject?.code }}</p>
-                </td>
-                <td class="px-4 py-3 text-slate-600">{{ sectionLabel(s.section_id) }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ s.classroom?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-center">
-                  <span :class="statusBadge(s.status)"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                    {{ s.status }}
+
+          <!-- Calendar grid -->
+          <div class="overflow-x-auto">
+            <div style="min-width: 580px">
+
+              <!-- Day column headers -->
+              <div class="flex border-b border-slate-100">
+                <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
+                <div v-for="day in WEEKDAYS" :key="day"
+                  class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
+                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    {{ day.slice(0, 3) }}
                   </span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <div class="flex items-center justify-end gap-1">
-                    <button @click="openForm(s)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                      <PencilIcon class="h-4 w-4" />
-                    </button>
-                    <button @click="cancel(s)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                      <TrashIcon class="h-4 w-4" />
-                    </button>
+                  <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
+                    {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Time axis + columns -->
+              <div class="flex" :style="{ height: CAL_H + 'px' }">
+
+                <!-- Time gutter -->
+                <div class="shrink-0 relative border-r border-slate-100" :style="{ width: GUTTER + 'px' }">
+                  <div v-for="h in HOURS" :key="h"
+                    :style="{ top: hourTop(h) + 'px' }"
+                    class="absolute right-2 -translate-y-2.5 select-none">
+                    <span class="text-xs text-slate-400 font-medium">
+                      {{ h === 12 ? '12PM' : h < 12 ? h + 'AM' : (h - 12) + 'PM' }}
+                    </span>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </div>
+
+                <!-- Grid body: gridlines + day columns -->
+                <div class="flex-1 relative flex">
+
+                  <!-- Horizontal hour lines (drawn over all columns) -->
+                  <div v-for="h in HOURS" :key="'hl-' + h"
+                    :style="{ top: hourTop(h) + 'px' }"
+                    class="absolute inset-x-0 border-t border-slate-100 pointer-events-none z-0" />
+
+                  <!-- Half-hour dashed lines -->
+                  <div v-for="h in HOURS" :key="'hl30-' + h"
+                    :style="{ top: (hourTop(h) + SCALE * 30) + 'px' }"
+                    class="absolute inset-x-0 border-t border-dashed border-slate-50 pointer-events-none z-0" />
+
+                  <!-- Day columns -->
+                  <div v-for="day in WEEKDAYS" :key="day"
+                    class="flex-1 relative border-l border-slate-100 overflow-hidden">
+
+                    <!-- Blocked period overlays -->
+                    <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
+                      :style="blockedStyle(bp)"
+                      class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
+                      <div class="absolute inset-0 bg-slate-100/70" />
+                      <span class="relative text-xs text-slate-400 font-medium px-1 text-center leading-tight select-none">
+                        {{ bp.label }}
+                      </span>
+                    </div>
+
+                    <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
+                    <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
+                      :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"
+                      class="pointer-events-none z-[1]">
+                      <div class="absolute inset-0 bg-slate-50/80 border-t border-slate-200/50" />
+                      <span class="relative block text-center text-xs text-slate-300 mt-2 select-none font-medium">
+                        No Classes
+                      </span>
+                    </div>
+
+                    <!-- Schedule event blocks -->
+                    <div v-for="s in (bySectionDay[sectionId]?.[day] ?? [])" :key="s.id"
+                      :style="[eventStyle(s), subjectColorStyle(s.subject?.id)]"
+                      class="absolute rounded border z-10 overflow-hidden cursor-pointer transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]"
+                      @click="openForm(s)">
+                      <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
+                        <div class="text-xs font-bold leading-tight truncate">
+                          {{ s.subject?.code }}
+                        </div>
+                        <div v-if="s.faculty?.name" class="text-xs leading-tight truncate opacity-75">
+                          {{ lastNameOf(s.faculty.name) }}
+                        </div>
+                        <div class="text-xs leading-tight opacity-55 tabular-nums">
+                          {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
+                        </div>
+                      </div>
+                      <!-- Status indicator bar -->
+                      <div v-if="s.status === 'tentative'"
+                        class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
+                      <div v-if="s.status === 'cancelled'"
+                        class="absolute inset-0 bg-white/60 flex items-center justify-center">
+                        <span class="text-xs text-slate-400 font-medium">Cancelled</span>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Legend: subjects for this section -->
+          <div class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
+            <div v-for="sub in subjectsInSection(sectionId)" :key="sub.id"
+              :style="subjectColorStyle(sub.id)"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
+              {{ sub.code }}
+            </div>
+          </div>
+
         </div>
       </div>
 
     </div>
 
     <!-- Schedule Form Modal -->
-    <div v-if="modal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+    <div v-if="modal"
+      class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 my-8">
         <h2 class="text-lg font-semibold text-slate-800">{{ form.id ? 'Edit' : 'Assign' }} Schedule</h2>
 
@@ -126,64 +214,76 @@
         <div class="grid grid-cols-2 gap-3">
           <div class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
-            <select v-model="form.faculty_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.faculty_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select faculty...</option>
               <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
             </select>
           </div>
           <div class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Subject *</label>
-            <select v-model="form.subject_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.subject_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select subject...</option>
               <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
-            <select v-model="form.section_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.section_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select section...</option>
-              <option v-for="sec in sections" :key="sec.id" :value="sec.id">{{ sec.sectionname }}</option>
+              <option v-for="sec in sections" :key="sec.id" :value="sec.id">
+                Grade {{ sec.levelid }} — {{ sec.sectionname }}
+              </option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Classroom *</label>
-            <select v-model="form.classroom_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.classroom_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select classroom...</option>
               <option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code }})</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
-            <select v-model="form.academic_term_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.academic_term_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select term...</option>
               <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
-            <select v-model="form.school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.school_year_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select school year...</option>
               <option v-for="t in terms" :key="'sy-' + t.id" :value="t.id">{{ t.label }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Day *</label>
-            <select v-model="form.day_of_week" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.day_of_week"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option value="">Select day...</option>
-              <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
+              <option v-for="d in WEEKDAYS" :key="d" :value="d">{{ d }}</option>
             </select>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Start Time *</label>
-            <input v-model="form.start_time" type="time" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            <input v-model="form.start_time" type="time"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">End Time *</label>
-            <input v-model="form.end_time" type="time" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            <input v-model="form.end_time" type="time"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-            <select v-model="form.status" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <select v-model="form.status"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option value="active">Active</option>
               <option value="tentative">Tentative</option>
               <option v-if="form.id" value="cancelled">Cancelled</option>
@@ -191,13 +291,17 @@
           </div>
           <div class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-            <textarea v-model="form.remarks" rows="2" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
+            <textarea v-model="form.remarks" rows="2"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
           </div>
 
-          <!-- Override warnings toggle -->
-          <div v-if="validationResult && validationResult.warnings?.length && !validationResult.errors?.length" class="col-span-2 flex items-center gap-2">
+          <!-- Override warnings -->
+          <div v-if="validationResult && validationResult.warnings?.length && !validationResult.errors?.length"
+            class="col-span-2 flex items-center gap-2">
             <input v-model="form.force" type="checkbox" id="force-save" class="rounded text-amber-500" />
-            <label for="force-save" class="text-sm text-amber-700">I acknowledge the warnings — save anyway</label>
+            <label for="force-save" class="text-sm text-amber-700">
+              I acknowledge the warnings — save anyway
+            </label>
           </div>
         </div>
 
@@ -207,7 +311,9 @@
             <MagnifyingGlassIcon class="h-4 w-4" /> Check Conflicts
           </button>
           <div class="flex gap-2">
-            <button @click="modal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
+            <button @click="modal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">
+              Cancel
+            </button>
             <button @click="save" :disabled="form.processing"
               class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
               {{ form.id ? 'Update' : 'Save' }}
@@ -230,6 +336,34 @@ import {
   MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
+// ── Calendar constants ───────────────────────────────────────────────────────
+
+const WEEKDAYS  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+const CAL_START = 7 * 60        // 7:00 AM in minutes
+const CAL_END   = 16 * 60 + 30  // 4:30 PM in minutes
+const SCALE     = 1.2            // px per minute
+const GUTTER    = 44             // width of the time-axis gutter in px
+const CAL_H     = (CAL_END - CAL_START) * SCALE  // total calendar height in px
+
+// Hour marks to draw (7 AM through 4 PM inclusive)
+const HOURS = Array.from({ length: 10 }, (_, i) => i + 7)
+
+// Subject color palette — 10 distinct colors, cycling by subject_id % 10
+const PALETTE = [
+  { bg: '#dbeafe', border: '#93c5fd', color: '#1e40af' },
+  { bg: '#ede9fe', border: '#c4b5fd', color: '#5b21b6' },
+  { bg: '#d1fae5', border: '#6ee7b7', color: '#065f46' },
+  { bg: '#fef3c7', border: '#fcd34d', color: '#92400e' },
+  { bg: '#fee2e2', border: '#fca5a5', color: '#991b1b' },
+  { bg: '#cffafe', border: '#67e8f9', color: '#0e7490' },
+  { bg: '#fce7f3', border: '#f9a8d4', color: '#9d174d' },
+  { bg: '#ecfdf5', border: '#34d399', color: '#064e3b' },
+  { bg: '#fff7ed', border: '#fdba74', color: '#9a3412' },
+  { bg: '#f0f9ff', border: '#7dd3fc', color: '#075985' },
+]
+
+// ── Props ────────────────────────────────────────────────────────────────────
+
 const props = defineProps({
   schedules:   { type: Array,  default: () => [] },
   terms:       { type: Array,  default: () => [] },
@@ -239,52 +373,136 @@ const props = defineProps({
   sections:    { type: Array,  default: () => [] },
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
+  dayConfigs:  { type: Object, default: () => ({}) },
 })
 
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+// ── Filters ──────────────────────────────────────────────────────────────────
 
 const filters = reactive({
   term_id:    props.filters.term_id    ?? props.currentTerm?.id ?? null,
-  faculty_id: props.filters.faculty_id ?? null,
+  section_id: props.filters.section_id ?? null,
 })
 
 function applyFilters() {
   router.get(route('faculty-loading.schedules.index'), filters, { preserveState: true })
 }
 
-// Group schedules by day
-const byDay = computed(() => {
+// ── Grouping ─────────────────────────────────────────────────────────────────
+
+/** { section_id: [schedules] } */
+const bySection = computed(() => {
   const map = {}
-  for (const d of days) map[d] = []
   for (const s of props.schedules) {
-    if (map[s.day_of_week]) map[s.day_of_week].push(s)
+    if (!map[s.section_id]) map[s.section_id] = []
+    map[s.section_id].push(s)
   }
   return map
 })
 
-const daysWithSchedules = computed(() => days.filter(d => byDay.value[d].length > 0))
+/** Section IDs in display order (backend already sorted by grade + name) */
+const sectionsWithSchedules = computed(() => {
+  const seen = []
+  for (const s of props.schedules) {
+    if (!seen.includes(s.section_id)) seen.push(s.section_id)
+  }
+  return seen
+})
+
+/** { section_id: { day: [schedules] } } */
+const bySectionDay = computed(() => {
+  const map = {}
+  for (const s of props.schedules) {
+    if (!map[s.section_id]) map[s.section_id] = {}
+    if (!map[s.section_id][s.day_of_week]) map[s.section_id][s.day_of_week] = []
+    map[s.section_id][s.day_of_week].push(s)
+  }
+  return map
+})
+
+/** Unique subjects for the legend of a given section */
+function subjectsInSection(sectionId) {
+  const seen = new Map()
+  for (const s of (bySection.value[sectionId] ?? [])) {
+    if (s.subject && !seen.has(s.subject.id)) seen.set(s.subject.id, s.subject)
+  }
+  return [...seen.values()]
+}
+
+// ── Calendar helpers ─────────────────────────────────────────────────────────
+
+function timeToMin(t) {
+  if (!t) return 0
+  const parts = t.split(':')
+  return parseInt(parts[0]) * 60 + parseInt(parts[1])
+}
+
+/** Top offset in px for a given hour mark */
+function hourTop(h) {
+  return (h * 60 - CAL_START) * SCALE
+}
+
+/** Absolute positioning style for a schedule event block */
+function eventStyle(s) {
+  const sm = Math.max(timeToMin(s.start_time), CAL_START)
+  const em = Math.min(timeToMin(s.end_time), CAL_END)
+  return {
+    position: 'absolute',
+    top:    ((sm - CAL_START) * SCALE) + 'px',
+    height: Math.max((em - sm) * SCALE, 24) + 'px',
+    left:   '2px',
+    right:  '2px',
+  }
+}
+
+/** Absolute positioning style for a blocked-period overlay */
+function blockedStyle(bp) {
+  const sm = Math.max(timeToMin(bp.start), CAL_START)
+  const em = Math.min(timeToMin(bp.end), CAL_END)
+  return {
+    position: 'absolute',
+    top:    ((sm - CAL_START) * SCALE) + 'px',
+    height: Math.max((em - sm) * SCALE, 4) + 'px',
+    left: 0,
+    right: 0,
+  }
+}
+
+/** Inline style for subject-colored event block (cycles palette by subject_id) */
+function subjectColorStyle(subjectId) {
+  const p = PALETTE[(subjectId ?? 0) % PALETTE.length]
+  return {
+    backgroundColor: p.bg,
+    borderColor:     p.border,
+    color:           p.color,
+  }
+}
+
+// ── Formatters ───────────────────────────────────────────────────────────────
 
 function fmtTime(t) {
-  if (! t) return '—'
+  if (!t) return '—'
   const [h, m] = t.split(':')
   const hour = parseInt(h)
-  const ampm = hour >= 12 ? 'PM' : 'AM'
-  return `${hour % 12 || 12}:${m} ${ampm}`
+  return `${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`
 }
 
-function sectionLabel(id) {
-  return props.sections.find(s => s.id === id)?.sectionname ?? `Section ${id}`
+/** Format HH:MM:SS → h:MM AM/PM for day config display */
+function fmtConfigTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':')
+  const hour = parseInt(h)
+  return `${hour % 12 || 12}:${m}${hour >= 12 ? 'PM' : 'AM'}`
 }
 
-function statusBadge(status) {
-  return {
-    active:    'bg-emerald-50 text-emerald-700',
-    tentative: 'bg-amber-50 text-amber-700',
-    cancelled: 'bg-slate-100 text-slate-400',
-  }[status] ?? 'bg-slate-50 text-slate-600'
+/** Extract surname for compact display in event blocks */
+function lastNameOf(name) {
+  if (!name) return ''
+  const parts = name.trim().split(' ')
+  return parts[parts.length - 1]
 }
 
-// Form & modal
+// ── Form & modal ─────────────────────────────────────────────────────────────
+
 const modal            = ref(false)
 const validationResult = ref(null)
 
@@ -294,29 +512,47 @@ const form = useForm({
   start_time: '', end_time: '', status: 'active', remarks: '', force: false,
 })
 
+/**
+ * Open the form modal.
+ * - Pass a full schedule object (with s.id) to edit.
+ * - Pass { section_id } to pre-fill a new-schedule form for that section.
+ * - Pass nothing to open a blank new-schedule form.
+ */
 function openForm(s = null) {
   validationResult.value = null
-  if (s) {
+  if (s && s.id) {
     Object.assign(form, {
-      id: s.id, faculty_id: s.faculty?.id ?? null, subject_id: s.subject?.id ?? null,
-      section_id: s.section_id, classroom_id: s.classroom?.id ?? null,
-      school_year_id: null, academic_term_id: filters.term_id ?? null,
-      day_of_week: s.day_of_week, start_time: s.start_time?.slice(0,5) ?? '',
-      end_time: s.end_time?.slice(0,5) ?? '', status: s.status, remarks: s.remarks ?? '', force: false,
+      id:               s.id,
+      faculty_id:       s.faculty?.id      ?? null,
+      subject_id:       s.subject?.id      ?? null,
+      section_id:       s.section_id,
+      classroom_id:     s.classroom?.id    ?? null,
+      school_year_id:   null,
+      academic_term_id: filters.term_id    ?? null,
+      day_of_week:      s.day_of_week,
+      start_time:       s.start_time?.slice(0, 5) ?? '',
+      end_time:         s.end_time?.slice(0, 5)   ?? '',
+      status:           s.status,
+      remarks:          s.remarks ?? '',
+      force:            false,
     })
   } else {
-    form.reset(); form.id = null; form.status = 'active'; form.force = false
-    form.academic_term_id = filters.term_id ?? null
+    form.reset()
+    form.id               = null
+    form.status           = 'active'
+    form.force            = false
+    form.academic_term_id = filters.term_id    ?? null
+    form.section_id       = s?.section_id ?? filters.section_id ?? null
   }
   modal.value = true
 }
 
 async function checkConflicts() {
-  if (! form.faculty_id || ! form.academic_term_id || ! form.day_of_week || ! form.start_time || ! form.end_time) return
+  if (!form.faculty_id || !form.academic_term_id || !form.day_of_week || !form.start_time || !form.end_time) return
   const payload = {
     faculty_id:       form.faculty_id,
-    subject_id:       form.subject_id ?? 0,
-    section_id:       form.section_id ?? 0,
+    subject_id:       form.subject_id   ?? 0,
+    section_id:       form.section_id   ?? 0,
     classroom_id:     form.classroom_id ?? 0,
     academic_term_id: form.academic_term_id,
     day_of_week:      form.day_of_week,
@@ -342,10 +578,5 @@ function save() {
       onSuccess: () => { modal.value = false; validationResult.value = null },
     })
   }
-}
-
-function cancel(s) {
-  if (! confirm(`Cancel schedule for "${s.subject?.name}" on ${s.day_of_week}?`)) return
-  useForm({}).delete(route('faculty-loading.schedules.destroy', s.id))
 }
 </script>

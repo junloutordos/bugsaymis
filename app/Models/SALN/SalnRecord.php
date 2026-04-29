@@ -7,6 +7,7 @@ use App\Traits\HasApprovalSnapshots;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\SALN\SalnChild;
 
 class SalnRecord extends Model
 {
@@ -96,6 +97,11 @@ class SalnRecord extends Model
     public function relatives(): HasMany
     {
         return $this->hasMany(SalnRelative::class, 'saln_record_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(SalnChild::class, 'saln_record_id')->orderBy('name');
     }
 
     public function reviews(): HasMany

@@ -22,6 +22,7 @@ class LoadAssignment extends Model
         'section_id',
         'load_units',
         'description',
+        'designation_id',
         'created_by',
     ];
 
@@ -75,6 +76,11 @@ class LoadAssignment extends Model
     public function committeeAssignment(): HasOne
     {
         return $this->hasOne(FacultyCommitteeAssignment::class);
+    }
+
+    public function designation(): BelongsTo
+    {
+        return $this->belongsTo(Designation::class);
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────────

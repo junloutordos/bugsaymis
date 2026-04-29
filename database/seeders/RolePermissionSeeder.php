@@ -184,14 +184,19 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // ── Faculty Loading ───────────────────────────────────────────────────
-        // CID/AUH: manage loads and schedules, manage catalog
-        $assign('CID', [
+        // CID Chief: manage loads and schedules, manage catalog, setup
+        $assign('CID Chief', [
             'faculty_loading.view',
             'faculty_loading.manage',
+            'faculty_loading.load_assignments',
             'faculty_loading.reports',
             'faculty_loading.subjects',
             'faculty_loading.classrooms',
             'faculty_loading.school_year',
+            'faculty_loading.setup',
+            'faculty_loading.vacancies',
+            'faculty_loading.training',
+            'faculty_loading.training.verify',
         ]);
 
         // Campus Director: approve overloads + view everything
@@ -199,6 +204,8 @@ class RolePermissionSeeder extends Seeder
             'faculty_loading.view',
             'faculty_loading.approve',
             'faculty_loading.reports',
+            'faculty_loading.vacancies',
+            'faculty_loading.training',
         ]);
 
         // Faculty: view own load only
@@ -332,6 +339,20 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
             'chat.access',
         ]);
+
+        // ── Activity Management System ─────────────────────────────────────────
+        // All staff can create and manage their own activities
+        $amsStaffRoles = [
+            'MIS', 'Payroll Officer', 'HRMPSB', 'Recruitment Officer',
+            'DivisionChief', 'OCD', 'PMT', 'CID Chief', 'Faculty', 'Staff', 'Registrar',
+            'Records', 'Librarian', 'Nurse', 'Guidance', 'GSU Head', 'FAD Chief',
+            'InformationOfficer', 'Dorm Manager',
+        ];
+        foreach ($amsStaffRoles as $roleName) {
+            $assign($roleName, ['activities.manage']);
+        }
+        // HR sees all activities (read-only) and can also create their own
+        $assign('HR', ['activities.manage', 'activities.view_all']);
 
         // ── Student / Parent — very limited read-only ─────────────────────────
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);

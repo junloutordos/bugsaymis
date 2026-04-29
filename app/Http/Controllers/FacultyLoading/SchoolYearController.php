@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Services\FacultyLoading\SchoolYearWorkflowService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,6 +13,7 @@ use Inertia\Response;
 
 class SchoolYearController extends Controller
 {
+    public function __construct(private readonly SchoolYearWorkflowService $workflow) {}
     public function index(): Response
     {
         $this->authorize('faculty_loading.school_year');
@@ -20,13 +22,14 @@ class SchoolYearController extends Controller
             ->orderByDesc('start_date')
             ->get()
             ->map(fn ($sy) => [
-                'id'         => $sy->id,
-                'name'       => $sy->name,
-                'start_date' => $sy->start_date?->toDateString(),
-                'end_date'   => $sy->end_date?->toDateString(),
-                'is_current' => $sy->is_current,
-                'status'     => $sy->status,
-                'terms'      => $sy->terms->map(fn ($t) => [
+                'id'              => $sy->id,
+                'name'            => $sy->name,
+                'start_date'      => $sy->start_date?->toDateString(),
+                'end_date'        => $sy->end_date?->toDateString(),
+                'is_current'      => $sy->is_current,
+                'status'          => $sy->status,
+                'workflow_status' => $sy->workflow_status,
+                'terms'           => $sy->terms->map(fn ($t) => [
                     'id'         => $t->id,
                     'name'       => $t->name,
                     'term_type'  => $t->term_type,
@@ -94,6 +97,34 @@ class SchoolYearController extends Controller
         $schoolYear->delete();
 
         return back()->with('success', 'School year deleted.');
+    }
+
+    // ── Workflow ──────────────────────────────────────────────────────────────
+
+    public function advance(SchoolYear $schoolYear): RedirectResponse
+    {
+        $this->authorize('faculty_loading.school_year');
+
+        $result = $this->workflow->advance($schoolYear);
+
+        if (! $result['ok']) {
+            return back()->withErrors(['error' => $result['message']]);
+        }
+
+        return back()->with('success', $result['message']);
+    }
+
+    public function archive(SchoolYear $schoolYear): RedirectResponse
+    {
+        $this->authorize('faculty_loading.school_year');
+
+        $result = $this->workflow->archive($schoolYear);
+
+        if (! $result['ok']) {
+            return back()->withErrors(['error' => $result['message']]);
+        }
+
+        return back()->with('success', $result['message']);
     }
 
     // ── Academic Terms ────────────────────────────────────────────────────────

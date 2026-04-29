@@ -1,9 +1,13 @@
 <?php
 
+use App\Http\Controllers\FacultyLoading\AcademicUnitController;
 use App\Http\Controllers\FacultyLoading\AiDashboardController;
 use App\Http\Controllers\FacultyLoading\FacultyListController;
 use App\Http\Controllers\FacultyLoading\AutoAssignmentController;
 use App\Http\Controllers\FacultyLoading\AutoScheduleController;
+use App\Http\Controllers\FacultyLoading\SlotPlanController;
+use App\Http\Controllers\FacultyLoading\DesignationController;
+use App\Http\Controllers\FacultyLoading\FacultyVacancyController;
 use App\Http\Controllers\FacultyLoading\LoadBalancingController;
 use App\Http\Controllers\FacultyLoading\ClassroomController;
 use App\Http\Controllers\FacultyLoading\SalaryScheduleController;
@@ -16,7 +20,9 @@ use App\Http\Controllers\FacultyLoading\ReportController;
 use App\Http\Controllers\FacultyLoading\ResearchAdvisoryController;
 use App\Http\Controllers\FacultyLoading\SchoolYearController;
 use App\Http\Controllers\FacultyLoading\SectionController;
+use App\Http\Controllers\FacultyLoading\SupervisoryController;
 use App\Http\Controllers\FacultyLoading\SubjectController;
+use App\Http\Controllers\FacultyLoading\TrainingRecordController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -84,6 +90,10 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::get('/jobs',                         [AutoScheduleController::class, 'jobs'])->name('jobs');
                     Route::get('/jobs/{aiScheduleJob}',         [AutoScheduleController::class, 'showJob'])->name('jobs.show');
                     Route::post('/jobs/{aiScheduleJob}/apply',  [AutoScheduleController::class, 'apply'])->name('jobs.apply');
+
+                    // ── Deterministic Slot Plan Generator (Phases 7–11) ────────
+                    Route::get('/slot-plan',         [SlotPlanController::class, 'index'])->name('slot-plan.index');
+                    Route::post('/slot-plan/preview',[SlotPlanController::class, 'preview'])->name('slot-plan.preview');
                 });
 
                 // Schedules
@@ -120,9 +130,18 @@ Route::middleware(['web', 'auth', 'verified'])
                     Route::delete('/{committeeAssignment}',         [CommitteeAssignmentController::class, 'destroy'])->name('destroy');
                 });
 
+                // Supervisory Positions
+                Route::prefix('supervisory')->name('supervisory.')->group(function () {
+                    Route::get('/',                                       [SupervisoryController::class, 'index'])->name('index');
+                    Route::post('/import-divisions',                      [SupervisoryController::class, 'importFromDivisions'])->name('import-divisions');
+                    Route::post('/{designation}/assign',                  [SupervisoryController::class, 'assign'])->name('assign');
+                    Route::delete('/{designation}/remove',                [SupervisoryController::class, 'remove'])->name('remove');
+                });
+
                 // Sections
                 Route::prefix('sections')->name('sections.')->group(function () {
                     Route::get('/',                [SectionController::class, 'index'])->name('index');
+                    Route::get('/{section}',       [SectionController::class, 'show'])->name('show');
                     Route::post('/',               [SectionController::class, 'store'])->name('store');
                     Route::put('/{section}',       [SectionController::class, 'update'])->name('update');
                     Route::delete('/{section}',    [SectionController::class, 'destroy'])->name('destroy');
@@ -198,6 +217,80 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::delete('/{classroom}', [ClassroomController::class, 'destroy'])->name('destroy');
             });
 
+        // ══════════════════════════════════════════════════════════════════════
+        // 6. Setup — academic units, designations
+        // ══════════════════════════════════════════════════════════════════════
+
+        // Academic Units
+        Route::middleware('permission:faculty_loading.setup')
+            ->prefix('academic-units')->name('academic-units.')->group(function () {
+                Route::get('/',                      [AcademicUnitController::class, 'index'])->name('index');
+                Route::post('/',                     [AcademicUnitController::class, 'store'])->name('store');
+                Route::put('/{academicUnit}',         [AcademicUnitController::class, 'update'])->name('update');
+                Route::delete('/{academicUnit}',      [AcademicUnitController::class, 'destroy'])->name('destroy');
+            });
+
+        // Designations (categories + designations) + assign/revoke
+        Route::middleware('permission:faculty_loading.setup')
+            ->prefix('designations')->name('designations.')->group(function () {
+                Route::get('/',                           [DesignationController::class, 'index'])->name('index');
+
+                // Categories
+                Route::post('/categories',                [DesignationController::class, 'storeCategory'])->name('categories.store');
+                Route::put('/categories/{category}',      [DesignationController::class, 'updateCategory'])->name('categories.update');
+                Route::delete('/categories/{category}',   [DesignationController::class, 'destroyCategory'])->name('categories.destroy');
+
+                // Designations
+                Route::post('/',                          [DesignationController::class, 'store'])->name('store');
+                Route::put('/{designation}',              [DesignationController::class, 'update'])->name('update');
+                Route::delete('/{designation}',           [DesignationController::class, 'destroy'])->name('destroy');
+            });
+
+        // Designation assign/revoke (requires load_assignments permission, not setup)
+        Route::middleware('permission:faculty_loading.load_assignments')
+            ->group(function () {
+                Route::post('/faculty-loads/{facultyLoad}/designations',        [DesignationController::class, 'assign'])->name('designations.assign');
+                Route::delete('/assignments/{assignment}/designation',           [DesignationController::class, 'revoke'])->name('designations.revoke');
+            });
+
+        // Designation assign/revoke direct (from Designations catalog page)
+        Route::middleware('permission:faculty_loading.manage')
+            ->group(function () {
+                Route::post('/designations/{designation}/assign-direct',        [DesignationController::class, 'assignDirect'])->name('designations.assign-direct');
+                Route::delete('/designations/assignments/{assignment}/revoke',   [DesignationController::class, 'revokeDirect'])->name('designations.revoke-direct');
+            });
+
+        // ══════════════════════════════════════════════════════════════════════
+        // 7. Vacancies
+        // ══════════════════════════════════════════════════════════════════════
+
+        Route::middleware('permission:faculty_loading.vacancies')
+            ->prefix('vacancies')->name('vacancies.')->group(function () {
+                Route::get('/',                              [FacultyVacancyController::class, 'index'])->name('index');
+                Route::post('/',                             [FacultyVacancyController::class, 'store'])->name('store');
+                Route::post('/{vacancy}/fill',               [FacultyVacancyController::class, 'fill'])->name('fill');
+                Route::post('/{vacancy}/cancel',             [FacultyVacancyController::class, 'cancel'])->name('cancel');
+                Route::delete('/{vacancy}',                  [FacultyVacancyController::class, 'destroy'])->name('destroy');
+            });
+
+        // ══════════════════════════════════════════════════════════════════════
+        // 8. Training Records
+        // ══════════════════════════════════════════════════════════════════════
+
+        Route::middleware('permission:faculty_loading.training')
+            ->prefix('training-records')->name('training-records.')->group(function () {
+                Route::get('/',                              [TrainingRecordController::class, 'index'])->name('index');
+                Route::post('/',                             [TrainingRecordController::class, 'store'])->name('store');
+                Route::put('/{trainingRecord}',              [TrainingRecordController::class, 'update'])->name('update');
+                Route::delete('/{trainingRecord}',           [TrainingRecordController::class, 'destroy'])->name('destroy');
+
+                // Verify/reject requires elevated permission
+                Route::middleware('permission:faculty_loading.training.verify')->group(function () {
+                    Route::post('/{trainingRecord}/verify',  [TrainingRecordController::class, 'verify'])->name('verify');
+                    Route::post('/{trainingRecord}/reject',  [TrainingRecordController::class, 'reject'])->name('reject');
+                });
+            });
+
         // School Years & Academic Terms
         Route::middleware('permission:faculty_loading.school_year')
             ->prefix('school-years')->name('school-years.')->group(function () {
@@ -210,5 +303,9 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::post('/{schoolYear}/terms',   [SchoolYearController::class, 'storeTerm'])->name('terms.store');
                 Route::put('/terms/{term}',          [SchoolYearController::class, 'updateTerm'])->name('terms.update');
                 Route::delete('/terms/{term}',       [SchoolYearController::class, 'destroyTerm'])->name('terms.destroy');
+
+                // Workflow transitions
+                Route::post('/{schoolYear}/advance', [SchoolYearController::class, 'advance'])->name('advance');
+                Route::post('/{schoolYear}/archive', [SchoolYearController::class, 'archive'])->name('archive');
             });
     });

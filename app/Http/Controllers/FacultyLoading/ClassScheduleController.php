@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\SchoolDayConfig;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
@@ -31,13 +33,22 @@ class ClassScheduleController extends Controller
 
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
-        $facultyId   = $request->input('faculty_id');
+        $sectionId   = $request->input('section_id');
 
-        $query = ClassSchedule::with(['subject', 'classroom', 'faculty:id,name'])
+        $query = ClassSchedule::with(['subject', 'classroom', 'faculty:id,name', 'section:id,sectionname,levelid'])
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
-            ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId));
+            ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId));
 
-        $schedules = $query->orderBy('day_of_week')->orderBy('start_time')->get()
+        // Order by grade level + section name + day + time for clean grouping
+        $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
+        $schedules = $query
+            ->join('sections as sec', 'sec.id', '=', 'class_schedules.section_id')
+            ->orderBy('sec.levelid')
+            ->orderByRaw('sec.sectionname')
+            ->orderByRaw($dayOrder)
+            ->orderBy('class_schedules.start_time')
+            ->select('class_schedules.*')
+            ->get()
             ->map(fn ($s) => $this->mapSchedule($s));
 
         $terms = AcademicTerm::with('schoolYear')
@@ -53,7 +64,24 @@ class ClassScheduleController extends Controller
         $subjects   = Subject::active()->orderBy('code')->get(['id', 'code', 'name', 'subject_type', 'load_units']);
         $classrooms = Classroom::available()->orderBy('name')->get(['id', 'name', 'code', 'classroom_type', 'capacity']);
 
-        $sections = DB::table('sections')->orderBy('sectionname')->get(['id', 'sectionname', 'levelid']);
+        // Sections filtered to the term's school year (fall back to all active sections)
+        $syId     = $currentTerm?->school_year_id;
+        $sections = Section::when($syId, fn ($q) => $q->where('school_year_id', $syId))
+            ->where('is_active', true)
+            ->orderBy('levelid')
+            ->orderBy('sectionname')
+            ->get(['id', 'sectionname', 'levelid']);
+
+        // Per-day school config for calendar rendering (blocked periods, class hours)
+        $dayConfigs = SchoolDayConfig::active()
+            ->get()
+            ->mapWithKeys(fn ($c) => [
+                $c->day_of_week => [
+                    'start'   => $c->classes_start,
+                    'end'     => $c->classes_end,
+                    'blocked' => $c->blocked_periods ?? [],
+                ],
+            ]);
 
         return Inertia::render('FacultyLoading/Schedules/Index', [
             'schedules'   => $schedules,
@@ -63,7 +91,8 @@ class ClassScheduleController extends Controller
             'classrooms'  => $classrooms,
             'sections'    => $sections,
             'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
-            'filters'     => $request->only(['term_id', 'faculty_id']),
+            'filters'     => $request->only(['term_id', 'section_id']),
+            'dayConfigs'  => $dayConfigs,
         ]);
     }
 
@@ -198,27 +227,29 @@ class ClassScheduleController extends Controller
     private function mapSchedule(ClassSchedule $s): array
     {
         return [
-            'id'          => $s->id,
-            'day_of_week' => $s->day_of_week,
-            'start_time'  => $s->start_time,
-            'end_time'    => $s->end_time,
-            'status'      => $s->status,
-            'remarks'     => $s->remarks,
-            'subject'     => $s->subject ? [
+            'id'           => $s->id,
+            'day_of_week'  => $s->day_of_week,
+            'start_time'   => $s->start_time,
+            'end_time'     => $s->end_time,
+            'status'       => $s->status,
+            'remarks'      => $s->remarks,
+            'subject'      => $s->subject ? [
                 'id'   => $s->subject->id,
                 'code' => $s->subject->code,
                 'name' => $s->subject->name,
             ] : null,
-            'classroom'   => $s->classroom ? [
+            'classroom'    => $s->classroom ? [
                 'id'   => $s->classroom->id,
                 'name' => $s->classroom->name,
                 'code' => $s->classroom->code,
             ] : null,
-            'faculty'     => $s->faculty ? [
+            'faculty'      => $s->faculty ? [
                 'id'   => $s->faculty->id,
                 'name' => $s->faculty->name,
             ] : null,
-            'section_id'  => $s->section_id,
+            'section_id'   => $s->section_id,
+            'section_name' => $s->section?->sectionname ?? "Section {$s->section_id}",
+            'grade_level'  => $s->section?->levelid ?? null,
         ];
     }
 }

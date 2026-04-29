@@ -29,7 +29,7 @@
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
       </div>
 
-      <!-- Filters -->
+      <!-- Term filter -->
       <div class="flex flex-wrap gap-2">
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -37,58 +37,115 @@
             {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
           </option>
         </select>
-        <select v-model="filters.faculty_id" @change="applyFilters"
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-          <option :value="null">All Faculty</option>
-          <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
-        </select>
+        <input v-model="search" type="search" placeholder="Search faculty..."
+          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-48 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
       </div>
 
       <!-- Empty -->
-      <div v-if="assignments.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
+      <div v-if="filteredFaculty.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
         <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
         <p class="text-sm font-medium text-slate-500">No assignments found for this term</p>
-        <p class="text-xs text-slate-400 mt-1">Add a load assignment to get started.</p>
+        <p class="text-xs text-slate-400 mt-1">Run Auto-Assign or add assignments manually to get started.</p>
       </div>
 
-      <!-- Table -->
+      <!-- Faculty list -->
       <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
         <table class="min-w-full divide-y divide-slate-100 text-sm">
           <thead class="bg-slate-50">
             <tr>
               <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assignment</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Units</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Position</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Other</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th class="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
-            <tr v-for="a in assignments" :key="a.id" class="hover:bg-slate-50/50">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ a.faculty?.name ?? '—' }}</td>
-              <td class="px-4 py-3 text-slate-700">{{ a.display_label }}</td>
+            <tr v-for="fl in filteredFaculty" :key="fl.faculty_id" class="hover:bg-slate-50/50">
+              <td class="px-4 py-3 font-medium text-slate-800">{{ fl.faculty_name }}</td>
+              <td class="px-4 py-3 text-slate-500 text-xs">{{ fl.position ?? '—' }}</td>
+              <td class="px-4 py-3 text-center font-semibold text-indigo-700">{{ fl.teaching_units }}u</td>
+              <td class="px-4 py-3 text-center text-slate-500">{{ fl.other_units }}u</td>
+              <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ fl.total_units }}u</td>
               <td class="px-4 py-3 text-center">
-                <span :class="typeBadge(a.assignment_type)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                  {{ typeLabel(a.assignment_type) }}
+                <span :class="statusBadge(fl.load_status)"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
+                  {{ fl.load_status ?? '—' }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ a.load_units }}</td>
               <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <button @click="openForm(a)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                    <PencilIcon class="h-4 w-4" />
-                  </button>
-                  <button @click="remove(a)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                    <TrashIcon class="h-4 w-4" />
-                  </button>
-                </div>
+                <button @click="openDetail(fl)"
+                  class="p-1.5 text-slate-400 hover:text-emerald-600 rounded transition-colors" title="View assignments">
+                  <EyeIcon class="h-4 w-4" />
+                </button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
+    </div>
+
+    <!-- ── Detail panel ─────────────────────────────────────────────────────── -->
+    <div v-if="detail.open" class="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm"
+      @click.self="detail.open = false">
+      <div class="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col overflow-hidden">
+
+        <!-- Panel header -->
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div>
+            <h2 class="text-base font-semibold text-slate-800">{{ detail.faculty?.faculty_name }}</h2>
+            <p class="text-xs text-slate-500 mt-0.5">{{ detail.faculty?.position ?? '' }}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="openForm(null, detail.faculty?.faculty_id)"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
+              <PlusIcon class="h-3.5 w-3.5" /> Add
+            </button>
+            <button @click="detail.open = false" class="p-1.5 text-slate-400 hover:text-slate-600 rounded">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Load summary strip -->
+        <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 flex gap-4 text-xs shrink-0">
+          <span class="text-slate-500">Teaching: <strong class="text-indigo-700">{{ detail.faculty?.teaching_units }}u</strong></span>
+          <span class="text-slate-500">Other: <strong class="text-slate-700">{{ detail.faculty?.other_units }}u</strong></span>
+          <span class="text-slate-500">Total: <strong class="text-slate-800">{{ detail.faculty?.total_units }}u</strong></span>
+          <span v-if="detail.faculty?.is_locked" class="ml-auto text-amber-600 font-medium">Locked</span>
+        </div>
+
+        <!-- Assignment list -->
+        <div class="flex-1 overflow-y-auto divide-y divide-slate-50">
+          <div v-if="!detail.faculty?.assignments?.length" class="py-12 text-center text-sm text-slate-400">
+            No assignments yet.
+          </div>
+          <div v-for="a in detail.faculty?.assignments" :key="a.id"
+            class="px-6 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-slate-800 truncate">{{ a.display_label }}</p>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span :class="typeBadge(a.assignment_type)"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium">
+                  {{ typeLabel(a.assignment_type) }}
+                </span>
+                <span class="text-xs text-slate-500">{{ a.load_units }}u</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button @click="openForm(a)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
+                <PencilIcon class="h-4 w-4" />
+              </button>
+              <button @click="remove(a)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
+                <TrashIcon class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Modal -->
@@ -125,22 +182,35 @@
             </select>
           </div>
 
-          <!-- Subject (teaching only) -->
+          <!-- Subject (teaching only) — shown before section so elective check can react -->
           <div v-if="form.assignment_type === 'teaching'">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Subject *</label>
-            <select v-model="form.subject_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">Select subject...</option>
-              <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Subject *
+              <span v-if="form.section_id && !selectedSubjectIsElective" class="text-indigo-500 font-normal ml-1">
+                ({{ filteredSubjects.length }} for Grade {{ selectedSectionGrade }})
+              </span>
+            </label>
+            <select v-model="form.subject_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">{{ form.section_id && !selectedSubjectIsElective ? 'Select subject...' : 'Select subject...' }}</option>
+              <option v-for="s in filteredSubjects" :key="s.id" :value="s.id">{{ s.code }} — {{ s.name }}</option>
             </select>
           </div>
 
-          <!-- Section (teaching only) -->
-          <div v-if="form.assignment_type === 'teaching'">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Section</label>
-            <select v-model="form.section_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <!-- Section (teaching only, non-elective subjects) -->
+          <div v-if="form.assignment_type === 'teaching' && !selectedSubjectIsElective">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Section *</label>
+            <select v-model="form.section_id"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">Select section...</option>
-              <option v-for="s in sections" :key="s.id" :value="s.id">Gr {{ s.levelid }} — {{ s.sectionname }}</option>
+              <option v-for="s in filteredSections" :key="s.id" :value="s.id">Grade {{ s.levelid }} — {{ s.sectionname }}</option>
             </select>
+          </div>
+
+          <!-- Elective notice (no section needed) -->
+          <div v-if="form.assignment_type === 'teaching' && selectedSubjectIsElective"
+            class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+            Elective subject — offered across sections, no specific section required.
           </div>
 
           <!-- Description (non-teaching) -->
@@ -152,9 +222,13 @@
 
           <!-- Load units -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Load Units *</label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Load Units *
+              <span v-if="form.subject_id" class="text-indigo-500 font-normal ml-1">(auto-filled from subject)</span>
+            </label>
             <input v-model.number="form.load_units" type="number" step="0.5" min="0.5" max="30"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              :class="form.subject_id ? 'bg-indigo-50 border-indigo-200' : ''" />
           </div>
         </div>
 
@@ -218,10 +292,37 @@
 
       <!-- Summary bar -->
       <div v-if="autoAssign.proposals" class="px-6 py-3 bg-purple-50 border-b border-purple-100 flex flex-wrap gap-4 text-xs text-purple-700">
+        <span><strong>{{ autoAssign.gapCount }}</strong> unfilled slots detected</span>
+        <span><strong>{{ allProposedItems.length }}</strong> proposed to fill</span>
         <span><strong>{{ autoAssign.proposals.filter(p => p.assignments.length).length }}</strong> faculty matched</span>
-        <span><strong>{{ allProposedItems.length }}</strong> assignments proposed</span>
-        <span><strong>{{ allProposedItems.filter(a => a.section_id).length }}</strong> with auto-assigned section</span>
-        <span><strong>{{ allProposedItems.filter(a => !a.section_id).length }}</strong> without section</span>
+        <span v-if="autoAssign.gapCount > allProposedItems.length" class="text-amber-600 font-medium">
+          ⚠ {{ autoAssign.gapCount - allProposedItems.length }} slots may still need manual assignment
+        </span>
+      </div>
+
+      <!-- Coverage gaps accordion -->
+      <div v-if="autoAssign.gaps?.length" class="px-6 pt-4">
+        <button @click="autoAssign.gapsOpen = !autoAssign.gapsOpen"
+          class="w-full flex items-center justify-between text-xs font-medium text-slate-600 hover:text-slate-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <span>
+            <span class="text-amber-700 font-semibold">{{ autoAssign.gapCount }} uncovered subject-section slots</span>
+            — click to {{ autoAssign.gapsOpen ? 'hide' : 'view' }} details by grade level
+          </span>
+          <span class="text-amber-500 ml-2">{{ autoAssign.gapsOpen ? '▲' : '▼' }}</span>
+        </button>
+        <div v-if="autoAssign.gapsOpen" class="mt-2 border border-amber-100 rounded-lg overflow-hidden">
+          <div v-for="(slots, grade) in gapsByGrade" :key="grade" class="border-b border-amber-50 last:border-0">
+            <div class="px-3 py-1.5 bg-amber-50 text-xs font-semibold text-amber-700">Grade {{ grade }}</div>
+            <div class="divide-y divide-slate-50">
+              <div v-for="slot in slots" :key="`${slot.section_id}-${slot.subject_id}`"
+                class="px-3 py-1.5 flex items-center gap-3 text-xs text-slate-600">
+                <span class="font-mono text-slate-500 w-20 shrink-0">{{ slot.subject_code }}</span>
+                <span class="flex-1 text-slate-700">{{ slot.subject_name }}</span>
+                <span class="text-slate-400 shrink-0">{{ slot.section_name }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Preview results -->
@@ -245,11 +346,19 @@
                 <AcademicCapIcon class="h-3 w-3" /> {{ p.specialization }}
               </span>
             </div>
-            <div class="shrink-0 text-xs text-slate-500 space-x-2">
-              <span>Cap: <strong>{{ p.teaching_cap }}u</strong></span>
-              <span>Already: <strong>{{ p.already_assigned }}u</strong></span>
-              <span v-if="p.assignments.length" class="text-purple-700">
-                +<strong>{{ p.assignments.reduce((s, a) => s + a.load_units, 0).toFixed(1) }}u proposed</strong>
+            <div class="shrink-0 text-xs text-slate-500 flex items-center gap-2 flex-wrap justify-end">
+              <!-- Non-teaching load badges -->
+              <span v-for="(units, type) in p.non_teaching_loads" :key="type"
+                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                :class="nonTeachingBadge(type)">
+                {{ typeLabel(type) }}: {{ units }}u
+              </span>
+              <!-- Capacity summary -->
+              <span class="text-slate-400">|</span>
+              <span>Total: <strong>{{ p.already_total }}u</strong>/{{ p.total_cap }}u</span>
+              <span>Teaching: <strong>{{ p.already_teaching }}u</strong>/{{ p.teaching_cap }}u</span>
+              <span v-if="p.assignments.length" class="text-purple-700 font-medium">
+                +{{ p.assignments.reduce((s, a) => s + a.load_units, 0).toFixed(1) }}u proposed
               </span>
             </div>
           </div>
@@ -259,64 +368,65 @@
             {{ p.skipped_reason ?? 'No matching subjects' }}
           </div>
 
-          <!-- Proposed assignments table -->
+          <!-- Proposed assignments table — grouped by subject -->
           <table v-else class="w-full text-sm divide-y divide-slate-50">
             <thead class="bg-white">
               <tr class="text-left text-xs text-slate-400 font-medium">
                 <th class="px-4 py-1.5 w-6"></th>
                 <th class="px-2 py-1.5">Subject</th>
                 <th class="px-2 py-1.5 text-center">Grade</th>
-                <th class="px-2 py-1.5">Section</th>
+                <th class="px-2 py-1.5">Sections</th>
                 <th class="px-2 py-1.5 text-center">Match</th>
-                <th class="px-2 py-1.5 text-right">Units</th>
+                <th class="px-2 py-1.5 text-right">Total Units</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
-              <tr v-for="a in p.assignments" :key="a.subject_id" class="hover:bg-slate-50">
-                <!-- Checkbox -->
+              <tr v-for="group in groupedAssignments(p.assignments)" :key="group.subject_id" class="hover:bg-slate-50">
+                <!-- Checkbox — selects/deselects all sections for this subject -->
                 <td class="px-4 py-2">
-                  <input type="checkbox" :value="buildSelected(p.faculty_id, a)"
-                    v-model="autoAssign.selected"
+                  <input type="checkbox"
+                    :checked="isGroupSelected(p.faculty_id, group)"
+                    @change="toggleGroup(p.faculty_id, group, $event.target.checked)"
                     class="rounded text-purple-600 focus:ring-purple-500" />
                 </td>
                 <!-- Subject -->
                 <td class="px-2 py-2">
-                  <span class="font-medium text-slate-700">{{ a.subject_code }}</span>
-                  <span class="text-slate-500 ml-1">{{ a.subject_name }}</span>
+                  <span class="font-medium text-slate-700">{{ group.subject_code }}</span>
+                  <span class="text-slate-400 ml-1 text-xs">{{ group.subject_name }}</span>
                 </td>
                 <!-- Grade -->
                 <td class="px-2 py-2 text-center text-slate-500">
-                  {{ a.grade_level || '—' }}
+                  {{ group.grade_level || '—' }}
                 </td>
-                <!-- Section: auto-assigned + override -->
+                <!-- Sections — all assigned -->
                 <td class="px-2 py-2">
-                  <div class="flex items-center gap-1.5">
-                    <span v-if="a.section_auto"
-                      class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 shrink-0">AUTO</span>
-                    <span v-else
-                      class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 shrink-0">NONE</span>
-                    <select v-model="a.section_id"
-                      class="text-xs border border-slate-200 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-purple-400 max-w-[160px]">
-                      <option :value="null">— No section —</option>
-                      <optgroup v-for="grade in sectionGrades(autoAssign.sections)" :key="grade" :label="`Grade ${grade}`">
-                        <option
-                          v-for="s in autoAssign.sections.filter(s => s.grade === grade)"
-                          :key="s.id" :value="s.id">
-                          {{ s.label }}
-                        </option>
-                      </optgroup>
-                    </select>
+                  <div v-if="group.sections.length" class="flex flex-wrap gap-1">
+                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                      {{ group.sections.length }} section{{ group.sections.length !== 1 ? 's' : '' }}
+                    </span>
+                    <span v-for="sec in group.sections" :key="sec.id"
+                      class="inline-block px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-500">
+                      {{ sec.label.split('—')[1]?.trim() ?? sec.label }}
+                    </span>
                   </div>
+                  <span v-else class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
+                    No section
+                  </span>
                 </td>
                 <!-- Match score -->
                 <td class="px-2 py-2 text-center">
-                  <span :class="scoreClass(a.match_score)"
+                  <span :class="scoreClass(group.match_score)"
                     class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold">
-                    {{ scoreLabel(a.match_score) }}
+                    {{ scoreLabel(group.match_score) }}
                   </span>
                 </td>
-                <!-- Units -->
-                <td class="px-2 py-2 text-right font-semibold text-purple-700">{{ a.load_units }}u</td>
+                <!-- Total units across all sections -->
+                <td class="px-2 py-2 text-right font-semibold text-purple-700">
+                  {{ group.totalUnits.toFixed(1) }}u
+                  <span class="text-xs font-normal text-slate-400 ml-0.5">
+                    ({{ group.load_units }}u × {{ group.sections.length || 1 }})
+                  </span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -328,6 +438,58 @@
           <button @click="autoAssign.selected = []" class="underline hover:text-slate-700">Deselect all</button>
           <span>{{ autoAssign.selected.length }} of {{ allProposedItems.length }} selected</span>
         </div>
+
+        <!-- Manual assignment panel for remaining unfilled slots -->
+        <div v-if="autoAssign.manualSlots.length" class="mt-3 border border-amber-200 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-amber-50 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-amber-800">
+                Needs Manual Assignment
+                <span class="ml-1.5 inline-flex items-center rounded-full bg-amber-200 text-amber-800 px-2 py-0.5 text-xs font-bold">
+                  {{ autoAssign.manualSlots.length }} slot{{ autoAssign.manualSlots.length !== 1 ? 's' : '' }}
+                </span>
+              </p>
+              <p class="text-xs text-amber-600 mt-0.5">
+                These subjects have no matching faculty specialization — select a faculty for each slot to include in Apply.
+              </p>
+            </div>
+            <span v-if="manualSelected.length" class="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+              {{ manualSelected.length }} assigned
+            </span>
+          </div>
+
+          <div v-for="group in manualSlotsBySection" :key="`${group.grade}-${group.section_id}`">
+            <!-- Section header -->
+            <div class="px-4 py-1.5 bg-slate-50 border-t border-amber-100 text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Grade {{ group.grade }} — {{ group.section_name }}
+            </div>
+
+            <!-- Subject rows -->
+            <div v-for="slot in group.subjects" :key="`${slot.section_id}-${slot.subject_id}`"
+              class="border-t border-slate-50 px-4 py-2.5 flex items-center gap-3 hover:bg-slate-50/50">
+
+              <!-- Subject info -->
+              <div class="flex-1 min-w-0">
+                <span class="font-medium text-slate-700 text-sm">{{ slot.subject_code }}</span>
+                <span class="text-slate-500 text-xs ml-1.5">{{ slot.subject_name }}</span>
+              </div>
+
+              <!-- Units badge -->
+              <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-xs font-semibold shrink-0">
+                {{ slot.load_units }}u
+              </span>
+
+              <!-- Faculty picker -->
+              <select v-model="slot.faculty_id"
+                class="text-sm border rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-amber-400 focus:border-transparent shrink-0 max-w-[220px]"
+                :class="slot.faculty_id ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'">
+                <option :value="null">Select faculty…</option>
+                <option v-for="f in props.faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Footer -->
@@ -337,11 +499,15 @@
         </p>
         <div class="flex gap-3">
           <button @click="autoAssign.open = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium">Cancel</button>
-          <button @click="applyAutoAssign" :disabled="!autoAssign.selected.length || autoAssign.applying"
+          <button @click="applyAutoAssign"
+            :disabled="(!autoAssign.selected.length && !manualSelected.length) || autoAssign.applying"
             class="inline-flex items-center gap-2 px-5 py-2 text-sm bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
             <ArrowPathIcon v-if="autoAssign.applying" class="h-4 w-4 animate-spin" />
             <CheckIcon v-else class="h-4 w-4" />
-            Apply {{ autoAssign.selected.length ? `(${autoAssign.selected.length})` : '' }}
+            Apply
+            <span v-if="autoAssign.selected.length || manualSelected.length">
+              ({{ autoAssign.selected.length + manualSelected.length }})
+            </span>
           </button>
         </div>
       </div>
@@ -353,23 +519,23 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   AcademicCapIcon, ArrowPathIcon, CheckCircleIcon, CheckIcon, ClipboardDocumentListIcon,
-  MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
+  EyeIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  assignments: { type: Array,  default: () => [] },
-  terms:       { type: Array,  default: () => [] },
-  faculty:     { type: Array,  default: () => [] },
-  subjects:    { type: Array,  default: () => [] },
-  sections:    { type: Array,  default: () => [] },
-  currentTerm: { type: Object, default: null },
-  filters:     { type: Object, default: () => ({}) },
+  facultyLoads: { type: Array,  default: () => [] },
+  terms:        { type: Array,  default: () => [] },
+  faculty:      { type: Array,  default: () => [] },
+  subjects:     { type: Array,  default: () => [] },
+  sections:     { type: Array,  default: () => [] },
+  currentTerm:  { type: Object, default: null },
+  filters:      { type: Object, default: () => ({}) },
 })
 
 const assignmentTypes = [
@@ -380,13 +546,77 @@ const assignmentTypes = [
   { value: 'committee',    label: 'Committee' },
 ]
 
+// The currently selected subject object
+const selectedSubject = computed(() =>
+  form.subject_id ? props.subjects.find(s => s.id === form.subject_id) ?? null : null
+)
+
+// True when the selected subject is an elective (no section assignment needed)
+const selectedSubjectIsElective = computed(() =>
+  selectedSubject.value?.subject_type === 'elective'
+)
+
+// Grade level of the currently selected section
+const selectedSectionGrade = computed(() => {
+  if (!form.section_id) return null
+  return props.sections.find(s => s.id === form.section_id)?.levelid ?? null
+})
+
+// Subjects filtered to the selected section's grade level.
+// Shows all subjects when no section is selected yet; electives always visible.
+const filteredSubjects = computed(() => {
+  if (!form.section_id) return props.subjects
+  const grade = selectedSectionGrade.value
+  if (!grade) return props.subjects
+  return props.subjects.filter(s =>
+    s.subject_type === 'elective' || s.grade_level === grade || s.grade_level === 0
+  )
+})
+
+// Sections filtered to match the selected subject's grade level (non-elective only)
+const filteredSections = computed(() => {
+  if (!form.subject_id || selectedSubjectIsElective.value) return props.sections
+  const grade = selectedSubject.value?.grade_level
+  if (!grade) return props.sections
+  return props.sections.filter(s => s.levelid === grade)
+})
+
+// Auto-fill load_units when a subject is selected; clear section if elective
+watch(() => form.subject_id, (subjectId) => {
+  if (!subjectId) return
+  const subject = props.subjects.find(s => s.id === subjectId)
+  if (subject?.load_units) form.load_units = subject.load_units
+  if (subject?.subject_type === 'elective') form.section_id = null
+})
+
+// Clear subject and reset units when assignment type changes
+watch(() => form.assignment_type, () => {
+  form.subject_id = null
+  form.section_id = null
+  form.load_units = 3
+})
+
 const filters = reactive({
-  term_id:    props.filters.term_id    ?? props.currentTerm?.id ?? null,
-  faculty_id: props.filters.faculty_id ?? null,
+  term_id: props.filters.term_id ?? props.currentTerm?.id ?? null,
+})
+const search = ref('')
+
+const filteredFaculty = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return props.facultyLoads
+  return props.facultyLoads.filter(fl => fl.faculty_name.toLowerCase().includes(q))
 })
 
 function applyFilters() {
   router.get(route('faculty-loading.assignments.index'), filters, { preserveState: true })
+}
+
+// Detail slide-over panel
+const detail = reactive({ open: false, faculty: null })
+
+function openDetail(fl) {
+  detail.faculty = fl
+  detail.open    = true
 }
 
 function onTermChange() {
@@ -407,7 +637,7 @@ const form = useForm({
   description: '',
 })
 
-function openForm(a = null) {
+function openForm(a = null, prefillFacultyId = null) {
   if (a) {
     Object.assign(form, {
       id: a.id,
@@ -425,6 +655,7 @@ function openForm(a = null) {
     form.id = null
     form.academic_term_id = filters.term_id ? Number(filters.term_id) : null
     form.load_units = 3
+    if (prefillFacultyId) form.user_id = prefillFacultyId
     // Pre-derive school_year_id from the pre-selected term
     const t = props.terms.find(t => t.id === form.academic_term_id)
     form.school_year_id = t?.school_year_id ?? null
@@ -452,6 +683,14 @@ function remove(a) {
   useForm({}).delete(route('faculty-loading.assignments.destroy', a.id))
 }
 
+function statusBadge(status) {
+  return {
+    underload: 'bg-amber-50 text-amber-700',
+    full_load: 'bg-emerald-50 text-emerald-700',
+    overload:  'bg-red-50 text-red-700',
+  }[status] ?? 'bg-slate-100 text-slate-400'
+}
+
 function typeBadge(type) {
   return {
     teaching:     'bg-indigo-50 text-indigo-700',
@@ -462,6 +701,15 @@ function typeBadge(type) {
   }[type] ?? 'bg-slate-50 text-slate-600'
 }
 
+function nonTeachingBadge(type) {
+  return {
+    research:     'bg-violet-100 text-violet-700',
+    admin:        'bg-blue-100 text-blue-700',
+    cocurricular: 'bg-teal-100 text-teal-700',
+    committee:    'bg-orange-100 text-orange-700',
+  }[type] ?? 'bg-slate-100 text-slate-600'
+}
+
 function typeLabel(type) {
   return assignmentTypes.find(t => t.value === type)?.label ?? type
 }
@@ -469,15 +717,44 @@ function typeLabel(type) {
 // ── Auto-Assign ───────────────────────────────────────────────────────────────
 
 const autoAssign = reactive({
-  open:      false,
-  termId:    props.filters.term_id ? Number(props.filters.term_id) : (props.currentTerm?.id ?? null),
-  facultyId: null,
-  loading:   false,
-  applying:  false,
-  error:     null,
-  proposals: null,
-  sections:  [],   // available sections returned from preview (for override dropdowns)
-  selected:  [],
+  open:         false,
+  termId:       props.filters.term_id ? Number(props.filters.term_id) : (props.currentTerm?.id ?? null),
+  facultyId:    null,
+  loading:      false,
+  applying:     false,
+  error:        null,
+  proposals:    null,
+  sections:     [],   // available sections returned from preview (for override dropdowns)
+  selected:     [],
+  gaps:         [],   // all uncovered section×subject slots (initial state)
+  gapCount:     0,
+  gapsOpen:     false,
+  manualSlots:  [],   // remaining gaps the algo couldn't fill — user assigns faculty manually
+})
+
+// Manual slots grouped by section for the "needs manual assignment" panel
+const manualSlotsBySection = computed(() => {
+  const grouped = {}
+  for (const slot of autoAssign.manualSlots) {
+    const key = `${slot.grade}-${slot.section_id}`
+    if (!grouped[key]) grouped[key] = { grade: slot.grade, section_name: slot.section_name, section_id: slot.section_id, subjects: [] }
+    grouped[key].subjects.push(slot)
+  }
+  return Object.values(grouped).sort((a, b) => a.grade - b.grade || a.section_name.localeCompare(b.section_name))
+})
+
+const manualSelected = computed(() => autoAssign.manualSlots.filter(s => s.faculty_id))
+
+// Coverage gaps grouped by grade level for the accordion display
+const gapsByGrade = computed(() => {
+  const grouped = {}
+  for (const slot of autoAssign.gaps) {
+    const g = slot.grade
+    if (!grouped[g]) grouped[g] = []
+    grouped[g].push(slot)
+  }
+  // Sort grades ascending
+  return Object.fromEntries(Object.entries(grouped).sort(([a], [b]) => Number(a) - Number(b)))
 })
 
 // Flat list of all proposed items across all faculty (used for select-all and count)
@@ -489,31 +766,96 @@ const allProposedItems = computed(() => {
 })
 
 function openAutoAssign() {
-  autoAssign.proposals = null
-  autoAssign.sections  = []
-  autoAssign.selected  = []
-  autoAssign.error     = null
-  autoAssign.open      = true
+  autoAssign.proposals   = null
+  autoAssign.sections    = []
+  autoAssign.selected    = []
+  autoAssign.error       = null
+  autoAssign.gaps        = []
+  autoAssign.gapCount    = 0
+  autoAssign.gapsOpen    = false
+  autoAssign.manualSlots = []
+  autoAssign.open        = true
 }
 
 function selectAllProposed() {
-  autoAssign.selected = allProposedItems.value.map(item => buildSelected(item.faculty_id, item))
+  autoAssign.selected = []
+  for (const p of (autoAssign.proposals ?? [])) {
+    for (const group of groupedAssignments(p.assignments)) {
+      toggleGroup(p.faculty_id, group, true)
+    }
+  }
 }
 
-/**
- * Build a selected-item snapshot that captures the current section_id from the
- * reactive assignment object (so overrides are included when applying).
- */
-function buildSelected(facultyId, a) {
-  return {
-    faculty_id:   facultyId,
-    subject_id:   a.subject_id,
-    subject_code: a.subject_code,
-    subject_name: a.subject_name,
-    load_units:   a.load_units,
-    grade_level:  a.grade_level,
-    match_score:  a.match_score,
-    section_id:   a.section_id,
+/** Group a flat assignments array by subject_id — one entry per subject with all its sections. */
+function groupedAssignments(assignments) {
+  const map = {}
+  for (const a of assignments) {
+    if (!map[a.subject_id]) {
+      map[a.subject_id] = {
+        subject_id:   a.subject_id,
+        subject_code: a.subject_code,
+        subject_name: a.subject_name,
+        grade_level:  a.grade_level,
+        load_units:   a.load_units,
+        match_score:  a.match_score,
+        sections:     [],
+        totalUnits:   0,
+      }
+    }
+    if (a.section_id) {
+      map[a.subject_id].sections.push({ id: a.section_id, label: a.section_label })
+    }
+    map[a.subject_id].totalUnits += a.load_units
+  }
+  return Object.values(map)
+}
+
+/** True when every section of a grouped subject is in the selected list. */
+function isGroupSelected(facultyId, group) {
+  if (group.sections.length === 0) {
+    return autoAssign.selected.some(
+      s => s.faculty_id === facultyId && s.subject_id === group.subject_id && !s.section_id
+    )
+  }
+  return group.sections.every(sec =>
+    autoAssign.selected.some(
+      s => s.faculty_id === facultyId && s.subject_id === group.subject_id && s.section_id === sec.id
+    )
+  )
+}
+
+/** Select or deselect all section assignments for a grouped subject. */
+function toggleGroup(facultyId, group, checked) {
+  // Remove any existing selections for this faculty+subject first
+  autoAssign.selected = autoAssign.selected.filter(
+    s => !(s.faculty_id === facultyId && s.subject_id === group.subject_id)
+  )
+  if (!checked) return
+
+  if (group.sections.length === 0) {
+    autoAssign.selected.push({
+      faculty_id:   facultyId,
+      subject_id:   group.subject_id,
+      subject_code: group.subject_code,
+      subject_name: group.subject_name,
+      load_units:   group.load_units,
+      grade_level:  group.grade_level,
+      match_score:  group.match_score,
+      section_id:   null,
+    })
+  } else {
+    for (const sec of group.sections) {
+      autoAssign.selected.push({
+        faculty_id:   facultyId,
+        subject_id:   group.subject_id,
+        subject_code: group.subject_code,
+        subject_name: group.subject_name,
+        load_units:   group.load_units,
+        grade_level:  group.grade_level,
+        match_score:  group.match_score,
+        section_id:   sec.id,
+      })
+    }
   }
 }
 
@@ -531,6 +873,26 @@ async function runPreview() {
     })
     autoAssign.proposals = data.proposals
     autoAssign.sections  = data.sections ?? []
+    autoAssign.gaps      = data.coverage_gaps ?? []
+    autoAssign.gapCount  = autoAssign.gaps.length
+    autoAssign.gapsOpen  = false
+
+    // Compute remaining gaps: slots the algo couldn't auto-fill
+    // Key format: "{subject_id}:{section_id}" for regular, "{subject_id}:elec" for electives
+    const proposedKeys = new Set(
+      (data.proposals ?? []).flatMap(p =>
+        p.assignments.map(a => a.section_id ? `${a.subject_id}:${a.section_id}` : `${a.subject_id}:elec`)
+      )
+    )
+    autoAssign.manualSlots = (data.coverage_gaps ?? [])
+      .filter(g => {
+        const key = g.section_id ? `${g.subject_id}:${g.section_id}` : `${g.subject_id}:elec`
+        return !proposedKeys.has(key)
+      })
+      .map(g => {
+        const subj = props.subjects.find(s => s.id === g.subject_id)
+        return { ...g, load_units: subj?.load_units ?? 3, faculty_id: null }
+      })
   } catch (err) {
     autoAssign.error = err.response?.data?.message ?? 'Failed to generate preview.'
   } finally {
@@ -539,17 +901,34 @@ async function runPreview() {
 }
 
 async function applyAutoAssign() {
-  if (!autoAssign.selected.length || autoAssign.applying) return
+  const hasAuto   = autoAssign.selected.length > 0
+  const hasManual = manualSelected.value.length > 0
+  if ((!hasAuto && !hasManual) || autoAssign.applying) return
   autoAssign.applying = true
   autoAssign.error    = null
 
-  // Re-snapshot section_id from the live assignment objects before submitting
-  // (user may have overridden sections after selecting)
-  const payload = autoAssign.selected.map(sel => {
-    const proposal = autoAssign.proposals?.find(p => p.faculty_id === sel.faculty_id)
-    const liveAssignment = proposal?.assignments?.find(a => a.subject_id === sel.subject_id)
+  // Re-snapshot section_id from the live assignment objects (user may have overridden).
+  // Must match on both subject_id AND section_id so multi-section subjects don't
+  // all collapse to the first section's id, causing the rest to be skipped as duplicates.
+  const autoPayload = autoAssign.selected.map(sel => {
+    const proposal       = autoAssign.proposals?.find(p => p.faculty_id === sel.faculty_id)
+    const liveAssignment = proposal?.assignments?.find(
+      a => a.subject_id === sel.subject_id && a.section_id === sel.section_id
+    )
     return { ...sel, section_id: liveAssignment?.section_id ?? sel.section_id }
   })
+
+  const manualPayload = manualSelected.value.map(s => ({
+    faculty_id:  s.faculty_id,
+    subject_id:  s.subject_id,
+    subject_code: s.subject_code,
+    subject_name: s.subject_name,
+    load_units:  s.load_units,
+    section_id:  s.section_id,
+    match_score: 0,
+  }))
+
+  const payload = [...autoPayload, ...manualPayload]
 
   try {
     const { data } = await axios.post('/faculty-loading/auto-assign/apply', {

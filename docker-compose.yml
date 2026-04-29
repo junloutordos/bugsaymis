@@ -70,8 +70,9 @@ services:
       SOKETI_DEFAULT_APP_KEY: JmzeD9601xoTtPhx58qxlX6sg4jJmX
       SOKETI_DEFAULT_APP_SECRET: hCwOFUeVzEMndsDoYcvYQ6vy479SaEns
       SOKETI_DEBUG: 0
-    expose:
-      - "6001"
+      SOKETI_PORT: 9601
+    ports:
+      - "9601:9601"
     networks:
       - bugsaymis_network
 
