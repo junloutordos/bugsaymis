@@ -66,11 +66,47 @@ jobs:
             -f nginx/Dockerfile \
             --push .
 
-      - name: Deploy to ECS
+      - name: Update ECS task definition and deploy
         run: |
+          # Get the current task definition used by the service
+          CURRENT_TASK_DEF=$(aws ecs describe-services \
+            --cluster crcmis-prod \
+            --services crcmis-prod-service \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          echo "Current task definition: $CURRENT_TASK_DEF"
+
+          # Fetch its full JSON, then replace image URIs for app and nginx containers
+          NEW_TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$CURRENT_TASK_DEF" \
+            --query 'taskDefinition' \
+            --output json | \
+            jq --arg app "$ECR/crcmis/app:${{ github.sha }}" \
+               --arg nginx "$ECR/crcmis/nginx:${{ github.sha }}" \
+            '.containerDefinitions |= map(
+              if (.image | contains("crcmis/app")) then .image = $app
+              elif (.image | contains("crcmis/nginx")) then .image = $nginx
+              else . end
+            ) | del(
+              .taskDefinitionArn, .revision, .status,
+              .requiresAttributes, .compatibilities,
+              .registeredAt, .registeredBy
+            )')
+
+          # Register the new revision and capture its ARN
+          NEW_TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "New task definition: $NEW_TASK_ARN"
+
+          # Update the service to use the new revision
           aws ecs update-service \
             --cluster crcmis-prod \
             --service crcmis-prod-service \
+            --task-definition "$NEW_TASK_ARN" \
             --force-new-deployment
 
       - name: Wait for stable deployment
