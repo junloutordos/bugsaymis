@@ -31,6 +31,7 @@ jobs:
       - name: Build and push app
         run: |
           docker buildx build --platform linux/amd64 \
+            --progress=plain \
             -t $ECR/crcmis/app:${{ github.sha }} \
             -t $ECR/crcmis/app:latest \
             --push .
@@ -38,6 +39,7 @@ jobs:
       - name: Build and push nginx
         run: |
           docker buildx build --platform linux/amd64 \
+            --progress=plain \
             -t $ECR/crcmis/nginx:${{ github.sha }} \
             -t $ECR/crcmis/nginx:latest \
             -f nginx/Dockerfile \
