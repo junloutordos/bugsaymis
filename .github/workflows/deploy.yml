@@ -43,7 +43,7 @@ jobs:
             -t $ECR/crcmis/nginx:${{ github.sha }} \
             -t $ECR/crcmis/nginx:latest \
             -f nginx/Dockerfile \
-            --push ./nginx
+            --push .
 
       - name: Deploy to ECS
         run: |
