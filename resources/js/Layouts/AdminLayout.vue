@@ -1224,7 +1224,7 @@ const menuItems = [
         href: route("ams.activities.index"),
         icon: ClipboardDocumentListIcon,
         roles: [],
-        permissions: ["activities.manage"],
+        permissions: ["activities.manage", "activities.view_all"],
       },
       {
         label: "My Activities",
