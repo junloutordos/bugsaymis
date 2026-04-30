@@ -9,6 +9,9 @@ if [ -n "$GOOGLE_DRIVE_CREDENTIALS_JSON" ]; then
     chmod 600 /var/www/google-credentials.json
 fi
 
+# Run pending migrations (safe — skips already-run migrations)
+php /var/www/artisan migrate --force
+
 # Cache config/routes/views for production performance
 php /var/www/artisan config:cache
 php /var/www/artisan route:cache
