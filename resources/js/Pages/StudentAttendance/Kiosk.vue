@@ -348,7 +348,7 @@ watch(lastScan, () => { photoError.value = false })
 
       <!-- ── Footer ──────────────────────────────────────────────────────── -->
       <footer class="kiosk-footer">
-        <p class="text-slate-500 text-xs">© 2026 PSHS-CRC · BugsayMIS</p>
+        <p class="text-slate-500 text-xs">© 2026 PSHS-CRC · CRCMIS</p>
 <p class="text-slate-600 text-xs">{{ clock }}</p>
       </footer>
 

@@ -29,7 +29,7 @@
     <div class="card">
       <div class="card-header">
         <h1>Placement Confirmation</h1>
-        <p class="lead">BugsayMIS — Recruitment &amp; Selection</p>
+        <p class="lead">CRCMIS — Recruitment &amp; Selection</p>
       </div>
       <div class="card-body">
         <div class="congrats-banner">
@@ -77,7 +77,7 @@
         <p>If you have any questions or concerns, do not hesitate to contact the HR Department.</p>
       </div>
       <div class="footer">
-        This is an automated message from BugsayMIS. Please do not reply directly to this email.
+        This is an automated message from CRCMIS. Please do not reply directly to this email.
       </div>
     </div>
   </div>

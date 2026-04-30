@@ -816,10 +816,6 @@ class FacilityRequestController extends Controller
             abort(403);
         }
 
-        if ($facilityRequest->status !== 'Approved') {
-            abort(403, 'Request not ready for printing');
-        }
-
         return view('facility_requests.print_ticket', ['request' => $facilityRequest]);
     }
 

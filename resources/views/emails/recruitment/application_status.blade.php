@@ -46,7 +46,7 @@
       @endphp
       <div class="card-header {{ $headerClass }}">
         <h1>{{ $subject }}</h1>
-        <p class="lead">BugsayMIS — Recruitment &amp; Selection</p>
+        <p class="lead">CRCMIS — Recruitment &amp; Selection</p>
       </div>
       <div class="card-body">
         <p>Dear <strong>{{ $applicant?->full_name ?? 'Applicant' }}</strong>,</p>
@@ -88,7 +88,7 @@
         @endif
       </div>
       <div class="footer">
-        This is an automated message from BugsayMIS. Please do not reply directly to this email.
+        This is an automated message from CRCMIS. Please do not reply directly to this email.
       </div>
     </div>
   </div>
