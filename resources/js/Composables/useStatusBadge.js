@@ -1,5 +1,5 @@
 /**
- * Returns Tailwind badge classes for any status string used across BUGSAY-MIS.
+ * Returns Tailwind badge classes for any status string used across CRCMIS.
  * Usage:  :class="statusBadgeClass(row.status)"
  */
 export function statusBadgeClass(status) {

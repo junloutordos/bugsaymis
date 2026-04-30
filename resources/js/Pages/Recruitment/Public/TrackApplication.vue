@@ -48,7 +48,7 @@ const docStatusColors = {
 </script>
 
 <template>
-  <Head title="Track Application — BugsayMIS" />
+  <Head title="Track Application — CRCMIS" />
 
   <div class="min-h-screen relative">
     <div class="fixed inset-0 bg-cover bg-center -z-10" :style="{ backgroundImage: 'url(/storage/bg.jpg)' }" />

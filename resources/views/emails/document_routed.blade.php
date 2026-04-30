@@ -32,7 +32,7 @@
     <div class="card">
       <div class="card-header">
         <h1>{{ $actionType === 'new' ? 'New Document Routed to You' : 'Document Forwarded to You' }}</h1>
-        <p style="margin:4px 0 0; opacity:.85; font-size:14px;">BugsayMIS Document Tracking</p>
+        <p style="margin:4px 0 0; opacity:.85; font-size:14px;">CRCMIS Document Tracking</p>
       </div>
 
       <div class="card-body">
@@ -96,7 +96,7 @@
         @endif
 
         <p style="font-size:13px; color:#64748b; margin-top:12px;">
-          Please log in to BugsayMIS to view the full document, record your action, and forward it to the next recipient as needed.
+          Please log in to CRCMIS to view the full document, record your action, and forward it to the next recipient as needed.
         </p>
       </div>
 
@@ -105,7 +105,7 @@
       </div>
 
       <div class="footer">
-        This is an automated notification from BugsayMIS Document Tracking.
+        This is an automated notification from CRCMIS Document Tracking.
         Do not reply to this email.
       </div>
     </div>

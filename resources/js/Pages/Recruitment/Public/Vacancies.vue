@@ -104,7 +104,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
 </script>
 
 <template>
-  <Head title="Job Openings — BugsayMIS" />
+  <Head title="Job Openings — CRCMIS" />
 
   <div class="min-h-screen relative">
     <!-- Background -->
