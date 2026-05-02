@@ -690,7 +690,6 @@ const handleNewRequest = async () => {
                     v-model="form.expected_completion_date"
                     type="date"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                    required
                   />
                 </div>
                 <div>

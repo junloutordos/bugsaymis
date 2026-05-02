@@ -152,12 +152,18 @@ export function useJobRequests(initialRequests = []) {
       form.put(`/job-requests/${form.id}/update`, {
         preserveScroll: true,
         onSuccess: async () => {
+          Swal.close()
           closeModal()
           await Swal.fire("Success", "MIS Assessment saved!", "success")
           window.location.reload()
         },
-        onError: async () => {
-          await Swal.fire("Error", "Failed to save assessment. Please try again.", "error")
+        onError: async (errors) => {
+          Swal.close()
+          const messages = Object.values(errors).flat().join('\n')
+          await Swal.fire("Error", messages || "Failed to save assessment. Please try again.", "error")
+        },
+        onFinish: () => {
+          if (form.processing === false) Swal.close()
         },
       })
     }

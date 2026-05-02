@@ -146,15 +146,12 @@ const stats = [
     <section class="hero">
       <!-- background layers -->
       <div class="hero-base" />
-      <!-- decorative circles — inspired by the reference image -->
-      <div class="deco deco-gold" />
-      <div class="deco deco-blue-lg" />
-      <div class="deco deco-blue-md" />
+      <!-- bottom-left ambient glows -->
       <div class="deco deco-cyan" />
       <div class="deco deco-bl" />
 
       <div class="hero-inner">
-        <!-- Left: headline + sign-in card -->
+        <!-- Left: hero text + stats + chips -->
         <div class="hero-left">
           <div class="hero-badge">
             <span class="badge-dot" />
@@ -162,8 +159,8 @@ const stats = [
           </div>
 
           <h1 class="hero-h1">
-            One System.<br>
-            <span class="hero-accent">Every Campus Need.</span>
+            a Way Forward <br>
+            <span class="hero-accent">to Digital Transformation.</span>
           </h1>
 
           <p class="hero-p">
@@ -171,8 +168,20 @@ const stats = [
             It unifies HR, activity, academics, student services, and campus operations into a single secure platform.
           </p>
 
-          <!-- Login card -->
-          <div id="hero-login" class="login-card">
+          <div class="chip-box">
+            <p class="chip-box-label">Integrated Modules</p>
+            <div class="chip-list">
+              <span v-for="m in modules" :key="m.name" class="chip">
+                <component :is="m.icon" class="chip-icon" />
+                {{ m.name }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: login card only -->
+        <div id="hero-login" class="hero-right">
+          <div class="login-card">
             <div class="lc-head">
               <div class="lc-icon-wrap">
                 <LockClosedIcon class="lc-icon" />
@@ -196,28 +205,8 @@ const stats = [
 
             <p class="lc-notice">
               <LockClosedIcon class="notice-icon" />
-              Only <strong>@crc.pshs.edu.ph</strong> accounts are authorized to sign in.
+              <span>Only <strong>@crc.pshs.edu.ph</strong> accounts are authorized to sign in.</span>
             </p>
-          </div>
-        </div>
-
-        <!-- Right: stats + chips -->
-        <div class="hero-right">
-          <div class="stats-grid">
-            <div v-for="s in stats" :key="s.label" class="stat-card">
-              <span class="stat-val">{{ s.value }}</span>
-              <span class="stat-lbl">{{ s.label }}</span>
-            </div>
-          </div>
-
-          <div class="chip-box">
-            <p class="chip-box-label">Integrated Modules</p>
-            <div class="chip-list">
-              <span v-for="m in modules" :key="m.name" class="chip">
-                <component :is="m.icon" class="chip-icon" />
-                {{ m.name }}
-              </span>
-            </div>
           </div>
         </div>
       </div>
@@ -278,7 +267,7 @@ const stats = [
           <p class="eyebrow">System Modules</p>
           <h2 class="section-h2">Everything campus administration needs, unified.</h2>
           <p class="section-lead">
-            CRCMIS covers all aspects of campus life — from personnel management and payroll
+            CRCMIS covers all aspects of campus life — from personnel management and service requests
             to student attendance and library services.
           </p>
         </div>
@@ -427,31 +416,11 @@ const stats = [
   background: linear-gradient(145deg, #060e50 0%, #0d1f8a 30%, #1447c0 60%, #1a5cd8 85%, #1e7de8 100%);
 }
 
-/* Decorative circles — mimicking the overlapping arcs from the reference */
+/* Ambient glow elements */
 .deco {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-}
-/* Gold arc top-right */
-.deco-gold {
-  width: 360px; height: 360px;
-  top: -120px; right: -80px;
-  background: conic-gradient(from 200deg, #f5c000 0deg, #f5c000 80deg, transparent 80deg);
-  opacity: .9;
-}
-/* Large blue circle behind gold */
-.deco-blue-lg {
-  width: 520px; height: 520px;
-  top: -180px; right: -140px;
-  background: radial-gradient(circle, rgba(30,125,232,.65) 0%, rgba(20,71,192,.4) 50%, transparent 72%);
-}
-/* Mid blue circle right */
-.deco-blue-md {
-  width: 380px; height: 380px;
-  top: 60px; right: 80px;
-  background: radial-gradient(circle, rgba(0,200,232,.22) 0%, rgba(20,71,192,.18) 50%, transparent 72%);
-  border: 1.5px solid rgba(0,200,232,.2);
 }
 /* Cyan glow bottom-left */
 .deco-cyan {
@@ -459,7 +428,7 @@ const stats = [
   bottom: -200px; left: -100px;
   background: radial-gradient(circle, rgba(0,200,232,.15) 0%, transparent 65%);
 }
-/* Extra subtle circle bottom-right */
+/* Subtle glow bottom-right */
 .deco-bl {
   width: 300px; height: 300px;
   bottom: 10%; right: 20%;
@@ -469,16 +438,14 @@ const stats = [
 .hero-inner {
   position: relative; z-index: 2;
   flex: 1;
-  display: flex; align-items: center; gap: 60px;
+  display: flex; align-items: flex-start; gap: 60px;
   max-width: 1200px; width: 100%; margin: 0 auto;
   padding: 80px 32px 48px;
 }
 
-/* ── Hero left ─────────── */
-.hero-left { flex: 1; min-width: 0; }
-
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
+  align-self: flex-start;
   padding: 6px 16px;
   background: rgba(0,200,232,.12);
   border: 1px solid rgba(0,200,232,.3);
@@ -518,7 +485,7 @@ const stats = [
 .login-card {
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.15);
-  border-radius: 20px; padding: 28px; max-width: 500px;
+  border-radius: 20px; padding: 28px; width: 100%;
   backdrop-filter: blur(14px);
   box-shadow: 0 24px 64px rgba(6,14,80,.5), inset 0 1px 0 rgba(255,255,255,.1);
 }
@@ -559,15 +526,20 @@ const stats = [
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .lc-notice {
-  display: flex; align-items: center; gap: 7px;
-  font-size: .72rem; color: #93c5fd; margin-top: 14px;
+  display: flex; align-items: flex-start; gap: 7px;
+  font-size: .72rem; color: #93c5fd; margin-top: 14px; line-height: 1.5;
 }
+.lc-notice strong { white-space: nowrap; }
 .notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: #00c8e8; }
 
-/* ── Hero right ─────────── */
-.hero-right { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 18px; }
+/* ── Hero left (hero text + stats + chips) ─────────── */
+.hero-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+/* ── Hero right (login card only) ─────────── */
+/* padding-top = badge height (~30px) + badge margin-bottom (28px) to align with h1 */
+.hero-right { width: 380px; flex-shrink: 0; padding-top: 58px; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .stat-card {
   background: rgba(255,255,255,.07);
   border: 1px solid rgba(255,255,255,.11);
@@ -781,11 +753,11 @@ const stats = [
 /* ── Large tablet / small laptop (≤900px) ─── */
 @media (max-width: 900px) {
   .hero-inner   { flex-direction: column; padding: 56px 24px 40px; gap: 36px; }
-  .hero-right   { width: 100%; }
+  .hero-right   { width: 100%; padding-top: 0; }
+  .hero-left    { width: 100%; }
   .hero-h1      { font-size: 2.6rem; }
   .hero-p       { max-width: 100%; }
   .login-card   { max-width: 100%; }
-  .stats-grid   { grid-template-columns: repeat(4, 1fr); }
   .pillars      { grid-template-columns: 1fr; gap: 18px; }
   .pillar       { padding: 28px 22px; }
   .modules-grid { grid-template-columns: repeat(2, 1fr); }
@@ -807,7 +779,7 @@ const stats = [
 
   /* Hero */
   .hero         { min-height: auto; }
-  .hero-inner   { padding: 44px 16px 32px; gap: 24px; }
+  .hero-inner   { padding: 44px 16px 32px; gap: 24px; flex-direction: column; }
   .hero-badge   { font-size: .65rem; padding: 5px 11px; margin-bottom: 20px; }
   .hero-h1      { font-size: 2rem; margin-bottom: 14px; }
   .hero-p       { font-size: .875rem; margin-bottom: 24px; }
@@ -819,8 +791,8 @@ const stats = [
   .g-icon-wrap  { width: 30px; height: 30px; }
   .g-icon       { width: 18px; height: 18px; }
 
-  /* Hero right */
-  .hero-right   { gap: 12px; }
+  /* Hero left (stats) */
+  .hero-left    { gap: 12px; }
   .stats-grid   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .stat-card    { padding: 16px 12px; border-radius: 14px; }
   .stat-val     { font-size: 1.7rem; }
