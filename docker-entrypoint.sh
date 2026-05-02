@@ -9,6 +9,9 @@ if [ -n "$GOOGLE_DRIVE_CREDENTIALS_JSON" ]; then
     chmod 600 /var/www/google-credentials.json
 fi
 
+# Clear application cache so stale values (e.g. app version) don't persist across deploys
+php /var/www/artisan cache:clear
+
 # Run pending migrations (safe — skips already-run migrations)
 php /var/www/artisan migrate --force
 
