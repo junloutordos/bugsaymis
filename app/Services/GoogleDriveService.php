@@ -41,12 +41,16 @@ class GoogleDriveService
             return; // credentials not configured — Drive calls will throw when invoked
         }
 
-        $client = new Client();
-        $client->setAuthConfig($credentials);
-        // Full Drive scope needed for Shared Drive membership
-        $client->addScope(Drive::DRIVE);
-
-        $this->drive = new Drive($client);
+        try {
+            $client = new Client();
+            $client->setAuthConfig($credentials);
+            $client->addScope(Drive::DRIVE);
+            $this->drive = new Drive($client);
+        } catch (\Throwable $e) {
+            logger()->warning('GoogleDriveService: failed to initialize client', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function getDrive(): Drive
