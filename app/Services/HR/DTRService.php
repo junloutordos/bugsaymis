@@ -165,6 +165,25 @@ class DTRService
     }
 
     /**
+     * When a leave application is finally approved, update any existing (unlocked)
+     * DTR records within its date range to reflect on_leave status immediately —
+     * without waiting for HR to re-run DTR generation.
+     */
+    public function applyLeaveToExistingDtrRecords(LeaveApplication $leave): void
+    {
+        $dateFrom = Carbon::parse($leave->date_from)->toDateString();
+        $dateTo   = Carbon::parse($leave->date_to)->toDateString();
+
+        DtrRecord::where('user_id', $leave->user_id)
+            ->whereBetween('work_date', [$dateFrom, $dateTo])
+            ->where('is_locked', false)
+            ->update([
+                'attendance_status'    => 'on_leave',
+                'leave_application_id' => $leave->id,
+            ]);
+    }
+
+    /**
      * Recompute derived time metrics on an existing DTR record (after manual edit).
      */
     public function recompute(DtrRecord $record): void

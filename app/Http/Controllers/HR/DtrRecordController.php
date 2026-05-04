@@ -75,7 +75,7 @@ class DtrRecordController extends Controller
         $records = DtrRecord::where('user_id', $user->id)
             ->whereYear('work_date', $y)
             ->whereMonth('work_date', $m)
-            ->with('schedule', 'leaveApplication')
+            ->with('schedule', 'leaveApplication.leaveType')
             ->orderBy('work_date')
             ->get()
             ->map(function ($record) {
@@ -123,7 +123,7 @@ class DtrRecordController extends Controller
         $records = DtrRecord::where('user_id', $user->id)
             ->whereYear('work_date', $y)
             ->whereMonth('work_date', $m)
-            ->with('schedule', 'leaveApplication')
+            ->with('schedule', 'leaveApplication.leaveType')
             ->orderBy('work_date')
             ->get()
             ->map(function ($record) {

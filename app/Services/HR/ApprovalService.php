@@ -5,6 +5,7 @@ namespace App\Services\HR;
 use App\Enums\ApprovalStep;
 use App\Models\HR\LeaveApplication;
 use App\Models\User;
+use App\Services\HR\DTRService;
 use App\Services\SnapshotService;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +24,7 @@ class ApprovalService
     public function __construct(
         private LeaveCreditService $credits,
         private SnapshotService    $snapshots,
+        private DTRService         $dtr,
     ) {}
 
     /**
@@ -107,6 +109,7 @@ class ApprovalService
                     );
                     if ($action === 'approved') {
                         $this->credits->applyLeaveDeduction($application->id, $approver->id);
+                        $this->dtr->applyLeaveToExistingDtrRecords($application);
                     } else {
                         $this->credits->restoreLeaveCredits($application->id, $approver->id);
                     }

@@ -285,6 +285,12 @@
                     <span v-if="r.wfh_attendance_id"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
                           title="Times sourced from WFH attendance log">WFH</span>
+                    <!-- Leave type badge -->
+                    <span v-if="r.attendance_status === 'on_leave' && r.leave_application?.leave_type"
+                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 whitespace-nowrap"
+                          :title="leaveTitle(r)">
+                      {{ r.leave_application.leave_type.code || 'L' }}
+                    </span>
                     <!-- Travel badge -->
                     <span v-if="r.is_travel"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-600 whitespace-nowrap"
@@ -610,6 +616,22 @@ function statusLabel(status) {
 
 function fieldLabel(field) {
   return { time_in_am: 'AM In', time_out_am: 'AM Out', time_in_pm: 'PM In', time_out_pm: 'PM Out' }[field] ?? field
+}
+
+function fmtDateRange(from, to) {
+  const fmt = (d) => {
+    if (!d) return ''
+    const [y, m, day] = String(d).slice(0, 10).split('-').map(Number)
+    return new Date(y, m - 1, day).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+  if (!from) return ''
+  return from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`
+}
+
+function leaveTitle(r) {
+  const type = r.leave_application?.leave_type?.name ?? 'Leave'
+  const range = fmtDateRange(r.leave_application?.date_from, r.leave_application?.date_to)
+  return range ? `${type} — ${range}` : type
 }
 
 // ── Submit Penned Entries ─────────────────────────────────────────────────────
