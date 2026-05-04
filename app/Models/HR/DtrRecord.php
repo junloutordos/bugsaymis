@@ -44,6 +44,8 @@ class DtrRecord extends Model
         'penned_submitted_at',
         'penned_submitted_by',
         'wfh_attendance_id',
+        'is_travel',
+        'travel_remarks',
     ];
 
     protected $casts = [
@@ -54,6 +56,7 @@ class DtrRecord extends Model
         'overtime_minutes'  => 'decimal:2',
         'is_posted'      => 'boolean',
         'is_locked'      => 'boolean',
+        'is_travel'      => 'boolean',
         'processed_at'        => 'datetime',
         'penned_at'           => 'datetime',
         'penned_submitted_at' => 'datetime',
