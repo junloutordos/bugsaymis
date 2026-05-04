@@ -272,29 +272,32 @@
                 </td>
                 <td class="px-4 py-2.5">
                   <div class="flex items-center gap-1 flex-wrap">
-                    <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                    <!-- Main status badge — hidden when a specific badge below replaces it -->
+                    <span v-if="r.attendance_status !== 'on_leave' && !r.is_travel && !gatepassByDate[toDateStr(r.work_date)]"
+                          :class="statusBadge(r.attendance_status)"
+                          class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
                       {{ statusLabel(r.attendance_status) }}
                     </span>
-                    <!-- Gate pass badge -->
+                    <!-- Gate pass badge (replaces main status badge) -->
                     <span v-if="gatepassByDate[toDateStr(r.work_date)]"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap"
                           :title="gatepassByDate[toDateStr(r.work_date)].type">
                       {{ gatepassByDate[toDateStr(r.work_date)].label }}
                     </span>
-                    <!-- WFH badge -->
-                    <span v-if="r.wfh_attendance_id"
+                    <!-- WFH badge — only when supplementary (status is not already 'wfh') -->
+                    <span v-if="r.wfh_attendance_id && r.attendance_status !== 'wfh'"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
                           title="Times sourced from WFH attendance log">WFH</span>
-                    <!-- Leave type badge -->
-                    <span v-if="r.attendance_status === 'on_leave' && r.leave_application?.leave_type"
+                    <!-- Leave type badge (replaces main status badge) -->
+                    <span v-if="r.attendance_status === 'on_leave'"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 whitespace-nowrap"
                           :title="leaveTitle(r)">
-                      {{ r.leave_application.leave_type.code || 'L' }}
+                      {{ r.leave_application?.leave_type?.code || 'L' }}
                     </span>
-                    <!-- Travel badge -->
+                    <!-- Travel badge (replaces main status badge) -->
                     <span v-if="r.is_travel"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-600 whitespace-nowrap"
-                          :title="r.travel_remarks || 'On official travel'">T</span>
+                          :title="r.penned_remarks || 'On official travel'">T</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5">
