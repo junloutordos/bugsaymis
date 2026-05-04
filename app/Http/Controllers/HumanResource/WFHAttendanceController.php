@@ -330,8 +330,8 @@ class WFHAttendanceController extends Controller
         $ocdUser = User::havingRole('OCD')->first();
 
         $isOcdDivision = $user->hasRole('OCD')
-            || strtolower(trim($division->acronym ?? '')) === 'ocd'
-            || str_contains(strtolower($division->division_name ?? ''), 'campus director');
+            || strtolower(trim($division?->acronym ?? '')) === 'ocd'
+            || str_contains(strtolower($division?->division_name ?? ''), 'campus director');
 
         return Inertia::render('HumanResource/WFH/PrintAccomplishments', [
             'employee'      => $user->only('id', 'name', 'position', 'badge_id'),

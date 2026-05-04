@@ -29,18 +29,37 @@ use Illuminate\Http\UploadedFile;
  */
 class GoogleDriveService
 {
-    private Drive $drive;
+    private ?Drive $drive = null;
     private ?string $folderId;
 
     public function __construct()
     {
-        $client = new Client();
-        $client->setAuthConfig(config('services.google_drive.credentials'));
-        // Full Drive scope needed for Shared Drive membership
-        $client->addScope(Drive::DRIVE);
-
-        $this->drive    = new Drive($client);
+        $credentials = config('services.google_drive.credentials');
         $this->folderId = config('services.google_drive.folder_id');
+
+        if (! $credentials) {
+            return; // credentials not configured — Drive calls will throw when invoked
+        }
+
+        try {
+            $client = new Client();
+            $client->setAuthConfig($credentials);
+            // Full Drive scope needed for Shared Drive membership
+            $client->addScope(Drive::DRIVE);
+            $this->drive = new Drive($client);
+        } catch (\Throwable $e) {
+            logger()->warning('GoogleDriveService: failed to initialize client', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function getDrive(): Drive
+    {
+        if ($this->drive === null) {
+            throw new \RuntimeException('Google Drive credentials are not configured (GOOGLE_DRIVE_CREDENTIALS).');
+        }
+        return $this->drive;
     }
 
     /**
@@ -55,7 +74,7 @@ class GoogleDriveService
             'parents' => $this->folderId ? [$this->folderId] : [],
         ]);
 
-        $uploaded = $this->drive->files->create($metadata, [
+        $uploaded = $this->getDrive()->files->create($metadata, [
             'data'             => file_get_contents($file->getRealPath()),
             'mimeType'         => $file->getMimeType(),
             'uploadType'       => 'multipart',
@@ -67,7 +86,7 @@ class GoogleDriveService
         $fileId = $uploaded->id;
 
         // Make the file publicly readable via link
-        $this->drive->permissions->create(
+        $this->getDrive()->permissions->create(
             $fileId,
             new Permission(['type' => 'anyone', 'role' => 'reader']),
             ['supportsAllDrives' => true]
@@ -85,7 +104,7 @@ class GoogleDriveService
      */
     public function download(string $fileId): array
     {
-        $response = $this->drive->files->get($fileId, [
+        $response = $this->getDrive()->files->get($fileId, [
             'alt'               => 'media',
             'supportsAllDrives' => true,
         ]);
@@ -102,7 +121,7 @@ class GoogleDriveService
     public function delete(string $fileId): void
     {
         try {
-            $this->drive->files->delete($fileId, ['supportsAllDrives' => true]);
+            $this->getDrive()->files->delete($fileId, ['supportsAllDrives' => true]);
         } catch (\Throwable) {
             // Silently ignore if already removed
         }
