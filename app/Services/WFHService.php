@@ -193,12 +193,27 @@ class WFHService
 
         if (($data['proof_type'] ?? null) === 'photo' && $photo) {
             $dateFolder = $attendance->getRawOriginal('date') ?? $today;
-            $fileName   = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
-            $uploaded = $this->drive->upload($photo, $fileName);
+            $drivePath  = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
 
-            $payload['google_drive_file_id'] = $uploaded['file_id'];
-            $payload['google_drive_link']    = $uploaded['link'];
-            $payload['file_name']            = $photo->getClientOriginalName();
+            try {
+                $uploaded = $this->drive->upload($photo, $drivePath);
+
+                $payload['google_drive_file_id'] = $uploaded['file_id'];
+                $payload['google_drive_link']    = $uploaded['link'];
+            } catch (\Throwable $e) {
+                logger()->warning('WFH accomplishment: Google Drive upload failed, saving locally', [
+                    'path'  => $drivePath,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $localPath = 'wfh-accomplishments/' . $drivePath;
+                \Illuminate\Support\Facades\Storage::put($localPath, file_get_contents($photo->getRealPath()));
+
+                $payload['google_drive_file_id'] = null;
+                $payload['google_drive_link']    = \Illuminate\Support\Facades\Storage::url($localPath);
+            }
+
+            $payload['file_name'] = $photo->getClientOriginalName();
         }
 
         return WFHAccomplishment::create($payload);

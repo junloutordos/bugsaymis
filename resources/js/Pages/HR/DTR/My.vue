@@ -285,6 +285,10 @@
                     <span v-if="r.wfh_attendance_id"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
                           title="Times sourced from WFH attendance log">WFH</span>
+                    <!-- Travel badge -->
+                    <span v-if="r.is_travel"
+                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-600 whitespace-nowrap"
+                          :title="r.travel_remarks || 'On official travel'">T</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5">
@@ -293,7 +297,7 @@
                   <!-- HR lock -->
                   <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" title="Record locked by HR" />
                   <!-- Edit button -->
-                  <button v-else-if="hasMissingSlots(r)"
+                  <button v-else-if="hasMissingSlots(r) || r.is_travel"
                     @click="openEdit(r)"
                     class="text-slate-300 hover:text-indigo-600 transition-colors"
                     title="Submit penned entry">
@@ -319,12 +323,23 @@
             This will be reviewed by HR.
           </p>
 
+          <!-- Travel toggle -->
+          <div class="mb-4 p-3 rounded-lg border border-slate-100 bg-slate-50">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" v-model="editForm.is_travel"
+                class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400" />
+              <span class="text-sm font-medium text-slate-700">On Official Travel</span>
+            </label>
+            <p class="text-[11px] text-slate-400 mt-1 ml-6">Check if you were on official travel this day. Time slots become optional.</p>
+          </div>
+
           <div class="grid grid-cols-2 gap-3">
             <div v-for="field in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="field">
               <label class="block text-xs font-medium mb-1"
-                :class="editModal.record?.[field] ? 'text-slate-500' : 'text-red-500'">
+                :class="editModal.record?.[field] ? 'text-slate-500' : (editForm.is_travel ? 'text-slate-400' : 'text-red-500')">
                 {{ fieldLabel(field) }}
                 <span v-if="editModal.record?.[field]" class="font-normal text-slate-400">(biometric)</span>
+                <span v-else-if="editForm.is_travel" class="font-normal text-slate-400">(optional)</span>
                 <span v-else class="font-normal text-red-400">(enter penned)</span>
               </label>
               <div v-if="editModal.record?.[field]"
@@ -334,10 +349,12 @@
               <input v-else
                 v-model="editForm['penned_' + field]"
                 type="time"
-                class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm font-mono text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" />
+                :class="editForm.is_travel
+                  ? 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400'
+                  : 'w-full border border-red-200 rounded-lg px-3 py-2 text-sm font-mono text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400'" />
             </div>
             <div class="col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
               <input v-model="editForm.penned_remarks" type="text" placeholder="Reason for penned entry (e.g. biometric malfunction)…"
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
             </div>
@@ -429,6 +446,7 @@ function tableCellClass(r, field) {
   if ((field === 'time_in_am' || field === 'time_out_pm') && props.wfhByDate[dateStr]) {
     return 'text-rose-500 font-semibold'
   }
+  if (r.is_travel) return 'text-sky-600 font-bold'
   if (r.attendance_status === 'on_leave') return 'text-red-600 font-bold'
   if (r.attendance_status === 'on_official_business') return 'text-red-600 font-bold'
   if (props.gatepassByDate[dateStr]) return 'text-red-500 font-bold'
@@ -441,6 +459,7 @@ function tableCellText(r, field) {
   const wfh = props.wfhByDate[dateStr]
   if (field === 'time_in_am'  && wfh?.time_in)  return fmtTime(wfh.time_in)
   if (field === 'time_out_pm' && wfh?.time_out) return fmtTime(wfh.time_out)
+  if (r.is_travel) return 'T'
   const gp = props.gatepassByDate[dateStr]
   if (gp) return gp.label
   const s = r.attendance_status
@@ -466,6 +485,7 @@ function cellSpecialLabel(cell) {
   const s  = cell.record?.attendance_status
   const gp = props.gatepassByDate[cell.date]
   if (gp) return gp.label
+  if (cell.record?.is_travel) return 'T'
   if (s === 'on_leave') return 'L'
   if (s === 'on_official_business') return 'OB'
   return null
@@ -621,6 +641,7 @@ const editForm  = useForm({
   penned_time_in_am: '', penned_time_out_am: '',
   penned_time_in_pm: '', penned_time_out_pm: '',
   penned_remarks: '',
+  is_travel: false,
 })
 
 function openEdit(record) {
@@ -632,6 +653,7 @@ function openEdit(record) {
   editForm.penned_time_in_pm  = p(record.penned_time_in_pm)
   editForm.penned_time_out_pm = p(record.penned_time_out_pm)
   editForm.penned_remarks     = record.penned_remarks ?? ''
+  editForm.is_travel = record.is_travel ?? false
 }
 
 function submitEdit() {

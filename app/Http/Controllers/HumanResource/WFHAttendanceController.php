@@ -5,6 +5,9 @@ namespace App\Http\Controllers\HumanResource;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\WFH\TimeInRequest;
 use App\Http\Requests\WFH\TimeOutRequest;
+use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\LoadAssignment;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
 use App\Models\WFHAttendance;
 use App\Services\GoogleDriveService;
@@ -329,22 +332,53 @@ class WFHAttendanceController extends Controller
 
         $ocdUser = User::havingRole('OCD')->first();
 
-        $isOcdDivision = $user->hasRole('OCD')
+        // ── Signatory logic ──────────────────────────────────────────────────
+        // OCD division or Division Chief → skip Monitored & Reviewed section
+        $isOcdDivision   = $user->hasRole('OCD')
             || strtolower(trim($division?->acronym ?? '')) === 'ocd'
             || str_contains(strtolower($division?->division_name ?? ''), 'campus director');
 
+        $isDivisionChief = $user->hasRole('DivisionChief');
+
+        // CID unit head → immediate head is the Assistant CID Chief for Academic Affairs
+        $isCidUnitHead   = strtolower(trim($division?->acronym ?? '')) === 'cid'
+            && $user->hasRole('UnitHead');
+
+        $immediateHead = null;
+        if ($isCidUnitHead) {
+            $sy = SchoolYear::where('is_current', true)->first();
+            $desig = Designation::where('name', 'Assistant CID Chief for Academic Affairs')->first();
+
+            if ($desig && $sy) {
+                $assignedUser = LoadAssignment::where('designation_id', $desig->id)
+                    ->where('school_year_id', $sy->id)
+                    ->with('faculty:id,name,position')
+                    ->first()
+                    ?->faculty;
+
+                if ($assignedUser) {
+                    $immediateHead = [
+                        'name'     => $assignedUser->name,
+                        'position' => $assignedUser->position ?? 'Assistant CID Chief for Academic Affairs',
+                    ];
+                }
+            }
+        }
+
         return Inertia::render('HumanResource/WFH/PrintAccomplishments', [
-            'employee'      => $user->only('id', 'name', 'position', 'badge_id'),
-            'division'      => $division ? [
+            'employee'       => $user->only('id', 'name', 'position', 'badge_id'),
+            'division'       => $division ? [
                 'division_name' => $division->division_name,
                 'chief_name'    => $division->divisionchief?->name,
             ] : null,
-            'office'        => $office ? [
+            'office'         => $office ? [
                 'name'           => $office->name,
                 'unit_head_name' => $office->unitHeadUser?->name,
             ] : null,
-            'isOcdDivision' => $isOcdDivision,
-            'approvedBy'    => $ocdUser ? [
+            'isOcdDivision'  => $isOcdDivision,
+            'isDivisionChief' => $isDivisionChief,
+            'immediateHead'  => $immediateHead,
+            'approvedBy'     => $ocdUser ? [
                 'name'     => $ocdUser->name,
                 'position' => $ocdUser->position ?? 'Campus Director',
             ] : null,

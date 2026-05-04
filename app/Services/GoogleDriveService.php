@@ -44,6 +44,7 @@ class GoogleDriveService
         try {
             $client = new Client();
             $client->setAuthConfig($credentials);
+            // Full Drive scope needed for Shared Drive membership
             $client->addScope(Drive::DRIVE);
             $this->drive = new Drive($client);
         } catch (\Throwable $e) {

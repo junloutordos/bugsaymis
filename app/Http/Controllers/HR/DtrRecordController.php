@@ -276,9 +276,13 @@ class DtrRecordController extends Controller
             'penned_time_in_pm'  => 'nullable|date_format:H:i',
             'penned_time_out_pm' => 'nullable|date_format:H:i',
             'penned_remarks'     => 'nullable|string|max:255',
+            'is_travel'          => 'boolean',
         ]);
 
-        $updates = ['penned_remarks' => $validated['penned_remarks'] ?? null];
+        $updates = [
+            'penned_remarks' => $validated['penned_remarks'] ?? null,
+            'is_travel'      => (bool) ($validated['is_travel'] ?? false),
+        ];
 
         foreach (['time_in_am', 'time_out_am', 'time_in_pm', 'time_out_pm'] as $field) {
             $key = 'penned_' . $field;

@@ -97,23 +97,42 @@
             </div>
           </div>
 
-          <div v-if="!isOcdDivision" class="wfh-sig-section">
+          <div v-if="!isOcdDivision && !isDivisionChief" class="wfh-sig-section">
             <p class="wfh-sig-top">Monitored &amp; Reviewed by:</p>
             <div class="wfh-sig-row">
-              <div class="wfh-sig-box">
-                <div class="wfh-sig-line">
-                  <span v-if="office?.unit_head_name" class="wfh-sig-name-inline">{{ office.unit_head_name.toUpperCase() }}</span>
+              <!-- CID unit head: show Assistant CID Chief + CID Chief -->
+              <template v-if="immediateHead">
+                <div class="wfh-sig-box">
+                  <div class="wfh-sig-line">
+                    <span class="wfh-sig-name-inline">{{ immediateHead.name.toUpperCase() }}</span>
+                  </div>
+                  <div class="wfh-sig-sub">{{ immediateHead.position }}</div>
                 </div>
-                <div class="wfh-sig-sub">Academic/ Unit Head</div>
-                <div v-if="office?.name" class="wfh-sig-office">{{ office.name }}</div>
-              </div>
-              <div class="wfh-sig-box">
-                <div class="wfh-sig-line">
-                  <span v-if="division?.chief_name" class="wfh-sig-name-inline">{{ division.chief_name.toUpperCase() }}</span>
+                <div class="wfh-sig-box">
+                  <div class="wfh-sig-line">
+                    <span v-if="division?.chief_name" class="wfh-sig-name-inline">{{ division.chief_name.toUpperCase() }}</span>
+                  </div>
+                  <div class="wfh-sig-sub">Division Chief</div>
+                  <div v-if="division?.division_name" class="wfh-sig-office">{{ division.division_name }}</div>
                 </div>
-                <div class="wfh-sig-sub">Division Chief</div>
-                <div v-if="division?.division_name" class="wfh-sig-office">{{ division.division_name }}</div>
-              </div>
+              </template>
+              <!-- Default: show Office Unit Head + Division Chief -->
+              <template v-else>
+                <div class="wfh-sig-box">
+                  <div class="wfh-sig-line">
+                    <span v-if="office?.unit_head_name" class="wfh-sig-name-inline">{{ office.unit_head_name.toUpperCase() }}</span>
+                  </div>
+                  <div class="wfh-sig-sub">Academic/ Unit Head</div>
+                  <div v-if="office?.name" class="wfh-sig-office">{{ office.name }}</div>
+                </div>
+                <div class="wfh-sig-box">
+                  <div class="wfh-sig-line">
+                    <span v-if="division?.chief_name" class="wfh-sig-name-inline">{{ division.chief_name.toUpperCase() }}</span>
+                  </div>
+                  <div class="wfh-sig-sub">Division Chief</div>
+                  <div v-if="division?.division_name" class="wfh-sig-office">{{ division.division_name }}</div>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -136,14 +155,16 @@ import { onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee:      Object,
-  division:      { type: Object, default: null },
-  office:        { type: Object, default: null },
-  approvedBy:    { type: Object, default: null },
-  isOcdDivision: { type: Boolean, default: false },
-  records:       Array,
-  mode:          { type: String, default: 'monthly' },
-  dateLabel:     { type: String, default: '' },
+  employee:        Object,
+  division:        { type: Object, default: null },
+  office:          { type: Object, default: null },
+  approvedBy:      { type: Object, default: null },
+  isOcdDivision:   { type: Boolean, default: false },
+  isDivisionChief: { type: Boolean, default: false },
+  immediateHead:   { type: Object, default: null },
+  records:         Array,
+  mode:            { type: String, default: 'monthly' },
+  dateLabel:       { type: String, default: '' },
 })
 
 function fmtDate(d) {
