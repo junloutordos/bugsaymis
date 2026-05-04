@@ -328,15 +328,9 @@
             <label class="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" v-model="editForm.is_travel"
                 class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-400" />
-              <span class="text-sm font-medium text-slate-700">On Official Travel / Mission</span>
+              <span class="text-sm font-medium text-slate-700">On Official Travel</span>
             </label>
             <p class="text-[11px] text-slate-400 mt-1 ml-6">Check if you were on official travel this day. Time slots become optional.</p>
-            <div v-if="editForm.is_travel" class="mt-2 ml-6">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Travel Remarks</label>
-              <input v-model="editForm.travel_remarks" type="text"
-                placeholder="e.g. Official mission to Manila, seminar attendance…"
-                class="w-full border border-sky-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400" />
-            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -647,8 +641,7 @@ const editForm  = useForm({
   penned_time_in_am: '', penned_time_out_am: '',
   penned_time_in_pm: '', penned_time_out_pm: '',
   penned_remarks: '',
-  is_travel:      false,
-  travel_remarks: '',
+  is_travel: false,
 })
 
 function openEdit(record) {
@@ -660,8 +653,7 @@ function openEdit(record) {
   editForm.penned_time_in_pm  = p(record.penned_time_in_pm)
   editForm.penned_time_out_pm = p(record.penned_time_out_pm)
   editForm.penned_remarks     = record.penned_remarks ?? ''
-  editForm.is_travel          = record.is_travel ?? false
-  editForm.travel_remarks     = record.travel_remarks ?? ''
+  editForm.is_travel = record.is_travel ?? false
 }
 
 function submitEdit() {
