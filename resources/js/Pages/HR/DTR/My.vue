@@ -281,8 +281,12 @@
                     <!-- Gate pass badge (replaces main status badge) -->
                     <span v-if="gatepassByDate[toDateStr(r.work_date)]"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap"
-                          :title="gatepassByDate[toDateStr(r.work_date)].type">
+                          :title="gatepassTitle(toDateStr(r.work_date))">
                       {{ gatepassByDate[toDateStr(r.work_date)].label }}
+                      <span v-if="gatepassByDate[toDateStr(r.work_date)].consumed_minutes > 0"
+                            class="ml-1 font-normal opacity-80">
+                        -{{ fmtMinutes(gatepassByDate[toDateStr(r.work_date)].consumed_minutes) }}
+                      </span>
                     </span>
                     <!-- WFH badge — only when supplementary (status is not already 'wfh') -->
                     <span v-if="r.wfh_attendance_id && r.attendance_status !== 'wfh'"
@@ -619,6 +623,15 @@ function statusLabel(status) {
 
 function fieldLabel(field) {
   return { time_in_am: 'AM In', time_out_am: 'AM Out', time_in_pm: 'PM In', time_out_pm: 'PM Out' }[field] ?? field
+}
+
+function gatepassTitle(dateStr) {
+  const gp = props.gatepassByDate[dateStr]
+  if (!gp) return ''
+  let title = gp.type || gp.label
+  if (gp.purpose) title += ` — ${gp.purpose}`
+  if (gp.consumed_minutes > 0) title += ` (${fmtMinutes(gp.consumed_minutes)} deducted)`
+  return title
 }
 
 function fmtDateRange(from, to) {

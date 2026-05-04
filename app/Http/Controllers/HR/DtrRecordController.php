@@ -741,7 +741,10 @@ class DtrRecordController extends Controller
 
     /**
      * Load approved gate passes for the employee/month, keyed by date string.
-     * Returns array of { label: 'OB'|'OT'|'UT', type: full string, purpose } per date.
+     * Returns array of { label, type, purpose, actual_timeout, actual_timein, consumed_minutes } per date.
+     *
+     * Accepted final statuses: 'OCD Approved' (standard flow), 'Approved' (legacy/manual).
+     * 'Division Approved' is intentionally excluded — it is an intermediate step, not final.
      */
     private function loadGatepassByDate(?string $badgeId, int $year, int $month): array
     {
@@ -757,12 +760,11 @@ class DtrRecordController extends Controller
 
         $rows = DB::table('gatepass')
             ->whereRaw("CAST(badgeNumber AS CHAR) = ?", [(string) $badgeId])
-            ->where('status', 'Approved')
+            ->whereIn('status', ['Approved', 'OCD Approved'])
             ->get();
 
         $result = [];
         foreach ($rows as $gp) {
-            // gatepass_date is stored as a string; try common formats
             try {
                 $parsed = Carbon::parse($gp->gatepass_date);
             } catch (\Throwable) {
@@ -773,10 +775,26 @@ class DtrRecordController extends Controller
             }
             $dateStr = $parsed->toDateString();
             $label   = $typeMap[strtolower(trim($gp->gatepass_type ?? ''))] ?? 'OB';
+
+            // Compute minutes consumed from actual times when both are recorded
+            $consumedMinutes = 0;
+            $actualOut = trim($gp->actual_timeout ?? '');
+            $actualIn  = trim($gp->actual_timein  ?? '');
+            if ($actualOut !== '' && $actualIn !== '') {
+                try {
+                    $out = Carbon::parse($actualOut);
+                    $in  = Carbon::parse($actualIn);
+                    $consumedMinutes = max(0, (int) $out->diffInMinutes($in));
+                } catch (\Throwable) {}
+            }
+
             $result[$dateStr] = [
-                'label'   => $label,
-                'type'    => $gp->gatepass_type ?? '',
-                'purpose' => $gp->purpose ?? '',
+                'label'            => $label,
+                'type'             => $gp->gatepass_type ?? '',
+                'purpose'          => $gp->purpose ?? '',
+                'actual_timeout'   => $actualOut ?: null,
+                'actual_timein'    => $actualIn  ?: null,
+                'consumed_minutes' => $consumedMinutes,
             ];
         }
 

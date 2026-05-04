@@ -165,6 +165,55 @@ class DTRService
     }
 
     /**
+     * Apply a gate pass time deduction to the employee's DTR record for the given date.
+     * Called when actual_timeout + actual_timein are recorded on an approved gate pass.
+     * Deducts the time spent outside from hours_worked and, for UT-type passes, adds
+     * the consumed minutes to undertime_minutes.
+     */
+    public function applyGatepassToDate(
+        int    $userId,
+        string $date,
+        string $actualTimeout,
+        string $actualTimein,
+        string $gatepassType,
+    ): void {
+        $record = DtrRecord::where('user_id', $userId)
+            ->where('work_date', $date)
+            ->where('is_locked', false)
+            ->first();
+
+        if (! $record) {
+            return;
+        }
+
+        try {
+            $out             = Carbon::parse($actualTimeout);
+            $in              = Carbon::parse($actualTimein);
+            $consumedMinutes = max(0, (int) $out->diffInMinutes($in));
+        } catch (\Throwable) {
+            return;
+        }
+
+        if ($consumedMinutes === 0) {
+            return;
+        }
+
+        $hoursConsumed = round($consumedMinutes / 60, 2);
+        $updates       = [
+            'hours_worked' => max(0, round((float) $record->hours_worked - $hoursConsumed, 2)),
+        ];
+
+        // UT gate passes explicitly represent undertime — count toward undertime minutes.
+        // OB and OT are authorised absences; we still reduce hours_worked but do not
+        // double-count them as undertime (the schedule recompute already captures that).
+        if (strtolower(trim($gatepassType)) === 'undertime') {
+            $updates['undertime_minutes'] = round((float) $record->undertime_minutes + $consumedMinutes, 2);
+        }
+
+        $record->update($updates);
+    }
+
+    /**
      * When a leave application is finally approved, update any existing (unlocked)
      * DTR records within its date range to reflect on_leave status immediately —
      * without waiting for HR to re-run DTR generation.
