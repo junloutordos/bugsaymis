@@ -91,7 +91,11 @@ class ITJobRequestPdfService
         $dir      = 'it_job_requests';
         $filename = $dir . '/' . $jobRequest->itjr_no . '.pdf';
 
-        Storage::disk('public')->put($filename, $mpdf->Output('', 'S'));
+        // Store with explicit Content-Type so S3 serves it as application/pdf,
+        // not the default application/octet-stream.
+        Storage::disk('public')->put($filename, $mpdf->Output('', 'S'), [
+            'ContentType' => 'application/pdf',
+        ]);
 
         $jobRequest->update(['pdf_path' => $filename]);
 
@@ -100,21 +104,25 @@ class ITJobRequestPdfService
 
     /**
      * Stream the stored PDF; regenerate if missing.
+     *
+     * Uses Storage::disk()->response() which streams correctly on both local
+     * and S3 disks, avoiding the get()-returns-false issue when throw is disabled.
      */
-    public function stream(ITJobRequest $jobRequest): \Illuminate\Http\Response
+    public function stream(ITJobRequest $jobRequest): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         if (! $jobRequest->pdf_path || ! Storage::disk('public')->exists($jobRequest->pdf_path)) {
             $this->generate($jobRequest);
             $jobRequest->refresh();
         }
 
-        $content  = Storage::disk('public')->get($jobRequest->pdf_path);
         $filename = 'ITJRF_' . $jobRequest->itjr_no . '.pdf';
 
-        return response($content, 200, [
-            'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $filename . '"',
-        ]);
+        return Storage::disk('public')->response(
+            $jobRequest->pdf_path,
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+            'inline'
+        );
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
