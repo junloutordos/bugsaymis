@@ -50,9 +50,9 @@
     .field-value-plain { font-weight: bold; font-size: 11px; word-break: break-word; }
 
     /* ── Signature block ────────────────────── */
-    .sig-cell    { text-align: center; padding: 4px 6px 6px; }
-    .sig-cell img { display: block; margin: 0 auto 4px; max-height: 54px; max-width: 150px; }
-    .sig-gap     { height: 52px; }
+    .sig-cell    { text-align: center; padding: 4px 6px 4px; }
+    .sig-cell img { display: block; margin: 0 auto 2px; max-height: 30px; max-width: 90px; }
+    .sig-gap     { height: 30px; }
     .sig-name    {
       display: inline-block;
       font-weight: bold;
@@ -60,8 +60,9 @@
       border-bottom: 1.5px solid #000;
       padding-bottom: 1px;
       margin-top: 2px;
+      min-width: 110px;
     }
-    .sig-pos     { font-size: 10px; margin-top: 3px; color: #333; }
+    .sig-pos     { font-size: 10px; margin-top: 2px; color: #333; }
 
     /* ── Section label rows ─────────────────── */
     .section-label { font-size: 10px; color: #333; font-weight: normal; padding: 5px 10px 3px; border-bottom: none; }
