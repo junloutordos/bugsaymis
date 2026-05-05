@@ -115,9 +115,9 @@ class ITJobRequestPdfService
 
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
-            'format'        => 'A4-L',
-            'margin_left'   => 10,
-            'margin_right'  => 10,
+            'format'        => 'A4',
+            'margin_left'   => 12,
+            'margin_right'  => 12,
             'margin_top'    => 10,
             'margin_bottom' => 10,
             'tempDir'       => $tmpDir,

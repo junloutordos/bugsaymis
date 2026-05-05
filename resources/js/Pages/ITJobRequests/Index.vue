@@ -917,7 +917,7 @@ const handleNewRequest = async () => {
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                   <input type="radio" v-model="exportScope" value="mine" class="text-emerald-600" />
-                  My requests only
+                  Requests I attended
                 </label>
               </div>
             </div>
