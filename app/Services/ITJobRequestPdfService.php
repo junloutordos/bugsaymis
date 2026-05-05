@@ -6,6 +6,7 @@ use App\Models\ITJobRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ITJobRequestPdfService
 {
@@ -38,24 +39,65 @@ class ITJobRequestPdfService
         'Other'                          => 'Provide appropriate technical assistance',
     ];
 
+    // ── Public API ────────────────────────────────────────────────────────────
+
     /**
-     * Generate the PDF for a job request, store it, update pdf_path, and return the storage path.
+     * Build the PDF bytes, store on S3/local, update pdf_path, return storage path.
+     * Used by auto-generation when status reaches "Acted by MIS".
      */
     public function generate(ITJobRequest $jobRequest): string
     {
+        $pdfBytes = $this->buildPdfBytes($jobRequest);
+
+        $dir      = 'it_job_requests';
+        $filename = $dir . '/' . $jobRequest->itjr_no . '.pdf';
+
+        Storage::disk('public')->put($filename, $pdfBytes, [
+            'ContentType' => 'application/pdf',
+        ]);
+
+        $jobRequest->update(['pdf_path' => $filename]);
+
+        return $filename;
+    }
+
+    /**
+     * Stream a freshly-generated PDF directly from PHP memory.
+     *
+     * Does NOT read from S3 — generates inline on every request. Eliminates
+     * all S3 read-back issues (driver->path(), get() returning false, mimeType
+     * errors, ACL problems, etc.). PDF is small so regeneration is fast.
+     */
+    public function stream(ITJobRequest $jobRequest): StreamedResponse
+    {
+        $pdfBytes = $this->buildPdfBytes($jobRequest);
+        $filename = 'ITJRF_' . $jobRequest->itjr_no . '.pdf';
+
+        return new StreamedResponse(function () use ($pdfBytes) {
+            echo $pdfBytes;
+        }, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Length'      => strlen($pdfBytes),
+        ]);
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    /**
+     * Build and return raw PDF bytes without storing anywhere.
+     */
+    private function buildPdfBytes(ITJobRequest $jobRequest): string
+    {
         $jobRequest->loadMissing(['user.division', 'divisionChief', 'assignedTo']);
 
-        // Approved by — use OCD role (same source as WFH accomplishments signatory)
         $director = User::havingRole('OCD')->first();
 
-        // Resolve recommendation: stored value wins over category default
         $recommendation = $jobRequest->recommendation
             ?: ($jobRequest->category
                 ? (self::DEFAULT_RECOMMENDATIONS[$jobRequest->category] ?? $jobRequest->category)
                 : '—');
 
-        // Convert signatures to base64 data URIs so mPDF can embed them.
-        // electronic_signature is stored as a public-disk relative path (e.g. "signatures/abc.png").
         $directorSig = $this->sigDataUri($director?->electronic_signature);
         $dcSig       = $this->sigDataUri($jobRequest->divisionChief?->electronic_signature);
         $assignedSig = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
@@ -69,7 +111,6 @@ class ITJobRequestPdfService
             'assignedSig'
         ))->render();
 
-        // Ensure mPDF temp dir exists (may not exist on fresh ECS container boot)
         $tmpDir = storage_path('app/tmp');
         if (! is_dir($tmpDir)) {
             mkdir($tmpDir, 0775, true);
@@ -88,52 +129,15 @@ class ITJobRequestPdfService
         $mpdf->SetTitle('IT JRF — ' . $jobRequest->itjr_no);
         $mpdf->WriteHTML($html);
 
-        $dir      = 'it_job_requests';
-        $filename = $dir . '/' . $jobRequest->itjr_no . '.pdf';
-
-        // Store with explicit Content-Type so S3 serves it as application/pdf,
-        // not the default application/octet-stream.
-        Storage::disk('public')->put($filename, $mpdf->Output('', 'S'), [
-            'ContentType' => 'application/pdf',
-        ]);
-
-        $jobRequest->update(['pdf_path' => $filename]);
-
-        return $filename;
+        return $mpdf->Output('', 'S');
     }
-
-    /**
-     * Stream the stored PDF; regenerate if missing.
-     *
-     * Uses Storage::disk()->response() which streams correctly on both local
-     * and S3 disks, avoiding the get()-returns-false issue when throw is disabled.
-     */
-    public function stream(ITJobRequest $jobRequest): \Symfony\Component\HttpFoundation\StreamedResponse
-    {
-        if (! $jobRequest->pdf_path || ! Storage::disk('public')->exists($jobRequest->pdf_path)) {
-            $this->generate($jobRequest);
-            $jobRequest->refresh();
-        }
-
-        $filename = 'ITJRF_' . $jobRequest->itjr_no . '.pdf';
-
-        return Storage::disk('public')->response(
-            $jobRequest->pdf_path,
-            $filename,
-            ['Content-Type' => 'application/pdf'],
-            'inline'
-        );
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
      * Convert a public-disk signature path (e.g. "signatures/file.png") to a
      * base64 data URI that mPDF can embed inline.
      *
-     * Uses Storage::disk('public') exclusively — compatible with both the local
-     * disk (dev) and S3 (production). Avoids ->path() and file_get_contents()
-     * which only work on local disks.
+     * Uses Storage::disk('public') exclusively — compatible with both local
+     * disk (dev) and S3 (production).
      */
     private function sigDataUri(?string $storedPath): ?string
     {
