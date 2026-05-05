@@ -333,6 +333,33 @@ class GatePassController extends Controller
             ->where('gatepass.id', $id)
             ->first();
 
+        // When actual_timein is newly recorded (employee has returned), apply the time
+        // deduction to the corresponding DTR record automatically.
+        $hadActualTimein = ! empty(trim($existing->actual_timein ?? ''));
+        $nowActualTimein = ! empty(trim($update['actual_timein'] ?? ''));
+        $nowActualTimeout = ! empty(trim($update['actual_timeout'] ?? ''));
+
+        if (! $hadActualTimein && $nowActualTimein && $nowActualTimeout) {
+            try {
+                $gateDate = \Carbon\Carbon::parse($existing->gatepass_date)->toDateString();
+                $user     = \App\Models\User::whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $existing->badgeNumber])->first();
+                if ($user && $gateDate) {
+                    app(\App\Services\HR\DTRService::class)->applyGatepassToDate(
+                        userId:        $user->id,
+                        date:          $gateDate,
+                        actualTimeout: $update['actual_timeout'],
+                        actualTimein:  $update['actual_timein'],
+                        gatepassType:  $existing->gatepass_type ?? 'official business',
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->warning('Failed to apply gate pass deduction to DTR', [
+                    'gatepass_id' => $id,
+                    'error'       => $e->getMessage(),
+                ]);
+            }
+        }
+
         // If Division Chief declined via in-app update, notify requester by email
         try {
             if (isset($data['status']) && $data['status'] === 'Division Declined') {

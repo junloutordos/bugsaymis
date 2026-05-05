@@ -15,6 +15,10 @@ php /var/www/artisan cache:clear
 # Run pending migrations (safe — skips already-run migrations)
 php /var/www/artisan migrate --force
 
+# Sync the app version from composer.json into the app_versions table
+php /var/www/artisan app:version-sync
+
+
 # Cache config/routes/views for production performance
 php /var/www/artisan config:cache
 php /var/www/artisan route:cache
