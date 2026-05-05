@@ -86,16 +86,21 @@
       <col class="c3">
     </colgroup>
 
-    {{-- Row 1: Requested by | ITJRF # --}}
+    {{-- Row 1: Requested by (with signature) | ITJRF # --}}
     <tr>
       <td colspan="2" style="border-right:1px solid #000;">
-        <div class="field-label">Requested by:</div>
-        <div class="val">{{ strtoupper($jobRequest->user->name ?? '—') }}</div>
-        @if($jobRequest->user?->division?->division_name)
-          <div style="font-size:10px; color:#555; margin-top:2px;">
-            {{ $jobRequest->user->division->division_name }}
-          </div>
-        @endif
+        <div class="field-label" style="margin-bottom:4px;">Requested by:</div>
+        <div class="sig-cell">
+          @if($requesterSig)
+            <img src="{{ $requesterSig }}" alt="" style="display:block; margin:0 auto 2px; height:38px; width:auto;">
+          @else
+            <div class="sig-gap"></div>
+          @endif
+          <div><span class="sig-name">{{ strtoupper($jobRequest->user?->name ?? '') }}</span></div>
+          @if($jobRequest->user?->division?->division_name)
+            <div class="sig-pos">{{ $jobRequest->user->division->division_name }}</div>
+          @endif
+        </div>
       </td>
       <td>
         <div class="field-label">ITJRF #:</div>
@@ -214,7 +219,7 @@
       <td class="section-label" style="text-align:center;">Confirmed by User:</td>
     </tr>
 
-    {{-- Row 11: Date completed | Serviced by (name + position) | Confirmed by user --}}
+    {{-- Row 11: Date completed | Serviced by (with sig) | Confirmed by user (with sig) --}}
     <tr>
       <td style="border-top:none; vertical-align:middle; padding:8px 10px;">
         @if($jobRequest->completed_at)
@@ -223,14 +228,31 @@
           </span>
         @endif
       </td>
-      <td style="border-top:none; text-align:center; vertical-align:middle; padding:8px 6px;">
-        <div class="val">{{ strtoupper($jobRequest->assignedTo?->name ?? '—') }}</div>
-        @if($jobRequest->assignedTo?->position)
-          <div class="sig-pos" style="margin-top:3px;">{{ $jobRequest->assignedTo->position }}</div>
-        @endif
+      <td style="border-top:none; text-align:center; padding:4px 6px;">
+        <div class="sig-cell">
+          @if($assignedSig)
+            <img src="{{ $assignedSig }}" alt="" style="display:block; margin:0 auto 2px; height:38px; width:auto;">
+          @else
+            <div class="sig-gap"></div>
+          @endif
+          <div><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
+          @if($jobRequest->assignedTo?->position)
+            <div class="sig-pos">{{ $jobRequest->assignedTo->position }}</div>
+          @endif
+        </div>
       </td>
-      <td style="border-top:none; text-align:center; vertical-align:middle; padding:8px 6px;">
-        <div class="val">{{ strtoupper($jobRequest->user?->name ?? '—') }}</div>
+      <td style="border-top:none; text-align:center; padding:4px 6px;">
+        <div class="sig-cell">
+          @if($requesterSig)
+            <img src="{{ $requesterSig }}" alt="" style="display:block; margin:0 auto 2px; height:38px; width:auto;">
+          @else
+            <div class="sig-gap"></div>
+          @endif
+          <div><span class="sig-name">{{ strtoupper($jobRequest->user?->name ?? '') }}</span></div>
+          @if($jobRequest->user?->position)
+            <div class="sig-pos">{{ $jobRequest->user->position }}</div>
+          @endif
+        </div>
       </td>
     </tr>
 

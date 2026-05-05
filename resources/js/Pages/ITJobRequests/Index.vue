@@ -8,7 +8,8 @@ import {
   PencilSquareIcon,
   DocumentArrowDownIcon,
   TrashIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  DocumentChartBarIcon,
 } from "@heroicons/vue/24/outline"
 import { useJobRequests } from "@/Composables/useJobRequests.js"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
@@ -217,6 +218,31 @@ function selectEquipment(eq) {
   eqDropOpen.value = false
 }
 
+// ── Export PDF modal ──────────────────────────────────────────────────────────
+const showExportModal  = ref(false)
+const exportDateFrom   = ref('')
+const exportDateTo     = ref('')
+const exportCategory   = ref('')
+const exportScope      = ref('mine')
+
+function openExportModal() {
+  exportDateFrom.value  = ''
+  exportDateTo.value    = ''
+  exportCategory.value  = ''
+  exportScope.value     = props.isAdmin ? 'all' : 'mine'
+  showExportModal.value = true
+}
+
+function runExport() {
+  const params = new URLSearchParams()
+  if (exportDateFrom.value)  params.set('date_from', exportDateFrom.value)
+  if (exportDateTo.value)    params.set('date_to',   exportDateTo.value)
+  if (exportCategory.value)  params.set('category',  exportCategory.value)
+  params.set('scope', exportScope.value)
+  window.open(route('jobrequests.export-pdf') + '?' + params.toString(), '_blank')
+  showExportModal.value = false
+}
+
 const handleNewRequest = async () => {
   if (hasPendingConfirmation.value) {
     await Swal.fire({
@@ -305,11 +331,17 @@ const handleNewRequest = async () => {
             </select>
           </div>
           <div class="flex gap-2">
-            <button @click="exportCSV" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <button @click="exportCSV" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Export CSV">
               <ArrowDownTrayIcon class="w-5 h-5" />
             </button>
-            <button @click="printTable" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <button @click="printTable" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print table">
               <PrinterIcon class="w-5 h-5" />
+            </button>
+            <button @click="openExportModal"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shadow-sm"
+              title="Export PDF report">
+              <DocumentChartBarIcon class="w-4 h-4" />
+              Export PDF
             </button>
           </div>
         </div>
@@ -841,5 +873,70 @@ const handleNewRequest = async () => {
     </div>
 
     </div>
+    <!-- Export PDF Modal -->
+    <Teleport to="body">
+      <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-semibold text-slate-800">Export IT Job Request Report</h3>
+            <button @click="showExportModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Date range -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Date From</label>
+                <input v-model="exportDateFrom" type="date"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Date To</label>
+                <input v-model="exportDateTo" type="date"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+              </div>
+            </div>
+
+            <!-- Category -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
+              <select v-model="exportCategory"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                <option value="">All Categories</option>
+                <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+              </select>
+            </div>
+
+            <!-- Scope (admin only) -->
+            <div v-if="props.isAdmin">
+              <label class="block text-xs font-medium text-slate-600 mb-2">Records to include</label>
+              <div class="flex gap-4">
+                <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                  <input type="radio" v-model="exportScope" value="all" class="text-emerald-600" />
+                  All requests
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                  <input type="radio" v-model="exportScope" value="mine" class="text-emerald-600" />
+                  My requests only
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex gap-3 justify-end mt-6">
+            <button @click="showExportModal = false"
+              class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+              Cancel
+            </button>
+            <button @click="runExport"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors">
+              <DocumentChartBarIcon class="w-4 h-4" />
+              Generate PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </AdminLayout>
 </template>
