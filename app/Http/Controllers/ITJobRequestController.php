@@ -687,11 +687,55 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     }
 
     /* =====================================================
-     | PRINT / DOWNLOAD PDF
+     | PRINT / DOWNLOAD PDF (single record)
      |=====================================================*/
     public function printForm(ITJobRequest $jobRequest)
     {
         return $this->pdfService->stream($jobRequest);
+    }
+
+    /* =====================================================
+     | EXPORT PDF (list report)
+     |=====================================================*/
+    public function exportPdf(Request $request)
+    {
+        $user    = $request->user();
+        $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+
+        $dateFrom = $request->input('date_from');
+        $dateTo   = $request->input('date_to');
+        $category = $request->input('category', '');
+        $scope    = $request->input('scope', 'mine');
+
+        $query = ITJobRequest::with(['user', 'assignedTo'])
+            ->orderBy('created_at');
+
+        // Non-admin users are always scoped to their own requests
+        if (! $isAdmin || $scope === 'mine') {
+            $query->where('user_id', $user->id);
+        }
+
+        if ($dateFrom) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+        if ($category) {
+            $query->where('category', $category);
+        }
+
+        $records  = $query->get();
+        $notedBy  = User::havingRole('OCD')->first();
+
+        return $this->pdfService->exportList(
+            records:     $records,
+            preparedBy:  $user,
+            notedBy:     $notedBy,
+            dateFrom:    $dateFrom,
+            dateTo:      $dateTo,
+            category:    $category ?: null,
+        );
     }
 
     /* =====================================================

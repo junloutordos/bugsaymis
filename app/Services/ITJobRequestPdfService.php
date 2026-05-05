@@ -82,6 +82,62 @@ class ITJobRequestPdfService
         ]);
     }
 
+    /**
+     * Generate a list-report PDF for a collection of IT Job Requests.
+     * Streams the PDF bytes directly (no S3 storage).
+     */
+    public function exportList(
+        \Illuminate\Support\Collection $records,
+        User                           $preparedBy,
+        ?User                          $notedBy,
+        ?string                        $dateFrom,
+        ?string                        $dateTo,
+        ?string                        $category,
+    ): StreamedResponse {
+        $headerPath = public_path('images/report_header.jpeg');
+        $footerPath = public_path('images/report_footer.jpeg');
+
+        $html = view('it-job-requests.export-pdf', compact(
+            'records',
+            'preparedBy',
+            'notedBy',
+            'dateFrom',
+            'dateTo',
+            'category',
+            'headerPath',
+            'footerPath',
+        ))->render();
+
+        $tmpDir = storage_path('app/tmp');
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
+        $mpdf = new Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A4-L',
+            'margin_left'   => 10,
+            'margin_right'  => 10,
+            'margin_top'    => 10,
+            'margin_bottom' => 10,
+            'tempDir'       => $tmpDir,
+        ]);
+
+        $mpdf->SetTitle('IT Job Request Report');
+        $mpdf->WriteHTML($html);
+
+        $pdfBytes = $mpdf->Output('', 'S');
+        $filename = 'ITJR_Report_' . now()->format('Y-m-d') . '.pdf';
+
+        return new StreamedResponse(function () use ($pdfBytes) {
+            echo $pdfBytes;
+        }, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Content-Length'      => strlen($pdfBytes),
+        ]);
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     /**
@@ -98,9 +154,10 @@ class ITJobRequestPdfService
                 ? (self::DEFAULT_RECOMMENDATIONS[$jobRequest->category] ?? $jobRequest->category)
                 : '—');
 
-        $directorSig = $this->sigDataUri($director?->electronic_signature);
-        $dcSig       = $this->sigDataUri($jobRequest->divisionChief?->electronic_signature);
-        $assignedSig = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
+        $directorSig  = $this->sigDataUri($director?->electronic_signature);
+        $dcSig        = $this->sigDataUri($jobRequest->divisionChief?->electronic_signature);
+        $assignedSig  = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
+        $requesterSig = $this->sigDataUri($jobRequest->user?->electronic_signature);
 
         $html = view('it-job-requests.pdf', compact(
             'jobRequest',
@@ -108,7 +165,8 @@ class ITJobRequestPdfService
             'recommendation',
             'directorSig',
             'dcSig',
-            'assignedSig'
+            'assignedSig',
+            'requesterSig'
         ))->render();
 
         $tmpDir = storage_path('app/tmp');
