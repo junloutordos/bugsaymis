@@ -8,7 +8,22 @@
       "Bash(php -l *)",
       "Bash(cd /Users/junlou/bugsaymis-docker && docker compose exec php bash -c *)",
       "Bash(curl -sk -X POST https://localhost/student-attendance/scan -H 'Content-Type: application/json' -H 'X-Requested-With: XMLHttpRequest' -d '{\"barcode\":\"13-2020-5-0\",\"gate_location\":\"main_gate\",\"source\":\"gate_scanner\"}')",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis status)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis diff --stat)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis diff resources/js/Composables/useJobRequests.js resources/js/Pages/ITJobRequests/Index.vue resources/js/Pages/Auth/Login.vue)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis add resources/js/Composables/useJobRequests.js resources/js/Pages/Auth/Login.vue resources/js/Pages/ITJobRequests/Index.vue)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis log --oneline -5)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis commit -m ' *)",
+      "Bash(grep -L '$fillable\\\\|$guarded' '/Users/junlou/bugsaymis-docker/src/bugsaymis/app/Models/*.php')",
+      "Bash(grep -n '$fillable\\\\|$guarded' /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Models/User.php)",
+      "Bash(grep -c '$fillable' /Users/junlou/bugsaymis-docker/src/bugsaymis/app/Models/SALN/SalnRecord.php)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis log --oneline main..development)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis log --oneline development..main)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis checkout development)",
+      "Bash(git cherry-pick *)",
+      "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis stash)",
+      "Bash(git checkout *)"
     ]
   }
 }
