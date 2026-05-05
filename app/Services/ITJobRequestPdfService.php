@@ -45,10 +45,8 @@ class ITJobRequestPdfService
     {
         $jobRequest->loadMissing(['user.division', 'divisionChief', 'assignedTo']);
 
-        // Approved by — active user with "Director" in position
-        $director = User::where('position', 'like', '%Director%')
-            ->where('status', 'active')
-            ->first();
+        // Approved by — use OCD role (same source as WFH accomplishments signatory)
+        $director = User::havingRole('OCD')->first();
 
         // Resolve recommendation: stored value wins over category default
         $recommendation = $jobRequest->recommendation
@@ -56,10 +54,11 @@ class ITJobRequestPdfService
                 ? (self::DEFAULT_RECOMMENDATIONS[$jobRequest->category] ?? $jobRequest->category)
                 : '—');
 
-        // Convert signatures to base64 data URIs so mPDF can embed them
-        $directorSig   = $this->sigDataUri($director?->electronic_signature);
-        $dcSig         = $this->sigDataUri($jobRequest->divisionChief?->electronic_signature);
-        $assignedSig   = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
+        // Convert signatures to base64 data URIs so mPDF can embed them.
+        // electronic_signature is stored as a public-disk relative path (e.g. "signatures/abc.png").
+        $directorSig = $this->sigDataUri($director?->electronic_signature);
+        $dcSig       = $this->sigDataUri($jobRequest->divisionChief?->electronic_signature);
+        $assignedSig = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
 
         $html = view('it-job-requests.pdf', compact(
             'jobRequest',
@@ -70,6 +69,12 @@ class ITJobRequestPdfService
             'assignedSig'
         ))->render();
 
+        // Ensure mPDF temp dir exists (may not exist on fresh ECS container boot)
+        $tmpDir = storage_path('app/tmp');
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
@@ -77,7 +82,7 @@ class ITJobRequestPdfService
             'margin_right'  => 15,
             'margin_top'    => 15,
             'margin_bottom' => 15,
-            'tempDir'       => storage_path('app/tmp'),
+            'tempDir'       => $tmpDir,
         ]);
 
         $mpdf->SetTitle('IT JRF — ' . $jobRequest->itjr_no);
@@ -85,6 +90,11 @@ class ITJobRequestPdfService
 
         $dir      = 'it_job_requests';
         $filename = $dir . '/' . $jobRequest->itjr_no . '.pdf';
+
+        // Ensure output directory exists on the public disk
+        if (! Storage::disk('public')->exists($dir)) {
+            Storage::disk('public')->makeDirectory($dir);
+        }
 
         Storage::disk('public')->put($filename, $mpdf->Output('', 'S'));
 
@@ -114,14 +124,27 @@ class ITJobRequestPdfService
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function sigDataUri(?string $filename): ?string
+    /**
+     * Convert a public-disk signature path (e.g. "signatures/file.png") to a
+     * base64 data URI that mPDF can embed inline.
+     *
+     * Previously used storage_path('app/public/signatures/' . $filename), which
+     * produced a double "signatures/" prefix when the stored value already included
+     * it, causing all signature images to silently fail.
+     */
+    private function sigDataUri(?string $storedPath): ?string
     {
-        if (! $filename) return null;
+        if (! $storedPath) {
+            return null;
+        }
 
-        $path = storage_path('app/public/signatures/' . $filename);
-        if (! file_exists($path)) return null;
+        if (! Storage::disk('public')->exists($storedPath)) {
+            return null;
+        }
 
-        $mime = mime_content_type($path) ?: 'image/png';
-        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+        $fullPath = Storage::disk('public')->path($storedPath);
+        $mime     = mime_content_type($fullPath) ?: 'image/png';
+
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fullPath));
     }
 }
