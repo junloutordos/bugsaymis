@@ -142,14 +142,16 @@ $statusAbbrev = [
   <table style="width:100%; margin-top:36px;">
     <tr>
       <td style="width:50%; vertical-align:top; padding-right:30px;">
-        <div style="font-size:11pt; margin-bottom:36px;">Prepared by:</div>
+        <div style="font-size:11pt;">Prepared by:</div>
+        <div style="height:50px;"></div>
         <div style="border-bottom:1.5px solid #000; min-width:180px; display:inline-block; padding-bottom:2px; margin-bottom:4px; font-weight:bold; font-size:12pt; text-decoration:underline;">
           {{ strtoupper($preparedBy->name) }}
         </div>
         <div style="font-size:11pt; color:#333;">{{ $preparedBy->position ?? 'Personnel' }}</div>
       </td>
       <td style="width:50%; vertical-align:top;">
-        <div style="font-size:11pt; margin-bottom:36px;">Noted by:</div>
+        <div style="font-size:11pt;">Noted by:</div>
+        <div style="height:50px;"></div>
         <div style="border-bottom:1.5px solid #000; min-width:180px; display:inline-block; padding-bottom:2px; margin-bottom:4px; font-weight:bold; font-size:12pt; text-decoration:underline;">
           {{ strtoupper($notedBy?->name ?? '') }}
         </div>
