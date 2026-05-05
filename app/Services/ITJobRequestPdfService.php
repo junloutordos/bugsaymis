@@ -113,13 +113,15 @@ class ITJobRequestPdfService
             mkdir($tmpDir, 0775, true);
         }
 
+        // Zero margins so the header/footer images bleed to the paper edge.
+        // The body cell adds its own padding so content stays indented.
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
-            'margin_left'   => 12,
-            'margin_right'  => 12,
-            'margin_top'    => 10,
-            'margin_bottom' => 10,
+            'margin_left'   => 0,
+            'margin_right'  => 0,
+            'margin_top'    => 0,
+            'margin_bottom' => 0,
             'tempDir'       => $tmpDir,
         ]);
 
