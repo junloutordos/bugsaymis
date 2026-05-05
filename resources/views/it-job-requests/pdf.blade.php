@@ -51,7 +51,7 @@
 
     /* ── Signature block ────────────────────── */
     .sig-cell    { text-align: center; padding: 4px 6px 4px; }
-    .sig-gap     { height: 22px; }
+    .sig-gap     { height: 38px; }
     .sig-name    {
       display: inline-block;
       font-weight: bold;
@@ -109,7 +109,7 @@
         <div class="field-label" style="margin-bottom:4px;">Approved by (Division Chief):</div>
         <div class="sig-cell">
           @if($dcSig)
-            <img src="{{ $dcSig }}" alt="" style="display:block; margin:0 auto 2px; height:22px; width:auto;">
+            <img src="{{ $dcSig }}" alt="" style="display:block; margin:0 auto 2px; height:38px; width:auto;">
           @else
             <div class="sig-gap"></div>
           @endif
@@ -163,7 +163,7 @@
       <td style="border-top:none; text-align:center; padding-top:0;">
         <div class="sig-cell">
           @if($assignedSig)
-            <img src="{{ $assignedSig }}" alt="" style="display:block; margin:0 auto 2px; height:22px; width:auto;">
+            <img src="{{ $assignedSig }}" alt="" style="display:block; margin:0 auto 2px; height:38px; width:auto;">
           @else
             <div class="sig-gap"></div>
           @endif
@@ -181,7 +181,7 @@
       <td style="border-top:none; text-align:center; padding-top:0;">
         <div class="sig-cell">
           @if($directorSig)
-            <img src="{{ $directorSig }}" alt="" style="display:block; margin:0 auto 2px; height:22px; width:auto;">
+            <img src="{{ $directorSig }}" alt="" style="display:block; margin:0 auto 2px; height:38px; width:auto;">
           @else
             <div class="sig-gap"></div>
           @endif

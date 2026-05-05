@@ -8,7 +8,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'CRCMIS';
 const appUrl   = import.meta.env.VITE_APP_URL;
 
 // If the page loaded on the wrong origin (e.g. 8443 instead of 8080),
