@@ -46,28 +46,15 @@
     .itjr-table tr:nth-child(even) td { background: #f5f5f5; }
 
     /* Portrait A4 usable = 210mm − 25.4mm padding = 184.6mm */
-    .col-no     { width: 11%; }
+    .col-seq    { width: 4%;  text-align: center; }
+    .col-no     { width: 10%; }
     .col-title  { width: 18%; }
-    .col-cat    { width: 13%; }
-    .col-by     { width: 13%; }
-    .col-filed  { width: 8%; text-align: center; }
-    .col-action { width: 19%; }
-    .col-date   { width: 8%; text-align: center; }
+    .col-cat    { width: 12%; }
+    .col-by     { width: 12%; }
+    .col-filed  { width: 8%;  text-align: center; }
+    .col-action { width: 18%; }
+    .col-date   { width: 8%;  text-align: center; }
     .col-status { width: 10%; text-align: center; }
-
-    /* ── Signatures ── */
-    .sig-label { font-size: 11pt; margin-bottom: 28px; }
-    .sig-name  {
-      font-weight: bold;
-      font-size: 12pt;
-      text-decoration: underline;
-      border-bottom: 1.5px solid #000;
-      padding-bottom: 2px;
-      margin-bottom: 4px;
-      display: inline-block;
-      min-width: 180px;
-    }
-    .sig-pos { font-size: 11pt; color: #333; }
 
     .no-data {
       text-align: center;
@@ -118,6 +105,7 @@ $statusAbbrev = [
     <table class="itjr-table">
       <thead>
         <tr>
+          <th class="col-seq">#</th>
           <th class="col-no">ITJR #</th>
           <th class="col-title">Request Title</th>
           <th class="col-cat">Category</th>
@@ -129,8 +117,9 @@ $statusAbbrev = [
         </tr>
       </thead>
       <tbody>
-        @foreach($records as $rec)
+        @foreach($records as $i => $rec)
           <tr>
+            <td class="col-seq">{{ $i + 1 }}</td>
             <td class="col-no">{{ $rec->itjr_no }}</td>
             <td class="col-title">{{ $rec->title }}</td>
             <td class="col-cat">{{ $rec->category }}</td>
@@ -149,18 +138,22 @@ $statusAbbrev = [
     </table>
   @endif
 
-  {{-- Signatures --}}
-  <table style="width:100%; margin-top:30px;">
+  {{-- Signature blocks — names and positions only; wet signatures applied on the printed copy --}}
+  <table style="width:100%; margin-top:36px;">
     <tr>
       <td style="width:50%; vertical-align:top; padding-right:30px;">
-        <div class="sig-label">Prepared by:</div>
-        <div class="sig-name">{{ strtoupper($preparedBy->name) }}</div>
-        <div class="sig-pos">{{ $preparedBy->position ?? 'Personnel' }}</div>
+        <div style="font-size:11pt; margin-bottom:36px;">Prepared by:</div>
+        <div style="border-bottom:1.5px solid #000; min-width:180px; display:inline-block; padding-bottom:2px; margin-bottom:4px; font-weight:bold; font-size:12pt; text-decoration:underline;">
+          {{ strtoupper($preparedBy->name) }}
+        </div>
+        <div style="font-size:11pt; color:#333;">{{ $preparedBy->position ?? 'Personnel' }}</div>
       </td>
       <td style="width:50%; vertical-align:top;">
-        <div class="sig-label">Noted by:</div>
-        <div class="sig-name">{{ strtoupper($notedBy?->name ?? '') }}</div>
-        <div class="sig-pos">{{ $notedBy?->position ?? 'Campus Director' }}</div>
+        <div style="font-size:11pt; margin-bottom:36px;">Noted by:</div>
+        <div style="border-bottom:1.5px solid #000; min-width:180px; display:inline-block; padding-bottom:2px; margin-bottom:4px; font-weight:bold; font-size:12pt; text-decoration:underline;">
+          {{ strtoupper($notedBy?->name ?? '') }}
+        </div>
+        <div style="font-size:11pt; color:#333;">{{ $notedBy?->position ?? 'Campus Director' }}</div>
       </td>
     </tr>
   </table>
