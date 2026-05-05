@@ -97,6 +97,13 @@ class ITJobRequestPdfService
         $headerPath = public_path('images/report_header.jpeg');
         $footerPath = public_path('images/report_footer.jpeg');
 
+        // Measure actual image heights so margins are exact.
+        // Images are scaled to A4 width (210mm); height scales proportionally.
+        $hInfo = @getimagesize($headerPath);
+        $fInfo = @getimagesize($footerPath);
+        $headerMm = $hInfo ? round(($hInfo[1] / $hInfo[0]) * 210) + 3 : 36;
+        $footerMm = $fInfo ? round(($fInfo[1] / $fInfo[0]) * 210) + 3 : 36;
+
         $html = view('it-job-requests.export-pdf', compact(
             'records',
             'preparedBy',
@@ -104,8 +111,6 @@ class ITJobRequestPdfService
             'dateFrom',
             'dateTo',
             'category',
-            'headerPath',
-            'footerPath',
         ))->render();
 
         $tmpDir = storage_path('app/tmp');
@@ -113,15 +118,24 @@ class ITJobRequestPdfService
             mkdir($tmpDir, 0775, true);
         }
 
+        // Left/right margins = 0 so header/footer images span full paper width.
+        // margin_top / margin_bottom reserve space for the header/footer images.
+        // Content is indented via padding in the HTML itself (0.5 inch each side).
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
-            'format'        => 'A4-L',
-            'margin_left'   => 10,
-            'margin_right'  => 10,
-            'margin_top'    => 10,
-            'margin_bottom' => 10,
+            'format'        => 'A4',
+            'margin_left'   => 0,
+            'margin_right'  => 0,
+            'margin_top'    => $headerMm,
+            'margin_bottom' => $footerMm,
+            'margin_header' => 0,
+            'margin_footer' => 0,
             'tempDir'       => $tmpDir,
         ]);
+
+        // Set repeating header/footer — renders on every page at full paper width.
+        $mpdf->SetHTMLHeader('<img src="' . $headerPath . '" style="width:100%; display:block;">');
+        $mpdf->SetHTMLFooter('<img src="' . $footerPath . '" style="width:100%; display:block;">');
 
         $mpdf->SetTitle('IT Job Request Report');
         $mpdf->WriteHTML($html);

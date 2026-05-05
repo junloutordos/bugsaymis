@@ -331,17 +331,12 @@ const handleNewRequest = async () => {
             </select>
           </div>
           <div class="flex gap-2">
-            <button @click="exportCSV" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Export CSV">
-              <ArrowDownTrayIcon class="w-5 h-5" />
-            </button>
-            <button @click="printTable" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print table">
-              <PrinterIcon class="w-5 h-5" />
-            </button>
+            
             <button @click="openExportModal"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shadow-sm"
-              title="Export PDF report">
+              title="Generate PDF report">
               <DocumentChartBarIcon class="w-4 h-4" />
-              Export PDF
+              
             </button>
           </div>
         </div>
@@ -917,7 +912,7 @@ const handleNewRequest = async () => {
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                   <input type="radio" v-model="exportScope" value="mine" class="text-emerald-600" />
-                  My requests only
+                  Requests I attended
                 </label>
               </div>
             </div>
