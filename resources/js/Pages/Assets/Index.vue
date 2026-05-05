@@ -6,6 +6,7 @@ import { PencilSquareIcon, TrashIcon, EyeIcon, XMarkIcon, PlusIcon } from '@hero
 import Swal from 'sweetalert2'
 import { useSubmit } from "@/Composables/useSubmit"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   assets: Array,
@@ -171,8 +172,8 @@ const getPhotoUrl = (asset) => {
   if (!asset || !asset.photo) return null
   const p = asset.photo
   if (p.indexOf('http') === 0) return p
-  if (p.startsWith('assets/')) return '/storage/' + p
-  return '/storage/assets/' + p
+  if (p.startsWith('assets/')) return storageUrl(p)
+  return storageUrl('assets/' + p)
 }
 
 const conditionBadge = (condition) => {

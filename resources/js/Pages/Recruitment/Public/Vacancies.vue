@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import axios from 'axios'
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   vacancies:          { type: Object, required: true },
@@ -109,12 +110,12 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
   <div class="min-h-screen relative">
     <!-- Background -->
     <div class="fixed inset-0 bg-cover bg-center -z-10"
-         :style="{ backgroundImage: 'url(/storage/bg.jpg)' }" />
+         :style="{ backgroundImage: `url(${storageUrl('bg.jpg')})` }" />
     <div class="fixed inset-0 bg-black/55 -z-10" />
 
     <!-- Hero -->
     <div class="text-white py-14 px-4 text-center">
-      <img v-if="campus.logo" :src="`/storage/${campus.logo}`" alt="Campus Logo" class="mx-auto h-16 mb-4 drop-shadow" />
+      <img v-if="campus.logo" :src="storageUrl(campus.logo)" alt="Campus Logo" class="mx-auto h-16 mb-4 drop-shadow" />
       <img v-else src="/images/pshslogo.png" alt="PSHS Logo" class="mx-auto h-16 mb-4 drop-shadow" />
       <h1 class="text-3xl font-bold tracking-tight drop-shadow">Career Opportunities</h1>
       <p class="mt-2 text-blue-100 text-sm drop-shadow">{{ campus.name ?? 'Philippine Science High School' }}</p>

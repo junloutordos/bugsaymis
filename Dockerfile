@@ -1,20 +1,19 @@
 FROM php:8.4-fpm
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git curl zip unzip libpng-dev libonig-dev libxml2-dev \
-    cron default-mysql-client supervisor \
+    git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev \
+    cron default-mysql-client supervisor nginx \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && pecl install redis \
+    && docker-php-ext-enable redis
 
-RUN apt-get update && apt-get install -y \
-    libzip-dev \
-    && docker-php-ext-install zip \
+# Install Node.js 20 for Vite frontend build
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
@@ -23,7 +22,25 @@ COPY . .
 
 RUN composer install --no-dev --optimize-autoloader
 
-# PHP security hardening
+# Build frontend assets and remove any leftover Vite dev-server marker
+ARG VITE_STORAGE_BASE_URL=https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com
+ENV VITE_STORAGE_BASE_URL=${VITE_STORAGE_BASE_URL}
+RUN npm ci --prefer-offline 2>/dev/null || npm install \
+    && npm run build \
+    && rm -f /var/www/public/hot \
+    && rm -rf /var/www/node_modules
+
+# Ensure all storage/bootstrap directories exist and are writable at runtime
+RUN mkdir -p \
+        /var/www/storage/logs \
+        /var/www/storage/app/public \
+        /var/www/storage/framework/cache/data \
+        /var/www/storage/framework/sessions \
+        /var/www/storage/framework/views \
+        /var/www/bootstrap/cache \
+    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache \
+    && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+
 RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
     && echo "display_errors = Off" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "log_errors = On" >> /usr/local/etc/php/conf.d/security.ini \
@@ -31,15 +48,18 @@ RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
     && echo "session.cookie_secure = 1" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.use_strict_mode = 1" >> /usr/local/etc/php/conf.d/security.ini
 
-# Setup Laravel scheduler cron
 RUN echo "* * * * * root . /etc/environment; cd /var/www && php artisan schedule:run >> /var/log/cron.log 2>&1" > /etc/cron.d/laravel-scheduler \
     && chmod 0644 /etc/cron.d/laravel-scheduler
 
-# Supervisor config — manages php-fpm, cron, and queue worker
+COPY docker/nginx-app.conf /etc/nginx/sites-enabled/default
+RUN rm -f /etc/nginx/sites-enabled/default.conf 2>/dev/null; \
+    rm -f /etc/nginx/conf.d/default.conf 2>/dev/null; true
+
 COPY docker/supervisord.conf /etc/supervisor/conf.d/bugsaymis.conf
 
-# Start via supervisor
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+EXPOSE 80
 
 CMD ["/usr/local/bin/docker-entrypoint.sh"]

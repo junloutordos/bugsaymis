@@ -1,0 +1,77 @@
+{
+  "family": "crcmis-prod",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::971422671747:role/crcmisECSTaskRole",
+  "taskRoleArn": "arn:aws:iam::971422671747:role/crcmisECSTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app:latest",
+      "essential": true,
+      "portMappings": [{ "containerPort": 9000, "protocol": "tcp" }],
+      "secrets": [
+        { "name": "APP_KEY",      "valueFrom": "/crcmis/prod/APP_KEY" },
+        { "name": "APP_ENV",      "valueFrom": "/crcmis/prod/APP_ENV" },
+        { "name": "APP_DEBUG",    "valueFrom": "/crcmis/prod/APP_DEBUG" },
+        { "name": "APP_URL",      "valueFrom": "/crcmis/prod/APP_URL" },
+        { "name": "DB_HOST",      "valueFrom": "/crcmis/prod/DB_HOST" },
+        { "name": "DB_DATABASE",  "valueFrom": "/crcmis/prod/DB_DATABASE" },
+        { "name": "DB_USERNAME",  "valueFrom": "/crcmis/prod/DB_USERNAME" },
+        { "name": "DB_PASSWORD",  "valueFrom": "/crcmis/prod/DB_PASSWORD" },
+        { "name": "REDIS_HOST",   "valueFrom": "/crcmis/prod/REDIS_HOST" },
+        { "name": "REDIS_PORT",   "valueFrom": "/crcmis/prod/REDIS_PORT" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/crcmis",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    },
+    {
+      "name": "nginx",
+      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/nginx:v3",
+      "essential": true,
+      "portMappings": [{ "containerPort": 80, "protocol": "tcp" }],
+      "dependsOn": [
+        { "containerName": "app", "condition": "START" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/crcmis",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "nginx"
+        }
+      }
+    },
+    {
+      "name": "soketi",
+      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/soketi:latest",
+      "essential": false,
+      "portMappings": [{ "containerPort": 9601, "protocol": "tcp" }],
+      "secrets": [
+        { "name": "SOKETI_DEFAULT_APP_ID",     "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_ID" },
+        { "name": "SOKETI_DEFAULT_APP_KEY",    "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_KEY" },
+        { "name": "SOKETI_DEFAULT_APP_SECRET", "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_SECRET" }
+      ],
+      "environment": [
+        { "name": "SOKETI_DEBUG", "value": "0" },
+        { "name": "SOKETI_PORT",  "value": "9601" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/crcmis",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "soketi"
+        }
+      }
+    }
+  ]
+}

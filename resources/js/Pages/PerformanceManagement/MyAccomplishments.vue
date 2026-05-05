@@ -5,6 +5,7 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import Swal from "sweetalert2"
 import axios from "axios"
 import { useSubmit } from "@/Composables/useSubmit"
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   accomplishments: Array,
@@ -127,7 +128,7 @@ async function submitPhoto() {
 }
 
 function proofUrl(photo) {
-  if (photo.local_path) return "/storage/" + photo.local_path
+  if (photo.local_path) return storageUrl(photo.local_path)
   return photo.google_drive_link
 }
 

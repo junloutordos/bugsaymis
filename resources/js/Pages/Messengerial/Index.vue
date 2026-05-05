@@ -5,6 +5,7 @@ import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon, XMa
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import Swal from 'sweetalert2'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({ requests: Array });
 const page = usePage();
@@ -204,7 +205,7 @@ const submitProof = () => {
                           [r.email, r.requestor_email, r.requester_email, r.user_email].includes(userEmail) ||
                           ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
                         ))
-                      )" :href="('/storage/' + r.proof_of_delivery)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Proof"><EyeIcon class="w-4 h-4"/></a>
+                      )" :href="storageUrl(r.proof_of_delivery)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Proof"><EyeIcon class="w-4 h-4"/></a>
                     <a v-if="(
                         (r.status ?? '').toString().toLowerCase().includes('approved') && (
                           userRole === 'Administrator' ||
@@ -249,7 +250,7 @@ const submitProof = () => {
               <button v-if="canModify(r)" @click.prevent="openModal(r)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PencilSquareIcon class="w-3.5 h-3.5"/> Edit</button>
               <button v-if="canModify(r)" @click.prevent="destroy(r)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><TrashIcon class="w-3.5 h-3.5"/></button>
               <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><ArrowUpTrayIcon class="w-3.5 h-3.5"/></button>
-              <a v-if="r.proof_of_delivery" :href="('/storage/' + r.proof_of_delivery)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><EyeIcon class="w-3.5 h-3.5"/></a>
+              <a v-if="r.proof_of_delivery" :href="storageUrl(r.proof_of_delivery)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><EyeIcon class="w-3.5 h-3.5"/></a>
               <a v-if="(r.status ?? '').toString().toLowerCase().includes('approved')" :href="route('messengerial.print', r.id)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PrinterIcon class="w-3.5 h-3.5"/></a>
             </div>
           </div>

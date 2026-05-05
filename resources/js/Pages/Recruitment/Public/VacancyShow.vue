@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import axios from 'axios'
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   vacancy:            { type: Object, required: true },
@@ -99,7 +100,7 @@ const submitApply = async () => {
   <div class="min-h-screen relative">
     <!-- Background -->
     <div class="fixed inset-0 bg-cover bg-center -z-10"
-         :style="{ backgroundImage: 'url(/storage/bg.jpg)' }" />
+         :style="{ backgroundImage: `url(${storageUrl('bg.jpg')})` }" />
     <div class="fixed inset-0 bg-black/55 -z-10" />
 
     <!-- Top bar -->

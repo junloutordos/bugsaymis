@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { storageUrl } from "@/Composables/useStorage.js";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
@@ -2114,7 +2115,7 @@ filteredMenu.value.forEach((item) => {
             class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <img
-              :src="user.profile_picture ? ('/storage/' + user.profile_picture) : 'https://i.pravatar.cc/40'"
+              :src="storageUrl(user.profile_picture) ?? 'https://i.pravatar.cc/40'"
               alt="User Avatar"
               class="w-7 h-7 rounded-full object-cover ring-2 ring-gray-200"
             />

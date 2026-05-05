@@ -7,26 +7,52 @@ on:
 env:
   AWS_REGION: ap-southeast-1
   ECR: 971422671747.dkr.ecr.ap-southeast-1.amazonaws.com
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4.0.2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@v2.0.1
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, mbstring, exif, pcntl, bcmath, gd, zip
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.2.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build frontend assets
+        run: npm ci && npm run build
+        env:
+          VITE_STORAGE_BASE_URL: https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.10.0
 
       - name: Build and push app
         run: |
           docker buildx build --platform linux/amd64 \
+            --progress=plain \
             -t $ECR/crcmis/app:${{ github.sha }} \
             -t $ECR/crcmis/app:latest \
             --push .
@@ -34,16 +60,53 @@ jobs:
       - name: Build and push nginx
         run: |
           docker buildx build --platform linux/amd64 \
+            --progress=plain \
             -t $ECR/crcmis/nginx:${{ github.sha }} \
             -t $ECR/crcmis/nginx:latest \
             -f nginx/Dockerfile \
-            --push ./nginx
+            --push .
 
-      - name: Deploy to ECS
+      - name: Update ECS task definition and deploy
         run: |
+          # Get the current task definition used by the service
+          CURRENT_TASK_DEF=$(aws ecs describe-services \
+            --cluster crcmis-prod \
+            --services crcmis-prod-service \
+            --query 'services[0].taskDefinition' \
+            --output text)
+
+          echo "Current task definition: $CURRENT_TASK_DEF"
+
+          # Fetch its full JSON, then replace image URIs for app and nginx containers
+          NEW_TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$CURRENT_TASK_DEF" \
+            --query 'taskDefinition' \
+            --output json | \
+            jq --arg app "$ECR/crcmis/app:${{ github.sha }}" \
+               --arg nginx "$ECR/crcmis/nginx:${{ github.sha }}" \
+            '.containerDefinitions |= map(
+              if (.image | contains("crcmis/app")) then .image = $app
+              elif (.image | contains("crcmis/nginx")) then .image = $nginx
+              else . end
+            ) | del(
+              .taskDefinitionArn, .revision, .status,
+              .requiresAttributes, .compatibilities,
+              .registeredAt, .registeredBy
+            )')
+
+          # Register the new revision and capture its ARN
+          NEW_TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "New task definition: $NEW_TASK_ARN"
+
+          # Update the service to use the new revision
           aws ecs update-service \
             --cluster crcmis-prod \
             --service crcmis-prod-service \
+            --task-definition "$NEW_TASK_ARN" \
             --force-new-deployment
 
       - name: Wait for stable deployment

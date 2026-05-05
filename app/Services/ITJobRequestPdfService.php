@@ -91,11 +91,6 @@ class ITJobRequestPdfService
         $dir      = 'it_job_requests';
         $filename = $dir . '/' . $jobRequest->itjr_no . '.pdf';
 
-        // Ensure output directory exists on the public disk
-        if (! Storage::disk('public')->exists($dir)) {
-            Storage::disk('public')->makeDirectory($dir);
-        }
-
         Storage::disk('public')->put($filename, $mpdf->Output('', 'S'));
 
         $jobRequest->update(['pdf_path' => $filename]);
@@ -128,9 +123,9 @@ class ITJobRequestPdfService
      * Convert a public-disk signature path (e.g. "signatures/file.png") to a
      * base64 data URI that mPDF can embed inline.
      *
-     * Previously used storage_path('app/public/signatures/' . $filename), which
-     * produced a double "signatures/" prefix when the stored value already included
-     * it, causing all signature images to silently fail.
+     * Uses Storage::disk('public') exclusively — compatible with both the local
+     * disk (dev) and S3 (production). Avoids ->path() and file_get_contents()
+     * which only work on local disks.
      */
     private function sigDataUri(?string $storedPath): ?string
     {
@@ -142,9 +137,9 @@ class ITJobRequestPdfService
             return null;
         }
 
-        $fullPath = Storage::disk('public')->path($storedPath);
-        $mime     = mime_content_type($fullPath) ?: 'image/png';
+        $contents = Storage::disk('public')->get($storedPath);
+        $mime     = Storage::disk('public')->mimeType($storedPath) ?: 'image/png';
 
-        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fullPath));
+        return 'data:' . $mime . ';base64,' . base64_encode($contents);
     }
 }

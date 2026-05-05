@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Head, useForm, Link } from '@inertiajs/vue3'
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   result: { type: Object, default: null },
@@ -51,7 +52,7 @@ const docStatusColors = {
   <Head title="Track Application — CRCMIS" />
 
   <div class="min-h-screen relative">
-    <div class="fixed inset-0 bg-cover bg-center -z-10" :style="{ backgroundImage: 'url(/storage/bg.jpg)' }" />
+    <div class="fixed inset-0 bg-cover bg-center -z-10" :style="{ backgroundImage: `url(${storageUrl('bg.jpg')})` }" />
     <div class="fixed inset-0 bg-black/55 -z-10" />
     <!-- Header -->
     <div class="text-white py-12 px-4 text-center">

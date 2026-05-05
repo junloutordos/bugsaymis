@@ -11,6 +11,7 @@ import {
   XMarkIcon,
 } from "@heroicons/vue/24/outline"
 import { useUsers } from "@/Composables/useUsers.js"
+import { storageUrl } from "@/Composables/useStorage.js"
 import { ref, watch, computed } from "vue"
 import { useSubmit } from "@/Composables/useSubmit"
 
@@ -463,7 +464,7 @@ function formatSg(user) {
                   <p class="text-xs font-medium text-slate-600 mb-1">Profile Picture</p>
                   <div class="w-24 h-24 bg-slate-50 rounded overflow-hidden border border-slate-200">
                     <img v-if="selectedUser.profile_picture"
-                      :src="selectedUser.profile_picture.indexOf('http') === 0 ? selectedUser.profile_picture : ('/storage/' + (selectedUser.profile_picture.startsWith('profile_pictures/') ? selectedUser.profile_picture : 'profile_pictures/' + selectedUser.profile_picture))"
+                      :src="storageUrl(selectedUser.profile_picture.startsWith('profile_pictures/') ? selectedUser.profile_picture : 'profile_pictures/' + selectedUser.profile_picture)"
                       alt="profile" class="w-full h-full object-cover" />
                     <div v-else class="w-full h-full flex items-center justify-center text-slate-400 text-xs">No image</div>
                   </div>
@@ -472,7 +473,7 @@ function formatSg(user) {
                   <p class="text-xs font-medium text-slate-600 mb-1">Electronic Signature</p>
                   <div class="w-48 h-16 bg-white rounded overflow-hidden border border-slate-200 flex items-center justify-center">
                     <img v-if="selectedUser.electronic_signature"
-                      :src="selectedUser.electronic_signature.indexOf('http') === 0 ? selectedUser.electronic_signature : ('/storage/' + (selectedUser.electronic_signature.startsWith('signatures/') ? selectedUser.electronic_signature : 'signatures/' + selectedUser.electronic_signature))"
+                      :src="storageUrl(selectedUser.electronic_signature.startsWith('signatures/') ? selectedUser.electronic_signature : 'signatures/' + selectedUser.electronic_signature)"
                       alt="signature" class="max-h-12" />
                     <div v-else class="text-slate-400 text-xs">No signature</div>
                   </div>

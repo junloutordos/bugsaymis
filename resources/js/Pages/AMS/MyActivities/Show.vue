@@ -50,7 +50,7 @@ function timeRange(a) {
 function storageUrl(path) {
   if (!path) return null
   if (path.startsWith('http')) return path
-  return `/storage/${path}`
+  return `https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com/${path}`
 }
 </script>
 

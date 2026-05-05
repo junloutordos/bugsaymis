@@ -1,0 +1,58 @@
+{
+  "family": "crcmis-prod",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "2048",
+  "memory": "4096",
+  "executionRoleArn": "arn:aws:iam::971422671747:role/crcmisECSTaskRole",
+  "taskRoleArn": "arn:aws:iam::971422671747:role/crcmisECSTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "nginx",
+      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app:v16",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "secrets": [
+        { "name": "APP_ENV",                    "valueFrom": "/crcmis/prod/APP_ENV" },
+        { "name": "APP_KEY",                    "valueFrom": "/crcmis/prod/APP_KEY" },
+        { "name": "APP_URL",                    "valueFrom": "/crcmis/prod/APP_URL" },
+        { "name": "APP_DEBUG",                  "valueFrom": "/crcmis/prod/APP_DEBUG" },
+        { "name": "DB_HOST",                    "valueFrom": "/crcmis/prod/DB_HOST" },
+        { "name": "DB_DATABASE",                "valueFrom": "/crcmis/prod/DB_DATABASE" },
+        { "name": "DB_USERNAME",                "valueFrom": "/crcmis/prod/DB_USERNAME" },
+        { "name": "DB_PASSWORD",                "valueFrom": "/crcmis/prod/DB_PASSWORD" },
+        { "name": "REDIS_HOST",                 "valueFrom": "/crcmis/prod/REDIS_HOST" },
+        { "name": "REDIS_PORT",                 "valueFrom": "/crcmis/prod/REDIS_PORT" },
+        { "name": "SOKETI_DEFAULT_APP_ID",      "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_ID" },
+        { "name": "SOKETI_DEFAULT_APP_KEY",     "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_KEY" },
+        { "name": "SOKETI_DEFAULT_APP_SECRET",  "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_SECRET" },
+        { "name": "GOOGLE_DRIVE_CREDENTIALS_JSON", "valueFrom": "/crcmis/prod/GOOGLE_DRIVE_CREDENTIALS_JSON" },
+        { "name": "GOOGLE_DRIVE_FOLDER_ID",       "valueFrom": "/crcmis/prod/GOOGLE_DRIVE_FOLDER_ID" }
+      ],
+      "environment": [
+        { "name": "DB_CONNECTION",      "value": "mysql" },
+        { "name": "CACHE_DRIVER",       "value": "redis" },
+        { "name": "SESSION_DRIVER",     "value": "redis" },
+        { "name": "QUEUE_CONNECTION",   "value": "redis" },
+        { "name": "LOG_CHANNEL",        "value": "stderr" },
+        { "name": "AWS_BUCKET",         "value": "crcmis-mis-storage" },
+        { "name": "AWS_DEFAULT_REGION", "value": "ap-southeast-1" },
+        { "name": "AWS_URL",            "value": "https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com" },
+        { "name": "GOOGLE_DRIVE_CREDENTIALS", "value": "/var/www/google-credentials.json" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/crcmis",
+          "awslogs-region":        "ap-southeast-1",
+          "awslogs-stream-prefix": "app"
+        }
+      }
+    }
+  ]
+}
