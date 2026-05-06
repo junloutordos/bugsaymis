@@ -3,6 +3,7 @@ import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
 import axios from "axios";
 import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import CsmForm from '@/Components/CsmForm.vue'
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
@@ -223,6 +224,11 @@ const minEventDate = computed(() => {
   d.setDate(d.getDate() + 3)
   return d.toISOString().slice(0, 10)
 })
+
+// ── CSM ───────────────────────────────────────────────────────────────────────
+const showCsmModal  = ref(false)
+const requestToCsm  = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
 
 const onItAssistanceChange = async () => {
   if (!form.requires_it_assistance) return  // unchecking — nothing to check
@@ -447,6 +453,14 @@ const bookingsForDate = (dt) => {
                       @click.prevent="openPrint(req)"
                       class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
                       <PrinterIcon class="w-4 h-4" />
+                    </button>
+                    <!-- CSM Survey button — shown to requestor when FAD approves -->
+                    <button
+                      v-if="req.status === 'Approved' && req.requestor_id === page.props.auth.user.id"
+                      @click.prevent="openCsmModal(req)"
+                      class="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium"
+                      title="Submit Client Satisfaction Survey">
+                      CSM
                     </button>
                   </div>
                 </td>
@@ -703,5 +717,16 @@ const bookingsForDate = (dt) => {
       </div>
 
     </div>
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="facility-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.date_filed?.slice(0,10) ?? requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="facility"
+      service-other-label=""
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
   </AdminLayout>
 </template>

@@ -62,6 +62,7 @@ class HandleInertiaRequests extends Middleware
                         'email' => $authUser->email,
                         // expose numeric/string role ids for client-side checks (may be CSV)
                         'role_id' => $authUser->role_id ?? $userRoles->pluck('id')->implode(','),
+                        'sex' => $authUser->sex,
                         'profile_picture' => $authUser->profile_picture,
                         'electronic_signature' => $authUser->electronic_signature,
                         'permissions' => $authUser->getPermissions(),

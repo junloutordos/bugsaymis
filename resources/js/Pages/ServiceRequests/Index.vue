@@ -6,9 +6,14 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { useSubmit } from "@/Composables/useSubmit";
+import CsmForm from '@/Components/CsmForm.vue'
 
 const props = defineProps({ requests: Object });
 const page = usePage();
+
+const showCsmModal = ref(false)
+const requestToCsm = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
 
 // client-side search + pagination (requests may be paginated server-side in props.requests.data)
 const requestsList = ref((props.requests && props.requests.data) ? props.requests.data : (props.requests || []))
@@ -249,6 +254,7 @@ const canPrint = (r) => {
                     </button>
                     <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="approveRequest(r)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve"><CheckIcon class="w-4 h-4"/></button>
                     <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="declineRequest(r)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
+                    <button v-if="r.status === 'Approved' && r.requestor_id === page.props.auth.user.id" @click.prevent="openCsmModal(r)" class="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium" title="Submit Client Satisfaction Survey">CSM</button>
                     <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
                       <PrinterIcon class="w-4 h-4" />
                     </a>
@@ -342,5 +348,16 @@ const canPrint = (r) => {
         </div>
       </div>
     </div>
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="service-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="others"
+      service-other-label="Request for Service"
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
   </AdminLayout>
 </template>

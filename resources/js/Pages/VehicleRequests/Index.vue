@@ -1,10 +1,11 @@
 <script setup>
 import { Head, usePage } from "@inertiajs/vue3";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { useVehicleRequests } from "@/Composables/useVehicleRequests";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import CsmForm from '@/Components/CsmForm.vue'
 
 const props = defineProps({ requests: Array, vehicles: Array, divisionChiefs: Array });
 const page  = usePage();
@@ -34,6 +35,10 @@ const {
   // actions
   destroy, openPrint,
 } = useVehicleRequests(props.requests || [], props.vehicles || [])
+
+const showCsmModal = ref(false)
+const requestToCsm = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
 </script>
 
 <template>
@@ -114,6 +119,7 @@ const {
                     <button v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" @click.prevent="destroy(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete"><TrashIcon class="w-4 h-4" /></button>
                     <button v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'Approved' && !req.driver" @click.prevent="openAssignDriverModal(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Assign Driver"><UserIcon class="w-4 h-4" /></button>
                     <button v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'OCD Approved'" @click.prevent="openPrint(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4" /></button>
+                    <button v-if="req.status === 'OCD Approved' && req.requestor_id === page.props.auth.user.id" @click.prevent="openCsmModal(req)" class="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium" title="Submit Client Satisfaction Survey">CSM</button>
                   </div>
                 </td>
               </tr>
@@ -334,5 +340,16 @@ const {
         </div>
       </div>
     </div>
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="vehicle-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="others"
+      service-other-label="Vehicle Request"
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
   </AdminLayout>
 </template>
