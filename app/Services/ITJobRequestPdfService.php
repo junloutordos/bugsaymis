@@ -205,8 +205,13 @@ class ITJobRequestPdfService
      * Convert a public-disk signature path (e.g. "signatures/file.png") to a
      * base64 data URI that mPDF can embed inline.
      *
-     * Uses Storage::disk('public') exclusively — compatible with both local
-     * disk (dev) and S3 (production).
+     * Permanent S3 fix:
+     * - Avoids Storage::disk()->mimeType() which makes a HEAD API call on S3
+     *   and can throw even when 'throw' => false is set on the disk config.
+     * - Derives MIME type from file extension instead (signatures are always
+     *   PNG per upload validation; profile pics may be JPG/PNG/GIF/WebP).
+     * - Entire method wrapped in try-catch so any S3/network error returns null
+     *   (signature simply won't appear) rather than causing a 500.
      */
     private function sigDataUri(?string $storedPath): ?string
     {
@@ -214,13 +219,33 @@ class ITJobRequestPdfService
             return null;
         }
 
-        if (! Storage::disk('public')->exists($storedPath)) {
+        try {
+            if (! Storage::disk('public')->exists($storedPath)) {
+                return null;
+            }
+
+            $contents = Storage::disk('public')->get($storedPath);
+
+            if (! $contents) {
+                return null;
+            }
+
+            $ext  = strtolower(pathinfo($storedPath, PATHINFO_EXTENSION));
+            $mime = match ($ext) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'gif'         => 'image/gif',
+                'webp'        => 'image/webp',
+                default       => 'image/png',
+            };
+
+            return 'data:' . $mime . ';base64,' . base64_encode($contents);
+
+        } catch (\Throwable $e) {
+            logger()->warning('ITJobRequestPdfService: signature load failed', [
+                'path'  => $storedPath,
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
-
-        $contents = Storage::disk('public')->get($storedPath);
-        $mime     = Storage::disk('public')->mimeType($storedPath) ?: 'image/png';
-
-        return 'data:' . $mime . ';base64,' . base64_encode($contents);
     }
 }
