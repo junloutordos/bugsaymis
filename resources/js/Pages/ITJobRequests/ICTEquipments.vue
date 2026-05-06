@@ -2,6 +2,7 @@
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { ref, computed, watch } from "vue"
+import { storageUrl } from "@/Composables/useStorage.js"
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -376,7 +377,7 @@ const showAllChecked    = computed({
                   <div class="flex items-center justify-center">
                     <img
                       v-if="selectedEquipment.qr_code_path"
-                      :src="`/${selectedEquipment.qr_code_path}`"
+                      :src="storageUrl(selectedEquipment.qr_code_path.replace(/^storage\//, ''))"
                       alt="QR Code"
                       class="w-48 h-48 border border-slate-200 rounded-lg p-2"
                     />
