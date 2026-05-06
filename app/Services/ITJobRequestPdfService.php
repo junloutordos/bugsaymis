@@ -118,9 +118,6 @@ class ITJobRequestPdfService
             mkdir($tmpDir, 0775, true);
         }
 
-        // Left/right margins = 0 so header/footer images span full paper width.
-        // margin_top / margin_bottom reserve space for the header/footer images.
-        // Content is indented via padding in the HTML itself (0.5 inch each side).
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
