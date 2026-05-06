@@ -145,6 +145,21 @@ class ICTEquipmentController extends Controller
         return redirect()->back()->with('success', 'Equipment deleted successfully.');
     }
 
+    /**
+     * Generate and stream a QR code SVG for the given equipment on demand.
+     * No S3 involved — generated fresh every request. Bypasses all S3 ACL issues.
+     */
+    public function qrCode(ICTEquipment $ictEquipment): \Illuminate\Http\Response
+    {
+        $url = url('/equipment/' . $ictEquipment->id);
+        $svg = QrCode::size(200)->generate($url);
+
+        return response($svg, 200, [
+            'Content-Type'  => 'image/svg+xml',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     // ✅ Public view when QR code is scanned
     public function publicShow(ICTEquipment $ictEquipment)
     {
