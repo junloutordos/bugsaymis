@@ -113,11 +113,6 @@ class ITJobRequestPdfService
             'category',
         ))->render();
 
-        $tmpDir = storage_path('app/tmp');
-        if (! is_dir($tmpDir)) {
-            mkdir($tmpDir, 0775, true);
-        }
-
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
@@ -127,7 +122,7 @@ class ITJobRequestPdfService
             'margin_bottom' => $footerMm,
             'margin_header' => 0,
             'margin_footer' => 0,
-            'tempDir'       => $tmpDir,
+            'tempDir'       => sys_get_temp_dir(),
         ]);
 
         // Set repeating header/footer — renders on every page at full paper width.
@@ -180,11 +175,6 @@ class ITJobRequestPdfService
             'requesterSig'
         ))->render();
 
-        $tmpDir = storage_path('app/tmp');
-        if (! is_dir($tmpDir)) {
-            mkdir($tmpDir, 0775, true);
-        }
-
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
@@ -192,7 +182,7 @@ class ITJobRequestPdfService
             'margin_right'  => 15,
             'margin_top'    => 15,
             'margin_bottom' => 15,
-            'tempDir'       => $tmpDir,
+            'tempDir'       => sys_get_temp_dir(),
         ]);
 
         $mpdf->SetTitle('IT JRF — ' . $jobRequest->itjr_no);
