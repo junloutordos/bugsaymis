@@ -20,43 +20,41 @@
     .report-title h2 { font-size: 15pt; font-weight: bold; letter-spacing: 1px; margin: 0 0 4px; }
     .report-subtitle { font-size: 12pt; color: #444; }
 
-    /* ── Main table ── */
+    /* ── Main table ──
+       Widths are set via width="" on <th> (most reliable in mPDF).
+       CSS class widths are a fallback only. */
     .itjr-table {
       width: 100%;
       border-collapse: collapse;
-      table-layout: fixed;   /* enforces column widths strictly in mPDF */
+      table-layout: fixed;
       margin-bottom: 16px;
     }
     .itjr-table th {
       background: #ddd;
       border: 1.5px solid #000;
-      padding: 7px 8px;
-      font-size: 12pt;
+      padding: 6px 5px;
+      font-size: 11pt;
       font-weight: bold;
       text-align: center;
       vertical-align: middle;
     }
     .itjr-table td {
       border: 1px solid #666;
-      padding: 7px 8px;
-      font-size: 13pt;
+      padding: 6px 5px;
+      font-size: 12pt;
       vertical-align: top;
-      line-height: 1.5;
+      line-height: 1.45;
       word-break: break-word;
     }
     .itjr-table tr:nth-child(even) td { background: #f5f5f5; }
+    .tc { text-align: center; }
 
-    /* Portrait A4 usable ≈ 184.6mm; table-layout:fixed makes widths exact */
-    .col-seq    { width: 4%;  text-align: center; }
-    .col-no     { width: 9%; }
-    .col-title  { width: 19%; }
-    .col-cat    { width: 10%; }
-    .col-by     { width: 10%; }
-    .col-filed  { width: 7%;  text-align: center; }
-    .col-action { width: 19%; }
-    .col-date   { width: 7%;  text-align: center; }
-    .col-status { width: 8%;  text-align: center; }
-    .col-rating { width: 7%;  text-align: center; }
+    .no-data {
+      text-align: center;
+      padding: 28px;
+      color: #888;
+      font-size: 12pt;
+    }
 
     .no-data {
       text-align: center;
@@ -107,35 +105,35 @@ $statusAbbrev = [
     <table class="itjr-table">
       <thead>
         <tr>
-          <th class="col-seq">#</th>
-          <th class="col-no">ITJR #</th>
-          <th class="col-title">Request Title</th>
-          <th class="col-cat">Category</th>
-          <th class="col-by">Submitted By</th>
-          <th class="col-filed">Date Filed</th>
-          <th class="col-action">Action Taken</th>
-          <th class="col-date">Date Completed</th>
-          <th class="col-status">Status</th>
-          <th class="col-rating">Rating</th>
+          {{-- width="" on <th> is the most reliable way to set column widths in mPDF --}}
+          <th width="3%"  class="tc">#</th>
+          <th width="9%">ITJR #</th>
+          <th width="18%">Request Title</th>
+          <th width="10%">Category</th>
+          <th width="10%">Submitted By</th>
+          <th width="7%"  class="tc">Date Filed</th>
+          <th width="18%">Action Taken</th>
+          <th width="7%"  class="tc">Date Completed</th>
+          <th width="8%"  class="tc">Status</th>
+          <th width="10%" class="tc">Rating</th>
         </tr>
       </thead>
       <tbody>
         @foreach($records as $i => $rec)
+          @php
+            $actionText = strip_tags($rec->action_taken ?? '');
+          @endphp
           <tr>
-            <td class="col-seq">{{ $i + 1 }}</td>
-            <td class="col-no">{{ $rec->itjr_no }}</td>
-            <td class="col-title">{{ $rec->title }}</td>
-            <td class="col-cat">{{ $rec->category }}</td>
-            <td class="col-by">{{ $rec->user?->name ?? '—' }}</td>
-            <td class="col-filed">
-              {{ $rec->created_at ? \Carbon\Carbon::parse($rec->created_at)->format('m/d/Y') : '—' }}
-            </td>
-            <td class="col-action">{{ $rec->action_taken ?? '—' }}</td>
-            <td class="col-date">
-              {{ $rec->completed_at ? \Carbon\Carbon::parse($rec->completed_at)->format('m/d/Y') : '—' }}
-            </td>
-            <td class="col-status">{{ $statusAbbrev[$rec->status] ?? $rec->status }}</td>
-            <td class="col-rating">
+            <td class="tc">{{ $i + 1 }}</td>
+            <td>{{ $rec->itjr_no }}</td>
+            <td>{{ $rec->title }}</td>
+            <td>{{ $rec->category }}</td>
+            <td>{{ $rec->user?->name ?? '—' }}</td>
+            <td class="tc">{{ $rec->created_at ? \Carbon\Carbon::parse($rec->created_at)->format('m/d/Y') : '—' }}</td>
+            <td>{{ $actionText ?: '—' }}</td>
+            <td class="tc">{{ $rec->completed_at ? \Carbon\Carbon::parse($rec->completed_at)->format('m/d/Y') : '—' }}</td>
+            <td class="tc">{{ $statusAbbrev[$rec->status] ?? $rec->status }}</td>
+            <td class="tc">
               @if($rec->rating)
                 {{ number_format($rec->rating, 1) }} ★
               @else

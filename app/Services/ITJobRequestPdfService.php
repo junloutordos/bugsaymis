@@ -118,12 +118,12 @@ class ITJobRequestPdfService
             mkdir($tmpDir, 0775, true);
         }
 
-        // Left/right margins = 0 so header/footer images span full paper width.
-        // margin_top / margin_bottom reserve space for the header/footer images.
-        // Content is indented via padding in the HTML itself (0.5 inch each side).
+        // Landscape (A4-L) gives ~271mm usable width vs ~184mm portrait — enough room
+        // for 10 columns with a properly readable font. Header/footer images still
+        // span the full paper width since left/right margins are 0.
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
-            'format'        => 'A4',
+            'format'        => 'A4-L',
             'margin_left'   => 0,
             'margin_right'  => 0,
             'margin_top'    => $headerMm,
