@@ -39,6 +39,27 @@ const {
 const showCsmModal = ref(false)
 const requestToCsm = ref(null)
 function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+
+import Swal from 'sweetalert2'
+
+const hasPendingConfirmation = computed(() => {
+  const uid = page.props.auth?.user?.id
+  if (!uid) return false
+  return (props.requests || []).some(r => r.status === 'OCD Approved' && r.requestor_id === uid)
+})
+
+async function handleNewRequest() {
+  if (hasPendingConfirmation.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You have a Vehicle Request that has been approved and is pending your confirmation. Please rate the service first before submitting a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+  openModal()
+}
 </script>
 
 <template>
@@ -59,7 +80,7 @@ function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-semibold text-slate-800">Vehicle Requests</h1>
         <div class="flex items-center gap-2">
-          <button v-if="!hasRole('GSU Head')" @click.prevent="openModal()"
+          <button v-if="!hasRole('GSU Head')" @click.prevent="handleNewRequest()"
                   class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             + New Request
           </button>
@@ -119,7 +140,7 @@ function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true
                     <button v-if="roleName === 'Administrator' && req.status !== 'Approved' && req.status !== 'Declined' && req.status !== 'OCD Approved'" @click.prevent="destroy(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Delete"><TrashIcon class="w-4 h-4" /></button>
                     <button v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'Approved' && !req.driver" @click.prevent="openAssignDriverModal(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Assign Driver"><UserIcon class="w-4 h-4" /></button>
                     <button v-if="hasAnyRole('Administrator','GSU Head') && req.status === 'OCD Approved'" @click.prevent="openPrint(req)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4" /></button>
-                    <button v-if="req.status === 'OCD Approved' && req.requestor_id === page.props.auth.user.id" @click.prevent="openCsmModal(req)" class="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium" title="Submit Client Satisfaction Survey">CSM</button>
+                    <button v-if="req.status === 'OCD Approved' && req.requestor_id === page.props.auth.user.id" @click.prevent="openCsmModal(req)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
                   </div>
                 </td>
               </tr>

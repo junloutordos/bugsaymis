@@ -230,6 +230,25 @@ const showCsmModal  = ref(false)
 const requestToCsm  = ref(null)
 function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
 
+const hasPendingConfirmation = computed(() => {
+  const uid = page.props.auth?.user?.id
+  if (!uid) return false
+  return requestsList.value.some(r => r.status === 'Approved' && r.requestor_id === uid)
+})
+
+async function handleNewRequest() {
+  if (hasPendingConfirmation.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You have a Facility Request that has been approved and is pending your confirmation. Please rate the service first before submitting a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+  openModal()
+}
+
 const onItAssistanceChange = async () => {
   if (!form.requires_it_assistance) return  // unchecking — nothing to check
 
@@ -376,7 +395,7 @@ const bookingsForDate = (dt) => {
         <div class="flex items-center gap-2">
           <button
             v-if="!hasRole('GSU Head')"
-            @click.prevent="openModal()"
+            @click.prevent="handleNewRequest()"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             + New Request
@@ -458,9 +477,8 @@ const bookingsForDate = (dt) => {
                     <button
                       v-if="req.status === 'Approved' && req.requestor_id === page.props.auth.user.id"
                       @click.prevent="openCsmModal(req)"
-                      class="p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-colors text-xs font-medium"
-                      title="Submit Client Satisfaction Survey">
-                      CSM
+                      class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                      Confirm &amp; Rate
                     </button>
                   </div>
                 </td>
