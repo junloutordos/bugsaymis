@@ -11,10 +11,12 @@ import {
   ArrowLeftIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
+import ScoreGrid from './components/ScoreGrid.vue'
 
 const props = defineProps({
-  classRecord: Object,
-  isAdmin:     { type: Boolean, default: false },
+  classRecord:   Object,
+  isAdmin:       { type: Boolean, default: false },
+  stanineLookup: { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -334,10 +336,16 @@ async function checkRecord() {
 
         <!-- ── Scores & Grades sub-tab ───────────────────────────────────── -->
         <div v-if="activeSubTab === 'scores'" class="p-5">
-          <div class="py-12 text-center text-slate-400">
-            <p class="text-sm font-medium text-slate-500">Scores & Grades entry</p>
-            <p class="text-xs mt-1">Coming in Phase 6 — score grid and grade computation.</p>
-          </div>
+          <ScoreGrid
+            :class-record-id="classRecord.id"
+            :quarter-number="activeQuarter"
+            :quarter-data="currentQuarterData"
+            :grading-option="classRecord.grading_option"
+            :stanine-lookup="stanineLookup"
+            :previous-grades="{}"
+            :is-locked="isLocked"
+            @reload="router.reload({ only: ['classRecord'] })"
+          />
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\ClassRecord\StanineLookup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -58,8 +59,9 @@ class ClassRecordPageController extends Controller
         ]);
 
         return Inertia::render('ClassRecord/Show', [
-            'classRecord' => $classRecord,
-            'isAdmin'     => $this->isAdmin(),
+            'classRecord'   => $classRecord,
+            'isAdmin'       => $this->isAdmin(),
+            'stanineLookup' => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
         ]);
     }
 }
