@@ -365,7 +365,7 @@ const handleNewRequest = async () => {
                     </template>
 
                     <button
-                      v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'"
+                      v-if="req.status === 'Acted by MIS' && req.user_id === currentUser?.id"
                       @click="openRatingModal(req)"
                       class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm"
                     >
