@@ -41,6 +41,9 @@ class ProfileController extends Controller
             $file = $request->file('profile_picture');
             Log::info('Profile picture received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
             $path = $file->store('profile_pictures', 'public');
+            if (! $path) {
+                return back()->withErrors(['profile_picture' => 'Failed to upload profile picture. Please try again.']);
+            }
             $data['profile_picture'] = $path;
         } else {
             Log::info('No profile picture file received.');
@@ -49,8 +52,10 @@ class ProfileController extends Controller
         if ($request->hasFile('electronic_signature')) {
             $file = $request->file('electronic_signature');
             Log::info('Electronic signature received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
-            // Store in `signatures` folder for easier access/consistency with UI expectations
             $path = $file->store('signatures', 'public');
+            if (! $path) {
+                return back()->withErrors(['electronic_signature' => 'Failed to upload signature. Please try again.']);
+            }
             Log::info('Electronic signature stored', ['path' => $path]);
             $data['electronic_signature'] = $path;
         } else {
