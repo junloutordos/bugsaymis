@@ -47,14 +47,15 @@
 
     /* Portrait A4 usable = 210mm − 25.4mm padding = 184.6mm */
     .col-seq    { width: 4%;  text-align: center; }
-    .col-no     { width: 10%; }
-    .col-title  { width: 18%; }
-    .col-cat    { width: 12%; }
-    .col-by     { width: 12%; }
-    .col-filed  { width: 8%;  text-align: center; }
-    .col-action { width: 18%; }
-    .col-date   { width: 8%;  text-align: center; }
-    .col-status { width: 10%; text-align: center; }
+    .col-no     { width: 9%; }
+    .col-title  { width: 17%; }
+    .col-cat    { width: 11%; }
+    .col-by     { width: 11%; }
+    .col-filed  { width: 7%;  text-align: center; }
+    .col-action { width: 17%; }
+    .col-date   { width: 7%;  text-align: center; }
+    .col-status { width: 9%;  text-align: center; }
+    .col-rating { width: 8%;  text-align: center; }
 
     .no-data {
       text-align: center;
@@ -114,6 +115,7 @@ $statusAbbrev = [
           <th class="col-action">Action Taken</th>
           <th class="col-date">Date Completed</th>
           <th class="col-status">Status</th>
+          <th class="col-rating">Rating</th>
         </tr>
       </thead>
       <tbody>
@@ -132,6 +134,13 @@ $statusAbbrev = [
               {{ $rec->completed_at ? \Carbon\Carbon::parse($rec->completed_at)->format('m/d/Y') : '—' }}
             </td>
             <td class="col-status">{{ $statusAbbrev[$rec->status] ?? $rec->status }}</td>
+            <td class="col-rating">
+              @if($rec->rating)
+                {{ number_format($rec->rating, 1) }} ★
+              @else
+                —
+              @endif
+            </td>
           </tr>
         @endforeach
       </tbody>
