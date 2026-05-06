@@ -16,46 +16,47 @@
     .page-body { padding: 10px 12.7mm 14px; }
 
     /* ── Report title ── */
-    .report-title    { text-align: center; margin-bottom: 12px; }
-    .report-title h2 { font-size: 14pt; font-weight: bold; letter-spacing: 1px; margin: 0 0 4px; }
-    .report-subtitle { font-size: 11pt; color: #444; }
+    .report-title    { text-align: center; margin-bottom: 14px; }
+    .report-title h2 { font-size: 15pt; font-weight: bold; letter-spacing: 1px; margin: 0 0 4px; }
+    .report-subtitle { font-size: 12pt; color: #444; }
 
     /* ── Main table ── */
     .itjr-table {
       width: 100%;
       border-collapse: collapse;
+      table-layout: fixed;   /* enforces column widths strictly in mPDF */
       margin-bottom: 16px;
     }
     .itjr-table th {
       background: #ddd;
       border: 1.5px solid #000;
-      padding: 6px 7px;
-      font-size: 11pt;
+      padding: 7px 8px;
+      font-size: 12pt;
       font-weight: bold;
       text-align: center;
       vertical-align: middle;
     }
     .itjr-table td {
       border: 1px solid #666;
-      padding: 6px 7px;
-      font-size: 12pt;
+      padding: 7px 8px;
+      font-size: 13pt;
       vertical-align: top;
-      line-height: 1.45;
+      line-height: 1.5;
       word-break: break-word;
     }
     .itjr-table tr:nth-child(even) td { background: #f5f5f5; }
 
-    /* Portrait A4 usable = 210mm − 25.4mm padding = 184.6mm */
+    /* Portrait A4 usable ≈ 184.6mm; table-layout:fixed makes widths exact */
     .col-seq    { width: 4%;  text-align: center; }
     .col-no     { width: 9%; }
-    .col-title  { width: 17%; }
-    .col-cat    { width: 11%; }
-    .col-by     { width: 11%; }
+    .col-title  { width: 19%; }
+    .col-cat    { width: 10%; }
+    .col-by     { width: 10%; }
     .col-filed  { width: 7%;  text-align: center; }
-    .col-action { width: 17%; }
+    .col-action { width: 19%; }
     .col-date   { width: 7%;  text-align: center; }
-    .col-status { width: 9%;  text-align: center; }
-    .col-rating { width: 8%;  text-align: center; }
+    .col-status { width: 8%;  text-align: center; }
+    .col-rating { width: 7%;  text-align: center; }
 
     .no-data {
       text-align: center;
