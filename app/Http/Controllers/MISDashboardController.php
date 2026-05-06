@@ -22,26 +22,27 @@ class MISDashboardController extends Controller
 
         // ── KPI Cards ─────────────────────────────────────────────────────────
 
-        $totalThisMonth = ITJobRequest::whereYear('created_at', $y)
-            ->whereMonth('created_at', $m)
+        $totalThisMonth = DB::table('it_job_requests')
+            ->whereYear('created_at', $y)->whereMonth('created_at', $m)
             ->count();
 
-        $completedThisMonth = ITJobRequest::where('status', 'Request Completed')
-            ->whereYear('completed_at', $y)
-            ->whereMonth('completed_at', $m)
+        $completedThisMonth = DB::table('it_job_requests')
+            ->where('status', 'Request Completed')
+            ->whereYear('completed_at', $y)->whereMonth('completed_at', $m)
             ->count();
 
-        $pendingAction = ITJobRequest::where('status', 'Acted by MIS')->count();
+        $pendingAction = DB::table('it_job_requests')
+            ->where('status', 'Acted by MIS')->count();
 
-        $avgRating = ITJobRequest::where('status', 'Request Completed')
-            ->whereYear('completed_at', $y)
-            ->whereMonth('completed_at', $m)
+        $avgRating = DB::table('it_job_requests')
+            ->where('status', 'Request Completed')
+            ->whereYear('completed_at', $y)->whereMonth('completed_at', $m)
             ->whereNotNull('rating')
             ->avg('rating');
 
-        $avgResponseDays = ITJobRequest::where('status', 'Request Completed')
-            ->whereYear('completed_at', $y)
-            ->whereMonth('completed_at', $m)
+        $avgResponseDays = DB::table('it_job_requests')
+            ->where('status', 'Request Completed')
+            ->whereYear('completed_at', $y)->whereMonth('completed_at', $m)
             ->whereNotNull('completed_at')
             ->selectRaw('ROUND(AVG(DATEDIFF(completed_at, created_at)), 1) as avg_days')
             ->value('avg_days');
@@ -70,11 +71,11 @@ class MISDashboardController extends Controller
             $d = $now->copy()->subMonths($i);
             return [
                 'month'     => $d->format('M Y'),
-                'filed'     => ITJobRequest::whereYear('created_at', $d->year)
-                                   ->whereMonth('created_at', $d->month)->count(),
-                'completed' => ITJobRequest::where('status', 'Request Completed')
-                                   ->whereYear('completed_at', $d->year)
-                                   ->whereMonth('completed_at', $d->month)->count(),
+                'filed'     => DB::table('it_job_requests')
+                                   ->whereYear('created_at', $d->year)->whereMonth('created_at', $d->month)->count(),
+                'completed' => DB::table('it_job_requests')
+                                   ->where('status', 'Request Completed')
+                                   ->whereYear('completed_at', $d->year)->whereMonth('completed_at', $d->month)->count(),
             ];
         })->values();
 
@@ -129,10 +130,13 @@ class MISDashboardController extends Controller
 
         // ── Recent Requests (last 10) ─────────────────────────────────────────
 
-        $recentRequests = ITJobRequest::with('user:id,name')
+        // Include `assignedto` so the $appends accessor (assigned_personnel) can
+        // resolve the relationship without throwing "Undefined property".
+        $recentRequests = ITJobRequest::with(['user:id,name', 'assignedTo:id,name'])
             ->orderByDesc('created_at')
             ->take(10)
-            ->get(['id', 'itjr_no', 'title', 'category', 'user_id', 'status', 'created_at']);
+            ->get(['id', 'itjr_no', 'title', 'category', 'user_id', 'assignedto', 'status', 'created_at'])
+            ->makeHidden(['assigned_personnel']);
 
         return Inertia::render('MIS/Dashboard', [
             'month'              => $month,
