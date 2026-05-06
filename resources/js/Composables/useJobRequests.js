@@ -62,6 +62,7 @@ export function useJobRequests(initialRequests = []) {
     id: null,
     title: "",
     category: "",
+    event_date: "",
     description: "",
     divisionchief_id: "",
     assignedto: "",
@@ -83,6 +84,7 @@ export function useJobRequests(initialRequests = []) {
         id: req.id,
         title: req.title || "",
         category: req.category || "",
+        event_date: req.event_date || "",
         description: req.description || "",
         divisionchief_id: req.divisionchief_id || "",
         assignedto: req.assignedto || "",
@@ -118,6 +120,26 @@ export function useJobRequests(initialRequests = []) {
   // Submit form
   const submitRequest = async () => {
     if (modalMode.value === "create") {
+      // Layer 2: pre-submit JS guard for 3-day rule (catches manually typed dates)
+      if (form.category === 'Technical Assistance on Events') {
+        if (!form.event_date) {
+          await Swal.fire('Missing Event Date', 'Please provide the date of the event.', 'warning')
+          return
+        }
+        const today    = new Date(); today.setHours(0, 0, 0, 0)
+        const minDate  = new Date(today); minDate.setDate(today.getDate() + 3)
+        const [y, m, d] = form.event_date.split('-').map(Number)
+        const picked   = new Date(y, m - 1, d)
+        if (picked < minDate) {
+          await Swal.fire(
+            'Filing Not Allowed',
+            'Filing a Technical Assistance request less than 3 days before the event is not allowed. Please coordinate directly with MIS.',
+            'error'
+          )
+          return
+        }
+      }
+
       showLoadingSwal('Creating request...')
       form.post(route("jobrequests.store"), {
         preserveScroll: true,

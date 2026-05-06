@@ -243,6 +243,20 @@ function runExport() {
   showExportModal.value = false
 }
 
+// Clear event_date when category changes away from Technical Assistance on Events
+watch(() => form.category, (val) => {
+  if (val !== 'Technical Assistance on Events') {
+    form.event_date = ''
+  }
+})
+
+// Layer 1: min date for the event date picker (today + 3 days)
+const minEventDate = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 3)
+  return d.toISOString().slice(0, 10)
+})
+
 const handleNewRequest = async () => {
   if (hasPendingConfirmation.value) {
     await Swal.fire({
@@ -651,6 +665,23 @@ const handleNewRequest = async () => {
                     </option>
 
                     </select>
+                </div>
+
+                <!-- Date of Event — only for Technical Assistance on Events -->
+                <div v-if="form.category === 'Technical Assistance on Events'">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">
+                    Date of Event <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    v-model="form.event_date"
+                    type="date"
+                    :min="minEventDate"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                    required
+                  />
+                  <p class="text-xs text-amber-600 mt-1">
+                    Event must be filed at least 3 days in advance. Dates within 3 days from today are disabled.
+                  </p>
                 </div>
 
                 <!-- Description -->
