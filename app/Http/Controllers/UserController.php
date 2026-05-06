@@ -251,6 +251,9 @@ class UserController extends Controller
             }
 
             $path = $request->file('electronic_signature')->store('signatures', 'public');
+            if (! $path) {
+                return back()->withErrors(['electronic_signature' => 'Failed to upload signature. Please try again.']);
+            }
             $user->electronic_signature = $path;
             $user->save();
         }

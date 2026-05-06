@@ -3,6 +3,7 @@ import { Head, usePage, useForm } from "@inertiajs/vue3";
 import { ref, reactive, computed, watch } from "vue";
 import axios from "axios";
 import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import CsmForm from '@/Components/CsmForm.vue'
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
@@ -110,6 +111,12 @@ const validateField = (field) => {
       break;
     case 'date_start':
       fieldErrors.date_start = form.date_start ? '' : 'Start date is required';
+      if (form.date_start) {
+        const [y, m, d] = form.date_start.split('-').map(Number)
+        const picked = new Date(y, m - 1, d)
+        const minD   = new Date(minEventDate.value)
+        if (picked < minD) fieldErrors.date_start = 'Event date must be at least 3 days from today.'
+      }
       if (form.date_start && form.date_end) {
         fieldErrors.date_end = (new Date(form.date_end) < new Date(form.date_start)) ? 'End date cannot be before start date' : '';
       }
@@ -211,6 +218,37 @@ const openModal = (req = null) => {
 
 const closeModal = () => { showModal.value = false; editingRequest.value = null; form.reset(); };
 
+// Layer 1: min date for event date pickers — today + 3 days
+const minEventDate = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 3)
+  return d.toISOString().slice(0, 10)
+})
+
+// ── CSM ───────────────────────────────────────────────────────────────────────
+const showCsmModal  = ref(false)
+const requestToCsm  = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+
+const hasPendingConfirmation = computed(() => {
+  const uid = page.props.auth?.user?.id
+  if (!uid) return false
+  return requestsList.value.some(r => r.status === 'Approved' && r.requestor_id === uid)
+})
+
+async function handleNewRequest() {
+  if (hasPendingConfirmation.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You have a Facility Request that has been approved and is pending your confirmation. Please rate the service first before submitting a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+  openModal()
+}
+
 const onItAssistanceChange = async () => {
   if (!form.requires_it_assistance) return  // unchecking — nothing to check
 
@@ -221,20 +259,30 @@ const onItAssistanceChange = async () => {
       form.assigned_mis_user = null
       await Swal.fire({
         icon: 'warning',
-        title: 'Pending IT Job Request',
-        html: `You have <strong>${data.count}</strong> IT Job Request${data.count > 1 ? 's' : ''} waiting to be completed and rated (status: <em>Acted by MIS</em>).<br><br>
-               Please go to <strong>IT Job Requests</strong> and rate the completed service first before requesting IT assistance.<br><br>
-               Your Facility Request will still be submitted, but an IT Job Request will <strong>not</strong> be auto-created.`,
+        title: 'Cannot Require Technical Assistance',
+        html: `You have <strong>${data.count}</strong> unrated IT Job Request${data.count > 1 ? 's' : ''} with status <em>Acted by MIS</em>.<br><br>
+               Please go to <strong>IT Job Requests</strong>, confirm completion, and rate the service first before requesting technical assistance.`,
         confirmButtonText: 'Understood',
       })
     }
   } catch {
-    // silently ignore network errors — let the request proceed normally
+    // silently ignore network errors
   }
 }
 
 const submit = () => {
   if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
+
+  // Layer 2: pre-submit guard — catches manually typed dates that bypass the min attribute
+  if (form.date_start) {
+    const [y, m, d] = form.date_start.split('-').map(Number)
+    const picked = new Date(y, m - 1, d)
+    const minD   = new Date(); minD.setDate(minD.getDate() + 3); minD.setHours(0, 0, 0, 0)
+    if (picked < minD) {
+      Swal.fire('Filing Not Allowed', 'Facility requests must be filed at least 3 days before the event date.', 'error')
+      return
+    }
+  }
   const onError = (errors) => {
     const venueErr = errors?.venue ?? page.props.errors?.venue;
     const text = venueErr ? (Array.isArray(venueErr) ? venueErr.join(', ') : venueErr) : (Object.values(errors || {}).flat().join(', ') || 'Failed to submit');
@@ -347,7 +395,7 @@ const bookingsForDate = (dt) => {
         <div class="flex items-center gap-2">
           <button
             v-if="!hasRole('GSU Head')"
-            @click.prevent="openModal()"
+            @click.prevent="handleNewRequest()"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             + New Request
@@ -424,6 +472,13 @@ const bookingsForDate = (dt) => {
                       @click.prevent="openPrint(req)"
                       class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
                       <PrinterIcon class="w-4 h-4" />
+                    </button>
+                    <!-- CSM Survey button — shown to requestor when FAD approves -->
+                    <button
+                      v-if="req.status === 'Approved' && req.requestor_id === page.props.auth.user.id"
+                      @click.prevent="openCsmModal(req)"
+                      class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                      Confirm &amp; Rate
                     </button>
                   </div>
                 </td>
@@ -607,12 +662,12 @@ const bookingsForDate = (dt) => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
-                <input v-model="form.date_start" @change="validateField('date_start')" type="date" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_start ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+                <input v-model="form.date_start" @change="validateField('date_start')" type="date" :min="minEventDate" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_start ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
                 <p v-if="fieldErrors.date_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_start }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
-                <input v-model="form.date_end" @change="validateField('date_end')" type="date" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_end ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+                <input v-model="form.date_end" @change="validateField('date_end')" type="date" :min="form.date_start || minEventDate" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_end ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
                 <p v-if="fieldErrors.date_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_end }}</p>
               </div>
             </div>
@@ -680,5 +735,16 @@ const bookingsForDate = (dt) => {
       </div>
 
     </div>
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="facility-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.date_filed?.slice(0,10) ?? requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="facility"
+      service-other-label=""
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
   </AdminLayout>
 </template>

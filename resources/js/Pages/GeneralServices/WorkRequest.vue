@@ -10,7 +10,7 @@
         </div>
         <button
           v-if="!hasRole('GSU Head')"
-          @click.prevent="openModal()"
+          @click.prevent="handleNewRequest()"
           class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
         >
           + New Request
@@ -144,6 +144,7 @@
               <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Delete</button>
               <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Mark Completed</button>
               <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Print</a>
+              <button v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" @click.prevent="openCsmModal(wr)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
             </div>
           </div>
           <div v-if="filteredWorkRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No work requests found.</div>
@@ -264,6 +265,17 @@
         </div>
       </div>
     </div>
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="work-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="others"
+      service-other-label="Work / Maintenance Request"
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
   </AdminLayout>
 </template>
 
@@ -273,6 +285,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, XMarkIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
+import CsmForm from '@/Components/CsmForm.vue'
 
 const props = defineProps({
   divisions: Array,
@@ -281,6 +294,29 @@ const props = defineProps({
   skilledUsers: Array,
   workRequests: Array,
 })
+
+const showCsmModal = ref(false)
+const requestToCsm = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+
+const hasPendingConfirmation = computed(() => {
+  const uid = page.props.auth?.user?.id
+  if (!uid) return false
+  return workRequestsList.value.some(r => r.status === 'Completed' && r.requester_id === uid)
+})
+
+async function handleNewRequest() {
+  if (hasPendingConfirmation.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You have a Work Request that has been completed and is pending your confirmation. Please rate the service first before submitting a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+  openModal()
+}
 
 // client-side search + pagination for work requests
 const workRequestsList = ref(props.workRequests || [])

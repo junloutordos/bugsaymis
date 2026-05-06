@@ -6,9 +6,33 @@ import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { useSubmit } from "@/Composables/useSubmit";
+import CsmForm from '@/Components/CsmForm.vue'
 
 const props = defineProps({ requests: Object });
 const page = usePage();
+
+const showCsmModal = ref(false)
+const requestToCsm = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+
+const hasPendingConfirmation = computed(() => {
+  const uid = page.props.auth?.user?.id
+  if (!uid) return false
+  return requestsList.value.some(r => r.status === 'Approved' && r.requestor_id === uid)
+})
+
+async function handleNewRequest() {
+  if (hasPendingConfirmation.value) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You have a Service Request that has been approved and is pending your confirmation. Please rate the service first before submitting a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+  openModal()
+}
 
 // client-side search + pagination (requests may be paginated server-side in props.requests.data)
 const requestsList = ref((props.requests && props.requests.data) ? props.requests.data : (props.requests || []))
@@ -168,7 +192,7 @@ const canPrint = (r) => {
           <h1 class="text-xl font-semibold text-slate-800">Request for Services</h1>
           <p class="text-sm text-slate-500 mt-0.5">Manage reproduction, security, and janitorial service requests</p>
         </div>
-        <button @click="openModal" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+        <button @click="handleNewRequest" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           + New Request
         </button>
       </div>
@@ -249,6 +273,7 @@ const canPrint = (r) => {
                     </button>
                     <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="approveRequest(r)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve"><CheckIcon class="w-4 h-4"/></button>
                     <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="declineRequest(r)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
+                    <button v-if="r.status === 'Approved' && r.requestor_id === page.props.auth.user.id" @click.prevent="openCsmModal(r)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
                     <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
                       <PrinterIcon class="w-4 h-4" />
                     </a>
@@ -342,5 +367,16 @@ const canPrint = (r) => {
         </div>
       </div>
     </div>
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="service-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="others"
+      service-other-label="Request for Service"
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
   </AdminLayout>
 </template>

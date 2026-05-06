@@ -11,6 +11,7 @@ import {
   ArrowDownTrayIcon,
   DocumentChartBarIcon,
 } from "@heroicons/vue/24/outline"
+import CsmForm from '@/Components/CsmForm.vue'
 import { useJobRequests } from "@/Composables/useJobRequests.js"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
@@ -114,71 +115,13 @@ const hasPendingConfirmation = computed(() => {
   return visibleRequests.value.some(req => req.status === 'Acted by MIS')
 })
 
-/* ---------------------------------------
-   ✅ Rating Modal Logic: Confirm Completion & Rate Service
---------------------------------------- */
+// ── CSM Survey modal ──────────────────────────────────────────────────────────
+const showCsmModal    = ref(false)
+const requestToRate   = ref(null)
 
-// State for rating modal
-const showRatingModal = ref(false)
-const requestToRate = ref(null)
-const rating = ref(0)
-const ratingRemarks = ref("")
-const isRatingSubmitting = ref(false)
-
-// Open rating modal
 function openRatingModal(request) {
   requestToRate.value = request
-  rating.value = 0
-  ratingRemarks.value = ""
-  showRatingModal.value = true
-}
-
-// Submit rating and confirm completion
-const submitRating = async () => {
-  if (!requestToRate.value) return
-
-  // Prevent submitting without selecting a rating
-  if (rating.value < 1) {
-    await Swal.fire("Error", "Please select a rating before submitting.", "error")
-    return
-  }
-
-  isRatingSubmitting.value = true
-
-  Swal.fire({
-    title: 'Submitting rating...',
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    showConfirmButton: false,
-    didOpen: () => { Swal.showLoading() },
-  })
-
-  router.post(
-    `/it-job-requests/${requestToRate.value.id}/confirm`,
-    {
-      rating: rating.value,
-      remarks: ratingRemarks.value,
-    },
-    {
-      preserveScroll: true,
-      onSuccess: async () => {
-        requestToRate.value.status = "Request Completed"
-        showRatingModal.value = false
-        requestToRate.value = null
-        rating.value = 0
-        ratingRemarks.value = ""
-        await Swal.fire("Success", "Request confirmed and rated successfully!", "success")
-        window.location.reload()
-      },
-      onError: async (errors) => {
-        console.error(errors)
-        await Swal.fire("Error", "Failed to submit rating. Please try again.", "error")
-      },
-      onFinish: () => {
-        isRatingSubmitting.value = false
-      },
-    }
-  )
+  showCsmModal.value  = true
 }
 // ── Equipment searchable dropdown ─────────────────────────────────────────────
 const eqSearch     = ref('')
@@ -242,6 +185,20 @@ function runExport() {
   window.open(route('jobrequests.export-pdf') + '?' + params.toString(), '_blank')
   showExportModal.value = false
 }
+
+// Clear event_date when category changes away from Technical Assistance on Events
+watch(() => form.category, (val) => {
+  if (val !== 'Technical Assistance on Events') {
+    form.event_date = ''
+  }
+})
+
+// Layer 1: min date for the event date picker (today + 3 days)
+const minEventDate = computed(() => {
+  const d = new Date()
+  d.setDate(d.getDate() + 3)
+  return d.toISOString().slice(0, 10)
+})
 
 const handleNewRequest = async () => {
   if (hasPendingConfirmation.value) {
@@ -408,7 +365,7 @@ const handleNewRequest = async () => {
                     </template>
 
                     <button
-                      v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'"
+                      v-if="req.status === 'Acted by MIS' && req.user_id === currentUser?.id"
                       @click="openRatingModal(req)"
                       class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm"
                     >
@@ -653,6 +610,23 @@ const handleNewRequest = async () => {
                     </select>
                 </div>
 
+                <!-- Date of Event — only for Technical Assistance on Events -->
+                <div v-if="form.category === 'Technical Assistance on Events'">
+                  <label class="block text-xs font-medium text-slate-600 mb-1">
+                    Date of Event <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    v-model="form.event_date"
+                    type="date"
+                    :min="minEventDate"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+                    required
+                  />
+                  <p class="text-xs text-amber-600 mt-1">
+                    Event must be filed at least 3 days in advance. Dates within 3 days from today are disabled.
+                  </p>
+                </div>
+
                 <!-- Description -->
                 <div>
                     <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
@@ -821,51 +795,18 @@ const handleNewRequest = async () => {
         </div>
       </div>
 
-      <!-- Rating Modal -->
-    <div v-show="showRatingModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-slate-800">Confirm Completion & Rate Service</h2>
-          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="showRatingModal = false">✕</button>
-        </div>
-        <div class="px-6 py-5 space-y-4">
-          <p class="text-sm text-slate-700">Request: <strong>{{ requestToRate?.title }}</strong></p>
-
-          <!-- Star Rating -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Rating</label>
-            <div class="flex space-x-1">
-              <template v-for="star in 5" :key="star">
-                <button
-                  type="button"
-                  @click="rating = star"
-                  class="text-2xl focus:outline-none"
-                >
-                  <span
-                    class="cursor-pointer"
-                    :class="{
-                      'text-amber-400': star <= rating,
-                      'text-slate-300': star > rating
-                    }"
-                  >★</span>
-                </button>
-              </template>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks (optional)</label>
-            <textarea v-model="ratingRemarks" rows="3" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"></textarea>
-          </div>
-        </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="showRatingModal=false" :disabled="isRatingSubmitting" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">Cancel</button>
-          <button @click="submitRating" :disabled="isRatingSubmitting" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed min-w-[90px]">
-            Submit
-          </button>
-        </div>
-      </div>
-    </div>
+      <!-- CSM Survey Modal -->
+      <CsmForm
+        :show="showCsmModal"
+        respondable-type="it-job-request"
+        :respondable-id="requestToRate?.id ?? 0"
+        :transaction-date="requestToRate?.created_at?.slice(0,10) ?? ''"
+        office-availed="MIS/ICT Unit"
+        service-key="others"
+        service-other-label="IT Job Request / Technical Assistance"
+        @close="showCsmModal = false"
+        @submitted="showCsmModal = false"
+      />
 
     </div>
     <!-- Export PDF Modal -->

@@ -94,12 +94,20 @@ public function index(Request $request)
      |=====================================================*/
     public function store(Request $request)
     {
+        $isTechEvent = $request->input('category') === 'Technical Assistance on Events';
+
         $validated = $request->validate([
-            'category' => 'required|string',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
+            'category'         => 'required|string',
+            'event_date'       => $isTechEvent
+                ? 'required|date|after_or_equal:' . now()->addDays(3)->toDateString()
+                : 'nullable|date',
+            'title'            => 'required|string|max:255',
+            'description'      => 'required|string',
             'divisionchief_id' => 'required|exists:users,id',
-            'assignedto' => 'required|exists:users,id',
+            'assignedto'       => 'required|exists:users,id',
+        ], [
+            'event_date.required'         => 'The date of the event is required for Technical Assistance requests.',
+            'event_date.after_or_equal'   => 'Filing a Technical Assistance request less than 3 days before the event is not allowed.',
         ]);
 
         // Duplicate guard: same user submitted identical title+category within the last 30 seconds

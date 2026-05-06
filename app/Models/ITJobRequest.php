@@ -18,6 +18,7 @@ class ITJobRequest extends Model
         'user_id',
         'facility_request_id',
         'category',
+        'event_date',
         'title',
         'description',
         'status',
@@ -35,8 +36,13 @@ class ITJobRequest extends Model
         'attendedby',
         'rating',
         'rating_remarks',
-        'rated_at'
+        'rated_at',
+        'decline_reason',
+        'declined_at',
+    ];
 
+    protected $casts = [
+        'event_date' => 'date:Y-m-d',
     ];
 
     /**

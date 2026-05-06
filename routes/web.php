@@ -319,6 +319,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     | Job Requests
     |--------------------------------------------------------------------------
     */
+    Route::post('/csm', [\App\Http\Controllers\CsmResponseController::class, 'store'])->name('csm.store');
     Route::get('/job-requests/check-pending-itjr', [ITJobRequestController::class, 'checkPendingActedByMis'])->name('jobrequests.check-pending');
     Route::get('/job-requests/export-pdf', [ITJobRequestController::class, 'exportPdf'])->name('jobrequests.export-pdf');
     Route::get('/job-requests', [ITJobRequestController::class, 'index'])->name('jobrequests.index');

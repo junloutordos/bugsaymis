@@ -65,6 +65,8 @@ class FacilityRequestController extends Controller
 
     public function store(Request $request)
     {
+        $minDate = now()->addDays(3)->toDateString();
+
         $request->validate([
             'unit' => 'nullable|string|max:50',
             'activity' => 'nullable|string|max:100',
@@ -76,6 +78,8 @@ class FacilityRequestController extends Controller
             'female' => 'nullable|integer|min:0',
             'venue' => 'nullable|array',
             'venue.*' => 'exists:facilities,id',
+            'date_start' => 'nullable|date|after_or_equal:' . $minDate,
+            'date_end'   => 'nullable|date|after_or_equal:date_start',
             // toggle to request IT assistance
             'requires_it_assistance' => 'nullable|boolean',
             'assigned_mis_user' => 'required_if:requires_it_assistance,1|nullable|exists:users,id',
@@ -85,6 +89,8 @@ class FacilityRequestController extends Controller
             'equipment_quantities.*' => 'nullable|integer|min:1',
             'time_start' => 'nullable|date_format:H:i',
             'time_end' => 'nullable|date_format:H:i',
+        ], [
+            'date_start.after_or_equal' => 'Facility requests must be filed at least 3 days before the event date.',
         ]);
 
         $data = $request->only([
