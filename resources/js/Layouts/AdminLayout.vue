@@ -484,6 +484,14 @@ const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "DivisionChief", "OCD"],
     children: [
       {
+        label: "MIS Dashboard",
+        routeName: "mis.dashboard",
+        href: route("mis.dashboard"),
+        icon: ChartBarIcon,
+        roles: ["Administrator"],
+        permissions: ["it.requests.manage"],
+      },
+      {
         label: "IT Job Requests",
         routeName: "jobrequests.index",
         href: route("jobrequests.index"),
