@@ -1306,6 +1306,21 @@ const menuItems = [
   },
 
   {
+    label: "Class Records",
+    icon: TableCellsIcon,
+    roles: ["Administrator", "Faculty"],
+    children: [
+      {
+        label: "My Class Records",
+        routeName: "class-records.page.index",
+        href: route("class-records.page.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "Faculty"],
+      },
+    ],
+  },
+
+  {
     label: "Faculty Loading",
     icon: AcademicCapIcon,
     roles: [],
