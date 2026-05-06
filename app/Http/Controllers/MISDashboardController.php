@@ -48,17 +48,19 @@ class MISDashboardController extends Controller
 
         // ── Status Breakdown (donut) ──────────────────────────────────────────
 
-        $statusBreakdown = ITJobRequest::selectRaw('status, COUNT(*) as count')
+        $statusBreakdown = DB::table('it_job_requests')
+            ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->orderByDesc('count')
             ->pluck('count', 'status');
 
         // ── Category Breakdown (bar) ──────────────────────────────────────────
 
-        $categoryBreakdown = ITJobRequest::selectRaw('category, COUNT(*) as count')
+        $categoryBreakdown = DB::table('it_job_requests')
+            ->selectRaw('category, COUNT(*) as count')
             ->groupBy('category')
             ->orderByDesc('count')
-            ->take(12)
+            ->limit(12)
             ->get()
             ->map(fn ($r) => ['category' => $r->category, 'count' => (int) $r->count]);
 
@@ -78,14 +80,15 @@ class MISDashboardController extends Controller
 
         // ── MIS Personnel Workload ─────────────────────────────────────────────
 
-        $personnelWorkload = ITJobRequest::selectRaw("
-            attendedby,
-            COUNT(*) as total,
-            ROUND(AVG(CASE WHEN rating IS NOT NULL THEN rating END), 1) as avg_rating,
-            SUM(CASE WHEN status = 'Acted by MIS' THEN 1 ELSE 0 END) as pending
-        ")
+        $personnelWorkload = DB::table('it_job_requests')
             ->whereNotNull('attendedby')
             ->where('attendedby', '!=', '')
+            ->selectRaw("
+                attendedby,
+                COUNT(*) as total,
+                ROUND(AVG(CASE WHEN rating IS NOT NULL THEN rating END), 1) as avg_rating,
+                SUM(CASE WHEN status = 'Acted by MIS' THEN 1 ELSE 0 END) as pending
+            ")
             ->groupBy('attendedby')
             ->orderByDesc('total')
             ->get();
