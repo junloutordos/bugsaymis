@@ -118,12 +118,9 @@ class ITJobRequestPdfService
             mkdir($tmpDir, 0775, true);
         }
 
-        // Landscape (A4-L) gives ~271mm usable width vs ~184mm portrait — enough room
-        // for 10 columns with a properly readable font. Header/footer images still
-        // span the full paper width since left/right margins are 0.
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
-            'format'        => 'A4-L',
+            'format'        => 'A4',
             'margin_left'   => 0,
             'margin_right'  => 0,
             'margin_top'    => $headerMm,

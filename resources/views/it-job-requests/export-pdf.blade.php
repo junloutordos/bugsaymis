@@ -32,18 +32,18 @@
     .itjr-table th {
       background: #ddd;
       border: 1.5px solid #000;
-      padding: 6px 5px;
-      font-size: 11pt;
+      padding: 5px 4px;
+      font-size: 9pt;
       font-weight: bold;
       text-align: center;
       vertical-align: middle;
     }
     .itjr-table td {
       border: 1px solid #666;
-      padding: 6px 5px;
-      font-size: 12pt;
+      padding: 5px 4px;
+      font-size: 10pt;
       vertical-align: top;
-      line-height: 1.45;
+      line-height: 1.4;
       word-break: break-word;
     }
     .itjr-table tr:nth-child(even) td { background: #f5f5f5; }
@@ -105,17 +105,16 @@ $statusAbbrev = [
     <table class="itjr-table">
       <thead>
         <tr>
-          {{-- width="" on <th> is the most reliable way to set column widths in mPDF --}}
           <th width="3%"  class="tc">#</th>
-          <th width="9%">ITJR #</th>
-          <th width="18%">Request Title</th>
-          <th width="10%">Category</th>
-          <th width="10%">Submitted By</th>
+          <th width="10%">ITJR #</th>
+          <th width="19%">Request Title</th>
+          <th width="11%">Category</th>
+          <th width="11%">Submitted By</th>
           <th width="7%"  class="tc">Date Filed</th>
-          <th width="18%">Action Taken</th>
+          <th width="19%">Action Taken</th>
           <th width="7%"  class="tc">Date Completed</th>
-          <th width="8%"  class="tc">Status</th>
-          <th width="10%" class="tc">Rating</th>
+          <th width="7%"  class="tc">Status</th>
+          <th width="6%"  class="tc">Rating</th>
         </tr>
       </thead>
       <tbody>
