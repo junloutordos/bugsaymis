@@ -1727,9 +1727,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/class-records/{classRecord}', [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'show'])->name('class-records.page.show');
 });
 Route::middleware(['auth'])->prefix('api/v1')->group(function () {
-    // Reference data
-    Route::get('/grading-options', [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'index'])
-        ->name('grading-options.index');
+    // Reference data — grading options
+    Route::get('/grading-options',  [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'index'])->name('grading-options.index');
+    Route::put('/grading-options/{gradingOption}',            [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'update'])->name('grading-options.update');
+    Route::put('/grading-options/{gradingOption}/categories', [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'updateCategories'])->name('grading-options.categories.update');
 
     // Class Records CRUD + workflow
     Route::get('/class-records',                        [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'index'])->name('class-records.index');

@@ -5,7 +5,7 @@ import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { badgeBase } from '@/Composables/useStatusBadge.js'
 import Swal from 'sweetalert2'
-import { PlusIcon, ArrowRightIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecords:   Array,
@@ -82,6 +82,73 @@ function navigateTo(record) {
   router.visit(route('class-records.page.show', record.id))
 }
 
+// ── Grading Option Management Modal ──────────────────────────────────────────
+const showManageModal   = ref(false)
+const managingOption    = ref(null)   // the option currently being edited
+const manageOptionForm  = ref({ name: '', description: '', is_active: true })
+const manageCategories  = ref([])
+const manageSaving      = ref(false)
+const manageErrors      = ref({})
+
+function openManageModal(option) {
+  managingOption.value   = option
+  manageOptionForm.value = { name: option.name, description: option.description ?? '', is_active: option.is_active }
+  manageCategories.value = option.categories.map(c => ({ ...c }))  // shallow copy
+  manageErrors.value     = {}
+  showManageModal.value  = true
+}
+
+const weightTotal = computed(() =>
+  Math.round(manageCategories.value.reduce((s, c) => s + Number(c.weight || 0), 0) * 100)
+)
+
+function addCategory() {
+  const next = manageCategories.value.length + 1
+  manageCategories.value.push({
+    id: null, name: '', code: '', weight: 0, max_assessments: 1, sort_order: next,
+  })
+}
+
+function removeCategory(idx) {
+  manageCategories.value.splice(idx, 1)
+  manageCategories.value.forEach((c, i) => { c.sort_order = i + 1 })
+}
+
+async function saveManageOption() {
+  manageSaving.value = true
+  manageErrors.value = {}
+
+  try {
+    // Save option meta
+    await axios.put(route('grading-options.update', managingOption.value.id), manageOptionForm.value)
+
+    // Save categories
+    const payload = manageCategories.value.map((c, i) => ({
+      id:              c.id ?? null,
+      name:            c.name,
+      code:            c.code,
+      weight:          Number(c.weight),
+      max_assessments: Number(c.max_assessments),
+      sort_order:      i + 1,
+    }))
+    await axios.put(route('grading-options.categories.update', managingOption.value.id), { categories: payload })
+
+    showManageModal.value = false
+    await Swal.fire({ icon: 'success', title: 'Grading option updated!', timer: 1200, showConfirmButton: false })
+    router.reload({ only: ['gradingOptions'] })
+  } catch (err) {
+    if (err.response?.status === 422) {
+      manageErrors.value = err.response.data.errors ?? {}
+      const msg = err.response.data.message ?? 'Please fix the errors below.'
+      Swal.fire('Validation Error', msg, 'warning')
+    } else {
+      Swal.fire('Error', err.response?.data?.message ?? 'Failed to save.', 'error')
+    }
+  } finally {
+    manageSaving.value = false
+  }
+}
+
 const selectedOption = computed(() =>
   props.gradingOptions?.find(o => o.id == form.value.grading_option_id) ?? null
 )
@@ -98,10 +165,30 @@ const selectedOption = computed(() =>
           <h1 class="text-xl font-semibold text-slate-800">Class Records</h1>
           <p class="text-sm text-slate-500 mt-0.5">Manage grade class records per subject and section</p>
         </div>
-        <button @click="openCreate"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          <PlusIcon class="h-4 w-4" /> New Class Record
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Grading options editor — admin/CID Chief only -->
+          <div v-if="isAdmin" class="relative group">
+            <button class="inline-flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Cog6ToothIcon class="h-4 w-4" /> Grading Options
+            </button>
+            <!-- Dropdown of options to edit -->
+            <div class="absolute right-0 mt-1 w-64 bg-white rounded-xl shadow-lg border border-slate-100 z-10 hidden group-hover:block">
+              <div class="py-1">
+                <p class="px-4 py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Edit an option</p>
+                <button v-for="opt in gradingOptions" :key="opt.id"
+                  @click="openManageModal(opt)"
+                  class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+                  <span>{{ opt.name }}</span>
+                  <span v-if="!opt.is_active" class="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">inactive</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <button @click="openCreate"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <PlusIcon class="h-4 w-4" /> New Class Record
+          </button>
+        </div>
       </div>
 
       <!-- Flash -->
@@ -233,5 +320,106 @@ const selectedOption = computed(() =>
         </div>
       </div>
     </Teleport>
+    <!-- Manage Grading Option Modal -->
+    <Teleport to="body">
+      <div v-if="showManageModal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm py-6 px-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-auto">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-slate-800">Edit Grading Option</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Changes affect all future class records using this option.</p>
+            </div>
+            <button @click="showManageModal = false" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+          </div>
+
+          <div class="px-6 py-5 space-y-5">
+            <!-- Option meta -->
+            <div class="grid grid-cols-2 gap-4">
+              <div class="col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Option Name <span class="text-red-500">*</span></label>
+                <input v-model="manageOptionForm.name" type="text"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div class="col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                <input v-model="manageOptionForm.description" type="text"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div class="col-span-2 flex items-center gap-2">
+                <input type="checkbox" v-model="manageOptionForm.is_active" id="opt-active" class="rounded text-indigo-600" />
+                <label for="opt-active" class="text-sm text-slate-700 cursor-pointer">Active (visible in dropdown)</label>
+              </div>
+            </div>
+
+            <!-- Categories table -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-sm font-semibold text-slate-700">Categories</p>
+                <span :class="['text-xs font-medium px-2 py-0.5 rounded-full',
+                  weightTotal === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600']">
+                  Total: {{ weightTotal }}% {{ weightTotal === 100 ? '✓' : '≠ 100%' }}
+                </span>
+              </div>
+              <p v-if="manageErrors.categories" class="text-xs text-red-500 mb-2">{{ manageErrors.categories[0] }}</p>
+
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-1/3">Name</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-16">Code</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-24">Weight %</th>
+                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 w-24">Max Items</th>
+                    <th class="px-3 py-2 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(cat, idx) in manageCategories" :key="idx" class="hover:bg-slate-50/50">
+                    <td class="px-3 py-1.5">
+                      <input v-model="cat.name" type="text" placeholder="e.g. Alternative Assessments"
+                        class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    </td>
+                    <td class="px-3 py-1.5">
+                      <input v-model="cat.code" type="text" maxlength="5" placeholder="AA"
+                        class="w-full rounded border border-slate-200 px-2 py-1 text-sm uppercase focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    </td>
+                    <td class="px-3 py-1.5">
+                      <div class="flex items-center gap-1">
+                        <input v-model.number="cat.weight" type="number" min="0.01" max="1" step="0.05"
+                          class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                        <span class="text-xs text-slate-400">{{ Math.round(cat.weight * 100) }}%</span>
+                      </div>
+                    </td>
+                    <td class="px-3 py-1.5">
+                      <input v-model.number="cat.max_assessments" type="number" min="1" max="20"
+                        class="w-16 rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                    </td>
+                    <td class="px-3 py-1.5 text-center">
+                      <button @click="removeCategory(idx)" class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500">
+                        <TrashIcon class="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <button @click="addCategory"
+                class="mt-2 inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+                <PlusIcon class="h-4 w-4" /> Add Category
+              </button>
+            </div>
+          </div>
+
+          <div class="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+            <button @click="showManageModal = false"
+              class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button @click="saveManageOption" :disabled="manageSaving || weightTotal !== 100"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
+              {{ manageSaving ? 'Saving…' : 'Save Changes' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </AdminLayout>
 </template>
