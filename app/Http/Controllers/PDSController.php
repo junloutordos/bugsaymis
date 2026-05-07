@@ -1227,10 +1227,10 @@ foreach ($questions as $q) {
         $mpdf   = new \Mpdf\Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
-            'margin_left'   => 20,
-            'margin_right'  => 20,
-            'margin_top'    => 15,
-            'margin_bottom' => 20,
+            'margin_left'   => 5,
+            'margin_right'  => 5,
+            'margin_top'    => 5,
+            'margin_bottom' => 5,
             'tempDir'       => $tmpDir,
         ]);
 
