@@ -65,6 +65,9 @@ function buildDraft(quarter) {
   return draft
 }
 
+const savingSetup = ref(false)
+const setupErrors = ref([])
+
 watch(activeQuarter, (q) => {
   activeSubTab.value    = 'setup'
   assessmentDraft.value = buildDraft(currentQuarterData.value)
@@ -75,9 +78,6 @@ watch(activeQuarter, (q) => {
 watch(() => props.classRecord.quarters, () => {
   assessmentDraft.value = buildDraft(currentQuarterData.value)
 }, { deep: true })
-
-const savingSetup = ref(false)
-const setupErrors = ref([])
 
 async function saveSetup() {
   savingSetup.value = true
