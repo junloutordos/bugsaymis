@@ -420,11 +420,11 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <div class="flex gap-2">
           <button v-if="props.pds && !editMode" @click="editMode = true" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <PencilSquareIcon class="h-4 w-4" />
-            Edit
+            Edit PDS & WES
           </button>
           <button v-if="props.pds && !editMode" @click="exportPDS(props.pds.id)" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <DocumentArrowDownIcon class="h-4 w-4" />
-            Export PDS
+            Export PDS XLSX
           </button>
           <a v-if="props.pds && !editMode"
             :href="route('pds.wes.pdf', props.pds.id)"
