@@ -21,8 +21,8 @@
       border: 2px solid #000;
       text-align: center;
       padding: 8px 10px;
-      background: #706f6fff;
-      font-size: 14pt;
+      background: #818080ff;
+      font-size: 12pt;
       font-weight: bold;
       font-style: italic;
       letter-spacing: 1px;
@@ -46,11 +46,10 @@
     }
 
     .entry {
-      margin-bottom: 18px;
-      padding-bottom: 14px;
-      border-bottom: 1px dashed #aaa;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      border: 1px solid #000;
     }
-    .entry:last-child { border-bottom: none; margin-bottom: 0; }
 
     .entry ul {
       list-style: disc;

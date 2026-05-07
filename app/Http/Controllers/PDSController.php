@@ -1216,7 +1216,10 @@ foreach ($questions as $q) {
     public function exportWesPdf(Pds $pds)
     {
         $this->authorizeAccess($pds);
-        $pds->load(['personalInfo', 'workExperienceSheets']);
+        $pds->load([
+            'personalInfo',
+            'workExperienceSheets' => fn ($q) => $q->orderByDesc('id'),
+        ]);
 
         $html = view('pds.wes_pdf', compact('pds'))->render();
 
