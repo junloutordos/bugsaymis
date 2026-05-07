@@ -40,6 +40,7 @@ const tabs = [
   { id: 2, label: 'C2' },
   { id: 3, label: 'C3' },
   { id: 4, label: 'C4' },
+  { id: 5, label: 'WES' },
 ]
 
 // 🔹 Edit mode
@@ -168,6 +169,18 @@ const form = useForm(
     references: props.pds?.references ?? [{ name: '', office_address: '', contact_no_email: '' }],
 
     other_info: props.pds?.other_info ?? { government_id: '', id_no: '', date_place_issuance: '', path_passport_photo: '' },
+
+    work_experience_sheets: (props.pds?.work_experience_sheets ?? []).map((w, i) => ({
+      from_date:                    w.from_date ?? '',
+      to_date:                      w.to_date ?? '',
+      position:                     w.position ?? '',
+      office_unit:                  w.office_unit ?? '',
+      immediate_supervisor:         w.immediate_supervisor ?? '',
+      agency_organization_location: w.agency_organization_location ?? '',
+      accomplishments:              Array.isArray(w.accomplishments) ? w.accomplishments : [''],
+      summary_of_duties:            Array.isArray(w.summary_of_duties) ? w.summary_of_duties : [''],
+      sort_order:                   i,
+    })),
   },
   {
     // 🔹 Validation rules
@@ -1334,6 +1347,150 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             <img :src="storageUrl(form.other_info.path_passport_photo)" alt="Passport Photo" class="h-32 w-32 object-cover rounded border" />
         </div>
         </section>
+        </div>
+
+        <!-- ── WES Tab (Work Experience Sheet — CS Form 212 Attachment) ──────── -->
+        <div v-show="activeTab === 5" class="space-y-6 p-6">
+
+          <!-- Header row -->
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-800">Work Experience Sheet</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Attachment to CS Form No. 212 — list from most recent first.</p>
+            </div>
+            <a v-if="props.pds && !editMode"
+              :href="route('pds.wes.pdf', props.pds.id)"
+              target="_blank"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
+              Export WES PDF
+            </a>
+          </div>
+
+          <!-- Entries -->
+          <div v-for="(wes, wi) in form.work_experience_sheets" :key="wi"
+            class="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm">
+
+            <!-- Entry header -->
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-indigo-700">Entry #{{ wi + 1 }}</span>
+              <button v-if="editMode"
+                @click="form.work_experience_sheets.splice(wi, 1)"
+                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors">
+                <TrashIcon class="h-4 w-4" />
+              </button>
+            </div>
+
+            <!-- Duration -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Duration From</label>
+                <input v-model="wes.from_date" type="text" placeholder="e.g. 11 February 2011 or 2002"
+                  :readonly="!editMode"
+                  class="input w-full" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Duration To</label>
+                <input v-model="wes.to_date" type="text" placeholder="e.g. Present or 10 February 2011"
+                  :readonly="!editMode"
+                  class="input w-full" />
+              </div>
+            </div>
+
+            <!-- Position -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Position</label>
+              <input v-model="wes.position" type="text" placeholder="e.g. Human Resource Management Officer III"
+                :readonly="!editMode"
+                class="input w-full" />
+            </div>
+
+            <!-- Office/Unit -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Name of Office/Unit</label>
+              <input v-model="wes.office_unit" type="text" placeholder="e.g. Finance and Administrative Service"
+                :readonly="!editMode"
+                class="input w-full" />
+            </div>
+
+            <!-- Immediate Supervisor -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Immediate Supervisor</label>
+              <input v-model="wes.immediate_supervisor" type="text" placeholder="e.g. Maria Estrada"
+                :readonly="!editMode"
+                class="input w-full" />
+            </div>
+
+            <!-- Agency/Organization -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Name of Agency/Organization and Location</label>
+              <textarea v-model="wes.agency_organization_location"
+                rows="2" placeholder="e.g. Department of Human Resources, Metro Manila"
+                :readonly="!editMode"
+                class="input w-full resize-none"></textarea>
+            </div>
+
+            <!-- Accomplishments -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-2">List of Accomplishments and Contributions <span class="text-slate-400">(if any)</span></label>
+              <div v-for="(item, ai) in wes.accomplishments" :key="ai" class="flex items-center gap-2 mb-1.5">
+                <span class="text-slate-400 text-sm">•</span>
+                <input v-model="wes.accomplishments[ai]" type="text"
+                  :readonly="!editMode"
+                  placeholder="e.g. Developed recruitment plan"
+                  class="input flex-1" />
+                <button v-if="editMode && wes.accomplishments.length > 1"
+                  @click="wes.accomplishments.splice(ai, 1)"
+                  class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500">
+                  <TrashIcon class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <button v-if="editMode"
+                @click="wes.accomplishments.push('')"
+                class="mt-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                + Add Item
+              </button>
+            </div>
+
+            <!-- Summary of Duties -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Summary of Actual Duties</label>
+              <div v-for="(item, di) in wes.summary_of_duties" :key="di" class="flex items-start gap-2 mb-1.5">
+                <span class="text-slate-400 text-sm mt-1.5">•</span>
+                <textarea v-model="wes.summary_of_duties[di]"
+                  rows="2" :readonly="!editMode"
+                  placeholder="e.g. Responsible for the management of the recruitment and selection process…"
+                  class="input flex-1 resize-none text-sm"></textarea>
+                <button v-if="editMode && wes.summary_of_duties.length > 1"
+                  @click="wes.summary_of_duties.splice(di, 1)"
+                  class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 mt-1">
+                  <TrashIcon class="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <button v-if="editMode"
+                @click="wes.summary_of_duties.push('')"
+                class="mt-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                + Add Item
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="form.work_experience_sheets.length === 0"
+            class="py-12 text-center text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl">
+            No work experience entries yet. Click "Add Work Experience" to start.
+          </div>
+
+          <!-- Add entry button -->
+          <button v-if="editMode"
+            @click="form.work_experience_sheets.push({
+              from_date: '', to_date: '', position: '', office_unit: '',
+              immediate_supervisor: '', agency_organization_location: '',
+              accomplishments: [''], summary_of_duties: [''],
+              sort_order: form.work_experience_sheets.length,
+            })"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <PlusIcon class="h-4 w-4" /> Add Work Experience
+          </button>
         </div>
 
         <!-- Submit -->

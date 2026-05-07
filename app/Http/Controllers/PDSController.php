@@ -183,6 +183,9 @@ class PDSController extends Controller
     $this->syncMany($pds, 'nonAcademicRecognition', $request->input('non_academic_recognition', []), $updating);
     $this->syncMany($pds, 'membershipOrganizations', $request->input('membership_organizations', []), $updating);
     $this->syncMany($pds, 'references', $request->input('references', []), $updating);
+
+    // Work Experience Sheet (CS Form 212 Attachment)
+    $this->syncMany($pds, 'workExperienceSheets', $request->input('work_experience_sheets', []), $updating);
 }
 
     /* =====================================================
@@ -238,6 +241,7 @@ class PDSController extends Controller
             'questions',
             'references',
             'otherInfo',
+            'workExperienceSheets',
         ]);
     }
 
@@ -1205,6 +1209,38 @@ foreach ($questions as $q) {
     return response()->download($tempFile, "PDS_CSCForm212_{$pds->id}.pdf")
                      ->deleteFileAfterSend(true);
 }
+
+    /* =====================================================
+     | EXPORT WES PDF (CS Form 212 Attachment)
+     ===================================================== */
+    public function exportWesPdf(Pds $pds)
+    {
+        $this->authorizeAccess($pds);
+        $pds->load(['personalInfo', 'workExperienceSheets']);
+
+        $html = view('pds.wes_pdf', compact('pds'))->render();
+
+        $tmpDir = sys_get_temp_dir();
+        $mpdf   = new \Mpdf\Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'margin_left'   => 20,
+            'margin_right'  => 20,
+            'margin_top'    => 15,
+            'margin_bottom' => 20,
+            'tempDir'       => $tmpDir,
+        ]);
+
+        $mpdf->SetTitle('Work Experience Sheet — ' . ($pds->personalInfo?->last_name ?? ''));
+        $mpdf->WriteHTML($html);
+
+        $tempFile = tempnam($tmpDir, 'wes_') . '.pdf';
+        $mpdf->Output($tempFile, 'F');
+
+        $name = ($pds->personalInfo?->last_name ?? 'WES') . '_WorkExperienceSheet.pdf';
+
+        return response()->download($tempFile, $name)->deleteFileAfterSend(true);
+    }
 
 public function uploadCsv(Request $request, Pds $pds)
     {
