@@ -21,12 +21,13 @@
       border: 2px solid #000;
       text-align: center;
       padding: 8px 10px;
-      background: #e0e0e0;
+      background: #706f6fff;
       font-size: 14pt;
       font-weight: bold;
       font-style: italic;
       letter-spacing: 1px;
       margin-bottom: 0;
+      color: #fff;
     }
 
     .instructions-box {
@@ -67,7 +68,7 @@
       margin-bottom: 3px;
       line-height: 1.6;
     }
-    .field-label { font-weight: bold; }
+    .field-label { }
 
     .signature-block {
       margin-top: 36px;
