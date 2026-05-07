@@ -44,8 +44,8 @@
     }
 
     .entry {
-      margin-bottom: 10px;
-      padding: 10px 12px;
+      margin-bottom: 0;
+      padding: 0;
       border: 1px solid #000;
     }
 
