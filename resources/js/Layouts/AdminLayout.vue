@@ -356,7 +356,7 @@ const menuItems = [
     routeName: "dashboard",
     href: route("dashboard"),
     icon: HomeIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "DivisionChief", "OCD"],
+    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "OCD"],
   },
   {
     label: "Data Management",
@@ -481,7 +481,7 @@ const menuItems = [
   {
     label: "MIS",
     icon: ServerStackIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "DivisionChief", "OCD"],
+    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "OCD"],
     children: [
       {
         label: "MIS Dashboard",
@@ -1058,24 +1058,11 @@ const menuItems = [
       },
     ],
   },
-  {
-    label: "Planning",
-    icon: ChartBarIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
-      {
-        label: "Activity Planner",
-            routeName: "activities.index",
-            href: route("activities.index"),
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
-    ],
-  },
+  
   {
     label: "Records Management",
     icon: ArchiveBoxIcon,
-    roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief", "OCD"],
+    roles: ["Administrator", "Records", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD"],
     children: [
       {
         label: "Docu Track",
@@ -1103,14 +1090,14 @@ const menuItems = [
   {
     label: "General Services",
     icon: WrenchScrewdriverIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief","OCD"],
+    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief","OCD"],
     children: [
       {
         label: "Vehicle Request",
         routeName: "vehicle-requests.index",
         href: route("vehicle-requests.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
         permissions: ["vehicles.view"],
       },
       {
@@ -1118,7 +1105,7 @@ const menuItems = [
         routeName: "facility-requests.index",
         href: route("facility-requests.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
         permissions: ["facilities.view"],
       },
       {
@@ -1126,7 +1113,7 @@ const menuItems = [
         routeName: "service-requests.index",
         href: route('service-requests.index'),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
         permissions: ["facilities.view"],
       },
       {
@@ -1142,7 +1129,7 @@ const menuItems = [
         routeName: "work-requests.index",
         href: route('work-requests.index'),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
         permissions: ["facilities.view"],
       },
       {
@@ -1251,62 +1238,62 @@ const menuItems = [
       },
     ],
   },
-  {
-    label: "Supply & Property",
-    icon: ShoppingCartIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
-      {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
-    ],
-  },
-  {
-    label: "Accounting",
-    icon: CreditCardIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
-      {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
-    ],
-  },
-  {
-    label: "Budget",
-    icon: BanknotesIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
-      {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
-    ],
-  },
-  {
-    label: "Cashier",
-    icon: CurrencyDollarIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
-      {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
-    ],
-  },
+  // {
+  //   label: "Supply & Property",
+  //   icon: ShoppingCartIcon,
+  //   roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //   children: [
+  //     {
+  //       label: "PDS",
+  //       routeName: null,
+  //       href: "#",
+  //       icon: ClipboardDocumentListIcon,
+  //       roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //     },
+  //   ],
+  // },
+  // {
+  //   label: "Accounting",
+  //   icon: CreditCardIcon,
+  //   roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //   children: [
+  //     {
+  //       label: "PDS",
+  //       routeName: null,
+  //       href: "#",
+  //       icon: ClipboardDocumentListIcon,
+  //       roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //     },
+  //   ],
+  // },
+  // {
+  //   label: "Budget",
+  //   icon: BanknotesIcon,
+  //   roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //   children: [
+  //     {
+  //       label: "PDS",
+  //       routeName: null,
+  //       href: "#",
+  //       icon: ClipboardDocumentListIcon,
+  //       roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //     },
+  //   ],
+  // },
+  // {
+  //   label: "Cashier",
+  //   icon: CurrencyDollarIcon,
+  //   roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //   children: [
+  //     {
+  //       label: "PDS",
+  //       routeName: null,
+  //       href: "#",
+  //       icon: ClipboardDocumentListIcon,
+  //       roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //     },
+  //   ],
+  // },
   {
     type: "section",
     label: "Curriculum & Instruction",
@@ -1714,20 +1701,20 @@ const menuItems = [
       },
     ],
   },
-  {
-    label: "Residence Hall",
-    icon: HomeModernIcon,
-    roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-    children: [
-      {
-        label: "PDS",
-        routeName: null,
-        href: "#",
-        icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
-      },
-    ],
-  },
+  // {
+  //   label: "Residence Hall",
+  //   icon: HomeModernIcon,
+  //   roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //   children: [
+  //     {
+  //       label: "PDS",
+  //       routeName: null,
+  //       href: "#",
+  //       icon: ClipboardDocumentListIcon,
+  //       roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
+  //     },
+  //   ],
+  // },
   {
     type: "section",
     label: "Reports",
