@@ -79,7 +79,7 @@
       width: 260px;
       margin-left: auto;
       margin-bottom: 4px;
-      height: 30px;
+      height: 0;
     }
     .signature-caption {
       font-size: 10pt;
