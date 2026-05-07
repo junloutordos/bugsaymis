@@ -323,6 +323,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::post('/csm', [\App\Http\Controllers\CsmResponseController::class, 'store'])->name('csm.store');
+
+    // ── CSM Feedback Center (admin/MIS) ───────────────────────────────────────
+    Route::get('/csm/dashboard', [\App\Http\Controllers\CSMFeedbackController::class, 'dashboard'])->name('csm.dashboard');
+    Route::get('/csm/list',      [\App\Http\Controllers\CSMFeedbackController::class, 'index'])->name('csm.list');
+    Route::get('/csm/list/{csmResponse}', [\App\Http\Controllers\CSMFeedbackController::class, 'show'])->name('csm.show');
+    Route::get('/csm/export',    [\App\Http\Controllers\CSMFeedbackController::class, 'export'])->name('csm.export');
     Route::get('/mis/dashboard', [\App\Http\Controllers\MISDashboardController::class, 'index'])
         ->middleware('permission:it.requests.manage')
         ->name('mis.dashboard');

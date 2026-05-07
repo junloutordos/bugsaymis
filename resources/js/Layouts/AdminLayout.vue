@@ -492,6 +492,14 @@ const menuItems = [
         permissions: ["it.requests.manage"],
       },
       {
+        label: "CSM Feedback",
+        routeName: "csm.dashboard",
+        href: route("csm.dashboard"),
+        icon: StarIcon,
+        roles: ["Administrator", "MIS"],
+        permissions: ["it.requests.manage"],
+      },
+      {
         label: "IT Job Requests",
         routeName: "jobrequests.index",
         href: route("jobrequests.index"),
