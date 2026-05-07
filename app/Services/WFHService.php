@@ -7,10 +7,12 @@ use App\Models\WFHAttendance;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class WFHService
 {
+    // GoogleDriveService kept for backward-compatible deletion of old Drive files
     public function __construct(private readonly GoogleDriveService $drive) {}
 
     // ─── Time In ──────────────────────────────────────────────────────────────
@@ -193,39 +195,34 @@ class WFHService
 
         if (($data['proof_type'] ?? null) === 'photo' && $photo) {
             $dateFolder = $attendance->getRawOriginal('date') ?? $today;
-            $drivePath  = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
+            $s3Key      = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
 
-            try {
-                $uploaded = $this->drive->upload($photo, $drivePath);
+            Storage::disk('public')->put($s3Key, file_get_contents($photo->getRealPath()));
 
-                $payload['google_drive_file_id'] = $uploaded['file_id'];
-                $payload['google_drive_link']    = $uploaded['link'];
-            } catch (\Throwable $e) {
-                logger()->warning('WFH accomplishment: Google Drive upload failed, saving locally', [
-                    'path'  => $drivePath,
-                    'error' => $e->getMessage(),
-                ]);
+            // Encode the S3 key so it can be passed as a single URL-safe route segment
+            $encodedKey = $this->encodeS3Key($s3Key);
 
-                $localPath = 'wfh-accomplishments/' . $drivePath;
-                \Illuminate\Support\Facades\Storage::put($localPath, file_get_contents($photo->getRealPath()));
-
-                $payload['google_drive_file_id'] = null;
-                $payload['google_drive_link']    = \Illuminate\Support\Facades\Storage::url($localPath);
-            }
-
-            $payload['file_name'] = $photo->getClientOriginalName();
+            $payload['google_drive_file_id'] = $encodedKey;
+            $payload['google_drive_link']    = url("/hr/wfh/photo/{$encodedKey}");
+            $payload['file_name']            = $photo->getClientOriginalName();
         }
 
         return WFHAccomplishment::create($payload);
     }
 
     /**
-     * Delete a WFH accomplishment. Also removes the Google Drive file if present.
+     * Delete a WFH accomplishment. Removes the file from S3 (new) or Drive (legacy).
      */
     public function deleteAccomplishment(WFHAccomplishment $accomplishment): void
     {
         if ($accomplishment->google_drive_file_id) {
-            $this->drive->delete($accomplishment->google_drive_file_id);
+            $decoded = $this->decodeS3Key($accomplishment->google_drive_file_id);
+            if ($decoded) {
+                Storage::disk('public')->delete($decoded);
+            } else {
+                // Legacy: old Google Drive file ID
+                try { $this->drive->delete($accomplishment->google_drive_file_id); } catch (\Throwable) {}
+            }
         }
 
         $accomplishment->delete();
@@ -241,14 +238,13 @@ class WFHService
     }
 
     /**
-     * Decode a base64 data URI, write it to a temp file, wrap it in an
-     * UploadedFile-compatible structure, then upload to Google Drive.
+     * Decode a base64 data URI, upload the raw image to S3, and return the
+     * encoded S3 key and a proxy URL for serving it through the app.
      *
      * @return array{ file_id: string, link: string }
      */
-    private function uploadBase64Photo(string $dataUri, string $drivePath): array
+    private function uploadBase64Photo(string $dataUri, string $s3Key): array
     {
-        // Strip the data URI prefix (e.g. "data:image/jpeg;base64,")
         if (str_contains($dataUri, ',')) {
             [, $base64] = explode(',', $dataUri, 2);
         } else {
@@ -257,37 +253,38 @@ class WFHService
 
         $imageData = base64_decode($base64);
 
-        $tmpPath = tempnam(sys_get_temp_dir(), 'wfh_') . '.jpg';
-        file_put_contents($tmpPath, $imageData);
+        Storage::disk('public')->put($s3Key, $imageData);
 
-        $uploadedFile = new UploadedFile(
-            $tmpPath,
-            basename($drivePath),
-            'image/jpeg',
-            null,
-            true   // test mode — skip is_uploaded_file() check
-        );
+        $encodedKey = $this->encodeS3Key($s3Key);
 
-        // Try Google Drive first; fall back to local storage if Drive is unreachable
-        try {
-            $result = $this->drive->upload($uploadedFile, $drivePath);
-            @unlink($tmpPath);
-            return $result;
-        } catch (\Throwable $e) {
-            @unlink($tmpPath);
-            logger()->warning('WFH Google Drive upload failed, saving locally', [
-                'path'  => $drivePath,
-                'error' => $e->getMessage(),
-            ]);
+        return [
+            'file_id' => $encodedKey,
+            'link'    => url("/hr/wfh/photo/{$encodedKey}"),
+        ];
+    }
 
-            // Save to local storage as fallback
-            $localPath = 'wfh-photos/' . $drivePath;
-            \Illuminate\Support\Facades\Storage::put($localPath, $imageData);
+    /**
+     * Encode an S3 key as URL-safe base64 so it fits a single route segment.
+     * Prefix "s3:" distinguishes encoded S3 keys from legacy Drive file IDs.
+     */
+    private function encodeS3Key(string $s3Key): string
+    {
+        return 's3.' . rtrim(strtr(base64_encode($s3Key), '+/', '-_'), '=');
+    }
 
-            return [
-                'file_id' => null,
-                'link'    => \Illuminate\Support\Facades\Storage::url($localPath),
-            ];
+    /**
+     * Decode an encoded S3 key. Returns the S3 path, or null if it is a
+     * legacy Google Drive file ID (does not start with the "s3." prefix).
+     */
+    private function decodeS3Key(string $fileId): ?string
+    {
+        if (! str_starts_with($fileId, 's3.')) {
+            return null;
         }
+        $padded = strtr(substr($fileId, 3), '-_', '+/');
+        $pad    = strlen($padded) % 4;
+        if ($pad) $padded .= str_repeat('=', 4 - $pad);
+        $decoded = base64_decode($padded, true);
+        return ($decoded !== false) ? $decoded : null;
     }
 }
