@@ -11,6 +11,8 @@ import {
   ArrowLeftIcon,
   CheckCircleIcon,
   ArrowDownTrayIcon,
+  PlusIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import ScoreGrid from './components/ScoreGrid.vue'
 
@@ -49,8 +51,13 @@ function buildDraft(quarter) {
   const draft = {}
   for (const cat of props.classRecord.grading_option?.categories ?? []) {
     draft[cat.id] = []
-    const existing = (quarter?.assessments ?? []).filter(a => a.grading_category_id === cat.id)
-    for (let n = 1; n <= cat.max_assessments; n++) {
+    const existing = (quarter?.assessments ?? [])
+      .filter(a => a.grading_category_id === cat.id)
+      .sort((a, b) => a.assessment_number - b.assessment_number)
+
+    // Show at least max_assessments rows OR all saved rows, whichever is more
+    const rowCount = Math.max(cat.max_assessments, existing.length)
+    for (let n = 1; n <= rowCount; n++) {
       const found = existing.find(a => a.assessment_number === n)
       draft[cat.id].push({
         grading_category_id: cat.id,
@@ -59,10 +66,47 @@ function buildDraft(quarter) {
         activity_date:       found?.activity_date ?? '',
         max_score:           found?.max_score ?? '',
         _saved:              !!found,
+        _db_id:              found?.id ?? null,  // track DB id for delete validation
       })
     }
   }
   return draft
+}
+
+function addAssessmentRow(catId) {
+  const rows = assessmentDraft.value[catId]
+  const nextNum = rows.length + 1
+  rows.push({
+    grading_category_id: catId,
+    assessment_number:   nextNum,
+    title:               '',
+    activity_date:       '',
+    max_score:           '',
+    _saved:              false,
+    _db_id:              null,
+  })
+}
+
+async function removeAssessmentRow(catId, idx) {
+  const row = assessmentDraft.value[catId][idx]
+
+  // If it has a DB assessment ID, check if scores exist
+  if (row._db_id) {
+    try {
+      const { data } = await axios.get(
+        route('class-records.scores.index', { classRecord: props.classRecord.id, q: activeQuarter.value })
+      )
+      const hasScores = Object.keys(data).some(k => k.startsWith(`_${row._db_id}`) || k.endsWith(`_${row._db_id}`))
+      if (hasScores) {
+        await Swal.fire('Cannot Remove', 'This assessment already has scores entered. Clear all scores for it first.', 'warning')
+        return
+      }
+    } catch { /* allow removal if check fails */ }
+  }
+
+  assessmentDraft.value[catId].splice(idx, 1)
+  // Re-number remaining rows
+  assessmentDraft.value[catId].forEach((r, i) => { r.assessment_number = i + 1 })
 }
 
 const savingSetup = ref(false)
@@ -305,12 +349,13 @@ async function checkRecord() {
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score</th>
+                      <th v-if="!isLocked" class="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
-                    <tr v-for="row in assessmentDraft[cat.id]" :key="row.assessment_number"
+                    <tr v-for="(row, rIdx) in assessmentDraft[cat.id]" :key="rIdx"
                       class="hover:bg-slate-50/40">
-                      <td class="px-4 py-2 text-xs font-bold text-slate-500">
+                      <td class="px-4 py-2 text-xs font-bold text-slate-500 whitespace-nowrap">
                         {{ cat.code }}{{ row.assessment_number }}
                       </td>
                       <td class="px-4 py-2">
@@ -330,9 +375,23 @@ async function checkRecord() {
                           placeholder="e.g. 30"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
+                      <td v-if="!isLocked" class="px-2 py-2 text-center">
+                        <button @click="removeAssessmentRow(cat.id, rIdx)"
+                          class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+                          title="Remove this assessment row">
+                          <XMarkIcon class="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
+              </div>
+              <!-- Add row button per category -->
+              <div v-if="!isLocked" class="mt-1.5">
+                <button @click="addAssessmentRow(cat.id)"
+                  class="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+                  <PlusIcon class="h-3.5 w-3.5" /> Add {{ cat.code }} Row
+                </button>
               </div>
             </div>
           </div>
