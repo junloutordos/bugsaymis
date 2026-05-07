@@ -1719,6 +1719,52 @@ if (app()->environment('local')) {
 
 /*
 |--------------------------------------------------------------------------
+| Class Record Routes (Inertia pages + JSON API)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->group(function () {
+    Route::get('/class-records',      [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'index'])->name('class-records.page.index');
+    Route::get('/class-records/{classRecord}', [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'show'])->name('class-records.page.show');
+});
+Route::middleware(['auth'])->prefix('api/v1')->group(function () {
+    // Reference data
+    Route::get('/grading-options', [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'index'])
+        ->name('grading-options.index');
+
+    // Class Records CRUD + workflow
+    Route::get('/class-records',                        [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'index'])->name('class-records.index');
+    Route::post('/class-records',                       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'store'])->name('class-records.store');
+    Route::get('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'show'])->name('class-records.show');
+    Route::put('/class-records/{classRecord}',          [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'update'])->name('class-records.update');
+    Route::delete('/class-records/{classRecord}',       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'destroy'])->name('class-records.destroy');
+    Route::post('/class-records/{classRecord}/submit',  [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'submit'])->name('class-records.submit');
+    Route::post('/class-records/{classRecord}/check',   [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'check'])->name('class-records.check');
+
+    // Quarter management
+    Route::get('/class-records/{classRecord}/quarters/{q}',        [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'show'])->name('class-records.quarters.show');
+    Route::post('/class-records/{classRecord}/quarters/{q}/lock',   [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'lock'])->name('class-records.quarters.lock');
+    Route::post('/class-records/{classRecord}/quarters/{q}/unlock', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'unlock'])->name('class-records.quarters.unlock');
+    Route::get('/class-records/{classRecord}/quarters/{q}/grades',  [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'grades'])->name('class-records.quarters.grades');
+
+    // Assessments
+    Route::get('/class-records/{classRecord}/quarters/{q}/assessments',  [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'index'])->name('class-records.assessments.index');
+    Route::post('/class-records/{classRecord}/quarters/{q}/assessments', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'upsert'])->name('class-records.assessments.upsert');
+
+    // Students
+    Route::get('/class-records/{classRecord}/quarters/{q}/students',  [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'index'])->name('class-records.students.index');
+    Route::post('/class-records/{classRecord}/quarters/{q}/students', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'upsert'])->name('class-records.students.upsert');
+
+    // Scores
+    Route::get('/class-records/{classRecord}/quarters/{q}/scores',  [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'index'])->name('class-records.scores.index');
+    Route::post('/class-records/{classRecord}/quarters/{q}/scores', [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'upsert'])->name('class-records.scores.upsert');
+
+    // Export (Phase 7)
+    Route::get('/class-records/{classRecord}/quarters/{q}/export', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportQuarter'])->name('class-records.quarters.export');
+    Route::get('/class-records/{classRecord}/export',              [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportAll'])->name('class-records.export');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Authentication Routes
 |--------------------------------------------------------------------------
 */

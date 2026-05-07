@@ -58,6 +58,11 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Accomplishments', 'name' => 'accomplishments.update', 'description' => 'Edit accomplishments'],
             ['module' => 'Accomplishments', 'name' => 'accomplishments.delete', 'description' => 'Delete accomplishments'],
 
+            // ── Class Records ─────────────────────────────────────────────────
+            ['module' => 'ClassRecord', 'name' => 'class-records.view',   'description' => 'View own class records (teacher)'],
+            ['module' => 'ClassRecord', 'name' => 'class-records.manage', 'description' => 'Create, edit, enter scores for own class records'],
+            ['module' => 'ClassRecord', 'name' => 'class-records.admin',  'description' => 'View all class records, check, unlock quarters (AUH/Admin)'],
+
             // ── IT / MIS ──────────────────────────────────────────────────────
             ['module' => 'IT',       'name' => 'it.requests.view',   'description' => 'View IT job requests'],
             ['module' => 'IT',       'name' => 'it.requests.create', 'description' => 'Submit IT job requests'],

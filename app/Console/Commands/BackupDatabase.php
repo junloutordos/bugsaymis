@@ -18,6 +18,9 @@ class BackupDatabase extends Command
 
     public function handle(): int
     {
+        // The raw SQL dump can exceed 40MB. Raise the limit so gzip + Drive upload succeed.
+        ini_set('memory_limit', '512M');
+
         $dbName = config('database.connections.mysql.database');
         $dbUser = env('DB_BACKUP_USERNAME', config('database.connections.mysql.username'));
         $dbPass = env('DB_BACKUP_PASSWORD', config('database.connections.mysql.password'));
@@ -30,8 +33,10 @@ class BackupDatabase extends Command
             mkdir($backupPath, 0750, true);
         }
 
-        $basename = 'backup_' . now()->format('Y-m-d_H-i-s') . '.sql';
-        $filename = $backupPath . $basename;
+        $basename     = 'backup_' . now()->format('Y-m-d_H-i-s') . '.sql';
+        $basenamegz   = $basename . '.gz';
+        $filename     = $backupPath . $basename;
+        $filenamegz   = $backupPath . $basenamegz;
 
         // ── Run mysqldump ─────────────────────────────────────────────────────
         $cnfContent = "[client]\npassword=" . str_replace('"', '\\"', $dbPass) . "\nskip_ssl\n";
@@ -61,12 +66,17 @@ class BackupDatabase extends Command
             return self::FAILURE;
         }
 
-        $sizeMb = round(filesize($filename) / 1024 / 1024, 2);
-        $this->info("Local backup created: {$basename} ({$sizeMb} MB)");
-        Log::info("Database backup created: {$filename} ({$sizeMb} MB)");
+        // ── Gzip the dump to cut size ~10x before Drive upload ───────────────
+        exec("gzip -f " . escapeshellarg($filename), $gzOut, $gzCode);
+        $uploadFile   = ($gzCode === 0 && file_exists($filenamegz)) ? $filenamegz : $filename;
+        $uploadBase   = ($gzCode === 0) ? $basenamegz : $basename;
+
+        $sizeMb = round(filesize($uploadFile) / 1024 / 1024, 2);
+        $this->info("Local backup created: {$uploadBase} ({$sizeMb} MB)");
+        Log::info("Database backup created: {$uploadFile} ({$sizeMb} MB)");
 
         // ── Prune local copies (keep last 7) ──────────────────────────────────
-        $files = glob($backupPath . 'backup_*.sql');
+        $files = glob($backupPath . 'backup_*.sql*');
         if (count($files) > 7) {
             usort($files, fn ($a, $b) => filemtime($a) - filemtime($b));
             foreach (array_slice($files, 0, count($files) - 7) as $old) {
@@ -87,22 +97,23 @@ class BackupDatabase extends Command
         try {
             $client = new GoogleClient();
             $client->setAuthConfig($credentialsPath);
-            $client->addScope(GoogleDrive::DRIVE_FILE);
+            $client->addScope(GoogleDrive::DRIVE); // Full scope required for Shared Drive folders
 
             $service  = new GoogleDrive($client);
             $metadata = new DriveFile([
-                'name'    => $basename,
+                'name'    => $uploadBase,
                 'parents' => [$folderId],
             ]);
 
             $service->files->create($metadata, [
-                'data'       => file_get_contents($filename),
-                'mimeType'   => 'application/sql',
+                'data'       => file_get_contents($uploadFile),
+                'mimeType'   => 'application/gzip',
                 'uploadType' => 'multipart',
                 'fields'     => 'id,name',
+                'supportsAllDrives' => true,
             ]);
 
-            $this->info("Uploaded to Google Drive: {$basename}");
+            $this->info("Uploaded to Google Drive: {$uploadBase}");
             Log::info("Backup uploaded to Google Drive: {$basename}");
 
             // ── Prune old Drive backups (keep last DRIVE_RETENTION) ───────────

@@ -217,17 +217,46 @@ class WFHAttendanceController extends Controller
     // ─── Image Proxy ──────────────────────────────────────────────────────────
 
     /**
-     * Stream a Google Drive file through the server so the browser never needs
-     * to authenticate with Google directly. Only authenticated app users can hit
-     * this endpoint.
+     * Serve a WFH photo through the server (authenticated users only).
+     *
+     * New format:  fileId starts with "s3." → base64url-encoded S3 key → read from S3
+     * Legacy format: plain Drive file ID → proxy through Google Drive download
      */
     public function photo(string $fileId, GoogleDriveService $drive)
     {
-        // Validate fileId format to prevent abuse
-        if (! preg_match('/^[a-zA-Z0-9_-]+$/', $fileId)) {
+        // Accept: s3.<base64url> (new) or alphanumeric/dash/underscore (legacy Drive)
+        if (! preg_match('/^[a-zA-Z0-9_.=-]+$/', $fileId)) {
             abort(400);
         }
 
+        // ── New: S3-backed photo ──────────────────────────────────────────────
+        if (str_starts_with($fileId, 's3.')) {
+            $padded  = strtr(substr($fileId, 3), '-_', '+/');
+            $pad     = strlen($padded) % 4;
+            if ($pad) $padded .= str_repeat('=', 4 - $pad);
+            $s3Key   = base64_decode($padded, true);
+
+            if (! $s3Key || ! \Illuminate\Support\Facades\Storage::disk('public')->exists($s3Key)) {
+                abort(404);
+            }
+
+            $contents = \Illuminate\Support\Facades\Storage::disk('public')->get($s3Key);
+            if (! $contents) abort(404);
+
+            $ext  = strtolower(pathinfo($s3Key, PATHINFO_EXTENSION));
+            $mime = match ($ext) {
+                'png'  => 'image/png',
+                'webp' => 'image/webp',
+                'gif'  => 'image/gif',
+                default => 'image/jpeg',
+            };
+
+            return response($contents, 200)
+                ->header('Content-Type', $mime)
+                ->header('Cache-Control', 'private, max-age=3600');
+        }
+
+        // ── Legacy: Google Drive photo ────────────────────────────────────────
         try {
             $file = $drive->download($fileId);
         } catch (\Throwable) {
