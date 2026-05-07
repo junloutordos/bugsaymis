@@ -422,19 +422,17 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             <PencilSquareIcon class="h-4 w-4" />
             Edit
           </button>
-          <!--
-          <button
-            v-if="props.pds && !editMode"
-            class="btn-icon bg-green-600"
-            @click="exportPDF(props.pds.id)"
-          >
-            <PrinterIcon class="h-5 w-5 text-white" />
-          </button>
-        -->
           <button v-if="props.pds && !editMode" @click="exportPDS(props.pds.id)" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <DocumentArrowDownIcon class="h-4 w-4" />
-            Export
+            Export PDS
           </button>
+          <a v-if="props.pds && !editMode"
+            :href="route('pds.wes.pdf', props.pds.id)"
+            target="_blank"
+            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <DocumentArrowDownIcon class="h-4 w-4" />
+            Export WES PDF
+          </a>
         </div>
       </div>
 
@@ -1353,17 +1351,9 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <div v-show="activeTab === 5" class="space-y-6 p-6">
 
           <!-- Header row -->
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h2 class="text-lg font-semibold text-slate-800">Work Experience Sheet</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Attachment to CS Form No. 212 — list from most recent first.</p>
-            </div>
-            <a v-if="props.pds && !editMode"
-              :href="route('pds.wes.pdf', props.pds.id)"
-              target="_blank"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
-              Export WES PDF
-            </a>
+          <div>
+            <h2 class="text-lg font-semibold text-slate-800">Work Experience Sheet</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Attachment to CS Form No. 212 — list from most recent first.</p>
           </div>
 
           <!-- Entries -->
