@@ -1758,9 +1758,9 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}/scores',  [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'index'])->name('class-records.scores.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/scores', [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'upsert'])->name('class-records.scores.upsert');
 
-    // Export placeholders (Phase 6)
-    Route::get('/class-records/{classRecord}/quarters/{q}/export', fn () => response()->json(['message' => 'Export coming in Phase 6.']))->name('class-records.quarters.export');
-    Route::get('/class-records/{classRecord}/export', fn () => response()->json(['message' => 'Full workbook export coming in Phase 6.']))->name('class-records.export');
+    // Export (Phase 7)
+    Route::get('/class-records/{classRecord}/quarters/{q}/export', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportQuarter'])->name('class-records.quarters.export');
+    Route::get('/class-records/{classRecord}/export',              [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportAll'])->name('class-records.export');
 });
 
 /*

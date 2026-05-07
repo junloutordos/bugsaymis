@@ -10,6 +10,7 @@ import {
   LockOpenIcon,
   ArrowLeftIcon,
   CheckCircleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 import ScoreGrid from './components/ScoreGrid.vue'
 
@@ -194,6 +195,11 @@ async function checkRecord() {
 
         <!-- Workflow actions -->
         <div class="flex items-center gap-2 shrink-0">
+          <!-- Export All button -->
+          <a :href="route('class-records.export', classRecord.id)"
+            class="inline-flex items-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+            <ArrowDownTrayIcon class="h-4 w-4" /> Export All
+          </a>
           <button v-if="classRecord.status === 'draft'"
             @click="submitRecord"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
@@ -225,8 +231,16 @@ async function checkRecord() {
           </button>
         </div>
 
+        <!-- Quarter export button -->
+        <div class="flex justify-end px-4 pt-2">
+          <a :href="route('class-records.quarters.export', { classRecord: classRecord.id, q: activeQuarter })"
+            class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 px-2 py-1 rounded hover:bg-slate-50">
+            <ArrowDownTrayIcon class="h-3.5 w-3.5" /> Export Q{{ activeQuarter }}
+          </a>
+        </div>
+
         <!-- Sub-tab bar -->
-        <div class="flex gap-1 px-4 pt-3 border-b border-slate-50">
+        <div class="flex gap-1 px-4 pt-1 border-b border-slate-50">
           <button
             v-for="tab in ['setup', 'scores']" :key="tab"
             @click="activeSubTab = tab"

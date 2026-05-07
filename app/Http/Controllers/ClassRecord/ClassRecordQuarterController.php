@@ -7,13 +7,18 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\StanineLookup;
 use App\Services\ClassRecord\GradeComputationService;
+use App\Services\ClassRecord\ClassRecordExcelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ClassRecordQuarterController extends Controller
 {
-    public function __construct(private readonly GradeComputationService $grader) {}
+    public function __construct(
+        private readonly GradeComputationService $grader,
+        private readonly ClassRecordExcelService $excelService,
+    ) {}
 
     private function isAdmin(): bool
     {
@@ -175,5 +180,51 @@ class ClassRecordQuarterController extends Controller
             $result[$s['studentId']] = $s['runningGrade'] ?? null;
         }
         return $result;
+    }
+
+    // ── GET /class-records/{cr}/quarters/{q}/export ───────────────────────────
+
+    public function exportQuarter(ClassRecord $classRecord, int $q): BinaryFileResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
+
+        $classRecord->loadMissing([
+            'gradingOption.categories',
+            'quarters.assessments.gradingCategory',
+            'quarters.students',
+        ]);
+
+        $tempFile = $this->excelService->exportQuarter($classRecord, $q);
+        $filename = $this->buildFilename($classRecord, $q);
+
+        return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+    }
+
+    // ── GET /class-records/{cr}/export ────────────────────────────────────────
+
+    public function exportAll(ClassRecord $classRecord): BinaryFileResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+
+        $classRecord->loadMissing([
+            'gradingOption.categories',
+            'quarters.assessments.gradingCategory',
+            'quarters.students',
+        ]);
+
+        $tempFile = $this->excelService->exportAll($classRecord);
+        $filename = $this->buildFilename($classRecord);
+
+        return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+    }
+
+    private function buildFilename(ClassRecord $classRecord, ?int $quarter = null): string
+    {
+        $subject = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->subject_name);
+        $section = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->year_level_section);
+        $sy      = str_replace('-', '_', $classRecord->school_year);
+        $qPart   = $quarter ? "_Q{$quarter}" : '_All';
+        return "{$subject}_{$section}{$qPart}_{$sy}.xlsx";
     }
 }
