@@ -40,9 +40,7 @@
     .instructions-box p { margin-bottom: 4px; }
 
     .entries-box {
-      border: 1px solid #000;
-      border-top: none;
-      padding: 10px 14px;
+      padding: 10px 0;
     }
 
     .entry {
