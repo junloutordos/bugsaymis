@@ -42,10 +42,12 @@ export function lookupGradeEquivalent(percentageScore, stanineLookup) {
  * Uses Math.floor to 3dp to match Excel behaviour (not Math.round).
  */
 export function computeRunningGrade(currentGE, previousGrade, quarter) {
-  if (quarter === 1 || previousGrade === null || previousGrade === undefined) {
+  if (quarter === 1) {
     return currentGE
   }
-  const raw = (currentGE * 2 / 3) + (previousGrade * 1 / 3)
+  // Q1 never computed → use 5.0 (Failed) as fallback previous grade
+  const prev = (previousGrade === null || previousGrade === undefined) ? 5.0 : previousGrade
+  const raw  = (currentGE * 2 / 3) + (prev * 1 / 3)
   return Math.floor(raw * 1000) / 1000
 }
 

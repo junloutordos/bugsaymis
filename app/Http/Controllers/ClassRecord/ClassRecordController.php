@@ -13,7 +13,7 @@ class ClassRecordController extends Controller
 {
     private function isAdmin(): bool
     {
-        return Auth::user()->hasAnyRole(['Administrator', 'AUH']);
+        return Auth::user()->hasAnyRole(['Administrator', 'AUH', 'CID Chief']);
     }
 
     // ── GET /class-records ────────────────────────────────────────────────────
@@ -92,6 +92,21 @@ class ClassRecordController extends Controller
             'subject_name'       => 'sometimes|string|max:255',
             'year_level_section' => 'sometimes|string|max:255',
         ]);
+
+        // Block grading option change after scores have been entered
+        if (isset($validated['grading_option_id'])
+            && $validated['grading_option_id'] != $classRecord->grading_option_id) {
+            $hasScores = \App\Models\ClassRecord\ClassRecordScore::whereHas(
+                'student.quarter.classRecord', fn ($q) => $q->where('id', $classRecord->id)
+            )->exists();
+
+            if ($hasScores) {
+                return response()->json([
+                    'message' => 'Cannot change grading option after scores have been entered.',
+                    'errors'  => ['grading_option_id' => ['Cannot change grading option after scores have been entered.']],
+                ], 422);
+            }
+        }
 
         $classRecord->update($validated);
 

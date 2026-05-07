@@ -114,8 +114,12 @@ class GradeComputationService
         int $quarter,
         iterable $stanineLookup
     ): array {
-        if ($quarter === 1 || $previousRunningGrade === null) {
+        if ($quarter === 1) {
             $finalGrade = $currentQuarterGE;
+        } elseif ($previousRunningGrade === null) {
+            // Q1 was never computed — use 5.0 (Failed) as default previous grade
+            $raw        = ($currentQuarterGE * (2 / 3)) + (5.0 * (1 / 3));
+            $finalGrade = $this->floorToDecimals($raw, 3);
         } else {
             $raw        = ($currentQuarterGE * (2 / 3)) + ($previousRunningGrade * (1 / 3));
             $finalGrade = $this->floorToDecimals($raw, 3);

@@ -14,7 +14,7 @@ class ClassRecordStudentController extends Controller
 {
     private function isAdmin(): bool
     {
-        return Auth::user()->hasAnyRole(['Administrator', 'AUH']);
+        return Auth::user()->hasAnyRole(['Administrator', 'AUH', 'CID Chief']);
     }
 
     private function resolveQuarter(ClassRecord $classRecord, int $q): ClassRecordQuarter
