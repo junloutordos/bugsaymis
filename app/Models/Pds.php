@@ -24,4 +24,5 @@ class Pds extends Model
     public function questions() { return $this->hasOne(PDSQuestions::class); }
     public function references() { return $this->hasMany(PDSReference::class); }
     public function otherInfo() { return $this->hasOne(PDSOtherInfo::class); }
+    public function workExperienceSheets() { return $this->hasMany(PDSWorkExperienceSheet::class)->orderBy('sort_order'); }
 }
