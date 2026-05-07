@@ -6,7 +6,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 11pt;
+      font-size: 10pt;
       color: #000;
       background: #fff;
     }
@@ -35,7 +35,7 @@
       padding: 8px 12px;
       font-size: 10pt;
     }
-    .instructions-box strong { font-size: 10.5pt; }
+    .instructions-box strong { font-size: 10pt; }
     .instructions-box p { margin-bottom: 4px; }
 
     .entries-box {
@@ -90,7 +90,7 @@
     }
     .date-line {
       margin-top: 16px;
-      font-size: 10.5pt;
+      font-size: 10pt;
     }
 
     .no-entries {
@@ -109,8 +109,8 @@
   <div class="header-box">WORK EXPERIENCE SHEET</div>
 
   <div class="instructions-box">
-    <p><strong>Instructions:</strong>&nbsp;&nbsp;
-      <strong>1.</strong> Include only the work experiences relevant to the position being applied to.
+    <p ><strong>Instructions:</strong>&nbsp;&nbsp;
+      <strong>1.</strong> <span style="font-style: italic;">Include only the work experiences relevant to the position being applied to.</span>
     </p>
     <p style="margin-left: 88px; font-style: italic;">
       <strong>2.</strong> The duration should include start and finish dates, if known, month in abbreviated form,
@@ -187,6 +187,13 @@
   <div class="signature-block">
     <div class="signature-line"></div>
     <div class="signature-caption">
+      @php
+        $fn  = strtoupper($pds->personalInfo?->first_name ?? '');
+        $mi  = $pds->personalInfo?->middle_name ? strtoupper(substr($pds->personalInfo->middle_name, 0, 1)) . '.' : '';
+        $sn  = strtoupper($pds->personalInfo?->surname ?? '');
+        $fullName = trim("$fn $mi $sn");
+      @endphp
+      <strong>{{ $fullName }}</strong><br>
       (Signature over Printed Name<br>of Employee/Applicant)
     </div>
     <div class="date-line">Date: ___________________</div>
