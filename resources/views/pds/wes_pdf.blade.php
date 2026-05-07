@@ -185,7 +185,7 @@
   </div>
 
   <div class="signature-block">
-    <div class="signature-line"></div>
+    
     <div class="signature-caption">
       @php
         $fn  = strtoupper($pds->personalInfo?->first_name ?? '');
@@ -194,9 +194,10 @@
         $fullName = trim("$fn $mi $sn");
       @endphp
       <strong>{{ $fullName }}</strong><br>
+      <div class="signature-line"></div>
       (Signature over Printed Name<br>of Employee/Applicant)
     </div>
-    <div class="date-line">Date: ___________________</div>
+    <div class="date-line">Date: {{ now()->format('F d, Y') }}</div>
   </div>
 
 </body>
