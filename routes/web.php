@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
 use App\Http\Controllers\HR\EmployeeDocumentController;
+use App\Http\Controllers\ApprovalInboxController;
 
     // Library Borrowings
     Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
@@ -257,6 +258,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
         ->middleware(['verified'])
         ->name('dashboard');
+
+    // ── Unified Approvals Inbox ───────────────────────────────────────────────
+    Route::get('/inbox', [ApprovalInboxController::class, 'index'])->name('approvals.inbox');
+    Route::post('/inbox/{type}/{id}/approve', [ApprovalInboxController::class, 'approve'])->name('approvals.approve');
+    Route::post('/inbox/{type}/{id}/decline', [ApprovalInboxController::class, 'decline'])->name('approvals.decline');
 
     // Schedule (Human Resource)
     Route::get('/schedules', [\App\Http\Controllers\HumanResource\ScheduleController::class, 'index'])

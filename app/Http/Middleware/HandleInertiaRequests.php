@@ -16,6 +16,7 @@ use App\Models\Borrowing;
 use App\Models\Committee;
 use App\Models\DocumentRouting;
 use App\Models\SpecialAssignment;
+use App\Services\ApprovalInboxService;
 use Carbon\Carbon;
 
 class HandleInertiaRequests extends Middleware
@@ -104,22 +105,9 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.it_requests.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasRole('DivisionChief')) {
-                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                            if ($divisionIds->isNotEmpty()) {
-                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                                return ITJobRequest::where('status', 'Pending Division Chief Approval')
-                                    ->whereIn('user_id', $userIds)->count();
-                            }
-                            return 0;
-                        }
-                        if ($user->hasRole('OCD')) {
-                            return ITJobRequest::where('status', 'Pending OCD Approval')->count();
-                        }
                         if ($user->hasAnyRole(['MIS', 'Administrator'])) {
                             return ITJobRequest::whereIn('status', ['In Progress'])->count();
                         }
-                        // Regular users: only their own in-progress requests
                         return ITJobRequest::whereIn('status', ['In Progress'])->where('user_id', $user->id)->count();
                     });
                 } catch (\Throwable $e) { return 0; }
@@ -130,18 +118,6 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.vehicles.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasRole('DivisionChief')) {
-                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                            if ($divisionIds->isNotEmpty()) {
-                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                                return VehicleRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
-                            }
-                            return 0;
-                        }
-                        if ($user->hasAnyRole(['GSU Head', 'OCD', 'Administrator'])) {
-                            return VehicleRequest::where('status', 'Pending')->count();
-                        }
-                        // Regular users: only their own pending requests
                         return VehicleRequest::where('status', 'Pending')->where('requestor_id', $user->id)->count();
                     });
                 } catch (\Throwable $e) { return 0; }
@@ -153,11 +129,10 @@ class HandleInertiaRequests extends Middleware
                     $cacheKey = 'badge.messengerial.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
                         if ($user->hasAnyRole(['Records', 'Administrator'])) {
-                            return MessengerialRequest::where('status', 'Pending')->count();
+                            return MessengerialRequest::whereNotIn('status', ['Completed', 'Declined'])->count();
                         }
-                        // Regular users: only their own requests (matched by email)
-                        return MessengerialRequest::where('status', 'Pending')
-                            ->where('email', $user->email)->count();
+                        return MessengerialRequest::where('email', $user->email)
+                            ->whereNotIn('status', ['Completed', 'Declined'])->count();
                     });
                 } catch (\Throwable $e) { return 0; }
             },
@@ -167,22 +142,6 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.facility.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasRole('DivisionChief')) {
-                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id')->toArray();
-                            if (!empty($divisionIds)) {
-                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id')->toArray();
-                                return FacilityRequest::where('status', 'Pending')
-                                    ->where(function ($q) use ($userIds, $divisionIds) {
-                                        $q->whereIn('requestor_id', $userIds)
-                                          ->orWhereHas('requester', fn ($q2) => $q2->whereIn('division_id', $divisionIds));
-                                    })->count();
-                            }
-                            return 0;
-                        }
-                        if ($user->hasAnyRole(['GSU Head', 'Administrator'])) {
-                            return FacilityRequest::where('status', 'Pending')->count();
-                        }
-                        // Regular users: only their own pending requests
                         return FacilityRequest::where('status', 'Pending')->where('requestor_id', $user->id)->count();
                     });
                 } catch (\Throwable $e) { return 0; }
@@ -193,18 +152,6 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.service.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasRole('DivisionChief')) {
-                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                            if ($divisionIds->isNotEmpty()) {
-                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                                return ServiceRequest::where('status', 'Pending')->whereIn('requestor_id', $userIds)->count();
-                            }
-                            return 0;
-                        }
-                        if ($user->hasAnyRole(['GSU Head', 'Administrator'])) {
-                            return ServiceRequest::where('status', 'Pending')->count();
-                        }
-                        // Regular users: only their own pending requests
                         return ServiceRequest::where('status', 'Pending')->where('requestor_id', $user->id)->count();
                     });
                 } catch (\Throwable $e) { return 0; }
@@ -215,24 +162,12 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.gatepass.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        $db = \Illuminate\Support\Facades\DB::table('gatepass');
-                        if ($user->hasRole('DivisionChief')) {
-                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                            if ($divisionIds->isNotEmpty()) {
-                                $badgeNumbers = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('badge_id')->filter()->toArray();
-                                if (!empty($badgeNumbers)) {
-                                    return $db->where('status', 'Pending')->whereIn('badgeNumber', $badgeNumbers)->count();
-                                }
-                            }
-                            return 0;
-                        }
-                        if ($user->hasAnyRole(['HR', 'OCD', 'Administrator'])) {
-                            return $db->where('status', 'Pending')->count();
-                        }
-                        // Regular users: only their own gatepass
                         $badgeId = \App\Models\User::where('id', $user->id)->value('badge_id');
                         if (!$badgeId) return 0;
-                        return $db->where('status', 'Pending')->where('badgeNumber', $badgeId)->count();
+                        return \Illuminate\Support\Facades\DB::table('gatepass')
+                            ->where('status', 'Pending')
+                            ->where('badgeNumber', $badgeId)
+                            ->count();
                     });
                 } catch (\Throwable $e) { return 0; }
             },
@@ -242,18 +177,6 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.work.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasRole('DivisionChief')) {
-                            $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
-                            if ($divisionIds->isNotEmpty()) {
-                                $userIds = \App\Models\User::whereIn('division_id', $divisionIds)->pluck('id');
-                                return WorkRequest::where('status', 'Pending FAD Approval')->whereIn('requester_id', $userIds)->count();
-                            }
-                            return 0;
-                        }
-                        if ($user->hasAnyRole(['GSU Head', 'Administrator'])) {
-                            return WorkRequest::where('status', 'Pending')->count();
-                        }
-                        // Regular users: only their own pending requests
                         return WorkRequest::where('status', 'Pending')->where('requester_id', $user->id)->count();
                     });
                 } catch (\Throwable $e) { return 0; }
@@ -283,6 +206,16 @@ class HandleInertiaRequests extends Middleware
                     Committee::where('head_id', $user->id)->exists()
                         || SpecialAssignment::where('coordinator_id', $user->id)->exists()
                 );
+            },
+            'approvalInboxCount' => function () use ($request) {
+                try {
+                    $user = $request->user();
+                    if (!$user) return 0;
+                    $cacheKey = 'badge.approvals_inbox.u' . $user->id;
+                    return Cache::remember($cacheKey, 60, function () use ($user) {
+                        return (new ApprovalInboxService($user))->totalPendingCount();
+                    });
+                } catch (\Throwable $e) { return 0; }
             },
             'appVersion' => function () {
                 try {
