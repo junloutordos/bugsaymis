@@ -211,7 +211,7 @@
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
                     class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
-                    :class="r.wfh_attendance_id && r[f] ? 'text-rose-600 font-medium' : (r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-red-600 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200'))))">
+                    :class="r.wfh_attendance_id && r[f] ? 'text-rose-600 font-medium' : (r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-amber-700 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200'))))">
                   {{ timeCell(r, f) }}
                 </td>
                 <!-- Scheduled times (indigo, derived from employee schedule) -->
@@ -247,10 +247,10 @@
                   </div>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
-                  <button v-if="!r.is_locked" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
+                  <button v-if="!r.is_locked && isAdmin" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
                     <PencilSquareIcon class="h-4 w-4" />
                   </button>
-                  <LockClosedIcon v-else class="h-4 w-4 text-red-300" />
+                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
                 </td>
               </tr>
             </tbody>
@@ -266,33 +266,55 @@
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
           <h3 class="text-base font-semibold text-slate-800 mb-0.5">DTR Record</h3>
           <p class="text-sm text-slate-400 mb-1">{{ toDateStr(editModal.record?.work_date) }} — {{ getDayName(editModal.record?.work_date) }}</p>
-          <p class="text-[11px] text-slate-400 mb-4">Biometric punches are read-only. Empty slots accept a <span class="text-red-500 font-medium">penned entry</span>.</p>
 
-          <div class="grid grid-cols-2 gap-3">
-            <div v-for="field in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="field">
-              <label class="block text-xs font-medium mb-1"
-                :class="editModal.record?.[field] ? 'text-slate-500' : 'text-red-500'">
-                {{ fieldLabel(field) }}
-                <span v-if="editModal.record?.[field]" class="font-normal text-slate-400">(biometric)</span>
-                <span v-else class="font-normal text-red-400">(penned)</span>
-              </label>
-              <!-- Biometric value: read-only display -->
-              <div v-if="editModal.record?.[field]"
-                class="w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm font-mono text-slate-400 select-none">
-                {{ fmtTime(editModal.record[field]) }}
+          <!-- Admin mode: all fields editable, no red styling -->
+          <template v-if="isAdmin">
+            <p class="text-[11px] text-slate-400 mb-4">Edit time entries directly. Changes are saved as official records.</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="field in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="field">
+                <label class="block text-xs font-medium text-slate-600 mb-1">{{ fieldLabel(field) }}</label>
+                <input
+                  v-model="editForm[field]"
+                  type="time"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
-              <!-- Empty slot: penned entry input -->
-              <input v-else
-                v-model="editForm['penned_' + field]"
-                type="time"
-                class="w-full border border-red-200 rounded-lg px-3 py-2 text-sm font-mono text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" />
+              <div class="col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+                <input v-model="editForm.remarks" type="text" placeholder="Reason for edit…"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
             </div>
-            <div class="col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-              <input v-model="editForm.penned_remarks" type="text" placeholder="Reason for penned entry…"
-                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          </template>
+
+          <!-- Employee mode: biometric slots read-only, empty slots accept penned entry -->
+          <template v-else>
+            <p class="text-[11px] text-slate-400 mb-4">Biometric punches are read-only. Empty slots accept a <span class="text-amber-600 font-medium">penned entry</span>.</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="field in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="field">
+                <label class="block text-xs font-medium mb-1"
+                  :class="editModal.record?.[field] ? 'text-slate-500' : 'text-amber-600'">
+                  {{ fieldLabel(field) }}
+                  <span v-if="editModal.record?.[field]" class="font-normal text-slate-400">(biometric)</span>
+                  <span v-else class="font-normal text-amber-500">(penned)</span>
+                </label>
+                <!-- Biometric value: read-only display -->
+                <div v-if="editModal.record?.[field]"
+                  class="w-full border border-slate-100 bg-slate-50 rounded-lg px-3 py-2 text-sm font-mono text-slate-400 select-none">
+                  {{ fmtTime(editModal.record[field]) }}
+                </div>
+                <!-- Empty slot: penned entry input -->
+                <input v-else
+                  v-model="editForm['penned_' + field]"
+                  type="time"
+                  class="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm font-mono text-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
+              <div class="col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+                <input v-model="editForm.penned_remarks" type="text" placeholder="Reason for penned entry…"
+                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </div>
             </div>
-          </div>
+          </template>
 
           <div class="flex gap-3 justify-end mt-5">
             <button @click="editModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
@@ -310,7 +332,7 @@
 
 <script setup>
 import { ref, computed, reactive } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
@@ -324,6 +346,11 @@ const props = defineProps({
   summary:  Object,
   month:    String,
 })
+
+const page = usePage()
+const isAdmin = computed(() =>
+  page.props.auth?.user?.roleNames?.includes('Administrator') ?? false
+)
 
 const currentMonth = ref(props.month)
 
@@ -515,6 +542,11 @@ function doRecompute() {
 
 const editModal = reactive({ open: false, record: null })
 const editForm  = useForm({
+  // Admin direct edit fields
+  time_in_am:  '', time_out_am:  '',
+  time_in_pm:  '', time_out_pm:  '',
+  remarks:     '',
+  // Employee penned entry fields
   penned_time_in_am: '', penned_time_out_am: '',
   penned_time_in_pm: '', penned_time_out_pm: '',
   penned_remarks: '',
@@ -523,18 +555,44 @@ const editForm  = useForm({
 function openEdit(record) {
   editModal.record = record
   editModal.open   = true
-  const p = (val) => (fmtTime(val) === '—' ? '' : (fmtTime(val) || ''))
-  editForm.penned_time_in_am  = p(record.penned_time_in_am)
-  editForm.penned_time_out_am = p(record.penned_time_out_am)
-  editForm.penned_time_in_pm  = p(record.penned_time_in_pm)
-  editForm.penned_time_out_pm = p(record.penned_time_out_pm)
-  editForm.penned_remarks     = record.penned_remarks ?? ''
+  const p = (val) => (fmtTime(val) || '')
+  if (isAdmin.value) {
+    // Admin: pre-fill with current biometric values (all editable)
+    editForm.time_in_am  = p(record.time_in_am)
+    editForm.time_out_am = p(record.time_out_am)
+    editForm.time_in_pm  = p(record.time_in_pm)
+    editForm.time_out_pm = p(record.time_out_pm)
+    editForm.remarks     = record.remarks ?? ''
+  } else {
+    // Employee: pre-fill penned fields only
+    editForm.penned_time_in_am  = p(record.penned_time_in_am)
+    editForm.penned_time_out_am = p(record.penned_time_out_am)
+    editForm.penned_time_in_pm  = p(record.penned_time_in_pm)
+    editForm.penned_time_out_pm = p(record.penned_time_out_pm)
+    editForm.penned_remarks     = record.penned_remarks ?? ''
+  }
 }
 
 function submitEdit() {
-  editForm.patch(route('hr.dtr.penned', editModal.record.id), {
-    onSuccess: () => { editModal.open = false },
-  })
+  if (isAdmin.value) {
+    // Admin: write directly to biometric fields via dtr.edit
+    editForm
+      .transform(data => ({
+        time_in_am:  data.time_in_am  ? data.time_in_am  + ':00' : null,
+        time_out_am: data.time_out_am ? data.time_out_am + ':00' : null,
+        time_in_pm:  data.time_in_pm  ? data.time_in_pm  + ':00' : null,
+        time_out_pm: data.time_out_pm ? data.time_out_pm + ':00' : null,
+        remarks:     data.remarks || null,
+      }))
+      .patch(route('hr.dtr.edit', editModal.record.id), {
+        onSuccess: () => { editModal.open = false },
+      })
+  } else {
+    // Employee: write to penned fields via dtr.penned
+    editForm.patch(route('hr.dtr.penned', editModal.record.id), {
+      onSuccess: () => { editModal.open = false },
+    })
+  }
 }
 </script>
 

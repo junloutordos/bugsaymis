@@ -22,21 +22,10 @@
       "Bash(python3 *)",
       "Bash(wc -l *)",
       "Bash(ipconfig getifaddr*)",
-<<<<<<< HEAD
-      "Bash(curl -s --max-time 5 -o /dev/null -w \"%{http_code}\" https://oauth2.googleapis.com/)",
-      "Read(//run/systemd/resolve/**)",
-      "Bash(docker network:*)",
-      "Bash(sudo iptables:*)",
-      "Read(//proc/sys/net/ipv4/**)",
-      "Read(//usr/local/bin/**)",
-      "Bash(wait)",
-      "Bash(chmod +x /home/bugsaymis/bugsaymis/scripts/artisan.sh /home/bugsaymis/bugsaymis/scripts/deploy.sh)"
-=======
-      "Read(//Users/junloe/**)",
+      "Read(//Users/junlou/**)",
       "Bash(docker -H unix:///var/run/docker.sock compose -f /Users/junloe/bugsaymis-docker/docker-compose.yml exec php bash -c \"chmod 666 /var/www/storage/logs/security-2026-04-14.log && ls -la /var/www/storage/logs/security-2026-04-14.log\")",
       "Read(//home/bugsaymis/**)",
       "Read(//opt/**)"
->>>>>>> staging
     ],
     "additionalDirectories": [
       "/Users/junlou/bugsaymis-docker",

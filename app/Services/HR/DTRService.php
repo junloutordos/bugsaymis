@@ -22,17 +22,20 @@ class DTRService
         $from = Carbon::parse($dateFrom);
         $to   = Carbon::parse($dateTo);
 
-        // Load all resolved biometric logs for this user in the range
+        // For overnight shifts, we need logs from the day AFTER $to as well
+        // (the time-out punch of the last overnight shift lands on $to+1)
+        $logQueryTo = $to->copy()->addDay()->endOfDay();
+
         $allLogs = BiometricLog::where('user_id', $userId)
             ->where('is_resolved', true)
             ->where('is_duplicate', false)
             ->whereBetween('log_datetime', [
                 $from->startOfDay()->format('Y-m-d H:i:s'),
-                $to->endOfDay()->format('Y-m-d H:i:s'),
+                $logQueryTo->format('Y-m-d H:i:s'),
             ])
             ->orderBy('log_datetime')
-            ->get()
-            ->groupBy(fn ($log) => Carbon::parse($log->log_datetime)->toDateString());
+            ->get();
+        // Do NOT group by date yet — we'll do shift-aware grouping per date below
 
         // Load holidays in range keyed by date
         $holidays = Holiday::where('is_active', true)
@@ -84,7 +87,7 @@ class DTRService
             [$dayType, $isWorkDay] = $this->getDayType($dateStr, $date, $schedule, $holidays);
 
             // Skip rest days entirely — weekend/off-day punches are not counted
-            $logsForDay = $allLogs->get($dateStr, collect());
+            $logsForDay = $this->getLogsForShift($allLogs, $dateStr, $schedule);
             if ($dayType === 'rest_day') {
                 continue;
             }
@@ -118,7 +121,8 @@ class DTRService
             }
 
             // Compute metrics
-            $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
+            $isOvernight      = $schedule && $schedule->isOvernightShift($dateStr);
+            $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight);
             $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
             $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
             $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
@@ -266,7 +270,8 @@ class DTRService
         $timeInPm  = $record->time_in_pm  ?? $record->penned_time_in_pm;
         $timeOutPm = $record->time_out_pm ?? $record->penned_time_out_pm;
 
-        $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm);
+        $isOvernight      = $schedule && $schedule->isOvernightShift($date);
+        $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight);
         $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $date, $schedule);
         $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $date, $schedule);
         $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
@@ -345,6 +350,96 @@ class DTRService
         return [$isWorkDay ? 'regular' : 'rest_day', $isWorkDay];
     }
 
+    /**
+     * Collect biometric logs that belong to the shift starting on $dateStr.
+     *
+     * For regular (non-overnight) shifts: all logs on $dateStr.
+     * For overnight shifts (time_out < time_in, e.g. 22:00–06:00):
+     *   - Logs from $dateStr within [time_in - 2h, midnight)
+     *   - Logs from $dateStr+1 within [midnight, time_out + 2h]
+     *
+     * The ±2h buffer absorbs early arrivals and late departures without
+     * accidentally picking up the NEXT shift's punches.
+     */
+    private function getLogsForShift(
+        \Illuminate\Support\Collection $allLogs,
+        string $dateStr,
+        ?EmployeeSchedule $schedule
+    ): \Illuminate\Support\Collection {
+        if (! $schedule || ! $schedule->isOvernightShift($dateStr)) {
+            // Regular shift: all logs on this calendar date
+            return $allLogs->filter(
+                fn ($log) => Carbon::parse($log->log_datetime)->toDateString() === $dateStr
+            )->values();
+        }
+
+        // Overnight shift: collect logs from both the start date and the next day
+        $timeIn  = $schedule->getTimeIn($dateStr);
+        $timeOut = $schedule->getTimeOut($dateStr);
+
+        $shiftStart = Carbon::parse($dateStr . ' ' . $timeIn)->subHours(2);
+        $nextDate   = Carbon::parse($dateStr)->addDay()->toDateString();
+        $shiftEnd   = Carbon::parse($nextDate . ' ' . $timeOut)->addHours(2);
+
+        return $allLogs->filter(function ($log) use ($shiftStart, $shiftEnd) {
+            $dt = Carbon::parse($log->log_datetime);
+            return $dt->gte($shiftStart) && $dt->lte($shiftEnd);
+        })->values();
+    }
+
+    /**
+     * Parse punches for an overnight shift (e.g. 22:00–06:00).
+     *
+     * Overnight shifts have no lunch break — we use a simple 2-punch model:
+     *   first punch = time_in_am (shift start)
+     *   last punch  = time_out_pm (shift end, next calendar day)
+     *
+     * Middle punches are ignored (no lunch break detection for overnight).
+     * time_out_am and time_in_pm are always null for overnight shifts.
+     */
+    private function parsePunchesOvernight(
+        \Illuminate\Support\Collection $logs,
+        string $dateStr,
+        EmployeeSchedule $schedule
+    ): array {
+        if ($logs->isEmpty()) {
+            return [null, null, null, null];
+        }
+
+        $sorted  = $logs->sortBy('log_datetime')->values();
+        $timeIn  = $schedule->getTimeIn($dateStr);
+        $timeOut = $schedule->getTimeOut($dateStr);
+
+        // Build the expected shift window with ±2h buffer
+        $nextDate    = Carbon::parse($dateStr)->addDay()->toDateString();
+        $windowStart = Carbon::parse($dateStr . ' ' . $timeIn)->subHours(2);
+        $windowEnd   = Carbon::parse($nextDate . ' ' . $timeOut)->addHours(2);
+
+        // Filter to only punches within the shift window
+        $inWindow = $sorted->filter(function ($log) use ($windowStart, $windowEnd) {
+            $dt = Carbon::parse($log->log_datetime);
+            return $dt->gte($windowStart) && $dt->lte($windowEnd);
+        })->values();
+
+        if ($inWindow->isEmpty()) {
+            return [null, null, null, null];
+        }
+
+        // First punch = time_in, last punch = time_out
+        // Store as H:i:s — the date component is intentionally dropped here
+        // because dtr_records.time_in_am/time_out_pm are TIME columns.
+        // The date context is preserved via work_date (the shift start date).
+        $timeInAm  = Carbon::parse($inWindow->first()->log_datetime)->format('H:i:s');
+        $timeOutPm = Carbon::parse($inWindow->last()->log_datetime)->format('H:i:s');
+
+        // If only one punch, treat as time-in only (employee forgot to tap out)
+        if ($inWindow->count() === 1) {
+            return [$timeInAm, null, null, null];
+        }
+
+        return [$timeInAm, null, null, $timeOutPm];
+    }
+
     private function parsePunches(
         \Illuminate\Support\Collection $logs,
         string $dateStr,
@@ -352,6 +447,11 @@ class DTRService
     ): array {
         if ($logs->isEmpty()) {
             return [null, null, null, null];
+        }
+
+        // ── Overnight shift: bypass all noon-based heuristics ────────────────────
+        if ($schedule && $schedule->isOvernightShift($dateStr)) {
+            return $this->parsePunchesOvernight($logs, $dateStr, $schedule);
         }
 
         $sorted = $logs->sortBy('log_datetime')->values();
@@ -500,6 +600,11 @@ class DTRService
      */
     private function getBreakMinutes(string $dateStr, ?EmployeeSchedule $schedule): int
     {
+        // Overnight shifts have no lunch break
+        if ($schedule && $schedule->isOvernightShift($dateStr)) {
+            return 0;
+        }
+
         if ($schedule) {
             $timeIn  = $schedule->getTimeIn($dateStr);
             $timeOut = $schedule->getTimeOut($dateStr);
@@ -543,7 +648,8 @@ class DTRService
         ?string $timeInAm,
         ?string $timeOutAm,
         ?string $timeInPm,
-        ?string $timeOutPm
+        ?string $timeOutPm,
+        bool $isOvernight = false
     ): float {
         $inAm  = $this->floorToMinute($timeInAm);
         $outAm = $this->floorToMinute($timeOutAm);
@@ -570,8 +676,15 @@ class DTRService
         // ── AM in + PM out (no AM out), with or without PM in ─────────────────
         // No AM-out means we can't split sessions — use 2-punch formula.
         if ($inAm && $outPm && ! $outAm) {
-            $total = Carbon::parse($inAm)->diffInMinutes(Carbon::parse($outPm));
-            return max(0, $total - 60) / 60;
+            $inCarbon  = Carbon::parse($inAm);
+            $outCarbon = Carbon::parse($outPm);
+            // For overnight shifts, time_out is on the next day
+            if ($isOvernight && $outCarbon->lt($inCarbon)) {
+                $outCarbon->addDay();
+            }
+            $total = $inCarbon->diffInMinutes($outCarbon);
+            // No lunch deduction for overnight shifts (no break midpoint)
+            return $isOvernight ? $total / 60 : max(0, $total - 60) / 60;
         }
 
         // ── AM session only ───────────────────────────────────────────────────
@@ -624,7 +737,8 @@ class DTRService
         // ── PM in late (returned late from lunch) ─────────────────────────────
         // No grace period: any minute past the expected return time is counted.
         // Expected PM start = break midpoint + 30 min (e.g. 12:30+30 = 13:00).
-        if ($timeInPm) {
+        // Skip for overnight shifts — they have no lunch break.
+        if ($timeInPm && (! $schedule || ! $schedule->isOvernightShift($dateStr))) {
             $lunchEnd    = Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes + 30);
             $actualInPm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeInPm));
 
@@ -656,7 +770,8 @@ class DTRService
 
         // ── AM out undertime (left before lunch started) ──────────────────────
         // Expected AM end = break midpoint − 30 min (e.g. 12:30−30 = 12:00).
-        if ($timeOutAm) {
+        // Skip for overnight shifts — they have no lunch break.
+        if ($timeOutAm && (! $schedule || ! $schedule->isOvernightShift($dateStr))) {
             $lunchStart   = Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes - 30);
             $actualOutAm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutAm));
 
@@ -670,8 +785,15 @@ class DTRService
             $scheduledTimeOut = $schedule->getTimeOut($dateStr);
             if ($scheduledTimeOut) {
                 $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
-                $actualOutPm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutPm));
-
+                // For overnight shifts, time_out is on the next calendar day
+                if ($schedule->isOvernightShift($dateStr)) {
+                    $scheduledOut->addDay();
+                }
+                $actualOutPm = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutPm));
+                // For overnight, actual out may also be next day
+                if ($schedule->isOvernightShift($dateStr) && $actualOutPm->lt(Carbon::parse($dateStr . ' 12:00:00'))) {
+                    $actualOutPm->addDay();
+                }
                 if ($actualOutPm->lt($scheduledOut)) {
                     $undertime += $actualOutPm->diffInMinutes($scheduledOut);
                 }
@@ -693,7 +815,13 @@ class DTRService
         }
 
         $scheduledOut = Carbon::parse($dateStr . ' ' . $scheduledTimeOut);
-        $actualOut    = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutPm));
+        if ($schedule->isOvernightShift($dateStr)) {
+            $scheduledOut->addDay();
+        }
+        $actualOut = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutPm));
+        if ($schedule->isOvernightShift($dateStr) && $actualOut->lt(Carbon::parse($dateStr . ' 12:00:00'))) {
+            $actualOut->addDay();
+        }
 
         if ($actualOut->lte($scheduledOut)) {
             return 0;

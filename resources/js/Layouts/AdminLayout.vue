@@ -49,6 +49,7 @@ import {
   IdentificationIcon,
   UserPlusIcon,
   UserCircleIcon,
+  InboxIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -207,6 +208,8 @@ const getBadge = (child) => {
       return toBadgeInt(page.props.borrowingsOverdueCount);
     case 'document-tracking.index':
       return toBadgeInt(page.props.documentTrackingNotificationCount);
+    case 'approvals.inbox':
+      return toBadgeInt(page.props.approvalInboxCount);
     default:
       return 0;
   }
@@ -359,6 +362,13 @@ const menuItems = [
     roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "OCD"],
   },
   {
+    label: "Approvals",
+    routeName: "approvals.inbox",
+    href: route("approvals.inbox"),
+    icon: InboxIcon,
+    roles: ["Administrator", "DivisionChief", "OCD", "GSU Head", "FAD Chief", "HR"],
+  },
+  {
     label: "Data Management",
     icon: UsersIcon,
     roles: ["Administrator"],
@@ -508,23 +518,6 @@ const menuItems = [
         permissions: ["it.requests.view"],
       },
       {
-        label: "For Approval ITJR",
-        routeName: "job-requests.for-approval",
-        href: route("job-requests.for-approval"),
-        icon: BookOpenIcon,
-        roles: ["DivisionChief"],
-        permissions: ["it.requests.manage"],
-      },
-      {
-        label: "OCD Approval ITJR",
-        routeName: "job-requests.ocd-approval",
-        href: route("job-requests.ocd-approval"),
-        icon: BookOpenIcon,
-        roles: ["OCD"],
-        permissions: ["it.requests.manage"],
-      },
-      
-      {
         label: "Equipment Inventory",
         routeName: "ict-equipments.index",
         href: route("ict-equipments.index"),
@@ -603,14 +596,6 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief"],
         permissions: ["hr.gatepass.view"],
-      },
-      {
-        label: "OCD Approval - Gate Pass",
-        routeName: "gatepass.ocd-approval",
-        href: route('gatepass.ocd-approval'),
-        icon: ClipboardDocumentListIcon,
-        roles: ["OCD"],
-        permissions: ["hr.gatepass.approve"],
       },
       {
         label: "Leave Applications",
@@ -1078,13 +1063,6 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent","GSU Head"],
       },
-      {
-        label: "For Approval — Messengerial",
-        routeName: "messengerial.for-approval",
-        href: route("messengerial.for-approval"),
-        icon: ClipboardDocumentListIcon,
-        roles: ["DivisionChief"],
-      },
     ],
   },
   {
@@ -1131,63 +1109,6 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
         permissions: ["facilities.view"],
-      },
-      {
-        label: "DC Approval — Vehicle",
-        routeName: "vehicle-requests.dc-approval",
-        href: route("vehicle-requests.dc-approval"),
-        icon: BookOpenIcon,
-        permissions: ["vehicles.dc-approve"],
-      },
-      {
-        label: "DC Approval — Facility",
-        routeName: "facility-requests.dc-approval",
-        href: route("facility-requests.dc-approval"),
-        icon: BookOpenIcon,
-        permissions: ["facilities.dc-approve"],
-      },
-      {
-        label: "DC Approval — Work Request",
-        routeName: "work-requests.dc-approval",
-        href: route("work-requests.dc-approval"),
-        icon: BookOpenIcon,
-        permissions: ["facilities.dc-approve"],
-      },
-      {
-        label: "DC Approval — Services",
-        routeName: "service-requests.dc-approval",
-        href: route("service-requests.dc-approval"),
-        icon: BookOpenIcon,
-        permissions: ["facilities.dc-approve"],
-      },
-      {
-        label: "FAD Approval — Facility",
-        routeName: "facility-requests.fad-approval",
-        href: route("facility-requests.fad-approval"),
-        icon: BookOpenIcon,
-        permissions: ["facilities.fad-approve"],
-      },
-      {
-        label: "FAD Approval — Work Request",
-        routeName: "work-requests.fad-approval",
-        href: route("work-requests.fad-approval"),
-        icon: BookOpenIcon,
-        permissions: ["facilities.fad-approve"],
-      },
-      {
-        label: "FAD Approval — Services",
-        routeName: "service-requests.fad-approval",
-        href: route("service-requests.fad-approval"),
-        icon: BookOpenIcon,
-        permissions: ["facilities.fad-approve"],
-      },
-      {
-        label: "OCD Approval - Vehicle",
-        routeName: "vehicle-requests.ocd-approval",
-        href: route("vehicle-requests.ocd-approval"),
-        icon: BookOpenIcon,
-        roles: ["OCD"],
-        permissions: ["vehicles.manage"],
       },
     ],
     // Only show this section for GSU Head if that's their only role
