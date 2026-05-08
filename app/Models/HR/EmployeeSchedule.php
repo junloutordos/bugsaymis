@@ -102,4 +102,25 @@ class EmployeeSchedule extends Model
         return $this->daily_schedules[$dow]['time_out']
             ?? ($this->time_out ? (string) $this->time_out : null);
     }
+
+    /**
+     * Returns true if the schedule for the given date crosses midnight
+     * (i.e. time_out < time_in, e.g. 22:00 → 06:00).
+     */
+    public function isOvernightShift(string $date): bool
+    {
+        $timeIn  = $this->getTimeIn($date);
+        $timeOut = $this->getTimeOut($date);
+        if (! $timeIn || ! $timeOut) {
+            return false;
+        }
+        return $this->timeStrToMinutes(substr($timeIn, 0, 5))
+             > $this->timeStrToMinutes(substr($timeOut, 0, 5));
+    }
+
+    private function timeStrToMinutes(string $time): int
+    {
+        [$h, $m] = explode(':', $time);
+        return (int) $h * 60 + (int) $m;
+    }
 }
