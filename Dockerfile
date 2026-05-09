@@ -46,7 +46,9 @@ RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
     && echo "log_errors = On" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.cookie_httponly = 1" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.cookie_secure = 1" >> /usr/local/etc/php/conf.d/security.ini \
-    && echo "session.use_strict_mode = 1" >> /usr/local/etc/php/conf.d/security.ini
+    && echo "session.use_strict_mode = 1" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "upload_max_filesize = 20M" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "post_max_size = 25M" >> /usr/local/etc/php/conf.d/security.ini
 
 RUN echo "* * * * * root . /etc/environment; cd /var/www && php artisan schedule:run >> /var/log/cron.log 2>&1" > /etc/cron.d/laravel-scheduler \
     && chmod 0644 /etc/cron.d/laravel-scheduler
