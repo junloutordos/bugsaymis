@@ -50,6 +50,7 @@ import {
   UserPlusIcon,
   UserCircleIcon,
   InboxIcon,
+  QuestionMarkCircleIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -2033,6 +2034,18 @@ filteredMenu.value.forEach((item) => {
 
         <!-- Right: chat + profile -->
         <div class="flex items-center gap-2">
+
+        <!-- Need Help? -->
+        <a
+          :href="route('docs.index')"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors border border-slate-200 hover:border-indigo-200"
+          aria-label="Help Documentation"
+        >
+          <QuestionMarkCircleIcon class="h-4 w-4" />
+          Need Help?
+        </a>
 
         <!-- Chat Icon -->
         <a

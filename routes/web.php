@@ -259,6 +259,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['verified'])
         ->name('dashboard');
 
+    // ── Help Documentation ────────────────────────────────────────────────────
+    Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
+
     // ── Unified Approvals Inbox ───────────────────────────────────────────────
     Route::get('/inbox', [ApprovalInboxController::class, 'index'])->name('approvals.inbox');
     Route::post('/inbox/{type}/{id}/approve', [ApprovalInboxController::class, 'approve'])->name('approvals.approve');

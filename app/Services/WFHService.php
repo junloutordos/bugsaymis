@@ -197,7 +197,7 @@ class WFHService
             $dateFolder = $attendance->getRawOriginal('date') ?? $today;
             $s3Key      = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
 
-            Storage::disk('public')->put($s3Key, file_get_contents($photo->getRealPath()));
+            Storage::disk('s3')->put($s3Key, file_get_contents($photo->getRealPath()));
 
             // Encode the S3 key so it can be passed as a single URL-safe route segment
             $encodedKey = $this->encodeS3Key($s3Key);
@@ -218,7 +218,7 @@ class WFHService
         if ($accomplishment->google_drive_file_id) {
             $decoded = $this->decodeS3Key($accomplishment->google_drive_file_id);
             if ($decoded) {
-                Storage::disk('public')->delete($decoded);
+                Storage::disk('s3')->delete($decoded);
             } else {
                 // Legacy: old Google Drive file ID
                 try { $this->drive->delete($accomplishment->google_drive_file_id); } catch (\Throwable) {}
@@ -253,7 +253,7 @@ class WFHService
 
         $imageData = base64_decode($base64);
 
-        Storage::disk('public')->put($s3Key, $imageData);
+        Storage::disk('s3')->put($s3Key, $imageData);
 
         $encodedKey = $this->encodeS3Key($s3Key);
 
