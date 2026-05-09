@@ -236,11 +236,11 @@ class WFHAttendanceController extends Controller
             if ($pad) $padded .= str_repeat('=', 4 - $pad);
             $s3Key   = base64_decode($padded, true);
 
-            if (! $s3Key || ! \Illuminate\Support\Facades\Storage::disk('public')->exists($s3Key)) {
+            if (! $s3Key || ! \Illuminate\Support\Facades\Storage::disk('s3')->exists($s3Key)) {
                 abort(404);
             }
 
-            $contents = \Illuminate\Support\Facades\Storage::disk('public')->get($s3Key);
+            $contents = \Illuminate\Support\Facades\Storage::disk('s3')->get($s3Key);
             if (! $contents) abort(404);
 
             $ext  = strtolower(pathinfo($s3Key, PATHINFO_EXTENSION));
