@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\WFHAccomplishment;
 use App\Models\WFHAttendance;
 use Carbon\Carbon;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -151,10 +150,9 @@ class WFHService
      * Store a WFH accomplishment for the authenticated user.
      * The user must have timed in today.
      *
-     * @param  array             $data  Validated data from StoreAccomplishmentRequest
-     * @param  UploadedFile|null $photo File upload (when proof_type = 'photo')
+     * @param  array $data  Validated data from StoreAccomplishmentRequest
      */
-    public function storeAccomplishment(array $data, ?UploadedFile $photo): WFHAccomplishment
+    public function storeAccomplishment(array $data): WFHAccomplishment
     {
         $user  = Auth::user();
         $today = Carbon::today()->toDateString();
@@ -193,31 +191,16 @@ class WFHService
             'proof_link'        => $data['proof_link'] ?? null,
         ];
 
-        if (($data['proof_type'] ?? null) === 'photo' && $photo) {
+        if (($data['proof_type'] ?? null) === 'photo' && ! empty($data['photo_base64'])) {
             $dateFolder = $attendance->getRawOriginal('date') ?? $today;
-            // Sanitize filename to avoid S3 key issues with special characters/spaces
-            $safeName   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $photo->getClientOriginalName());
+            $safeName   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $data['photo_name'] ?? 'photo.jpg');
             $s3Key      = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$safeName}";
 
-            $content = file_get_contents($photo->getRealPath());
+            $uploaded = $this->uploadBase64Photo($data['photo_base64'], $s3Key);
 
-            if ($content === false) {
-                logger()->error('WFH accomplishment: failed to read uploaded file', ['s3_key' => $s3Key]);
-            } else {
-                $uploaded = Storage::disk('s3')->put($s3Key, $content);
-                if (! $uploaded) {
-                    logger()->warning('WFH accomplishment: S3 upload returned false', ['s3_key' => $s3Key]);
-                } else {
-                    logger()->info('WFH accomplishment: photo uploaded to S3', ['s3_key' => $s3Key]);
-                }
-            }
-
-            // Encode the S3 key so it can be passed as a single URL-safe route segment
-            $encodedKey = $this->encodeS3Key($s3Key);
-
-            $payload['google_drive_file_id'] = $encodedKey;
-            $payload['google_drive_link']    = url("/hr/wfh/photo/{$encodedKey}");
-            $payload['file_name']            = $photo->getClientOriginalName();
+            $payload['google_drive_file_id'] = $uploaded['file_id'];
+            $payload['google_drive_link']    = $uploaded['link'];
+            $payload['file_name']            = $data['photo_name'] ?? 'photo.jpg';
         }
 
         return WFHAccomplishment::create($payload);

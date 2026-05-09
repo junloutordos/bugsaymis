@@ -31,8 +31,7 @@ class WFHAccomplishmentController extends Controller
     public function store(StoreAccomplishmentRequest $request)
     {
         $accomplishment = $this->wfhService->storeAccomplishment(
-            data:  $request->validated(),
-            photo: $request->file('photo'),
+            data: $request->validated(),
         );
 
         return response()->json([
