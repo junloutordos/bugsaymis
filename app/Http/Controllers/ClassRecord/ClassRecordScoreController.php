@@ -54,6 +54,7 @@ class ClassRecordScoreController extends Controller
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
 
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
         $quarter = $this->resolveQuarter($classRecord, $q);
         abort_if($quarter->is_locked, 403, 'Quarter is locked. Unlock it before entering scores.');
 

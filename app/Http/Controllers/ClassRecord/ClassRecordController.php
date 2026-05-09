@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ClassRecord;
 use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\FacultyLoading\SchoolYear;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,18 +42,28 @@ class ClassRecordController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $currentSY = SchoolYear::where('is_current', true)->first();
+
+        if (! $currentSY) {
+            return response()->json([
+                'message' => 'No active school year is set. Please contact the administrator.',
+                'errors'  => ['school_year' => ['No active school year is configured.']],
+            ], 422);
+        }
+
         $validated = $request->validate([
             'subject_id'         => 'nullable|integer|exists:subjects,id',
             'section_id'         => 'nullable|integer',
             'grading_option_id'  => 'required|integer|exists:grading_options,id',
-            'school_year'        => 'required|string|max:20',
             'subject_name'       => 'required|string|max:255',
             'year_level_section' => 'required|string|max:255',
         ]);
 
         $record = ClassRecord::create(array_merge($validated, [
-            'teacher_id' => Auth::id(),
-            'status'     => 'draft',
+            'teacher_id'     => Auth::id(),
+            'school_year_id' => $currentSY->id,
+            'school_year'    => $currentSY->name,
+            'status'         => 'draft',
         ]));
 
         return response()->json([
@@ -134,6 +145,7 @@ class ClassRecordController extends Controller
     public function submit(ClassRecord $classRecord): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
         abort_if($classRecord->status !== 'draft', 422, 'Only draft records can be submitted.');
 
         $classRecord->update([

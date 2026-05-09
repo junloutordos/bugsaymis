@@ -9,6 +9,7 @@ use App\Models\ClassRecord\ClassRecordStudent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClassRecordStudentController extends Controller
 {
@@ -46,6 +47,7 @@ class ClassRecordStudentController extends Controller
     public function upsert(Request $request, ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         abort_if($quarter->is_locked, 403, 'Quarter is locked. Unlock it before editing the roster.');
@@ -83,6 +85,68 @@ class ClassRecordStudentController extends Controller
         return response()->json([
             'message' => count($upserted) . ' student(s) saved.',
             'data'    => $upserted,
+        ]);
+    }
+
+    // ── GET /class-records/{cr}/quarters/{q}/students/template ───────────────
+
+    public function template(ClassRecord $classRecord, int $q): StreamedResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+
+        $filename = 'students_template_Q' . $q . '.csv';
+
+        return response()->streamDownload(function () {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Sequence No.', 'Family Name', 'Given Name', 'Middle Initial', 'Sex (M/F)']);
+            // Sample rows so the teacher knows the expected format
+            fputcsv($out, [1, 'DELA CRUZ', 'JUAN', 'S', 'M']);
+            fputcsv($out, [2, 'SANTOS', 'MARIA', 'L', 'F']);
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    // ── POST /class-records/{cr}/quarters/{q}/students/import ────────────────
+
+    public function import(Request $request, ClassRecord $classRecord, int $q): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
+
+        $quarter = $this->resolveQuarter($classRecord, $q);
+        abort_if($quarter->is_locked, 403, 'Quarter is locked. Unlock it before importing students.');
+
+        $validated = $request->validate([
+            'rows'                   => 'required|array|min:1|max:500',
+            'rows.*.sequence_number' => 'required|integer|min:1',
+            'rows.*.family_name'     => 'required|string|max:255',
+            'rows.*.given_name'      => 'required|string|max:255',
+            'rows.*.middle_initial'  => 'nullable|string|max:5',
+            'rows.*.sex'             => 'required|in:M,F',
+        ]);
+
+        $upserted = 0;
+        foreach ($validated['rows'] as $item) {
+            ClassRecordStudent::updateOrCreate(
+                [
+                    'class_record_quarter_id' => $quarter->id,
+                    'sequence_number'         => $item['sequence_number'],
+                ],
+                [
+                    'family_name'    => strtoupper(trim($item['family_name'])),
+                    'given_name'     => strtoupper(trim($item['given_name'])),
+                    'middle_initial' => isset($item['middle_initial']) ? strtoupper(trim($item['middle_initial'])) : null,
+                    'sex'            => strtoupper(trim($item['sex'])),
+                    'is_active'      => true,
+                ]
+            );
+            $upserted++;
+        }
+
+        return response()->json([
+            'message' => "{$upserted} student(s) imported successfully.",
         ]);
     }
 }
