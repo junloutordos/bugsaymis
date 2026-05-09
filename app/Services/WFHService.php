@@ -195,9 +195,22 @@ class WFHService
 
         if (($data['proof_type'] ?? null) === 'photo' && $photo) {
             $dateFolder = $attendance->getRawOriginal('date') ?? $today;
-            $s3Key      = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$photo->getClientOriginalName()}";
+            // Sanitize filename to avoid S3 key issues with special characters/spaces
+            $safeName   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $photo->getClientOriginalName());
+            $s3Key      = "WFH/{$user->id}/{$dateFolder}/accomplishment_{$safeName}";
 
-            Storage::disk('s3')->put($s3Key, file_get_contents($photo->getRealPath()));
+            $content = file_get_contents($photo->getRealPath());
+
+            if ($content === false) {
+                logger()->error('WFH accomplishment: failed to read uploaded file', ['s3_key' => $s3Key]);
+            } else {
+                $uploaded = Storage::disk('s3')->put($s3Key, $content);
+                if (! $uploaded) {
+                    logger()->warning('WFH accomplishment: S3 upload returned false', ['s3_key' => $s3Key]);
+                } else {
+                    logger()->info('WFH accomplishment: photo uploaded to S3', ['s3_key' => $s3Key]);
+                }
+            }
 
             // Encode the S3 key so it can be passed as a single URL-safe route segment
             $encodedKey = $this->encodeS3Key($s3Key);
