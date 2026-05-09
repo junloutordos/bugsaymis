@@ -2,7 +2,7 @@ FROM php:8.4-fpm
 
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev \
-    cron default-mysql-client supervisor nginx \
+    cron default-mysql-client supervisor nginx awscli \
     && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
@@ -48,7 +48,11 @@ RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
     && echo "session.cookie_secure = 1" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "session.use_strict_mode = 1" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "upload_max_filesize = 20M" >> /usr/local/etc/php/conf.d/security.ini \
-    && echo "post_max_size = 25M" >> /usr/local/etc/php/conf.d/security.ini
+    && echo "post_max_size = 25M" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "max_execution_time = 120" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "allow_url_fopen = Off" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "disable_functions = system,shell_exec,passthru,proc_open,popen,pcntl_exec" >> /usr/local/etc/php/conf.d/security.ini \
+    && echo "open_basedir = /var/www:/tmp:/usr/local/etc/php:/dev/stdin:/dev/stdout:/dev/stderr" >> /usr/local/etc/php/conf.d/security.ini
 
 RUN echo "* * * * * root . /etc/environment; cd /var/www && php artisan schedule:run >> /var/log/cron.log 2>&1" > /etc/cron.d/laravel-scheduler \
     && chmod 0644 /etc/cron.d/laravel-scheduler

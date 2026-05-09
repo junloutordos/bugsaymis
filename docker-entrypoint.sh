@@ -1,28 +1,40 @@
 #!/bin/bash
+set -e
 
-# Export container environment variables so cron and supervisor can use them
-printenv | grep -v "no_proxy" > /etc/environment
+# ── Secrets Manager: fetch Google Drive credentials ───────────────────────────
+# Pull credentials JSON from Secrets Manager and write to disk.
+# The env var GOOGLE_DRIVE_CREDENTIALS_JSON is no longer used — secret lives only in SM.
+GOOGLE_JSON=$(aws secretsmanager get-secret-value \
+  --secret-id crcmis/google-drive-credentials \
+  --region ap-southeast-1 \
+  --query SecretString \
+  --output text 2>/dev/null || echo "")
 
-# Write Google service-account credentials to disk if injected via SSM
-if [ -n "$GOOGLE_DRIVE_CREDENTIALS_JSON" ]; then
-    echo "$GOOGLE_DRIVE_CREDENTIALS_JSON" > /var/www/google-credentials.json
+if [ -n "$GOOGLE_JSON" ]; then
+    echo "$GOOGLE_JSON" > /var/www/google-credentials.json
     chmod 600 /var/www/google-credentials.json
+    chown www-data:www-data /var/www/google-credentials.json
 fi
 
-# Clear application cache so stale values (e.g. app version) don't persist across deploys
+# ── Export env vars for cron (restricted to non-secret vars) ──────────────────
+# Exclude secrets — DB_PASSWORD, APP_KEY, SOKETI secret are injected by ECS
+# at runtime and available to processes; cron reads /etc/environment on start.
+printenv | grep -vE "^(no_proxy|GOOGLE_DRIVE_CREDENTIALS_JSON|LS_COLORS|GPG_KEYS|PHP_(ASC|SHA|CFLAGS|CPPFLAGS|LDFLAGS|URL|INI|VERSION)|PHPIZE_DEPS)" \
+  > /etc/environment
+chmod 600 /etc/environment
+
+# ── Ensure writable directories are owned by www-data ─────────────────────────
+chown -R www-data:www-data \
+    /var/www/storage \
+    /var/www/bootstrap/cache
+
+# ── Laravel bootstrap ─────────────────────────────────────────────────────────
 php /var/www/artisan cache:clear
-
-# Run pending migrations (safe — skips already-run migrations)
 php /var/www/artisan migrate --force
-
-# Sync the app version from composer.json into the app_versions table
 php /var/www/artisan app:version-sync
-
-
-# Cache config/routes/views for production performance
 php /var/www/artisan config:cache
 php /var/www/artisan route:cache
 php /var/www/artisan view:cache
 
-# Start all services via supervisord (nginx + php-fpm + cron + queue worker)
+# ── Start services via supervisord ─────────────────────────────────────────────
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/bugsaymis.conf
