@@ -38,8 +38,20 @@ RUN mkdir -p \
         /var/www/storage/framework/sessions \
         /var/www/storage/framework/views \
         /var/www/bootstrap/cache \
+        /var/lib/nginx/body \
+        /var/lib/nginx/proxy \
+        /var/lib/nginx/fastcgi \
+        /var/lib/nginx/uwsgi \
+        /var/lib/nginx/scgi \
+        /var/log/nginx \
+        /var/run/nginx \
     && chmod -R 775 /var/www/storage /var/www/bootstrap/cache \
-    && chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+    && chown -R www-data:www-data \
+        /var/www/storage \
+        /var/www/bootstrap/cache \
+        /var/lib/nginx \
+        /var/log/nginx \
+        /var/run/nginx
 
 RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
     && echo "display_errors = Off" >> /usr/local/etc/php/conf.d/security.ini \
