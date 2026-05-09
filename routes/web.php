@@ -953,7 +953,7 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
     // Image proxy — streams Drive photos server-side (no client Google auth needed)
     Route::get('/photo/{fileId}', [\App\Http\Controllers\HumanResource\WFHAttendanceController::class, 'photo'])
         ->name('photo')
-        ->where('fileId', '[a-zA-Z0-9_-]+');
+        ->where('fileId', '[a-zA-Z0-9_.=-]+');  // dot needed for s3.<base64url> format
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
