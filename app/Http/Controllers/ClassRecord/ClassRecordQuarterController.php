@@ -55,6 +55,7 @@ class ClassRecordQuarterController extends Controller
     public function lock(ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         abort_if($quarter->is_locked, 422, 'Quarter is already locked.');
@@ -69,6 +70,7 @@ class ClassRecordQuarterController extends Controller
     public function unlock(ClassRecord $classRecord, int $q): JsonResponse
     {
         abort_unless($this->isAdmin(), 403, 'Only administrators can unlock a quarter.');
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year and is read-only.');
 
         $quarter = $this->resolveQuarter($classRecord, $q);
         $quarter->update(['is_locked' => false, 'locked_at' => null]);

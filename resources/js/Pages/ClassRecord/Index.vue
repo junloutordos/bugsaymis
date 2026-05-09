@@ -8,9 +8,10 @@ import Swal from 'sweetalert2'
 import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  classRecords:   Array,
-  gradingOptions: Array,
-  isAdmin:        { type: Boolean, default: false },
+  classRecords:      Array,
+  gradingOptions:    Array,
+  isAdmin:           { type: Boolean, default: false },
+  currentSchoolYear: { type: String, default: null },
 })
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -50,12 +51,11 @@ const createErrors = ref({})
 const form = ref({
   subject_name:       '',
   year_level_section: '',
-  school_year:        '',
   grading_option_id:  '',
 })
 
 function openCreate() {
-  form.value = { subject_name: '', year_level_section: '', school_year: '', grading_option_id: '' }
+  form.value = { subject_name: '', year_level_section: '', grading_option_id: '' }
   createErrors.value = {}
   showModal.value = true
 }
@@ -289,11 +289,14 @@ const selectedOption = computed(() =>
             </div>
 
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">School Year <span class="text-red-500">*</span></label>
-              <input v-model="form.school_year" type="text" placeholder="e.g. 2025-2026" required
-                class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                :class="createErrors.school_year ? 'border-red-400' : 'border-slate-200'" />
-              <p v-if="createErrors.school_year" class="text-xs text-red-500 mt-1">{{ createErrors.school_year[0] }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
+              <div v-if="currentSchoolYear"
+                class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 font-medium">
+                {{ currentSchoolYear }}
+              </div>
+              <div v-else class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                No active school year is configured. Please contact the administrator.
+              </div>
             </div>
 
             <div>
@@ -311,7 +314,7 @@ const selectedOption = computed(() =>
             <div class="flex gap-3 justify-end pt-2">
               <button type="button" @click="showModal = false"
                 class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-              <button type="submit" :disabled="creating"
+              <button type="submit" :disabled="creating || !currentSchoolYear"
                 class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
                 {{ creating ? 'Creating…' : 'Create Class Record' }}
               </button>

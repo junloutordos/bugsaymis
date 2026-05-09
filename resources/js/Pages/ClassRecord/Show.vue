@@ -20,6 +20,8 @@ const props = defineProps({
   classRecord:   Object,
   isAdmin:       { type: Boolean, default: false },
   stanineLookup: { type: Array, default: () => [] },
+  isCurrentSY:   { type: Boolean, default: true },
+  currentSYName: { type: String, default: null },
 })
 
 const page = usePage()
@@ -41,7 +43,8 @@ const currentQuarterData = computed(() =>
   props.classRecord.quarters?.find(q => q.quarter === activeQuarter.value) ?? null
 )
 
-const isLocked = computed(() => currentQuarterData.value?.is_locked ?? false)
+const isLocked   = computed(() => currentQuarterData.value?.is_locked ?? false)
+const isReadOnly = computed(() => !props.isCurrentSY)  // past school year → fully read-only
 
 // ── Assessment setup ──────────────────────────────────────────────────────────
 // Build editable assessment rows from the grading option categories
@@ -209,6 +212,83 @@ async function checkRecord() {
     Swal.fire('Error', err.response?.data?.message ?? 'Failed to mark as checked.', 'error')
   }
 }
+
+// ── CSV Import ────────────────────────────────────────────────────────────────
+const csvInput       = ref(null)
+const importRows     = ref([])   // parsed rows for preview
+const importErrors   = ref([])
+const showImport     = ref(false)
+const importingCsv   = ref(false)
+
+function triggerCsvPicker() {
+  csvInput.value?.click()
+}
+
+function onCsvSelected(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  importErrors.value = []
+
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    const text  = ev.target.result
+    const lines = text.split(/\r?\n/).filter(l => l.trim())
+    const rows  = []
+    const errs  = []
+
+    lines.forEach((line, idx) => {
+      if (idx === 0) return  // skip header
+      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const [seqRaw, familyName, givenName, middleInitial, sex] = cols
+
+      const seq = parseInt(seqRaw)
+      const rowNum = idx + 1
+
+      if (isNaN(seq) || seq < 1)        errs.push(`Row ${rowNum}: Invalid sequence number "${seqRaw}".`)
+      if (!familyName)                   errs.push(`Row ${rowNum}: Family name is required.`)
+      if (!givenName)                    errs.push(`Row ${rowNum}: Given name is required.`)
+      if (!['M','F'].includes(sex?.toUpperCase())) errs.push(`Row ${rowNum}: Sex must be M or F (got "${sex}").`)
+
+      rows.push({
+        sequence_number: seq,
+        family_name:     familyName ?? '',
+        given_name:      givenName ?? '',
+        middle_initial:  middleInitial ?? '',
+        sex:             sex?.toUpperCase() ?? '',
+        _valid: !errs.some(e => e.startsWith(`Row ${rowNum}:`)),
+      })
+    })
+
+    importRows.value   = rows
+    importErrors.value = errs
+    showImport.value   = true
+  }
+  reader.readAsText(file)
+  e.target.value = ''  // reset so same file can be re-selected
+}
+
+async function confirmImport() {
+  if (importErrors.value.length) {
+    Swal.fire('Fix Errors', 'Please correct the highlighted rows before importing.', 'warning')
+    return
+  }
+
+  importingCsv.value = true
+  try {
+    const { data } = await axios.post(
+      route('class-records.students.import', { classRecord: props.classRecord.id, q: activeQuarter.value }),
+      { rows: importRows.value }
+    )
+    showImport.value = false
+    importRows.value = []
+    await Swal.fire({ icon: 'success', title: data.message, timer: 1400, showConfirmButton: false })
+    router.reload({ only: ['classRecord'] })
+  } catch (err) {
+    Swal.fire('Import Failed', err.response?.data?.message ?? 'Could not import students.', 'error')
+  } finally {
+    importingCsv.value = false
+  }
+}
 </script>
 
 <template>
@@ -244,7 +324,7 @@ async function checkRecord() {
             class="inline-flex items-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
             <ArrowDownTrayIcon class="h-4 w-4" /> Export All
           </a>
-          <button v-if="classRecord.status === 'draft'"
+          <button v-if="classRecord.status === 'draft' && isCurrentSY"
             @click="submitRecord"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             Submit for Review
@@ -255,6 +335,16 @@ async function checkRecord() {
             <CheckCircleIcon class="h-4 w-4" /> Mark as Checked
           </button>
         </div>
+      </div>
+
+      <!-- Past SY read-only banner -->
+      <div v-if="isReadOnly"
+        class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <LockClosedIcon class="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+        <span>
+          This class record is from <strong>SY {{ classRecord.school_year }}</strong> and is
+          <strong>read-only</strong>. The school year is no longer active.
+        </span>
       </div>
 
       <!-- Quarter tabs -->
@@ -307,19 +397,24 @@ async function checkRecord() {
               Configure assessment titles, dates, and max scores for each category.
             </p>
             <div class="flex items-center gap-2">
-              <button v-if="!isLocked"
-                @click="lockQuarter"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 text-xs font-medium">
-                <LockClosedIcon class="h-3.5 w-3.5" /> Lock Quarter
-              </button>
-              <button v-if="isLocked && isAdmin"
-                @click="unlockQuarter"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium">
-                <LockOpenIcon class="h-3.5 w-3.5" /> Unlock
-              </button>
-              <span v-if="isLocked && !isAdmin"
-                class="inline-flex items-center gap-1 text-xs text-amber-600">
-                <LockClosedIcon class="h-3.5 w-3.5" /> Locked
+              <template v-if="!isReadOnly">
+                <button v-if="!isLocked"
+                  @click="lockQuarter"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 text-xs font-medium">
+                  <LockClosedIcon class="h-3.5 w-3.5" /> Lock Quarter
+                </button>
+                <button v-if="isLocked && isAdmin"
+                  @click="unlockQuarter"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium">
+                  <LockOpenIcon class="h-3.5 w-3.5" /> Unlock
+                </button>
+                <span v-if="isLocked && !isAdmin"
+                  class="inline-flex items-center gap-1 text-xs text-amber-600">
+                  <LockClosedIcon class="h-3.5 w-3.5" /> Locked
+                </span>
+              </template>
+              <span v-else class="inline-flex items-center gap-1 text-xs text-amber-600">
+                <LockClosedIcon class="h-3.5 w-3.5" /> Past School Year
               </span>
             </div>
           </div>
@@ -349,7 +444,7 @@ async function checkRecord() {
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500">Title / Description</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-36">Activity Date</th>
                       <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 w-28">Max Score</th>
-                      <th v-if="!isLocked" class="px-2 py-2 w-8"></th>
+                      <th v-if="!isLocked && !isReadOnly" class="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-100">
@@ -360,22 +455,22 @@ async function checkRecord() {
                       </td>
                       <td class="px-4 py-2">
                         <input v-model="row.title" type="text"
-                          :disabled="isLocked"
+                          :disabled="isLocked || isReadOnly"
                           :placeholder="`${cat.code}${row.assessment_number} title…`"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td class="px-4 py-2">
                         <input v-model="row.activity_date" type="date"
-                          :disabled="isLocked"
+                          :disabled="isLocked || isReadOnly"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
                       <td class="px-4 py-2">
                         <input v-model.number="row.max_score" type="number" min="0.01" step="0.5"
-                          :disabled="isLocked"
+                          :disabled="isLocked || isReadOnly"
                           placeholder="e.g. 30"
                           class="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-slate-50 disabled:text-slate-400" />
                       </td>
-                      <td v-if="!isLocked" class="px-2 py-2 text-center">
+                      <td v-if="!isLocked && !isReadOnly" class="px-2 py-2 text-center">
                         <button @click="removeAssessmentRow(cat.id, rIdx)"
                           class="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
                           title="Remove this assessment row">
@@ -387,7 +482,7 @@ async function checkRecord() {
                 </table>
               </div>
               <!-- Add row button per category -->
-              <div v-if="!isLocked" class="mt-1.5">
+              <div v-if="!isLocked && !isReadOnly" class="mt-1.5">
                 <button @click="addAssessmentRow(cat.id)"
                   class="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
                   <PlusIcon class="h-3.5 w-3.5" /> Add {{ cat.code }} Row
@@ -396,9 +491,84 @@ async function checkRecord() {
             </div>
           </div>
 
-          <!-- Save button -->
+          <!-- CSV import controls (hidden file input) -->
+          <input ref="csvInput" type="file" accept=".csv" class="hidden" @change="onCsvSelected" />
+
+          <!-- Student roster CSV import section -->
+          <div v-if="!isReadOnly && !isLocked" class="mt-6 border-t border-slate-100 pt-5">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Student Roster (Bulk Import)</p>
+                <p class="text-xs text-slate-400 mt-0.5">Download the template, fill it in, then upload to add students in bulk.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <a :href="route('class-records.students.template', { classRecord: classRecord.id, q: activeQuarter })"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium transition-colors">
+                  <ArrowDownTrayIcon class="h-3.5 w-3.5" /> Download Template
+                </a>
+                <button @click="triggerCsvPicker"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-medium transition-colors">
+                  <PlusIcon class="h-3.5 w-3.5" /> Upload CSV
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CSV Preview Modal -->
+          <div v-if="showImport" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+              <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h3 class="text-base font-semibold text-slate-800">Preview Import — {{ importRows.length }} Student(s)</h3>
+                <button @click="showImport = false; importRows = []; importErrors = []"
+                  class="p-1.5 rounded hover:bg-slate-100 text-slate-400">
+                  <XMarkIcon class="h-4 w-4" />
+                </button>
+              </div>
+
+              <div v-if="importErrors.length" class="mx-5 mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700 space-y-1">
+                <p v-for="e in importErrors" :key="e">{{ e }}</p>
+              </div>
+
+              <div class="overflow-auto flex-1 p-5">
+                <table class="min-w-full text-xs border-separate border-spacing-0">
+                  <thead>
+                    <tr class="bg-slate-50">
+                      <th class="px-3 py-2 text-left font-semibold text-slate-500 border border-slate-200 rounded-tl">#</th>
+                      <th class="px-3 py-2 text-left font-semibold text-slate-500 border-y border-r border-slate-200">Seq</th>
+                      <th class="px-3 py-2 text-left font-semibold text-slate-500 border-y border-r border-slate-200">Family Name</th>
+                      <th class="px-3 py-2 text-left font-semibold text-slate-500 border-y border-r border-slate-200">Given Name</th>
+                      <th class="px-3 py-2 text-left font-semibold text-slate-500 border-y border-r border-slate-200">MI</th>
+                      <th class="px-3 py-2 text-left font-semibold text-slate-500 border-y border-r border-slate-200 rounded-tr">Sex</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, idx) in importRows" :key="idx"
+                      :class="row._valid ? 'bg-white' : 'bg-red-50'">
+                      <td class="px-3 py-1.5 border-b border-x border-slate-200 text-slate-400">{{ idx + 1 }}</td>
+                      <td class="px-3 py-1.5 border-b border-r border-slate-200">{{ row.sequence_number }}</td>
+                      <td class="px-3 py-1.5 border-b border-r border-slate-200 font-medium">{{ row.family_name }}</td>
+                      <td class="px-3 py-1.5 border-b border-r border-slate-200">{{ row.given_name }}</td>
+                      <td class="px-3 py-1.5 border-b border-r border-slate-200">{{ row.middle_initial }}</td>
+                      <td class="px-3 py-1.5 border-b border-r border-slate-200">{{ row.sex }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="flex justify-end gap-3 px-5 py-4 border-t border-slate-100">
+                <button @click="showImport = false; importRows = []; importErrors = []"
+                  class="px-4 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button @click="confirmImport" :disabled="importingCsv || importErrors.length > 0"
+                  class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
+                  {{ importingCsv ? 'Importing…' : `Import ${importRows.length} Student(s)` }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Save setup button -->
           <div class="mt-5 flex justify-end">
-            <button v-if="!isLocked"
+            <button v-if="!isLocked && !isReadOnly"
               @click="saveSetup"
               :disabled="savingSetup"
               class="inline-flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
@@ -416,7 +586,7 @@ async function checkRecord() {
             :grading-option="classRecord.grading_option"
             :stanine-lookup="stanineLookup"
             :previous-grades="{}"
-            :is-locked="isLocked"
+            :is-locked="isLocked || isReadOnly"
             @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>

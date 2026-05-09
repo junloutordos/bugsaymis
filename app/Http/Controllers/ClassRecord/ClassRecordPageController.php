@@ -7,6 +7,7 @@ use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\ClassRecord\StanineLookup;
+use App\Models\FacultyLoading\SchoolYear;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -36,11 +37,14 @@ class ClassRecordPageController extends Controller
 
         $records = $query->get();
 
+        $currentSY = SchoolYear::where('is_current', true)->first();
+
         return Inertia::render('ClassRecord/Index', [
-            'classRecords'   => $records,
-            'gradingOptions' => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
-            'isAdmin'        => $this->isAdmin(),
-            'filters'        => $request->only(['school_year']),
+            'classRecords'      => $records,
+            'gradingOptions'    => GradingOption::with('categories')->where('is_active', true)->orderBy('id')->get(),
+            'isAdmin'           => $this->isAdmin(),
+            'filters'           => $request->only(['school_year']),
+            'currentSchoolYear' => $currentSY ? $currentSY->name : null,
         ]);
     }
 
@@ -58,10 +62,15 @@ class ClassRecordPageController extends Controller
             'quarters.students',
         ]);
 
+        $currentSY   = SchoolYear::where('is_current', true)->first();
+        $isCurrentSY = $currentSY && $classRecord->school_year_id === $currentSY->id;
+
         return Inertia::render('ClassRecord/Show', [
             'classRecord'   => $classRecord,
             'isAdmin'       => $this->isAdmin(),
             'stanineLookup' => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
+            'isCurrentSY'   => $isCurrentSY,
+            'currentSYName' => $currentSY?->name,
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models\ClassRecord;
 
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
 use App\Models\Subject;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class ClassRecord extends Model
         'section_id',
         'teacher_id',
         'grading_option_id',
+        'school_year_id',
         'school_year',
         'subject_name',
         'year_level_section',
@@ -32,6 +34,16 @@ class ClassRecord extends Model
         'submitted_at' => 'datetime',
         'checked_at'   => 'datetime',
     ];
+
+    public function schoolYear(): BelongsTo
+    {
+        return $this->belongsTo(SchoolYear::class, 'school_year_id');
+    }
+
+    public function isCurrentSchoolYear(): bool
+    {
+        return $this->schoolYear?->is_current === true;
+    }
 
     public function subject(): BelongsTo
     {
