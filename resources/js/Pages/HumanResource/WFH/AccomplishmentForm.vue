@@ -172,6 +172,16 @@ function clearPhoto() {
   if (photoInputEl.value) photoInputEl.value.value = ''
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload  = e => resolve(e.target.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 // ── Submit ────────────────────────────────────────────────────────────────────
 async function submit() {
   errors.value = {}
@@ -192,18 +202,20 @@ async function submit() {
   loading.value = true
 
   try {
-    const fd = new FormData()
-    fd.append('description', form.description.trim())
-    if (props.attendanceId) fd.append('attendance_id', props.attendanceId)
-    if (form.time_from) fd.append('time_from', form.time_from)
-    if (form.time_to)   fd.append('time_to',   form.time_to)
-    if (form.proof_type) fd.append('proof_type', form.proof_type)
-    if (form.proof_type === 'link')  fd.append('proof_link', form.proof_link.trim())
-    if (form.proof_type === 'photo') fd.append('photo', photoFile.value)
+    const payload = {
+      description:  form.description.trim(),
+      proof_type:   form.proof_type || null,
+    }
+    if (props.attendanceId) payload.attendance_id = props.attendanceId
+    if (form.time_from)     payload.time_from     = form.time_from
+    if (form.time_to)       payload.time_to       = form.time_to
+    if (form.proof_type === 'link')  payload.proof_link  = form.proof_link.trim()
+    if (form.proof_type === 'photo') {
+      payload.photo_base64 = await toBase64(photoFile.value)
+      payload.photo_name   = photoFile.value.name
+    }
 
-    const { data } = await axios.post(route('hr.wfh.accomplishments.store'), fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const { data } = await axios.post(route('hr.wfh.accomplishments.store'), payload)
 
     emit('saved', data.accomplishment)
     resetForm()

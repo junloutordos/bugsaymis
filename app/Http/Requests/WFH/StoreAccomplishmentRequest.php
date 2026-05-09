@@ -33,14 +33,13 @@ class StoreAccomplishmentRequest extends FormRequest
                 'max:2048',
             ],
 
-            // Required when proof_type = 'photo'
-            'photo'       => [
+            // Required when proof_type = 'photo' — sent as base64 data URI
+            'photo_base64' => [
                 Rule::requiredIf(fn () => $this->proof_type === 'photo'),
                 'nullable',
-                'file',
-                'mimes:jpeg,jpg,png,webp',
-                'max:10240', // 10 MB
+                'string',
             ],
+            'photo_name'   => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -61,9 +60,7 @@ class StoreAccomplishmentRequest extends FormRequest
             'description.required' => 'Accomplishment details are required.',
             'proof_link.required' => 'A URL is required when proof type is set to link.',
             'proof_link.url'      => 'Proof link must be a valid URL.',
-            'photo.required'      => 'A photo file is required when proof type is set to photo.',
-            'photo.mimes'         => 'Proof photo must be a JPEG, PNG, or WebP image.',
-            'photo.max'           => 'Proof photo must not exceed 10 MB.',
+            'photo_base64.required' => 'A photo is required when proof type is set to photo.',
         ];
     }
 }
