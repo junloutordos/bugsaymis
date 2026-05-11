@@ -379,35 +379,49 @@ def build_device_list(config):
 def post_to_crcmis(devices, config):
     api_token    = config['crcmis']['api_token']
     app_hostname = 'mis.crc.pshs.edu.ph'
-    alb_url      = 'https://crcmis-alb-481818448.ap-southeast-1.elb.amazonaws.com/api/network/scan-report'
+    alb_hostname = 'crcmis-alb-481818448.ap-southeast-1.elb.amazonaws.com'
+    # Fallback IPs in case campus DNS cannot resolve the ALB hostname
+    alb_fallback_ips = config.get('alb_fallback_ips', ['54.254.59.56', '13.214.50.217'])
+    path             = '/api/network/scan-report'
 
     payload = {'agent_version': '1.1', 'devices': devices}
 
-    try:
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-        resp = requests.post(
-            alb_url, json=payload,
-            headers={
-                'Authorization': f'Bearer {api_token}',
-                'Accept':        'application/json',
-                'Content-Type':  'application/json',
-                'Host':          app_hostname,
-            },
-            verify=False, timeout=60,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        log.info(f'CRCMIS sync OK — {data.get("devices_synced")} synced, '
-                 f'{data.get("devices_online")} online, {data.get("duration_ms")}ms')
-        return True
-    except requests.HTTPError:
-        log.error(f'CRCMIS API error {resp.status_code}: {resp.text[:300]}')
-        return False
-    except Exception as e:
-        log.error(f'Failed to POST to CRCMIS: {e}')
-        return False
+    headers = {
+        'Authorization': f'Bearer {api_token}',
+        'Accept':        'application/json',
+        'Content-Type':  'application/json',
+        'Host':          app_hostname,
+    }
+
+    # Build list of URLs to try: DNS hostname first, then fallback IPs
+    urls = [f'https://{alb_hostname}{path}']
+    for ip in alb_fallback_ips:
+        urls.append(f'https://{ip}{path}')
+
+    for url in urls:
+        try:
+            resp = requests.post(url, json=payload, headers=headers,
+                                 verify=False, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            log.info(f'CRCMIS sync OK — {data.get("devices_synced")} synced, '
+                     f'{data.get("devices_online")} online, {data.get("duration_ms")}ms')
+            return True
+        except requests.HTTPError:
+            log.error(f'CRCMIS API error {resp.status_code}: {resp.text[:300]}')
+            return False
+        except requests.ConnectionError as e:
+            log.warning(f'Connection failed ({url}): {e} — trying next...')
+            continue
+        except Exception as e:
+            log.error(f'Unexpected error posting to {url}: {e}')
+            return False
+
+    log.error('All CRCMIS endpoints failed.')
+    return False
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
