@@ -1,0 +1,20 @@
+{
+  "snmp": {
+    "host":      "192.168.1.1",
+    "community": "public",
+    "port":      161
+  },
+
+  "crcmis": {
+    "api_url":   "https://mis.crc.pshs.edu.ph",
+    "api_token": "PASTE_YOUR_SCANNER_TOKEN_HERE"
+  },
+
+  "resolve_hostnames": true,
+
+  "subnets": [
+    "192.168.1.0/24",
+    "192.168.10.0/24",
+    "192.168.20.0/24"
+  ]
+}

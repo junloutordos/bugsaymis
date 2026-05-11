@@ -53,4 +53,14 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
 
+    'ruijie_cloud' => [
+        'base_url'   => env('RUIJIE_CLOUD_BASE_URL', ''),
+        'api_key'    => env('RUIJIE_CLOUD_API_KEY', ''),
+        'api_secret' => env('RUIJIE_CLOUD_API_SECRET', ''),
+    ],
+
+    'network_scanner' => [
+        'token' => env('NETWORK_SCANNER_TOKEN', ''),
+    ],
+
 ];
