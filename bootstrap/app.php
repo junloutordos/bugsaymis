@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // so it keeps working after the browser session expires (kiosk runs all day).
         $middleware->validateCsrfTokens(except: [
             'student-attendance/scan',
+            'api/network/scan-report',
         ]);
 
         $middleware->web(append: [

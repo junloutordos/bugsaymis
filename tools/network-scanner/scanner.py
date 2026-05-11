@@ -25,11 +25,14 @@ from pysnmp.hlapi import (
 )
 
 # ── Logging ───────────────────────────────────────────────────────────────────
+_log_path = '/var/log/crcmis-scanner.log' if os.access('/var/log', os.W_OK) else \
+            str(Path(__file__).parent / 'scanner.log')
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler('/var/log/crcmis-scanner.log'),
+        logging.FileHandler(_log_path),
         logging.StreamHandler(),
     ]
 )
@@ -65,9 +68,22 @@ def get_vendor(mac: str) -> str:
 # ── Normalize MAC ─────────────────────────────────────────────────────────────
 def normalize_mac(raw) -> str:
     """Convert any MAC format to aa:bb:cc:dd:ee:ff"""
-    if isinstance(raw, bytes):
+    # pysnmp returns OctetString objects — convert to bytes first
+    try:
+        raw_bytes = bytes(raw)
+        if len(raw_bytes) == 6:
+            return ':'.join(f'{b:02x}' for b in raw_bytes)
+    except Exception:
+        pass
+
+    if isinstance(raw, bytes) and len(raw) == 6:
         return ':'.join(f'{b:02x}' for b in raw)
-    cleaned = str(raw).lower().replace(':', '').replace('-', '').replace('.', '')
+
+    # Try hex string fallback (e.g. "0x8005886f6f73" or "80:05:88:6f:6f:73")
+    cleaned = str(raw).lower()
+    cleaned = cleaned.replace('0x', '').replace(':', '').replace('-', '').replace('.', '').replace(' ', '')
+    # Remove non-hex characters
+    cleaned = ''.join(c for c in cleaned if c in '0123456789abcdef')
     if len(cleaned) != 12:
         return ''
     return ':'.join(cleaned[i:i+2] for i in range(0, 12, 2))
@@ -248,8 +264,12 @@ def build_device_list(config):
 
 # ── POST to CRCMIS ─────────────────────────────────────────────────────────────
 def post_to_crcmis(devices, config):
-    api_url   = config['crcmis']['api_url'].rstrip('/') + '/api/network/scan-report'
-    api_token = config['crcmis']['api_token']
+    api_token    = config['crcmis']['api_token']
+    app_hostname = 'mis.crc.pshs.edu.ph'
+
+    # Bypass Cloudflare by hitting the ALB directly.
+    # The ALB is internet-facing and forwards to ECS without going through Cloudflare.
+    alb_url  = 'https://crcmis-alb-481818448.ap-southeast-1.elb.amazonaws.com/api/network/scan-report'
 
     payload = {
         'agent_version': '1.0',
@@ -257,10 +277,19 @@ def post_to_crcmis(devices, config):
     }
 
     try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         resp = requests.post(
-            api_url,
+            alb_url,
             json=payload,
-            headers={'Authorization': f'Bearer {api_token}', 'Accept': 'application/json'},
+            headers={
+                'Authorization': f'Bearer {api_token}',
+                'Accept':        'application/json',
+                'Content-Type':  'application/json',
+                'Host':          app_hostname,
+            },
+            verify=False,   # ALB cert is issued for the app domain, not the ALB DNS name
             timeout=30,
         )
         resp.raise_for_status()
@@ -269,7 +298,7 @@ def post_to_crcmis(devices, config):
                  f'{data.get("devices_online")} online, '
                  f'{data.get("duration_ms")}ms server-side')
         return True
-    except requests.HTTPError as e:
+    except requests.HTTPError:
         log.error(f'CRCMIS API error {resp.status_code}: {resp.text[:200]}')
         return False
     except Exception as e:
