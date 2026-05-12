@@ -226,9 +226,9 @@ class ApprovalInboxService
                 ->map(fn($r) => $this->normaliseFacilityRequest($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'facility_requests', 'Facility Requests', $frOCD);
 
-            $mrOCD = MessengerialRequest::where('status', 'Approved')->latest()->get()
-                ->map(fn($r) => $this->normaliseMessengerialRequest($r))->values()->all();
-            $this->mergeOrAddTab($tabs, 'messengerial_requests', 'Messengerial Requests', $mrOCD);
+            // Messengerial: OCD acts as Division Chief for OCD-division requestors only.
+            // Those requests are already covered by the DC block (division_chief_id = $user->id).
+            // No separate OCD messengerial queue here.
 
             $gpOCD = DB::table('gatepass')
                 ->leftJoin('users', DB::raw('CAST(users.badge_id AS CHAR)'), '=', DB::raw('CAST(gatepass.badgeNumber AS CHAR)'))
