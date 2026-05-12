@@ -463,6 +463,37 @@ const sections = [
     ],
   },
   {
+    id: 'esignature',
+    title: 'Electronic Signature',
+    icon: '✍️',
+    articles: [
+      {
+        q: 'Will my e-signature only be used for requests I personally submit or approve?',
+        a: 'Yes. Your electronic signature is rendered on printed documents only for the specific role you played in that transaction. For example, if you submitted a Vehicle Request, your signature appears in the "Requested by" field of that request\'s printed slip. If you are a Division Chief, your signature appears in the "Approved by" field only on requests you approved. The system links your signature to a document only when your user account is directly associated with that record as a requestor, approver, or signatory — never for records you have no involvement in.',
+      },
+      {
+        q: 'Where is my e-signature stored and who can access it?',
+        a: 'Your signature image is stored as a file in the server\'s secure storage directory (storage/signatures/). The file path is saved in your user profile. Only authenticated users can access their own profile data. Administrators can view user records for management purposes but cannot download or export signature files in bulk. The storage directory is not publicly browsable — files are served only through the application when generating official printed documents.',
+      },
+      {
+        q: 'What safeguards prevent unauthorized use of my signature?',
+        a: 'The system enforces the following safeguards: (1) Your signature is only embedded in a printed document when your user ID is directly linked to that record as a participant. (2) No API endpoint or export feature exposes raw signature files to other users. (3) The application uses server-side authorization checks before rendering any signature on a document. (4) All document generation is logged with timestamps and the identity of the user who triggered it. (5) Access to the server storage directory is restricted at the infrastructure level.',
+      },
+      {
+        q: 'What is the retention policy for my e-signature?',
+        a: 'When you upload a new signature, the system automatically deletes your previous signature file and replaces it with the new one. Your signature remains on file as long as your account is active in the system. If your account is deactivated, the signature file is retained for audit trail purposes — historical printed documents that already bear your signature remain valid records. You may request deletion of your signature by contacting your system administrator, subject to applicable records retention requirements under Philippine law.',
+      },
+      {
+        q: 'Can I remove or update my e-signature?',
+        a: 'Yes. Go to your Profile (click your name/avatar in the top-right corner) and navigate to the Electronic Signature section. You can upload a new signature image (PNG format, max 1200×600 px) at any time. Uploading a new signature automatically removes the old one. If you want your signature removed entirely without replacement, contact your system administrator.',
+      },
+      {
+        q: 'On which documents does my signature appear?',
+        a: 'Your signature currently appears on the following printed documents where you are a named participant: IT Job Request PDF (as requestor, Division Chief, assigned MIS personnel, or OCD); Vehicle Request print slip (as requestor, Division Chief, or OCD); Facility Request print slip (as requestor, Division Chief, or FAD Chief); Messengerial Request print slip (as requestor); and Library Statistics Report (for Librarian and Clerk roles). Your signature is never placed on a document for a request you did not participate in.',
+      },
+    ],
+  },
+  {
     id: 'admin',
     title: 'Administration',
     icon: '⚙️',
