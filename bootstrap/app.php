@@ -24,7 +24,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // so it keeps working after the browser session expires (kiosk runs all day).
         $middleware->validateCsrfTokens(except: [
             'student-attendance/scan',
-            'api/network/scan-report',
         ]);
 
         $middleware->web(append: [
@@ -34,10 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Register custom middleware
         $middleware->alias([
-            'role'            => \App\Http\Middleware\RoleMiddleware::class,
-            'permission'      => \App\Http\Middleware\CheckPermission::class,
-            'pshs.email'      => \App\Http\Middleware\EnsurePshsEmail::class,
-            'scanner.auth'    => \App\Http\Middleware\NetworkScannerAuth::class,
+            'role'       => \App\Http\Middleware\RoleMiddleware::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'pshs.email' => \App\Http\Middleware\EnsurePshsEmail::class,
         ]);
     })
 

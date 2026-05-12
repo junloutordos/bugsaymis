@@ -9,17 +9,15 @@ class Kernel extends ConsoleKernel
 {
     protected $commands = [
         \App\Console\Commands\BackupDatabase::class,
-        \App\Console\Commands\SyncRuijieCloud::class,
     ];
 
     protected function schedule(Schedule $schedule)
     {
-        // Database backups
+        // Run daily at 12:00 NN
         $schedule->command('db:backup')->dailyAt('12:00');
-        $schedule->command('db:backup')->dailyAt('17:00');
 
-        // Ruijie Cloud wireless client sync — every 10 minutes
-        $schedule->command('network:sync-ruijie-cloud')->everyTenMinutes();
+        // Run daily at 5:00 PM
+        $schedule->command('db:backup')->dailyAt('17:00');
     }
 
     protected function commands()

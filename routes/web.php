@@ -1784,29 +1784,6 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/export',              [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportAll'])->name('class-records.export');
 });
 
-// ─── Network Inventory ────────────────────────────────────────────────────────
-
-// Scanner agent API — authenticated by Bearer token (no session/CSRF needed)
-Route::post('/api/network/scan-report',
-    [\App\Http\Controllers\NetworkInventory\NetworkScanReportController::class, 'store'])
-    ->middleware('scanner.auth')
-    ->name('network.scan-report');
-
-// Web pages & API — authenticated users
-Route::middleware(['auth', 'permission:network.inventory.view'])
-    ->prefix('network')
-    ->name('network.')
-    ->group(function () {
-        // Inertia pages
-        Route::get('/inventory',            [\App\Http\Controllers\NetworkInventory\NetworkInventoryController::class, 'index'])->name('inventory.index');
-        Route::get('/inventory/{networkDevice}', [\App\Http\Controllers\NetworkInventory\NetworkInventoryController::class, 'show'])->name('inventory.show');
-
-        // JSON API
-        Route::get('/devices',              [\App\Http\Controllers\NetworkInventory\NetworkInventoryController::class, 'devices'])->name('devices');
-        Route::patch('/inventory/{networkDevice}', [\App\Http\Controllers\NetworkInventory\NetworkInventoryController::class, 'update'])->name('inventory.update');
-        Route::get('/scan-logs',            [\App\Http\Controllers\NetworkInventory\NetworkInventoryController::class, 'scanLogs'])->name('scan-logs');
-    });
-
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
