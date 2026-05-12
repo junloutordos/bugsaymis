@@ -107,6 +107,12 @@
                     >
                       <PrinterIcon class="w-4 h-4" />
                     </a>
+                    <button
+                      v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id"
+                      @click.prevent="openCsmModal(wr)"
+                      class="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors"
+                      title="Confirm & Rate"
+                    >Confirm &amp; Rate</button>
                   </div>
                 </td>
               </tr>
@@ -304,8 +310,6 @@ const hasPendingConfirmation = computed(() => props.hasPendingCsm)
 
 function onCsmSubmitted() {
   showCsmModal.value = false
-  // Reload only the work requests data so the block lifts immediately
-  router.reload({ only: ['workRequests', 'hasPendingCsm'] })
 }
 
 async function handleNewRequest() {
@@ -322,7 +326,7 @@ async function handleNewRequest() {
 }
 
 // client-side search + pagination for work requests
-const workRequestsList = ref(props.workRequests || [])
+const workRequestsList = computed(() => props.workRequests || [])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
