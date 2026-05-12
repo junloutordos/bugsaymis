@@ -262,6 +262,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
+    // ── Data Privacy Policy ───────────────────────────────────────────────────
+    Route::get('/privacy', fn () => inertia('Privacy/Index'))->name('privacy.index');
+
     // ── Unified Approvals Inbox ───────────────────────────────────────────────
     Route::get('/inbox', [ApprovalInboxController::class, 'index'])->name('approvals.inbox');
     Route::post('/inbox/{type}/{id}/approve', [ApprovalInboxController::class, 'approve'])->name('approvals.approve');

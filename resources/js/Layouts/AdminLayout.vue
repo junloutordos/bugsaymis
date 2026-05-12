@@ -2035,6 +2035,18 @@ filteredMenu.value.forEach((item) => {
         <!-- Right: chat + profile -->
         <div class="flex items-center gap-2">
 
+        <!-- Privacy Policy -->
+        <a
+          :href="route('privacy.index')"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors border border-slate-200 hover:border-emerald-200"
+          aria-label="Data Privacy Policy"
+        >
+          <ShieldCheckIcon class="h-4 w-4" />
+          Privacy Policy
+        </a>
+
         <!-- Need Help? -->
         <a
           :href="route('docs.index')"
