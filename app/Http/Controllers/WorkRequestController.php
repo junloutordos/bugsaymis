@@ -49,13 +49,19 @@ class WorkRequestController extends Controller
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
+        // Server-side check: does this user have any Completed (unrated) work requests?
+        $hasPendingCsm = WorkRequest::where('requester_id', $user->id)
+            ->where('status', 'Completed')
+            ->exists();
+
         return Inertia::render('GeneralServices/WorkRequest', [
-            'divisions' => $divisions,
-            'offices' => $offices,
-            'users' => $users,
+            'divisions'    => $divisions,
+            'offices'      => $offices,
+            'users'        => $users,
             'skilledUsers' => $skilledUsers,
             'workRequests' => $workRequests,
             'isDivisionChief' => $isDivisionChief,
+            'hasPendingCsm'   => $hasPendingCsm,
         ]);
     }
 
