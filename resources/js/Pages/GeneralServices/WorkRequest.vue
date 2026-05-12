@@ -144,8 +144,7 @@
               <button v-if="hasRole('Administrator')" @click.prevent="destroy(wr)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Delete</button>
               <button v-if="((wr.status === 'FAD Approved' && (hasRole('GSU Head') || hasRole('Administrator'))) || (wr.status === 'Division Approved' && hasRole('GSU Head')))" @click.prevent="openCompleteModal(wr)" class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Mark Completed</button>
               <a v-if="(wr.status === 'Completed') && (hasAnyRole('GSU Head','Administrator'))" :href="`/work-requests/${wr.id}/print`" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Print</a>
-              <button v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" @click.prevent="openCsmModal(wr)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
-            </div>
+              <button v-if="wr.status === 'Completed' && wr.requester_id === page.props.auth.user.id" @click.prevent="openCsmModal(wr)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>            </div>
           </div>
           <div v-if="filteredWorkRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No work requests found.</div>
         </div>
@@ -274,13 +273,13 @@
       service-key="others"
       service-other-label="Work / Maintenance Request"
       @close="showCsmModal = false"
-      @submitted="showCsmModal = false"
+      @submitted="onCsmSubmitted"
     />
   </AdminLayout>
 </template>
 
 <script setup>
-import { Head, usePage, useForm } from '@inertiajs/vue3'
+import { Head, usePage, useForm, router } from '@inertiajs/vue3'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, XMarkIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -293,17 +292,21 @@ const props = defineProps({
   users: Array,
   skilledUsers: Array,
   workRequests: Array,
+  hasPendingCsm: { type: Boolean, default: false },
 })
 
 const showCsmModal = ref(false)
 const requestToCsm = ref(null)
 function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
 
-const hasPendingConfirmation = computed(() => {
-  const uid = page.props.auth?.user?.id
-  if (!uid) return false
-  return workRequestsList.value.some(r => r.status === 'Completed' && r.requester_id === uid)
-})
+// Use server-side prop — accurate regardless of pagination or filters
+const hasPendingConfirmation = computed(() => props.hasPendingCsm)
+
+function onCsmSubmitted() {
+  showCsmModal.value = false
+  // Reload only the work requests data so the block lifts immediately
+  router.reload({ only: ['workRequests', 'hasPendingCsm'] })
+}
 
 async function handleNewRequest() {
   if (hasPendingConfirmation.value) {
