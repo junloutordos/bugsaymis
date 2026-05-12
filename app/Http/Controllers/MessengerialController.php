@@ -31,8 +31,13 @@ class MessengerialController extends Controller
             ->latest()
             ->get();
 
+        $hasPendingCsm = MessengerialRequest::where('user_id', $user->id)
+            ->where('status', 'Completed')
+            ->exists();
+
         return Inertia::render('Messengerial/Index', [
-            'requests' => $requests,
+            'requests'      => $requests,
+            'hasPendingCsm' => $hasPendingCsm,
         ]);
     }
 
@@ -55,9 +60,18 @@ class MessengerialController extends Controller
 
         $user = $request->user();
         if ($user) {
+            $hasPendingCsm = MessengerialRequest::where('user_id', $user->id)
+                ->where('status', 'Completed')
+                ->exists();
+
+            if ($hasPendingCsm) {
+                return back()->withErrors(['purpose' => 'Please rate your completed messengerial request(s) before submitting a new one.']);
+            }
+
+            $data['user_id']   = $user->id;
             $data['requestor'] = $user->name;
-            $data['email'] = $user->email;
-            $data['unit'] = $user->division->division_name ?? $user->office ?? null;
+            $data['email']     = $user->email;
+            $data['unit']      = $user->division->division_name ?? $user->office ?? null;
         }
 
         $data['status'] = 'Pending Division Chief Approval';

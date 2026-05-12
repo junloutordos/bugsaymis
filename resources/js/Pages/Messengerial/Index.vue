@@ -1,17 +1,21 @@
 <script setup>
-import { Head, usePage, useForm } from "@inertiajs/vue3";
+import { Head, usePage, useForm, router } from "@inertiajs/vue3";
 import { ref, computed, watch } from "vue";
 import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import Swal from 'sweetalert2'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { storageUrl } from "@/Composables/useStorage.js"
+import CsmForm from '@/Components/CsmForm.vue'
 
-const props = defineProps({ requests: Array });
+const props = defineProps({
+  requests: Array,
+  hasPendingCsm: { type: Boolean, default: false },
+});
 const page = usePage();
 
 // client-side search & pagination
-const requestsList = ref(props.requests || [])
+const requestsList = computed(() => props.requests || [])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
@@ -43,9 +47,27 @@ const userRole = page.props.auth?.user?.role?.name ?? null;
 const userEmail = page.props.auth?.user?.email ?? null;
 
 const canModify = (r) => {
-  // Only Administrators can edit or delete requests.
   return userRole === 'Administrator';
 };
+
+// CSM gate
+async function handleNewRequest() {
+  if (props.hasPendingCsm) {
+    await Swal.fire({
+      icon: 'warning',
+      title: 'Action Required',
+      text: 'You have a Messengerial Request that has been completed and is pending your confirmation. Please rate the service first before submitting a new request.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+  openModal()
+}
+
+const showCsmModal = ref(false)
+const requestToCsm = ref(null)
+function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+function onCsmSubmitted() { showCsmModal.value = false }
 
 const showModal = ref(false);
 const showUploadModal = ref(false);
@@ -142,7 +164,7 @@ const submitProof = () => {
           <h1 class="text-xl font-semibold text-slate-800">Messengerial Requests</h1>
           <p class="text-sm text-slate-500 mt-0.5">Track and manage document delivery requests</p>
         </div>
-        <button @click.prevent="openModal()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+        <button @click.prevent="handleNewRequest()" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
           + New Request
         </button>
       </div>
@@ -214,6 +236,12 @@ const submitProof = () => {
                           ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
                         )
                       )" :href="route('messengerial.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4"/></a>
+                    <button
+                      v-if="r.status === 'Completed' && r.email === userEmail"
+                      @click.prevent="openCsmModal(r)"
+                      class="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors"
+                      title="Confirm & Rate"
+                    >Confirm &amp; Rate</button>
                   </div>
                 </td>
               </tr>
@@ -252,6 +280,7 @@ const submitProof = () => {
               <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><ArrowUpTrayIcon class="w-3.5 h-3.5"/></button>
               <a v-if="r.proof_of_delivery" :href="storageUrl(r.proof_of_delivery)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><EyeIcon class="w-3.5 h-3.5"/></a>
               <a v-if="(r.status ?? '').toString().toLowerCase().includes('approved')" :href="route('messengerial.print', r.id)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PrinterIcon class="w-3.5 h-3.5"/></a>
+              <button v-if="r.status === 'Completed' && r.email === userEmail" @click.prevent="openCsmModal(r)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
             </div>
           </div>
           <div v-if="filteredRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No messengerial requests found.</div>
@@ -388,5 +417,17 @@ const submitProof = () => {
       </div>
 
     </div>
+
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="messengerial-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="Records Office"
+      service-key="others"
+      service-other-label="Messengerial / Delivery Request"
+      @close="showCsmModal = false"
+      @submitted="onCsmSubmitted"
+    />
   </AdminLayout>
 </template>
