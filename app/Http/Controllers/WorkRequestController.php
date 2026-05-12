@@ -79,7 +79,17 @@ class WorkRequestController extends Controller
             'expected_completion_date' => 'nullable|date',
         ]);
 
-        $data['requester_id'] = Auth::id();
+        $userId = Auth::id();
+
+        $hasPendingCsm = WorkRequest::where('requester_id', $userId)
+            ->where('status', 'Completed')
+            ->exists();
+
+        if ($hasPendingCsm) {
+            return back()->withErrors(['issue' => 'Please rate your completed work request(s) before submitting a new one.']);
+        }
+
+        $data['requester_id'] = $userId;
         $data['status'] = 'Pending';
 
         $wr = WorkRequest::create($data);
