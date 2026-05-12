@@ -279,7 +279,7 @@ class ApprovalInboxController extends Controller
             'facility_requests'    => ['Pending', 'Pending FAD Approval', 'Pending OCD Approval'],
             'work_requests'        => ['Pending', 'GSU Approved'],
             'service_requests'     => ['Pending', 'Approved'],
-            'messengerial_requests'=> ['Pending Division Chief Approval', 'Approved'],
+            'messengerial_requests'=> ['Pending Division Chief Approval'],
             'gate_passes'          => ['Pending', 'Division Approved'],
             'leave_applications'   => ['pending', 'hr_verified', 'forwarded'],
         ];
@@ -353,10 +353,7 @@ class ApprovalInboxController extends Controller
 
             case 'messengerial_requests':
                 $request->merge(['action' => 'approve']);
-                if ($status === 'Approved') {
-                    return app(\App\Http\Controllers\MessengerialController::class)
-                        ->ocdAction($request, $record);
-                }
+                // OCD acts as Division Chief for OCD-division requestors — always use divisionChiefAction
                 return app(\App\Http\Controllers\MessengerialController::class)
                     ->divisionChiefAction($request, $record);
 
@@ -438,10 +435,7 @@ class ApprovalInboxController extends Controller
 
             case 'messengerial_requests':
                 $request->merge(['action' => 'reject']);
-                if ($status === 'Approved') {
-                    return app(\App\Http\Controllers\MessengerialController::class)
-                        ->ocdAction($request, $record);
-                }
+                // OCD acts as Division Chief for OCD-division requestors — always use divisionChiefAction
                 return app(\App\Http\Controllers\MessengerialController::class)
                     ->divisionChiefAction($request, $record);
 
