@@ -73,13 +73,28 @@ const showModal = ref(false);
 const showUploadModal = ref(false);
 const selectedRequest = ref(null);
 const proofForm = useForm({
-  proof: null,
+  proof_base64: null,
+  proof_name: '',
   courier_service_provider: '',
   courier_cost: '',
   date_received_by_courier: '',
   date_delivered: '',
   proof_remarks: '',
 });
+const proofFile = ref(null);
+const proofPreviewName = ref('');
+
+function onProofSelected(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  proofPreviewName.value = file.name;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    proofForm.proof_base64 = ev.target.result;
+    proofForm.proof_name   = file.name;
+  };
+  reader.readAsDataURL(file);
+}
 const form = useForm({ purpose: '', destination: '', reference_no: '', delivery_methods: [], messengerial_kinds: [], consignee_name: '', consignee_contact: '', consignee_email: '' });
 
 const openModal = (req = null) => {
@@ -127,20 +142,23 @@ const destroy = (req) => {
 const openUpload = (req) => {
   selectedRequest.value = req;
   proofForm.reset();
-  // prefill courier fields if any existing values
-
+  proofPreviewName.value = '';
   proofForm.courier_service_provider = req.courier_service_provider ?? '';
-  proofForm.courier_cost = req.courier_cost ?? '';
+  proofForm.courier_cost             = req.courier_cost             ?? '';
   proofForm.date_received_by_courier = req.date_received_by_courier ?? '';
-  proofForm.date_delivered = req.date_delivered ?? '';
-  proofForm.proof_remarks = req.proof_remarks ?? '';
+  proofForm.date_delivered           = req.date_delivered           ?? '';
+  proofForm.proof_remarks            = req.proof_remarks            ?? '';
   showUploadModal.value = true;
 };
 
 const submitProof = () => {
   if (!selectedRequest.value) return;
+  if (!proofForm.proof_base64) {
+    proofForm.setError('proof_base64', 'Please select a file.');
+    return;
+  }
+  // Send as JSON — Cloudflare WAF blocks multipart/form-data file uploads
   proofForm.post(route('messengerial.upload_proof', selectedRequest.value.id), {
-    forceFormData: true,
     onSuccess: () => {
       showUploadModal.value = false;
       selectedRequest.value = null;
@@ -227,7 +245,7 @@ const submitProof = () => {
                           [r.email, r.requestor_email, r.requester_email, r.user_email].includes(userEmail) ||
                           ((r.requestor || '') && (r.requestor.toString().toLowerCase() === (page.props.auth?.user?.name ?? '').toString().toLowerCase()))
                         ))
-                      )" :href="storageUrl(r.proof_of_delivery)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Proof"><EyeIcon class="w-4 h-4"/></a>
+                      )" :href="route('messengerial.proof', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Proof"><EyeIcon class="w-4 h-4"/></a>
                     <a v-if="(
                         (r.status ?? '').toString().toLowerCase().includes('approved') && (
                           userRole === 'Administrator' ||
@@ -278,7 +296,7 @@ const submitProof = () => {
               <button v-if="canModify(r)" @click.prevent="openModal(r)" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PencilSquareIcon class="w-3.5 h-3.5"/> Edit</button>
               <button v-if="canModify(r)" @click.prevent="destroy(r)" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><TrashIcon class="w-3.5 h-3.5"/></button>
               <button v-if="(userRole === 'Administrator' || userRole === 'Records') && (r.status ?? '').toString().toLowerCase().includes('approved') && !r.proof_of_delivery" @click.prevent="openUpload(r)" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><ArrowUpTrayIcon class="w-3.5 h-3.5"/></button>
-              <a v-if="r.proof_of_delivery" :href="storageUrl(r.proof_of_delivery)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><EyeIcon class="w-3.5 h-3.5"/></a>
+              <a v-if="r.proof_of_delivery" :href="route('messengerial.proof', r.id)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><EyeIcon class="w-3.5 h-3.5"/></a>
               <a v-if="(r.status ?? '').toString().toLowerCase().includes('approved')" :href="route('messengerial.print', r.id)" target="_blank" class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"><PrinterIcon class="w-3.5 h-3.5"/></a>
               <button v-if="r.status === 'Completed' && r.email === userEmail" @click.prevent="openCsmModal(r)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
             </div>
@@ -374,12 +392,14 @@ const submitProof = () => {
               <XMarkIcon class="w-4 h-4" />
             </button>
           </div>
-          <form @submit.prevent="submitProof" class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto" enctype="multipart/form-data">
+          <form @submit.prevent="submitProof" class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto">
             <p class="text-xs text-slate-500">Request ID: {{ selectedRequest?.id }}</p>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Proof (PDF/JPG/PNG)</label>
-              <input type="file" @change="e => proofForm.proof = e.target.files[0]" class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-700 file:text-sm hover:file:bg-indigo-100" />
-              <p v-if="proofForm.errors.proof" class="text-red-600 text-xs mt-1">{{ proofForm.errors.proof }}</p>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Proof (PDF/JPG/PNG, max 5 MB)</label>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="onProofSelected"
+                class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-700 file:text-sm hover:file:bg-indigo-100" />
+              <p v-if="proofPreviewName" class="text-xs text-slate-500 mt-1">Selected: {{ proofPreviewName }}</p>
+              <p v-if="proofForm.errors.proof_base64" class="text-red-600 text-xs mt-1">{{ proofForm.errors.proof_base64 }}</p>
             </div>
             <div v-if="selectedRequest?.delivery_methods && selectedRequest.delivery_methods.includes('Courier Services')">
               <div>
