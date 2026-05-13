@@ -29,7 +29,14 @@ class MessengerialController extends Controller
 
         $requests = MessengerialRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email))
             ->latest()
-            ->get();
+            ->get()
+            ->map(function ($r) use ($canViewAll) {
+                // Flag missing files so the UI can show re-upload button
+                $r->proof_missing = $canViewAll
+                    && $r->proof_of_delivery
+                    && ! Storage::disk('s3')->exists($r->proof_of_delivery);
+                return $r;
+            });
 
         $hasPendingCsm = MessengerialRequest::where('user_id', $user->id)
             ->where('status', 'Completed')
@@ -537,8 +544,13 @@ class MessengerialController extends Controller
             abort(403);
         }
 
+        // Allow re-upload only if the file is actually missing from S3
         if ($messengerialRequest->status === 'Completed') {
-            return back()->with('error', 'Proof already uploaded.');
+            $existingPath = $messengerialRequest->proof_of_delivery;
+            if ($existingPath && Storage::disk('s3')->exists($existingPath)) {
+                return back()->with('error', 'Proof already uploaded and verified.');
+            }
+            // File is missing — allow re-upload to fix it
         }
 
         $usesCourier = is_array($messengerialRequest->delivery_methods)
@@ -615,12 +627,13 @@ class MessengerialController extends Controller
 
         $path = $messengerialRequest->proof_of_delivery;
         if (! $path) {
-            abort(404, 'No proof file attached.');
+            return redirect()->route('messengerial.index')
+                ->with('error', 'No proof file is attached to this request.');
         }
 
-        // Support both old public-ACL files and new private S3 files
         if (! Storage::disk('s3')->exists($path)) {
-            abort(404, 'Proof file not found.');
+            return redirect()->route('messengerial.index')
+                ->with('error', 'Proof file not found on the server. The file may have failed to upload — please re-upload the proof.');
         }
 
         $contents = Storage::disk('s3')->get($path);
