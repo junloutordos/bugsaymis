@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pds;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -253,8 +254,10 @@ public function exportPDS(Pds $pds)
     $this->authorizeAccess($pds);
     $pds = $this->loadFullPds($pds);
 
-    $templatePath = storage_path('app/public/templates/pds_template2025.xlsx');
-    $spreadsheet = IOFactory::load($templatePath);
+    $tempTemplate = tempnam(sys_get_temp_dir(), 'pds_tpl_');
+    file_put_contents($tempTemplate, Storage::disk('s3')->get('templates/pds_template2025.xlsx'));
+    $spreadsheet = IOFactory::load($tempTemplate);
+    @unlink($tempTemplate);
 
     /* =====================================================
      | C1 – EXISTING WORKING CODE (UNCHANGED)
@@ -741,8 +744,10 @@ public function exportPDSPdf(Pds $pds)
     $this->authorizeAccess($pds);
     $pds = $this->loadFullPds($pds);
 
-    $templatePath = storage_path('app/public/templates/pds_template2025.xlsx');
-    $spreadsheet = IOFactory::load($templatePath);
+    $tempTemplate = tempnam(sys_get_temp_dir(), 'pds_tpl_');
+    file_put_contents($tempTemplate, Storage::disk('s3')->get('templates/pds_template2025.xlsx'));
+    $spreadsheet = IOFactory::load($tempTemplate);
+    @unlink($tempTemplate);
 
     /* =====================================================
      | C1 – EXISTING WORKING CODE (UNCHANGED)
