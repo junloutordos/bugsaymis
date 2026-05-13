@@ -51,11 +51,17 @@ class VehicleRequestController extends Controller
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
+        // Server-side check: does this user have any OCD Approved (unrated) vehicle requests?
+        $hasPendingCsm = VehicleRequest::where('requestor_id', $user->id)
+            ->where('status', 'OCD Approved')
+            ->exists();
+
         return Inertia::render('VehicleRequests/Index', [
-            'requests' => $requests,
-            'vehicles' => $vehicles,
-            'divisionChiefs' => $divisionChiefs,
+            'requests'        => $requests,
+            'vehicles'        => $vehicles,
+            'divisionChiefs'  => $divisionChiefs,
             'isDivisionChief' => $isDivisionChief,
+            'hasPendingCsm'   => $hasPendingCsm,
         ]);
     }
 
