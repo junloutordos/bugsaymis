@@ -31,6 +31,7 @@ class User extends Authenticatable
         'office_id',
         'profile_picture',
         'electronic_signature',
+        'signature_pin',
         'emp_category',
         'on_study_leave',
         'salary_grade',
@@ -47,6 +48,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'signature_pin'     => 'hashed',
             'on_study_leave'    => 'boolean',
         ];
     }
@@ -94,6 +96,11 @@ class User extends Authenticatable
     public function ipcrs()
     {
         return $this->hasMany(IPCR::class, 'user_id');
+    }
+
+    public function digitalSignatures()
+    {
+        return $this->hasMany(DigitalSignature::class, 'signer_id');
     }
 
     // ─── Organizational Unit relationships ────────────────────────────────────

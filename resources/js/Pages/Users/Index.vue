@@ -128,15 +128,16 @@ const openSignaturePicker = (user) => {
 const handleUpload = (user, e) => {
   const file = e.target.files?.[0]
   if (!file) return
-  const fd = new FormData()
-  fd.append('electronic_signature', file)
-  submitUpload(
-    (o) => router.post(`/users/${user.id}/upload-signature`, fd, { ...o, preserveState: false }),
-    {
-      onSuccess: () => window.location.reload(),
-      onError: (errors) => alert(Object.values(errors).flat().join(', ') || 'Failed to upload signature'),
+  const reader = new FileReader()
+  reader.onload = async (ev) => {
+    try {
+      await axios.post(`/users/${user.id}/upload-signature`, { signature_base64: ev.target.result })
+      window.location.reload()
+    } catch (err) {
+      alert(err.response?.data?.message ?? 'Failed to upload signature')
     }
-  )
+  }
+  reader.readAsDataURL(file)
 }
 
 // ── Salary Grade modal ─────────────────────────────────────────────────────────

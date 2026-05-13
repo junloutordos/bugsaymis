@@ -61,17 +61,19 @@ const onFileChange = (e) => {
 
 const submitUpload = async () => {
   if (!uploadFile.value || !uploadDivision.value) return
-  const fd = new FormData()
-  fd.append('signature', uploadFile.value)
-  submitSignature.post(`/users-divisions/${uploadDivision.value.id}/upload-signature`, fd, {
-    onSuccess: (page) => {
-      // update local list entry if present
-      const idx = divisionsList.value.findIndex(d => d.id === uploadDivision.value.id)
-      if (idx !== -1) divisionsList.value[idx].signature_path = page.props.divisions?.find?.(d => d.id === uploadDivision.value.id)?.signature_path ?? null
+  const reader = new FileReader()
+  reader.onload = async (ev) => {
+    try {
+      await axios.post(`/users-divisions/${uploadDivision.value.id}/upload-signature`, {
+        signature_base64: ev.target.result,
+      })
       closeUploadModal()
       window.location.reload()
+    } catch (err) {
+      alert(err.response?.data?.message ?? 'Failed to upload signature')
     }
-  })
+  }
+  reader.readAsDataURL(uploadFile.value)
 }
 </script>
 
