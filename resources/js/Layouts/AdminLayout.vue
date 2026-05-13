@@ -2047,6 +2047,18 @@ filteredMenu.value.forEach((item) => {
           Privacy Policy
         </a>
 
+        <!-- QMS Manuals -->
+        <a
+          href="https://drive.google.com/drive/folders/16XAkvSwQCPquxuMtgFmEOWEMAeUfOqwL"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors border border-slate-200 hover:border-amber-200"
+          aria-label="QMS Manuals"
+        >
+          <BookOpenIcon class="h-4 w-4" />
+          QMS Manuals
+        </a>
+
         <!-- Need Help? -->
         <a
           :href="route('docs.index')"

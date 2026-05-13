@@ -1,5 +1,5 @@
 <script setup>
-import { Head, usePage } from "@inertiajs/vue3";
+import { Head, usePage, router } from "@inertiajs/vue3";
 import { computed, ref } from "vue";
 import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
@@ -7,7 +7,12 @@ import { useVehicleRequests } from "@/Composables/useVehicleRequests";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import CsmForm from '@/Components/CsmForm.vue'
 
-const props = defineProps({ requests: Array, vehicles: Array, divisionChiefs: Array });
+const props = defineProps({
+  requests: Array,
+  vehicles: Array,
+  divisionChiefs: Array,
+  hasPendingCsm: { type: Boolean, default: false },
+});
 const page  = usePage();
 
 const roleName  = computed(() => page.props.auth?.user?.role?.name ?? '')
@@ -42,11 +47,13 @@ function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true
 
 import Swal from 'sweetalert2'
 
-const hasPendingConfirmation = computed(() => {
-  const uid = page.props.auth?.user?.id
-  if (!uid) return false
-  return (props.requests || []).some(r => r.status === 'OCD Approved' && r.requestor_id === uid)
-})
+// Use server-side prop — accurate regardless of pagination or filters
+const hasPendingConfirmation = computed(() => props.hasPendingCsm)
+
+function onCsmSubmitted() {
+  showCsmModal.value = false
+  router.reload({ only: ['requests', 'hasPendingCsm'] })
+}
 
 async function handleNewRequest() {
   if (hasPendingConfirmation.value) {
@@ -370,7 +377,7 @@ async function handleNewRequest() {
       service-key="others"
       service-other-label="Vehicle Request"
       @close="showCsmModal = false"
-      @submitted="showCsmModal = false"
+      @submitted="onCsmSubmitted"
     />
   </AdminLayout>
 </template>
