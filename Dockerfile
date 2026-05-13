@@ -20,8 +20,7 @@ WORKDIR /var/www
 
 COPY . .
 
-RUN composer config --global github-oauth.github.com "" 2>/dev/null || true \
-    && composer install --no-dev --optimize-autoloader
+RUN COMPOSER_AUTH='{}' composer install --no-dev --optimize-autoloader
 
 # Build frontend assets and remove any leftover Vite dev-server marker
 ARG VITE_STORAGE_BASE_URL=https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com
