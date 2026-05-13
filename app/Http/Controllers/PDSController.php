@@ -541,13 +541,6 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
  ===================================================== */
 $sheet = $spreadsheet->getSheetByName('C4');
 
-function markYesNo(Worksheet $sheet, string $yesCell, string $noCell, $value): void
-{
-    $isYes = in_array($value, [1, '1', 'yes', 'Yes', true], true);
-
-    $sheet->setCellValue($yesCell, $isYes ? '☑ Yes' : '☐ Yes');
-    $sheet->setCellValue($noCell,  $isYes ? '☐ No'  : '☑ No');
-}
 
 
 /*
@@ -670,7 +663,7 @@ $c4 = $pds->questions;
 foreach ($questions as $q) {
     $value = (int) ($c4?->{$q['field']} ?? 0);
 
-    markYesNo($sheet, $q['yesCell'], $q['noCell'], $value);
+    $this->markYesNo($sheet, $q['yesCell'], $q['noCell'], $value);
 
     if ($value === 1 && isset($q['detailsCell'], $q['detailsField'])) {
         $sheet->setCellValue(
@@ -1036,13 +1029,6 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
  ===================================================== */
 $sheet = $spreadsheet->getSheetByName('C4');
 
-function markYesNo(Worksheet $sheet, string $yesCell, string $noCell, $value): void
-{
-    $isYes = in_array($value, [1, '1', 'yes', 'Yes', true], true);
-
-    $sheet->setCellValue($yesCell, $isYes ? '☑ Yes' : '☐ Yes');
-    $sheet->setCellValue($noCell,  $isYes ? '☐ No'  : '☑ No');
-}
 
 
 /*
@@ -1165,7 +1151,7 @@ $c4 = $pds->questions;
 foreach ($questions as $q) {
     $value = (int) ($c4?->{$q['field']} ?? 0);
 
-    markYesNo($sheet, $q['yesCell'], $q['noCell'], $value);
+    $this->markYesNo($sheet, $q['yesCell'], $q['noCell'], $value);
 
     if ($value === 1 && isset($q['detailsCell'], $q['detailsField'])) {
         $sheet->setCellValue(
