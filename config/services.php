@@ -53,4 +53,9 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
 
+    'kms' => [
+        'signing_key_arn' => env('KMS_SIGNING_KEY_ARN'),
+        'region'          => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
+    ],
+
 ];
