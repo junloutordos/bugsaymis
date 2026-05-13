@@ -72,6 +72,7 @@ export function useJobRequests(initialRequests = []) {
     action_taken: "",
     completed_at: "",
     ict_equipment_id:"",
+    pin: null,
   })
 
   // Open modal

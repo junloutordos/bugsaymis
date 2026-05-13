@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use App\Enums\ApprovalStep;
+use App\Models\DigitalSignature;
+use App\Services\DigitalSignatureService;
 use App\Services\SnapshotService;
 use App\Services\ITJobRequestPdfService;
 
@@ -26,6 +28,7 @@ class ITJobRequestController extends Controller
     public function __construct(
         private SnapshotService $snapshots,
         private ITJobRequestPdfService $pdfService,
+        private DigitalSignatureService $sigService,
     ) {}
     /* =====================================================
      | INDEX
@@ -79,6 +82,8 @@ public function index(Request $request)
             ->orderBy('description')
             ->get(['id', 'description', 'room_id', 'owner_id', 'serial_no']),
         'isAdmin'        => $isAdmin,
+        'hasPin'         => ! empty($user->signature_pin),
+        'signatureUri'   => $this->sigService->getSignatureDataUri($user),
     ]);
 }
 
@@ -171,6 +176,12 @@ public function index(Request $request)
                 }
             }
         }
+
+        // Optional digital signing on submission
+        $this->trySign($request, $jobRequest, 'submission',
+            "IT Job Request #{$jobRequest->itjr_no} — {$jobRequest->title}",
+            $jobRequest->itjr_no . $jobRequest->title . $jobRequest->user_id
+        );
 
         return back()->with('success', 'Request submitted successfully.');
     }
@@ -470,6 +481,11 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
     // Auto-generate PDF when status becomes "Acted by MIS"
     if ($isActedByMIS) {
+        $this->trySign($request, $jobRequest, 'mis_acted',
+            "IT Job Request #{$jobRequest->itjr_no} — Acted by MIS",
+            $jobRequest->itjr_no . 'mis_acted' . $request->user()->id
+        );
+
         try {
             $this->pdfService->generate($jobRequest);
         } catch (\Throwable $e) {
@@ -512,6 +528,11 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             ]);
         });
 
+        $this->trySign($request, $jobRequest, 'completion',
+            "IT Job Request #{$jobRequest->itjr_no} — Completion Confirmed",
+            $jobRequest->itjr_no . 'completion' . $request->user()->id
+        );
+
         return back()->with('success', 'Request confirmed and rated.');
     }
 
@@ -545,6 +566,8 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             'requests'   => $requests,
             'filters'    => ['search' => $search, 'category' => $category],
             'categories' => ITJobCategory::orderBy('name')->get(['id', 'name']),
+            'hasPin'     => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -574,6 +597,11 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 sequence:   1,
                 action:     'approved',
                 approver:   $request->user(),
+            );
+
+            $this->trySign($request, $jobRequest, 'dc_approval',
+                "IT Job Request #{$jobRequest->itjr_no} — Division Chief Approval",
+                $jobRequest->itjr_no . 'dc_approval' . $request->user()->id
             );
         } else {
             $jobRequest->update([
@@ -628,6 +656,8 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
             'requests'   => $requests,
             'filters'    => ['search' => $search, 'category' => $category],
             'categories' => ITJobCategory::orderBy('name')->get(['id', 'name']),
+            'hasPin'     => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -657,6 +687,11 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 sequence:   4,
                 action:     'approved',
                 approver:   $request->user(),
+            );
+
+            $this->trySign($request, $jobRequest, 'ocd_approval',
+                "IT Job Request #{$jobRequest->itjr_no} — OCD Approval",
+                $jobRequest->itjr_no . 'ocd_approval' . $request->user()->id
             );
         } else {
             $jobRequest->update([
@@ -759,5 +794,47 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         });
 
         return back()->with('success', 'IT Job Request deleted successfully.');
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private function trySign(
+        Request      $request,
+        ITJobRequest $jobRequest,
+        string       $stage,
+        string       $title,
+        string       $contentHash
+    ): void {
+        $signer = $request->user();
+
+        // Users who have set a PIN must provide the correct one to sign.
+        // Users without a PIN are signed automatically (signature image in PDF).
+        if (! empty($signer->signature_pin)) {
+            $pin = $request->input('pin');
+            if (! $pin || ! $this->sigService->verifyPin($signer, $pin)) {
+                return;
+            }
+        }
+
+        try {
+            $this->sigService->sign(
+                signer:        $signer,
+                signableType:  ITJobRequest::class,
+                signableId:    $jobRequest->id,
+                documentTitle: $title,
+                contentToHash: $contentHash,
+                metadata:      [
+                    'stage'   => $stage,
+                    'itjr_no' => $jobRequest->itjr_no,
+                    'title'   => $jobRequest->title,
+                ],
+            );
+        } catch (\Throwable $e) {
+            logger()->error('ITJR digital sign failed', [
+                'job_request_id' => $jobRequest->id,
+                'stage'          => $stage,
+                'error'          => $e->getMessage(),
+            ]);
+        }
     }
 }

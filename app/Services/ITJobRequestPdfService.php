@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Models\DigitalSignature;
+use App\Services\DigitalSignatureService;
 
 class ITJobRequestPdfService
 {
@@ -188,6 +190,17 @@ class ITJobRequestPdfService
         $mpdf->SetTitle('IT JRF — ' . $jobRequest->itjr_no);
         $mpdf->WriteHTML($html);
 
+        // Embed digital signature QR block if any signatures exist
+        $sig = DigitalSignature::where('signable_type', ITJobRequest::class)
+            ->where('signable_id', $jobRequest->id)
+            ->latest('signed_at')
+            ->first();
+
+        if ($sig) {
+            $signerSigUri = $this->sigDataUri($sig->signer?->electronic_signature);
+            app(DigitalSignatureService::class)->embedInPdf($mpdf, $sig, $signerSigUri);
+        }
+
         return $mpdf->Output('', 'S');
     }
 
@@ -205,37 +218,35 @@ class ITJobRequestPdfService
      */
     private function sigDataUri(?string $storedPath): ?string
     {
-        if (! $storedPath) {
+        if (! $storedPath || $storedPath === '0') {
             return null;
         }
 
-        try {
-            if (! Storage::disk('public')->exists($storedPath)) {
-                return null;
+        $ext  = strtolower(pathinfo($storedPath, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            'webp'        => 'image/webp',
+            default       => 'image/png',
+        };
+
+        // Try S3 first (new uploads), then fall back to disk('public') for legacy uploads
+        foreach (['s3', 'public'] as $disk) {
+            try {
+                if (Storage::disk($disk)->exists($storedPath)) {
+                    $contents = Storage::disk($disk)->get($storedPath);
+                    if ($contents) {
+                        return 'data:' . $mime . ';base64,' . base64_encode($contents);
+                    }
+                }
+            } catch (\Throwable $e) {
+                logger()->warning("ITJobRequestPdfService: signature load failed on {$disk}", [
+                    'path'  => $storedPath,
+                    'error' => $e->getMessage(),
+                ]);
             }
-
-            $contents = Storage::disk('public')->get($storedPath);
-
-            if (! $contents) {
-                return null;
-            }
-
-            $ext  = strtolower(pathinfo($storedPath, PATHINFO_EXTENSION));
-            $mime = match ($ext) {
-                'jpg', 'jpeg' => 'image/jpeg',
-                'gif'         => 'image/gif',
-                'webp'        => 'image/webp',
-                default       => 'image/png',
-            };
-
-            return 'data:' . $mime . ';base64,' . base64_encode($contents);
-
-        } catch (\Throwable $e) {
-            logger()->warning('ITJobRequestPdfService: signature load failed', [
-                'path'  => $storedPath,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
         }
+
+        return null;
     }
 }

@@ -99,7 +99,12 @@ class ITJobRequest extends Model
     }
     public function assignedTo()
     {
-        return $this->belongsTo(User::class, 'assignedto', 'id'); // ✅ THIS FIXES THE ERROR
+        return $this->belongsTo(User::class, 'assignedto', 'id');
+    }
+
+    public function digitalSignatures()
+    {
+        return $this->morphMany(DigitalSignature::class, 'signable')->latest();
     }
 
 

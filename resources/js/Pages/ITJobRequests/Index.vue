@@ -12,6 +12,7 @@ import {
   DocumentChartBarIcon,
 } from "@heroicons/vue/24/outline"
 import CsmForm from '@/Components/CsmForm.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { useJobRequests } from "@/Composables/useJobRequests.js"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
@@ -24,6 +25,8 @@ const props = defineProps({
   misPersonnel: Array,
   ictEquipment: Array,
   isAdmin: { type: Boolean, default: false },
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 // Composable: modal/form/submit logic (pass current page's data)
@@ -212,6 +215,28 @@ const handleNewRequest = async () => {
   }
 
   openModal('create')
+}
+
+// ── Digital Signature PIN modal ───────────────────────────────────────────────
+const sigShow    = ref(false)
+const sigLoading = ref(false)
+
+const sigConfirmLabel = computed(() =>
+  modalMode.value === 'create' ? 'Sign & Submit' : 'Sign & Save'
+)
+
+function handleFormSubmit() {
+  sigShow.value = true
+}
+
+function handleSigConfirm(pin) {
+  sigShow.value = false
+  form.pin = pin
+  submitRequest()
+}
+
+function handleSigCancel() {
+  sigShow.value = false
 }
 
 </script>
@@ -586,7 +611,7 @@ const handleNewRequest = async () => {
 
 
             <!-- CREATE / MIS ASSESSMENT FORM -->
-            <form v-else @submit.prevent="submitRequest" class="space-y-4">
+            <form v-else @submit.prevent="handleFormSubmit" class="space-y-4">
 
               <!-- Fields common to CREATE -->
               <template v-if="modalMode==='create'">
@@ -806,6 +831,16 @@ const handleNewRequest = async () => {
         service-other-label="IT Job Request / Technical Assistance"
         @close="showCsmModal = false"
         @submitted="showCsmModal = false"
+      />
+
+      <DigitalSignaturePin
+        :show="sigShow"
+        :has-pin="props.hasPin"
+        :signature-uri="props.signatureUri"
+        :loading="sigLoading"
+        :confirm-label="sigConfirmLabel"
+        @confirm="handleSigConfirm"
+        @cancel="handleSigCancel"
       />
 
     </div>
