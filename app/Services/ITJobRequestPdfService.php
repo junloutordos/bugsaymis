@@ -188,7 +188,13 @@ class ITJobRequestPdfService
         ]);
 
         $mpdf->SetTitle('IT JRF — ' . $jobRequest->itjr_no);
+
+        // Base64-embedded signature images can push the HTML past PHP's default
+        // pcre.backtrack_limit (1 MB). Raise it temporarily so mPDF can parse.
+        $prevBacktrack = ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', (string) (10 * 1000 * 1000));
         $mpdf->WriteHTML($html);
+        ini_set('pcre.backtrack_limit', (string) $prevBacktrack);
 
         // Embed digital signature QR block if any signatures exist
         $sig = DigitalSignature::where('signable_type', ITJobRequest::class)
