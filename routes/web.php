@@ -642,10 +642,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/messengerial/{messengerialRequest}/print', [\App\Http\Controllers\MessengerialController::class, 'printTicket'])
         ->name('messengerial.print');
 
-    // Upload proof of delivery
+    // Upload proof of delivery (base64 JSON — Cloudflare blocks multipart)
     Route::post('/messengerial/{messengerialRequest}/upload-proof', [\App\Http\Controllers\MessengerialController::class, 'uploadProof'])
         ->name('messengerial.upload_proof')
         ->middleware('permission:documents.approve');
+
+    // View/stream proof PDF from S3 (authenticated proxy — S3 bucket is private)
+    Route::get('/messengerial/{messengerialRequest}/proof', [\App\Http\Controllers\MessengerialController::class, 'viewProof'])
+        ->name('messengerial.proof');
 
     // Document Tracking
     Route::get('/document-tracking', [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('document-tracking.index');

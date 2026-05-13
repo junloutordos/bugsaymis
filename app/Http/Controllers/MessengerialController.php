@@ -537,34 +537,39 @@ class MessengerialController extends Controller
             abort(403);
         }
 
-        // Only allow upload when request is approved and not already completed
         if ($messengerialRequest->status === 'Completed') {
-            return redirect()->back()->with('error', 'Proof already uploaded.');
+            return back()->with('error', 'Proof already uploaded.');
         }
 
-        // Determine if courier fields are applicable
-        $usesCourier = is_array($messengerialRequest->delivery_methods) && in_array('Courier Services', $messengerialRequest->delivery_methods);
+        $usesCourier = is_array($messengerialRequest->delivery_methods)
+            && in_array('Courier Services', $messengerialRequest->delivery_methods);
 
-        $rules = [
-            'proof' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'rfsf_reference_no' => 'nullable|string|max:255',
-            'date_received_by_courier' => 'nullable|date',
-            'date_delivered' => 'nullable|date',
-            'proof_remarks' => 'nullable|string|max:2000',
-        ];
+        $validated = $request->validate([
+            'proof_base64'             => ['required', 'string'],
+            'proof_name'               => ['nullable', 'string', 'max:255'],
+            'rfsf_reference_no'        => ['nullable', 'string', 'max:255'],
+            'date_received_by_courier' => ['nullable', 'date'],
+            'date_delivered'           => ['nullable', 'date'],
+            'proof_remarks'            => ['nullable', 'string', 'max:2000'],
+            'courier_service_provider' => [$usesCourier ? 'required' : 'nullable', 'string', 'max:255'],
+            'courier_cost'             => ['nullable', 'numeric'],
+        ]);
 
-        if ($usesCourier) {
-            $rules['courier_service_provider'] = 'required|string|max:255';
-            $rules['courier_cost'] = 'nullable|numeric';
-        } else {
-            $rules['courier_service_provider'] = 'nullable|string|max:255';
-            $rules['courier_cost'] = 'nullable|numeric';
+        // Decode base64 data URI sent from the frontend (Cloudflare blocks multipart)
+        $dataUri  = $validated['proof_base64'];
+        $base64   = str_contains($dataUri, ',') ? explode(',', $dataUri, 2)[1] : $dataUri;
+        $content  = base64_decode($base64);
+
+        if ($content === false || strlen($content) === 0) {
+            return back()->withErrors(['proof_base64' => 'Invalid file data. Please try again.']);
         }
 
-        $validated = $request->validate($rules);
+        $originalName = $validated['proof_name'] ?? 'proof.pdf';
+        $safeName     = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalName);
+        $s3Key        = 'messengerial_proofs/' . \Illuminate\Support\Str::random(40) . '_' . $safeName;
 
-        $file = $request->file('proof');
-        $path = $file->store('messengerial_proofs', 'public');
+        Storage::disk('s3')->put($s3Key, $content);
+        $path = $s3Key;
 
         $messengerialRequest->proof_of_delivery = $path;
         $messengerialRequest->status = 'Completed';
@@ -595,6 +600,42 @@ class MessengerialController extends Controller
         }
 
         return redirect()->route('messengerial.index')->with('success', 'Proof uploaded and request marked completed.');
+    }
+
+    public function viewProof(Request $request, MessengerialRequest $messengerialRequest)
+    {
+        $user = $request->user();
+        $isOwner   = $messengerialRequest->user_id === $user->id
+                  || $messengerialRequest->email   === $user->email;
+        $isStaff   = $user->hasAnyRole(['Administrator', 'Records', 'DivisionChief', 'OCD']);
+
+        if (! $isOwner && ! $isStaff) {
+            abort(403);
+        }
+
+        $path = $messengerialRequest->proof_of_delivery;
+        if (! $path) {
+            abort(404, 'No proof file attached.');
+        }
+
+        // Support both old public-ACL files and new private S3 files
+        if (! Storage::disk('s3')->exists($path)) {
+            abort(404, 'Proof file not found.');
+        }
+
+        $contents = Storage::disk('s3')->get($path);
+        $ext      = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime     = match ($ext) {
+            'pdf'  => 'application/pdf',
+            'png'  => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            default => 'application/octet-stream',
+        };
+
+        return response($contents, 200)
+            ->header('Content-Type', $mime)
+            ->header('Content-Disposition', 'inline; filename="' . basename($path) . '"')
+            ->header('Cache-Control', 'private, max-age=3600');
     }
 
     public function ocdApproval(Request $request)
