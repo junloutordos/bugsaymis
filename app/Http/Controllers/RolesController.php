@@ -102,14 +102,21 @@ class RolesController extends Controller
      */
     public function uploadSignature(Request $request, Division $division)
     {
-        $data = $request->validate([
-            'signature' => 'required|image|mimes:png,jpg,jpeg,svg|max:2048',
+        $request->validate([
+            'signature_base64' => ['required', 'string', 'starts_with:data:image/'],
         ]);
 
-        $file = $request->file('signature');
-        $path = $file->store('signatures/divisions', 'public');
+        $base64   = preg_replace('/^data:image\/\w+;base64,/', '', $request->signature_base64);
+        $data     = base64_decode($base64);
+        $s3Key    = 'signatures/divisions/division_' . $division->id . '_' . time() . '.png';
 
-        $division->signature_path = $path;
+        if ($division->signature_path && Storage::disk('s3')->exists($division->signature_path)) {
+            Storage::disk('s3')->delete($division->signature_path);
+        }
+
+        Storage::disk('s3')->put($s3Key, $data, ['ContentType' => 'image/png']);
+
+        $division->signature_path = $s3Key;
         $division->save();
 
         return back()->with('success', 'Signature uploaded successfully');

@@ -1092,6 +1092,12 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Digital Signature — profile setup
+    Route::get('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'show'])->name('profile.signature');
+    Route::post('/profile/signature', [\App\Http\Controllers\UserSignatureController::class, 'saveSignature'])->name('profile.signature.save');
+    Route::post('/profile/signature/pin', [\App\Http\Controllers\UserSignatureController::class, 'setPin'])->name('profile.signature.pin');
+    Route::post('/profile/signature/verify-pin', [\App\Http\Controllers\UserSignatureController::class, 'verifyPin'])->name('profile.signature.verify-pin');
+
     /*
     |--------------------------------------------------------------------------
     | Recruitment & Selection Module
@@ -1790,6 +1796,15 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}/export', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportQuarter'])->name('class-records.quarters.export');
     Route::get('/class-records/{classRecord}/export',              [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportAll'])->name('class-records.export');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Document Verification — public, no auth required
+|--------------------------------------------------------------------------
+*/
+Route::get('/verify/{token}', [\App\Http\Controllers\DocumentVerificationController::class, 'show'])
+    ->name('document.verify')
+    ->where('token', '[0-9a-f\-]{36}');
 
 /*
 |--------------------------------------------------------------------------

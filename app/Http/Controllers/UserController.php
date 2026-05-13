@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\Division;
 use App\Models\Office;
 use App\Models\FacultyLoading\SalarySchedule;
+use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -240,23 +241,11 @@ class UserController extends Controller
 
     public function uploadSignature(Request $request, User $user)
     {
-        $data = $request->validate([
-            'electronic_signature' => 'required|file|mimes:png|dimensions:max_width=1200,max_height=600|max:2048',
+        $request->validate([
+            'signature_base64' => ['required', 'string', 'starts_with:data:image/png;base64,'],
         ]);
 
-        if ($request->hasFile('electronic_signature')) {
-            // remove old signature if exists
-            if (!empty($user->electronic_signature)) {
-                Storage::disk('public')->delete($user->electronic_signature);
-            }
-
-            $path = $request->file('electronic_signature')->store('signatures', 'public');
-            if (! $path) {
-                return back()->withErrors(['electronic_signature' => 'Failed to upload signature. Please try again.']);
-            }
-            $user->electronic_signature = $path;
-            $user->save();
-        }
+        app(DigitalSignatureService::class)->saveSignatureImage($user, $request->signature_base64);
 
         return redirect()->route('users.index')->with('success', 'Electronic signature uploaded.');
     }
