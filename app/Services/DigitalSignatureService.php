@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DigitalSignature;
 use App\Models\User;
+use Aws\Kms\KmsClient;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -96,6 +97,7 @@ class DigitalSignatureService
 
     /**
      * Cryptographically sign a document and create a DigitalSignature record.
+     * Uses AWS KMS when configured, falls back to HMAC-SHA256 for local dev.
      */
     public function sign(
         User $signer,
@@ -105,11 +107,13 @@ class DigitalSignatureService
         string $contentToHash,
         array $metadata = []
     ): DigitalSignature {
-        $token = (string) Str::uuid();
+        $token        = (string) Str::uuid();
         $documentHash = hash('sha256', $contentToHash);
+        $message      = $documentHash . '|' . $token . '|' . $signer->id;
 
-        // HMAC-SHA256 with the app key as the shared secret
-        $signature = hash_hmac('sha256', $documentHash . '|' . $token . '|' . $signer->id, config('app.key'));
+        [$signature, $signatureType] = $this->kmsAvailable()
+            ? $this->kmsSign($message)
+            : [$this->hmacSign($message), 'hmac'];
 
         return DigitalSignature::create([
             'signable_type'      => $signableType,
@@ -117,6 +121,7 @@ class DigitalSignatureService
             'signer_id'          => $signer->id,
             'document_hash'      => $documentHash,
             'signature'          => $signature,
+            'signature_type'     => $signatureType,
             'verification_token' => $token,
             'document_title'     => $documentTitle,
             'metadata'           => $metadata,
@@ -126,6 +131,7 @@ class DigitalSignatureService
 
     /**
      * Verify a signed document by token. Returns the record if valid, null if tampered or not found.
+     * Routes to KMS or HMAC verification based on the record's signature_type.
      */
     public function verify(string $token): ?DigitalSignature
     {
@@ -137,17 +143,61 @@ class DigitalSignatureService
             return null;
         }
 
-        $expected = hash_hmac(
-            'sha256',
-            $record->document_hash . '|' . $token . '|' . $record->signer_id,
-            config('app.key')
-        );
+        $message = $record->document_hash . '|' . $token . '|' . $record->signer_id;
+        $valid   = $record->signature_type === 'kms'
+            ? $this->kmsVerify($message, $record->signature)
+            : hash_equals($this->hmacSign($message), $record->signature);
 
-        if (! hash_equals($expected, $record->signature)) {
-            return null;
+        return $valid ? $record : null;
+    }
+
+    // ── Internal signing helpers ──────────────────────────────────────────────
+
+    private function kmsAvailable(): bool
+    {
+        return ! empty(config('services.kms.signing_key_arn'));
+    }
+
+    private function kmsClient(): KmsClient
+    {
+        return new KmsClient([
+            'region'  => config('services.kms.region', 'ap-southeast-1'),
+            'version' => 'latest',
+        ]);
+    }
+
+    private function kmsSign(string $message): array
+    {
+        $result = $this->kmsClient()->sign([
+            'KeyId'            => config('services.kms.signing_key_arn'),
+            'Message'          => $message,
+            'MessageType'      => 'RAW',
+            'SigningAlgorithm' => 'RSASSA_PKCS1_V1_5_SHA_256',
+        ]);
+
+        return [base64_encode($result['Signature']->getContents()), 'kms'];
+    }
+
+    private function kmsVerify(string $message, string $signature): bool
+    {
+        try {
+            $result = $this->kmsClient()->verify([
+                'KeyId'            => config('services.kms.signing_key_arn'),
+                'Message'          => $message,
+                'MessageType'      => 'RAW',
+                'Signature'        => base64_decode($signature),
+                'SigningAlgorithm' => 'RSASSA_PKCS1_V1_5_SHA_256',
+            ]);
+
+            return (bool) $result['SignatureValid'];
+        } catch (\Exception) {
+            return false;
         }
+    }
 
-        return $record;
+    private function hmacSign(string $message): string
+    {
+        return hash_hmac('sha256', $message, config('app.key'));
     }
 
     /**

@@ -12,6 +12,7 @@ class DigitalSignature extends Model
         'signer_id',
         'document_hash',
         'signature',
+        'signature_type',
         'verification_token',
         'document_title',
         'metadata',
