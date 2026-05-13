@@ -6,16 +6,22 @@ import { CheckCircleIcon, XCircleIcon, EyeIcon, FunnelIcon } from "@heroicons/vu
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
   requests: Object,
   filters: Object,
   categories: Array,
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 // State
 const showModal = ref(false)
 const selectedRequest = ref(null)
+const sigShow = ref(false)
+const sigLoading = ref(false)
+const pendingApproveId = ref(null)
 
 // Server-side filters
 const search         = ref(props.filters?.search   ?? '')
@@ -62,23 +68,25 @@ const totalPages = computed(() => props.requests?.last_page ?? 1)
 const filteredRequests = computed(() => props.requests?.data ?? [])
 
 // SweetAlert actions
-const approveRequest = async (id) => {
-  const result = await Swal.fire({
-    title: "Are you sure?",
-    text: "Do you want to approve this request?",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Yes, approve it!",
-    cancelButtonText: "Cancel",
-    reverseButtons: true
-  })
+const approveRequest = (id) => {
+  pendingApproveId.value = id
+  sigShow.value = true
+}
 
-  if (result.isConfirmed) {
-    Swal.fire({ title: 'Approving request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
-    router.post(route("job-requests.division-chief-action", id), { action: "approve" }, {
-      onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
-    })
-  }
+const handleApproveConfirm = (pin) => {
+  sigShow.value = false
+  sigLoading.value = false
+  const id = pendingApproveId.value
+  pendingApproveId.value = null
+  Swal.fire({ title: 'Approving request...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
+  router.post(route("job-requests.division-chief-action", id), { action: "approve", pin }, {
+    onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
+  })
+}
+
+const handleApproveCancel = () => {
+  sigShow.value = false
+  pendingApproveId.value = null
 }
 
 const rejectRequest = async (id) => {
@@ -242,5 +250,15 @@ const closeModal = () => {
         </div>
       </div>
     </div>
+
+    <DigitalSignaturePin
+      :show="sigShow"
+      :has-pin="props.hasPin"
+      :signature-uri="props.signatureUri"
+      :loading="sigLoading"
+      confirm-label="Approve & Sign"
+      @confirm="handleApproveConfirm"
+      @cancel="handleApproveCancel"
+    />
   </AdminLayout>
 </template>
