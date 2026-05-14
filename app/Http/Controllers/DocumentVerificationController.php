@@ -2,12 +2,57 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DigitalSignature;
+use App\Models\ITJobRequest;
 use App\Services\DigitalSignatureService;
 use Inertia\Inertia;
 
 class DocumentVerificationController extends Controller
 {
     public function __construct(private DigitalSignatureService $svc) {}
+
+    private const STAGE_LABELS = [
+        'submission'  => 'Submission',
+        'dc_approval' => 'Division Chief Approval',
+        'ocd_approval'=> 'OCD Approval',
+        'mis_acted'   => 'MIS Action',
+        'completion'  => 'Completion',
+    ];
+
+    /**
+     * Document-level ITJR verification page — shows all signers for one ITJR.
+     * Public, no authentication required.
+     */
+    public function showItjr(string $itjrNo)
+    {
+        $jobRequest = ITJobRequest::where('itjr_no', $itjrNo)
+            ->with('user:id,name,position')
+            ->firstOrFail();
+
+        $signatures = DigitalSignature::where('signable_type', ITJobRequest::class)
+            ->where('signable_id', $jobRequest->id)
+            ->with('signer:id,name,position')
+            ->orderBy('signed_at')
+            ->get();
+
+        $entries = $signatures->map(function (DigitalSignature $sig) {
+            $valid  = $this->svc->verify($sig->verification_token) !== null;
+            $stage  = $sig->metadata['stage'] ?? 'unknown';
+
+            return [
+                'stage'     => self::STAGE_LABELS[$stage] ?? ucfirst($stage),
+                'signer'    => $sig->signer?->name ?? '—',
+                'position'  => $sig->signer?->position ?? '—',
+                'signed_at' => $sig->signed_at->format('F d, Y h:i A'),
+                'valid'     => $valid,
+            ];
+        });
+
+        return view('it-job-requests.verify', [
+            'jobRequest' => $jobRequest,
+            'entries'    => $entries,
+        ]);
+    }
 
     /**
      * Public verification page — no authentication required.

@@ -1806,6 +1806,10 @@ Route::get('/verify/{token}', [\App\Http\Controllers\DocumentVerificationControl
     ->name('document.verify')
     ->where('token', '[0-9a-f\-]{36}');
 
+Route::get('/verify/itjr/{itjrNo}', [\App\Http\Controllers\DocumentVerificationController::class, 'showItjr'])
+    ->name('itjr.verify')
+    ->where('itjrNo', '[0-9\-]+');
+
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes

@@ -12,22 +12,11 @@
       background: #fff;
     }
 
-    /* ── Header ─────────────────────────────── */
-    .header {
-      text-align: center;
-      margin-bottom: 16px;
-      line-height: 1.6;
-    }
+    .header { text-align: center; margin-bottom: 16px; line-height: 1.6; }
     .header .org   { font-size: 13px; font-weight: bold; }
     .header .title { font-size: 13px; font-weight: bold; letter-spacing: 3px; margin-top: 10px; }
 
-    /* ── Main form table ─────────────────────── */
-    .ft {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-
+    .ft { width: 100%; border-collapse: collapse; table-layout: fixed; }
     col.c1 { width: 33%; }
     col.c2 { width: 28%; }
     col.c3 { width: 39%; }
@@ -39,36 +28,43 @@
       word-wrap: break-word;
     }
 
-    .lbl  { font-size: 10.5px; color: #333; }
-    .val  { font-weight: bold; font-size: 11px; word-break: break-word; }
-    .uline{ text-decoration: underline; }
+    .val   { font-weight: bold; font-size: 11px; word-break: break-word; }
+    .uline { text-decoration: underline; }
 
     .field-label       { font-size: 10px; color: #555; margin-bottom: 3px; }
     .field-value       { font-weight: bold; font-size: 11px; text-decoration: underline; word-break: break-word; }
     .field-value-plain { font-weight: bold; font-size: 11px; word-break: break-word; }
 
-    /* ── Signature ──────────────────────────── */
-    .sig-name {
-      display: inline-block;
-      font-weight: bold;
-      font-size: 11px;
-      border-bottom: 1.5px solid #000;
-      padding-bottom: 1px;
-      margin-top: 2px;
-      min-width: 90px;
-    }
+    /* ── Signature layout: 2-col inner table ── */
+    .sig-inner { width: 100%; border: none; border-collapse: collapse; }
+    .sig-inner td { border: none; padding: 0; vertical-align: middle; }
+    .sig-col  { text-align: center; }
+    .dig-col  { padding-left: 2px; text-align: left; width: 1%; white-space: nowrap; }
+
+    .sig-name { display: inline-block; font-weight: bold; font-size: 11px; border-bottom: 1.5px solid #000; padding-bottom: 1px; margin-top: 2px; min-width: 90px; }
     .sig-pos  { font-size: 9.5px; margin-top: 2px; color: #333; }
 
-    /* ── Section label rows ─────────────────── */
+    /* ── Digital signed text badge ── */
+    .dig-badge { margin-top: 4px; }
+    .dig-check { font-size: 7.5px; color: #1d4ed8; font-weight: bold; }
+    .dig-date  { font-size: 6.5px; color: #64748b; }
+
     .section-label { font-size: 10px; color: #333; font-weight: normal; padding: 5px 10px 3px; border-bottom: none; }
 
-    /* ── Footer ─────────────────────────────── */
+    /* ── Document QR footer ── */
+    .qr-footer { margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 5px; padding: 8px 12px; }
+    .qr-footer table { border: none; border-collapse: collapse; width: 100%; }
+    .qr-footer td    { border: none; padding: 0; vertical-align: middle; }
+    .qr-footer .qr-text-col { padding-left: 10px; }
+    .qr-title   { font-size: 9px; font-weight: bold; color: #1e293b; margin-bottom: 2px; }
+    .qr-sub     { font-size: 7.5px; color: #64748b; }
+    .qr-scan    { font-size: 7px; color: #94a3b8; margin-top: 2px; }
+
     .footer { font-size: 9px; color: #555; margin-top: 6px; }
   </style>
 </head>
 <body>
 
-  {{-- Header --}}
   <div class="header">
     <div class="org">PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM</div>
     <div class="org">CAMPUS: <span style="text-decoration:underline;">CARAGA REGION</span></div>
@@ -77,19 +73,16 @@
 
   <table class="ft">
     <colgroup>
-      <col class="c1">
-      <col class="c2">
-      <col class="c3">
+      <col class="c1"><col class="c2"><col class="c3">
     </colgroup>
 
     {{-- Row 1: Requested by | ITJRF # --}}
     <tr>
       <td colspan="2" style="border-right:1px solid #000;">
         <div class="field-label" style="margin-bottom:4px;">Requested by:</div>
-        @php $badge = $sigBadges['submission'] ?? null; @endphp
-        <table style="width:100%;border:none;border-collapse:collapse;">
+        <table class="sig-inner">
           <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
+            <td class="sig-col">
               @if($requesterSig)
                 <img src="{{ $requesterSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
               @else
@@ -100,12 +93,12 @@
                 <div class="sig-pos">{{ $jobRequest->user->division->division_name }}</div>
               @endif
             </td>
-            @if($badge)
-            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
-              <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
-              <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
-              <div style="font-size:6px;color:#94a3b8;">Scan QR to verify</div>
+            @if(isset($sigBadges['submission']))
+            <td class="dig-col">
+              <div class="dig-badge">
+                <div class="dig-check">&#10003; Digitally Signed</div>
+                <div class="dig-date">{{ $sigBadges['submission'] }}</div>
+              </div>
             </td>
             @endif
           </tr>
@@ -121,10 +114,9 @@
     <tr>
       <td colspan="2" style="border-right:1px solid #000;">
         <div class="field-label" style="margin-bottom:4px;">Approved by (Division Chief):</div>
-        @php $badge = $sigBadges['dc_approval'] ?? null; @endphp
-        <table style="width:100%;border:none;border-collapse:collapse;">
+        <table class="sig-inner">
           <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
+            <td class="sig-col">
               @if($dcSig)
                 <img src="{{ $dcSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
               @else
@@ -133,12 +125,12 @@
               <div><span class="sig-name">{{ strtoupper($jobRequest->divisionChief?->name ?? '') }}</span></div>
               <div class="sig-pos">{{ $jobRequest->divisionChief?->position ?? 'Division Chief' }}</div>
             </td>
-            @if($badge)
-            <td style="border:none;padding:0 0 0 8px;vertical-align:middle;width:38%;text-align:left;">
-              <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
-              <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
-              <div style="font-size:6px;color:#94a3b8;">Scan QR to verify</div>
+            @if(isset($sigBadges['dc_approval']))
+            <td class="dig-col">
+              <div class="dig-badge">
+                <div class="dig-check">&#10003; Digitally Signed</div>
+                <div class="dig-date">{{ $sigBadges['dc_approval'] }}</div>
+              </div>
             </td>
             @endif
           </tr>
@@ -188,10 +180,9 @@
     {{-- Row 7: Assigned staff | Target date | Director --}}
     <tr>
       <td style="border-top:none;padding-top:4px;">
-        @php $badge = $sigBadges['mis_acted'] ?? null; @endphp
-        <table style="width:100%;border:none;border-collapse:collapse;">
+        <table class="sig-inner">
           <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
+            <td class="sig-col">
               @if($assignedSig)
                 <img src="{{ $assignedSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
               @else
@@ -200,12 +191,12 @@
               <div><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
               <div class="sig-pos">{{ $jobRequest->assignedTo?->position ?? 'IT/ISA Staff' }}</div>
             </td>
-            @if($badge)
-            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
-              <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
-              <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
-              <div style="font-size:6px;color:#94a3b8;">Scan QR to verify</div>
+            @if(isset($sigBadges['mis_acted']))
+            <td class="dig-col">
+              <div class="dig-badge">
+                <div class="dig-check">&#10003; Digitally Signed</div>
+                <div class="dig-date">{{ $sigBadges['mis_acted'] }}</div>
+              </div>
             </td>
             @endif
           </tr>
@@ -219,10 +210,9 @@
         @endif
       </td>
       <td style="border-top:none;padding-top:4px;">
-        @php $badge = $sigBadges['ocd_approval'] ?? null; @endphp
-        <table style="width:100%;border:none;border-collapse:collapse;">
+        <table class="sig-inner">
           <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
+            <td class="sig-col">
               @if($directorSig)
                 <img src="{{ $directorSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
               @else
@@ -231,12 +221,12 @@
               <div><span class="sig-name">{{ strtoupper($director?->name ?? '') }}</span></div>
               <div class="sig-pos">{{ $director?->position ?? 'Campus Director' }}</div>
             </td>
-            @if($badge)
-            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
-              <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
-              <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
-              <div style="font-size:6px;color:#94a3b8;">Scan QR to verify</div>
+            @if(isset($sigBadges['ocd_approval']))
+            <td class="dig-col">
+              <div class="dig-badge">
+                <div class="dig-check">&#10003; Digitally Signed</div>
+                <div class="dig-date">{{ $sigBadges['ocd_approval'] }}</div>
+              </div>
             </td>
             @endif
           </tr>
@@ -277,10 +267,9 @@
         @endif
       </td>
       <td style="border-top:none;padding:4px 6px;">
-        @php $badge = $sigBadges['mis_acted'] ?? null; @endphp
-        <table style="width:100%;border:none;border-collapse:collapse;">
+        <table class="sig-inner">
           <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
+            <td class="sig-col">
               @if($assignedSig)
                 <img src="{{ $assignedSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
               @else
@@ -291,22 +280,21 @@
                 <div class="sig-pos">{{ $jobRequest->assignedTo->position }}</div>
               @endif
             </td>
-            @if($badge)
-            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
-              <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
-              <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
-              <div style="font-size:6px;color:#94a3b8;">Scan QR to verify</div>
+            @if(isset($sigBadges['mis_acted']))
+            <td class="dig-col">
+              <div class="dig-badge">
+                <div class="dig-check">&#10003; Digitally Signed</div>
+                <div class="dig-date">{{ $sigBadges['mis_acted'] }}</div>
+              </div>
             </td>
             @endif
           </tr>
         </table>
       </td>
       <td style="border-top:none;padding:4px 6px;">
-        @php $badge = $sigBadges['completion'] ?? null; @endphp
-        <table style="width:100%;border:none;border-collapse:collapse;">
+        <table class="sig-inner">
           <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
+            <td class="sig-col">
               @if($requesterSig)
                 <img src="{{ $requesterSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
               @else
@@ -317,12 +305,12 @@
                 <div class="sig-pos">{{ $jobRequest->user->position }}</div>
               @endif
             </td>
-            @if($badge)
-            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
-              <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
-              <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
-              <div style="font-size:6px;color:#94a3b8;">Scan QR to verify</div>
+            @if(isset($sigBadges['completion']))
+            <td class="dig-col">
+              <div class="dig-badge">
+                <div class="dig-check">&#10003; Digitally Signed</div>
+                <div class="dig-date">{{ $sigBadges['completion'] }}</div>
+              </div>
             </td>
             @endif
           </tr>
@@ -333,6 +321,24 @@
   </table>
 
   <div class="footer">PSHS-00-F-ITU-01-Ver02-Rev2-12/31/21</div>
+
+  {{-- Document-level QR footer — only shown when at least one digital signature exists --}}
+  @if($documentQr)
+  <div class="qr-footer">
+    <table>
+      <tr>
+        <td style="width:70px;">
+          <img src="data:image/svg+xml;base64,{{ $documentQr }}" style="width:65px;height:65px;display:block;">
+        </td>
+        <td class="qr-text-col">
+          <div class="qr-title">Digitally Signed Document</div>
+          <div class="qr-sub">ITJRF #{{ $jobRequest->itjr_no }} — {{ count($sigBadges) }} digital signature(s) on record</div>
+          <div class="qr-scan">Scan QR code to verify all digital signatures and their authenticity</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+  @endif
 
 </body>
 </html>

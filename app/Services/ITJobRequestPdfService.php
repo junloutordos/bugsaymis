@@ -171,22 +171,27 @@ class ITJobRequestPdfService
         $assignedSig  = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
         $requesterSig = $this->sigDataUri($jobRequest->user?->electronic_signature);
 
-        // Build per-stage digital signature badges for inline embedding in the form
+        // Collect per-stage text badges (signed_at label only — no per-sig QR)
         $sigBadges = [];
+        $documentQr = null;
         $digitalSigs = DigitalSignature::where('signable_type', ITJobRequest::class)
             ->where('signable_id', $jobRequest->id)
             ->latest('signed_at')
             ->get();
 
-        $sigSvc = app(DigitalSignatureService::class);
-        foreach ($digitalSigs as $ds) {
-            $stage = $ds->metadata['stage'] ?? null;
-            if ($stage && ! isset($sigBadges[$stage])) {
-                $sigBadges[$stage] = [
-                    'qr_base64' => base64_encode($sigSvc->generateQrSvg($ds->verification_token, 100)),
-                    'signed_at' => $ds->signed_at->format('M d, Y h:i A'),
-                ];
+        if ($digitalSigs->isNotEmpty()) {
+            $sigSvc = app(DigitalSignatureService::class);
+
+            foreach ($digitalSigs as $ds) {
+                $stage = $ds->metadata['stage'] ?? null;
+                if ($stage && ! isset($sigBadges[$stage])) {
+                    $sigBadges[$stage] = $ds->signed_at->format('M d, Y h:i A');
+                }
             }
+
+            // One document-level QR linking to the ITJR verification page
+            $verifyUrl  = route('itjr.verify', $jobRequest->itjr_no);
+            $documentQr = base64_encode($sigSvc->generateQrSvg($verifyUrl, 120));
         }
 
         $html = view('it-job-requests.pdf', compact(
@@ -197,7 +202,8 @@ class ITJobRequestPdfService
             'dcSig',
             'assignedSig',
             'requesterSig',
-            'sigBadges'
+            'sigBadges',
+            'documentQr'
         ))->render();
 
         $mpdf = new Mpdf([
