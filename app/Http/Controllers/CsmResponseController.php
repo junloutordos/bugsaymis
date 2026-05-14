@@ -96,6 +96,10 @@ class CsmResponseController extends Controller
             ->exists();
 
         if ($exists) {
+            // Heal: CSM exists but status may not have been updated (transient DB issue on first submit)
+            if ($model->status !== $module['post_status']) {
+                $model->update(['status' => $module['post_status']]);
+            }
             return back()->with('success', 'You have already submitted a satisfaction survey for this request.');
         }
 
