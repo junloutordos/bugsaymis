@@ -101,7 +101,7 @@
               @endif
             </td>
             @if($badge)
-            <td style="border:none;padding:0 0 0 8px;vertical-align:middle;width:38%;text-align:left;">
+            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
               <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
               <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
               <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
@@ -201,7 +201,7 @@
               <div class="sig-pos">{{ $jobRequest->assignedTo?->position ?? 'IT/ISA Staff' }}</div>
             </td>
             @if($badge)
-            <td style="border:none;padding:0 0 0 6px;vertical-align:middle;width:38%;text-align:left;">
+            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
               <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
               <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
               <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
@@ -232,7 +232,7 @@
               <div class="sig-pos">{{ $director?->position ?? 'Campus Director' }}</div>
             </td>
             @if($badge)
-            <td style="border:none;padding:0 0 0 6px;vertical-align:middle;width:38%;text-align:left;">
+            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
               <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
               <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
               <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
@@ -292,7 +292,7 @@
               @endif
             </td>
             @if($badge)
-            <td style="border:none;padding:0 0 0 6px;vertical-align:middle;width:38%;text-align:left;">
+            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
               <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
               <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
               <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
@@ -318,7 +318,7 @@
               @endif
             </td>
             @if($badge)
-            <td style="border:none;padding:0 0 0 6px;vertical-align:middle;width:38%;text-align:left;">
+            <td style="border:none;padding:0;vertical-align:middle;width:38%;text-align:left;">
               <img src="data:image/svg+xml;base64,{{ $badge['qr_base64'] }}" style="width:44px;height:44px;display:block;margin-bottom:2px;">
               <div style="font-size:7px;color:#1d4ed8;font-weight:bold;">&#10003; Digitally Signed</div>
               <div style="font-size:6.5px;color:#64748b;">{{ $badge['signed_at'] }}</div>
