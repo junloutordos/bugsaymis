@@ -43,27 +43,29 @@
     <tr>
       <td colspan="2" style="border-right:1px solid #000;">
         <div class="field-label" style="margin-bottom:4px;">Requested by:</div>
-        <table style="width:100%;border:none;border-collapse:collapse;">
-          <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
-              @if($requesterSig)
-                <img src="{{ $requesterSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
-              @else
-                <div style="height:36px;"></div>
+        <div style="text-align:center;">
+          <table style="border:none;border-collapse:collapse;margin:0 auto;">
+            <tr>
+              <td style="border:none;padding:0;vertical-align:middle;">
+                @if($requesterSig)
+                  <img src="{{ $requesterSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @else
+                  <div style="height:36px;width:50px;"></div>
+                @endif
+              </td>
+              @if(isset($sigBadges['submission']))
+              <td style="border:none;padding:0;vertical-align:middle;">
+                <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
+                <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['submission'] }}</div>
+              </td>
               @endif
-              <div><span class="sig-name">{{ strtoupper($jobRequest->user?->name ?? '') }}</span></div>
-              @if($jobRequest->user?->division?->division_name)
-                <div class="sig-pos">{{ $jobRequest->user->division->division_name }}</div>
-              @endif
-            </td>
-            @if(isset($sigBadges['submission']))
-            <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
-              <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['submission'] }}</div>
-            </td>
-            @endif
-          </tr>
-        </table>
+            </tr>
+          </table>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->user?->name ?? '') }}</span></div>
+          @if($jobRequest->user?->division?->division_name)
+            <div class="sig-pos">{{ $jobRequest->user->division->division_name }}</div>
+          @endif
+        </div>
       </td>
       <td>
         <div class="field-label">ITJRF #:</div>
@@ -75,25 +77,27 @@
     <tr>
       <td colspan="2" style="border-right:1px solid #000;">
         <div class="field-label" style="margin-bottom:4px;">Approved by (Division Chief):</div>
-        <table style="width:100%;border:none;border-collapse:collapse;">
-          <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
-              @if($dcSig)
-                <img src="{{ $dcSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
-              @else
-                <div style="height:36px;"></div>
+        <div style="text-align:center;">
+          <table style="border:none;border-collapse:collapse;margin:0 auto;">
+            <tr>
+              <td style="border:none;padding:0;vertical-align:middle;">
+                @if($dcSig)
+                  <img src="{{ $dcSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @else
+                  <div style="height:36px;width:50px;"></div>
+                @endif
+              </td>
+              @if(isset($sigBadges['dc_approval']))
+              <td style="border:none;padding:0;vertical-align:middle;">
+                <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
+                <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['dc_approval'] }}</div>
+              </td>
               @endif
-              <div><span class="sig-name">{{ strtoupper($jobRequest->divisionChief?->name ?? '') }}</span></div>
-              <div class="sig-pos">{{ $jobRequest->divisionChief?->position ?? 'Division Chief' }}</div>
-            </td>
-            @if(isset($sigBadges['dc_approval']))
-            <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
-              <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['dc_approval'] }}</div>
-            </td>
-            @endif
-          </tr>
-        </table>
+            </tr>
+          </table>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->divisionChief?->name ?? '') }}</span></div>
+          <div class="sig-pos">{{ $jobRequest->divisionChief?->position ?? 'Division Chief' }}</div>
+        </div>
       </td>
       <td style="vertical-align:middle;">
         <div class="field-label">Date:</div>
@@ -137,25 +141,27 @@
     {{-- Row 7: Assigned staff | Target date | Director --}}
     <tr>
       <td style="border-top:none;padding-top:4px;">
-        <table style="width:100%;border:none;border-collapse:collapse;">
-          <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
-              @if($assignedSig)
-                <img src="{{ $assignedSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
-              @else
-                <div style="height:36px;"></div>
+        <div style="text-align:center;">
+          <table style="border:none;border-collapse:collapse;margin:0 auto;">
+            <tr>
+              <td style="border:none;padding:0;vertical-align:middle;">
+                @if($assignedSig)
+                  <img src="{{ $assignedSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @else
+                  <div style="height:36px;width:50px;"></div>
+                @endif
+              </td>
+              @if(isset($sigBadges['mis_acted']))
+              <td style="border:none;padding:0;vertical-align:middle;">
+                <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
+                <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['mis_acted'] }}</div>
+              </td>
               @endif
-              <div><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
-              <div class="sig-pos">{{ $jobRequest->assignedTo?->position ?? 'IT/ISA Staff' }}</div>
-            </td>
-            @if(isset($sigBadges['mis_acted']))
-            <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
-              <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['mis_acted'] }}</div>
-            </td>
-            @endif
-          </tr>
-        </table>
+            </tr>
+          </table>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
+          <div class="sig-pos">{{ $jobRequest->assignedTo?->position ?? 'IT/ISA Staff' }}</div>
+        </div>
       </td>
       <td style="border-top:none;text-align:center;vertical-align:middle;">
         @if($jobRequest->expected_completion_date)
@@ -163,25 +169,27 @@
         @endif
       </td>
       <td style="border-top:none;padding-top:4px;">
-        <table style="width:100%;border:none;border-collapse:collapse;">
-          <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
-              @if($directorSig)
-                <img src="{{ $directorSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
-              @else
-                <div style="height:36px;"></div>
+        <div style="text-align:center;">
+          <table style="border:none;border-collapse:collapse;margin:0 auto;">
+            <tr>
+              <td style="border:none;padding:0;vertical-align:middle;">
+                @if($directorSig)
+                  <img src="{{ $directorSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @else
+                  <div style="height:36px;width:50px;"></div>
+                @endif
+              </td>
+              @if(isset($sigBadges['ocd_approval']))
+              <td style="border:none;padding:0;vertical-align:middle;">
+                <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
+                <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['ocd_approval'] }}</div>
+              </td>
               @endif
-              <div><span class="sig-name">{{ strtoupper($director?->name ?? '') }}</span></div>
-              <div class="sig-pos">{{ $director?->position ?? 'Campus Director' }}</div>
-            </td>
-            @if(isset($sigBadges['ocd_approval']))
-            <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
-              <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['ocd_approval'] }}</div>
-            </td>
-            @endif
-          </tr>
-        </table>
+            </tr>
+          </table>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($director?->name ?? '') }}</span></div>
+          <div class="sig-pos">{{ $director?->position ?? 'Campus Director' }}</div>
+        </div>
       </td>
     </tr>
 
@@ -216,50 +224,54 @@
         @endif
       </td>
       <td style="border-top:none;padding:4px 6px;">
-        <table style="width:100%;border:none;border-collapse:collapse;">
-          <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
-              @if($assignedSig)
-                <img src="{{ $assignedSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
-              @else
-                <div style="height:36px;"></div>
+        <div style="text-align:center;">
+          <table style="border:none;border-collapse:collapse;margin:0 auto;">
+            <tr>
+              <td style="border:none;padding:0;vertical-align:middle;">
+                @if($assignedSig)
+                  <img src="{{ $assignedSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @else
+                  <div style="height:36px;width:50px;"></div>
+                @endif
+              </td>
+              @if(isset($sigBadges['mis_acted']))
+              <td style="border:none;padding:0;vertical-align:middle;">
+                <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
+                <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['mis_acted'] }}</div>
+              </td>
               @endif
-              <div><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
-              @if($jobRequest->assignedTo?->position)
-                <div class="sig-pos">{{ $jobRequest->assignedTo->position }}</div>
-              @endif
-            </td>
-            @if(isset($sigBadges['mis_acted']))
-            <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
-              <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['mis_acted'] }}</div>
-            </td>
-            @endif
-          </tr>
-        </table>
+            </tr>
+          </table>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->assignedTo?->name ?? '') }}</span></div>
+          @if($jobRequest->assignedTo?->position)
+            <div class="sig-pos">{{ $jobRequest->assignedTo->position }}</div>
+          @endif
+        </div>
       </td>
       <td style="border-top:none;padding:4px 6px;">
-        <table style="width:100%;border:none;border-collapse:collapse;">
-          <tr>
-            <td style="border:none;padding:0;text-align:center;vertical-align:middle;">
-              @if($requesterSig)
-                <img src="{{ $requesterSig }}" alt="" style="display:block;margin:0 auto 2px;height:36px;width:auto;">
-              @else
-                <div style="height:36px;"></div>
+        <div style="text-align:center;">
+          <table style="border:none;border-collapse:collapse;margin:0 auto;">
+            <tr>
+              <td style="border:none;padding:0;vertical-align:middle;">
+                @if($requesterSig)
+                  <img src="{{ $requesterSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @else
+                  <div style="height:36px;width:50px;"></div>
+                @endif
+              </td>
+              @if(isset($sigBadges['completion']))
+              <td style="border:none;padding:0;vertical-align:middle;">
+                <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
+                <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['completion'] }}</div>
+              </td>
               @endif
-              <div><span class="sig-name">{{ strtoupper($jobRequest->user?->name ?? '') }}</span></div>
-              @if($jobRequest->user?->position)
-                <div class="sig-pos">{{ $jobRequest->user->position }}</div>
-              @endif
-            </td>
-            @if(isset($sigBadges['completion']))
-            <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
-              <div style="font-size:7.5px;color:#1d4ed8;font-weight:bold;white-space:nowrap;">&#10003; Digitally Signed</div>
-              <div style="font-size:6.5px;color:#64748b;white-space:nowrap;">{{ $sigBadges['completion'] }}</div>
-            </td>
-            @endif
-          </tr>
-        </table>
+            </tr>
+          </table>
+          <div style="margin-top:2px;"><span class="sig-name">{{ strtoupper($jobRequest->user?->name ?? '') }}</span></div>
+          @if($jobRequest->user?->position)
+            <div class="sig-pos">{{ $jobRequest->user->position }}</div>
+          @endif
+        </div>
       </td>
     </tr>
 
