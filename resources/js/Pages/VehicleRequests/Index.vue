@@ -1,17 +1,21 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3";
 import { computed, ref } from "vue";
+import axios from "axios";
 import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { useVehicleRequests } from "@/Composables/useVehicleRequests";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import CsmForm from '@/Components/CsmForm.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
-  requests: Array,
-  vehicles: Array,
+  requests:       Array,
+  vehicles:       Array,
   divisionChiefs: Array,
-  hasPendingCsm: { type: Boolean, default: false },
+  hasPendingCsm:  { type: Boolean, default: false },
+  hasPin:         { type: Boolean, default: false },
+  signatureUri:   { type: String, default: null },
 });
 const page  = usePage();
 
@@ -41,9 +45,47 @@ const {
   destroy, openPrint,
 } = useVehicleRequests(props.requests || [], props.vehicles || [])
 
+// Dynamically add pin field to composable form
+form.pin = null
+
+const showSubmitPin = ref(false)
+const pinLoading = ref(false)
+
+const openPinModal = () => { showSubmitPin.value = true }
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = (pin) => {
+  form.pin = pin || null
+  showSubmitPin.value = false
+  submit()
+}
+
 const showCsmModal = ref(false)
 const requestToCsm = ref(null)
-function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+const showCsmPin   = ref(false)
+const csmPinLoading = ref(false)
+
+function openCsmModal(req) {
+  requestToCsm.value = req
+  if (props.hasPin) {
+    showCsmPin.value = true
+  } else {
+    handleCsmPinConfirm(null)
+  }
+}
+
+async function handleCsmPinConfirm(pin) {
+  showCsmPin.value = false
+  if (!requestToCsm.value) return
+  csmPinLoading.value = true
+  try {
+    await axios.post(route('vehicle-requests.sign-completion', requestToCsm.value.id), { pin })
+  } catch {
+    // non-blocking — signature failure doesn't block CSM survey
+  } finally {
+    csmPinLoading.value = false
+  }
+  showCsmModal.value = true
+}
 
 import Swal from 'sweetalert2'
 
@@ -355,7 +397,7 @@ async function handleNewRequest() {
         </div>
         <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
           <button @click.prevent="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-          <button @click.prevent="submit" :disabled="form.processing"
+          <button @click.prevent="editingRequest ? submit() : openPinModal()" :disabled="form.processing"
                   class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
             <span v-if="form.processing" class="inline-flex items-center">
               <svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -369,6 +411,24 @@ async function handleNewRequest() {
         </div>
       </div>
     </div>
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
+    <DigitalSignaturePin
+      :show="showCsmPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="csmPinLoading"
+      confirmLabel="Sign & Confirm"
+      @confirm="handleCsmPinConfirm"
+      @cancel="showCsmPin = false"
+    />
     <CsmForm
       :show="showCsmModal"
       respondable-type="vehicle-request"

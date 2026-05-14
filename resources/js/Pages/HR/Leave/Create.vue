@@ -186,7 +186,7 @@
                 class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
             Cancel
           </Link>
-          <button @click="submit" :disabled="form.processing"
+          <button @click="openPinModal" :disabled="form.processing"
                   class="px-6 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
             {{ form.processing ? 'Filing…' : 'File Application' }}
           </button>
@@ -194,6 +194,15 @@
 
       </div>
     </div>
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & File"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
   </AdminLayout>
 </template>
 
@@ -201,10 +210,13 @@
 import { ref, computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
-  leaveTypes: Array,
-  credits:    Array,
+  leaveTypes:   Array,
+  credits:      Array,
+  hasPin:       { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 const currentYear = new Date().getFullYear()
@@ -252,7 +264,19 @@ const form = useForm({
   leave_details_specify: '',
   reason:                '',
   supporting_document:   null,
+  pin:                   null,
 })
+
+const showSubmitPin = ref(false)
+const pinLoading = ref(false)
+
+const openPinModal = () => { showSubmitPin.value = true }
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = (pin) => {
+  form.pin = pin || null
+  showSubmitPin.value = false
+  submit()
+}
 
 // ── Leave type selection ─────────────────────────────────────────────────────
 

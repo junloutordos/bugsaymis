@@ -7,8 +7,15 @@ import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { useSubmit } from "@/Composables/useSubmit";
 import CsmForm from '@/Components/CsmForm.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
-const props = defineProps({ requests: Object });
+const props = defineProps({
+  requests:        Object,
+  isDivisionChief: { type: Boolean, default: false },
+  canViewAll:      { type: Boolean, default: false },
+  hasPin:          { type: Boolean, default: false },
+  signatureUri:    { type: String,  default: null },
+});
 const page = usePage();
 
 const showCsmModal = ref(false)
@@ -34,8 +41,7 @@ async function handleNewRequest() {
   openModal()
 }
 
-// client-side search + pagination (requests may be paginated server-side in props.requests.data)
-const requestsList = ref((props.requests && props.requests.data) ? props.requests.data : (props.requests || []))
+const requestsList = ref(Array.isArray(props.requests) ? props.requests : (props.requests?.data ?? []))
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
@@ -83,7 +89,28 @@ const form = useForm({
   time_needed: '',
   purposes: '',
   details: '',
+  pin: null,
 });
+
+const showSubmitPin = ref(false)
+const pinLoading = ref(false)
+
+const openPinModal = () => {
+  if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
+  showSubmitPin.value = true
+}
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = (pin) => {
+  form.pin = pin || null
+  showSubmitPin.value = false
+  doPostStore()
+}
+const doPostStore = () => {
+  form.post(route('service-requests.store'), {
+    onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+    onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed to submit', text: Object.values(errs || {}).flat().join('\n') || 'Failed to submit' }) }
+  })
+}
 
 // Inline client-side validation state
 const fieldErrors = reactive({
@@ -156,11 +183,6 @@ const submit = () => {
       onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
       onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errs || {}).flat().join('\n') || 'Failed to update' }) }
     });
-  } else {
-    form.post(route('service-requests.store'), {
-      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
-      onError: (errs) => { Swal.fire({ icon: 'error', title: 'Failed to submit', text: Object.values(errs || {}).flat().join('\n') || 'Failed to submit' }) }
-    });
   }
 };
 
@@ -178,7 +200,9 @@ const remove = (id) => {
 
 const canPrint = (r) => {
   const st = (r?.status || '').toString().toLowerCase();
-  return hasAnyRole('Administrator', 'GSU Head') && st.includes('approved');
+  if (!st.includes('approved')) return false
+  const isOwn = r?.requestor_id === page.props.auth?.user?.id
+  return props.canViewAll || isOwn
 };
 </script>
 
@@ -359,7 +383,7 @@ const canPrint = (r) => {
           </div>
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
             <button @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button @click="submit" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+            <button @click="editingId ? submit() : openPinModal()" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
               <span v-if="form.processing">Processing…</span>
               <span v-else>{{ editingId ? 'Update' : 'Submit' }}</span>
             </button>
@@ -367,6 +391,15 @@ const canPrint = (r) => {
         </div>
       </div>
     </div>
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
     <CsmForm
       :show="showCsmModal"
       respondable-type="service-request"

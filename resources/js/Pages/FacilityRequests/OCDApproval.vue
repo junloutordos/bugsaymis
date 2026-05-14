@@ -5,8 +5,14 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { CheckCircleIcon, XCircleIcon, EyeIcon, XMarkIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
-const props = defineProps({ requests: Object, filters: Object })
+const props = defineProps({
+  requests:     Object,
+  filters:      Object,
+  hasPin:       { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
+})
 
 const showModal       = ref(false)
 const selectedRequest = ref(null)
@@ -55,6 +61,10 @@ const venueLabel = (venue) => {
   } catch { return String(venue) }
 }
 
+const showApprovePin   = ref(false)
+const pendingApproveId = ref(null)
+const pinLoading       = ref(false)
+
 const approveRequest = async (id) => {
   const result = await Swal.fire({
     title: 'Approve this facility request?',
@@ -62,9 +72,15 @@ const approveRequest = async (id) => {
     confirmButtonText: 'Yes, approve', cancelButtonText: 'Cancel', reverseButtons: true,
   })
   if (!result.isConfirmed) return
+  pendingApproveId.value = id
+  showApprovePin.value = true
+}
+
+function handleApproveConfirm(pin) {
+  showApprovePin.value = false
   isSubmitting.value = true
   Swal.fire({ title: 'Approving…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
-  router.post(route('facility-requests.ocd-action', id), { action: 'approve' }, {
+  router.post(route('facility-requests.ocd-action', pendingApproveId.value), { action: 'approve', pin: pin || null }, {
     onSuccess: () => Swal.fire('Approved!', 'Facility request approved by OCD.', 'success'),
     onFinish:  () => { isSubmitting.value = false },
   })
@@ -201,5 +217,14 @@ const rejectRequest = async (id) => {
         </div>
       </div>
     </div>
+    <DigitalSignaturePin
+      :show="showApprovePin"
+      :hasPin="props.hasPin"
+      :signatureUri="props.signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Approve"
+      @confirm="handleApproveConfirm"
+      @cancel="showApprovePin = false"
+    />
   </AdminLayout>
 </template>

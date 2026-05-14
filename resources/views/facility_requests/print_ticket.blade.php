@@ -55,6 +55,7 @@
         .small {
             font-size: 11px;
         }
+        .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
         .signatures {
             display: flex;
             justify-content: space-between;
@@ -278,32 +279,38 @@
             }
         @endphp
 
-        <div class="sign {{ $reqSig ? 'with-image' : '' }}">
-            @if($reqSig)
+        <div class="sign {{ ($reqSig || isset($sigs['submission'])) ? 'with-image' : '' }}">
+            @if(isset($sigs['submission']['uri']))
+                <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+            @elseif($reqSig)
                 <img src="{{ asset('storage/' . $reqSig) }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
             @endif
             <div class="line"></div>
-
+            @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="small"><strong>{{ $request->requester?->name ?? $request->requestor ?? '—' }}</strong></div>
             Requestor
         </div>
 
-        <div class="sign {{ $dcSig ? 'with-image' : '' }}">
-            @if($dcSig)
+        <div class="sign {{ ($dcSig || isset($sigs['dc_approval'])) ? 'with-image' : '' }}">
+            @if(isset($sigs['dc_approval']['uri']))
+                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+            @elseif($dcSig)
                 <img src="{{ asset('storage/' . $dcSig) }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
             @endif
             <div class="line"></div>
-
+            @if(isset($sigs['dc_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['dc_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="small"><strong>{{ $dcName ?? '—' }}</strong></div>
             Division Head Concerned
         </div>
 
-        <div class="sign {{ $fadSig ? 'with-image' : '' }}">
-            @if($fadSig)
+        <div class="sign {{ ($fadSig || isset($sigs['fad_approval'])) ? 'with-image' : '' }}">
+            @if(isset($sigs['fad_approval']['uri']))
+                <img src="{{ $sigs['fad_approval']['uri'] }}" alt="fad signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+            @elseif($fadSig)
                 <img src="{{ asset('storage/' . $fadSig) }}" alt="fad signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
             @endif
             <div class="line"></div>
-
+            @if(isset($sigs['fad_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['fad_approval']['name'] }} · {{ optional($sigs['fad_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="small"><strong>{{ $fadName ?? '—' }}</strong></div>
             FAD Chief / Approving Authority
         </div>

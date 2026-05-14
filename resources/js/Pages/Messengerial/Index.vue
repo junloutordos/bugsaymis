@@ -7,10 +7,13 @@ import Swal from 'sweetalert2'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { storageUrl } from "@/Composables/useStorage.js"
 import CsmForm from '@/Components/CsmForm.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
   requests: Array,
   hasPendingCsm: { type: Boolean, default: false },
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 });
 const page = usePage();
 
@@ -95,7 +98,18 @@ function onProofSelected(e) {
   };
   reader.readAsDataURL(file);
 }
-const form = useForm({ purpose: '', destination: '', reference_no: '', delivery_methods: [], messengerial_kinds: [], consignee_name: '', consignee_contact: '', consignee_email: '' });
+const form = useForm({ purpose: '', destination: '', reference_no: '', delivery_methods: [], messengerial_kinds: [], consignee_name: '', consignee_contact: '', consignee_email: '', pin: null });
+
+const showSubmitPin = ref(false)
+const pinLoading = ref(false)
+
+const openPinModal = () => { showSubmitPin.value = true }
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = (pin) => {
+  form.pin = pin || null
+  showSubmitPin.value = false
+  submit()
+}
 
 const openModal = (req = null) => {
   if (req) {
@@ -374,7 +388,7 @@ const submitProof = () => {
             </div>
             <div class="flex justify-end gap-2 pt-2">
               <button @click.prevent="closeModal" type="button" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-              <button :disabled="form.processing" type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+              <button :disabled="form.processing" type="button" @click.prevent="openPinModal" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
                 <span v-if="form.processing">Submitting…</span>
                 <span v-else>Submit</span>
               </button>
@@ -438,6 +452,15 @@ const submitProof = () => {
 
     </div>
 
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
     <CsmForm
       :show="showCsmModal"
       respondable-type="messengerial-request"

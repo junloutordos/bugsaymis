@@ -226,7 +226,7 @@
           </form>
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
             <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="submit" @click="submitForm" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+            <button type="button" @click="editingId ? submitForm() : openPinModal()" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
               <span v-if="form.processing">Saving…</span>
               <span v-else>Save</span>
             </button>
@@ -270,6 +270,15 @@
         </div>
       </div>
     </div>
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
     <CsmForm
       :show="showCsmModal"
       respondable-type="work-request"
@@ -291,6 +300,7 @@ import { PencilSquareIcon, TrashIcon, UserPlusIcon, CheckCircleIcon, XMarkIcon, 
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import CsmForm from '@/Components/CsmForm.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
   divisions: Array,
@@ -299,6 +309,8 @@ const props = defineProps({
   skilledUsers: Array,
   workRequests: Array,
   hasPendingCsm: { type: Boolean, default: false },
+  hasPin: { type: Boolean, default: false },
+  signatureUri: { type: String, default: null },
 })
 
 const showCsmModal = ref(false)
@@ -382,7 +394,25 @@ const form = useForm({
   location_office_id: '',
   expected_completion_date: '',
   assigned_user_id: '',
+  pin: null,
 })
+
+const showSubmitPin = ref(false)
+const pinLoading = ref(false)
+
+const openPinModal = () => { showSubmitPin.value = true }
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = (pin) => {
+  form.pin = pin || null
+  showSubmitPin.value = false
+  doPostStore()
+}
+const doPostStore = () => {
+  form.post('/work-requests', {
+    onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Work request created', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+    onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to create', text: Object.values(errors).flat().join('\n') || 'Failed to create' }) }
+  })
+}
 
 const completeForm = useForm({
   acted_by_id: '',
@@ -447,11 +477,6 @@ const submitForm = () => {
     form.put(`/work-requests/${editingId.value}`, {
       onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Work request updated', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
       onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to update', text: Object.values(errors).flat().join('\n') || 'Failed to update' }) }
-    })
-  } else {
-    form.post('/work-requests', {
-      onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: 'Work request created', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
-      onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to create', text: Object.values(errors).flat().join('\n') || 'Failed to create' }) }
     })
   }
 }

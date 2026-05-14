@@ -5,11 +5,14 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { EyeIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
-  tabs:       { type: Array,  default: () => [] },
-  totalCount: { type: Number, default: 0 },
-  filters:    { type: Object, default: () => ({}) },
+  tabs:         { type: Array,   default: () => [] },
+  totalCount:   { type: Number,  default: 0 },
+  filters:      { type: Object,  default: () => ({}) },
+  hasPin:       { type: Boolean, default: false },
+  signatureUri: { type: String,  default: null },
 })
 
 // ── Local state ───────────────────────────────────────────────────────────────
@@ -21,6 +24,11 @@ const selectedItem = ref(null)
 const showDecline  = ref(false)
 const declineReason = ref('')
 const isSubmitting  = ref(false)
+
+// PIN modal state
+const showPinModal   = ref(false)
+const pinModalLoading = ref(false)
+const pendingApproveItem = ref(null)
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const visibleTabs = computed(() => localTabs.value.filter(t => t.count > 0))
@@ -81,28 +89,31 @@ function closeModal() {
 }
 
 // ── Approve ───────────────────────────────────────────────────────────────────
-async function confirmApprove(item) {
-  const result = await Swal.fire({
-    title: 'Approve this request?',
-    text: `${item.reference_no} — ${item.summary}`,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Yes, approve',
-    cancelButtonText: 'Cancel',
-    reverseButtons: true,
-  })
-  if (!result.isConfirmed) return
+function confirmApprove(item) {
+  pendingApproveItem.value = item
+  showPinModal.value = true
+}
 
+function handlePinConfirm(pin) {
+  const item = pendingApproveItem.value
+  if (! item) return
+
+  pinModalLoading.value = true
   isSubmitting.value = true
   Swal.fire({ title: 'Processing…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
 
+  const payload = {}
+  if (pin) payload.pin = pin
+
   router.post(
     route('approvals.approve', { type: item.type, id: item.id }),
-    {},
+    payload,
     {
       onSuccess: () => {
         removeItemFromTabs(item.type, item.id)
         closeModal()
+        showPinModal.value = false
+        pendingApproveItem.value = null
         Swal.fire({
           icon: 'success',
           title: 'Approved',
@@ -118,9 +129,17 @@ async function confirmApprove(item) {
           text: errors?.message ?? 'Could not approve this request. It may have already been acted upon.',
         })
       },
-      onFinish: () => { isSubmitting.value = false },
+      onFinish: () => {
+        isSubmitting.value = false
+        pinModalLoading.value = false
+      },
     }
   )
+}
+
+function handlePinCancel() {
+  showPinModal.value = false
+  pendingApproveItem.value = null
 }
 
 // ── Decline ───────────────────────────────────────────────────────────────────
@@ -372,5 +391,16 @@ function submitDecline(item) {
         </div>
       </div>
     </div>
+
+    <!-- Digital Signature PIN modal for approvals -->
+    <DigitalSignaturePin
+      :show="showPinModal"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinModalLoading"
+      confirmLabel="Approve"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
   </AdminLayout>
 </template>

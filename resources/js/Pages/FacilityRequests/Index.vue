@@ -1,5 +1,6 @@
 <script setup>
 import { Head, usePage, useForm } from "@inertiajs/vue3";
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { ref, reactive, computed, watch } from "vue";
 import axios from "axios";
 import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
@@ -8,7 +9,13 @@ import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
-const props = defineProps({ requests: Array, facilities: Array, misUsers: Array });
+const props = defineProps({
+  requests:     Array,
+  facilities:   Array,
+  misUsers:     Array,
+  hasPin:       { type: Boolean, default: false },
+  signatureUri: { type: String,  default: null },
+});
 const page = usePage();
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
 const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
@@ -226,9 +233,33 @@ const minEventDate = computed(() => {
 })
 
 // ── CSM ───────────────────────────────────────────────────────────────────────
-const showCsmModal  = ref(false)
-const requestToCsm  = ref(null)
-function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
+const showCsmModal   = ref(false)
+const requestToCsm   = ref(null)
+const showCsmPin     = ref(false)
+const csmPinLoading  = ref(false)
+
+function openCsmModal(req) {
+  requestToCsm.value = req
+  if (props.hasPin) {
+    showCsmPin.value = true
+  } else {
+    handleCsmPinConfirm(null)
+  }
+}
+
+async function handleCsmPinConfirm(pin) {
+  showCsmPin.value = false
+  if (!requestToCsm.value) return
+  csmPinLoading.value = true
+  try {
+    await axios.post(route('facility-requests.sign-completion', requestToCsm.value.id), { pin })
+  } catch {
+    // non-blocking — signature failure doesn't block CSM survey
+  } finally {
+    csmPinLoading.value = false
+  }
+  showCsmModal.value = true
+}
 
 const hasPendingConfirmation = computed(() => {
   const uid = page.props.auth?.user?.id
@@ -268,6 +299,41 @@ const onItAssistanceChange = async () => {
   } catch {
     // silently ignore network errors
   }
+}
+
+// ── PIN modal for submission ──────────────────────────────────────────────────
+const showSubmitPin = ref(false)
+const pinLoading    = ref(false)
+function handlePinCancel() { showSubmitPin.value = false }
+function handlePinConfirm(pin) {
+  pinLoading.value = true
+  if (pin) form.pin = pin
+  doPostStore()
+}
+
+function openPinModal() {
+  if (!validateAll()) { Swal.fire({ icon: 'error', title: 'Validation failed', text: 'Please fix the highlighted errors before submitting.' }); return }
+  if (form.date_start) {
+    const [y, m, d] = form.date_start.split('-').map(Number)
+    const picked = new Date(y, m - 1, d)
+    const minD   = new Date(); minD.setDate(minD.getDate() + 3); minD.setHours(0, 0, 0, 0)
+    if (picked < minD) { Swal.fire('Filing Not Allowed', 'Facility requests must be filed at least 3 days before the event date.', 'error'); return }
+  }
+  showSubmitPin.value = true
+}
+
+function doPostStore() {
+  const onError = (errors) => {
+    const venueErr = errors?.venue ?? page.props.errors?.venue
+    const text = venueErr ? (Array.isArray(venueErr) ? venueErr.join(', ') : venueErr) : (Object.values(errors || {}).flat().join(', ') || 'Failed to submit')
+    Swal.fire({ icon: 'error', title: 'Failed to submit', text })
+    pinLoading.value = false; showSubmitPin.value = false
+  }
+  form.post(route('facility-requests.store'), {
+    onSuccess: () => { closeModal(); showSubmitPin.value = false; Swal.fire({ icon: 'success', title: 'Request submitted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+    onError,
+    onFinish: () => { pinLoading.value = false },
+  })
 }
 
 const submit = () => {
@@ -726,7 +792,7 @@ const bookingsForDate = (dt) => {
           </div>
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
             <button @click.prevent="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button @click.prevent="submit" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
+            <button @click.prevent="editingRequest ? submit() : openPinModal()" :disabled="form.processing || pinLoading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
               <span v-if="form.processing">Submitting…</span>
               <span v-else>Submit</span>
             </button>
@@ -745,6 +811,24 @@ const bookingsForDate = (dt) => {
       service-other-label=""
       @close="showCsmModal = false"
       @submitted="showCsmModal = false"
+    />
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="props.hasPin"
+      :signatureUri="props.signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
+    <DigitalSignaturePin
+      :show="showCsmPin"
+      :hasPin="props.hasPin"
+      :signatureUri="props.signatureUri"
+      :loading="csmPinLoading"
+      confirmLabel="Sign & Confirm"
+      @confirm="handleCsmPinConfirm"
+      @cancel="showCsmPin = false"
     />
   </AdminLayout>
 </template>

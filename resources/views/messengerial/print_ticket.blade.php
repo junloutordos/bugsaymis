@@ -102,6 +102,8 @@
             font-size: 11px;
         }
 
+        .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
+
         /* NOTE */
         .note {
             margin-top: 15px;
@@ -188,17 +190,24 @@
     <!-- SIGNATURES -->
     <div class="signature">
         <div class="sig-box">
-            @if(!empty($requestorSignature))
+            @if(isset($sigs['submission']['uri']))
+                <img src="{{ $sigs['submission']['uri'] }}" alt="Signature" class="sig-img" />
+            @elseif(!empty($requestorSignature))
                 <img src="{{ '/storage/' . $requestorSignature }}" alt="Signature" class="sig-img" />
             @endif
 
             <div class="sig-line"></div>
+            @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="sig-name">{{ $request->requestor ?? '' }}</div>
             <div class="sig-label">Requested By</div>
         </div>
 
         <div class="sig-box">
+            @if(isset($sigs['division_chief']['uri']))
+                <img src="{{ $sigs['division_chief']['uri'] }}" alt="Signature" class="sig-img" />
+            @endif
             <div class="sig-line"></div>
+            @if(isset($sigs['division_chief'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['division_chief']['name'] }} · {{ optional($sigs['division_chief']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             Received by
         </div>
     </div>
@@ -285,17 +294,24 @@
     <!-- SIGNATURES -->
     <div class="signature">
         <div class="sig-box">
-            @if(!empty($requestorSignature))
+            @if(isset($sigs['submission']['uri']))
+                <img src="{{ $sigs['submission']['uri'] }}" alt="Signature" class="sig-img" />
+            @elseif(!empty($requestorSignature))
                 <img src="{{ '/storage/' . $requestorSignature }}" alt="Signature" class="sig-img" />
             @endif
 
             <div class="sig-line"></div>
+            @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="sig-name">{{ $request->requestor ?? '' }}</div>
             <div class="sig-label">Requested By</div>
         </div>
 
         <div class="sig-box">
+            @if(isset($sigs['division_chief']['uri']))
+                <img src="{{ $sigs['division_chief']['uri'] }}" alt="Signature" class="sig-img" />
+            @endif
             <div class="sig-line"></div>
+            @if(isset($sigs['division_chief'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['division_chief']['name'] }} · {{ optional($sigs['division_chief']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             Received by
         </div>
     </div>
