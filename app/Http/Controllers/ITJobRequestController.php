@@ -536,6 +536,34 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         return back()->with('success', 'Request confirmed and rated.');
     }
 
+    /**
+     * Create a digital signature for the completion stage.
+     * Called separately from the CSM rating form so PIN can be collected first.
+     */
+    public function signCompletion(Request $request, ITJobRequest $jobRequest)
+    {
+        if ($jobRequest->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $alreadySigned = DigitalSignature::where('signable_type', ITJobRequest::class)
+            ->where('signable_id', $jobRequest->id)
+            ->where('metadata->stage', 'completion')
+            ->exists();
+
+        if (! $alreadySigned) {
+            $this->trySign(
+                $request,
+                $jobRequest,
+                'completion',
+                "IT Job Request #{$jobRequest->itjr_no} — Completion Confirmed",
+                $jobRequest->itjr_no . 'completion' . $request->user()->id,
+            );
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function forApproval(Request $request)
     {
         $user = $request->user();

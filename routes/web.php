@@ -352,8 +352,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::delete('/job-requests/{jobRequest}', [ITJobRequestController::class, 'destroy'])->name('jobrequests.destroy');
     Route::get('/job-requests/{jobRequest}/print', [ITJobRequestController::class, 'printForm'])->name('jobrequests.print');
     Route::post('/app-versions', [\App\Http\Controllers\AppVersionController::class, 'store'])->name('app-versions.store');
-    Route::post('/it-job-requests/{jobRequest}/confirm',[ITJobRequestController::class, 'confirmCompletion']
-);
+    Route::post('/it-job-requests/{jobRequest}/confirm',[ITJobRequestController::class, 'confirmCompletion']);
+    Route::post('/it-job-requests/{jobRequest}/sign-completion', [ITJobRequestController::class, 'signCompletion'])->name('jobrequests.sign-completion');
 
     Route::get('/itjr/{jobRequest}/division-chief/{action}',[ITJobRequestController::class, 'approveByDivisionChief'])->name('itjr.dc.action');
     

@@ -122,9 +122,33 @@ const hasPendingConfirmation = computed(() => {
 const showCsmModal    = ref(false)
 const requestToRate   = ref(null)
 
-function openRatingModal(request) {
-  requestToRate.value = request
-  showCsmModal.value  = true
+// ── Completion digital signature ──────────────────────────────────────────────
+const completionSigShow    = ref(false)
+const completionSigLoading = ref(false)
+const completionItem       = ref(null)
+
+function openConfirmRating(request) {
+  completionItem.value = request
+  completionSigShow.value = true
+}
+
+async function handleCompletionSigConfirm(pin) {
+  completionSigLoading.value = true
+  try {
+    await axios.post(route('jobrequests.sign-completion', completionItem.value.id), { pin })
+  } catch (e) {
+    // Non-fatal — proceed with CSM form even if signing fails
+  } finally {
+    completionSigLoading.value = false
+  }
+  completionSigShow.value = false
+  requestToRate.value = completionItem.value
+  showCsmModal.value = true
+}
+
+function handleCompletionSigCancel() {
+  completionSigShow.value = false
+  completionItem.value = null
 }
 // ── Equipment searchable dropdown ─────────────────────────────────────────────
 const eqSearch     = ref('')
@@ -391,7 +415,7 @@ function handleSigCancel() {
 
                     <button
                       v-if="req.status === 'Acted by MIS' && req.user_id === currentUser?.id"
-                      @click="openRatingModal(req)"
+                      @click="openConfirmRating(req)"
                       class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm"
                     >
                       Confirm & Rate
@@ -463,7 +487,7 @@ function handleSigCancel() {
 
               <button
                 v-if="req.status === 'Acted by MIS' && userRole !== 'Administrator'"
-                @click="openRatingModal(req)"
+                @click="openConfirmRating(req)"
                 class="w-full inline-flex items-center justify-center px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 Confirm & Rate
@@ -841,6 +865,16 @@ function handleSigCancel() {
         :confirm-label="sigConfirmLabel"
         @confirm="handleSigConfirm"
         @cancel="handleSigCancel"
+      />
+
+      <DigitalSignaturePin
+        :show="completionSigShow"
+        :has-pin="props.hasPin"
+        :signature-uri="props.signatureUri"
+        :loading="completionSigLoading"
+        confirm-label="Sign & Confirm"
+        @confirm="handleCompletionSigConfirm"
+        @cancel="handleCompletionSigCancel"
       />
 
     </div>

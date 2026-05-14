@@ -167,12 +167,7 @@ class ITJobRequestPdfService
                 ? (self::DEFAULT_RECOMMENDATIONS[$jobRequest->category] ?? $jobRequest->category)
                 : '—');
 
-        $directorSig  = $this->sigDataUri($director?->electronic_signature);
-        $dcSig        = $this->sigDataUri($jobRequest->divisionChief?->electronic_signature);
-        $assignedSig  = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
-        $requesterSig = $this->sigDataUri($jobRequest->user?->electronic_signature);
-
-        // Collect per-stage text badges (signed_at label only — no per-sig QR)
+        // Collect per-stage text badges first — sig images are only shown for stages that have been signed
         $sigBadges = [];
         $documentQr = null;
         $digitalSigs = DigitalSignature::where('signable_type', ITJobRequest::class)
@@ -181,8 +176,6 @@ class ITJobRequestPdfService
             ->get();
 
         if ($digitalSigs->isNotEmpty()) {
-            $sigSvc = app(DigitalSignatureService::class);
-
             foreach ($digitalSigs as $ds) {
                 $stage = $ds->metadata['stage'] ?? null;
                 if ($stage && ! isset($sigBadges[$stage])) {
@@ -195,6 +188,13 @@ class ITJobRequestPdfService
             $documentQr = base64_encode(QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
         }
 
+        // Only embed a signature image when that stage has a confirmed digital signature record
+        $requesterSig  = isset($sigBadges['submission'])   ? $this->sigDataUri($jobRequest->user?->electronic_signature)         : null;
+        $dcSig         = isset($sigBadges['dc_approval'])  ? $this->sigDataUri($jobRequest->divisionChief?->electronic_signature) : null;
+        $assignedSig   = isset($sigBadges['mis_acted'])    ? $this->sigDataUri($jobRequest->assignedTo?->electronic_signature)    : null;
+        $directorSig   = isset($sigBadges['ocd_approval']) ? $this->sigDataUri($director?->electronic_signature)                  : null;
+        $completionSig = isset($sigBadges['completion'])   ? $this->sigDataUri($jobRequest->user?->electronic_signature)          : null;
+
         $html = view('it-job-requests.pdf', compact(
             'jobRequest',
             'director',
@@ -203,6 +203,7 @@ class ITJobRequestPdfService
             'dcSig',
             'assignedSig',
             'requesterSig',
+            'completionSig',
             'sigBadges',
             'documentQr'
         ))->render();
