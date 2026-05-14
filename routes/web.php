@@ -387,6 +387,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])->name('vehicle-requests.store');
     Route::post('/vehicle-requests/{vehicleRequest}/approve', [\App\Http\Controllers\VehicleRequestController::class, 'approveInApp'])->name('vehicle-requests.approve.inapp')->middleware('permission:vehicles.dc-approve');
     Route::post('/vehicle-requests/{vehicleRequest}/decline', [\App\Http\Controllers\VehicleRequestController::class, 'declineInApp'])->name('vehicle-requests.decline.inapp')->middleware('permission:vehicles.dc-approve');
+    Route::post('/vehicle-requests/{vehicleRequest}/sign-completion', [\App\Http\Controllers\VehicleRequestController::class, 'signCompletion'])->name('vehicle-requests.sign-completion');
+    Route::post('/facility-requests/{facilityRequest}/sign-completion', [\App\Http\Controllers\FacilityRequestController::class, 'signCompletion'])->name('facility-requests.sign-completion');
     // Vehicle bookings API for calendar
     Route::get('/vehicle-bookings', [\App\Http\Controllers\VehicleRequestController::class, 'bookings'])->name('vehicle-requests.bookings');
     // Facility bookings API for calendar

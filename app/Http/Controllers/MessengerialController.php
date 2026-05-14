@@ -17,10 +17,17 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
+use App\Services\DigitalSignatureService;
+use App\Http\Traits\SignsDocuments;
 
 class MessengerialController extends Controller
 {
-    public function __construct(private SnapshotService $snapshots) {}
+    use SignsDocuments;
+
+    public function __construct(
+        private SnapshotService         $snapshots,
+        private DigitalSignatureService $sigService,
+    ) {}
 
     public function index(Request $request)
     {
@@ -45,6 +52,8 @@ class MessengerialController extends Controller
         return Inertia::render('Messengerial/Index', [
             'requests'      => $requests,
             'hasPendingCsm' => $hasPendingCsm,
+            'hasPin'        => ! empty($user->signature_pin),
+            'signatureUri'  => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -200,6 +209,12 @@ class MessengerialController extends Controller
                 logger()->error('Failed to send messengerial request email', ['error' => $e->getMessage()]);
             }
         }
+
+        $this->performSign($request, MessengerialRequest::class, $mr->id,
+            'submission',
+            "Messengerial Request #{$mr->id}",
+            MessengerialRequest::class . $mr->id . 'submission'
+        );
 
         return redirect()->route('messengerial.index')->with('success', 'Request submitted');
     }
@@ -391,6 +406,12 @@ class MessengerialController extends Controller
             $messengerialRequest->status = 'Approved';
             $messengerialRequest->save();
 
+            $this->performSign($request, MessengerialRequest::class, $messengerialRequest->id,
+                'division_chief',
+                "Messengerial Request #{$messengerialRequest->id}",
+                MessengerialRequest::class . $messengerialRequest->id . 'division_chief'
+            );
+
             // Notify requester
             try {
                 if ($messengerialRequest->email) {
@@ -505,10 +526,13 @@ class MessengerialController extends Controller
             $requestorSignature = $reqUser?->electronic_signature ?? null;
         }
 
+        $sigs = $this->loadSigsForPrint(MessengerialRequest::class, $messengerialRequest->id);
+
         return view('messengerial.print_ticket', [
-            'request' => $messengerialRequest,
-            'divisionChiefName' => $divisionChiefName,
+            'request'            => $messengerialRequest,
+            'divisionChiefName'  => $divisionChiefName,
             'requestorSignature' => $requestorSignature,
+            'sigs'               => $sigs,
         ]);
     }
 

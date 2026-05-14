@@ -12,6 +12,8 @@ use App\Models\FacultyLoading\SalarySchedule;
 use App\Services\HR\ApprovalService;
 use App\Services\HR\LeaveCreditService;
 use App\Services\SnapshotService;
+use App\Services\DigitalSignatureService;
+use App\Http\Traits\SignsDocuments;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,10 +21,13 @@ use Inertia\Inertia;
 
 class LeaveApplicationController extends Controller
 {
+    use SignsDocuments;
+
     public function __construct(
-        private LeaveCreditService $credits,
-        private ApprovalService    $approvals,
-        private SnapshotService    $snapshots,
+        private LeaveCreditService      $credits,
+        private ApprovalService         $approvals,
+        private SnapshotService         $snapshots,
+        private DigitalSignatureService $sigService,
     ) {}
 
     public function index(Request $request)
@@ -54,15 +59,17 @@ class LeaveApplicationController extends Controller
 
         $balances = $this->credits->getEmployeeLeaveBalance(Auth::id(), now()->year);
 
+        $authUser = Auth::user();
+
         return Inertia::render('HR/Leave/Create', [
-            'leaveTypes' => LeaveType::where('is_active', true)->orderBy('sort_order')->get(),
-            // Full credit rows for the print form sidebar
-            'credits'    => LeaveCredit::where('user_id', Auth::id())
+            'leaveTypes'   => LeaveType::where('is_active', true)->orderBy('sort_order')->get(),
+            'credits'      => LeaveCredit::where('user_id', Auth::id())
                 ->where('year', now()->year)
                 ->with('leaveType')
                 ->get(),
-            // Summarised balances keyed by leave type code for the balance indicator
-            'balances'   => $balances,
+            'balances'     => $balances,
+            'hasPin'       => ! empty($authUser->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($authUser),
         ]);
     }
 
@@ -115,7 +122,13 @@ class LeaveApplicationController extends Controller
                 ->store('hr/leave_documents', 'local');
         }
 
-        LeaveApplication::create($data);
+        $leaveApplication = LeaveApplication::create($data);
+
+        $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
+            'submission',
+            "Leave Application #{$leaveApplication->id}",
+            LeaveApplication::class . $leaveApplication->id . 'submission'
+        );
 
         return redirect()->route('hr.leave.index')->with('success', 'Leave application filed.');
     }
@@ -157,6 +170,14 @@ class LeaveApplicationController extends Controller
             remarks:     $data['remarks'] ?? '',
             approver:    Auth::user(),
         );
+
+        if ($data['action'] === 'approve') {
+            $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
+                $data['stage'],
+                "Leave Application #{$leaveApplication->id}",
+                LeaveApplication::class . $leaveApplication->id . $data['stage']
+            );
+        }
 
         return back()->with('success', 'Action recorded.');
     }
@@ -401,6 +422,8 @@ class LeaveApplicationController extends Controller
             $application, ApprovalStep::SIG_AUTHORIZED_OFFICIAL, $liveOfficial
         );
 
+        $sigs = $this->loadSigsForPrint(LeaveApplication::class, $leaveApplication->id);
+
         return Inertia::render('HR/Leave/PrintForm', [
             'application'        => $application,
             'credits'            => $creditsMap,
@@ -408,6 +431,7 @@ class LeaveApplicationController extends Controller
             'authorizedOfficer'  => $authorizedOfficer,
             'authorizedOfficial' => $authorizedOfficial,
             'monthlySalary'      => $monthlySalary,
+            'sigs'               => $sigs,
         ]);
     }
 

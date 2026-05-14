@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\HumanResource;
 
 use App\Http\Controllers\Controller;
+use App\Http\Traits\SignsDocuments;
+use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +17,10 @@ use Inertia\Inertia;
 
 class GatePassController extends Controller
 {
+    use SignsDocuments;
+
+    public function __construct(private DigitalSignatureService $sigService) {}
+
     public function index(Request $request)
     {
         // If current user is the chief of a division, show only pending gatepasses
@@ -112,10 +118,16 @@ class GatePassController extends Controller
             }
         }
 
+        $user         = $request->user();
+        $hasPin       = ! empty($user?->signature_pin);
+        $signatureUri = $user ? $this->sigService->getSignatureDataUri($user) : null;
+
         return Inertia::render('HumanResource/GatePass/Index', [
-            'rows' => $rows,
-            'divisionChief' => $divisionChief,
-            'director' => $director,
+            'rows'         => $rows,
+            'divisionChief'=> $divisionChief,
+            'director'     => $director,
+            'hasPin'       => $hasPin,
+            'signatureUri' => $signatureUri,
         ]);
     }
 
@@ -245,6 +257,12 @@ class GatePassController extends Controller
             logger()->error('Failed to send gatepass notification', ['error' => $e->getMessage()]);
         }
 
+        $this->performSign($request, 'App\Models\GatePass', (int) $id,
+            'submission',
+            "Gate Pass #{$id}",
+            'GatePass' . $id . 'submission'
+        );
+
         return response()->json(['row' => $row], 201);
     }
 
@@ -371,6 +389,12 @@ class GatePassController extends Controller
             }
             // If Division Chief approved via in-app update, notify role_id=7 users
             if (isset($data['status']) && $data['status'] === 'Division Approved') {
+                $this->performSign($request, 'App\Models\GatePass', (int) $id,
+                    'dc_approval',
+                    "Gate Pass #{$id}",
+                    'GatePass' . $id . 'dc_approval'
+                );
+
                 try {
                     $notifyUsers = DB::table('users')->where('role_id', 7)->get();
                     foreach ($notifyUsers as $u) {
@@ -446,10 +470,13 @@ class GatePassController extends Controller
             }
         }
 
+        $sigs = $this->loadSigsForPrint('App\Models\GatePass', (int) $id);
+
         return view('hr.print_gatepass', [
-            'row' => $row,
+            'row'           => $row,
             'divisionChief' => $divisionChief,
-            'director' => $director,
+            'director'      => $director,
+            'sigs'          => $sigs,
         ]);
     }
 
@@ -693,6 +720,14 @@ class GatePassController extends Controller
 
         $newStatus = $request->action === 'approve' ? 'OCD Approved' : 'OCD Declined';
         DB::table('gatepass')->where('id', $id)->update(['status' => $newStatus, 'updated_at' => now()]);
+
+        if ($request->action === 'approve') {
+            $this->performSign($request, 'App\Models\GatePass', (int) $id,
+                'ocd_approval',
+                "Gate Pass #{$id}",
+                'GatePass' . $id . 'ocd_approval'
+            );
+        }
 
         try {
             $requester = \App\Models\User::where('badge_id', $row->badgeNumber)->first();

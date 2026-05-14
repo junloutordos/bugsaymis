@@ -19,10 +19,17 @@ use App\Mail\WorkRequestFADApprovalMail;
 use App\Mail\WorkRequestCompletedMail;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
+use App\Services\DigitalSignatureService;
+use App\Http\Traits\SignsDocuments;
 
 class WorkRequestController extends Controller
 {
-    public function __construct(private SnapshotService $snapshots) {}
+    use SignsDocuments;
+
+    public function __construct(
+        private SnapshotService         $snapshots,
+        private DigitalSignatureService $sigService,
+    ) {}
     public function index()
     {
         $divisions = Building::select('id', 'name')->get();
@@ -55,13 +62,15 @@ class WorkRequestController extends Controller
             ->exists();
 
         return Inertia::render('GeneralServices/WorkRequest', [
-            'divisions'    => $divisions,
-            'offices'      => $offices,
-            'users'        => $users,
-            'skilledUsers' => $skilledUsers,
-            'workRequests' => $workRequests,
+            'divisions'       => $divisions,
+            'offices'         => $offices,
+            'users'           => $users,
+            'skilledUsers'    => $skilledUsers,
+            'workRequests'    => $workRequests,
             'isDivisionChief' => $isDivisionChief,
             'hasPendingCsm'   => $hasPendingCsm,
+            'hasPin'          => ! empty($user->signature_pin),
+            'signatureUri'    => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -115,6 +124,12 @@ class WorkRequestController extends Controller
         } catch (\Throwable $e) {
             logger()->error('Failed to send GSU Head work request email', ['error' => $e->getMessage(), 'work_request_id' => $wr->id]);
         }
+
+        $this->performSign($request, WorkRequest::class, $wr->id,
+            'submission',
+            "Work Request #{$wr->id} — {$wr->issue}",
+            WorkRequest::class . $wr->id . 'submission'
+        );
 
         return redirect()->route('work-requests.index')->with('success', 'Work request created.');
     }
@@ -185,6 +200,12 @@ class WorkRequestController extends Controller
         } catch (\Throwable $e) {
             logger()->error('Failed to send GSU Head notification', ['error' => $e->getMessage()]);
         }
+
+        $this->performSign($request, WorkRequest::class, $workRequest->id,
+            'dc_approval',
+            "Work Request #{$workRequest->id} — {$workRequest->issue}",
+            WorkRequest::class . $workRequest->id . 'dc_approval'
+        );
 
         return back()->with('success', 'Work request approved for assignment.');
     }
@@ -564,6 +585,13 @@ class WorkRequestController extends Controller
 
         if ($request->action === 'approve') {
             $workRequest->update(['status' => 'FAD Approved']);
+
+            $this->performSign($request, WorkRequest::class, $workRequest->id,
+                'fad_approval',
+                "Work Request #{$workRequest->id} — {$workRequest->issue}",
+                WorkRequest::class . $workRequest->id . 'fad_approval'
+            );
+
             try {
                 $requesterEmail = $workRequest->requester?->email ?? null;
                 if ($requesterEmail) {
@@ -685,6 +713,10 @@ class WorkRequestController extends Controller
     public function print(WorkRequest $workRequest)
     {
         $workRequest->load(['division', 'office', 'assignedUser', 'requester', 'actedBy']);
-        return view('work_requests.print_ticket', ['workRequest' => $workRequest]);
+        $sigs = $this->loadSigsForPrint(WorkRequest::class, $workRequest->id);
+        return view('work_requests.print_ticket', [
+            'workRequest' => $workRequest,
+            'sigs'        => $sigs,
+        ]);
     }
 }

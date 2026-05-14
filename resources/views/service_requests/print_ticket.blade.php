@@ -80,6 +80,7 @@
             margin-top: 40px;
             font-size: 10px;
         }
+        .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
     </style>
 </head>
 
@@ -171,11 +172,14 @@
                         }
                     } catch (\Throwable $e) { $reqSig = null; }
                 @endphp
-                @if($reqSig)
+                @if(isset($sigs['submission']['uri']))
+                    <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+                @elseif($reqSig)
                     <img src="{{ asset('storage/' . $reqSig) }}" alt="requestor signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
                 @else
                     <div class="line mt-30"></div>
                 @endif
+                @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
                 <div class="mt-10"><strong>{{ $request->requester?->name ?? $request->requestor ?? ($request->requestor_id ? optional(\App\Models\User::find($request->requestor_id))->name : '—') }}</strong></div>
             <div class="mt-10">Name & Signature of Requisitioner</div>
             <div class="mt-10">
@@ -210,11 +214,14 @@
                     }
                 } catch (\Throwable $e) { $dcSig = null; $dcName = null; }
             @endphp
-            @if($dcSig)
+            @if(isset($sigs['dc_approval']['uri']))
+                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
+            @elseif($dcSig)
                 <img src="{{ asset('storage/' . $dcSig) }}" alt="division chief signature" style="max-height:70px; display:block; margin:0 auto 6px;" />
             @else
                 <div class="line mt-30"></div>
             @endif
+            @if(isset($sigs['dc_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['dc_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="mt-10"><strong>{{ $dcName ?? '—' }}</strong></div>
             <div class="mt-10">Name & Signature of Division Chief</div>
         </div>
@@ -258,11 +265,14 @@
 
     <div class="mt-30">
         <div style="text-align:left;">
-            @if($fadSig)
+            @if(isset($sigs['fad_approval']['uri']))
+                <img src="{{ $sigs['fad_approval']['uri'] }}" alt="fad signature" style="max-height:70px; display:block; margin:0 0 6px 0;" />
+            @elseif($fadSig)
                 <img src="{{ asset('storage/' . $fadSig) }}" alt="fad signature" style="max-height:70px; display:block; margin:0 0 6px 0;" />
             @else
                 <div class="line mt-30" style="margin:0 0 0 0;"></div>
             @endif
+            @if(isset($sigs['fad_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['fad_approval']['name'] }} · {{ optional($sigs['fad_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             <div class="mt-10"><strong>{{ $fadName ?? '—' }}</strong></div>
             <div class="mt-6">FAD Chief</div>
         </div>

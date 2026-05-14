@@ -14,10 +14,17 @@ use App\Models\Division;
 use App\Models\User;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
+use App\Services\DigitalSignatureService;
+use App\Http\Traits\SignsDocuments;
 
 class ServiceRequestController extends Controller
 {
-    public function __construct(private SnapshotService $snapshots) {}
+    use SignsDocuments;
+
+    public function __construct(
+        private SnapshotService         $snapshots,
+        private DigitalSignatureService $sigService,
+    ) {}
     public function index()
     {
         $user = Auth::user();
@@ -31,13 +38,16 @@ class ServiceRequestController extends Controller
             $query->where('requestor_id', $user->id);
         }
 
-        $requests = $query->paginate(15);
+        $requests = $query->get();
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
         return Inertia::render('ServiceRequests/Index', [
-            'requests' => $requests,
+            'requests'        => $requests,
             'isDivisionChief' => $isDivisionChief,
+            'canViewAll'      => $canViewAll,
+            'hasPin'          => ! empty($user->signature_pin),
+            'signatureUri'    => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -102,6 +112,12 @@ class ServiceRequestController extends Controller
                 logger()->error('Failed to send service request email', ['error' => $e->getMessage()]);
             }
         }
+
+        $this->performSign($request, ServiceRequest::class, $sr->id,
+            'submission',
+            "Service Request #{$sr->id}",
+            ServiceRequest::class . $sr->id . 'submission'
+        );
 
         return redirect()->route('service-requests.index')->with('success', 'Service request submitted.');
     }
@@ -270,6 +286,12 @@ class ServiceRequestController extends Controller
         } catch (\Throwable $e) {
             logger()->error('Failed to queue FAD notifications for service request (in-app)', ['error' => $e->getMessage()]);
         }
+
+        $this->performSign($request, ServiceRequest::class, $serviceRequest->id,
+            'dc_approval',
+            "Service Request #{$serviceRequest->id}",
+            ServiceRequest::class . $serviceRequest->id . 'dc_approval'
+        );
 
         return back()->with('success', 'Service request approved.');
     }
@@ -565,6 +587,13 @@ class ServiceRequestController extends Controller
 
         if ($request->action === 'approve') {
             $serviceRequest->update(['status' => 'FAD Approved']);
+
+            $this->performSign($request, ServiceRequest::class, $serviceRequest->id,
+                'fad_approval',
+                "Service Request #{$serviceRequest->id}",
+                ServiceRequest::class . $serviceRequest->id . 'fad_approval'
+            );
+
             try {
                 $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
                 $requesterEmail = $requester?->email ?? null;
@@ -603,7 +632,11 @@ class ServiceRequestController extends Controller
             abort(403, 'Request not ready for printing');
         }
 
-        return view('service_requests.print_ticket', ['request' => $serviceRequest]);
+        $sigs = $this->loadSigsForPrint(ServiceRequest::class, $serviceRequest->id);
+        return view('service_requests.print_ticket', [
+            'request' => $serviceRequest,
+            'sigs'    => $sigs,
+        ]);
     }
 
     protected function resolveDivisionChiefId(ServiceRequest $serviceRequest)

@@ -14,10 +14,17 @@ use App\Models\User;
 use Carbon\Carbon;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
+use App\Services\DigitalSignatureService;
+use App\Http\Traits\SignsDocuments;
 
 class VehicleRequestController extends Controller
 {
-    public function __construct(private SnapshotService $snapshots) {}
+    use SignsDocuments;
+
+    public function __construct(
+        private SnapshotService         $snapshots,
+        private DigitalSignatureService $sigService,
+    ) {}
     /**
      * Display a listing of vehicle requests.
      */
@@ -63,6 +70,8 @@ class VehicleRequestController extends Controller
             'divisionChiefs'  => $divisionChiefs,
             'isDivisionChief' => $isDivisionChief,
             'hasPendingCsm'   => $hasPendingCsm,
+            'hasPin'          => ! empty($user->signature_pin),
+            'signatureUri'    => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -173,6 +182,12 @@ class VehicleRequestController extends Controller
             }
         }
 
+        $this->performSign($request, VehicleRequest::class, $vr->id,
+            'submission',
+            "Vehicle Request #{$vr->id}",
+            VehicleRequest::class . $vr->id . 'submission'
+        );
+
         return redirect()->route('vehicle-requests.index');
     }
 
@@ -234,6 +249,12 @@ class VehicleRequestController extends Controller
         } catch (\Throwable $e) {
             logger()->error('Failed to notify GSU Head users after in-app approval', ['error' => $e->getMessage()]);
         }
+
+        $this->performSign($request, VehicleRequest::class, $vehicleRequest->id,
+            'dc_approval',
+            "Vehicle Request #{$vehicleRequest->id}",
+            VehicleRequest::class . $vehicleRequest->id . 'dc_approval'
+        );
 
         return back()->with('success', 'Vehicle request approved.');
     }
@@ -572,10 +593,13 @@ class VehicleRequestController extends Controller
         $director    = User::havingRole('OCD')->first();
         $directorSig = $this->sigDataUri($director?->electronic_signature);
 
+        $sigs = $this->loadSigsForPrint(VehicleRequest::class, $vehicleRequest->id);
+
         return view('vehicle_requests.print_ticket', [
             'request'     => $vehicleRequest,
             'director'    => $director,
             'directorSig' => $directorSig,
+            'sigs'        => $sigs,
         ]);
     }
 
@@ -637,8 +661,10 @@ class VehicleRequestController extends Controller
             ->withQueryString();
 
         return Inertia::render('VehicleRequests/DivisionChiefApproval', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -662,8 +688,10 @@ class VehicleRequestController extends Controller
             ->withQueryString();
 
         return Inertia::render('VehicleRequests/OCDApproval', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($request->user()->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($request->user()),
         ]);
     }
 
@@ -680,6 +708,12 @@ class VehicleRequestController extends Controller
                 sequence:   4,
                 action:     'approved',
                 approver:   $request->user(),
+            );
+
+            $this->performSign($request, VehicleRequest::class, $vehicleRequest->id,
+                'ocd_approval',
+                "Vehicle Request #{$vehicleRequest->id}",
+                VehicleRequest::class . $vehicleRequest->id . 'ocd_approval'
             );
 
             try {
@@ -716,5 +750,23 @@ class VehicleRequestController extends Controller
         }
 
         return back()->with('success', 'OCD action recorded.');
+    }
+
+    public function signCompletion(Request $request, VehicleRequest $vehicleRequest)
+    {
+        if ($vehicleRequest->requestor_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $this->performSign(
+            $request,
+            VehicleRequest::class,
+            $vehicleRequest->id,
+            'completion',
+            "Vehicle Request #{$vehicleRequest->id}",
+            VehicleRequest::class . $vehicleRequest->id . 'completion'
+        );
+
+        return response()->json(['ok' => true]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\ApprovalInboxService;
+use App\Services\DigitalSignatureService;
 use App\Models\ITJobRequest;
 use App\Models\VehicleRequest;
 use App\Models\FacilityRequest;
@@ -47,7 +48,11 @@ class ApprovalInboxController extends Controller
             'search' => $request->query('search', ''),
         ];
 
-        return Inertia::render('Approvals/Inbox', compact('tabs', 'totalCount', 'filters'));
+        $sigService   = app(DigitalSignatureService::class);
+        $hasPin       = ! empty($user->signature_pin);
+        $signatureUri = $sigService->getSignatureDataUri($user);
+
+        return Inertia::render('Approvals/Inbox', compact('tabs', 'totalCount', 'filters', 'hasPin', 'signatureUri'));
     }
 
     /**

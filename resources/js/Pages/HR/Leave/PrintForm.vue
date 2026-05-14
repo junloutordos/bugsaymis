@@ -146,7 +146,9 @@
           <div class="cb-row mt-1"><span class="cb">☐</span> Not Requested</div>
           <div class="cb-row"><span class="cb">☐</span> Requested</div>
           <div class="sig-space"></div>
+          <img v-if="sigs['submission']?.uri" :src="sigs['submission'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="applicant signature" />
           <div class="sig-line-el"></div>
+          <div v-if="sigs['submission']" class="dig-badge-sm">✓ Digitally Signed · {{ sigs['submission'].signed_at ? new Date(sigs['submission'].signed_at).toLocaleString('en-PH') : '' }}</div>
           <div class="sig-lbl">Signature of Applicant</div>
         </td>
       </tr>
@@ -206,8 +208,10 @@
             </tbody>
           </table>
           <div class="sig-space"></div>
+          <img v-if="sigs['hr_officer']?.uri" :src="sigs['hr_officer'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="hr officer signature" />
           <div class="sig-space"></div>
           <div class="mt-6 officer-name">{{ certifyingOfficer?.name?.toUpperCase() ?? '' }}</div>
+          <div v-if="sigs['hr_officer']" class="dig-badge-sm">✓ Digitally Signed</div>
           <div class="sig-lbl">(Authorized Officer)</div>
         </td>
 
@@ -223,7 +227,9 @@
           <div class="disapprove-line mt-6"></div>
           <div class="disapprove-line mt-6"></div>
           <div class="disapprove-line mt-6"></div>
+          <img v-if="sigs['division_chief']?.uri" :src="sigs['division_chief'].uri" style="max-height:36px;display:block;margin:4px auto 2px;" alt="division chief signature" />
           <div class="mt-12 officer-name">{{ authorizedOfficer?.name?.toUpperCase() ?? '' }}</div>
+          <div v-if="sigs['division_chief']" class="dig-badge-sm">✓ Digitally Signed</div>
           <div class="sig-lbl">(Authorized Officer)</div>
         </td>
       </tr>
@@ -253,7 +259,9 @@
       <!-- Authorized Official — full width inside the table -->
       <tr>
         <td class="body-cell" colspan="2" style="padding:6px 4px; text-align:center; border-top:1px solid #000;">
+          <img v-if="sigs['campus_director']?.uri" :src="sigs['campus_director'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="campus director signature" />
           <div class="officer-name">{{ authorizedOfficial?.name?.toUpperCase() ?? '' }}</div>
+          <div v-if="sigs['campus_director']" class="dig-badge-sm">✓ Digitally Signed</div>
           <div class="sig-lbl">(Authorized Official)</div>
         </td>
       </tr>
@@ -276,6 +284,7 @@ const props = defineProps({
   authorizedOfficer:  Object,  // 7.B — Division Chief where user belongs
   authorizedOfficial: Object,  // bottom — Campus Director / Head of Agency
   monthlySalary:      { type: String, default: null },
+  sigs:               { type: Object, default: () => ({}) },
 })
 
 // ── CSC Form 6 leave type definitions (order matches the official form) ──────
@@ -466,6 +475,7 @@ html, body { margin: 0; padding: 0; background: #fff; font-family: Arial, Helvet
 .sig-space    { height: 28px; }
 .sig-line-el  { border-bottom: 1px solid #000; width: 100%; display: block; margin-top: 2px; }
 .sig-lbl { font-size: 7pt; text-align: center; margin-top: 1px; }
+.dig-badge-sm { font-size:7pt; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:2px; padding:1px 4px; margin:2px auto; display:inline-block; }
 .rec-remarks { font-size: 7pt; color: #555; font-style: italic; margin: 2px 0; }
 
 /* ── 7A credits table ─────────────────────────────────────────────── */

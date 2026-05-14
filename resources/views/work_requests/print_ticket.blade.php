@@ -17,6 +17,7 @@
     .two-cols { display:flex; gap:16px }
     .col { flex:1 }
     .right { text-align:right }
+    .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
   </style>
 </head>
 <body onload="window.print()">
@@ -46,7 +47,13 @@
     <div class="two-cols section small">
       <div class="col">
         <div><strong>Requested by:</strong></div>
+        @if(isset($sigs['submission']['uri']))
+          <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:48px; display:block; margin:4px auto;" />
+        @endif
         <div class="box">{{ optional($workRequest->requester)->name ?? '—' }}</div>
+        @if(isset($sigs['submission']))
+          <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div>
+        @endif
         <div style="margin-top:8px">Signature Over Printed Name</div>
       </div>
       <div class="col">
@@ -83,7 +90,13 @@
     <div class="two-cols section">
       <div class="col">
         <div class="label">FAD Chief</div>
+        @if(isset($sigs['fad_approval']['uri']))
+          <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD signature" style="max-height:48px; display:block; margin:4px auto;" />
+        @endif
         <div class="box sign">&nbsp;</div>
+        @if(isset($sigs['fad_approval']))
+          <div class="dig-badge">✓ Digitally Signed · {{ $sigs['fad_approval']['name'] }} · {{ optional($sigs['fad_approval']['signed_at'])->format('M d, Y H:i') }}</div>
+        @endif
         <div class="small">Signature / Date</div>
       </div>
       <div class="col right">

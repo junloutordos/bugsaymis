@@ -15,10 +15,17 @@ use App\Models\User;
 use App\Models\Facility;
 use App\Enums\ApprovalStep;
 use App\Services\SnapshotService;
+use App\Services\DigitalSignatureService;
+use App\Http\Traits\SignsDocuments;
 
 class FacilityRequestController extends Controller
 {
-    public function __construct(private SnapshotService $snapshots) {}
+    use SignsDocuments;
+
+    public function __construct(
+        private SnapshotService         $snapshots,
+        private DigitalSignatureService $sigService,
+    ) {}
 
     public function index(Request $request)
     {
@@ -56,10 +63,12 @@ class FacilityRequestController extends Controller
         $isDivisionChief = $user->hasRole('DivisionChief');
 
         return Inertia::render('FacilityRequests/Index', [
-            'requests' => $requests,
-            'facilities' => $facilities,
-            'misUsers' => $misUsers,
+            'requests'     => $requests,
+            'facilities'   => $facilities,
+            'misUsers'     => $misUsers,
             'isDivisionChief' => $isDivisionChief,
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -316,6 +325,12 @@ class FacilityRequestController extends Controller
             }
         }
 
+        $this->performSign($request, FacilityRequest::class, $fr->id,
+            'submission',
+            "Facility Request #{$fr->id}",
+            FacilityRequest::class . $fr->id . 'submission'
+        );
+
         return redirect()->route('facility-requests.index')->with('success', 'Facility request submitted');
     }
 
@@ -426,6 +441,12 @@ class FacilityRequestController extends Controller
         } catch (\Throwable $e) {
             logger()->error('Failed to queue FAD notifications for facility request (in-app)', ['error' => $e->getMessage()]);
         }
+
+        $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
+            'dc_approval',
+            "Facility Request #{$facilityRequest->id}",
+            FacilityRequest::class . $facilityRequest->id . 'dc_approval'
+        );
 
         return back()->with('success', 'Facility request approved. FAD has been notified.');
     }
@@ -822,7 +843,13 @@ class FacilityRequestController extends Controller
             abort(403);
         }
 
-        return view('facility_requests.print_ticket', ['request' => $facilityRequest]);
+        $facilityRequest->load(['requester']);
+        $sigs = $this->loadSigsForPrint(FacilityRequest::class, $facilityRequest->id);
+
+        return view('facility_requests.print_ticket', [
+            'request' => $facilityRequest,
+            'sigs'    => $sigs,
+        ]);
     }
 
     /* =====================================================
@@ -854,8 +881,10 @@ class FacilityRequestController extends Controller
             ->withQueryString();
 
         return Inertia::render('FacilityRequests/DivisionChiefApproval', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -883,8 +912,10 @@ class FacilityRequestController extends Controller
             ->withQueryString();
 
         return Inertia::render('FacilityRequests/FADApproval', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 
@@ -898,6 +929,12 @@ class FacilityRequestController extends Controller
 
         if ($request->action === 'approve') {
             $facilityRequest->update(['status' => 'Approved']);
+
+            $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
+                'fad_approval',
+                "Facility Request #{$facilityRequest->id}",
+                FacilityRequest::class . $facilityRequest->id . 'fad_approval'
+            );
 
             // Notify requester — FAD is the final approver
             try {
@@ -941,8 +978,10 @@ class FacilityRequestController extends Controller
             ->withQueryString();
 
         return Inertia::render('FacilityRequests/OCDApproval', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($request->user()->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($request->user()),
         ]);
     }
 
@@ -952,6 +991,12 @@ class FacilityRequestController extends Controller
 
         if ($request->action === 'approve') {
             $facilityRequest->update(['status' => 'OCD Approved']);
+
+            $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
+                'ocd_approval',
+                "Facility Request #{$facilityRequest->id}",
+                FacilityRequest::class . $facilityRequest->id . 'ocd_approval'
+            );
         } else {
             $request->validate(['reason' => 'nullable|string|max:1000']);
             $facilityRequest->update([
@@ -962,5 +1007,23 @@ class FacilityRequestController extends Controller
         }
 
         return back()->with('success', 'OCD action recorded.');
+    }
+
+    public function signCompletion(Request $request, FacilityRequest $facilityRequest)
+    {
+        if ($facilityRequest->requestor_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $this->performSign(
+            $request,
+            FacilityRequest::class,
+            $facilityRequest->id,
+            'completion',
+            "Facility Request #{$facilityRequest->id}",
+            FacilityRequest::class . $facilityRequest->id . 'completion'
+        );
+
+        return response()->json(['ok' => true]);
     }
 }

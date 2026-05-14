@@ -190,7 +190,7 @@
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
             <button @click="formModal = false" :disabled="saving"
                     class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="saveForm" :disabled="saving"
+            <button @click="editingId ? saveForm() : openPinModal()" :disabled="saving"
                     class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
               {{ saving ? 'Saving…' : (editingId ? 'Update' : 'Submit') }}
             </button>
@@ -350,6 +350,15 @@
       </div>
     </Teleport>
 
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
   </AdminLayout>
 </template>
 
@@ -359,9 +368,12 @@ import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const page        = usePage()
 const rows        = computed(() => page.props.rows ?? [])
+const hasPin      = computed(() => page.props.hasPin ?? false)
+const signatureUri = computed(() => page.props.signatureUri ?? null)
 const currentUser = computed(() => page.props.auth?.user ?? {})
 const isSelf      = computed(() => ['Staff', 'Faculty'].includes(currentUser.value.role?.name ?? ''))
 const isDivisionChief = computed(() => currentUser.value.role?.name === 'DivisionChief')
@@ -410,6 +422,17 @@ const formModal = ref(false)
 const editingId = ref(null)
 const saving    = ref(false)
 const form      = ref({ gatepass_type: '', gatepass_date: '', gatepass_timeout: '', gatepass_timein: '', destination: '', purpose: '' })
+
+const showSubmitPin = ref(false)
+const pinLoading = ref(false)
+
+const openPinModal = () => { showSubmitPin.value = true }
+const handlePinCancel = () => { showSubmitPin.value = false }
+const handlePinConfirm = async (pin) => {
+  form.value.pin = pin || null
+  showSubmitPin.value = false
+  await saveForm()
+}
 
 function openAdd() {
   editingId.value = null
