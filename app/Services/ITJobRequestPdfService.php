@@ -9,6 +9,7 @@ use Mpdf\Mpdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Models\DigitalSignature;
 use App\Services\DigitalSignatureService;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ITJobRequestPdfService
 {
@@ -191,7 +192,7 @@ class ITJobRequestPdfService
 
             // One document-level QR linking to the ITJR verification page
             $verifyUrl  = route('itjr.verify', $jobRequest->itjr_no);
-            $documentQr = base64_encode($sigSvc->generateQrSvg($verifyUrl, 120));
+            $documentQr = base64_encode(QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
         }
 
         $html = view('it-job-requests.pdf', compact(
