@@ -200,7 +200,7 @@ const remove = (id) => {
 
 const canPrint = (r) => {
   const st = (r?.status || '').toString().toLowerCase();
-  if (!st.includes('approved')) return false
+  if (!st.includes('approved') && st !== 'completed') return false
   const isOwn = r?.requestor_id === page.props.auth?.user?.id
   return props.canViewAll || isOwn
 };
