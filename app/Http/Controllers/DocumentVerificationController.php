@@ -31,7 +31,7 @@ class DocumentVerificationController extends Controller
 
         $signatures = DigitalSignature::where('signable_type', ITJobRequest::class)
             ->where('signable_id', $jobRequest->id)
-            ->with('signer:id,name,position')
+            ->with('signer:id,name,position,badge_id,electronic_signature')
             ->orderBy('signed_at')
             ->get();
 

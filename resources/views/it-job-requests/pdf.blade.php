@@ -253,8 +253,8 @@
           <table style="border:none;border-collapse:collapse;margin:0 auto;">
             <tr>
               <td style="border:none;padding:0;vertical-align:middle;">
-                @if($requesterSig)
-                  <img src="{{ $requesterSig }}" alt="" style="display:block;height:36px;width:auto;">
+                @if($completionSig)
+                  <img src="{{ $completionSig }}" alt="" style="display:block;height:36px;width:auto;">
                 @else
                   <div style="height:36px;width:50px;"></div>
                 @endif
