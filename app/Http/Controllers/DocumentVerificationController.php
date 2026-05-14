@@ -38,13 +38,18 @@ class DocumentVerificationController extends Controller
         $entries = $signatures->map(function (DigitalSignature $sig) {
             $valid  = $this->svc->verify($sig->verification_token) !== null;
             $stage  = $sig->metadata['stage'] ?? 'unknown';
+            $sigUri = $sig->signer ? $this->svc->getSignatureDataUri($sig->signer) : null;
 
             return [
-                'stage'     => self::STAGE_LABELS[$stage] ?? ucfirst($stage),
-                'signer'    => $sig->signer?->name ?? '—',
-                'position'  => $sig->signer?->position ?? '—',
-                'signed_at' => $sig->signed_at->format('F d, Y h:i A'),
-                'valid'     => $valid,
+                'stage'              => self::STAGE_LABELS[$stage] ?? ucfirst($stage),
+                'signer'             => $sig->signer?->name ?? '—',
+                'position'           => $sig->signer?->position ?? '—',
+                'badge_id'           => $sig->signer?->badge_id ?? null,
+                'signed_at'          => $sig->signed_at->format('F d, Y \a\t h:i A'),
+                'valid'              => $valid,
+                'signature_uri'      => $sigUri,
+                'verification_token' => $sig->verification_token,
+                'metadata'           => $sig->metadata ?? [],
             ];
         });
 
