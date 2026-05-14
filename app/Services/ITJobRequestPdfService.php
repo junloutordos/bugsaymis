@@ -153,6 +153,10 @@ class ITJobRequestPdfService
      */
     private function buildPdfBytes(ITJobRequest $jobRequest): string
     {
+        // Signature images are large base64 blobs; raise memory limit for this PDF build only
+        $prevMemory = ini_get('memory_limit');
+        ini_set('memory_limit', '256M');
+
         $jobRequest->loadMissing(['user.division', 'divisionChief', 'assignedTo']);
 
         $director = User::havingRole('OCD')->first();
@@ -207,7 +211,10 @@ class ITJobRequestPdfService
             app(DigitalSignatureService::class)->embedInPdf($mpdf, $sig, $signerSigUri);
         }
 
-        return $mpdf->Output('', 'S');
+        $pdfBytes = $mpdf->Output('', 'S');
+        ini_set('memory_limit', $prevMemory);
+
+        return $pdfBytes;
     }
 
     /**
