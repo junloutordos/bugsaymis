@@ -561,8 +561,8 @@ class VehicleRequestController extends Controller
             abort(403);
         }
 
-        // Only allow printing when OCD has approved the request
-        if ($vehicleRequest->status !== 'OCD Approved') {
+        // Allow printing once OCD has approved (includes Completed requests)
+        if (! in_array($vehicleRequest->status, ['OCD Approved', 'Completed'])) {
             abort(403, 'Request not ready for printing');
         }
 
