@@ -203,11 +203,11 @@ class DigitalSignatureService
     /**
      * Generate a QR code PNG (binary) linking to the verification page.
      */
-    public function generateQrPng(string $token, int $size = 150): string
+    public function generateQrSvg(string $token, int $size = 150): string
     {
         $url = route('document.verify', $token);
 
-        return QrCode::format('png')
+        return QrCode::format('svg')
             ->size($size)
             ->margin(1)
             ->generate($url);
@@ -219,8 +219,8 @@ class DigitalSignatureService
      */
     public function embedInPdf(\Mpdf\Mpdf $mpdf, DigitalSignature $sig, ?string $signatureDataUri = null): void
     {
-        $qrPng    = $this->generateQrPng($sig->verification_token);
-        $qrBase64 = base64_encode($qrPng);
+        $qrSvg    = $this->generateQrSvg($sig->verification_token);
+        $qrBase64 = base64_encode($qrSvg);
         $signedAt = $sig->signed_at->format('F d, Y h:i A');
 
         $signerName     = $sig->signer->name ?? '';
@@ -233,7 +233,7 @@ class DigitalSignatureService
         $html = "
         <div style=\"border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;margin-top:16px;display:flex;align-items:center;gap:16px;font-family:Arial,sans-serif;font-size:9pt;\">
             <div>
-                <img src=\"data:image/png;base64,{$qrBase64}\" style=\"width:80px;height:80px;\">
+                <img src=\"data:image/svg+xml;base64,{$qrBase64}\" style=\"width:80px;height:80px;\">
             </div>
             <div>
                 <div style=\"font-weight:bold;color:#1e293b;margin-bottom:2px;\">Digitally Signed</div>
