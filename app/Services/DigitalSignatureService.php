@@ -175,7 +175,7 @@ class DigitalSignatureService
             'SigningAlgorithm' => 'RSASSA_PKCS1_V1_5_SHA_256',
         ]);
 
-        return [base64_encode($result['Signature']->getContents()), 'kms'];
+        return [base64_encode((string) $result['Signature']), 'kms'];
     }
 
     private function kmsVerify(string $message, string $signature): bool
