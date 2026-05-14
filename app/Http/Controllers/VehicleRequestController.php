@@ -7,6 +7,7 @@ use Inertia\Inertia;
 use App\Models\VehicleRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use App\Mail\VehicleRequestCreatedMail;
 use App\Models\User;
@@ -568,7 +569,46 @@ class VehicleRequestController extends Controller
 
         $vehicleRequest->load(['requester','driver', 'divisionChief']);
 
-        return view('vehicle_requests.print_ticket', ['request' => $vehicleRequest]);
+        $director    = User::havingRole('OCD')->first();
+        $directorSig = $this->sigDataUri($director?->electronic_signature);
+
+        return view('vehicle_requests.print_ticket', [
+            'request'     => $vehicleRequest,
+            'director'    => $director,
+            'directorSig' => $directorSig,
+        ]);
+    }
+
+    private function sigDataUri(?string $storedPath): ?string
+    {
+        if (! $storedPath || $storedPath === '0') {
+            return null;
+        }
+
+        $ext  = strtolower(pathinfo($storedPath, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            'webp'        => 'image/webp',
+            default       => 'image/png',
+        };
+
+        foreach (['s3', 'public'] as $disk) {
+            try {
+                if (Storage::disk($disk)->exists($storedPath)) {
+                    $contents = Storage::disk($disk)->get($storedPath);
+                    if ($contents) {
+                        return 'data:' . $mime . ';base64,' . base64_encode($contents);
+                    }
+                }
+            } catch (\Throwable $e) {
+                logger()->warning("VehicleRequestController: sig load failed on {$disk}", [
+                    'path' => $storedPath, 'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
     }
 
     /* =====================================================
