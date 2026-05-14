@@ -66,56 +66,8 @@
         $fadName = null; $fadSig = null;
       }
 
-      // Resolve Office/Campus Director name: prefer a Division record for the Campus Director,
-      // then fallback to user position or role.
-      $directorName = null; $directorSig = null;
-      try {
-        $divDirector = \App\Models\Division::where('division_name', 'Office of the Campus Director')
-            ->orWhere('division_name', 'like', '%Campus Director%')
-            ->first();
-        if ($divDirector && $divDirector->divisionchief) {
-          $directorName = $divDirector->divisionchief->name;
-          // Prefer a division-level signature_path
-          if (!empty($divDirector->signature_path)) {
-            $directorSig = $divDirector->signature_path;
-          } else {
-            // If the division record has an OCD-assigned user id, prefer that user's signature
-            $ocdUserId = null;
-            if (!empty($divDirector->ocd_id)) {
-                $ocdUserId = $divDirector->ocd_id;
-            } elseif (!empty($divDirector->ocd)) {
-                $ocdUserId = $divDirector->ocd;
-            } elseif (!empty($divDirector->ocd_user_id)) {
-                $ocdUserId = $divDirector->ocd_user_id;
-            }
-            if ($ocdUserId) {
-                try {
-                    $ocdUser = \App\Models\User::find($ocdUserId);
-                    if ($ocdUser && !empty($ocdUser->electronic_signature)) {
-                        $directorSig = $ocdUser->electronic_signature;
-                    }
-                } catch (\Throwable $e) {
-                    // ignore and fallback
-                }
-            }
-            // fallback to divisionchief's electronic signature if still empty
-            if (empty($directorSig) && !empty($divDirector->divisionchief->electronic_signature)) {
-                $directorSig = $divDirector->divisionchief->electronic_signature;
-            }
-          }
-        } else {
-          $director = \App\Models\User::where('position', 'like', '%Campus Director%')->first();
-          if (! $director) {
-            $director = \App\Models\User::whereHas('role', function($q){ $q->where('name', 'like', '%Director%'); })->first();
-          }
-          if ($director) {
-            $directorName = $director->name;
-            if (!empty($director->electronic_signature)) $directorSig = $director->electronic_signature;
-          }
-        }
-      } catch (\Throwable $e) {
-        $directorName = null; $directorSig = null;
-      }
+      // Director resolved in controller via User::havingRole('OCD')->first()
+      $directorName = $director?->name;
     @endphp
     <div class="two-up">
       <div class="copy">
@@ -281,7 +233,7 @@
         </div>
         <div style="width:48%;text-align:center">
           @if(!empty($directorSig))
-            <img src="{{ asset('storage/' . $directorSig) }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            <img src="{{ $directorSig }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
           @else
             <div style="height:40px"></div>
           @endif
@@ -437,7 +389,7 @@
             </div>
             <div style="width:48%;text-align:center">
               @if(!empty($directorSig))
-                <img src="{{ asset('storage/' . $directorSig) }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                <img src="{{ $directorSig }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
               @else
                 <div style="height:40px"></div>
               @endif
@@ -579,7 +531,7 @@
                   <div style="font-weight:bold;margin-bottom:6px">Approval</div>
                   <div style="text-align:center">
                     @if(!empty($directorSig))
-                      <img src="{{ asset('storage/' . $directorSig) }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                      <img src="{{ $directorSig }}" alt="Director signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
                     @else
                       <div style="height:48px"></div>
                     @endif
