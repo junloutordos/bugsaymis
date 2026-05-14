@@ -171,6 +171,24 @@ class ITJobRequestPdfService
         $assignedSig  = $this->sigDataUri($jobRequest->assignedTo?->electronic_signature);
         $requesterSig = $this->sigDataUri($jobRequest->user?->electronic_signature);
 
+        // Build per-stage digital signature badges for inline embedding in the form
+        $sigBadges = [];
+        $digitalSigs = DigitalSignature::where('signable_type', ITJobRequest::class)
+            ->where('signable_id', $jobRequest->id)
+            ->latest('signed_at')
+            ->get();
+
+        $sigSvc = app(DigitalSignatureService::class);
+        foreach ($digitalSigs as $ds) {
+            $stage = $ds->metadata['stage'] ?? null;
+            if ($stage && ! isset($sigBadges[$stage])) {
+                $sigBadges[$stage] = [
+                    'qr_base64' => base64_encode($sigSvc->generateQrSvg($ds->verification_token, 100)),
+                    'signed_at' => $ds->signed_at->format('M d, Y h:i A'),
+                ];
+            }
+        }
+
         $html = view('it-job-requests.pdf', compact(
             'jobRequest',
             'director',
@@ -178,7 +196,8 @@ class ITJobRequestPdfService
             'directorSig',
             'dcSig',
             'assignedSig',
-            'requesterSig'
+            'requesterSig',
+            'sigBadges'
         ))->render();
 
         $mpdf = new Mpdf([
@@ -199,17 +218,6 @@ class ITJobRequestPdfService
         ini_set('pcre.backtrack_limit', (string) (10 * 1000 * 1000));
         $mpdf->WriteHTML($html);
         ini_set('pcre.backtrack_limit', (string) $prevBacktrack);
-
-        // Embed digital signature QR block if any signatures exist
-        $sig = DigitalSignature::where('signable_type', ITJobRequest::class)
-            ->where('signable_id', $jobRequest->id)
-            ->latest('signed_at')
-            ->first();
-
-        if ($sig) {
-            $signerSigUri = $this->sigDataUri($sig->signer?->electronic_signature);
-            app(DigitalSignatureService::class)->embedInPdf($mpdf, $sig, $signerSigUri);
-        }
 
         $pdfBytes = $mpdf->Output('', 'S');
         ini_set('memory_limit', $prevMemory);
