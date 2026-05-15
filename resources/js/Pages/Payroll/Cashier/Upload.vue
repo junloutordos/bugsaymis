@@ -52,7 +52,8 @@ async function submit() {
   }, {
     onError: (errs) => {
       loading.value = false
-      Swal.fire({ icon: 'error', title: 'Parse failed', text: Object.values(errs).flat().join('\n') })
+      const msg = Object.values(errs).flat().join('\n') || 'An unexpected error occurred. Check the browser console or contact support.'
+      Swal.fire({ icon: 'error', title: 'Parse failed', text: msg })
     },
     onFinish: () => { loading.value = false },
   })

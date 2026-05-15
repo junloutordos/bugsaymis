@@ -85,48 +85,53 @@ class PayrollCashierController extends Controller
             }
         }
 
-        // Merge bonus fields into items
-        $items = $this->mergeBonusIntoItems($parsed['items'], $bonusData);
+        try {
+            // Merge bonus fields into items
+            $items = $this->mergeBonusIntoItems($parsed['items'], $bonusData);
 
-        // Match employees
-        $items = $this->matcher->matchItems($items);
+            // Match employees
+            $items = $this->matcher->matchItems($items);
 
-        // Store Excel on S3
-        $mainKey  = $this->storeBase64ToS3($request->input('main_file_base64'), $request->input('main_filename'));
-        $bonusKey = $request->filled('bonus_file_base64')
-            ? $this->storeBase64ToS3($request->input('bonus_file_base64'), $request->input('bonus_filename', 'bonus.xlsx'))
-            : null;
+            // Store Excel on S3
+            $mainKey  = $this->storeBase64ToS3($request->input('main_file_base64'), $request->input('main_filename'));
+            $bonusKey = $request->filled('bonus_file_base64')
+                ? $this->storeBase64ToS3($request->input('bonus_file_base64'), $request->input('bonus_filename', 'bonus.xlsx'))
+                : null;
 
-        // Use filename-based fallback if payroll_no is blank
-        $payrollNo = $parsed['payroll_no'] ?: ('PR-' . $parsed['year'] . '-' . str_pad($parsed['month'], 2, '0', STR_PAD_LEFT) . '-' . uniqid());
+            // Use filename-based fallback if payroll_no is blank
+            $payrollNo = $parsed['payroll_no'] ?: ('PR-' . $parsed['year'] . '-' . str_pad($parsed['month'], 2, '0', STR_PAD_LEFT) . '-' . uniqid());
 
-        // Create batch (idempotent on payroll_no)
-        $batch = PayrollBatch::updateOrCreate(
-            ['payroll_no' => $payrollNo],
-            [
-                'batch_type'            => 'main',
-                'period_start'          => $parsed['period_start'],
-                'period_end'            => $parsed['period_end'],
-                'month'                 => $parsed['month'],
-                'year'                  => $parsed['year'],
-                'fund_cluster'          => $parsed['fund_cluster'],
-                'entity_name'           => $parsed['entity_name'],
-                'source_main_filename'  => $request->input('main_filename'),
-                'source_bonus_filename' => $request->input('bonus_filename'),
-                'source_main_s3_key'    => $mainKey,
-                'source_bonus_s3_key'   => $bonusKey,
-                'uploaded_by'           => $user->id,
-                'status'                => 'previewed',
-            ]
-        );
+            // Create batch (idempotent on payroll_no)
+            $batch = PayrollBatch::updateOrCreate(
+                ['payroll_no' => $payrollNo],
+                [
+                    'batch_type'            => 'main',
+                    'period_start'          => $parsed['period_start'],
+                    'period_end'            => $parsed['period_end'],
+                    'month'                 => $parsed['month'],
+                    'year'                  => $parsed['year'],
+                    'fund_cluster'          => $parsed['fund_cluster'],
+                    'entity_name'           => $parsed['entity_name'],
+                    'source_main_filename'  => $request->input('main_filename'),
+                    'source_bonus_filename' => $request->input('bonus_filename'),
+                    'source_main_s3_key'    => $mainKey,
+                    'source_bonus_s3_key'   => $bonusKey,
+                    'uploaded_by'           => $user->id,
+                    'status'                => 'previewed',
+                ]
+            );
 
-        // Upsert items (one per employee per month)
-        foreach ($items as $itemData) {
-            $this->upsertItem($batch, $itemData, $parsed['month'], $parsed['year']);
+            // Upsert items (one per employee per month)
+            foreach ($items as $itemData) {
+                $this->upsertItem($batch, $itemData, $parsed['month'], $parsed['year']);
+            }
+
+            // Recompute totals
+            $this->recalcTotals($batch);
+
+        } catch (\Throwable $e) {
+            return back()->withErrors(['main_file_base64' => '[DB/S3] ' . $e->getMessage()]);
         }
-
-        // Recompute totals
-        $this->recalcTotals($batch);
 
         return redirect()->route('payroll.cashier.preview', $batch->id)
             ->with('success', 'Payroll parsed successfully.');
