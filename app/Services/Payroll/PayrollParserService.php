@@ -21,44 +21,42 @@ class PayrollParserService
         'job order', 'cos', 'grand total', 'noted by',
     ];
 
-    // CSV column header → DB field map (order matches template)
+    // CSV column header → DB field map (order matches the official Excel payroll layout)
     private const CSV_COLUMNS = [
+        // Identity
         'Name'                    => 'employee_name_raw',
         'Employee No.'            => 'employee_no',
         'Position'                => 'position',
-        'Basic Salary'            => 'basic_salary',
+        // Compensations
+        'Salaries and Wages-Regular' => 'basic_salary',
         'PERA'                    => 'pera',
-        'Salary Increase'         => 'salary_increase',
-        'Additional Compensation' => 'additional_compensation',
-        'Subsistence & Laundry'   => 'sala',
-        'Hazard Pay'              => 'hazard_pay',
-        'Longevity Pay'           => 'longevity_pay',
-        'Others/Bonuses'          => 'others_bonuses',
-        'Gross Earnings'          => 'gross_earnings',
-        'LAWOP/Undertime'         => 'lawop',
+        'Gross Amount Earned'     => 'gross_earnings',
+        // Deductions — General
+        'Tardiness/AWOP'          => 'lawop',
         'BIR Withholding Tax'     => 'bir_tax',
-        'GSIS Contribution'       => 'gsis_contribution',
-        'GSIS Salary Loan'        => 'gsis_salary_loan',
-        'GSIS Policy Loan'        => 'gsis_policy_loan',
-        'GSIS Consolidated Loan'  => 'gsis_consolidated_loan',
-        'GSIS Emergency Loan'     => 'gsis_emergency_loan',
+        // GSIS
+        'RLIP EE'                 => 'gsis_contribution',
+        'Pol. Loan'               => 'gsis_policy_loan',
+        'Emergency/Cal. Loan'     => 'gsis_emergency_loan',
+        'GFAL'                    => 'gsis_gfal',
         'GSIS MPL'                => 'gsis_mpl',
-        'GSIS GFAL'               => 'gsis_gfal',
-        'GSIS CPL'                => 'gsis_cpl',
-        'GSIS MPL Lite'           => 'gsis_mpl_lite',
-        'HDMF Contribution'       => 'hdmf_contribution',
-        'HDMF Salary Loan'        => 'hdmf_salary_loan',
-        'HDMF Calamity Loan'      => 'hdmf_calamity',
-        'HDMF Housing Loan'       => 'hdmf_housing',
-        'HDMF Multi-Purpose'      => 'hdmf_multipurpose',
-        'HDMF MP2'                => 'hdmf_mp2',
-        'Landbank Loan'           => 'landbank_loan',
+        'CPL'                     => 'gsis_cpl',
+        'Multi-purpose Life'      => 'gsis_mpl_lite',
+        // PAG-IBIG / HDMF
+        'EE Share'                => 'hdmf_contribution',
+        'MP2'                     => 'hdmf_mp2',
+        'PAG-IBIG MPL'            => 'hdmf_multipurpose',
+        'Calamity Loan'           => 'hdmf_calamity',
+        'HLF'                     => 'hdmf_housing',
+        // Other deductions
+        'Landbank'                => 'landbank_loan',
         'Credit Union'            => 'credit_union',
-        'PhilHealth Contribution' => 'philhealth_contribution',
+        'PHIC EE Share'           => 'philhealth_contribution',
+        // Totals & net pay
         'Total Deductions'        => 'total_deductions',
-        'Net Pay'                 => 'net_pay',
-        '1st Half'                => 'first_half_amount',
-        '2nd Half'                => 'second_half_amount',
+        'Net Amount Due'          => 'net_pay',
+        '1-15'                    => 'first_half_amount',
+        '16-30'                   => 'second_half_amount',
     ];
 
     /**
@@ -67,11 +65,15 @@ class PayrollParserService
     public function csvTemplate(): string
     {
         $headers = array_keys(self::CSV_COLUMNS);
-        $example = array_fill(0, count($headers), 0);
-        // Set example name, employee_no, and position
+        $example = array_fill(0, count($headers), '');
+        // Identity columns
         $example[0] = 'DELA CRUZ, Juan A.';
         $example[1] = 'pshscrc13-00123';
         $example[2] = 'Administrative Assistant II';
+        // Compensations — fill with sample numeric values
+        $example[3] = '33947.00'; // Salaries and Wages-Regular
+        $example[4] = '2000.00';  // PERA
+        $example[5] = '35947.00'; // Gross Amount Earned (auto-computed if 0)
 
         $out = fopen('php://temp', 'r+');
         fputcsv($out, $headers);
@@ -482,8 +484,8 @@ class PayrollParserService
             if (empty($row['gross_earnings']) || $row['gross_earnings'] == 0) {
                 $row['gross_earnings'] = array_sum(array_map(
                     fn($f) => $row[$f] ?? 0,
-                    ['basic_salary','pera','salary_increase','additional_compensation',
-                     'sala','hazard_pay','longevity_pay','others_bonuses']
+                    ['basic_salary', 'pera', 'salary_increase', 'additional_compensation',
+                     'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses']
                 ));
             }
 
