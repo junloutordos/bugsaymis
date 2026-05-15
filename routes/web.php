@@ -1613,6 +1613,29 @@ Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->gr
         ->name('reports.register');
     Route::get('/{payrollRun}/reports/deductions', [\App\Http\Controllers\Payroll\PayslipController::class, 'deductionsRegister'])
         ->name('reports.deductions');
+
+    // ── Cashier Payroll Upload ─────────────────────────────────────────────────
+    Route::middleware('permission:payroll.upload|payroll.view_all')->prefix('cashier')->name('cashier.')->group(function () {
+        Route::get('/',                                   [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'index'])->name('index');
+        Route::get('/upload',                             [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'uploadForm'])->name('upload');
+        Route::post('/upload',                            [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'upload'])->name('upload.store');
+        Route::get('/{batch}/preview',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'preview'])->name('preview');
+        Route::post('/{batch}/resolve',                   [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'resolve'])->name('resolve');
+        Route::post('/{batch}/adjustments',               [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'adjustments'])->name('adjustments');
+        Route::post('/{batch}/send',                      [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'send'])->name('send');
+        Route::get('/{batch}/status',                     [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'status'])->name('status');
+        Route::post('/{batch}/resend',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'resend'])->name('resend');
+        Route::get('/{batch}/log.csv',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'auditCsv'])->name('audit-csv');
+        Route::get('/{batch}/upload-bonus',               [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'uploadBonusForm'])->name('upload-bonus');
+        Route::post('/{batch}/upload-bonus',              [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'uploadBonus'])->name('upload-bonus.store');
+    });
+
+    // ── Employee Payslip History ───────────────────────────────────────────────
+    Route::prefix('my-payslips')->name('my-payslips.')->group(function () {
+        Route::get('/',              [\App\Http\Controllers\Payroll\PayrollEmployeeController::class, 'index'])->name('index');
+        Route::get('/{payrollItem}', [\App\Http\Controllers\Payroll\PayrollEmployeeController::class, 'show'])->name('show');
+        Route::get('/{payrollItem}/pdf', [\App\Http\Controllers\Payroll\PayrollEmployeeController::class, 'pdf'])->name('pdf');
+    });
 });
 
 // HR Reports (outside payroll prefix)

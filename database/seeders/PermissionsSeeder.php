@@ -204,6 +204,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.training',        'description' => 'Manage training and L&D records'],
             ['module' => 'Faculty Loading', 'name' => 'faculty_loading.training.verify', 'description' => 'Verify or reject training records'],
 
+            // ── Payroll Upload (Cashier) ──────────────────────────────────────
+            ['module' => 'Payroll', 'name' => 'payroll.upload',    'description' => 'Upload payroll Excel and parse into payslips'],
+            ['module' => 'Payroll', 'name' => 'payroll.send',      'description' => 'Queue and send payslip emails to employees'],
+            ['module' => 'Payroll', 'name' => 'payroll.view_all',  'description' => 'View all payroll batches and employee payslips'],
+            ['module' => 'Payroll', 'name' => 'payroll.view_own',  'description' => 'View own payslip history'],
+
         ];
 
         foreach ($permissions as $data) {

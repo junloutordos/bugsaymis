@@ -33,6 +33,7 @@ class User extends Authenticatable
         'electronic_signature',
         'signature_pin',
         'emp_category',
+        'employee_no',
         'on_study_leave',
         'salary_grade',
         'salary_step',
