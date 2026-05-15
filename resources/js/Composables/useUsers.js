@@ -85,6 +85,7 @@ export function useUsers(props) {
         email: user.email,
         sex: user.sex,
         badge_id: user.badge_id ?? "",
+        employee_no: user.employee_no ?? "",
         role_id: Array.isArray(user.role_id)
           ? user.role_id
           : user.role_id
