@@ -61,16 +61,28 @@ class PayrollCashierController extends Controller
 
         $user = Auth::user();
 
-        // Parse main file
-        $parsed = $this->parser->parseMain(
-            $request->input('main_file_base64'),
-            $request->input('sheet_name')
-        );
+        try {
+            // Parse main file
+            $parsed = $this->parser->parseMain(
+                $request->input('main_file_base64'),
+                $request->input('sheet_name')
+            );
+        } catch (\Throwable $e) {
+            return back()->withErrors(['main_file_base64' => 'Could not parse the Excel file: ' . $e->getMessage()]);
+        }
+
+        if (empty($parsed['items'])) {
+            return back()->withErrors(['main_file_base64' => 'No employee rows found. Check that the sheet name is correct and data starts at row 11.']);
+        }
 
         // Parse bonus file if provided
         $bonusData = [];
         if ($request->filled('bonus_file_base64')) {
-            $bonusData = $this->parser->parseBonus($request->input('bonus_file_base64'));
+            try {
+                $bonusData = $this->parser->parseBonus($request->input('bonus_file_base64'));
+            } catch (\Throwable $e) {
+                return back()->withErrors(['bonus_file_base64' => 'Could not parse the bonus file: ' . $e->getMessage()]);
+            }
         }
 
         // Merge bonus fields into items
@@ -85,9 +97,12 @@ class PayrollCashierController extends Controller
             ? $this->storeBase64ToS3($request->input('bonus_file_base64'), $request->input('bonus_filename', 'bonus.xlsx'))
             : null;
 
+        // Use filename-based fallback if payroll_no is blank
+        $payrollNo = $parsed['payroll_no'] ?: ('PR-' . $parsed['year'] . '-' . str_pad($parsed['month'], 2, '0', STR_PAD_LEFT) . '-' . uniqid());
+
         // Create batch (idempotent on payroll_no)
         $batch = PayrollBatch::updateOrCreate(
-            ['payroll_no' => $parsed['payroll_no']],
+            ['payroll_no' => $payrollNo],
             [
                 'batch_type'            => 'main',
                 'period_start'          => $parsed['period_start'],
