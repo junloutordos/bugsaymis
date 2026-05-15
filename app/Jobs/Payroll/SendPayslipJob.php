@@ -48,9 +48,10 @@ class SendPayslipJob implements ShouldQueue
             $firstName = explode(' ', $emp->name)[0];
             $subject   = $emailRecord->subject;
             $bcc       = $emailRecord->bcc_email;
+            $sendType  = $emailRecord->send_type;
 
             $htmlBody = view('payroll.payslip_email', compact(
-                'item', 'batch', 'preparedBy', 'certifiedBy', 'firstName'
+                'item', 'batch', 'preparedBy', 'certifiedBy', 'firstName', 'sendType'
             ))->render();
 
             $pdfBytes  = $pdfService->generate($item);

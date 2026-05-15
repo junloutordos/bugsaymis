@@ -12,17 +12,21 @@ class PayrollBatch extends Model
     protected $table = 'payroll_batches';
 
     protected $fillable = [
-        'payroll_no', 'batch_type', 'period_start', 'period_end',
-        'month', 'year', 'fund_cluster', 'entity_name',
-        'source_main_filename', 'source_bonus_filename',
-        'source_main_s3_key', 'source_bonus_s3_key',
+        'payroll_no', 'batch_type', 'disbursement_type', 'label',
+        'period_start', 'period_end', 'month', 'year',
+        'fund_cluster', 'entity_name',
+        'source_main_filename', 'source_main_s3_key',
         'uploaded_by', 'status',
+        'first_half_credit_date', 'second_half_credit_date', 'credit_date',
         'totals_gross', 'totals_deductions', 'totals_net', 'notes',
     ];
 
     protected $casts = [
-        'period_start' => 'date',
-        'period_end'   => 'date',
+        'period_start'           => 'date',
+        'period_end'             => 'date',
+        'first_half_credit_date' => 'date',
+        'second_half_credit_date'=> 'date',
+        'credit_date'            => 'date',
     ];
 
     public function uploader(): BelongsTo

@@ -12,11 +12,39 @@
 
   <div style="padding:20px 24px 8px;">
     <p>Dear <strong>{{ $firstName }}</strong>,</p>
-    <p style="margin-top:8px;">
-      Please find below your payslip for
-      <strong>{{ \Carbon\Carbon::parse($batch->period_start)->format('F j') }} –
-      {{ \Carbon\Carbon::parse($batch->period_end)->format('F j, Y') }}</strong>.
-      A PDF copy is also attached for your records.
+
+    @php
+      $disbType  = $sendType ?? $batch->disbursement_type ?? 'monthly_salary';
+      $disbLabel = match($disbType) {
+        'first_half'    => '1st Half Salary',
+        'second_half'   => '2nd Half Salary',
+        'hazard_pay'    => 'Hazard Pay',
+        'sala'          => 'Subsistence Allowance',
+        'longevity_pay' => 'Longevity Pay',
+        default         => $batch->label ?: 'Allowance',
+      };
+      $creditAmt  = match($disbType) {
+        'first_half'  => $item->first_half_amount,
+        'second_half' => $item->second_half_amount,
+        default       => $item->net_pay,
+      };
+      $creditDate = match($disbType) {
+        'first_half'  => $batch->first_half_credit_date?->format('F j, Y'),
+        'second_half' => $batch->second_half_credit_date?->format('F j, Y'),
+        default       => $batch->credit_date?->format('F j, Y'),
+      };
+      $period = \Carbon\Carbon::parse($batch->period_start)->format('F j') . ' – ' .
+                \Carbon\Carbon::parse($batch->period_end)->format('F j, Y');
+    @endphp
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin:12px 0;line-height:1.7;">
+      Your <strong>{{ $disbLabel }}</strong> for the period <strong>{{ $period }}</strong>
+      amounting to <strong style="font-size:12pt;">₱ {{ number_format((float)$creditAmt, 2) }}</strong>
+      has been credited to your ATM account{{ $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' }}.
+    </div>
+
+    <p style="margin-top:8px;font-size:9pt;color:#555;">
+      Please see the attached payslip for the complete breakdown of your earnings and deductions.
     </p>
   </div>
 
