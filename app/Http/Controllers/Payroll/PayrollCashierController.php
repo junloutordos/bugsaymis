@@ -45,6 +45,18 @@ class PayrollCashierController extends Controller
         return Inertia::render('Payroll/Cashier/Upload');
     }
 
+    // ── CSV template download ─────────────────────────────────────────────────
+
+    public function csvTemplate()
+    {
+        $this->authorize('payroll.upload');
+        $content = $this->parser->csvTemplate();
+        return response($content, 200, [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="payroll_template.csv"',
+        ]);
+    }
+
     // ── Parse & store ─────────────────────────────────────────────────────────
 
     public function upload(Request $request)
@@ -57,15 +69,28 @@ class PayrollCashierController extends Controller
             'bonus_file_base64' => 'nullable|string',
             'bonus_filename'    => 'nullable|string|max:255',
             'sheet_name'        => 'nullable|string|max:100',
+            'payroll_no'        => 'nullable|string|max:100',
+            'period_start'      => 'nullable|date',
+            'period_end'        => 'nullable|date',
         ]);
 
         $user = Auth::user();
+
+        // Build override meta from form fields (used for CSV uploads or manual correction)
+        $overrideMeta = array_filter([
+            'payroll_no'   => $request->input('payroll_no'),
+            'period_start' => $request->input('period_start'),
+            'period_end'   => $request->input('period_end'),
+            'month'        => $request->filled('period_start') ? (int) date('n', strtotime($request->input('period_start'))) : null,
+            'year'         => $request->filled('period_start') ? (int) date('Y', strtotime($request->input('period_start'))) : null,
+        ], fn($v) => $v !== null && $v !== '');
 
         try {
             // Parse main file
             $parsed = $this->parser->parseMain(
                 $request->input('main_file_base64'),
-                $request->input('sheet_name')
+                $request->input('sheet_name'),
+                $overrideMeta
             );
         } catch (\Throwable $e) {
             return back()->withErrors(['main_file_base64' => 'Could not parse the Excel file: ' . $e->getMessage()]);

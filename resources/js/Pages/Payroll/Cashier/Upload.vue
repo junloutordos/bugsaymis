@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 
 const mainFile      = ref(null)
@@ -11,7 +12,12 @@ const bonusFile     = ref(null)
 const bonusFilename = ref('')
 const bonusBase64   = ref('')
 const sheetName     = ref('')
+const payrollNo     = ref('')
+const periodStart   = ref('')
+const periodEnd     = ref('')
 const loading       = ref(false)
+
+const isCsv = computed(() => mainFilename.value.toLowerCase().endsWith('.csv'))
 
 function readFile(file) {
   return new Promise((resolve, reject) => {
@@ -41,6 +47,10 @@ async function submit() {
     Swal.fire({ icon: 'warning', title: 'Select the main payroll file first.' })
     return
   }
+  if (isCsv.value && (!periodStart.value || !periodEnd.value)) {
+    Swal.fire({ icon: 'warning', title: 'CSV upload requires Period Start and Period End.' })
+    return
+  }
   loading.value = true
 
   router.post(route('payroll.cashier.upload.store'), {
@@ -49,6 +59,9 @@ async function submit() {
     bonus_file_base64: bonusBase64.value || null,
     bonus_filename:    bonusFilename.value || null,
     sheet_name:        sheetName.value || null,
+    payroll_no:        payrollNo.value || null,
+    period_start:      periodStart.value || null,
+    period_end:        periodEnd.value || null,
   }, {
     onError: (errs) => {
       loading.value = false
@@ -65,26 +78,32 @@ async function submit() {
   <AdminLayout title="Upload Payroll">
     <div class="max-w-xl mx-auto">
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
-        <div>
-          <h2 class="text-base font-semibold text-slate-800">Upload Payroll Excel</h2>
-          <p class="text-sm text-slate-500 mt-1">
-            Main file is required. Bonus/SALA file is optional — it can be uploaded later via the batch list.
-          </p>
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold text-slate-800">Upload Payroll Excel / CSV</h2>
+            <p class="text-sm text-slate-500 mt-1">
+              Main file is required. Bonus/SALA file is optional — uploadable later.
+            </p>
+          </div>
+          <a :href="route('payroll.cashier.csv-template')"
+             class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+            <ArrowDownTrayIcon class="w-3.5 h-3.5" /> CSV Template
+          </a>
         </div>
 
         <!-- Main file -->
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">
             Main Payroll File <span class="text-red-500">*</span>
-            <span class="text-slate-400 font-normal">(NEW ACU-SALARIES & PERA PAYROLL …xlsx)</span>
+            <span class="text-slate-400 font-normal">(.xlsx, .xls, or .csv)</span>
           </label>
-          <input type="file" accept=".xlsx,.xls" @change="onMainChange"
+          <input type="file" accept=".xlsx,.xls,.csv" @change="onMainChange"
                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 file:mr-3 file:rounded file:border-0 file:bg-indigo-50 file:text-indigo-700 file:text-xs file:font-medium" />
           <p v-if="mainFilename" class="mt-1 text-xs text-slate-500">{{ mainFilename }}</p>
         </div>
 
-        <!-- Sheet name (optional) -->
-        <div>
+        <!-- Sheet name (Excel only) -->
+        <div v-if="!isCsv">
           <label class="block text-xs font-medium text-slate-600 mb-1">
             Sheet Name <span class="text-slate-400 font-normal">(leave blank to auto-detect latest month)</span>
           </label>
@@ -92,8 +111,39 @@ async function submit() {
                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
 
-        <!-- Bonus file (optional) -->
+        <!-- Period fields (required for CSV, optional for Excel) -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Period Start
+              <span v-if="isCsv" class="text-red-500">*</span>
+              <span v-else class="text-slate-400 font-normal">(overrides Excel)</span>
+            </label>
+            <input v-model="periodStart" type="date"
+                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">
+              Period End
+              <span v-if="isCsv" class="text-red-500">*</span>
+              <span v-else class="text-slate-400 font-normal">(overrides Excel)</span>
+            </label>
+            <input v-model="periodEnd" type="date"
+                   class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <!-- Payroll No (optional override) -->
         <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">
+            Payroll No. <span class="text-slate-400 font-normal">(optional — overrides parsed value)</span>
+          </label>
+          <input v-model="payrollNo" type="text" placeholder="e.g. 2026-05-001"
+                 class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <!-- Bonus file (optional, Excel only) -->
+        <div v-if="!isCsv">
           <label class="block text-xs font-medium text-slate-600 mb-1">
             Bonus / SALA File <span class="text-slate-400 font-normal">(optional)</span>
           </label>
@@ -112,6 +162,11 @@ async function submit() {
             {{ loading ? 'Parsing…' : 'Parse & Preview' }}
           </button>
         </div>
+      </div>
+
+      <!-- CSV usage note -->
+      <div v-if="isCsv" class="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+        <strong>CSV mode:</strong> Period Start and Period End are required. Gross Earnings, Total Deductions, and Net Pay are auto-computed if left at 0. Bonus/SALA upload is not supported for CSV — use the batch page after parsing.
       </div>
     </div>
   </AdminLayout>

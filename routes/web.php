@@ -1598,6 +1598,7 @@ Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->gr
         Route::get('/',                                   [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'index'])->name('index');
         Route::get('/upload',                             [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'uploadForm'])->name('upload');
         Route::post('/upload',                            [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'upload'])->name('upload.store');
+        Route::get('/csv-template',                       [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'csvTemplate'])->name('csv-template');
         Route::get('/{batch}/preview',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'preview'])->name('preview');
         Route::post('/{batch}/resolve',                   [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'resolve'])->name('resolve');
         Route::post('/{batch}/adjustments',               [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'adjustments'])->name('adjustments');
