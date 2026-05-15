@@ -24,6 +24,7 @@ class PayrollParserService
     // CSV column header → DB field map (order matches template)
     private const CSV_COLUMNS = [
         'Name'                    => 'employee_name_raw',
+        'Employee No.'            => 'employee_no',
         'Position'                => 'position',
         'Basic Salary'            => 'basic_salary',
         'PERA'                    => 'pera',
@@ -67,9 +68,10 @@ class PayrollParserService
     {
         $headers = array_keys(self::CSV_COLUMNS);
         $example = array_fill(0, count($headers), 0);
-        // Set example name and position
+        // Set example name, employee_no, and position
         $example[0] = 'DELA CRUZ, Juan A.';
-        $example[1] = 'Administrative Assistant II';
+        $example[1] = 'pshscrc13-00123';
+        $example[2] = 'Administrative Assistant II';
 
         $out = fopen('php://temp', 'r+');
         fputcsv($out, $headers);
@@ -465,11 +467,12 @@ class PayrollParserService
             if ($name === '' || $this->isFooter($name)) continue;
 
             $row = ['excel_row_number' => $rowNum, 'raw_row_json' => []];
+            $stringFields = ['employee_name_raw', 'employee_no', 'position'];
             foreach ($colMap as $idx => $field) {
                 $val = trim($cells[$idx] ?? '');
-                $row[$field] = is_numeric(str_replace(',', '', $val))
-                    ? (float) str_replace(',', '', $val)
-                    : ($field === 'employee_name_raw' || $field === 'position' ? $val : 0.0);
+                $row[$field] = in_array($field, $stringFields)
+                    ? $val
+                    : (is_numeric(str_replace(',', '', $val)) ? (float) str_replace(',', '', $val) : 0.0);
             }
 
             // Ensure required field
