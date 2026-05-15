@@ -54,8 +54,8 @@ class PayrollParserService
         // Totals & net pay
         'Total Deductions'        => 'total_deductions',
         'Net Amount Due'          => 'net_pay',
-        '1-15'                    => 'first_half_amount',
-        '16-30'                   => 'second_half_amount',
+        'First Half'              => 'first_half_amount',
+        'Second Half'             => 'second_half_amount',
     ];
 
     /**
