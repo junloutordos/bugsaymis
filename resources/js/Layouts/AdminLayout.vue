@@ -768,6 +768,21 @@ const menuItems = [
         roles: ["Administrator", "HR", "Payroll Officer"],
         permissions: ["payroll.manage"],
       },
+      {
+        label: "Payroll Upload",
+        routeName: "payroll.cashier.index",
+        href: route('payroll.cashier.index'),
+        icon: DocumentChartBarIcon,
+        roles: ["Administrator", "Cashier"],
+        permissions: ["payroll.upload", "payroll.view_all"],
+      },
+      {
+        label: "My Payslips",
+        routeName: "payroll.my-payslips.index",
+        href: route('payroll.my-payslips.index'),
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "HR", "Cashier", "Payroll Officer", "Faculty", "Staff", "DivisionChief"],
+      },
     ],
   },
 
