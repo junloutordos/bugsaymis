@@ -119,6 +119,10 @@ class AppServiceProvider extends ServiceProvider
             'payroll.process',
             'payroll.approve',
             'payroll.manage',
+            'payroll.upload',
+            'payroll.send',
+            'payroll.view_all',
+            'payroll.view_own',
         ] as $permission) {
             Gate::define($permission, fn (User $user) => $user->hasPermission($permission));
         }
