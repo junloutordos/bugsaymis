@@ -21,19 +21,97 @@ class PayrollParserService
         'job order', 'cos', 'grand total', 'noted by',
     ];
 
+    // CSV column header → DB field map (order matches template)
+    private const CSV_COLUMNS = [
+        'Name'                    => 'employee_name_raw',
+        'Position'                => 'position',
+        'Basic Salary'            => 'basic_salary',
+        'PERA'                    => 'pera',
+        'Salary Increase'         => 'salary_increase',
+        'Additional Compensation' => 'additional_compensation',
+        'Subsistence & Laundry'   => 'sala',
+        'Hazard Pay'              => 'hazard_pay',
+        'Longevity Pay'           => 'longevity_pay',
+        'Others/Bonuses'          => 'others_bonuses',
+        'Gross Earnings'          => 'gross_earnings',
+        'LAWOP/Undertime'         => 'lawop',
+        'BIR Withholding Tax'     => 'bir_tax',
+        'GSIS Contribution'       => 'gsis_contribution',
+        'GSIS Salary Loan'        => 'gsis_salary_loan',
+        'GSIS Policy Loan'        => 'gsis_policy_loan',
+        'GSIS Consolidated Loan'  => 'gsis_consolidated_loan',
+        'GSIS Emergency Loan'     => 'gsis_emergency_loan',
+        'GSIS MPL'                => 'gsis_mpl',
+        'GSIS GFAL'               => 'gsis_gfal',
+        'GSIS CPL'                => 'gsis_cpl',
+        'GSIS MPL Lite'           => 'gsis_mpl_lite',
+        'HDMF Contribution'       => 'hdmf_contribution',
+        'HDMF Salary Loan'        => 'hdmf_salary_loan',
+        'HDMF Calamity Loan'      => 'hdmf_calamity',
+        'HDMF Housing Loan'       => 'hdmf_housing',
+        'HDMF Multi-Purpose'      => 'hdmf_multipurpose',
+        'HDMF MP2'                => 'hdmf_mp2',
+        'Landbank Loan'           => 'landbank_loan',
+        'Credit Union'            => 'credit_union',
+        'PhilHealth Contribution' => 'philhealth_contribution',
+        'Total Deductions'        => 'total_deductions',
+        'Net Pay'                 => 'net_pay',
+        '1st Half'                => 'first_half_amount',
+        '2nd Half'                => 'second_half_amount',
+    ];
+
+    /**
+     * Generate and return CSV template content as a string.
+     */
+    public function csvTemplate(): string
+    {
+        $headers = array_keys(self::CSV_COLUMNS);
+        $example = array_fill(0, count($headers), 0);
+        // Set example name and position
+        $example[0] = 'DELA CRUZ, Juan A.';
+        $example[1] = 'Administrative Assistant II';
+
+        $out = fopen('php://temp', 'r+');
+        fputcsv($out, $headers);
+        fputcsv($out, $example);
+        rewind($out);
+        $content = stream_get_contents($out);
+        fclose($out);
+        return $content;
+    }
+
     /**
      * Parse main payroll Excel and return batch metadata + item rows.
      *
      * @return array{ payroll_no, fund_cluster, entity_name, period_start, period_end,
      *                month, year, items: array }
      */
-    public function parseMain(string $base64OrPath, string $sheetName = null): array
+    public function parseMain(string $base64OrPath, string $sheetName = null, array $overrideMeta = []): array
     {
+        // Detect CSV by content before trying PhpSpreadsheet
+        if ($this->isCsvData($base64OrPath)) {
+            $items = $this->parseCsvData($base64OrPath);
+            $meta  = array_merge([
+                'payroll_no'   => '',
+                'fund_cluster' => '',
+                'entity_name'  => 'Philippine Science High School — Caraga Region Campus',
+                'period_start' => date('Y-m-01'),
+                'period_end'   => date('Y-m-t'),
+                'month'        => (int) date('n'),
+                'year'         => (int) date('Y'),
+            ], $overrideMeta);
+
+            return array_merge($meta, ['items' => $items]);
+        }
+
         $spreadsheet = $this->loadSpreadsheet($base64OrPath);
         $ws          = $this->resolveSheet($spreadsheet, $sheetName);
 
         $meta  = $this->parseMeta($ws);
         $items = $this->parseDataRows($ws);
+
+        // Allow caller to override parsed metadata (e.g. from form fields)
+        $meta = array_merge($meta, array_filter($overrideMeta, fn($v) => $v !== null && $v !== ''));
 
         return array_merge($meta, ['items' => $items]);
     }
@@ -332,5 +410,100 @@ class PayrollParserService
         $name = preg_replace('/\.\s*$/', '', $name); // trailing period
         $name = preg_replace('/\s+/', ' ', $name);
         return trim($name);
+    }
+
+    // ── CSV helpers ───────────────────────────────────────────────────────────
+
+    private function isCsvData(string $data): bool
+    {
+        // Strip data URI prefix
+        if (str_starts_with($data, 'data:')) {
+            $data = substr($data, strpos($data, ',') + 1);
+        }
+        $decoded = base64_decode($data, true);
+        if ($decoded === false) return false;
+
+        // CSV has no binary magic bytes; xlsx starts with PK (zip), xls with D0CF
+        $magic = substr($decoded, 0, 4);
+        if ($magic === "PK\x03\x04" || $magic === "\xD0\xCF\x11\xE0") return false;
+
+        // Looks like text — check first line has commas
+        $firstLine = strtok($decoded, "\n");
+        return str_contains($firstLine, ',');
+    }
+
+    private function parseCsvData(string $data): array
+    {
+        if (str_starts_with($data, 'data:')) {
+            $data = substr($data, strpos($data, ',') + 1);
+        }
+        $decoded = base64_decode($data, true);
+        $lines   = array_filter(explode("\n", str_replace("\r\n", "\n", $decoded)));
+        $lines   = array_values($lines);
+
+        if (empty($lines)) return [];
+
+        // Parse header row
+        $headers = str_getcsv(array_shift($lines));
+        $headers = array_map('trim', $headers);
+
+        // Build index: CSV header → DB field
+        $colMap = [];
+        foreach ($headers as $idx => $h) {
+            if (isset(self::CSV_COLUMNS[$h])) {
+                $colMap[$idx] = self::CSV_COLUMNS[$h];
+            }
+        }
+
+        $items = [];
+        $rowNum = 2;
+        foreach ($lines as $line) {
+            if (trim($line) === '') continue;
+            $cells = str_getcsv($line);
+
+            $name = trim($cells[0] ?? '');
+            if ($name === '' || $this->isFooter($name)) continue;
+
+            $row = ['excel_row_number' => $rowNum, 'raw_row_json' => []];
+            foreach ($colMap as $idx => $field) {
+                $val = trim($cells[$idx] ?? '');
+                $row[$field] = is_numeric(str_replace(',', '', $val))
+                    ? (float) str_replace(',', '', $val)
+                    : ($field === 'employee_name_raw' || $field === 'position' ? $val : 0.0);
+            }
+
+            // Ensure required field
+            if (empty($row['employee_name_raw'])) $row['employee_name_raw'] = $name;
+
+            // Auto-compute gross_earnings if blank
+            if (empty($row['gross_earnings']) || $row['gross_earnings'] == 0) {
+                $row['gross_earnings'] = array_sum(array_map(
+                    fn($f) => $row[$f] ?? 0,
+                    ['basic_salary','pera','salary_increase','additional_compensation',
+                     'sala','hazard_pay','longevity_pay','others_bonuses']
+                ));
+            }
+
+            // Auto-compute total_deductions if blank
+            if (empty($row['total_deductions']) || $row['total_deductions'] == 0) {
+                $deductionFields = ['lawop','bir_tax','gsis_contribution','gsis_salary_loan',
+                    'gsis_policy_loan','gsis_consolidated_loan','gsis_emergency_loan',
+                    'gsis_mpl','gsis_gfal','gsis_cpl','gsis_mpl_lite',
+                    'hdmf_contribution','hdmf_salary_loan','hdmf_calamity',
+                    'hdmf_housing','hdmf_multipurpose','hdmf_mp2',
+                    'landbank_loan','credit_union','philhealth_contribution'];
+                $row['total_deductions'] = array_sum(array_map(fn($f) => $row[$f] ?? 0, $deductionFields));
+            }
+
+            // Auto-compute net_pay if blank
+            if (empty($row['net_pay']) || $row['net_pay'] == 0) {
+                $row['net_pay'] = ($row['gross_earnings'] ?? 0) - ($row['total_deductions'] ?? 0);
+            }
+
+            $items[] = $row;
+            $rowNum++;
+        }
+
+        return $items;
     }
 }
