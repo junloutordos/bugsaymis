@@ -47,7 +47,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive' for the employees list as well
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name', 'sex', 'email', 'badge_id', 'role_id', 'position', 'specialization',
+            ->select('id', 'name', 'sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization',
                      'division_id', 'office_id', 'profile_picture', 'electronic_signature',
                      'status', 'emp_category', 'salary_grade', 'salary_step', 'created_at')
             ->where('status', '<>', 'inactive')
@@ -123,6 +123,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name'           => 'required|string|max:255',
             'sex'            => 'nullable|in:Male,Female',
+            'employee_no'    => ['nullable','string','max:50','unique:users,employee_no'],
             'position'       => 'nullable|string|max:255',
             'specialization' => 'nullable|string|max:150',
             'division_id'    => 'nullable|exists:divisions,id',
@@ -141,6 +142,9 @@ class UserController extends Controller
         $data['badge_id'] = null;
 
         $user = User::create($data);
+        if (empty($user->employee_no)) {
+            $user->update(['employee_no' => 'pshscrc13-00' . $user->id]);
+        }
 
         return redirect()->route('hr.employees.index')->with('success', 'Employee record created. Please ask System Administrator to assign system credentials.');
     }
@@ -184,13 +188,17 @@ class UserController extends Controller
             'email'          => 'required|email|unique:users,email',
             'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
             'badge_id'       => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id'],
+            'employee_no'    => ['nullable','string','max:50','unique:users,employee_no'],
             'position'       => 'nullable|string|max:255',
             'specialization' => 'nullable|string|max:150',
             'division_id'    => 'nullable|exists:divisions,id',
             'office_id'      => 'nullable|exists:offices,id',
         ]);
 
-        User::create($data);
+        $user = User::create($data);
+        if (empty($user->employee_no)) {
+            $user->update(['employee_no' => 'pshscrc13-00' . $user->id]);
+        }
 
         return redirect()->route('users.index')->with('success', 'User created successfully');
     }
@@ -205,6 +213,7 @@ class UserController extends Controller
             'email'          => 'required|email|unique:users,email,' . $user->id,
             'emp_category'   => 'nullable|in:Plantilla Teaching,Plantilla Non-Teaching,COS Teaching,COS Non Teaching',
             'badge_id'       => ['nullable','string','max:64','regex:/^[A-Za-z0-9_\\-]+$/','unique:users,badge_id,' . $user->id],
+            'employee_no'    => ['nullable','string','max:50','unique:users,employee_no,' . $user->id],
             'position'       => 'nullable|string|max:255',
             'specialization' => 'nullable|string|max:150',
             'division_id'    => 'nullable|exists:divisions,id',
