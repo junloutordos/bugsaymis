@@ -40,6 +40,7 @@ class RolesSeeder extends Seeder
 
             // ── HR & Payroll ──────────────────────────────────────────────────
             ['name' => 'Payroll Officer',    'description' => 'Processes, approves, and releases payroll runs.'],
+            ['name' => 'Cashier',            'description' => 'Uploads payroll Excel workbooks and sends per-employee payslip emails.'],
 
             // ── Recruitment ───────────────────────────────────────────────────
             ['name' => 'Recruitment Officer','description' => 'Manages the full recruitment and selection process.'],

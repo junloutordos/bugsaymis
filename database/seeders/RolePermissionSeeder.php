@@ -102,6 +102,12 @@ class RolePermissionSeeder extends Seeder
             'chat.access',
         ]);
 
+        // ── Cashier ───────────────────────────────────────────────────────────
+        $assign('Cashier', [
+            'payroll.upload', 'payroll.send', 'payroll.view_all', 'payroll.view_own',
+            'chat.access',
+        ]);
+
         // ── HRMPSB ───────────────────────────────────────────────────────────
         // Evaluate applicants, conduct interviews, and participate in ranking.
         // No manage/approve/publish — those stay with Recruitment Officer / HR.
