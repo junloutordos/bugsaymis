@@ -97,11 +97,18 @@ class PayrollParserService
             $data = substr($data, strpos($data, ',') + 1);
         }
 
-        if (base64_decode($data, true) !== false && !file_exists($data)) {
-            $tmp = tempnam(sys_get_temp_dir(), 'payroll_') . '.xlsx';
-            file_put_contents($tmp, base64_decode($data));
-            $spreadsheet = IOFactory::load($tmp);
-            unlink($tmp);
+        $decoded = base64_decode($data, true);
+        if ($decoded !== false && !file_exists($data)) {
+            // Detect file type by magic bytes: PK = xlsx/zip, 0xD0CF = xls
+            $magic = substr($decoded, 0, 4);
+            $ext   = ($magic === "\xD0\xCF\x11\xE0") ? 'xls' : 'xlsx';
+            $tmp   = sys_get_temp_dir() . '/payroll_' . uniqid() . '.' . $ext;
+            file_put_contents($tmp, $decoded);
+            try {
+                $spreadsheet = IOFactory::load($tmp);
+            } finally {
+                @unlink($tmp);
+            }
             return $spreadsheet;
         }
 
