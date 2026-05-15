@@ -50,7 +50,6 @@ class PayrollParserService
         'HLF'                     => 'hdmf_housing',
         // Other deductions
         'Landbank'                => 'landbank_loan',
-        'Credit Union'            => 'credit_union',
         'PHIC EE Share'           => 'philhealth_contribution',
         // Totals & net pay
         'Total Deductions'        => 'total_deductions',
