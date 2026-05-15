@@ -92,27 +92,33 @@ class PayrollParserService
 
     private function loadSpreadsheet(string $data): \PhpOffice\PhpSpreadsheet\Spreadsheet
     {
-        // Accept base64 data URI or raw base64 or a file path
+        // Strip data URI prefix if present — after this $data is raw base64
         if (str_starts_with($data, 'data:')) {
             $data = substr($data, strpos($data, ',') + 1);
         }
 
-        $decoded = base64_decode($data, true);
-        if ($decoded !== false && !file_exists($data)) {
-            // Detect file type by magic bytes: PK = xlsx/zip, 0xD0CF = xls
-            $magic = substr($decoded, 0, 4);
-            $ext   = ($magic === "\xD0\xCF\x11\xE0") ? 'xls' : 'xlsx';
-            $tmp   = sys_get_temp_dir() . '/payroll_' . uniqid() . '.' . $ext;
-            file_put_contents($tmp, $decoded);
-            try {
-                $spreadsheet = IOFactory::load($tmp);
-            } finally {
-                @unlink($tmp);
-            }
-            return $spreadsheet;
+        // Short string starting with / or . → treat as file path
+        if (strlen($data) < 4096 && (str_starts_with($data, '/') || str_starts_with($data, '.')) && file_exists($data)) {
+            return IOFactory::load($data);
         }
 
-        return IOFactory::load($data);
+        // Otherwise decode base64 content
+        $decoded = base64_decode($data, true);
+        if ($decoded === false) {
+            throw new \InvalidArgumentException('Invalid base64 data — could not decode file.');
+        }
+
+        // Detect .xls (legacy) vs .xlsx by magic bytes
+        $magic = substr($decoded, 0, 4);
+        $ext   = ($magic === "\xD0\xCF\x11\xE0") ? 'xls' : 'xlsx';
+        $tmp   = sys_get_temp_dir() . '/payroll_' . uniqid() . '.' . $ext;
+        file_put_contents($tmp, $decoded);
+        try {
+            $spreadsheet = IOFactory::load($tmp);
+        } finally {
+            @unlink($tmp);
+        }
+        return $spreadsheet;
     }
 
     private function resolveSheet(\PhpOffice\PhpSpreadsheet\Spreadsheet $spreadsheet, ?string $name): Worksheet
