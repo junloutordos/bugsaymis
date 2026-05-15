@@ -1606,8 +1606,6 @@ Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->gr
         Route::get('/{batch}/status',                     [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'status'])->name('status');
         Route::post('/{batch}/resend',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'resend'])->name('resend');
         Route::get('/{batch}/log.csv',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'auditCsv'])->name('audit-csv');
-        Route::get('/{batch}/upload-bonus',               [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'uploadBonusForm'])->name('upload-bonus');
-        Route::post('/{batch}/upload-bonus',              [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'uploadBonus'])->name('upload-bonus.store');
     });
 
     // ── Employee Payslip History (must be before /{payrollRun} wildcard) ───────

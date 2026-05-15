@@ -47,13 +47,15 @@ class PayrollCashierController extends Controller
 
     // ── CSV template download ─────────────────────────────────────────────────
 
-    public function csvTemplate()
+    public function csvTemplate(Request $request)
     {
         $this->authorize('payroll.upload');
-        $content = $this->parser->csvTemplate();
+        $type     = $request->query('type', 'monthly_salary');
+        $content  = $this->parser->csvTemplate($type);
+        $filename = str_replace('_', '-', $type) . '-template.csv';
         return response($content, 200, [
             'Content-Type'        => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="payroll_template.csv"',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
 
@@ -63,95 +65,82 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.upload');
 
-        $request->validate([
-            'main_file_base64'  => 'required|string',
-            'main_filename'     => 'required|string|max:255',
-            'bonus_file_base64' => 'nullable|string',
-            'bonus_filename'    => 'nullable|string|max:255',
-            'sheet_name'        => 'nullable|string|max:100',
-            'payroll_no'        => 'nullable|string|max:100',
-            'period_start'      => 'nullable|date',
-            'period_end'        => 'nullable|date',
+        $data = $request->validate([
+            'main_file_base64'        => 'required|string',
+            'main_filename'           => 'required|string|max:255',
+            'disbursement_type'       => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,other',
+            'label'                   => 'nullable|string|max:150',
+            'period_start'            => 'required|date',
+            'period_end'              => 'required|date|after_or_equal:period_start',
+            'first_half_credit_date'  => 'required_if:disbursement_type,monthly_salary|nullable|date',
+            'second_half_credit_date' => 'required_if:disbursement_type,monthly_salary|nullable|date',
+            'credit_date'             => 'required_unless:disbursement_type,monthly_salary|nullable|date',
+            'payroll_no'              => 'nullable|string|max:100',
         ]);
 
-        $user = Auth::user();
+        $disbursementType = $data['disbursement_type'];
+        $periodStart      = $data['period_start'];
 
-        // Build override meta from form fields (used for CSV uploads or manual correction)
+        $label = $data['label'] ?: match($disbursementType) {
+            'monthly_salary' => 'Monthly Salary',
+            'hazard_pay'     => 'Hazard Pay',
+            'sala'           => 'Subsistence Allowance',
+            'longevity_pay'  => 'Longevity Pay',
+            default          => 'Other Allowance',
+        };
+
         $overrideMeta = array_filter([
-            'payroll_no'   => $request->input('payroll_no'),
-            'period_start' => $request->input('period_start'),
-            'period_end'   => $request->input('period_end'),
-            'month'        => $request->filled('period_start') ? (int) date('n', strtotime($request->input('period_start'))) : null,
-            'year'         => $request->filled('period_start') ? (int) date('Y', strtotime($request->input('period_start'))) : null,
+            'payroll_no'   => $data['payroll_no'] ?? null,
+            'period_start' => $periodStart,
+            'period_end'   => $data['period_end'],
+            'month'        => (int) date('n', strtotime($periodStart)),
+            'year'         => (int) date('Y', strtotime($periodStart)),
         ], fn($v) => $v !== null && $v !== '');
 
         try {
-            // Parse main file
-            $parsed = $this->parser->parseMain(
-                $request->input('main_file_base64'),
-                $request->input('sheet_name'),
-                $overrideMeta
-            );
+            $parsed = $this->parser->parseMain($data['main_file_base64'], $overrideMeta);
         } catch (\Throwable $e) {
-            return back()->withErrors(['main_file_base64' => 'Could not parse the Excel file: ' . $e->getMessage()]);
+            return back()->withErrors(['main_file_base64' => 'Could not parse the CSV file: ' . $e->getMessage()]);
         }
 
         if (empty($parsed['items'])) {
-            return back()->withErrors(['main_file_base64' => 'No employee rows found. Check that the sheet name is correct and data starts at row 11.']);
-        }
-
-        // Parse bonus file if provided
-        $bonusData = [];
-        if ($request->filled('bonus_file_base64')) {
-            try {
-                $bonusData = $this->parser->parseBonus($request->input('bonus_file_base64'));
-            } catch (\Throwable $e) {
-                return back()->withErrors(['bonus_file_base64' => 'Could not parse the bonus file: ' . $e->getMessage()]);
-            }
+            return back()->withErrors(['main_file_base64' => 'No employee rows found. Check that your CSV has the correct headers and data rows.']);
         }
 
         try {
-            // Merge bonus fields into items
-            $items = $this->mergeBonusIntoItems($parsed['items'], $bonusData);
+            $items  = $this->matcher->matchItems($parsed['items']);
+            $mainKey = $this->storeBase64ToS3($data['main_file_base64'], $data['main_filename']);
 
-            // Match employees
-            $items = $this->matcher->matchItems($items);
+            $payrollNo = $parsed['payroll_no'] ?: (
+                'PR-' . $parsed['year'] . '-' . str_pad($parsed['month'], 2, '0', STR_PAD_LEFT) . '-' . substr(md5(uniqid()), 0, 6)
+            );
 
-            // Store Excel on S3
-            $mainKey  = $this->storeBase64ToS3($request->input('main_file_base64'), $request->input('main_filename'));
-            $bonusKey = $request->filled('bonus_file_base64')
-                ? $this->storeBase64ToS3($request->input('bonus_file_base64'), $request->input('bonus_filename', 'bonus.xlsx'))
-                : null;
-
-            // Use filename-based fallback if payroll_no is blank
-            $payrollNo = $parsed['payroll_no'] ?: ('PR-' . $parsed['year'] . '-' . str_pad($parsed['month'], 2, '0', STR_PAD_LEFT) . '-' . uniqid());
-
-            // Create batch (idempotent on payroll_no)
             $batch = PayrollBatch::updateOrCreate(
                 ['payroll_no' => $payrollNo],
                 [
-                    'batch_type'            => 'main',
-                    'period_start'          => $parsed['period_start'],
-                    'period_end'            => $parsed['period_end'],
-                    'month'                 => $parsed['month'],
-                    'year'                  => $parsed['year'],
-                    'fund_cluster'          => $parsed['fund_cluster'],
-                    'entity_name'           => $parsed['entity_name'],
-                    'source_main_filename'  => $request->input('main_filename'),
-                    'source_bonus_filename' => $request->input('bonus_filename'),
-                    'source_main_s3_key'    => $mainKey,
-                    'source_bonus_s3_key'   => $bonusKey,
-                    'uploaded_by'           => $user->id,
-                    'status'                => 'previewed',
+                    'batch_type'              => 'main',
+                    'disbursement_type'       => $disbursementType,
+                    'label'                   => $label,
+                    'period_start'            => $parsed['period_start'],
+                    'period_end'              => $parsed['period_end'],
+                    'month'                   => $parsed['month'],
+                    'year'                    => $parsed['year'],
+                    'fund_cluster'            => $parsed['fund_cluster'],
+                    'entity_name'             => $parsed['entity_name'],
+                    'source_main_filename'    => $data['main_filename'],
+                    'source_main_s3_key'      => $mainKey,
+                    'uploaded_by'             => Auth::id(),
+                    'status'                  => 'previewed',
+                    'first_half_credit_date'  => $data['first_half_credit_date'] ?? null,
+                    'second_half_credit_date' => $data['second_half_credit_date'] ?? null,
+                    'credit_date'             => $data['credit_date'] ?? null,
                 ]
             );
 
-            // Upsert items (one per employee per month)
             foreach ($items as $itemData) {
                 $this->upsertItem($batch, $itemData, $parsed['month'], $parsed['year']);
             }
 
-            // Recompute totals
             $this->recalcTotals($batch);
 
         } catch (\Throwable $e) {
@@ -204,8 +193,6 @@ class PayrollCashierController extends Controller
 
         foreach ($data['resolutions'] as $res) {
             $item = PayrollItem::findOrFail($res['item_id']);
-
-            // Enforce: this item belongs to this batch's month/year
             abort_if($item->month !== $batch->month || $item->year !== $batch->year, 403);
 
             $item->update([
@@ -214,11 +201,7 @@ class PayrollCashierController extends Controller
             ]);
 
             if (!empty($res['save_alias'])) {
-                $this->matcher->saveAlias(
-                    $item->employee_name_raw,
-                    $res['user_id'],
-                    Auth::id()
-                );
+                $this->matcher->saveAlias($item->employee_name_raw, $res['user_id'], Auth::id());
             }
         }
 
@@ -251,32 +234,42 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.send');
 
-        $items = PayrollItem::where('month', $batch->month)
-            ->where('year', $batch->year)
+        $items = PayrollItem::where('batch_id', $batch->id)
             ->whereNotNull('matched_user_id')
             ->whereIn('match_status', ['matched', 'probable', 'manual'])
-            ->with('employee:id,name,email,status,email_verified_at')
+            ->with('employee:id,name,email,status')
             ->get();
+
+        $delay = 0;
 
         foreach ($items as $item) {
             $emp = $item->employee;
-            if (!$emp || $emp->status === 'inactive' || !$emp->email) {
-                continue;
+            if (!$emp || $emp->status === 'inactive' || !$emp->email) continue;
+
+            if ($batch->disbursement_type === 'monthly_salary') {
+                // Two notifications: one for each half
+                foreach (['first_half', 'second_half'] as $sendType) {
+                    $emailRecord = PayrollEmail::create([
+                        'payroll_item_id' => $item->id,
+                        'send_type'       => $sendType,
+                        'to_email'        => $emp->email,
+                        'bcc_email'       => config('mail.payroll_bcc'),
+                        'subject'         => $this->emailSubject($batch, $sendType),
+                        'status'          => 'queued',
+                    ]);
+                    SendPayslipJob::dispatch($emailRecord->id)->delay(now()->addSeconds($delay++ * 2));
+                }
+            } else {
+                $emailRecord = PayrollEmail::create([
+                    'payroll_item_id' => $item->id,
+                    'send_type'       => $batch->disbursement_type,
+                    'to_email'        => $emp->email,
+                    'bcc_email'       => config('mail.payroll_bcc'),
+                    'subject'         => $this->emailSubject($batch),
+                    'status'          => 'queued',
+                ]);
+                SendPayslipJob::dispatch($emailRecord->id)->delay(now()->addSeconds($delay++ * 2));
             }
-
-            // Create queued email record
-            $emailRecord = PayrollEmail::create([
-                'payroll_item_id' => $item->id,
-                'send_type'       => 'initial',
-                'to_email'        => $emp->email,
-                'bcc_email'       => config('mail.payroll_bcc'),
-                'subject'         => $this->emailSubject($batch),
-                'status'          => 'queued',
-            ]);
-
-            SendPayslipJob::dispatch($emailRecord->id)->delay(
-                now()->addSeconds($items->search($item) * 2)
-            );
         }
 
         $batch->update(['status' => 'sending']);
@@ -290,29 +283,24 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.view_all');
 
-        $items = PayrollItem::where('month', $batch->month)
-            ->where('year', $batch->year)
+        $items = PayrollItem::where('batch_id', $batch->id)
             ->whereNotNull('matched_user_id')
             ->with(['employee:id,name,email', 'emails' => fn($q) => $q->latest()->limit(1)])
             ->get();
 
-        $counts = [
-            'total'   => $items->count(),
-            'queued'  => 0, 'sending' => 0,
-            'sent'    => 0, 'failed'  => 0,
-        ];
+        $counts = ['total' => $items->count(), 'queued' => 0, 'sending' => 0, 'sent' => 0, 'failed' => 0];
 
         $rows = $items->map(function ($item) use (&$counts) {
             $latest = $item->emails->first();
             $status = $latest?->status ?? 'unsent';
             if (isset($counts[$status])) $counts[$status]++;
             return [
-                'id'         => $item->id,
-                'name'       => $item->employee?->name ?? $item->employee_name_raw,
-                'email'      => $item->employee?->email,
+                'id'           => $item->id,
+                'name'         => $item->employee?->name ?? $item->employee_name_raw,
+                'email'        => $item->employee?->email,
                 'email_status' => $status,
-                'sent_at'    => $latest?->sent_at,
-                'last_error' => $latest?->last_error,
+                'sent_at'      => $latest?->sent_at,
+                'last_error'   => $latest?->last_error,
             ];
         });
 
@@ -361,7 +349,7 @@ class PayrollCashierController extends Controller
         $this->authorize('payroll.view_all');
 
         $emails = PayrollEmail::with('item.employee:id,name,email')
-            ->whereHas('item', fn($q) => $q->where('month', $batch->month)->where('year', $batch->year))
+            ->whereHas('item', fn($q) => $q->where('batch_id', $batch->id))
             ->orderBy('created_at')
             ->get();
 
@@ -385,97 +373,6 @@ class PayrollCashierController extends Controller
         ]);
     }
 
-    // ── Bonus upload ──────────────────────────────────────────────────────────
-
-    public function uploadBonusForm(PayrollBatch $batch)
-    {
-        $this->authorize('payroll.upload');
-        return Inertia::render('Payroll/Cashier/UploadBonus', [
-            'batch' => $batch->only(['id', 'payroll_no', 'period_start', 'period_end', 'month', 'year']),
-        ]);
-    }
-
-    public function uploadBonus(Request $request, PayrollBatch $batch)
-    {
-        $this->authorize('payroll.upload');
-
-        $request->validate([
-            'bonus_file_base64' => 'required|string',
-            'bonus_filename'    => 'required|string|max:255',
-        ]);
-
-        $bonusData = $this->parser->parseBonus($request->input('bonus_file_base64'));
-        $bonusKey  = $this->storeBase64ToS3(
-            $request->input('bonus_file_base64'),
-            $request->input('bonus_filename')
-        );
-
-        // Create a bonus batch record
-        $bonusBatch = PayrollBatch::create([
-            'payroll_no'            => $batch->payroll_no . '-BONUS',
-            'batch_type'            => 'bonus',
-            'period_start'          => $batch->period_start,
-            'period_end'            => $batch->period_end,
-            'month'                 => $batch->month,
-            'year'                  => $batch->year,
-            'fund_cluster'          => $batch->fund_cluster,
-            'entity_name'           => $batch->entity_name,
-            'source_bonus_filename' => $request->input('bonus_filename'),
-            'source_bonus_s3_key'   => $bonusKey,
-            'uploaded_by'           => Auth::id(),
-            'status'                => 'completed',
-        ]);
-
-        // Update existing payroll items for this month/year with bonus fields
-        $updated = 0;
-        foreach ($bonusData as $normalizedName => $bonusFields) {
-            $alias   = \App\Models\Payroll\PayrollNameAlias::where('alias_name', $normalizedName)->first();
-            $userId  = $alias?->user_id
-                ?? User::where('status', '<>', 'inactive')->get()
-                       ->first(fn($u) => $this->parser->normalizeName($u->name) === $normalizedName)
-                       ?->id;
-
-            if (!$userId) continue;
-
-            PayrollItem::where('month', $batch->month)
-                ->where('year', $batch->year)
-                ->where('matched_user_id', $userId)
-                ->update(array_merge($bonusFields, [
-                    'bonus_batch_id'   => $bonusBatch->id,
-                    'bonus_uploaded_at'=> now(),
-                ]));
-            $updated++;
-        }
-
-        // Queue bonus notification emails
-        $items = PayrollItem::where('month', $batch->month)
-            ->where('year', $batch->year)
-            ->whereNotNull('bonus_uploaded_at')
-            ->whereNotNull('matched_user_id')
-            ->with('employee:id,name,email,status,email_verified_at')
-            ->get();
-
-        foreach ($items as $item) {
-            $emp = $item->employee;
-            if (!$emp || $emp->status === 'inactive' || !$emp->email) continue;
-
-            $emailRecord = PayrollEmail::create([
-                'payroll_item_id' => $item->id,
-                'send_type'       => 'bonus_update',
-                'to_email'        => $emp->email,
-                'bcc_email'       => config('mail.payroll_bcc'),
-                'subject'         => '[Updated] ' . $this->emailSubject($batch),
-                'status'          => 'queued',
-            ]);
-
-            SendPayslipJob::dispatch($emailRecord->id)->delay(
-                now()->addSeconds($items->search($item) * 2)
-            );
-        }
-
-        return back()->with('success', "Bonus data uploaded. {$updated} payslips updated and notifications queued.");
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function upsertItem(PayrollBatch $batch, array $data, int $month, int $year): void
@@ -484,8 +381,8 @@ class PayrollCashierController extends Controller
             [
                 'year'            => $year,
                 'month'           => $month,
+                'batch_id'        => $batch->id,
                 'matched_user_id' => $data['matched_user_id'] ?? null,
-                // For unmatched rows, also match on raw name to avoid duplication
                 ...($data['matched_user_id'] ? [] : ['employee_name_raw' => $data['employee_name_raw']]),
             ],
             array_merge($data, [
@@ -496,17 +393,6 @@ class PayrollCashierController extends Controller
         );
     }
 
-    private function mergeBonusIntoItems(array $items, array $bonusData): array
-    {
-        return array_map(function ($item) use ($bonusData) {
-            $key = $this->parser->normalizeName($item['employee_name_raw'] ?? '');
-            if (isset($bonusData[$key])) {
-                $item = array_merge($item, $bonusData[$key]);
-            }
-            return $item;
-        }, $items);
-    }
-
     private function recalcTotals(PayrollBatch $batch): void
     {
         $totals = PayrollItem::where('batch_id', $batch->id)
@@ -514,9 +400,9 @@ class PayrollCashierController extends Controller
             ->first();
 
         $batch->update([
-            'totals_gross'       => $totals->g ?? 0,
-            'totals_deductions'  => $totals->d ?? 0,
-            'totals_net'         => $totals->n ?? 0,
+            'totals_gross'      => $totals->g ?? 0,
+            'totals_deductions' => $totals->d ?? 0,
+            'totals_net'        => $totals->n ?? 0,
         ]);
     }
 
@@ -531,10 +417,18 @@ class PayrollCashierController extends Controller
         return $key;
     }
 
-    private function emailSubject(PayrollBatch $batch): string
+    private function emailSubject(PayrollBatch $batch, string $sendType = null): string
     {
-        $start = \Carbon\Carbon::parse($batch->period_start)->format('M j');
-        $end   = \Carbon\Carbon::parse($batch->period_end)->format('M j, Y');
-        return "Payslip for {$start}–{$end} — PSHS-CRC";
+        $period = \Carbon\Carbon::parse($batch->period_start)->format('M Y');
+        $type   = $sendType ?? $batch->disbursement_type;
+
+        return match($type) {
+            'first_half'    => "1st Half Salary — {$period} — PSHS-CRC",
+            'second_half'   => "2nd Half Salary — {$period} — PSHS-CRC",
+            'hazard_pay'    => "Hazard Pay — {$period} — PSHS-CRC",
+            'sala'          => "Subsistence Allowance — {$period} — PSHS-CRC",
+            'longevity_pay' => "Longevity Pay — {$period} — PSHS-CRC",
+            default         => ($batch->label ?: 'Allowance') . " — {$period} — PSHS-CRC",
+        };
     }
 }
