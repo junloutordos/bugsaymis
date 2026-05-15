@@ -260,7 +260,7 @@ class PayrollCashierController extends Controller
 
         foreach ($items as $item) {
             $emp = $item->employee;
-            if (!$emp || $emp->status === 'inactive' || !$emp->email_verified_at) {
+            if (!$emp || $emp->status === 'inactive' || !$emp->email) {
                 continue;
             }
 
@@ -457,7 +457,7 @@ class PayrollCashierController extends Controller
 
         foreach ($items as $item) {
             $emp = $item->employee;
-            if (!$emp || $emp->status === 'inactive' || !$emp->email_verified_at) continue;
+            if (!$emp || $emp->status === 'inactive' || !$emp->email) continue;
 
             $emailRecord = PayrollEmail::create([
                 'payroll_item_id' => $item->id,
