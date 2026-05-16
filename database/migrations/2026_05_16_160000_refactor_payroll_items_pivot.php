@@ -7,6 +7,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const NUMERIC_COLS = [
+        'basic_salary', 'salary_increase', 'additional_compensation',
+        'pera', 'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses', 'gross_earnings',
+        'lawop', 'pvp_overpayment', 'gsis_contribution', 'bir_tax',
+        'wht_hazard', 'wht_cna', 'longevity_tax',
+        'philhealth_contribution', 'philhealth_differential',
+        'hdmf_contribution', 'hdmf_additional',
+        'gsis_salary_loan', 'gsis_policy_loan', 'gsis_consolidated_loan',
+        'gsis_emergency_loan', 'gsis_mpl', 'gsis_gfal', 'gsis_cpl', 'gsis_mpl_lite',
+        'hdmf_salary_loan', 'hdmf_calamity', 'hdmf_housing', 'hdmf_multipurpose', 'hdmf_mp2',
+        'landbank_loan', 'credit_union',
+        'total_deductions', 'net_pay', 'first_half_amount', 'second_half_amount',
+    ];
+
     public function up(): void
     {
         // 1. Create the pivot table (idempotent — prod may already have it from a prior partial run)
@@ -37,9 +51,51 @@ return new class extends Migration
             });
         }
 
-        // MySQL allows multiple NULLs in a unique index, so unmatched rows (NULL user) are fine
+        // 4. Deduplicate: prod may have multiple items per (matched_user_id, month, year) from before
+        //    the merge-ADD rule was introduced. Merge them so the unique constraint can be added.
         if (!$indexes->contains('payroll_items_per_user_month')) {
+            $this->deduplicateItems();
             DB::statement('ALTER TABLE payroll_items ADD UNIQUE payroll_items_per_user_month (matched_user_id, month, year)');
+        }
+    }
+
+    private function deduplicateItems(): void
+    {
+        $groups = DB::table('payroll_items')
+            ->selectRaw('matched_user_id, month, year, MIN(id) as keep_id')
+            ->whereNotNull('matched_user_id')
+            ->groupBy('matched_user_id', 'month', 'year')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        foreach ($groups as $group) {
+            $dupIds = DB::table('payroll_items')
+                ->where('matched_user_id', $group->matched_user_id)
+                ->where('month', $group->month)
+                ->where('year', $group->year)
+                ->where('id', '!=', $group->keep_id)
+                ->pluck('id');
+
+            // Add numeric columns from duplicates into the keeper
+            $sumSelect = implode(', ', array_map(fn($c) => "SUM(`$c`) as `$c`", self::NUMERIC_COLS));
+            $sums = DB::table('payroll_items')->whereIn('id', $dupIds)->selectRaw($sumSelect)->first();
+
+            $updates = [];
+            foreach (self::NUMERIC_COLS as $col) {
+                $updates[$col] = DB::raw("`$col` + " . round((float) ($sums->$col ?? 0), 2));
+            }
+            DB::table('payroll_items')->where('id', $group->keep_id)->update($updates);
+
+            // Point pivot rows for duplicates to the keeper (INSERT IGNORE to skip collisions)
+            foreach ($dupIds as $dupId) {
+                $batchIds = DB::table('payroll_batch_items')->where('item_id', $dupId)->pluck('batch_id');
+                foreach ($batchIds as $batchId) {
+                    DB::table('payroll_batch_items')->insertOrIgnore(['batch_id' => $batchId, 'item_id' => $group->keep_id]);
+                }
+                DB::table('payroll_batch_items')->where('item_id', $dupId)->delete();
+            }
+
+            DB::table('payroll_items')->whereIn('id', $dupIds)->delete();
         }
     }
 
