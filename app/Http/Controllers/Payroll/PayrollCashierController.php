@@ -456,64 +456,33 @@ class PayrollCashierController extends Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // Numeric columns that are ADDED (not replaced) when merging a second disbursement type
-    private const MERGE_NUMERIC = [
-        'basic_salary', 'salary_increase', 'additional_compensation',
-        'pera', 'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses', 'gross_earnings',
-        'lawop', 'pvp_overpayment', 'gsis_contribution', 'bir_tax',
-        'wht_hazard', 'wht_cna', 'longevity_tax',
-        'philhealth_contribution', 'philhealth_differential',
-        'hdmf_contribution', 'hdmf_additional',
-        'gsis_salary_loan', 'gsis_policy_loan', 'gsis_consolidated_loan',
-        'gsis_emergency_loan', 'gsis_mpl', 'gsis_gfal', 'gsis_cpl', 'gsis_mpl_lite',
-        'hdmf_salary_loan', 'hdmf_calamity', 'hdmf_housing', 'hdmf_multipurpose', 'hdmf_mp2',
-        'landbank_loan', 'credit_union',
-        'total_deductions', 'net_pay', 'first_half_amount', 'second_half_amount',
-    ];
-
     private function upsertItem(PayrollBatch $batch, array $data, int $month, int $year): void
     {
         $userId = $data['matched_user_id'] ?? null;
 
-        // For matched employees, try to find an existing item for this period (any batch)
+        // One item per batch per matched employee (unique: batch_id + matched_user_id)
         $existing = $userId
-            ? PayrollItem::where('matched_user_id', $userId)
-                ->where('month', $month)
-                ->where('year', $year)
+            ? PayrollItem::where('batch_id', $batch->id)
+                ->where('matched_user_id', $userId)
                 ->first()
             : null;
 
         if ($existing) {
-            // ADD numeric values from this upload on top of what already exists
-            foreach (self::MERGE_NUMERIC as $col) {
-                if (isset($data[$col])) {
-                    $existing->$col = round((float) $existing->$col + (float) $data[$col], 2);
-                }
-            }
-            // Update descriptive fields only if the new value is non-empty
-            foreach (['position', 'office_division', 'employee_no'] as $col) {
-                if (!empty($data[$col])) $existing->$col = $data[$col];
-            }
-            $existing->save();
-
-            // Link existing item to this (new) batch via pivot
-            DB::table('payroll_batch_items')->insertOrIgnore([
-                'batch_id' => $batch->id,
-                'item_id'  => $existing->id,
-            ]);
+            $existing->update(array_merge($data, ['month' => $month, 'year' => $year]));
+            $itemId = $existing->id;
         } else {
-            // Create a brand-new item for this batch
-            $item = PayrollItem::create(array_merge($data, [
+            $item   = PayrollItem::create(array_merge($data, [
                 'batch_id' => $batch->id,
                 'month'    => $month,
                 'year'     => $year,
             ]));
-
-            DB::table('payroll_batch_items')->insertOrIgnore([
-                'batch_id' => $batch->id,
-                'item_id'  => $item->id,
-            ]);
+            $itemId = $item->id;
         }
+
+        DB::table('payroll_batch_items')->insertOrIgnore([
+            'batch_id' => $batch->id,
+            'item_id'  => $itemId,
+        ]);
     }
 
     private function recalcTotals(PayrollBatch $batch, array $parsedItems): void
