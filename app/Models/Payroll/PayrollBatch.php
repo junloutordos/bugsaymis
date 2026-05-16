@@ -22,12 +22,53 @@ class PayrollBatch extends Model
     ];
 
     protected $casts = [
-        'period_start'           => 'date',
-        'period_end'             => 'date',
-        'first_half_credit_date' => 'date',
-        'second_half_credit_date'=> 'date',
-        'credit_date'            => 'date',
+        'period_start'            => 'date',
+        'period_end'              => 'date',
+        'first_half_credit_date'  => 'date',
+        'second_half_credit_date' => 'date',
+        'credit_date'             => 'date',
+        'disbursement_type'       => 'array',
     ];
+
+    public function hasType(string $type): bool
+    {
+        return in_array($type, (array) $this->disbursement_type);
+    }
+
+    public function isMonthly(): bool
+    {
+        return $this->hasType('monthly_salary');
+    }
+
+    /** Human-readable label for a given send pass (first_half / second_half / null for single). */
+    public function disbursementLabel(?string $pass = null): string
+    {
+        if ($this->label) return $this->label;
+        return self::buildLabel((array) $this->disbursement_type, $pass);
+    }
+
+    public static function buildLabel(array $types, ?string $pass = null): string
+    {
+        $names = [
+            'monthly_salary' => 'Monthly Salary',
+            'hazard_pay'     => 'Hazard Pay',
+            'sala'           => 'Subsistence Allowance',
+            'longevity_pay'  => 'Longevity Pay',
+            'other'          => 'Other Allowance',
+        ];
+
+        if ($pass === 'first_half') return '1st Half Salary';
+
+        $parts = [];
+        foreach ($types as $t) {
+            if ($pass === 'second_half' && $t === 'monthly_salary') {
+                $parts[] = '2nd Half Salary';
+            } else {
+                $parts[] = $names[$t] ?? ucwords(str_replace('_', ' ', $t));
+            }
+        }
+        return implode(' + ', $parts);
+    }
 
     public function uploader(): BelongsTo
     {

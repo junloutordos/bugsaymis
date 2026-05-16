@@ -97,9 +97,9 @@
     </div>
     <div class="info-row">
       <span class="info-label">Disbursement:</span>
-      <span class="info-val">{{ $batch->label ?? ucwords(str_replace('_', ' ', $batch->disbursement_type ?? '')) }}</span>
+      <span class="info-val">{{ $batch->disbursementLabel() }}</span>
     </div>
-    @if(($batch->disbursement_type ?? '') === 'monthly_salary')
+    @if($batch->isMonthly())
     <div class="info-row">
       <span class="info-label">1st Half Credit:</span>
       <span class="info-val">{{ $batch->first_half_credit_date?->format('M j, Y') ?? '—' }}</span>
@@ -108,7 +108,7 @@
       <span class="info-label">2nd Half Credit:</span>
       <span class="info-val">{{ $batch->second_half_credit_date?->format('M j, Y') ?? '—' }}</span>
     </div>
-    @elseif($batch->credit_date ?? null)
+    @elseif($batch->credit_date)
     <div class="info-row">
       <span class="info-label">Credit Date:</span>
       <span class="info-val">{{ $batch->credit_date->format('M j, Y') }}</span>

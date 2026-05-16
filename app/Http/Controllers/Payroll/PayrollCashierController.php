@@ -50,9 +50,9 @@ class PayrollCashierController extends Controller
     public function csvTemplate(Request $request)
     {
         $this->authorize('payroll.upload');
-        $type     = $request->query('type', 'monthly_salary');
-        $content  = $this->parser->csvTemplate($type);
-        $filename = str_replace('_', '-', $type) . '-template.csv';
+        $types    = (array) ($request->query('type') ?: ['monthly_salary']);
+        $content  = $this->parser->csvTemplate($types);
+        $filename = implode('-', $types) . '-template.csv';
         return response($content, 200, [
             'Content-Type'        => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -68,26 +68,31 @@ class PayrollCashierController extends Controller
         $data = $request->validate([
             'main_file_base64'        => 'required|string',
             'main_filename'           => 'required|string|max:255',
-            'disbursement_type'       => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,other',
+            'disbursement_type'       => 'required|array|min:1',
+            'disbursement_type.*'     => 'string|in:monthly_salary,hazard_pay,sala,longevity_pay,other',
             'label'                   => 'nullable|string|max:150',
             'period_start'            => 'required|date',
             'period_end'              => 'required|date|after_or_equal:period_start',
-            'first_half_credit_date'  => 'required_if:disbursement_type,monthly_salary|nullable|date',
-            'second_half_credit_date' => 'required_if:disbursement_type,monthly_salary|nullable|date',
-            'credit_date'             => 'required_unless:disbursement_type,monthly_salary|nullable|date',
+            'first_half_credit_date'  => 'nullable|date',
+            'second_half_credit_date' => 'nullable|date',
+            'credit_date'             => 'nullable|date',
             'payroll_no'              => 'nullable|string|max:100',
         ]);
 
-        $disbursementType = $data['disbursement_type'];
-        $periodStart      = $data['period_start'];
+        $disbursementTypes = $data['disbursement_type'];
+        $isMonthly         = in_array('monthly_salary', $disbursementTypes);
+        $periodStart       = $data['period_start'];
 
-        $label = $data['label'] ?: match($disbursementType) {
-            'monthly_salary' => 'Monthly Salary',
-            'hazard_pay'     => 'Hazard Pay',
-            'sala'           => 'Subsistence Allowance',
-            'longevity_pay'  => 'Longevity Pay',
-            default          => 'Other Allowance',
-        };
+        // Require 1st half credit date when monthly salary is selected
+        if ($isMonthly && empty($data['first_half_credit_date'])) {
+            return back()->withErrors(['first_half_credit_date' => '1st Half Credit Date is required for Monthly Salary.']);
+        }
+        // Require a credit date when no monthly salary
+        if (!$isMonthly && empty($data['credit_date'])) {
+            return back()->withErrors(['credit_date' => 'Credit Date is required.']);
+        }
+
+        $label = $data['label'] ?: PayrollBatch::buildLabel($disbursementTypes);
 
         $overrideMeta = array_filter([
             'payroll_no'   => $data['payroll_no'] ?? null,
@@ -119,7 +124,7 @@ class PayrollCashierController extends Controller
                 ['payroll_no' => $payrollNo],
                 [
                     'batch_type'              => 'main',
-                    'disbursement_type'       => $disbursementType,
+                    'disbursement_type'       => $disbursementTypes,
                     'label'                   => $label,
                     'period_start'            => $parsed['period_start'],
                     'period_end'              => $parsed['period_end'],
@@ -228,7 +233,7 @@ class PayrollCashierController extends Controller
         return back()->with('success', 'Adjustments saved.');
     }
 
-    // ── Send ──────────────────────────────────────────────────────────────────
+    // ── Send (1st half / single disbursement) ────────────────────────────────
 
     public function send(PayrollBatch $batch)
     {
@@ -246,23 +251,36 @@ class PayrollCashierController extends Controller
             $emp = $item->employee;
             if (!$emp || $emp->status === 'inactive' || !$emp->email) continue;
 
-            if ($batch->disbursement_type === 'monthly_salary') {
-                // Two notifications: one for each half
-                foreach (['first_half', 'second_half'] as $sendType) {
+            if ($batch->isMonthly()) {
+                // Always send 1st half notification
+                $emailRecord = PayrollEmail::create([
+                    'payroll_item_id' => $item->id,
+                    'send_type'       => 'first_half',
+                    'to_email'        => $emp->email,
+                    'bcc_email'       => config('mail.payroll_bcc'),
+                    'subject'         => $this->emailSubject($batch, 'first_half'),
+                    'status'          => 'queued',
+                ]);
+                SendPayslipJob::dispatch($emailRecord->id)->delay(now()->addSeconds($delay++ * 2));
+
+                // Send 2nd half notification immediately only if date is already set
+                if ($batch->second_half_credit_date) {
                     $emailRecord = PayrollEmail::create([
                         'payroll_item_id' => $item->id,
-                        'send_type'       => $sendType,
+                        'send_type'       => 'second_half',
                         'to_email'        => $emp->email,
                         'bcc_email'       => config('mail.payroll_bcc'),
-                        'subject'         => $this->emailSubject($batch, $sendType),
+                        'subject'         => $this->emailSubject($batch, 'second_half'),
                         'status'          => 'queued',
                     ]);
                     SendPayslipJob::dispatch($emailRecord->id)->delay(now()->addSeconds($delay++ * 2));
                 }
             } else {
+                // Single non-monthly disbursement — one email per employee
+                $sendType = (array) $batch->disbursement_type;
                 $emailRecord = PayrollEmail::create([
                     'payroll_item_id' => $item->id,
-                    'send_type'       => $batch->disbursement_type,
+                    'send_type'       => implode('+', $sendType),
                     'to_email'        => $emp->email,
                     'bcc_email'       => config('mail.payroll_bcc'),
                     'subject'         => $this->emailSubject($batch),
@@ -275,6 +293,46 @@ class PayrollCashierController extends Controller
         $batch->update(['status' => 'sending']);
 
         return back()->with('success', 'Payslips queued for sending.');
+    }
+
+    // ── Send 2nd half (after date is known) ──────────────────────────────────
+
+    public function sendSecondHalf(Request $request, PayrollBatch $batch)
+    {
+        $this->authorize('payroll.send');
+
+        abort_unless($batch->isMonthly(), 422, 'Not a monthly salary batch.');
+        abort_if($batch->second_half_credit_date, 422, '2nd half notifications have already been sent for this batch.');
+
+        $data = $request->validate([
+            'second_half_credit_date' => 'required|date',
+        ]);
+
+        $batch->update(['second_half_credit_date' => $data['second_half_credit_date']]);
+
+        $items = PayrollItem::where('batch_id', $batch->id)
+            ->whereNotNull('matched_user_id')
+            ->whereIn('match_status', ['matched', 'probable', 'manual'])
+            ->with('employee:id,name,email,status')
+            ->get();
+
+        $delay = 0;
+        foreach ($items as $item) {
+            $emp = $item->employee;
+            if (!$emp || $emp->status === 'inactive' || !$emp->email) continue;
+
+            $emailRecord = PayrollEmail::create([
+                'payroll_item_id' => $item->id,
+                'send_type'       => 'second_half',
+                'to_email'        => $emp->email,
+                'bcc_email'       => config('mail.payroll_bcc'),
+                'subject'         => $this->emailSubject($batch, 'second_half'),
+                'status'          => 'queued',
+            ]);
+            SendPayslipJob::dispatch($emailRecord->id)->delay(now()->addSeconds($delay++ * 2));
+        }
+
+        return back()->with('success', '2nd half notifications queued for sending.');
     }
 
     // ── Send status (polling) ─────────────────────────────────────────────────
@@ -420,15 +478,7 @@ class PayrollCashierController extends Controller
     private function emailSubject(PayrollBatch $batch, string $sendType = null): string
     {
         $period = \Carbon\Carbon::parse($batch->period_start)->format('M Y');
-        $type   = $sendType ?? $batch->disbursement_type;
-
-        return match($type) {
-            'first_half'    => "1st Half Salary — {$period} — PSHS-CRC",
-            'second_half'   => "2nd Half Salary — {$period} — PSHS-CRC",
-            'hazard_pay'    => "Hazard Pay — {$period} — PSHS-CRC",
-            'sala'          => "Subsistence Allowance — {$period} — PSHS-CRC",
-            'longevity_pay' => "Longevity Pay — {$period} — PSHS-CRC",
-            default         => ($batch->label ?: 'Allowance') . " — {$period} — PSHS-CRC",
-        };
+        $label  = $batch->disbursementLabel($sendType);
+        return "{$label} — {$period} — PSHS-CRC";
     }
 }
