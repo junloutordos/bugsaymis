@@ -66,94 +66,109 @@ class PayrollCashierController extends Controller
         $this->authorize('payroll.upload');
 
         $data = $request->validate([
-            'main_file_base64'        => 'required|string',
-            'main_filename'           => 'required|string|max:255',
-            'disbursement_type'       => 'required|array|min:1',
-            'disbursement_type.*'     => 'string|in:monthly_salary,hazard_pay,sala,longevity_pay,other',
-            'label'                   => 'nullable|string|max:150',
-            'period_start'            => 'required|date',
-            'period_end'              => 'required|date|after_or_equal:period_start',
-            'first_half_credit_date'  => 'nullable|date',
-            'second_half_credit_date' => 'nullable|date',
-            'credit_date'             => 'nullable|date',
-            'payroll_no'              => 'nullable|string|max:100',
+            'period_start'                        => 'required|date',
+            'period_end'                          => 'required|date|after_or_equal:period_start',
+            'types'                               => 'required|array|min:1',
+            'types.*.type'                        => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,other',
+            'types.*.label'                       => 'nullable|string|max:150',
+            'types.*.base64'                      => 'required|string',
+            'types.*.filename'                    => 'required|string|max:255',
+            'types.*.first_half_credit_date'      => 'nullable|date',
+            'types.*.second_half_credit_date'     => 'nullable|date',
+            'types.*.credit_date'                 => 'nullable|date',
+            'types.*.payroll_no'                  => 'nullable|string|max:100',
         ]);
 
-        $disbursementTypes = $data['disbursement_type'];
-        $isMonthly         = in_array('monthly_salary', $disbursementTypes);
-        $periodStart       = $data['period_start'];
+        $periodStart = $data['period_start'];
+        $periodEnd   = $data['period_end'];
+        $month       = (int) date('n', strtotime($periodStart));
+        $year        = (int) date('Y', strtotime($periodStart));
 
-        // Require 1st half credit date when monthly salary is selected
-        if ($isMonthly && empty($data['first_half_credit_date'])) {
-            return back()->withErrors(['first_half_credit_date' => '1st Half Credit Date is required for Monthly Salary.']);
-        }
-        // Require a credit date when no monthly salary
-        if (!$isMonthly && empty($data['credit_date'])) {
-            return back()->withErrors(['credit_date' => 'Credit Date is required.']);
-        }
-
-        $label = $data['label'] ?: PayrollBatch::buildLabel($disbursementTypes);
-
-        $overrideMeta = array_filter([
-            'payroll_no'   => $data['payroll_no'] ?? null,
-            'period_start' => $periodStart,
-            'period_end'   => $data['period_end'],
-            'month'        => (int) date('n', strtotime($periodStart)),
-            'year'         => (int) date('Y', strtotime($periodStart)),
-        ], fn($v) => $v !== null && $v !== '');
-
-        try {
-            $parsed = $this->parser->parseMain($data['main_file_base64'], $overrideMeta);
-        } catch (\Throwable $e) {
-            return back()->withErrors(['main_file_base64' => 'Could not parse the CSV file: ' . $e->getMessage()]);
+        // Per-type validation
+        foreach ($data['types'] as $i => $entry) {
+            $isMonthly = $entry['type'] === 'monthly_salary';
+            if ($isMonthly && empty($entry['first_half_credit_date'])) {
+                return back()->withErrors(["types.{$i}.first_half_credit_date" => '1st Half Credit Date is required for Monthly Salary.']);
+            }
+            if (!$isMonthly && empty($entry['credit_date'])) {
+                return back()->withErrors(["types.{$i}.credit_date" => "ATM Credit Date is required for {$entry['type']}."]);
+            }
         }
 
-        if (empty($parsed['items'])) {
-            return back()->withErrors(['main_file_base64' => 'No employee rows found. Check that your CSV has the correct headers and data rows.']);
-        }
+        $createdBatches = [];
 
-        try {
-            $items  = $this->matcher->matchItems($parsed['items']);
-            $mainKey = $this->storeBase64ToS3($data['main_file_base64'], $data['main_filename']);
+        foreach ($data['types'] as $i => $entry) {
+            $isMonthly = $entry['type'] === 'monthly_salary';
+            $label     = $entry['label'] ?: PayrollBatch::buildLabel([$entry['type']]);
 
-            $payrollNo = $parsed['payroll_no'] ?: (
-                'PR-' . $parsed['year'] . '-' . str_pad($parsed['month'], 2, '0', STR_PAD_LEFT) . '-' . substr(md5(uniqid()), 0, 6)
-            );
+            $overrideMeta = array_filter([
+                'payroll_no'   => $entry['payroll_no'] ?? null,
+                'period_start' => $periodStart,
+                'period_end'   => $periodEnd,
+                'month'        => $month,
+                'year'         => $year,
+            ], fn($v) => $v !== null && $v !== '');
 
-            $batch = PayrollBatch::updateOrCreate(
-                ['payroll_no' => $payrollNo],
-                [
-                    'batch_type'              => 'main',
-                    'disbursement_type'       => $disbursementTypes,
-                    'label'                   => $label,
-                    'period_start'            => $parsed['period_start'],
-                    'period_end'              => $parsed['period_end'],
-                    'month'                   => $parsed['month'],
-                    'year'                    => $parsed['year'],
-                    'fund_cluster'            => $parsed['fund_cluster'],
-                    'entity_name'             => $parsed['entity_name'],
-                    'source_main_filename'    => $data['main_filename'],
-                    'source_main_s3_key'      => $mainKey,
-                    'uploaded_by'             => Auth::id(),
-                    'status'                  => 'previewed',
-                    'first_half_credit_date'  => $data['first_half_credit_date'] ?? null,
-                    'second_half_credit_date' => $data['second_half_credit_date'] ?? null,
-                    'credit_date'             => $data['credit_date'] ?? null,
-                ]
-            );
-
-            foreach ($items as $itemData) {
-                $this->upsertItem($batch, $itemData, $parsed['month'], $parsed['year']);
+            try {
+                $parsed = $this->parser->parseMain($entry['base64'], $overrideMeta);
+            } catch (\Throwable $e) {
+                return back()->withErrors(["types.{$i}.base64" => "[{$label}] Could not parse CSV: " . $e->getMessage()]);
             }
 
-            $this->recalcTotals($batch);
+            if (empty($parsed['items'])) {
+                return back()->withErrors(["types.{$i}.base64" => "[{$label}] No employee rows found. Check headers and data rows."]);
+            }
 
-        } catch (\Throwable $e) {
-            return back()->withErrors(['main_file_base64' => '[DB/S3] ' . $e->getMessage()]);
+            try {
+                $items     = $this->matcher->matchItems($parsed['items']);
+                $s3Key     = $this->storeBase64ToS3($entry['base64'], $entry['filename']);
+
+                $payrollNo = $parsed['payroll_no'] ?: (
+                    'PR-' . $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-' . strtoupper($entry['type'][0]) . '-' . substr(md5(uniqid()), 0, 5)
+                );
+
+                $batch = PayrollBatch::updateOrCreate(
+                    ['payroll_no' => $payrollNo],
+                    [
+                        'batch_type'              => 'main',
+                        'disbursement_type'       => [$entry['type']],
+                        'label'                   => $label,
+                        'period_start'            => $parsed['period_start'],
+                        'period_end'              => $parsed['period_end'],
+                        'month'                   => $parsed['month'],
+                        'year'                    => $parsed['year'],
+                        'fund_cluster'            => $parsed['fund_cluster'],
+                        'entity_name'             => $parsed['entity_name'],
+                        'source_main_filename'    => $entry['filename'],
+                        'source_main_s3_key'      => $s3Key,
+                        'uploaded_by'             => Auth::id(),
+                        'status'                  => 'previewed',
+                        'first_half_credit_date'  => $isMonthly ? ($entry['first_half_credit_date'] ?? null) : null,
+                        'second_half_credit_date' => $isMonthly ? ($entry['second_half_credit_date'] ?? null) : null,
+                        'credit_date'             => !$isMonthly ? ($entry['credit_date'] ?? null) : null,
+                    ]
+                );
+
+                foreach ($items as $itemData) {
+                    $this->upsertItem($batch, $itemData, $parsed['month'], $parsed['year']);
+                }
+
+                $this->recalcTotals($batch);
+                $createdBatches[] = $batch;
+
+            } catch (\Throwable $e) {
+                return back()->withErrors(["types.{$i}.base64" => "[{$label}] " . $e->getMessage()]);
+            }
         }
 
-        return redirect()->route('payroll.cashier.preview', $batch->id)
-            ->with('success', 'Payroll parsed successfully.');
+        // Single batch → go straight to preview; multiple → cashier index
+        if (count($createdBatches) === 1) {
+            return redirect()->route('payroll.cashier.preview', $createdBatches[0]->id)
+                ->with('success', 'Payroll parsed successfully.');
+        }
+
+        return redirect()->route('payroll.cashier.index')
+            ->with('success', count($createdBatches) . ' payroll batches parsed successfully.');
     }
 
     // ── Preview ───────────────────────────────────────────────────────────────
