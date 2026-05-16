@@ -1603,6 +1603,7 @@ Route::middleware(['auth', 'verified'])->prefix('payroll')->name('payroll.')->gr
         Route::post('/{batch}/resolve',                   [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'resolve'])->name('resolve');
         Route::post('/{batch}/adjustments',               [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'adjustments'])->name('adjustments');
         Route::post('/{batch}/send',                      [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'send'])->name('send');
+        Route::post('/{batch}/send-second-half',          [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'sendSecondHalf'])->name('send-second-half');
         Route::get('/{batch}/status',                     [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'status'])->name('status');
         Route::post('/{batch}/resend',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'resend'])->name('resend');
         Route::get('/{batch}/log.csv',                    [\App\Http\Controllers\Payroll\PayrollCashierController::class, 'auditCsv'])->name('audit-csv');

@@ -53,6 +53,20 @@ class PayrollParserService
         'Second Half'                => 'second_half_amount',
     ];
 
+    // Extra earnings columns injected after "Gross Amount Earned" when combined with monthly salary
+    private const EXTRA_EARNINGS = [
+        'hazard_pay'    => ['Hazard Pay'],
+        'sala'          => ['Subsistence and Laundry'],
+        'longevity_pay' => ['Longevity Pay'],
+        'other'         => ['Others (Bonus/Incentives/CA)'],
+    ];
+
+    // Extra deduction columns injected before "Total Deductions" when combined with monthly salary
+    private const EXTRA_DEDUCTIONS = [
+        'hazard_pay'    => ['WHT Hazard Pay'],
+        'longevity_pay' => ['Longevity Pay Tax'],
+    ];
+
     // Columns included per disbursement type template
     private const DISBURSEMENT_TEMPLATES = [
         'monthly_salary' => [
@@ -79,11 +93,53 @@ class PayrollParserService
     ];
 
     /**
-     * Generate downloadable CSV template for the given disbursement type.
+     * Generate downloadable CSV template for the given disbursement type(s).
+     *
+     * @param string|string[] $types
      */
-    public function csvTemplate(string $type = 'monthly_salary'): string
+    public function csvTemplate(array|string $types = 'monthly_salary'): string
     {
-        $headers = self::DISBURSEMENT_TEMPLATES[$type] ?? self::DISBURSEMENT_TEMPLATES['monthly_salary'];
+        $types = (array) $types;
+
+        if (in_array('monthly_salary', $types)) {
+            // Base: full monthly salary columns
+            $headers = self::DISBURSEMENT_TEMPLATES['monthly_salary'];
+
+            // Splice in extra earnings after "Gross Amount Earned"
+            $extras = [];
+            foreach ($types as $t) {
+                if ($t === 'monthly_salary') continue;
+                foreach (self::EXTRA_EARNINGS[$t] ?? [] as $col) {
+                    if (!in_array($col, $extras)) $extras[] = $col;
+                }
+            }
+            if ($extras) {
+                $pos = array_search('Gross Amount Earned', $headers);
+                if ($pos !== false) array_splice($headers, $pos + 1, 0, $extras);
+            }
+
+            // Splice in extra deductions before "Total Deductions"
+            $extraDeds = [];
+            foreach ($types as $t) {
+                if ($t === 'monthly_salary') continue;
+                foreach (self::EXTRA_DEDUCTIONS[$t] ?? [] as $col) {
+                    if (!in_array($col, $extraDeds)) $extraDeds[] = $col;
+                }
+            }
+            if ($extraDeds) {
+                $pos = array_search('Total Deductions', $headers);
+                if ($pos !== false) array_splice($headers, $pos, 0, $extraDeds);
+            }
+        } else {
+            // Non-monthly: union of all selected type columns, no duplicates
+            $headers = [];
+            foreach ($types as $t) {
+                foreach (self::DISBURSEMENT_TEMPLATES[$t] ?? [] as $col) {
+                    if (!in_array($col, $headers)) $headers[] = $col;
+                }
+            }
+        }
+
         $pos     = array_flip($headers);
         $example = array_fill(0, count($headers), '');
 

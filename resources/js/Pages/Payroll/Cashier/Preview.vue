@@ -13,10 +13,24 @@ const props = defineProps({
   users:     Array,
 })
 
-const activeTab    = ref('matched')
-const resolutions  = ref({}) // itemId → { user_id, save_alias }
-const submitting   = ref(false)
-const sendLoading  = ref(false)
+const activeTab        = ref('matched')
+const resolutions      = ref({})
+const submitting       = ref(false)
+const sendLoading      = ref(false)
+const secondHalfDate   = ref('')
+const secondHalfLoading= ref(false)
+
+const isMonthly = computed(() =>
+  Array.isArray(props.batch.disbursement_type)
+    ? props.batch.disbursement_type.includes('monthly_salary')
+    : props.batch.disbursement_type === 'monthly_salary'
+)
+
+const needsSecondHalf = computed(() =>
+  isMonthly.value &&
+  !props.batch.second_half_credit_date &&
+  ['sending', 'completed'].includes(props.batch.status)
+)
 
 const tabs = computed(() => [
   { key: 'matched',   label: 'Matched',   count: props.matched.length,   icon: CheckCircleIcon,        color: 'text-emerald-600' },
@@ -48,6 +62,30 @@ function saveResolutions() {
   router.post(route('payroll.cashier.resolve', props.batch.id), { resolutions: list }, {
     onSuccess: () => Swal.fire({ icon: 'success', title: 'Matches saved', timer: 1200, showConfirmButton: false }),
     onFinish:  () => { submitting.value = false },
+  })
+}
+
+function sendSecondHalf() {
+  if (!secondHalfDate.value) {
+    Swal.fire({ icon: 'warning', title: 'Please select the 2nd half credit date.' })
+    return
+  }
+  Swal.fire({
+    title: 'Send 2nd half notifications?',
+    text: `Employees will be notified that their 2nd half salary has been credited on ${secondHalfDate.value}.`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, notify',
+    reverseButtons: true,
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    secondHalfLoading.value = true
+    router.post(route('payroll.cashier.send-second-half', props.batch.id), {
+      second_half_credit_date: secondHalfDate.value,
+    }, {
+      onSuccess: () => Swal.fire({ icon: 'success', title: '2nd half notifications queued!', timer: 1500, showConfirmButton: false }),
+      onFinish:  () => { secondHalfLoading.value = false },
+    })
   })
 }
 
@@ -94,6 +132,25 @@ function sendAll() {
           <button @click="sendAll" :disabled="sendLoading || !matched.length"
                   class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
             {{ sendLoading ? 'Queuing…' : `Send ${matched.length} Payslips` }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 2nd Half Notification Panel -->
+      <div v-if="needsSecondHalf"
+           class="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-amber-800">2nd Half Not Yet Notified</p>
+          <p class="text-xs text-amber-700 mt-0.5">
+            Set the ATM credit date and click <strong>Notify 2nd Half</strong> to send notifications to all matched employees.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <input v-model="secondHalfDate" type="date"
+                 class="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          <button @click="sendSecondHalf" :disabled="secondHalfLoading || !secondHalfDate"
+                  class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap">
+            {{ secondHalfLoading ? 'Queuing…' : 'Notify 2nd Half' }}
           </button>
         </div>
       </div>

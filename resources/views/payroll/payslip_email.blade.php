@@ -14,25 +14,21 @@
     <p>Dear <strong>{{ $firstName }}</strong>,</p>
 
     @php
-      $disbType  = $sendType ?? $batch->disbursement_type ?? 'monthly_salary';
-      $disbLabel = match($disbType) {
-        'first_half'    => '1st Half Salary',
-        'second_half'   => '2nd Half Salary',
-        'hazard_pay'    => 'Hazard Pay',
-        'sala'          => 'Subsistence Allowance',
-        'longevity_pay' => 'Longevity Pay',
-        default         => $batch->label ?: 'Allowance',
+      $pass      = $sendType ?? null; // 'first_half', 'second_half', or type string
+      $disbLabel = $batch->disbursementLabel($pass);
+
+      $creditAmt = match($pass) {
+        'first_half'  => (float) $item->first_half_amount,
+        'second_half' => (float) $item->net_pay - (float) $item->first_half_amount,
+        default       => (float) $item->net_pay,
       };
-      $creditAmt  = match($disbType) {
-        'first_half'  => $item->first_half_amount,
-        'second_half' => $item->second_half_amount,
-        default       => $item->net_pay,
-      };
-      $creditDate = match($disbType) {
+
+      $creditDate = match($pass) {
         'first_half'  => $batch->first_half_credit_date?->format('F j, Y'),
         'second_half' => $batch->second_half_credit_date?->format('F j, Y'),
         default       => $batch->credit_date?->format('F j, Y'),
       };
+
       $period = \Carbon\Carbon::parse($batch->period_start)->format('F j') . ' – ' .
                 \Carbon\Carbon::parse($batch->period_end)->format('F j, Y');
     @endphp
