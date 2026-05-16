@@ -1,15 +1,20 @@
 <script setup>
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { PlusIcon, EyeIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps({ batches: Object })
+const props = defineProps({ periods: Array })
 
-const goToPage = (url) => { if (url) router.get(url) }
-
-const monthName = (m) => ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] ?? m
 const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })
+
+const MONTH = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+const statusClass = (s) => ({
+  previewed: 'bg-slate-100 text-slate-600',
+  sending:   'bg-amber-100 text-amber-700',
+  completed: 'bg-emerald-100 text-emerald-700',
+  failed:    'bg-red-100 text-red-600',
+}[s] ?? 'bg-slate-100 text-slate-500')
 </script>
 
 <template>
@@ -18,8 +23,8 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 
     <div>
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 class="text-xl font-semibold text-slate-800">Payroll Upload</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Upload Excel payroll workbooks and send per-employee payslips</p>
+          <h1 class="text-xl font-semibold text-slate-800">Payroll Batches</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Uploads grouped by pay period. Each disbursement type shares one payslip per employee.</p>
         </div>
         <a :href="route('payroll.cashier.upload')"
            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
@@ -27,55 +32,67 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 
         </a>
       </div>
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-x-auto">
+      <div v-if="!periods.length" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center text-slate-400 text-sm">
+        No payroll batches yet.
+      </div>
+
+      <!-- One card per pay period -->
+      <div v-for="period in periods" :key="period.year + '-' + period.month"
+           class="bg-white rounded-xl border border-slate-100 shadow-sm mb-4 overflow-hidden">
+
+        <!-- Period header -->
+        <div class="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
+          <div>
+            <span class="text-sm font-semibold text-slate-800">
+              {{ MONTH[period.month] }} {{ period.year }}
+            </span>
+            <span class="ml-2 text-xs text-slate-400">
+              {{ period.period_start }} – {{ period.period_end }}
+            </span>
+          </div>
+          <span class="text-xs text-slate-400">
+            {{ period.batches.length }} disbursement{{ period.batches.length !== 1 ? 's' : '' }}
+          </span>
+        </div>
+
+        <!-- Batch rows within this period -->
         <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Payroll No.</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Period</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Gross</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Net</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Uploaded by</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+          <thead>
+            <tr class="bg-white">
+              <th class="px-5 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wide w-48">Type</th>
+              <th class="px-5 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Payroll No.</th>
+              <th class="px-5 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Gross</th>
+              <th class="px-5 py-2 text-right text-xs font-medium text-slate-400 uppercase tracking-wide">Net</th>
+              <th class="px-5 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
+              <th class="px-5 py-2 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Uploaded by</th>
+              <th class="px-5 py-2 text-center text-xs font-medium text-slate-400 uppercase tracking-wide">Preview</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-for="b in batches.data" :key="b.id" class="hover:bg-slate-50/60">
-              <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ b.payroll_no }}</td>
-              <td class="px-4 py-3 text-slate-700">{{ monthName(b.month) }} {{ b.year }}</td>
-              <td class="px-4 py-3 text-slate-700">₱ {{ fmt(b.totals_gross) }}</td>
-              <td class="px-4 py-3 text-slate-700 font-medium">₱ {{ fmt(b.totals_net) }}</td>
-              <td class="px-4 py-3">
-                <span :class="[badgeBase, statusBadgeClass(b.status)]">{{ b.status }}</span>
+          <tbody class="divide-y divide-slate-50">
+            <tr v-for="b in period.batches" :key="b.id" class="hover:bg-slate-50/50">
+              <td class="px-5 py-3 font-medium text-slate-700">
+                {{ b.label || b.disbursement_type?.join(' + ') }}
               </td>
-              <td class="px-4 py-3 text-slate-600 text-xs">{{ b.uploader?.name ?? '—' }}</td>
-              <td class="px-4 py-3 text-center">
-                <div class="flex items-center gap-1.5 justify-center">
-                  <a :href="route('payroll.cashier.preview', b.id)"
-                     class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Preview">
-                    <EyeIcon class="w-4 h-4" />
-                  </a>
-                </div>
+              <td class="px-5 py-3 font-mono text-xs text-slate-500">{{ b.payroll_no }}</td>
+              <td class="px-5 py-3 text-right text-slate-600">₱ {{ fmt(b.totals_gross) }}</td>
+              <td class="px-5 py-3 text-right font-medium text-slate-800">₱ {{ fmt(b.totals_net) }}</td>
+              <td class="px-5 py-3">
+                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusClass(b.status)]">
+                  {{ b.status }}
+                </span>
               </td>
-            </tr>
-            <tr v-if="!batches.data?.length">
-              <td colspan="7" class="py-16 text-center text-slate-400 text-sm">No payroll batches yet.</td>
+              <td class="px-5 py-3 text-xs text-slate-500">{{ b.uploader?.name ?? '—' }}</td>
+              <td class="px-5 py-3 text-center">
+                <a :href="route('payroll.cashier.preview', b.id)"
+                   class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                  <EyeIcon class="w-3.5 h-3.5" /> View
+                </a>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="batches.last_page > 1" class="flex items-center justify-between mt-4 text-sm text-slate-600">
-        <span>Page {{ batches.current_page }} of {{ batches.last_page }}</span>
-        <div class="flex gap-2">
-          <button @click="goToPage(batches.prev_page_url)" :disabled="!batches.prev_page_url"
-                  class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Prev</button>
-          <button @click="goToPage(batches.next_page_url)" :disabled="!batches.next_page_url"
-                  class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Next</button>
-        </div>
-      </div>
     </div>
   </AdminLayout>
 </template>

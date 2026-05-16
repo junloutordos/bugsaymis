@@ -5,6 +5,7 @@ namespace App\Models\Payroll;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PayrollItem extends Model
@@ -49,6 +50,11 @@ class PayrollItem extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'matched_user_id');
+    }
+
+    public function batches(): BelongsToMany
+    {
+        return $this->belongsToMany(PayrollBatch::class, 'payroll_batch_items', 'item_id', 'batch_id');
     }
 
     public function emails(): HasMany

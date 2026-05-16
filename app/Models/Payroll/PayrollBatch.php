@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class PayrollBatch extends Model
 {
@@ -75,8 +76,15 @@ class PayrollBatch extends Model
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
+    /** Primary items (batch_id FK — used for unmatched rows and legacy queries). */
     public function items(): HasMany
     {
         return $this->hasMany(PayrollItem::class, 'batch_id');
+    }
+
+    /** All items linked to this batch via pivot (matched + merged across types). */
+    public function linkedItems(): BelongsToMany
+    {
+        return $this->belongsToMany(PayrollItem::class, 'payroll_batch_items', 'batch_id', 'item_id');
     }
 }
