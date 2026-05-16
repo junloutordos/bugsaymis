@@ -12,6 +12,7 @@ use App\Services\Payroll\PayrollParserService;
 use App\Jobs\Payroll\SendPayslipJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -28,13 +29,21 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.view_all');
 
-        $batches = PayrollBatch::with('uploader:id,name')
-            ->latest()
-            ->paginate(20);
+        // Group batches by period so uploads for the same month appear as one entry
+        $periods = PayrollBatch::with('uploader:id,name')
+            ->orderByDesc('year')->orderByDesc('month')->orderByDesc('id')
+            ->get()
+            ->groupBy(fn($b) => $b->year . '-' . str_pad($b->month, 2, '0', STR_PAD_LEFT))
+            ->map(fn($batches) => [
+                'year'         => $batches->first()->year,
+                'month'        => $batches->first()->month,
+                'period_start' => $batches->first()->period_start,
+                'period_end'   => $batches->first()->period_end,
+                'batches'      => $batches->values(),
+            ])
+            ->values();
 
-        return Inertia::render('Payroll/Cashier/Index', [
-            'batches' => $batches,
-        ]);
+        return Inertia::render('Payroll/Cashier/Index', ['periods' => $periods]);
     }
 
     // ── Upload form ───────────────────────────────────────────────────────────
@@ -153,7 +162,7 @@ class PayrollCashierController extends Controller
                     $this->upsertItem($batch, $itemData, $parsed['month'], $parsed['year']);
                 }
 
-                $this->recalcTotals($batch);
+                $this->recalcTotals($batch, $parsed['items']);
                 $createdBatches[] = $batch;
 
             } catch (\Throwable $e) {
@@ -177,10 +186,7 @@ class PayrollCashierController extends Controller
         $this->authorize('payroll.view_all');
 
         $items = PayrollItem::with('employee:id,name,email')
-            ->where('batch_id', $batch->id)
-            ->orWhere(function ($q) use ($batch) {
-                $q->where('month', $batch->month)->where('year', $batch->year);
-            })
+            ->whereHas('batches', fn($q) => $q->where('payroll_batches.id', $batch->id))
             ->get()
             ->groupBy('match_status');
 
@@ -212,7 +218,10 @@ class PayrollCashierController extends Controller
 
         foreach ($data['resolutions'] as $res) {
             $item = PayrollItem::findOrFail($res['item_id']);
-            abort_if($item->month !== $batch->month || $item->year !== $batch->year, 403);
+            abort_if(
+                !DB::table('payroll_batch_items')->where('batch_id', $batch->id)->where('item_id', $item->id)->exists(),
+                403
+            );
 
             $item->update([
                 'matched_user_id' => $res['user_id'],
@@ -253,7 +262,7 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.send');
 
-        $items = PayrollItem::where('batch_id', $batch->id)
+        $items = PayrollItem::whereHas('batches', fn($q) => $q->where('payroll_batches.id', $batch->id))
             ->whereNotNull('matched_user_id')
             ->whereIn('match_status', ['matched', 'probable', 'manual'])
             ->with('employee:id,name,email,status')
@@ -324,7 +333,7 @@ class PayrollCashierController extends Controller
 
         $batch->update(['second_half_credit_date' => $data['second_half_credit_date']]);
 
-        $items = PayrollItem::where('batch_id', $batch->id)
+        $items = PayrollItem::whereHas('batches', fn($q) => $q->where('payroll_batches.id', $batch->id))
             ->whereNotNull('matched_user_id')
             ->whereIn('match_status', ['matched', 'probable', 'manual'])
             ->with('employee:id,name,email,status')
@@ -355,7 +364,7 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.view_all');
 
-        $items = PayrollItem::where('batch_id', $batch->id)
+        $items = PayrollItem::whereHas('batches', fn($q) => $q->where('payroll_batches.id', $batch->id))
             ->whereNotNull('matched_user_id')
             ->with(['employee:id,name,email', 'emails' => fn($q) => $q->latest()->limit(1)])
             ->get();
@@ -421,7 +430,7 @@ class PayrollCashierController extends Controller
         $this->authorize('payroll.view_all');
 
         $emails = PayrollEmail::with('item.employee:id,name,email')
-            ->whereHas('item', fn($q) => $q->where('batch_id', $batch->id))
+            ->whereHas('item.batches', fn($q) => $q->where('payroll_batches.id', $batch->id))
             ->orderBy('created_at')
             ->get();
 
@@ -447,34 +456,73 @@ class PayrollCashierController extends Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    // Numeric columns that are ADDED (not replaced) when merging a second disbursement type
+    private const MERGE_NUMERIC = [
+        'basic_salary', 'salary_increase', 'additional_compensation',
+        'pera', 'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses', 'gross_earnings',
+        'lawop', 'pvp_overpayment', 'gsis_contribution', 'bir_tax',
+        'wht_hazard', 'wht_cna', 'longevity_tax',
+        'philhealth_contribution', 'philhealth_differential',
+        'hdmf_contribution', 'hdmf_additional',
+        'gsis_salary_loan', 'gsis_policy_loan', 'gsis_consolidated_loan',
+        'gsis_emergency_loan', 'gsis_mpl', 'gsis_gfal', 'gsis_cpl', 'gsis_mpl_lite',
+        'hdmf_salary_loan', 'hdmf_calamity', 'hdmf_housing', 'hdmf_multipurpose', 'hdmf_mp2',
+        'landbank_loan', 'credit_union',
+        'total_deductions', 'net_pay', 'first_half_amount', 'second_half_amount',
+    ];
+
     private function upsertItem(PayrollBatch $batch, array $data, int $month, int $year): void
     {
-        PayrollItem::updateOrCreate(
-            [
-                'year'            => $year,
-                'month'           => $month,
-                'batch_id'        => $batch->id,
-                'matched_user_id' => $data['matched_user_id'] ?? null,
-                ...($data['matched_user_id'] ? [] : ['employee_name_raw' => $data['employee_name_raw']]),
-            ],
-            array_merge($data, [
+        $userId = $data['matched_user_id'] ?? null;
+
+        // For matched employees, try to find an existing item for this period (any batch)
+        $existing = $userId
+            ? PayrollItem::where('matched_user_id', $userId)
+                ->where('month', $month)
+                ->where('year', $year)
+                ->first()
+            : null;
+
+        if ($existing) {
+            // ADD numeric values from this upload on top of what already exists
+            foreach (self::MERGE_NUMERIC as $col) {
+                if (isset($data[$col])) {
+                    $existing->$col = round((float) $existing->$col + (float) $data[$col], 2);
+                }
+            }
+            // Update descriptive fields only if the new value is non-empty
+            foreach (['position', 'office_division', 'employee_no'] as $col) {
+                if (!empty($data[$col])) $existing->$col = $data[$col];
+            }
+            $existing->save();
+
+            // Link existing item to this (new) batch via pivot
+            DB::table('payroll_batch_items')->insertOrIgnore([
+                'batch_id' => $batch->id,
+                'item_id'  => $existing->id,
+            ]);
+        } else {
+            // Create a brand-new item for this batch
+            $item = PayrollItem::create(array_merge($data, [
                 'batch_id' => $batch->id,
                 'month'    => $month,
                 'year'     => $year,
-            ])
-        );
+            ]));
+
+            DB::table('payroll_batch_items')->insertOrIgnore([
+                'batch_id' => $batch->id,
+                'item_id'  => $item->id,
+            ]);
+        }
     }
 
-    private function recalcTotals(PayrollBatch $batch): void
+    private function recalcTotals(PayrollBatch $batch, array $parsedItems): void
     {
-        $totals = PayrollItem::where('batch_id', $batch->id)
-            ->selectRaw('SUM(gross_earnings) as g, SUM(total_deductions) as d, SUM(net_pay) as n')
-            ->first();
-
+        // Totals are computed from the raw CSV data so each batch reflects its own contribution
         $batch->update([
-            'totals_gross'      => $totals->g ?? 0,
-            'totals_deductions' => $totals->d ?? 0,
-            'totals_net'        => $totals->n ?? 0,
+            'totals_gross'      => round(array_sum(array_column($parsedItems, 'gross_earnings')), 2),
+            'totals_deductions' => round(array_sum(array_column($parsedItems, 'total_deductions')), 2),
+            'totals_net'        => round(array_sum(array_column($parsedItems, 'net_pay')), 2),
         ]);
     }
 
