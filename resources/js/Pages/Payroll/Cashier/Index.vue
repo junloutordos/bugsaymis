@@ -2,7 +2,7 @@
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
-import { PlusIcon, EyeIcon, ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, EyeIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ batches: Object })
 
@@ -55,10 +55,6 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 
                   <a :href="route('payroll.cashier.preview', b.id)"
                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Preview">
                     <EyeIcon class="w-4 h-4" />
-                  </a>
-                  <a :href="route('payroll.cashier.upload-bonus', b.id)"
-                     class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 transition-colors" title="Upload Bonus/SALA">
-                    <ArrowUpTrayIcon class="w-4 h-4" />
                   </a>
                 </div>
               </td>
