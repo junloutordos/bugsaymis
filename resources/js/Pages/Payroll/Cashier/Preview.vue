@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import { CheckCircleIcon, QuestionMarkCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
@@ -12,6 +12,8 @@ const props = defineProps({
   unmatched: Array,
   users:     Array,
 })
+
+const alsoUploaded = computed(() => usePage().props.flash?.also_uploaded ?? [])
 
 const activeTab        = ref('matched')
 const resolutions      = ref({})
@@ -133,6 +135,22 @@ function sendAll() {
                   class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
             {{ sendLoading ? 'Queuing…' : `Send ${matched.length} Payslips` }}
           </button>
+        </div>
+      </div>
+
+      <!-- Other batches from same upload -->
+      <div v-if="alsoUploaded.length"
+           class="mb-6 bg-sky-50 border border-sky-200 rounded-xl px-5 py-4">
+        <p class="text-sm font-semibold text-sky-800 mb-2">
+          {{ alsoUploaded.length }} more batch{{ alsoUploaded.length > 1 ? 'es were' : ' was' }} created from this upload — send payslips for each one:
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <a v-for="b in alsoUploaded" :key="b.id"
+             :href="route('payroll.cashier.preview', b.id)"
+             class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg
+                    bg-sky-100 hover:bg-sky-200 text-sky-800 transition-colors">
+            {{ b.label }} — {{ b.payroll_no }}
+          </a>
         </div>
       </div>
 

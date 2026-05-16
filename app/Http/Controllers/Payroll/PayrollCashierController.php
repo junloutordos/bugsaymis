@@ -161,14 +161,13 @@ class PayrollCashierController extends Controller
             }
         }
 
-        // Single batch → go straight to preview; multiple → cashier index
-        if (count($createdBatches) === 1) {
-            return redirect()->route('payroll.cashier.preview', $createdBatches[0]->id)
-                ->with('success', 'Payroll parsed successfully.');
-        }
+        // Always go to first batch preview; flash the others so the user knows to send them too
+        $first  = array_shift($createdBatches);
+        $others = array_map(fn($b) => ['id' => $b->id, 'label' => $b->label, 'payroll_no' => $b->payroll_no], $createdBatches);
 
-        return redirect()->route('payroll.cashier.index')
-            ->with('success', count($createdBatches) . ' payroll batches parsed successfully.');
+        return redirect()->route('payroll.cashier.preview', $first->id)
+            ->with('success', 'Payroll parsed successfully.')
+            ->with('also_uploaded', $others);
     }
 
     // ── Preview ───────────────────────────────────────────────────────────────
