@@ -138,6 +138,7 @@
     'Longevity Pay'                                  => $item->longevity_pay,
     'Year-End Bonus'                                 => $item->year_end_bonus,
     'Cash Gift'                                      => $item->cash_gift,
+    'Clothing Allowance'                             => $item->clothing_allowance,
     'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
   ], fn($v) => $v !== null);
 

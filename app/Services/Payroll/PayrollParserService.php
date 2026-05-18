@@ -33,6 +33,10 @@ class PayrollParserService
         'Cash Gift'                         => 'cash_gift',
         'Less: BIR Tax Withheld'            => 'bir_tax',
         'NET AMOUNT'                        => 'net_pay',
+        // Clothing Allowance
+        'Gross'                             => 'clothing_allowance',
+        'Deductions'                        => 'total_deductions',
+        'Net'                               => 'net_pay',
         'Longevity Pay'                     => 'longevity_pay',
         'Longevity Pay Tax'          => 'longevity_tax',
         'Others (Bonus/Incentives/CA)' => 'others_bonuses',
@@ -112,6 +116,10 @@ class PayrollParserService
             'Year-End Bonus', 'Cash Gift', 'Gross Amount',
             'Less: BIR Tax Withheld', 'NET AMOUNT',
         ],
+        'clothing_allowance' => [
+            'Name', 'Employee No.', 'Position',
+            'Gross', 'Deductions', 'Net',
+        ],
     ];
 
     /**
@@ -189,6 +197,9 @@ class PayrollParserService
         $set('Cash Gift',                     '5000.00');
         $set('Less: BIR Tax Withheld',        '0.00');
         $set('NET AMOUNT',                    '42024.00');
+        $set('Gross',                         '6000.00');
+        $set('Deductions',                    '0.00');
+        $set('Net',                           '6000.00');
         $set('Longevity Pay',                 '3000.00');
         $set('Longevity Pay Tax',             '150.00');
         $set('Others (Bonus/Incentives/CA)',  '5000.00');
@@ -305,7 +316,7 @@ class PayrollParserService
                     fn($f) => (float) ($row[$f] ?? 0),
                     ['basic_salary', 'pera', 'salary_increase', 'additional_compensation',
                      'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses',
-                     'year_end_bonus', 'cash_gift']
+                     'year_end_bonus', 'cash_gift', 'clothing_allowance']
                 ));
             }
 
