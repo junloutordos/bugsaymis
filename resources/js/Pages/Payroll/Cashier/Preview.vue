@@ -22,6 +22,7 @@ const submitting       = ref(false)
 const sendLoading      = ref(false)
 const secondHalfDate   = ref('')
 const secondHalfLoading= ref(false)
+const resendingIds     = ref([])
 
 const isMonthly = computed(() =>
   Array.isArray(props.batch.disbursement_type)
@@ -94,6 +95,26 @@ function sendSecondHalf() {
     }, {
       onSuccess: () => Swal.fire({ icon: 'success', title: '2nd half notifications queued!', timer: 1500, showConfirmButton: false }),
       onFinish:  () => { secondHalfLoading.value = false },
+    })
+  })
+}
+
+function resendOne(item) {
+  const name = item.employee?.name ?? item.employee_name_raw
+  Swal.fire({
+    title: 'Resend payslip?',
+    text: `${name} will receive a new payslip email.`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, resend',
+    reverseButtons: true,
+  }).then((res) => {
+    if (!res.isConfirmed) return
+    resendingIds.value.push(item.id)
+    router.post(route('payroll.cashier.resend', props.batch.id), { item_ids: [item.id] }, {
+      preserveScroll: true,
+      onSuccess: () => Swal.fire({ icon: 'success', title: 'Queued!', timer: 1200, showConfirmButton: false }),
+      onFinish:  () => { resendingIds.value = resendingIds.value.filter(id => id !== item.id) },
     })
   })
 }
@@ -259,6 +280,7 @@ function sendAll() {
               <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Basic</th>
               <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Pay</th>
               <th v-if="activeTab !== 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Assign to</th>
+              <th v-if="activeTab === 'matched'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Action</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -288,9 +310,15 @@ function sendAll() {
                   </label>
                 </div>
               </td>
+              <td v-if="activeTab === 'matched'" class="px-4 py-3">
+                <button @click="resendOne(item)" :disabled="resendingIds.includes(item.id)"
+                        class="inline-flex items-center gap-1.5 border border-indigo-300 text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 whitespace-nowrap">
+                  {{ resendingIds.includes(item.id) ? '…' : 'Resend' }}
+                </button>
+              </td>
             </tr>
             <tr v-if="!currentItems.length">
-              <td :colspan="activeTab !== 'matched' ? 7 : 6" class="py-12 text-center text-slate-400 text-sm">
+              <td colspan="7" class="py-12 text-center text-slate-400 text-sm">
                 No {{ activeTab }} rows.
               </td>
             </tr>
