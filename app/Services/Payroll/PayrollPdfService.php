@@ -95,11 +95,12 @@ class PayrollPdfService
         $batch = $item->relationLoaded('batch') ? $item->getRelation('batch') : $item->batch;
         if ($batch?->release_id) {
             $siblingIds = PayrollBatch::where('release_id', $batch->release_id)->pluck('id');
-            $allItems   = PayrollItem::whereIn('batch_id', $siblingIds)
+            $allItems   = PayrollItem::with('batch')->whereIn('batch_id', $siblingIds)
                 ->where('matched_user_id', $item->matched_user_id)
                 ->get();
         } else {
-            $allItems = PayrollItem::where('matched_user_id', $item->matched_user_id)
+            $allItems = PayrollItem::with('batch')
+                ->where('matched_user_id', $item->matched_user_id)
                 ->where('month', $item->month)
                 ->where('year', $item->year)
                 ->get();
@@ -107,6 +108,14 @@ class PayrollPdfService
 
         if ($allItems->count() <= 1) {
             return $item;
+        }
+
+        // Normalize SALA batch items where only 'Gross Amount' was stored (sala=0, gross_earnings>0).
+        // This fixes existing DB data from before the parser was corrected.
+        foreach ($allItems as $i) {
+            if ($i->batch?->hasType('sala') && (float)$i->sala == 0.0 && (float)$i->gross_earnings > 0) {
+                $i->sala = $i->gross_earnings;
+            }
         }
 
         // replicate() copies all attributes without persisting; override numeric cols with sums
