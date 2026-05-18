@@ -34,13 +34,15 @@ class PayrollPdfService
     {
         [$preparedBy, $certifiedBy] = $this->signatories();
 
-        $combined = $this->buildCombined($item);
+        $combined          = $this->buildCombined($item);
+        $disbursementLabel = $this->combinedDisbursementLabel($item);
 
         $html = view('payroll.payslip', [
-            'item'        => $combined,
-            'batch'       => $item->batch,
-            'preparedBy'  => $preparedBy,
-            'certifiedBy' => $certifiedBy,
+            'item'               => $combined,
+            'batch'              => $item->batch,
+            'preparedBy'         => $preparedBy,
+            'certifiedBy'        => $certifiedBy,
+            'disbursementLabel'  => $disbursementLabel,
         ])->render();
 
         $mpdf = new Mpdf([
@@ -112,6 +114,31 @@ class PayrollPdfService
         }
 
         return $combined;
+    }
+
+    /**
+     * Build a combined disbursement label from all batches the employee has for this period.
+     * E.g. "Monthly Salary + Clothing Allowance"
+     */
+    public function combinedDisbursementLabel(PayrollItem $item): string
+    {
+        if (!$item->matched_user_id) {
+            return $item->batch->disbursementLabel();
+        }
+
+        $labels = PayrollItem::where('matched_user_id', $item->matched_user_id)
+            ->where('month', $item->month)
+            ->where('year', $item->year)
+            ->with('batch')
+            ->get()
+            ->pluck('batch')
+            ->filter()
+            ->map(fn($b) => $b->disbursementLabel())
+            ->unique()
+            ->values()
+            ->implode(' + ');
+
+        return $labels ?: $item->batch->disbursementLabel();
     }
 
     /**

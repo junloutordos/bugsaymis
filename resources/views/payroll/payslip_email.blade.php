@@ -42,13 +42,73 @@
       has been credited to your ATM account{!! $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' !!}.
     </div>
 
-    <p style="margin-top:8px;font-size:9pt;color:#555;">
+    @php
+      $fmt2 = fn($v) => '&#8369;&nbsp;' . number_format((float)$v, 2);
+      $rows = match(true) {
+        in_array($pass, ['first_half', 'second_half']) => array_filter([
+          'Gross Earnings'       => $fmt2($n->gross_earnings),
+          'Total Deductions'     => $fmt2($n->total_deductions),
+          'Net Pay'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+          ($pass === 'first_half' ? 'Amount Due (1st Half)' : 'Amount Due (2nd Half)') =>
+            '<strong>' . $fmt2($pass === 'first_half' ? $n->first_half_amount : ((float)$n->net_pay - (float)$n->first_half_amount)) . '</strong>',
+        ]),
+        str_contains($pass, 'hazard_pay') => [
+          'Hazard Pay'              => $fmt2($n->hazard_pay),
+          'WHT on Hazard Pay'       => $fmt2($n->wht_hazard),
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+        str_contains($pass, 'sala') => array_filter([
+          'Subsistence Allowance'          => $fmt2($n->subsistence_allowance),
+          'Laundry Allowance'              => $fmt2($n->laundry_allowance),
+          'LAWOP Deduction'                => $fmt2($n->lawop),
+          'OB/Travel/Seminar Deduction'    => $fmt2($n->ob_travel_seminar),
+          'Net SALA'                       => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ]),
+        str_contains($pass, 'year_end_bonus') => [
+          'Year-End Bonus'          => $fmt2($n->year_end_bonus),
+          'Cash Gift'               => $fmt2($n->cash_gift),
+          'BIR Tax Withheld'        => $fmt2($n->bir_tax),
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+        str_contains($pass, 'clothing_allowance') => [
+          'Clothing Allowance'      => $fmt2($n->clothing_allowance),
+          'Deductions'              => $fmt2($n->total_deductions),
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+        str_contains($pass, 'midyear_bonus') => [
+          'Midyear Bonus'           => $fmt2($n->midyear_bonus),
+          'Deductions'              => $fmt2($n->total_deductions),
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+        str_contains($pass, 'cna') => [
+          'CNA Incentive'           => $fmt2($n->cna_incentive),
+          'Deductions'              => $fmt2($n->total_deductions),
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+        str_contains($pass, 'longevity_pay') => [
+          'Longevity Pay'           => $fmt2($n->longevity_pay),
+          'Longevity Pay Tax'       => $fmt2($n->longevity_tax ?? 0),
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+        default => [
+          'Net Amount'              => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ],
+      };
+    @endphp
+
+    <p style="margin-top:8px;font-size:9pt;color:#555;">Breakdown:</p>
+    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:12px;">
+      @foreach($rows as $label => $val)
+      <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding:5px 8px;color:#555;">{{ $label }}</td>
+        <td style="padding:5px 8px;text-align:right;font-family:monospace;">{!! $val !!}</td>
+      </tr>
+      @endforeach
+    </table>
+
+    <p style="font-size:9pt;color:#555;">
       Please see the attached payslip for the complete breakdown of your earnings and deductions.
     </p>
-  </div>
-
-  <div style="padding:0 12px 12px;">
-    @include('payroll.payslip', ['item' => $item, 'batch' => $batch, 'preparedBy' => $preparedBy, 'certifiedBy' => $certifiedBy])
   </div>
 
   <div style="padding:12px 24px;background:#f9f9f9;border-top:1px solid #eee;font-size:8pt;color:#666;">
