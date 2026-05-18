@@ -319,6 +319,10 @@ class PayrollParserService
         $nameColIdx = array_search('Name', $headers);
         if ($nameColIdx === false) $nameColIdx = 0;
 
+        // Detect SALA-type CSV by presence of subsistence/laundry columns in the header row.
+        // When these columns exist but are blank, we fall back to deriving sala from gross_earnings.
+        $isSalaCsv = in_array('subsistence_allowance', $colMap) || in_array('laundry_allowance', $colMap);
+
         $stringFields = ['employee_name_raw', 'employee_no', 'position'];
         $items  = [];
         $rowNum = 2;
@@ -346,6 +350,12 @@ class PayrollParserService
             // Auto-compute sala (gross SALA) from subsistence + laundry if blank
             if (empty($row['sala'])) {
                 $row['sala'] = (float)($row['subsistence_allowance'] ?? 0) + (float)($row['laundry_allowance'] ?? 0);
+            }
+
+            // SALA CSVs sometimes have only 'Gross Amount' filled (subsistence/laundry left blank).
+            // Derive sala from gross_earnings so the payslip shows the correct line item.
+            if ($isSalaCsv && empty($row['sala']) && !empty($row['gross_earnings'])) {
+                $row['sala'] = $row['gross_earnings'];
             }
 
             // Auto-compute gross_earnings if blank
