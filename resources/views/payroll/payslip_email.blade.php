@@ -18,6 +18,7 @@
       // $item             = combined item (drives the inline payslip showing all disbursements)
       $n         = $notificationItem ?? $item; // fallback for safety
       $pass      = $sendType ?? null; // 'first_half', 'second_half', or type string
+      $purpose   = $batch->notes ?? null;       // set for cash_advance / reimbursement
       $disbLabel = $batch->disbursementLabel($pass);
       // For release groups, append the period range to the label
       if (!empty($releaseItems) && $releaseItems->count() > 1) {
@@ -53,9 +54,15 @@
     @endphp
 
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin:12px 0;line-height:1.7;">
-      Your <strong>{{ $disbLabel }}</strong> for the period <strong>{{ $period }}</strong>
-      amounting to <strong style="font-size:12pt;">₱ {{ number_format((float)$creditAmt, 2) }}</strong>
-      has been credited to your ATM account{!! $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' !!}.
+      @if ($purpose)
+        Your <strong>{{ $disbLabel }}</strong> for <strong>{{ $purpose }}</strong>
+        amounting to <strong style="font-size:12pt;">₱ {{ number_format((float)$creditAmt, 2) }}</strong>
+        has been released{!! $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' !!}.
+      @else
+        Your <strong>{{ $disbLabel }}</strong> for the period <strong>{{ $period }}</strong>
+        amounting to <strong style="font-size:12pt;">₱ {{ number_format((float)$creditAmt, 2) }}</strong>
+        has been credited to your ATM account{!! $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' !!}.
+      @endif
     </div>
 
     @php
@@ -151,6 +158,16 @@
           'Longevity Pay Tax' => $fmt2($n->longevity_tax ?? 0),
           'Net Amount'        => '<strong>' . $fmt2($n->net_pay) . '</strong>',
         ],
+        str_contains($pass, 'cash_advance') => array_filter([
+          'Purpose'         => $purpose ? e($purpose) : null,
+          'Amount Released' => $fmt2($n->gross_earnings),
+          'Net Amount'      => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ]),
+        str_contains($pass, 'reimbursement') => array_filter([
+          'Purpose'               => $purpose ? e($purpose) : null,
+          'Reimbursement Amount'  => $fmt2($n->gross_earnings),
+          'Net Amount'            => '<strong>' . $fmt2($n->net_pay) . '</strong>',
+        ]),
         default => [
           'Net Amount' => '<strong>' . $fmt2($n->net_pay) . '</strong>',
         ],
@@ -205,9 +222,11 @@
       </table>
     @endif
 
+    @if ($hasPdf ?? true)
     <p style="font-size:9pt;color:#555;">
       Please see the attached payslip for the complete breakdown of your earnings and deductions.
     </p>
+    @endif
   </div>
 
   <div style="padding:12px 24px;background:#f9f9f9;border-top:1px solid #eee;font-size:8pt;color:#666;">

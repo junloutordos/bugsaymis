@@ -69,6 +69,9 @@ class SendPayslipJob implements ShouldQueue
             // For release groups, the banner shows the total accumulated amount
             $notificationItem = $batch->release_id ? $combined : $item;
 
+            // Cash Advance and Reimbursement: email notification only, no PDF attachment
+            $noPdf = in_array($batch->disbursement_type[0] ?? '', ['cash_advance', 'reimbursement']);
+
             $htmlBody = view('payroll.payslip_email', [
                 'item'             => $combined,
                 'notificationItem' => $notificationItem,
@@ -78,21 +81,25 @@ class SendPayslipJob implements ShouldQueue
                 'firstName'        => $firstName,
                 'sendType'         => $sendType,
                 'releaseItems'     => $releaseItems,
+                'hasPdf'           => !$noPdf,
             ])->render();
 
-            $pdfBytes  = $pdfService->generate($item);
-            $pdfName   = $pdfService->filename($item);
-
-            Mail::send([], [], function ($message) use ($emp, $subject, $bcc, $htmlBody, $pdfBytes, $pdfName) {
-                $message->to($emp->email, $emp->name)
-                    ->subject($subject)
-                    ->html($htmlBody)
-                    ->attachData($pdfBytes, $pdfName, ['mime' => 'application/pdf']);
-
-                if ($bcc) {
-                    $message->bcc($bcc);
-                }
-            });
+            if ($noPdf) {
+                Mail::send([], [], function ($message) use ($emp, $subject, $bcc, $htmlBody) {
+                    $message->to($emp->email, $emp->name)->subject($subject)->html($htmlBody);
+                    if ($bcc) { $message->bcc($bcc); }
+                });
+            } else {
+                $pdfBytes = $pdfService->generate($item);
+                $pdfName  = $pdfService->filename($item);
+                Mail::send([], [], function ($message) use ($emp, $subject, $bcc, $htmlBody, $pdfBytes, $pdfName) {
+                    $message->to($emp->email, $emp->name)
+                        ->subject($subject)
+                        ->html($htmlBody)
+                        ->attachData($pdfBytes, $pdfName, ['mime' => 'application/pdf']);
+                    if ($bcc) { $message->bcc($bcc); }
+                });
+            }
 
             $emailRecord->update([
                 'status'  => 'sent',

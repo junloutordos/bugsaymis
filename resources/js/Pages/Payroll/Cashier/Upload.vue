@@ -15,7 +15,12 @@ const TYPES = [
   { value: 'midyear_bonus',      label: 'Midyear Bonus' },
   { value: 'cna',                label: 'CNA Incentive' },
   { value: 'other',              label: 'Other Allowance' },
+  { value: 'cash_advance',       label: 'Cash Advance' },
+  { value: 'reimbursement',      label: 'Reimbursement' },
 ]
+
+const NEEDS_PURPOSE = ['cash_advance', 'reimbursement']
+const needsPurpose = (type) => NEEDS_PURPOSE.includes(type)
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -47,6 +52,7 @@ function initTypeState(type) {
         customLabel: '',
         creditDate:  '',
         payrollNo:   '',
+        purpose:     '',
         entries:     [blankEntry()],
       }
     }
@@ -130,6 +136,10 @@ async function submit() {
         Swal.fire({ icon: 'warning', title: `ATM Credit Date is required for ${typeLabel(type)}.` })
         return
       }
+      if (needsPurpose(type) && !s.purpose) {
+        Swal.fire({ icon: 'warning', title: `Purpose is required for ${typeLabel(type)}.` })
+        return
+      }
       for (const [ei, entry] of s.entries.entries()) {
         if (!entry.base64) {
           Swal.fire({ icon: 'warning', title: `Please upload a CSV for ${typeLabel(type)} (entry ${ei + 1}).` })
@@ -164,6 +174,7 @@ async function submit() {
         label:       typeLabel(type),
         credit_date: s.creditDate || null,
         payroll_no:  s.payrollNo || null,
+        purpose:     needsPurpose(type) ? (s.purpose || null) : null,
         entries:     s.entries.map(e => ({
           period_month: e.periodMonth || null,
           period_year:  e.periodYear  || null,
@@ -317,6 +328,16 @@ async function submit() {
                 <input v-model="typeState[type].payrollNo" type="text" placeholder="e.g. 2026-05-001"
                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
+            </div>
+
+            <!-- Purpose — required for Cash Advance and Reimbursement -->
+            <div v-if="needsPurpose(type)">
+              <label class="block text-xs font-medium text-slate-600 mb-1">
+                Purpose <span class="text-red-500">*</span>
+              </label>
+              <input v-model="typeState[type].purpose" type="text"
+                     :placeholder="type === 'cash_advance' ? 'e.g. Official Travel to Manila' : 'e.g. Medical Reimbursement — Receipt #12345'"
+                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
 
             <!-- Per-month file entries -->
