@@ -7,6 +7,7 @@ class PayrollParserService
     private const FOOTER_PATTERNS = [
         'prepared by', 'certified correct', 'total', 'sub-total',
         'job order', 'cos', 'grand total', 'noted by',
+        'staff', 'faculty', 'teaching', 'non-teaching',
     ];
 
     // CSV column header → DB field (covers all disbursement types)
@@ -20,15 +21,23 @@ class PayrollParserService
         'PERA'                       => 'pera',
         'Gross Amount Earned'        => 'gross_earnings',
         // Earnings — Allowances (separate disbursements)
-        'Hazard Pay'                 => 'hazard_pay',
-        'WHT Hazard Pay'             => 'wht_hazard',
-        'Subsistence and Laundry'    => 'sala',
-        'Longevity Pay'              => 'longevity_pay',
+        'Hazard Pay'                        => 'hazard_pay',
+        'WHT Hazard Pay'                    => 'wht_hazard',
+        'Subsistence and Laundry'           => 'sala',
+        // SALA breakdown columns (new template)
+        'Subsistence Allowance'             => 'subsistence_allowance',
+        'Laundry Allowance'                 => 'laundry_allowance',
+        'Gross Amount'                      => 'sala',
+        'Longevity Pay'                     => 'longevity_pay',
         'Longevity Pay Tax'          => 'longevity_tax',
         'Others (Bonus/Incentives/CA)' => 'others_bonuses',
         // Deductions — General
-        'Tardiness/AWOP'             => 'lawop',
-        'BIR Withholding Tax'        => 'bir_tax',
+        'Tardiness/AWOP'                                   => 'lawop',
+        'Late/Absent/Work at Home/On Quarantine'           => 'lawop',
+        'OB/Travel/Seminar with meals'                     => 'ob_travel_seminar',
+        'Amount'                                           => 'total_deductions',
+        'Net SALA'                                         => 'net_pay',
+        'BIR Withholding Tax'                              => 'bir_tax',
         // GSIS
         'RLIP EE'                    => 'gsis_contribution',
         'Pol. Loan'                  => 'gsis_policy_loan',
@@ -56,7 +65,7 @@ class PayrollParserService
     // Extra earnings columns injected after "Gross Amount Earned" when combined with monthly salary
     private const EXTRA_EARNINGS = [
         'hazard_pay'    => ['Hazard Pay'],
-        'sala'          => ['Subsistence and Laundry'],
+        'sala'          => ['Subsistence Allowance', 'Laundry Allowance'],
         'longevity_pay' => ['Longevity Pay'],
         'other'         => ['Others (Bonus/Incentives/CA)'],
     ];
@@ -82,7 +91,10 @@ class PayrollParserService
             'Name', 'Employee No.', 'Position', 'Hazard Pay', 'WHT Hazard Pay', 'Net Amount Due',
         ],
         'sala' => [
-            'Name', 'Employee No.', 'Position', 'Subsistence and Laundry', 'Net Amount Due',
+            'Name', 'Employee No.', 'Position',
+            'Subsistence Allowance', 'Laundry Allowance', 'Gross Amount',
+            'Late/Absent/Work at Home/On Quarantine', 'OB/Travel/Seminar with meals', 'Amount',
+            'Net SALA',
         ],
         'longevity_pay' => [
             'Name', 'Employee No.', 'Position', 'Longevity Pay', 'Longevity Pay Tax', 'Net Amount Due',
@@ -156,6 +168,13 @@ class PayrollParserService
         $set('Hazard Pay',                    '5000.00');
         $set('WHT Hazard Pay',                '250.00');
         $set('Subsistence and Laundry',       '4000.00');
+        $set('Subsistence Allowance',         '3000.00');
+        $set('Laundry Allowance',             '500.00');
+        $set('Gross Amount',                  '3500.00');
+        $set('Late/Absent/Work at Home/On Quarantine', '125.00');
+        $set('OB/Travel/Seminar with meals',  '0.00');
+        $set('Amount',                        '125.00');
+        $set('Net SALA',                      '3375.00');
         $set('Longevity Pay',                 '3000.00');
         $set('Longevity Pay Tax',             '150.00');
         $set('Others (Bonus/Incentives/CA)',  '5000.00');
@@ -236,6 +255,10 @@ class PayrollParserService
             }
         }
 
+        // Find which column holds the employee name (handles NO. as column 0)
+        $nameColIdx = array_search('Name', $headers);
+        if ($nameColIdx === false) $nameColIdx = 0;
+
         $stringFields = ['employee_name_raw', 'employee_no', 'position'];
         $items  = [];
         $rowNum = 2;
@@ -244,7 +267,7 @@ class PayrollParserService
             if (trim($line) === '') continue;
             $cells = str_getcsv($line);
 
-            $name = trim($cells[0] ?? '');
+            $name = trim($cells[$nameColIdx] ?? '');
             if ($name === '' || $this->isFooter($name)) continue;
 
             $row = ['excel_row_number' => $rowNum, 'raw_row_json' => []];
@@ -256,6 +279,11 @@ class PayrollParserService
             }
 
             if (empty($row['employee_name_raw'])) $row['employee_name_raw'] = $name;
+
+            // Auto-compute sala (gross SALA) from subsistence + laundry if blank
+            if (empty($row['sala'])) {
+                $row['sala'] = (float)($row['subsistence_allowance'] ?? 0) + (float)($row['laundry_allowance'] ?? 0);
+            }
 
             // Auto-compute gross_earnings if blank
             if (empty($row['gross_earnings'])) {
@@ -270,7 +298,7 @@ class PayrollParserService
             if (empty($row['total_deductions'])) {
                 $row['total_deductions'] = array_sum(array_map(
                     fn($f) => (float) ($row[$f] ?? 0),
-                    ['lawop', 'bir_tax', 'wht_hazard', 'longevity_tax',
+                    ['lawop', 'ob_travel_seminar', 'bir_tax', 'wht_hazard', 'longevity_tax',
                      'gsis_contribution', 'gsis_salary_loan', 'gsis_policy_loan',
                      'gsis_consolidated_loan', 'gsis_emergency_loan', 'gsis_mpl',
                      'gsis_gfal', 'gsis_cpl', 'gsis_mpl_lite',

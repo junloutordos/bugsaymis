@@ -124,19 +124,24 @@
 
 {{-- ── Main payslip table ──────────────────────────────────────────── --}}
 @php
-  $earnings = [
+  $hasSalaBreakdown = (float)$item->subsistence_allowance || (float)$item->laundry_allowance;
+  $earnings = array_filter([
     'Basic Salary'                                   => $item->basic_salary,
     'Salary Increase'                                => $item->salary_increase,
     'Additional Compensation'                        => $item->additional_compensation,
     'Personnel Economic Relief Allowance'            => $item->pera,
-    'Subsistence and Laundry Allowance'              => $item->sala,
+    // Show breakdown if new SALA template; otherwise show combined sala
+    'Subsistence Allowance'                          => $hasSalaBreakdown ? $item->subsistence_allowance : null,
+    'Laundry Allowance'                              => $hasSalaBreakdown ? $item->laundry_allowance : null,
+    'Subsistence and Laundry Allowance'              => !$hasSalaBreakdown ? $item->sala : null,
     'Hazard Pay'                                     => $item->hazard_pay,
     'Longevity Pay'                                  => $item->longevity_pay,
     'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
-  ];
+  ], fn($v) => $v !== null);
 
   $mandatory = [
     'LAWOP/Undertime/Tardiness'        => $item->lawop,
+    'OB/Travel/Seminar with meals'     => $item->ob_travel_seminar,
     'PVP Overpayment'                  => $adjVal('pvp_overpayment') ?: $item->pvp_overpayment,
     'GSIS Contributions'               => $item->gsis_contribution,
     'BIR Withholding Tax'              => $item->bir_tax,
@@ -261,7 +266,7 @@
 @php
   $addenda = [];
   if ((float)$item->hazard_pay    != 0) $addenda[] = 'Hazard Pay';
-  if ((float)$item->sala          != 0) $addenda[] = 'Subsistence and Laundry';
+  if ((float)$item->sala          != 0) $addenda[] = $hasSalaBreakdown ? 'SALA' : 'Subsistence and Laundry';
   if ((float)$item->longevity_pay != 0) $addenda[] = 'Longevity Pay';
   if ((float)$item->others_bonuses!= 0) $addenda[] = 'Others';
   $addendaStr = $addenda ? ' + (' . implode(' + ', $addenda) . ')' : '';
