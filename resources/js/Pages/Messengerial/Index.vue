@@ -70,7 +70,7 @@ async function handleNewRequest() {
 const showCsmModal = ref(false)
 const requestToCsm = ref(null)
 function openCsmModal(req) { requestToCsm.value = req; showCsmModal.value = true }
-function onCsmSubmitted() { showCsmModal.value = false }
+function onCsmSubmitted() { showCsmModal.value = false; router.reload() }
 
 const showModal = ref(false);
 const showUploadModal = ref(false);
