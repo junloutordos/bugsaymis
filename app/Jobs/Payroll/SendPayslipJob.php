@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Payroll;
 
+use App\Models\Payroll\PayrollBatch;
 use App\Models\Payroll\PayrollEmail;
 use App\Models\Payroll\PayrollItem;
 use App\Services\Payroll\PayrollPdfService;
@@ -45,21 +46,38 @@ class SendPayslipJob implements ShouldQueue
         try {
             [$preparedBy, $certifiedBy] = $pdfService->signatories();
 
-            $firstName        = explode(' ', $emp->name)[0];
-            $subject          = $emailRecord->subject;
-            $bcc              = $emailRecord->bcc_email;
-            $sendType         = $emailRecord->send_type;
-            $notificationItem = $item;                        // per-batch: drives banner credit amount
-            $combined         = $pdfService->buildCombined($item); // all disbursements for the period
+            $firstName = explode(' ', $emp->name)[0];
+            $subject   = $emailRecord->subject;
+            $bcc       = $emailRecord->bcc_email;
+            $sendType  = $emailRecord->send_type;
+
+            // For release groups: collect per-month items for the breakdown table
+            $releaseItems = null;
+            if ($batch->release_id && $item->matched_user_id) {
+                $siblingIds   = PayrollBatch::where('release_id', $batch->release_id)
+                    ->orderBy('year')->orderBy('month')
+                    ->pluck('id');
+                $releaseItems = PayrollItem::whereIn('batch_id', $siblingIds)
+                    ->where('matched_user_id', $item->matched_user_id)
+                    ->with('batch')
+                    ->get()
+                    ->sortBy(fn($i) => $i->year * 100 + $i->month)
+                    ->values();
+            }
+
+            $combined         = $pdfService->buildCombined($item);
+            // For release groups, the banner shows the total accumulated amount
+            $notificationItem = $batch->release_id ? $combined : $item;
 
             $htmlBody = view('payroll.payslip_email', [
-                'item'             => $combined,        // inline payslip = full combined
-                'notificationItem' => $notificationItem, // banner amount = this disbursement only
+                'item'             => $combined,
+                'notificationItem' => $notificationItem,
                 'batch'            => $batch,
                 'preparedBy'       => $preparedBy,
                 'certifiedBy'      => $certifiedBy,
                 'firstName'        => $firstName,
                 'sendType'         => $sendType,
+                'releaseItems'     => $releaseItems,
             ])->render();
 
             $pdfBytes  = $pdfService->generate($item);
