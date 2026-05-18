@@ -57,6 +57,8 @@ class PayrollBatch extends Model
             'longevity_pay'  => 'Longevity Pay',
             'year_end_bonus'     => 'Year-End Bonus and Cash Gift',
             'clothing_allowance' => 'Clothing Allowance',
+            'midyear_bonus'      => 'Midyear Bonus',
+            'cna'                => 'CNA Incentive',
             'other'              => 'Other Allowance',
         ];
 

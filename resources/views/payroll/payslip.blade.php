@@ -139,6 +139,8 @@
     'Year-End Bonus'                                 => $item->year_end_bonus,
     'Cash Gift'                                      => $item->cash_gift,
     'Clothing Allowance'                             => $item->clothing_allowance,
+    'Midyear Bonus'                                  => $item->midyear_bonus,
+    'CNA Incentive'                                  => $item->cna_incentive,
     'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
   ], fn($v) => $v !== null);
 

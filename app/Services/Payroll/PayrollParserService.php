@@ -33,10 +33,12 @@ class PayrollParserService
         'Cash Gift'                         => 'cash_gift',
         'Less: BIR Tax Withheld'            => 'bir_tax',
         'NET AMOUNT'                        => 'net_pay',
-        // Clothing Allowance
+        // Clothing Allowance / Midyear Bonus / CNA
         'Gross'                             => 'clothing_allowance',
         'Deductions'                        => 'total_deductions',
         'Net'                               => 'net_pay',
+        'Midyear Bonus'                     => 'midyear_bonus',
+        'CNA Incentive'                     => 'cna_incentive',
         'Longevity Pay'                     => 'longevity_pay',
         'Longevity Pay Tax'          => 'longevity_tax',
         'Others (Bonus/Incentives/CA)' => 'others_bonuses',
@@ -120,6 +122,14 @@ class PayrollParserService
             'Name', 'Employee No.', 'Position',
             'Gross', 'Deductions', 'Net',
         ],
+        'midyear_bonus' => [
+            'Name', 'Employee No.', 'Position',
+            'Midyear Bonus', 'Deductions', 'Net',
+        ],
+        'cna' => [
+            'Name', 'Employee No.', 'Position',
+            'CNA Incentive', 'Deductions', 'Net',
+        ],
     ];
 
     /**
@@ -200,6 +210,8 @@ class PayrollParserService
         $set('Gross',                         '6000.00');
         $set('Deductions',                    '0.00');
         $set('Net',                           '6000.00');
+        $set('Midyear Bonus',                 '19500.00');
+        $set('CNA Incentive',                 '10000.00');
         $set('Longevity Pay',                 '3000.00');
         $set('Longevity Pay Tax',             '150.00');
         $set('Others (Bonus/Incentives/CA)',  '5000.00');
@@ -316,7 +328,7 @@ class PayrollParserService
                     fn($f) => (float) ($row[$f] ?? 0),
                     ['basic_salary', 'pera', 'salary_increase', 'additional_compensation',
                      'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses',
-                     'year_end_bonus', 'cash_gift', 'clothing_allowance']
+                     'year_end_bonus', 'cash_gift', 'clothing_allowance', 'midyear_bonus', 'cna_incentive']
                 ));
             }
 
