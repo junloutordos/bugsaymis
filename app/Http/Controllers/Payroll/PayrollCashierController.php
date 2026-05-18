@@ -78,7 +78,7 @@ class PayrollCashierController extends Controller
             'period_start'                        => 'required|date',
             'period_end'                          => 'required|date|after_or_equal:period_start',
             'types'                               => 'required|array|min:1',
-            'types.*.type'                        => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,other',
+            'types.*.type'                        => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,year_end_bonus,clothing_allowance,midyear_bonus,cna,other',
             'types.*.label'                       => 'nullable|string|max:150',
             'types.*.base64'                      => 'required|string',
             'types.*.filename'                    => 'required|string|max:255',
