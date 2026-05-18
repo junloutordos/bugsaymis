@@ -97,14 +97,14 @@
     <td class="val" style="font-weight:bold;">{{ $item->employee->name ?? $item->employee_name_raw }}</td>
     <td></td>
     <td class="lbl">Position:</td>
-    <td class="val">{{ $item->position ?? '—' }}</td>
+    <td class="val">{{ $item->employee?->position ?? $item->position ?? '—' }}</td>
   </tr>
   <tr>
     <td class="lbl">Employee No.:</td>
     <td class="val">{{ $item->employee_no ?? $item->employee?->employee_no ?? '—' }}</td>
     <td></td>
     <td class="lbl">Disbursement:</td>
-    <td class="val">{{ $batch->disbursementLabel() }}</td>
+    <td class="val">{{ $disbursementLabel ?? $batch->disbursementLabel() }}</td>
   </tr>
   @if($batch->isMonthly())
   <tr>
@@ -141,7 +141,7 @@
     'Clothing Allowance'                             => $item->clothing_allowance,
     'Midyear Bonus'                                  => $item->midyear_bonus,
     'CNA Incentive'                                  => $item->cna_incentive,
-    'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
+    'Others'                                         => $item->others_bonuses,
   ], fn($v) => $v !== null);
 
   $mandatory = [
