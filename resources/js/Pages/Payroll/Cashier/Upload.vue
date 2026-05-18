@@ -12,6 +12,8 @@ const TYPES = [
   { value: 'longevity_pay',  label: 'Longevity Pay' },
   { value: 'year_end_bonus',     label: 'Year-End Bonus and Cash Gift' },
   { value: 'clothing_allowance', label: 'Clothing Allowance' },
+  { value: 'midyear_bonus',      label: 'Midyear Bonus' },
+  { value: 'cna',                label: 'CNA Incentive' },
   { value: 'other',              label: 'Other Allowance' },
 ]
 
