@@ -280,13 +280,17 @@
   if ((float)$item->cna_incentive  != 0) $addenda[] = 'CNA Incentive';
   if ((float)$item->others_bonuses != 0) $addenda[] = 'Others';
   $addendaStr = $addenda ? ' + (' . implode(' + ', $addenda) . ')' : '';
+  // Addenda net = combined net_pay minus the monthly 1st+2nd half split amounts
+  $addendaAmt = ($hasHalfBreakdown && $addenda)
+    ? max(0, (float)$item->net_pay - (float)$item->first_half_amount - (float)$item->second_half_amount)
+    : 0;
 @endphp
 <table class="due-tbl" style="margin-top:5px;">
   @if($hasHalfBreakdown)
   <tr>
     <td>Amount Due (1st Half){{ $addendaStr }}:</td>
     <td style="text-align:right;white-space:nowrap;font-weight:bold;">
-      &#8369; {{ $fmt($item->first_half_amount) }}
+      &#8369; {{ $fmt((float)$item->first_half_amount + $addendaAmt) }}
     </td>
   </tr>
   <tr>
