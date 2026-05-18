@@ -142,9 +142,9 @@
     'Midyear Bonus'                                  => $item->midyear_bonus,
     'CNA Incentive'                                  => $item->cna_incentive,
     'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
-  ], fn($v) => $v !== null && (float)$v != 0.0);
+  ], fn($v) => $v !== null);
 
-  $mandatory = array_filter([
+  $mandatory = [
     'LAWOP/Undertime/Tardiness'        => $item->lawop,
     'OB/Travel/Seminar with meals'     => $item->ob_travel_seminar,
     'PVP Overpayment'                  => $adjVal('pvp_overpayment') ?: $item->pvp_overpayment,
@@ -157,7 +157,7 @@
     'PHILHEALTH Differential'          => $adjVal('philhealth_differential') ?: $item->philhealth_differential,
     'HDMF (Pag-ibig) Contribution'     => $item->hdmf_contribution,
     'HDMF Contribution-Additional'     => $adjVal('hdmf_additional') ?: $item->hdmf_additional,
-  ], fn($v) => (float)$v != 0.0);
+  ];
 
   $gsisLoans = [
     'Salary Loan'       => $item->gsis_salary_loan,
