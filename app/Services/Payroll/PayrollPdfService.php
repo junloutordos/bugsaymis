@@ -12,8 +12,9 @@ class PayrollPdfService
     // All numeric columns that are summed across batches when building the combined payslip
     private const NUMERIC_COLS = [
         'basic_salary', 'salary_increase', 'additional_compensation',
-        'pera', 'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses', 'gross_earnings',
-        'lawop', 'pvp_overpayment', 'gsis_contribution', 'bir_tax',
+        'pera', 'sala', 'subsistence_allowance', 'laundry_allowance',
+        'hazard_pay', 'longevity_pay', 'others_bonuses', 'gross_earnings',
+        'lawop', 'pvp_overpayment', 'ob_travel_seminar', 'gsis_contribution', 'bir_tax',
         'wht_hazard', 'wht_cna', 'longevity_tax',
         'philhealth_contribution', 'philhealth_differential',
         'hdmf_contribution', 'hdmf_additional',
