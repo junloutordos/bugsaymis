@@ -142,9 +142,9 @@
     'Midyear Bonus'                                  => $item->midyear_bonus,
     'CNA Incentive'                                  => $item->cna_incentive,
     'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
-  ], fn($v) => $v !== null);
+  ], fn($v) => $v !== null && (float)$v != 0.0);
 
-  $mandatory = [
+  $mandatory = array_filter([
     'LAWOP/Undertime/Tardiness'        => $item->lawop,
     'OB/Travel/Seminar with meals'     => $item->ob_travel_seminar,
     'PVP Overpayment'                  => $adjVal('pvp_overpayment') ?: $item->pvp_overpayment,
@@ -157,7 +157,7 @@
     'PHILHEALTH Differential'          => $adjVal('philhealth_differential') ?: $item->philhealth_differential,
     'HDMF (Pag-ibig) Contribution'     => $item->hdmf_contribution,
     'HDMF Contribution-Additional'     => $adjVal('hdmf_additional') ?: $item->hdmf_additional,
-  ];
+  ], fn($v) => (float)$v != 0.0);
 
   $gsisLoans = [
     'Salary Loan'       => $item->gsis_salary_loan,
@@ -269,14 +269,20 @@
 
 {{-- ── Amount Due / ATM ──────────────────────────────────────────── --}}
 @php
+  $hasHalfBreakdown = (float)$item->first_half_amount > 0;
   $addenda = [];
-  if ((float)$item->hazard_pay    != 0) $addenda[] = 'Hazard Pay';
-  if ((float)$item->sala          != 0) $addenda[] = $hasSalaBreakdown ? 'SALA' : 'Subsistence and Laundry';
-  if ((float)$item->longevity_pay != 0) $addenda[] = 'Longevity Pay';
-  if ((float)$item->others_bonuses!= 0) $addenda[] = 'Others';
+  if ((float)$item->hazard_pay     != 0) $addenda[] = 'Hazard Pay';
+  if ((float)$item->sala           != 0) $addenda[] = $hasSalaBreakdown ? 'SALA' : 'Subsistence and Laundry';
+  if ((float)$item->longevity_pay  != 0) $addenda[] = 'Longevity Pay';
+  if ((float)$item->year_end_bonus != 0) $addenda[] = 'Year-End Bonus & Cash Gift';
+  if ((float)$item->clothing_allowance != 0) $addenda[] = 'Clothing Allowance';
+  if ((float)$item->midyear_bonus  != 0) $addenda[] = 'Midyear Bonus';
+  if ((float)$item->cna_incentive  != 0) $addenda[] = 'CNA Incentive';
+  if ((float)$item->others_bonuses != 0) $addenda[] = 'Others';
   $addendaStr = $addenda ? ' + (' . implode(' + ', $addenda) . ')' : '';
 @endphp
 <table class="due-tbl" style="margin-top:5px;">
+  @if($hasHalfBreakdown)
   <tr>
     <td>Amount Due (1st Half){{ $addendaStr }}:</td>
     <td style="text-align:right;white-space:nowrap;font-weight:bold;">
@@ -289,6 +295,14 @@
       &#8369; {{ $fmt($item->second_half_amount) }}
     </td>
   </tr>
+  @else
+  <tr>
+    <td>Amount Due:</td>
+    <td style="text-align:right;white-space:nowrap;font-weight:bold;">
+      &#8369; {{ $fmt($item->net_pay) }}
+    </td>
+  </tr>
+  @endif
   <tr>
     <td>Received thru: <strong>ATM</strong></td>
     <td></td>
