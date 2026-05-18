@@ -62,6 +62,8 @@ class PayrollBatch extends Model
             'midyear_bonus'      => 'Midyear Bonus',
             'cna'                => 'CNA Incentive',
             'other'              => 'Other Allowance',
+            'cash_advance'       => 'Cash Advance',
+            'reimbursement'      => 'Reimbursement',
         ];
 
         if ($pass === 'first_half') return '1st Half Salary';

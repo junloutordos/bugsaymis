@@ -79,7 +79,7 @@ class PayrollCashierController extends Controller
             'period_start'                         => 'nullable|date',
             'period_end'                           => 'nullable|date|after_or_equal:period_start',
             'types'                                => 'required|array|min:1',
-            'types.*.type'                         => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,year_end_bonus,clothing_allowance,midyear_bonus,cna,other',
+            'types.*.type'                         => 'required|string|in:monthly_salary,hazard_pay,sala,longevity_pay,year_end_bonus,clothing_allowance,midyear_bonus,cna,other,cash_advance,reimbursement',
             'types.*.label'                        => 'nullable|string|max:150',
             'types.*.payroll_no'                   => 'nullable|string|max:100',
             // Monthly-only (at type level)
@@ -89,6 +89,7 @@ class PayrollCashierController extends Controller
             'types.*.second_half_credit_date'      => 'nullable|date',
             // Non-monthly: credit_date shared across all entries in this type
             'types.*.credit_date'                  => 'nullable|date',
+            'types.*.purpose'                      => 'nullable|string|max:500',
             // Non-monthly entries (one per month)
             'types.*.entries'                      => 'nullable|array|min:1',
             'types.*.entries.*.period_month'       => 'nullable|integer|min:1|max:12',
@@ -119,6 +120,9 @@ class PayrollCashierController extends Controller
                 }
                 if (empty($entry['credit_date'])) {
                     return back()->withErrors(["types.{$i}.credit_date" => "ATM Credit Date is required for {$entry['type']}."]);
+                }
+                if (in_array($entry['type'], ['cash_advance', 'reimbursement']) && empty($entry['purpose'])) {
+                    return back()->withErrors(["types.{$i}.purpose" => 'Purpose is required for Cash Advance and Reimbursement.']);
                 }
                 foreach ($entries as $ei => $fileEntry) {
                     if (empty($fileEntry['base64'])) {
@@ -256,6 +260,9 @@ class PayrollCashierController extends Controller
                                 'first_half_credit_date'  => null,
                                 'second_half_credit_date' => null,
                                 'credit_date'             => $entry['credit_date'] ?? null,
+                                'notes'                   => in_array($entry['type'], ['cash_advance', 'reimbursement'])
+                                                                ? ($entry['purpose'] ?? null)
+                                                                : null,
                                 'release_id'              => $releaseId,
                                 'is_primary'              => $isPrimary,
                             ]

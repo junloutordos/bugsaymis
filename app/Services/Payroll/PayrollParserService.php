@@ -42,6 +42,9 @@ class PayrollParserService
         'Longevity Pay'                     => 'longevity_pay',
         'Longevity Pay Tax'          => 'longevity_tax',
         'Others (Bonus/Incentives/CA)' => 'others_bonuses',
+        // Cash Advance / Reimbursement
+        'Cash Advance Amount'          => 'gross_earnings',
+        'Reimbursement Amount'         => 'gross_earnings',
         // Deductions — General
         'Tardiness/AWOP'                                   => 'lawop',
         'Late/Absent/Work at Home/On Quarantine'           => 'lawop',
@@ -129,6 +132,12 @@ class PayrollParserService
         'cna' => [
             'Name', 'Employee No.', 'Position',
             'CNA Incentive', 'Deductions', 'Net',
+        ],
+        'cash_advance' => [
+            'Name', 'Employee No.', 'Position', 'Cash Advance Amount', 'Net Amount Due',
+        ],
+        'reimbursement' => [
+            'Name', 'Employee No.', 'Position', 'Reimbursement Amount', 'Net Amount Due',
         ],
     ];
 
