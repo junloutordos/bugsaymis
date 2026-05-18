@@ -75,6 +75,16 @@ class PayrollCashierController extends Controller
     {
         $this->authorize('payroll.upload');
 
+        try { return $this->processUpload($request); }
+        catch (\Illuminate\Validation\ValidationException $e) { throw $e; }
+        catch (\Throwable $e) {
+            \Log::error('Payroll upload error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return back()->withErrors(['types' => $e->getMessage()]);
+        }
+    }
+
+    private function processUpload(Request $request)
+    {
         $data = $request->validate([
             'period_start'                         => 'nullable|date',
             'period_end'                           => 'nullable|date|after_or_equal:period_start',
@@ -660,7 +670,7 @@ class PayrollCashierController extends Controller
         return $key;
     }
 
-    private function emailSubject(PayrollBatch $batch, string $sendType = null): string
+    private function emailSubject(PayrollBatch $batch, ?string $sendType = null): string
     {
         $label = $batch->disbursementLabel($sendType);
 

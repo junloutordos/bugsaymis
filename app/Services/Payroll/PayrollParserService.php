@@ -4,11 +4,14 @@ namespace App\Services\Payroll;
 
 class PayrollParserService
 {
-    private const FOOTER_PATTERNS = [
-        'prepared by', 'certified correct', 'total', 'sub-total',
-        'job order', 'cos', 'grand total', 'noted by',
-        'staff', 'faculty', 'teaching', 'non-teaching',
-    ];
+    // Short codes that are section labels only when the entire cell equals one of these
+    private const FOOTER_EXACT = ['cos', 'jo', 'jo/cos', 'cos/jo', 'permanent', 'regular'];
+
+    // Section labels that appear at the START of the cell (e.g. "TEACHING PERSONNEL")
+    private const FOOTER_STARTS = ['total', 'sub-total', 'grand total', 'teaching', 'non-teaching', 'faculty', 'staff'];
+
+    // Certification/signature lines identifiable by a substring anywhere
+    private const FOOTER_CONTAINS = ['prepared by', 'certified correct', 'noted by', 'job order'];
 
     // CSV column header → DB field (covers all disbursement types)
     private const CSV_COLUMNS = [
@@ -287,6 +290,16 @@ class PayrollParserService
             throw new \InvalidArgumentException('Excel files are no longer supported. Please upload a CSV file.');
         }
 
+        // Strip UTF-8 BOM if present
+        if (str_starts_with($decoded, "\xEF\xBB\xBF")) {
+            $decoded = substr($decoded, 3);
+        }
+
+        // Convert non-UTF-8 encodings (e.g. Windows-1252 from Excel) to UTF-8
+        if (!mb_check_encoding($decoded, 'UTF-8')) {
+            $decoded = mb_convert_encoding($decoded, 'UTF-8', 'Windows-1252');
+        }
+
         $lines = array_filter(explode("\n", str_replace("\r\n", "\n", $decoded)));
         $lines = array_values($lines);
 
@@ -319,7 +332,10 @@ class PayrollParserService
 
             $row = ['excel_row_number' => $rowNum, 'raw_row_json' => []];
             foreach ($colMap as $idx => $field) {
-                $val       = trim($cells[$idx] ?? '');
+                $val = trim($cells[$idx] ?? '');
+                if (!mb_check_encoding($val, 'UTF-8')) {
+                    $val = mb_convert_encoding($val, 'UTF-8', 'Windows-1252');
+                }
                 $row[$field] = in_array($field, $stringFields)
                     ? $val
                     : (is_numeric(str_replace(',', '', $val)) ? (float) str_replace(',', '', $val) : 0.0);
@@ -371,9 +387,20 @@ class PayrollParserService
     private function isFooter(string $name): bool
     {
         $lower = strtolower(trim($name));
-        foreach (self::FOOTER_PATTERNS as $pattern) {
-            if (str_contains($lower, $pattern)) return true;
+
+        // Exact match only — prevents matching surnames like MARCOS, ACOSTA, COSTALES
+        if (in_array($lower, self::FOOTER_EXACT)) return true;
+
+        // Must START with the pattern — "TEACHING PERSONNEL" is a section header; "BETEACHING" is not
+        foreach (self::FOOTER_STARTS as $p) {
+            if (str_starts_with($lower, $p)) return true;
         }
+
+        // Certification lines are identifiable as substrings (won't appear in any personal name)
+        foreach (self::FOOTER_CONTAINS as $p) {
+            if (str_contains($lower, $p)) return true;
+        }
+
         return false;
     }
 }
