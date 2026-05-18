@@ -6,11 +6,12 @@ import Swal from 'sweetalert2'
 import { CheckCircleIcon, QuestionMarkCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  batch:     Object,
-  matched:   Array,
-  probable:  Array,
-  unmatched: Array,
-  users:     Array,
+  batch:        Object,
+  matched:      Array,
+  probable:     Array,
+  unmatched:    Array,
+  users:        Array,
+  releaseGroup: Array, // null or ordered array of sibling batch summaries
 })
 
 const alsoUploaded = computed(() => usePage().props.flash?.also_uploaded ?? [])
@@ -33,6 +34,12 @@ const needsSecondHalf = computed(() =>
   !props.batch.second_half_credit_date &&
   ['sending', 'completed'].includes(props.batch.status)
 )
+
+const isRelease     = computed(() => !!props.releaseGroup)
+const isPrimaryBatch = computed(() => !props.batch.release_id || props.batch.is_primary)
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function monthName(m) { return MONTHS[(m || 1) - 1] }
 
 const tabs = computed(() => [
   { key: 'matched',   label: 'Matched',   count: props.matched.length,   icon: CheckCircleIcon,        color: 'text-emerald-600' },
@@ -92,9 +99,13 @@ function sendSecondHalf() {
 }
 
 function sendAll() {
+  const text = isRelease.value
+    ? `This will email ${props.matched.length} employees — one combined email covering all ${props.releaseGroup.length} months in this release group.`
+    : `This will email ${props.matched.length} matched employees.`
+
   Swal.fire({
     title: 'Send all payslips?',
-    text: `This will email ${props.matched.length} matched employees.`,
+    text,
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: 'Yes, send',
@@ -131,11 +142,42 @@ function sendAll() {
              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
             Download CSV
           </a>
-          <button @click="sendAll" :disabled="sendLoading || !matched.length"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            {{ sendLoading ? 'Queuing…' : `Send ${matched.length} Payslips` }}
-          </button>
+          <template v-if="isPrimaryBatch">
+            <button @click="sendAll" :disabled="sendLoading || !matched.length"
+                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+              {{ sendLoading ? 'Queuing…' : `Send ${matched.length} Payslips` }}
+            </button>
+          </template>
         </div>
+      </div>
+
+      <!-- Release group panel -->
+      <div v-if="isRelease"
+           class="mb-6 bg-violet-50 border border-violet-200 rounded-xl px-5 py-4">
+        <p class="text-sm font-semibold text-violet-800 mb-1">
+          Release Group — {{ releaseGroup.length }} month{{ releaseGroup.length > 1 ? 's' : '' }}
+          <span v-if="!isPrimaryBatch" class="ml-2 text-xs font-normal text-violet-600">(Send from the primary batch)</span>
+        </p>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <a v-for="b in releaseGroup" :key="b.id"
+             :href="route('payroll.cashier.preview', b.id)"
+             :class="['inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors',
+                      b.id === batch.id
+                        ? 'bg-violet-200 text-violet-900 cursor-default pointer-events-none'
+                        : 'bg-violet-100 hover:bg-violet-200 text-violet-800']">
+            {{ monthName(b.month) }} {{ b.year }}
+            <span v-if="b.is_primary" class="text-violet-500">(Primary)</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Non-primary notice -->
+      <div v-if="!isPrimaryBatch"
+           class="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+        <p class="text-sm font-semibold text-amber-800">Non-Primary Release Batch</p>
+        <p class="text-xs text-amber-700 mt-0.5">
+          This batch is part of a release group. Emails are sent from the primary batch — navigate there to send payslips for all months.
+        </p>
       </div>
 
       <!-- Other batches from same upload -->

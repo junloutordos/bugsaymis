@@ -2,6 +2,7 @@
 
 namespace App\Services\Payroll;
 
+use App\Models\Payroll\PayrollBatch;
 use App\Models\Payroll\PayrollItem;
 use App\Models\User;
 use Illuminate\Http\Response;
@@ -90,10 +91,19 @@ class PayrollPdfService
             return $item;
         }
 
-        $allItems = PayrollItem::where('matched_user_id', $item->matched_user_id)
-            ->where('month', $item->month)
-            ->where('year', $item->year)
-            ->get();
+        // Release group: sum across all sibling batches for this employee
+        $batch = $item->relationLoaded('batch') ? $item->getRelation('batch') : $item->batch;
+        if ($batch?->release_id) {
+            $siblingIds = PayrollBatch::where('release_id', $batch->release_id)->pluck('id');
+            $allItems   = PayrollItem::whereIn('batch_id', $siblingIds)
+                ->where('matched_user_id', $item->matched_user_id)
+                ->get();
+        } else {
+            $allItems = PayrollItem::where('matched_user_id', $item->matched_user_id)
+                ->where('month', $item->month)
+                ->where('year', $item->year)
+                ->get();
+        }
 
         if ($allItems->count() <= 1) {
             return $item;
@@ -122,8 +132,26 @@ class PayrollPdfService
      */
     public function combinedDisbursementLabel(PayrollItem $item): string
     {
+        $batch = $item->relationLoaded('batch') ? $item->getRelation('batch') : $item->batch;
+
         if (!$item->matched_user_id) {
-            return $item->batch->disbursementLabel();
+            return $batch?->disbursementLabel() ?? '';
+        }
+
+        // Release group: show type label + period range
+        if ($batch?->release_id) {
+            $siblings = PayrollBatch::where('release_id', $batch->release_id)
+                ->orderBy('year')->orderBy('month')
+                ->get(['month', 'year', 'disbursement_type', 'label']);
+            $baseLabel = $batch->disbursementLabel();
+            if ($siblings->count() > 1) {
+                $first = $siblings->first();
+                $last  = $siblings->last();
+                $firstStr = \Carbon\Carbon::createFromDate($first->year, $first->month, 1)->format('M Y');
+                $lastStr  = \Carbon\Carbon::createFromDate($last->year, $last->month, 1)->format('M Y');
+                return "{$baseLabel} ({$firstStr}–{$lastStr})";
+            }
+            return $baseLabel;
         }
 
         $labels = PayrollItem::where('matched_user_id', $item->matched_user_id)
@@ -138,7 +166,7 @@ class PayrollPdfService
             ->values()
             ->implode(' + ');
 
-        return $labels ?: $item->batch->disbursementLabel();
+        return $labels ?: ($batch?->disbursementLabel() ?? '');
     }
 
     /**

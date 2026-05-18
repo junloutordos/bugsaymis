@@ -20,6 +20,7 @@ class PayrollBatch extends Model
         'uploaded_by', 'status',
         'first_half_credit_date', 'second_half_credit_date', 'credit_date',
         'totals_gross', 'totals_deductions', 'totals_net', 'notes',
+        'release_id', 'is_primary',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class PayrollBatch extends Model
         'second_half_credit_date' => 'date',
         'credit_date'             => 'date',
         'disbursement_type'       => 'array',
+        'is_primary'              => 'boolean',
     ];
 
     public function hasType(string $type): bool
