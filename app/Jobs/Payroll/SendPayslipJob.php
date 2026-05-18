@@ -45,14 +45,22 @@ class SendPayslipJob implements ShouldQueue
         try {
             [$preparedBy, $certifiedBy] = $pdfService->signatories();
 
-            $firstName = explode(' ', $emp->name)[0];
-            $subject   = $emailRecord->subject;
-            $bcc       = $emailRecord->bcc_email;
-            $sendType  = $emailRecord->send_type;
+            $firstName        = explode(' ', $emp->name)[0];
+            $subject          = $emailRecord->subject;
+            $bcc              = $emailRecord->bcc_email;
+            $sendType         = $emailRecord->send_type;
+            $notificationItem = $item;                        // per-batch: drives banner credit amount
+            $combined         = $pdfService->buildCombined($item); // all disbursements for the period
 
-            $htmlBody = view('payroll.payslip_email', compact(
-                'item', 'batch', 'preparedBy', 'certifiedBy', 'firstName', 'sendType'
-            ))->render();
+            $htmlBody = view('payroll.payslip_email', [
+                'item'             => $combined,        // inline payslip = full combined
+                'notificationItem' => $notificationItem, // banner amount = this disbursement only
+                'batch'            => $batch,
+                'preparedBy'       => $preparedBy,
+                'certifiedBy'      => $certifiedBy,
+                'firstName'        => $firstName,
+                'sendType'         => $sendType,
+            ])->render();
 
             $pdfBytes  = $pdfService->generate($item);
             $pdfName   = $pdfService->filename($item);

@@ -82,7 +82,7 @@ class PayrollPdfService
      * the employee has for this period. Non-numeric meta (name, position, etc.)
      * and adjustments come from the triggering item.
      */
-    private function buildCombined(PayrollItem $item): PayrollItem
+    public function buildCombined(PayrollItem $item): PayrollItem
     {
         if (!$item->matched_user_id) {
             return $item;

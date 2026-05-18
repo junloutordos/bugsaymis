@@ -14,13 +14,16 @@
     <p>Dear <strong>{{ $firstName }}</strong>,</p>
 
     @php
+      // $notificationItem = per-batch item (drives the banner credit amount for this disbursement)
+      // $item             = combined item (drives the inline payslip showing all disbursements)
+      $n         = $notificationItem ?? $item; // fallback for safety
       $pass      = $sendType ?? null; // 'first_half', 'second_half', or type string
       $disbLabel = $batch->disbursementLabel($pass);
 
       $creditAmt = match($pass) {
-        'first_half'  => (float) $item->first_half_amount,
-        'second_half' => (float) $item->net_pay - (float) $item->first_half_amount,
-        default       => (float) $item->net_pay,
+        'first_half'  => (float) $n->first_half_amount,
+        'second_half' => (float) $n->net_pay - (float) $n->first_half_amount,
+        default       => (float) $n->net_pay,
       };
 
       $creditDate = match($pass) {
