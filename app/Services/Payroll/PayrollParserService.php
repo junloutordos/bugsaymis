@@ -27,7 +27,12 @@ class PayrollParserService
         // SALA breakdown columns (new template)
         'Subsistence Allowance'             => 'subsistence_allowance',
         'Laundry Allowance'                 => 'laundry_allowance',
-        'Gross Amount'                      => 'sala',
+        'Gross Amount'                      => 'gross_earnings',
+        // Year-End Bonus and Cash Gift
+        'Year-End Bonus'                    => 'year_end_bonus',
+        'Cash Gift'                         => 'cash_gift',
+        'Less: BIR Tax Withheld'            => 'bir_tax',
+        'NET AMOUNT'                        => 'net_pay',
         'Longevity Pay'                     => 'longevity_pay',
         'Longevity Pay Tax'          => 'longevity_tax',
         'Others (Bonus/Incentives/CA)' => 'others_bonuses',
@@ -102,6 +107,11 @@ class PayrollParserService
         'other' => [
             'Name', 'Employee No.', 'Position', 'Others (Bonus/Incentives/CA)', 'Net Amount Due',
         ],
+        'year_end_bonus' => [
+            'Name', 'Employee No.', 'Position',
+            'Year-End Bonus', 'Cash Gift', 'Gross Amount',
+            'Less: BIR Tax Withheld', 'NET AMOUNT',
+        ],
     ];
 
     /**
@@ -175,6 +185,10 @@ class PayrollParserService
         $set('OB/Travel/Seminar with meals',  '0.00');
         $set('Amount',                        '125.00');
         $set('Net SALA',                      '3375.00');
+        $set('Year-End Bonus',                '37024.00');
+        $set('Cash Gift',                     '5000.00');
+        $set('Less: BIR Tax Withheld',        '0.00');
+        $set('NET AMOUNT',                    '42024.00');
         $set('Longevity Pay',                 '3000.00');
         $set('Longevity Pay Tax',             '150.00');
         $set('Others (Bonus/Incentives/CA)',  '5000.00');
@@ -290,7 +304,8 @@ class PayrollParserService
                 $row['gross_earnings'] = array_sum(array_map(
                     fn($f) => (float) ($row[$f] ?? 0),
                     ['basic_salary', 'pera', 'salary_increase', 'additional_compensation',
-                     'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses']
+                     'sala', 'hazard_pay', 'longevity_pay', 'others_bonuses',
+                     'year_end_bonus', 'cash_gift']
                 ));
             }
 

@@ -10,6 +10,7 @@ const TYPES = [
   { value: 'hazard_pay',     label: 'Hazard Pay' },
   { value: 'sala',           label: 'Subsistence Allowance (SALA)' },
   { value: 'longevity_pay',  label: 'Longevity Pay' },
+  { value: 'year_end_bonus', label: 'Year-End Bonus and Cash Gift' },
   { value: 'other',          label: 'Other Allowance' },
 ]
 
