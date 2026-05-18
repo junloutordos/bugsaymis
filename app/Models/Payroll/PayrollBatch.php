@@ -55,6 +55,7 @@ class PayrollBatch extends Model
             'hazard_pay'     => 'Hazard Pay',
             'sala'           => 'Subsistence Allowance',
             'longevity_pay'  => 'Longevity Pay',
+            'year_end_bonus' => 'Year-End Bonus and Cash Gift',
             'other'          => 'Other Allowance',
         ];
 

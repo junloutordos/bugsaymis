@@ -136,6 +136,8 @@
     'Subsistence and Laundry Allowance'              => !$hasSalaBreakdown ? $item->sala : null,
     'Hazard Pay'                                     => $item->hazard_pay,
     'Longevity Pay'                                  => $item->longevity_pay,
+    'Year-End Bonus'                                 => $item->year_end_bonus,
+    'Cash Gift'                                      => $item->cash_gift,
     'Others (Bonuses/Incentives/Clothing Allowance)' => $item->others_bonuses,
   ], fn($v) => $v !== null);
 

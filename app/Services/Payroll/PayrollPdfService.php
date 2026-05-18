@@ -13,7 +13,7 @@ class PayrollPdfService
     private const NUMERIC_COLS = [
         'basic_salary', 'salary_increase', 'additional_compensation',
         'pera', 'sala', 'subsistence_allowance', 'laundry_allowance',
-        'hazard_pay', 'longevity_pay', 'others_bonuses', 'gross_earnings',
+        'hazard_pay', 'longevity_pay', 'others_bonuses', 'year_end_bonus', 'cash_gift', 'gross_earnings',
         'lawop', 'pvp_overpayment', 'ob_travel_seminar', 'gsis_contribution', 'bir_tax',
         'wht_hazard', 'wht_cna', 'longevity_tax',
         'philhealth_contribution', 'philhealth_differential',
