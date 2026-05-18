@@ -39,7 +39,7 @@
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin:12px 0;line-height:1.7;">
       Your <strong>{{ $disbLabel }}</strong> for the period <strong>{{ $period }}</strong>
       amounting to <strong style="font-size:12pt;">₱ {{ number_format((float)$creditAmt, 2) }}</strong>
-      has been credited to your ATM account{{ $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' }}.
+      has been credited to your ATM account{!! $creditDate ? ' on <strong>' . $creditDate . '</strong>' : '' !!}.
     </div>
 
     <p style="margin-top:8px;font-size:9pt;color:#555;">
