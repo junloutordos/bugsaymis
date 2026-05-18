@@ -55,8 +55,9 @@ class PayrollBatch extends Model
             'hazard_pay'     => 'Hazard Pay',
             'sala'           => 'Subsistence Allowance',
             'longevity_pay'  => 'Longevity Pay',
-            'year_end_bonus' => 'Year-End Bonus and Cash Gift',
-            'other'          => 'Other Allowance',
+            'year_end_bonus'     => 'Year-End Bonus and Cash Gift',
+            'clothing_allowance' => 'Clothing Allowance',
+            'other'              => 'Other Allowance',
         ];
 
         if ($pass === 'first_half') return '1st Half Salary';
