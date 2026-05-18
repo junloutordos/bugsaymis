@@ -128,6 +128,15 @@ function sendAll() {
   <Head title="Payroll Preview" />
   <AdminLayout title="Payroll Preview">
     <div>
+      <!-- Back link -->
+      <div class="mb-4">
+        <a :href="route('payroll.cashier.index')"
+           class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          Back to Payroll List
+        </a>
+      </div>
+
       <!-- Batch header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
