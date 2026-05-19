@@ -39,11 +39,25 @@ class ITJobRequest extends Model
         'rated_at',
         'decline_reason',
         'declined_at',
+        'priority',
+        'queued_at',
     ];
 
     protected $casts = [
         'event_date' => 'date:Y-m-d',
+        'queued_at'  => 'datetime',
     ];
+
+    // Priority rank for queue ordering (lower = higher priority)
+    public const PRIORITY_RANK = ['urgent' => 1, 'high' => 2, 'normal' => 3, 'low' => 4];
+
+    public function scopeInQueue($query)
+    {
+        return $query
+            ->whereIn('status', ['In Progress', 'MIS Assessed the Request'])
+            ->orderByRaw("FIELD(priority, 'urgent', 'high', 'normal', 'low')")
+            ->orderBy('queued_at', 'asc');
+    }
 
     /**
      * Relationship with User (requestor)

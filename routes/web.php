@@ -346,6 +346,8 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->name('mis.dashboard');
     Route::get('/job-requests/check-pending-itjr', [ITJobRequestController::class, 'checkPendingActedByMis'])->name('jobrequests.check-pending');
     Route::get('/job-requests/export-pdf', [ITJobRequestController::class, 'exportPdf'])->name('jobrequests.export-pdf');
+    Route::get('/job-requests/queue', [ITJobRequestController::class, 'queue'])->name('jobrequests.queue');
+    Route::put('/job-requests/{jobRequest}/priority', [ITJobRequestController::class, 'updatePriority'])->name('jobrequests.update-priority');
     Route::get('/job-requests', [ITJobRequestController::class, 'index'])->name('jobrequests.index');
     Route::get('/job-requests/create', [ITJobRequestController::class, 'create'])->name('jobrequests.create');
     Route::post('/job-requests', [ITJobRequestController::class, 'store'])->name('jobrequests.store');

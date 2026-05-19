@@ -64,6 +64,7 @@ export function useJobRequests(initialRequests = []) {
     category: "",
     event_date: "",
     description: "",
+    priority: "normal",
     divisionchief_id: "",
     assignedto: "",
     mis_assessment: "",

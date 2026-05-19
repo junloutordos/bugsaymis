@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, nextTick } from "vue"
+import { ref, computed, watch } from "vue"
 import { Head, usePage, router } from "@inertiajs/vue3"
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue"
@@ -10,9 +10,11 @@ import {
   TrashIcon,
   ArrowDownTrayIcon,
   DocumentChartBarIcon,
+  QueueListIcon,
 } from "@heroicons/vue/24/outline"
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import MISAssessmentModal from '@/Components/MISAssessmentModal.vue'
 import { useJobRequests } from "@/Composables/useJobRequests.js"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
@@ -40,10 +42,7 @@ const {
   closeModal,
   submitRequest,
   viewRequest,
-  misAssessment,
   deleteRequest,
-  exportCSV,
-  printTable,
 } = useJobRequests(props.requests?.data ?? [])
 
 // Auth info — use server-resolved isAdmin prop for reliable role check
@@ -51,8 +50,13 @@ const page = usePage()
 const currentUser = page.props.auth?.user ?? null
 const userRole = props.isAdmin ? 'Administrator' : (currentUser?.role?.name ?? null)
 
+// ── MIS Assessment modal (dedicated component) ────────────────────────────────
+const showAssessmentModal = ref(false)
+const assessmentRequest   = ref(null)
+
 function openMISAssessment(request) {
-  misAssessment(request)
+  assessmentRequest.value   = request
+  showAssessmentModal.value = true
 }
 
 // Server-side filters
@@ -150,44 +154,6 @@ function handleCompletionSigCancel() {
   completionSigShow.value = false
   completionItem.value = null
 }
-// ── Equipment searchable dropdown ─────────────────────────────────────────────
-const eqSearch     = ref('')
-const eqDropOpen   = ref(false)
-const eqSearchInput = ref(null)
-
-const filteredEquipment = computed(() => {
-  const q = eqSearch.value.toLowerCase().trim()
-  if (!q) return props.ictEquipment ?? []
-  return (props.ictEquipment ?? []).filter(eq => {
-    const str = [eq.room?.name, eq.owner?.name, eq.description, eq.serial_no]
-      .filter(Boolean).join(' ').toLowerCase()
-    return str.includes(q)
-  })
-})
-
-const selectedEquipmentLabel = computed(() => {
-  if (!form.ict_equipment_id) return ''
-  const eq = (props.ictEquipment ?? []).find(e => e.id == form.ict_equipment_id)
-  if (!eq) return ''
-  return [eq.room?.name, eq.owner?.name, eq.description, `(${eq.serial_no})`].filter(Boolean).join(' - ')
-})
-
-function openEqDrop() {
-  eqSearch.value = ''
-  eqDropOpen.value = true
-  nextTick(() => eqSearchInput.value?.focus())
-}
-
-function closeEqDrop() {
-  setTimeout(() => { eqDropOpen.value = false }, 150)
-}
-
-function selectEquipment(eq) {
-  form.ict_equipment_id = eq.id ?? ''
-  eqSearch.value = ''
-  eqDropOpen.value = false
-}
-
 // ── Export PDF modal ──────────────────────────────────────────────────────────
 const showExportModal  = ref(false)
 const exportDateFrom   = ref('')
@@ -212,6 +178,15 @@ function runExport() {
   window.open(route('jobrequests.export-pdf') + '?' + params.toString(), '_blank')
   showExportModal.value = false
 }
+
+// ── Priority helpers ──────────────────────────────────────────────────────────
+const PRIORITY_COLORS = {
+  urgent: 'bg-red-100 text-red-700',
+  high:   'bg-orange-100 text-orange-700',
+  normal: 'bg-blue-100 text-blue-700',
+  low:    'bg-slate-100 text-slate-500',
+}
+const PRIORITY_LABELS = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' }
 
 // Clear event_date when category changes away from Technical Assistance on Events
 watch(() => form.category, (val) => {
@@ -273,12 +248,22 @@ function handleSigCancel() {
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-semibold text-slate-800">IT Job Requests</h1>
-        <button
-          @click="handleNewRequest"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          + New Request
-        </button>
+        <div class="flex items-center gap-2">
+          <a
+            v-if="props.isAdmin"
+            :href="route('jobrequests.queue')"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >
+            <QueueListIcon class="w-4 h-4 text-indigo-500" />
+            Queue
+          </a>
+          <button
+            @click="handleNewRequest"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >
+            + New Request
+          </button>
+        </div>
       </div>
 
       <!-- Filter bar -->
@@ -373,6 +358,7 @@ function handleSigCancel() {
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
                 <th v-if="userRole === 'Administrator'" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted By</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Filed</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Priority</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
               </tr>
@@ -389,6 +375,17 @@ function handleSigCancel() {
                 </td>
 
                 <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(req.created_at) }}</td>
+
+                <td class="px-4 py-3">
+                  <span
+                    v-if="['In Progress', 'MIS Assessed the Request'].includes(req.status)"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
+                    :class="PRIORITY_COLORS[req.priority] ?? PRIORITY_COLORS.normal"
+                  >
+                    {{ PRIORITY_LABELS[req.priority] ?? 'Normal' }}
+                  </span>
+                  <span v-else class="text-slate-300 text-xs">—</span>
+                </td>
 
                 <td class="px-4 py-3">
                   <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
@@ -425,7 +422,7 @@ function handleSigCancel() {
               </tr>
 
               <tr v-if="visibleRequests.length === 0">
-                <td :colspan="userRole === 'Administrator' ? 7 : 6" class="py-16 text-center text-slate-400 text-sm">
+                <td :colspan="userRole === 'Administrator' ? 8 : 7" class="py-16 text-center text-slate-400 text-sm">
                   No requests found.
                 </td>
               </tr>
@@ -687,6 +684,30 @@ function handleSigCancel() {
                     ></textarea>
                 </div>
 
+                <!-- Urgency -->
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-2">Urgency</label>
+                  <div class="flex gap-2 flex-wrap">
+                    <label
+                      v-for="opt in [
+                        { value: 'low',    label: 'Low',    color: 'peer-checked:bg-slate-100 peer-checked:border-slate-400 peer-checked:text-slate-700' },
+                        { value: 'normal', label: 'Normal', color: 'peer-checked:bg-blue-50 peer-checked:border-blue-400 peer-checked:text-blue-700' },
+                        { value: 'high',   label: 'High',   color: 'peer-checked:bg-orange-50 peer-checked:border-orange-400 peer-checked:text-orange-700' },
+                        { value: 'urgent', label: 'Urgent', color: 'peer-checked:bg-red-50 peer-checked:border-red-400 peer-checked:text-red-700' },
+                      ]"
+                      :key="opt.value"
+                      class="relative cursor-pointer"
+                    >
+                      <input type="radio" v-model="form.priority" :value="opt.value" class="peer sr-only" />
+                      <span
+                        class="inline-flex items-center px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors border-slate-200 text-slate-500 hover:bg-slate-50"
+                        :class="opt.color"
+                      >{{ opt.label }}</span>
+                    </label>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1">MIS may adjust the final priority based on workload.</p>
+                </div>
+
                 <!-- Division Approval -->
                 <div>
                   <label class="block text-xs font-medium text-slate-600 mb-1">Division Approval</label>
@@ -723,114 +744,6 @@ function handleSigCancel() {
                 </div>
 
               </template>
-
-              <!-- MIS Assessment fields -->
-              <template v-if="modalMode==='mis-assessment'">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Initial Assessment</label>
-                  <textarea
-                    v-model="form.mis_assessment"
-                    rows="3"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  ></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Expected Date of Completion</label>
-                  <input
-                    v-model="form.expected_completion_date"
-                    type="date"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Recommendation</label>
-                  <textarea
-                    v-model="form.recommendation"
-                    rows="2"
-                    placeholder="e.g. Repair/Replace defective hardware component(s)"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  ></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Action Taken</label>
-                  <textarea
-                    v-model="form.action_taken"
-                    rows="3"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  ></textarea>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Date Completed</label>
-                  <input
-                    v-model="form.completed_at"
-                    type="date"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                  />
-                </div>
-                <!-- ICT Equipment (ONLY for Hardware Repair) -->
-                <div v-if="selectedRequest?.category?.toLowerCase().includes('hardware')" class="relative">
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Tag ICT Equipment</label>
-
-                  <!-- Trigger button -->
-                  <button
-                    type="button"
-                    @click="openEqDrop"
-                    class="w-full flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <span :class="form.ict_equipment_id ? 'text-slate-800' : 'text-slate-400'" class="truncate">
-                      {{ selectedEquipmentLabel || '-- Select Equipment --' }}
-                    </span>
-                    <svg class="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                  </button>
-
-                  <!-- Dropdown panel -->
-                  <div v-if="eqDropOpen" class="absolute z-40 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
-                    <!-- Search input -->
-                    <div class="p-2 border-b border-slate-100">
-                      <input
-                        ref="eqSearchInput"
-                        v-model="eqSearch"
-                        type="text"
-                        placeholder="Search by name, owner, serial no…"
-                        @blur="closeEqDrop"
-                        class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-
-                    <!-- Options list -->
-                    <ul class="max-h-56 overflow-y-auto py-1">
-                      <li>
-                        <button type="button" @mousedown.prevent="selectEquipment({ id: '' })"
-                          class="w-full text-left px-3 py-2 text-sm text-slate-400 hover:bg-slate-50">
-                          -- Select Equipment --
-                        </button>
-                      </li>
-                      <li v-if="filteredEquipment.length === 0" class="px-3 py-3 text-center text-sm text-slate-400">
-                        No equipment found
-                      </li>
-                      <li v-for="eq in filteredEquipment" :key="eq.id">
-                        <button
-                          type="button"
-                          @mousedown.prevent="selectEquipment(eq)"
-                          class="w-full text-left px-3 py-2 text-sm transition-colors"
-                          :class="form.ict_equipment_id == eq.id
-                            ? 'bg-indigo-50 text-indigo-700 font-medium'
-                            : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'"
-                        >
-                          <span class="font-medium">{{ eq.room?.name ?? '—' }}</span>
-                          <span class="text-slate-500"> · {{ eq.owner?.name ?? '—' }}</span>
-                          <span> · {{ eq.description }}</span>
-                          <span class="text-slate-400 text-xs"> ({{ eq.serial_no }})</span>
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-              </template>
-
 
               <div class="flex justify-end gap-2 pt-4">
                 <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
@@ -942,6 +855,16 @@ function handleSigCancel() {
         </div>
       </div>
     </Teleport>
+
+      <MISAssessmentModal
+        :show="showAssessmentModal"
+        :request="assessmentRequest"
+        :ict-equipment="props.ictEquipment ?? []"
+        :has-pin="props.hasPin"
+        :signature-uri="props.signatureUri"
+        @close="showAssessmentModal = false"
+        @saved="showAssessmentModal = false"
+      />
 
   </AdminLayout>
 </template>

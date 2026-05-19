@@ -5,9 +5,10 @@ import Swal from 'sweetalert2'
 
 // Form state
 const form = useForm({
-  title: '',
+  title:    '',
   category: '',
-  description: ''
+  description: '',
+  priority: 'normal',
 })
 
 // Submit handler
@@ -78,6 +79,37 @@ const submit = () => {
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
                 required
               ></textarea>
+            </div>
+
+            <!-- Urgency -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Urgency</label>
+              <div class="flex gap-2 flex-wrap">
+                <label
+                  v-for="opt in [
+                    { value: 'low',    label: 'Low',    color: 'peer-checked:bg-slate-100 peer-checked:border-slate-400 peer-checked:text-slate-700' },
+                    { value: 'normal', label: 'Normal', color: 'peer-checked:bg-blue-50 peer-checked:border-blue-400 peer-checked:text-blue-700' },
+                    { value: 'high',   label: 'High',   color: 'peer-checked:bg-orange-50 peer-checked:border-orange-400 peer-checked:text-orange-700' },
+                    { value: 'urgent', label: 'Urgent', color: 'peer-checked:bg-red-50 peer-checked:border-red-400 peer-checked:text-red-700' },
+                  ]"
+                  :key="opt.value"
+                  class="relative cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    v-model="form.priority"
+                    :value="opt.value"
+                    class="peer sr-only"
+                  />
+                  <span
+                    class="inline-flex items-center px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors border-slate-200 text-slate-500 hover:bg-slate-50"
+                    :class="opt.color"
+                  >
+                    {{ opt.label }}
+                  </span>
+                </label>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">MIS may adjust the final priority based on workload.</p>
             </div>
 
             <!-- Submit -->
