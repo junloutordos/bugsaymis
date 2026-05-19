@@ -48,6 +48,7 @@ public function index(Request $request)
             'action_taken', 'created_at', 'updated_at',
             'mis_assessment', 'recommendation', 'expected_completion_date', 'completed_at',
             'ict_equipment_id', 'rating', 'rating_remarks', 'rated_at', 'pdf_path',
+            'priority', 'queued_at',
         ])
         ->with([
             'user:id,name',
@@ -110,6 +111,7 @@ public function index(Request $request)
             'description'      => 'required|string',
             'divisionchief_id' => 'required|exists:users,id',
             'assignedto'       => 'required|exists:users,id',
+            'priority'         => 'nullable|in:urgent,high,normal,low',
         ], [
             'event_date.required'         => 'The date of the event is required for Technical Assistance requests.',
             'event_date.after_or_equal'   => 'Filing a Technical Assistance request less than 3 days before the event is not allowed.',
@@ -311,7 +313,8 @@ public function index(Request $request)
     // 3️⃣ Update the request status and log the approval date
     $jobRequest->update([
         'ocd_approval_date' => now(),
-        'status' => 'In Progress',
+        'status'            => 'In Progress',
+        'queued_at'         => now(),
     ]);
 
     // 4️⃣ Create a tracking log
@@ -697,9 +700,10 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
         if ($request->action === 'approve') {
             $jobRequest->update([
-                'ocd_approval' => true,
+                'ocd_approval'     => true,
                 'ocd_approval_date' => now(),
-                'status' => 'In Progress',
+                'status'           => 'In Progress',
+                'queued_at'        => now(),
             ]);
 
             ITJRTrackingLog::create([
@@ -822,6 +826,108 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         });
 
         return back()->with('success', 'IT Job Request deleted successfully.');
+    }
+
+    /* =====================================================
+     | QUEUE DASHBOARD (MIS / Admin only)
+     |=====================================================*/
+    public function queue(Request $request)
+    {
+        $user    = $request->user();
+        $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+
+        if (! $isAdmin) {
+            abort(403, 'Unauthorized');
+        }
+
+        $search   = trim($request->query('search', ''));
+        $category = trim($request->query('category', ''));
+
+        $items = ITJobRequest::select([
+                'id', 'itjr_no', 'title', 'category', 'description', 'status',
+                'user_id', 'assignedto', 'priority', 'queued_at', 'created_at',
+                'mis_assessment', 'recommendation', 'expected_completion_date',
+                'action_taken', 'completed_at', 'ict_equipment_id',
+            ])
+            ->with(['user:id,name', 'assignedTo:id,name'])
+            ->inQueue()
+            ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('title', 'like', "%{$search}%")
+                      ->orWhere('itjr_no', 'like', "%{$search}%")
+                      ->orWhere('category', 'like', "%{$search}%")
+                      ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->when($category, fn($q) => $q->where('category', $category))
+            ->get();
+
+        // Assign absolute queue positions
+        $items->each(function ($item, $index) {
+            $item->queue_position = $index + 1;
+        });
+
+        return Inertia::render('ITJobRequests/Queue', [
+            'items'        => $items,
+            'filters'      => ['search' => $search, 'category' => $category],
+            'categories'   => ITJobCategory::orderBy('name')->get(['id', 'name']),
+            'ictEquipment' => ICTEquipment::with(['room:id,name,code', 'owner:id,name'])
+                ->orderBy('description')
+                ->get(['id', 'description', 'room_id', 'owner_id', 'serial_no']),
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
+        ]);
+    }
+
+    /* =====================================================
+     | UPDATE PRIORITY (MIS / Admin only)
+     |=====================================================*/
+    public function updatePriority(Request $request, ITJobRequest $jobRequest)
+    {
+        $user    = $request->user();
+        $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+
+        if (! $isAdmin) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validated = $request->validate([
+            'priority' => 'required|in:urgent,high,normal,low',
+        ]);
+
+        $oldPriority = $jobRequest->priority ?? 'normal';
+        $newPriority = $validated['priority'];
+
+        $jobRequest->update(['priority' => $newPriority]);
+
+        ITJRTrackingLog::create([
+            'it_job_request_id' => $jobRequest->id,
+            'status'            => 'Priority Updated',
+            'remarks'           => "Priority changed from {$oldPriority} to {$newPriority} by {$user->name}.",
+            'updated_by'        => $user->id,
+        ]);
+
+        // Notify requestor only on escalation (priority goes up)
+        $rankMap = ITJobRequest::PRIORITY_RANK;
+        $wasEscalated = ($rankMap[$newPriority] ?? 3) < ($rankMap[$oldPriority] ?? 3);
+
+        if ($wasEscalated && $jobRequest->user && $jobRequest->user->email) {
+            try {
+                Mail::to($jobRequest->user->email)->send(
+                    new ITJRStatusMail(
+                        $jobRequest,
+                        'Request Priority Updated',
+                        "Your request has been escalated to {$newPriority} priority.",
+                        'MIS'
+                    )
+                );
+            } catch (\Throwable $e) {
+                logger()->error('Failed to send priority escalation email', [
+                    'job_request_id' => $jobRequest->id,
+                    'error'          => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return back()->with('success', 'Priority updated.');
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
