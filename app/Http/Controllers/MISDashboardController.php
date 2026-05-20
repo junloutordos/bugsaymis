@@ -87,7 +87,7 @@ class MISDashboardController extends Controller
             ->join('role_user', 'role_user.user_id', '=', 'users.id')
             ->join('roles', 'roles.id', '=', 'role_user.role_id')
             ->where('roles.name', 'MIS')
-            ->leftJoin('it_job_requests', 'it_job_requests.assignedto', '=', 'users.id')
+            ->leftJoin('it_job_requests', DB::raw('LOWER(TRIM(it_job_requests.attendedby))'), '=', DB::raw('LOWER(TRIM(users.name))'))
             ->select([
                 'users.id',
                 DB::raw("users.name as attendedby"),
