@@ -11,21 +11,13 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use App\Mail\FacilityRequestCreatedMail;
-use App\Services\NotificationService;
 use App\Models\Division;
-use App\Services\NotificationService;
 use App\Models\User;
-use App\Services\NotificationService;
 use App\Models\Facility;
-use App\Services\NotificationService;
 use App\Enums\ApprovalStep;
-use App\Services\NotificationService;
 use App\Services\SnapshotService;
-use App\Services\NotificationService;
 use App\Services\DigitalSignatureService;
-use App\Services\NotificationService;
 use App\Http\Traits\SignsDocuments;
-use App\Services\NotificationService;
 
 class FacilityRequestController extends Controller
 {
