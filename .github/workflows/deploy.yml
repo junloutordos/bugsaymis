@@ -38,33 +38,24 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4.2.0
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Build frontend assets
-        run: |
-          export VITE_PUSHER_APP_KEY=$(aws ssm get-parameter \
-            --name /crcmis/prod/SOKETI_DEFAULT_APP_KEY \
-            --with-decryption \
-            --query Parameter.Value \
-            --output text)
-          npm ci && npm run build
-        env:
-          VITE_STORAGE_BASE_URL: https://mis.crc.pshs.edu.ph/media
-          VITE_PUSHER_HOST: mis.crc.pshs.edu.ph
-          VITE_PUSHER_PORT: 443
-          VITE_PUSHER_SCHEME: https
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.10.0
 
       - name: Build and push app
         run: |
+          SOKETI_KEY=$(aws ssm get-parameter \
+            --name /crcmis/prod/SOKETI_DEFAULT_APP_KEY \
+            --with-decryption \
+            --query Parameter.Value \
+            --output text)
           docker buildx build --platform linux/amd64 \
             --progress=plain \
+            --build-arg VITE_STORAGE_BASE_URL=https://mis.crc.pshs.edu.ph/media \
+            --build-arg VITE_PUSHER_HOST=mis.crc.pshs.edu.ph \
+            --build-arg VITE_PUSHER_PORT=443 \
+            --build-arg VITE_PUSHER_SCHEME=https \
+            --build-arg VITE_PUSHER_APP_KEY=$SOKETI_KEY \
+            --build-arg VITE_PUSHER_APP_CLUSTER=mt1 \
             -t $ECR/crcmis/app:${{ github.sha }} \
             --push .
 
