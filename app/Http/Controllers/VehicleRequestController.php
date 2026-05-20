@@ -5,17 +5,24 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\VehicleRequest;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use App\Mail\VehicleRequestCreatedMail;
+use App\Services\NotificationService;
 use App\Models\User;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use App\Enums\ApprovalStep;
+use App\Services\NotificationService;
 use App\Services\SnapshotService;
+use App\Services\NotificationService;
 use App\Services\DigitalSignatureService;
+use App\Services\NotificationService;
 use App\Http\Traits\SignsDocuments;
+use App\Services\NotificationService;
 
 class VehicleRequestController extends Controller
 {
@@ -225,6 +232,7 @@ class VehicleRequestController extends Controller
 
         $vehicleRequest->status = 'Approved';
         $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief', route('vehicle-requests.index')); }
 
         $this->snapshots->recordApproval(
             approvable: $vehicleRequest,
@@ -295,6 +303,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->decline_reason = $data['reason'];
         $vehicleRequest->declined_at = now();
         $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Rejected by Division Chief', route('vehicle-requests.index')); }
 
         $this->snapshots->recordApproval(
             approvable: $vehicleRequest,
@@ -334,6 +343,7 @@ class VehicleRequestController extends Controller
 
         $vehicleRequest->status = 'Approved';
         $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief', route('vehicle-requests.index')); }
 
         // Notify all GSU Head users (Division Chief approved -> GSU assigns driver)
         $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
@@ -388,6 +398,7 @@ class VehicleRequestController extends Controller
 
         $vehicleRequest->status = 'OCD Approved';
         $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Fully Approved — request scheduled', route('vehicle-requests.index')); }
 
         // Notify requester
         $requester = $vehicleRequest->requester;
@@ -430,6 +441,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->decline_reason = $request->input('reason');
         $vehicleRequest->declined_at = now();
         $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Declined by OCD', route('vehicle-requests.index')); }
 
         // Notify requester
         $requester = $vehicleRequest->requester;
@@ -468,6 +480,7 @@ class VehicleRequestController extends Controller
         $vehicleRequest->decline_reason = $request->input('reason');
         $vehicleRequest->declined_at = now();
         $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Rejected by Division Chief', route('vehicle-requests.index')); }
 
         // Notify requester via email (declined by Division Chief)
         $requester = $vehicleRequest->requester;
@@ -701,6 +714,7 @@ class VehicleRequestController extends Controller
 
         if ($request->action === 'approve') {
             $vehicleRequest->update(['status' => 'OCD Approved']);
+            if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Fully Approved — request scheduled', route('vehicle-requests.index')); }
 
             $this->snapshots->recordApproval(
                 approvable: $vehicleRequest,
@@ -728,6 +742,7 @@ class VehicleRequestController extends Controller
             }
         } else {
             $vehicleRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by OCD.']);
+            if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Declined by OCD', route('vehicle-requests.index')); }
 
             $this->snapshots->recordApproval(
                 approvable: $vehicleRequest,

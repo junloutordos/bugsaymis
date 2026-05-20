@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\RequestStatusNotification;
 use Illuminate\Support\Facades\Broadcast;
@@ -10,7 +11,9 @@ class NotificationService
 {
     /**
      * Send a request-status notification to a user.
-     * Stores in DB + broadcasts on their private channel via Soketi.
+     * 1. Persists to DB (notifications table)
+     * 2. Broadcasts real-time via Soketi (in-app bell)
+     * 3. Sends Web Push to all registered browser subscriptions
      */
     public static function notifyUser(
         User    $user,
@@ -21,18 +24,16 @@ class NotificationService
         ?string $remarks = null,
     ): void {
         try {
-            $notification = new RequestStatusNotification(
+            // 1 — DB + in-app bell
+            $user->notify(new RequestStatusNotification(
                 requestType: $requestType,
                 referenceNo: $referenceNo,
                 newStatus:   $newStatus,
                 url:         $url,
                 remarks:     $remarks,
-            );
+            ));
 
-            // Persist to DB (creates the notifications row)
-            $user->notify($notification);
-
-            // Broadcast real-time update on the user's private channel
+            // 2 — Real-time Soketi broadcast
             Broadcast::private("user.{$user->id}")
                 ->event('request.status.updated', [
                     'request_type' => $requestType,
@@ -43,10 +44,67 @@ class NotificationService
                     'created_at'   => now()->toIso8601String(),
                 ]);
         } catch (\Throwable $e) {
-            logger()->error('Failed to send request notification', [
-                'user_id' => $user->id,
-                'error'   => $e->getMessage(),
-            ]);
+            logger()->error('Failed to send in-app notification', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+        }
+
+        // 3 — Web Push (fire-and-forget, never blocks the request)
+        try {
+            static::sendWebPush($user, $requestType, $referenceNo, $newStatus, $url, $remarks);
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send web push', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    private static function sendWebPush(
+        User $user, string $requestType, string $referenceNo,
+        string $newStatus, string $url, ?string $remarks,
+    ): void {
+        if (! class_exists(\Minishlink\WebPush\WebPush::class)) return;
+
+        $vapidPublic  = env('VAPID_PUBLIC_KEY');
+        $vapidPrivate = env('VAPID_PRIVATE_KEY');
+        $vapidSubject = env('VAPID_SUBJECT', 'mailto:portal@crc.pshs.edu.ph');
+
+        if (! $vapidPublic || ! $vapidPrivate) return;
+
+        $subscriptions = PushSubscription::where('user_id', $user->id)->get();
+        if ($subscriptions->isEmpty()) return;
+
+        $webPush = new \Minishlink\WebPush\WebPush([
+            'VAPID' => [
+                'subject'    => $vapidSubject,
+                'publicKey'  => $vapidPublic,
+                'privateKey' => $vapidPrivate,
+            ],
+        ]);
+
+        $payload = json_encode([
+            'title' => "{$requestType} — {$newStatus}",
+            'body'  => $referenceNo . ($remarks ? ": {$remarks}" : ''),
+            'icon'  => '/images/pshslogo.png',
+            'data'  => ['url' => $url],
+            'tag'   => 'crcmis-' . md5($requestType . $referenceNo),
+        ]);
+
+        foreach ($subscriptions as $sub) {
+            try {
+                $subscription = \Minishlink\WebPush\Subscription::create([
+                    'endpoint'        => $sub->endpoint,
+                    'publicKey'       => $sub->public_key,
+                    'authToken'       => $sub->auth_token,
+                    'contentEncoding' => $sub->content_encoding ?? 'aesgcm',
+                ]);
+                $webPush->queueNotification($subscription, $payload);
+            } catch (\Throwable $e) {
+                logger()->warning('Invalid push subscription', ['id' => $sub->id, 'error' => $e->getMessage()]);
+                $sub->delete(); // Remove invalid subscription
+            }
+        }
+
+        foreach ($webPush->flush() as $report) {
+            if ($report->isSubscriptionExpired()) {
+                PushSubscription::where('endpoint', $report->getRequest()->getUri()->__toString())->delete();
+            }
         }
     }
 }

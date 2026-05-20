@@ -298,6 +298,9 @@ public function index(Request $request)
                     'Division Chief'
                 ));
         }
+        if ($jobRequest->user) {
+            NotificationService::notifyUser($jobRequest->user, 'IT Job Request', $jobRequest->itjr_no, 'Rejected by Division Chief', route('jobrequests.index'), $validated['reason']);
+        }
 
         return view('emails.itjr.declined', [
             'jobRequest' => $jobRequest,
@@ -422,6 +425,9 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                     $validated['reason'],
                     'OCD'
                 ));
+        }
+        if ($jobRequest->user) {
+            NotificationService::notifyUser($jobRequest->user, 'IT Job Request', $jobRequest->itjr_no, 'Rejected by OCD', route('jobrequests.index'), $validated['reason']);
         }
 
         return view('emails.itjr.declined', [
@@ -558,6 +564,8 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'updated_by' => $request->user()->id,
             ]);
         });
+
+        NotificationService::notifyUser($request->user(), 'IT Job Request', $jobRequest->itjr_no, 'Request Completed — thank you for your rating!', route('jobrequests.index'));
 
         $this->trySign($request, $jobRequest, 'completion',
             "IT Job Request #{$jobRequest->itjr_no} — Completion Confirmed",

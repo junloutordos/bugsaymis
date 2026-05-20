@@ -3,19 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceRequest;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use App\Mail\ServiceRequestCreatedMail;
+use App\Services\NotificationService;
 use App\Mail\ServiceRequestStatusMail;
+use App\Services\NotificationService;
 use App\Models\Division;
+use App\Services\NotificationService;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Enums\ApprovalStep;
+use App\Services\NotificationService;
 use App\Services\SnapshotService;
+use App\Services\NotificationService;
 use App\Services\DigitalSignatureService;
+use App\Services\NotificationService;
 use App\Http\Traits\SignsDocuments;
+use App\Services\NotificationService;
 
 class ServiceRequestController extends Controller
 {
@@ -163,6 +172,7 @@ class ServiceRequestController extends Controller
 
         $serviceRequest->status = 'Approved';
         $serviceRequest->save();
+        if ($serviceRequest->requester) { NotificationService::notifyUser($serviceRequest->requester, 'Service Request', "#{$serviceRequest->id}", 'Approved by Division Chief', route('service-requests.index')); }
 
         // Notify requester via email
         try {
@@ -587,6 +597,7 @@ class ServiceRequestController extends Controller
 
         if ($request->action === 'approve') {
             $serviceRequest->update(['status' => 'FAD Approved']);
+            if ($serviceRequest->requester) { NotificationService::notifyUser($serviceRequest->requester, 'Service Request', "#{$serviceRequest->id}", 'Approved by FAD', route('service-requests.index')); }
 
             $this->performSign($request, ServiceRequest::class, $serviceRequest->id,
                 'fad_approval',
@@ -605,6 +616,7 @@ class ServiceRequestController extends Controller
             }
         } else {
             $serviceRequest->update(['status' => 'FAD Declined', 'decline_reason' => 'Declined by FAD Chief.', 'declined_at' => now()]);
+            if ($serviceRequest->requester) { NotificationService::notifyUser($serviceRequest->requester, 'Service Request', "#{$serviceRequest->id}", 'Declined by FAD', route('service-requests.index')); }
             try {
                 $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
                 $requesterEmail = $requester?->email ?? null;
