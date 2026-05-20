@@ -51,6 +51,7 @@ import {
   UserCircleIcon,
   InboxIcon,
   QuestionMarkCircleIcon,
+  CircleStackIcon,
 } from "@heroicons/vue/24/outline";
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
@@ -507,6 +508,14 @@ const menuItems = [
         routeName: "csm.dashboard",
         href: route("csm.dashboard"),
         icon: StarIcon,
+        roles: ["Administrator", "MIS"],
+        permissions: ["it.requests.manage"],
+      },
+      {
+        label: "System Architecture",
+        routeName: "mis.architecture",
+        href: route("mis.architecture"),
+        icon: CircleStackIcon,
         roles: ["Administrator", "MIS"],
         permissions: ["it.requests.manage"],
       },
