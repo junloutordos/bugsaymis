@@ -22,9 +22,22 @@ COPY . .
 
 RUN COMPOSER_AUTH='{}' composer install --no-dev --optimize-autoloader
 
-# Build frontend assets and remove any leftover Vite dev-server marker
-ARG VITE_STORAGE_BASE_URL=https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com
+# Build frontend assets with production VITE env vars injected as build args.
+# All ARG values have safe defaults for local builds; CI passes production values.
+ARG VITE_STORAGE_BASE_URL=https://mis.crc.pshs.edu.ph/media
+ARG VITE_PUSHER_HOST=localhost
+ARG VITE_PUSHER_PORT=9601
+ARG VITE_PUSHER_SCHEME=http
+ARG VITE_PUSHER_APP_KEY=bugsaymis-app-key
+ARG VITE_PUSHER_APP_CLUSTER=mt1
+
 ENV VITE_STORAGE_BASE_URL=${VITE_STORAGE_BASE_URL}
+ENV VITE_PUSHER_HOST=${VITE_PUSHER_HOST}
+ENV VITE_PUSHER_PORT=${VITE_PUSHER_PORT}
+ENV VITE_PUSHER_SCHEME=${VITE_PUSHER_SCHEME}
+ENV VITE_PUSHER_APP_KEY=${VITE_PUSHER_APP_KEY}
+ENV VITE_PUSHER_APP_CLUSTER=${VITE_PUSHER_APP_CLUSTER}
+
 RUN npm ci --prefer-offline 2>/dev/null || npm install \
     && npm run build \
     && rm -f /var/www/public/hot \
