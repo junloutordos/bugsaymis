@@ -236,6 +236,9 @@ export function useChat(authUser) {
   }
 
   function applyReadReceipt({ message_ids, read_at }) {
+    // read_at on individual messages only applies to DMs — group chats
+    // use conversation_user.last_read_at on the pivot, not per-message read_at
+    if (activeConversation.value?.type !== 'direct') return
     messages.value.forEach(m => {
       if (message_ids.includes(m.id)) m.read_at = read_at
     })
