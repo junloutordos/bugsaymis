@@ -204,6 +204,13 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
+// ── In-app notifications ──────────────────────────────────────────────────────
+Route::middleware(['auth'])->prefix('api/notifications')->group(function () {
+    Route::get('/',           [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/read-all',  [\App\Http\Controllers\NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+});
+
 // Storage proxy — serves private S3 files through the app (auth required)
 Route::middleware(['auth'])->get('/media/{path}', [\App\Http\Controllers\StorageProxyController::class, 'serve'])
     ->where('path', '.+')

@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\URL;
 use App\Mail\GatePassCreatedMail;
 use App\Mail\GatePassDeclinedMail;
 use App\Mail\GatePassStatusMail;
+use App\Models\User;
+use App\Services\NotificationService;
 use Inertia\Inertia;
 
 class GatePassController extends Controller
@@ -640,6 +642,12 @@ class GatePassController extends Controller
             $requester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
             if ($requester && !empty($requester->email)) {
                 Mail::to($requester->email)->send(new GatePassStatusMail($row, 'OCD Approved', null, 'Office of the Campus Director'));
+            }
+            if ($requester) {
+                $user = User::find($requester->id);
+                if ($user) {
+                    NotificationService::notifyUser($user, 'Gate Pass', $row->controlno, 'Approved by OCD', route('gatepass.index'));
+                }
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send OCD-approved notification to requester', ['error' => $e->getMessage(), 'id' => $id]);
