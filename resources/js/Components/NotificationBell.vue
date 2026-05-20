@@ -78,10 +78,51 @@ function onClickOutside(e) {
   if (!e.target.closest('[data-notification-bell]')) open.value = false
 }
 
+// ── Web Push ─────────────────────────────────────────────────────────────────
+const pushEnabled = ref(false)
+
+function urlBase64ToUint8Array(base64) {
+  const pad = '='.repeat((4 - base64.length % 4) % 4)
+  const b64 = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(b64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  try {
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') return
+
+    const { data } = await axios.get(route('push.vapid-key'))
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(data.public_key),
+    })
+    const json = sub.toJSON()
+    await axios.post(route('push.subscribe'), {
+      endpoint:         json.endpoint,
+      keys:             json.keys,
+      content_encoding: (sub.options?.applicationServerKey ? 'aes128gcm' : 'aesgcm'),
+    })
+    pushEnabled.value = true
+  } catch (e) {
+    // Web Push not available or denied — app works without it
+  }
+}
+
 onMounted(() => {
   fetchNotifications()
   subscribe()
   document.addEventListener('click', onClickOutside)
+  // Register service worker silently — only prompts if permission not yet decided
+  if (Notification.permission === 'default') {
+    registerServiceWorker()
+  } else if (Notification.permission === 'granted') {
+    registerServiceWorker()
+    pushEnabled.value = true
+  }
 })
 
 onUnmounted(() => {

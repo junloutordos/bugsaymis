@@ -33,7 +33,7 @@ jobs:
           coverage: none
 
       - name: Update pinned security dependencies
-        run: composer update setasign/fpdi --no-interaction --no-progress
+        run: composer update setasign/fpdi laravel-notification-channels/webpush --no-interaction --no-progress
 
       - name: Install Composer dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
