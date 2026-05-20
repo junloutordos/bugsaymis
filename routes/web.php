@@ -6,6 +6,9 @@ use App\Http\Controllers\ICTEquipmentController;
 use App\Http\Controllers\HR\EmployeeDocumentController;
 use App\Http\Controllers\ApprovalInboxController;
 
+// ECS container health check — no auth, no session
+Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
+
     // Library Borrowings
     Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
         ->name('library.borrowings.index');
