@@ -204,6 +204,11 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
+// Storage proxy — serves private S3 files through the app (auth required)
+Route::middleware(['auth'])->get('/media/{path}', [\App\Http\Controllers\StorageProxyController::class, 'serve'])
+    ->where('path', '.+')
+    ->name('storage.proxy');
+
 Route::middleware(['auth'])->group(function () {
     // Redirect user to their PDS (create or edit)
     Route::get('/my-pds', [PDSController::class, 'myPds'])->name('pds.my');
