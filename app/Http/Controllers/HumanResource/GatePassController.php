@@ -216,8 +216,21 @@ class GatePassController extends Controller
         $insert['actual_timeout'] = $data['actual_timeout'] ?? '';
         $insert['actual_timein'] = $data['actual_timein'] ?? '';
         $insert['time_consumed'] = $data['time_consumed'] ?? '';
-        // default status to 'Pending' if not provided (first creation)
-        $insert['status'] = !empty($data['status']) ? $data['status'] : 'Pending';
+
+        // Determine whether to bypass Division Chief approval:
+        // - Division Chief's own gatepass goes directly to OCD (no self-approval)
+        // - Staff from the Office of the Campus Director (OCD division) also go directly to OCD
+        $submitter        = $request->user();
+        $submitterDivision = ($submitter && $submitter->division_id)
+            ? DB::table('divisions')->where('id', $submitter->division_id)->first()
+            : null;
+        $isOCDDivision = $submitterDivision &&
+            strtolower(trim($submitterDivision->division_name)) === strtolower('Office of the Campus Director');
+        $bypassDivisionChief = $submitter && ($submitter->hasRole('DivisionChief') || $isOCDDivision);
+
+        // Status: skip to 'Division Approved' when DC step is bypassed so OCD sees it immediately
+        $insert['status'] = !empty($data['status']) ? $data['status']
+            : ($bypassDivisionChief ? 'Division Approved' : 'Pending');
 
         $id = DB::table('gatepass')->insertGetId(array_merge($insert, ['created_at' => now(), 'updated_at' => now()]));
 
@@ -228,11 +241,9 @@ class GatePassController extends Controller
             ->where('gatepass.id', $id)
             ->first();
 
-        // Notification routing: DivisionChief's gatepass goes to OCD; others go to their Division Chief.
+        // Notification routing: bypass cases go straight to OCD; others go to their Division Chief.
         try {
-            $submitter = $request->user();
-            if ($submitter && $submitter->hasRole('DivisionChief')) {
-                // Division Chief's immediate head is the Campus Director (OCD)
+            if ($bypassDivisionChief) {
                 $ocdUsers = \App\Models\User::havingRole('OCD')->get();
                 foreach ($ocdUsers as $ocd) {
                     if (!empty($ocd->email)) {
@@ -243,7 +254,7 @@ class GatePassController extends Controller
                 }
             } elseif ($submitter && $submitter->division_id) {
                 // Regular staff/faculty → notify their Division Chief
-                $division = DB::table('divisions')->where('id', $submitter->division_id)->first();
+                $division = $submitterDivision; // already resolved above
                 if ($division && !empty($division->division_chief_id)) {
                     $chief = DB::table('users')->where('id', $division->division_chief_id)->first();
                     if ($chief && !empty($chief->email)) {
