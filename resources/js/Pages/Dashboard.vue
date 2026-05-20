@@ -17,16 +17,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import {
   UsersIcon,
   AcademicCapIcon,
-  ClockIcon,
   DocumentCheckIcon,
-  BookOpenIcon,
-  StarIcon,
-  ComputerDesktopIcon,
-  TruckIcon,
-  BuildingOfficeIcon,
-  WrenchScrewdriverIcon,
-  ArrowTrendingUpIcon,
-  CheckBadgeIcon,
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(
@@ -76,7 +67,6 @@ const props = defineProps({
   monthlyTrends: { type: Object, default: () => ({ labels: [], datasets: [] }) },
   lndStats:     { type: Object, default: () => ({ programs: 0, sessions: 0, tna_pending: 0, idp_pending: 0 }) },
   rewardsStats: { type: Object, default: () => ({ total: 0, pending: 0, approved: 0, awarded_this_year: 0 }) },
-  // GAD / sex-disaggregated
   ipcrBySex:    { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
   tnaBySex:     { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
   idpBySex:     { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
@@ -84,20 +74,28 @@ const props = defineProps({
   employeesByDivisionWithSex: { type: Array, default: () => [] },
 })
 
-// ── Palette ──────────────────────────────────────────────────────────────────
-const p = {
-  blue:   '#3b82f6',
-  indigo: '#6366f1',
-  violet: '#8b5cf6',
-  emerald:'#10b981',
-  amber:  '#f59e0b',
-  rose:   '#f43f5e',
-  cyan:   '#06b6d4',
-  slate:  '#64748b',
-  teal:   '#14b8a6',
-  orange: '#f97316',
+// ── Colour system ─────────────────────────────────────────────────────────────
+// Semantic — always the same meaning across every chart
+const sem = {
+  male:      '#3B82F6', // blue-500
+  female:    '#EC4899', // pink-500
+  pending:   '#F59E0B', // amber-400
+  completed: '#10B981', // emerald-500
 }
-const palette = Object.values(p)
+
+// Brand-derived categorical palette — 6 harmonious, brand-anchored colours
+// Used for multi-category charts (trends, IPCR status, IT categories, general services)
+const brandPalette = [
+  '#1447C0', // brand primary blue
+  '#0891B2', // cyan-blue (brand family)
+  '#7C3AED', // violet (contrast)
+  '#059669', // emerald (positive)
+  '#D97706', // amber (attention)
+  '#64748B', // slate (neutral / other)
+]
+
+
+
 
 // ── Chart base options ────────────────────────────────────────────────────────
 const base = {
@@ -163,8 +161,8 @@ const monthlyTrendsData = computed(() => ({
   datasets: (props.monthlyTrends.datasets ?? []).map((d, i) => ({
     label: d.label,
     data: d.data,
-    borderColor: palette[i % palette.length],
-    backgroundColor: palette[i % palette.length] + '18',
+    borderColor: brandPalette[i % brandPalette.length],
+    backgroundColor: brandPalette[i % brandPalette.length] + '18',
     tension: 0.4,
     fill: false,
     pointRadius: 3,
@@ -179,13 +177,13 @@ const requestOverviewData = computed(() => ({
     {
       label: 'Pending',
       data: props.requestOverview.map(r => r.pending),
-      backgroundColor: p.amber + 'cc',
+      backgroundColor: sem.pending + 'cc',
       borderRadius: 4,
     },
     {
       label: 'Completed',
       data: props.requestOverview.map(r => r.completed ?? 0),
-      backgroundColor: p.emerald + 'cc',
+      backgroundColor: '#1447C0cc',
       borderRadius: 4,
     },
   ],
@@ -193,12 +191,12 @@ const requestOverviewData = computed(() => ({
 
 const ipcrStatusData = computed(() => ({
   labels: props.ipcrByStatus.map(r => r.status),
-  datasets: [{ data: props.ipcrByStatus.map(r => r.total), backgroundColor: palette, borderWidth: 0 }],
+  datasets: [{ data: props.ipcrByStatus.map(r => r.total), backgroundColor: brandPalette, borderWidth: 0 }],
 }))
 
 const itjrCategoryData = computed(() => ({
   labels: props.itjrByCategory.map(r => r.category),
-  datasets: [{ data: props.itjrByCategory.map(r => r.total), backgroundColor: palette, borderWidth: 0 }],
+  datasets: [{ data: props.itjrByCategory.map(r => r.total), backgroundColor: brandPalette, borderWidth: 0 }],
 }))
 
 const gsModules = ['Vehicle Requests', 'Facility Requests', 'Service Requests', 'Work Requests']
@@ -206,15 +204,15 @@ const generalServicesData = computed(() => {
   const rows = props.requestOverview.filter(r => gsModules.includes(r.label))
   return {
     labels: rows.map(r => r.label),
-    datasets: [{ data: rows.map(r => r.total), backgroundColor: [p.blue, p.indigo, p.violet, p.cyan], borderWidth: 0 }],
+    datasets: [{ data: rows.map(r => r.total), backgroundColor: brandPalette.slice(0, 4), borderWidth: 0 }],
   }
 })
 
 const divisionSexData = computed(() => ({
   labels: props.employeesByDivisionWithSex.map(d => d.name),
   datasets: [
-    { label: 'Male',   data: props.employeesByDivisionWithSex.map(d => d.male),   backgroundColor: p.blue + 'cc', borderRadius: 4 },
-    { label: 'Female', data: props.employeesByDivisionWithSex.map(d => d.female), backgroundColor: p.rose + 'cc', borderRadius: 4 },
+    { label: 'Male',   data: props.employeesByDivisionWithSex.map(d => d.male),   backgroundColor: sem.male   + 'cc', borderRadius: 4 },
+    { label: 'Female', data: props.employeesByDivisionWithSex.map(d => d.female), backgroundColor: sem.female + 'cc', borderRadius: 4 },
   ],
 }))
 
@@ -241,56 +239,29 @@ const gadSummaryRows = computed(() => {
 
 const employeeGenderData = computed(() => ({
   labels: ['Male', 'Female'],
-  datasets: [{ data: [props.employeeMaleCount, props.employeeFemaleCount], backgroundColor: [p.blue, p.rose], borderWidth: 0 }],
+  datasets: [{ data: [props.employeeMaleCount, props.employeeFemaleCount], backgroundColor: [sem.male, sem.female], borderWidth: 0 }],
 }))
 
 const studentGenderData = computed(() => ({
   labels: ['Male', 'Female'],
-  datasets: [{ data: [props.maleCount, props.femaleCount], backgroundColor: [p.cyan, p.violet], borderWidth: 0 }],
+  datasets: [{ data: [props.maleCount, props.femaleCount], backgroundColor: [sem.male, sem.female], borderWidth: 0 }],
 }))
 
 const libraryAttendanceData = computed(() => ({
   labels: ['G7', 'G8', 'G9', 'G10', 'G11', 'G12'],
   datasets: [
-    { label: 'Male',   data: props.libraryAttendanceMaleByGrade,   backgroundColor: p.blue + 'cc',  borderRadius: 4 },
-    { label: 'Female', data: props.libraryAttendanceFemaleByGrade, backgroundColor: p.rose + 'cc',  borderRadius: 4 },
+    { label: 'Male',   data: props.libraryAttendanceMaleByGrade,   backgroundColor: sem.male   + 'cc', borderRadius: 4 },
+    { label: 'Female', data: props.libraryAttendanceFemaleByGrade, backgroundColor: sem.female + 'cc', borderRadius: 4 },
   ],
 }))
 
 // ── KPI Cards ─────────────────────────────────────────────────────────────────
-// Cards with `male`/`female` fields render a sex-disaggregated split bar.
 const kpiCards = computed(() => [
   { label: 'Total Employees', value: props.totalEmployees, male: props.employeeMaleCount, female: props.employeeFemaleCount, sub: `${props.activeDivisions} divisions`, icon: UsersIcon,          color: 'bg-blue-500',    text: 'text-blue-600',   bg: 'bg-blue-50'   },
   { label: 'Faculty',         value: props.facultyCount,   male: props.facultyMaleCount,  female: props.facultyFemaleCount,  sub: 'Teaching staff', icon: AcademicCapIcon, color: 'bg-indigo-500',  text: 'text-indigo-600', bg: 'bg-indigo-50' },
   { label: 'Staff',           value: props.staffCount,     male: props.staffMaleCount,    female: props.staffFemaleCount,    sub: 'Non-teaching',   icon: UsersIcon,       color: 'bg-violet-500',  text: 'text-violet-600', bg: 'bg-violet-50' },
   { label: 'Students',        value: props.maleCount + props.femaleCount, male: props.maleCount, female: props.femaleCount, sub: `${props.scholarsCount} scholars`, icon: AcademicCapIcon, color: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { label: 'Pending Requests',value: props.totalPendingRequests, sub: 'All modules',         icon: ClockIcon,           color: 'bg-amber-500',   text: 'text-amber-600',  bg: 'bg-amber-50'  },
   { label: 'IPCR For Review', value: props.ipcrForReview,  male: props.ipcrBySex.male, female: props.ipcrBySex.female, sub: 'Awaiting review', icon: DocumentCheckIcon,   color: 'bg-rose-500',    text: 'text-rose-600',   bg: 'bg-rose-50'   },
-  { label: 'L&D Programs',    value: props.lndStats.programs, male: props.tnaBySex.male, female: props.tnaBySex.female, sub: `${props.lndStats.sessions} sessions`, icon: BookOpenIcon, color: 'bg-teal-500', text: 'text-teal-600',   bg: 'bg-teal-50'   },
-  { label: 'Recognitions',    value: props.rewardsStats.total, male: props.rewardsBySex.male, female: props.rewardsBySex.female, sub: `${props.rewardsStats.awarded_this_year} awarded ${new Date().getFullYear()}`, icon: StarIcon, color: 'bg-orange-500', text: 'text-orange-600', bg: 'bg-orange-50' },
-])
-
-// ── Module Quick Stats ────────────────────────────────────────────────────────
-const moduleStats = computed(() => [
-  { label: 'IT Job Requests', pending: props.requestOverview.find(r => r.label === 'IT Job Requests')?.pending ?? 0, total: props.requestOverview.find(r => r.label === 'IT Job Requests')?.total ?? 0, icon: ComputerDesktopIcon, color: 'text-blue-600', dot: 'bg-blue-500' },
-  { label: 'Vehicle Requests', pending: props.requestOverview.find(r => r.label === 'Vehicle Requests')?.pending ?? 0, total: props.requestOverview.find(r => r.label === 'Vehicle Requests')?.total ?? 0, icon: TruckIcon, color: 'text-indigo-600', dot: 'bg-indigo-500' },
-  { label: 'Facility Requests', pending: props.requestOverview.find(r => r.label === 'Facility Requests')?.pending ?? 0, total: props.requestOverview.find(r => r.label === 'Facility Requests')?.total ?? 0, icon: BuildingOfficeIcon, color: 'text-violet-600', dot: 'bg-violet-500' },
-  { label: 'Work Requests', pending: props.requestOverview.find(r => r.label === 'Work Requests')?.pending ?? 0, total: props.requestOverview.find(r => r.label === 'Work Requests')?.total ?? 0, icon: WrenchScrewdriverIcon, color: 'text-amber-600', dot: 'bg-amber-500' },
-])
-
-// ── L&D + Rewards Quick Stats ─────────────────────────────────────────────────
-const lndCards = computed(() => [
-  { label: 'Programs',     value: props.lndStats.programs,    sub: 'Active',      color: 'text-teal-600',  dot: 'bg-teal-400' },
-  { label: 'Sessions',     value: props.lndStats.sessions,    sub: 'Total',       color: 'text-teal-600',  dot: 'bg-teal-300' },
-  { label: 'TNA Pending',  value: props.lndStats.tna_pending, sub: 'Needs review',color: 'text-amber-600', dot: 'bg-amber-400' },
-  { label: 'IDP Submitted',value: props.lndStats.idp_pending, sub: 'For approval',color: 'text-rose-600',  dot: 'bg-rose-400' },
-])
-
-const rewardsCards = computed(() => [
-  { label: 'Total Nominations',  value: props.rewardsStats.total,             sub: 'All time',            color: 'text-orange-600', dot: 'bg-orange-400' },
-  { label: 'Pending',            value: props.rewardsStats.pending,           sub: 'Awaiting screening',  color: 'text-amber-600',  dot: 'bg-amber-400'  },
-  { label: 'Approved',           value: props.rewardsStats.approved,          sub: 'This cycle',          color: 'text-emerald-600',dot: 'bg-emerald-400'},
-  { label: `Awarded ${new Date().getFullYear()}`, value: props.rewardsStats.awarded_this_year, sub: 'Incentives given', color: 'text-blue-600', dot: 'bg-blue-400' },
 ])
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -343,73 +314,96 @@ onMounted(() => {
 
 <template>
   <AdminLayout title="Dashboard">
-    <div class="space-y-6">
+    <div class="dash-root">
 
-      <!-- ── Greeting Header ──────────────────────────────────────────────── -->
-      <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white px-6 py-4 shadow-sm">
-        <div>
-          <p class="text-xs font-medium uppercase tracking-widest text-gray-400">{{ today }}</p>
-          <h1 class="mt-0.5 text-xl font-bold text-gray-800">
-            {{ greeting }}, {{ authUser?.name?.split(' ')[0] ?? 'Admin' }} 👋
-          </h1>
-          <p class="mt-0.5 text-sm text-gray-500">Here's what's happening across all modules today.</p>
-        </div>
-        <div class="flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
-          <ArrowTrendingUpIcon class="h-4 w-4" />
-          {{ totalPendingRequests }} pending items across all modules
-        </div>
-      </div>
-
-      <!-- ── GAD Banner ───────────────────────────────────────────────────── -->
-      <div class="flex items-center gap-3 rounded-2xl border border-pink-100 bg-gradient-to-r from-blue-50 via-white to-pink-50 px-5 py-3 shadow-sm">
-        <span class="text-2xl shrink-0 text-purple-600">⚧</span>
-        <p class="text-xs text-gray-600">
-          <span class="font-semibold text-purple-800">Gender and Development Data Ready</span>
-          — This dashboard presents sex-disaggregated data in compliance with the Magna Carta of Women and DOST/PSHSS GAD requirements.
-        </p>
-        <div class="ml-auto flex shrink-0 items-center gap-3 text-[11px] font-semibold">
-          <span class="flex items-center gap-1.5 text-blue-600"><span class="inline-block h-2.5 w-2.5 rounded-full bg-blue-500"></span>Male</span>
-          <span class="flex items-center gap-1.5 text-pink-600"><span class="inline-block h-2.5 w-2.5 rounded-full bg-pink-500"></span>Female</span>
-        </div>
-      </div>
-
-      <!-- ── KPI Strip ────────────────────────────────────────────────────── -->
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
-        <div v-for="card in kpiCards" :key="card.label"
-          class="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <div :class="[card.bg, 'mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl']">
-            <component :is="card.icon" :class="[card.text, 'h-4 w-4']" />
+      <!-- ══════════════════════════════════════════════════════════
+           HERO BANNER
+      ══════════════════════════════════════════════════════════ -->
+      <div class="hero-banner">
+        <!-- Decorative grid overlay -->
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="hero-inner">
+          <div class="hero-left">
+            <div class="hero-avatar">
+              {{ (authUser?.name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') }}
+            </div>
+            <div>
+              <h1 class="hero-greeting">
+                {{ greeting }}, {{ authUser?.name?.split(' ')[0] ?? 'Admin' }} 👋
+              </h1>
+              <p class="hero-date">{{ today }}</p>
+            </div>
           </div>
-          <p class="text-2xl font-bold tracking-tight text-gray-900">{{ card.value.toLocaleString() }}</p>
-          <p class="mt-0.5 text-xs font-semibold text-gray-600 leading-tight">{{ card.label }}</p>
+          <div class="hero-right">
+            <div class="hero-pending-badge">
+              <ClockIcon class="h-3.5 w-3.5 shrink-0" />
+              <span class="font-bold">{{ totalPendingRequests }}</span>
+              <span class="opacity-80">pending items</span>
+            </div>
+            <p class="hero-pending-sub">across all modules</p>
+          </div>
+        </div>
+      </div>
 
-          <!-- Sex-disaggregated split bar (shown when card has male/female data) -->
+      <!-- ══════════════════════════════════════════════════════════
+           GAD BANNER
+      ══════════════════════════════════════════════════════════ -->
+      <div class="gad-banner">
+        <span class="gad-icon">⚧</span>
+        <p class="gad-text">
+          <span class="gad-bold">Gender and Development Data Ready</span>
+          — Sex-disaggregated data in compliance with the Magna Carta of Women and DOST/PSHSS GAD requirements.
+        </p>
+        <div class="gad-legend">
+          <span class="gad-dot gad-dot-m"></span><span class="gad-legend-label">Male</span>
+          <span class="gad-dot gad-dot-f ml-3"></span><span class="gad-legend-label">Female</span>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════
+           KPI STRIP
+      ══════════════════════════════════════════════════════════ -->
+      <div class="kpi-grid">
+        <div
+          v-for="card in kpiCards"
+          :key="card.label"
+          class="kpi-card"
+          style="border-left-color: #1447C0"
+        >
+          <!-- Floating icon -->
+          <component :is="card.icon" :class="[card.text, 'kpi-icon-float']" />
+
+          <!-- Value -->
+          <p class="kpi-value">{{ card.value.toLocaleString() }}</p>
+          <p class="kpi-label">{{ card.label }}</p>
+
+          <!-- Sex bar -->
           <template v-if="card.male !== undefined && card.female !== undefined">
-            <div class="mt-2 flex h-1 overflow-hidden rounded-full bg-slate-100">
+            <div class="kpi-sex-bar mt-2">
               <div
-                class="bg-blue-400 transition-all duration-300"
+                class="kpi-sex-male"
                 :style="{ width: (card.male + card.female) > 0 ? `${Math.round(card.male / (card.male + card.female) * 100)}%` : '50%' }"
               ></div>
-              <div class="flex-1 bg-pink-400"></div>
+              <div class="kpi-sex-female flex-1"></div>
             </div>
-            <div class="mt-1 flex justify-between text-[10px] font-medium">
-              <span class="text-blue-500">{{ card.male.toLocaleString() }} M</span>
-              <span class="text-pink-500">F {{ card.female.toLocaleString() }}</span>
+            <div class="kpi-sex-labels">
+              <span class="kpi-sex-m">{{ card.male.toLocaleString() }} M</span>
+              <span class="kpi-sex-f">F {{ card.female.toLocaleString() }}</span>
             </div>
           </template>
-          <p v-else class="text-[10px] text-gray-400 mt-0.5">{{ card.sub }}</p>
-
-          <div :class="[card.color, 'absolute bottom-0 left-0 h-0.5 w-full opacity-60']"></div>
+          <p v-else class="kpi-sub">{{ card.sub }}</p>
         </div>
       </div>
 
-      <!-- ── Main 3-col Grid ──────────────────────────────────────────────── -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <!-- ══════════════════════════════════════════════════════════
+           MAIN 3-COL GRID
+      ══════════════════════════════════════════════════════════ -->
+      <div class="main-grid">
 
-        <!-- LEFT: 3 columns -->
-        <div class="space-y-6 lg:col-span-3">
+        <!-- LEFT — 3 columns wide -->
+        <div class="main-left">
 
-          <!-- Monthly Trends (Line) -->
+          <!-- Monthly Trends -->
           <div class="card">
             <div class="card-header">
               <div>
@@ -424,7 +418,7 @@ onMounted(() => {
           </div>
 
           <!-- Request Overview + IPCR -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
             <div class="card md:col-span-2">
               <div class="card-header">
                 <div>
@@ -437,7 +431,6 @@ onMounted(() => {
                 <EmptyState v-else text="No request data" />
               </div>
             </div>
-
             <div class="card">
               <div class="card-header">
                 <div>
@@ -453,7 +446,7 @@ onMounted(() => {
           </div>
 
           <!-- IT + General Services -->
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div class="card">
               <div class="card-header">
                 <div>
@@ -466,7 +459,6 @@ onMounted(() => {
                 <EmptyState v-else text="No data" />
               </div>
             </div>
-
             <div class="card">
               <div class="card-header">
                 <div>
@@ -486,9 +478,8 @@ onMounted(() => {
           </div>
 
           <!-- HR Analytics -->
-          <div class="section-divider">HR Analytics</div>
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <!-- Stacked sex-disaggregated division chart -->
+          <div class="section-head">HR Analytics</div>
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div class="card" v-if="employeesByDivisionWithSex.length">
               <div class="card-header">
                 <div>
@@ -500,7 +491,6 @@ onMounted(() => {
                 <Bar :data="divisionSexData" :options="stackedHBarOptions" />
               </div>
             </div>
-
             <div class="card">
               <div class="card-header">
                 <div>
@@ -508,7 +498,7 @@ onMounted(() => {
                   <p class="card-sub">{{ totalEmployees.toLocaleString() }} total employees</p>
                 </div>
               </div>
-              <div class="min-h-[200px]">
+              <div class="min-h-[180px]">
                 <Doughnut
                   v-if="employeeMaleCount + employeeFemaleCount > 0"
                   :data="employeeGenderData"
@@ -516,23 +506,22 @@ onMounted(() => {
                 />
                 <EmptyState v-else text="No gender data" />
               </div>
-              <!-- Sex breakdown pills -->
-              <div class="mt-4 grid grid-cols-2 gap-3">
-                <div class="rounded-xl bg-blue-50 px-3 py-2 text-center">
-                  <p class="text-lg font-bold text-blue-700">{{ employeeMaleCount.toLocaleString() }}</p>
-                  <p class="text-xs text-blue-500">Male · {{ pct(employeeMaleCount, totalEmployees) }}%</p>
+              <div class="sex-pills mt-4">
+                <div class="sex-pill sex-pill-m">
+                  <p class="sex-pill-val">{{ employeeMaleCount.toLocaleString() }}</p>
+                  <p class="sex-pill-lbl">Male · {{ pct(employeeMaleCount, totalEmployees) }}%</p>
                 </div>
-                <div class="rounded-xl bg-rose-50 px-3 py-2 text-center">
-                  <p class="text-lg font-bold text-rose-700">{{ employeeFemaleCount.toLocaleString() }}</p>
-                  <p class="text-xs text-rose-500">Female · {{ pct(employeeFemaleCount, totalEmployees) }}%</p>
+                <div class="sex-pill sex-pill-f">
+                  <p class="sex-pill-val">{{ employeeFemaleCount.toLocaleString() }}</p>
+                  <p class="sex-pill-lbl">Female · {{ pct(employeeFemaleCount, totalEmployees) }}%</p>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Student Analytics -->
-          <div class="section-divider">Student Analytics</div>
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div class="section-head">Student Analytics</div>
+          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div class="card">
               <div class="card-header">
                 <div>
@@ -540,22 +529,21 @@ onMounted(() => {
                   <p class="card-sub">{{ (maleCount + femaleCount).toLocaleString() }} enrolled</p>
                 </div>
               </div>
-              <div class="min-h-[200px]">
+              <div class="min-h-[180px]">
                 <Doughnut v-if="maleCount + femaleCount > 0" :data="studentGenderData" :options="doughnutOptions" />
                 <EmptyState v-else text="No student data" />
               </div>
-              <div class="mt-4 grid grid-cols-2 gap-3">
-                <div class="rounded-xl bg-blue-50 px-3 py-2 text-center">
-                  <p class="text-lg font-bold text-blue-700">{{ maleCount.toLocaleString() }}</p>
-                  <p class="text-xs text-blue-500">Male · {{ pct(maleCount, maleCount + femaleCount) }}%</p>
+              <div class="sex-pills mt-4">
+                <div class="sex-pill sex-pill-m">
+                  <p class="sex-pill-val">{{ maleCount.toLocaleString() }}</p>
+                  <p class="sex-pill-lbl">Male · {{ pct(maleCount, maleCount + femaleCount) }}%</p>
                 </div>
-                <div class="rounded-xl bg-rose-50 px-3 py-2 text-center">
-                  <p class="text-lg font-bold text-rose-700">{{ femaleCount.toLocaleString() }}</p>
-                  <p class="text-xs text-rose-500">Female · {{ pct(femaleCount, maleCount + femaleCount) }}%</p>
+                <div class="sex-pill sex-pill-f">
+                  <p class="sex-pill-val">{{ femaleCount.toLocaleString() }}</p>
+                  <p class="sex-pill-lbl">Female · {{ pct(femaleCount, maleCount + femaleCount) }}%</p>
                 </div>
               </div>
             </div>
-
             <div class="card">
               <div class="card-header">
                 <div>
@@ -569,44 +557,44 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- GAD Summary Table -->
-          <div class="section-divider">GAD Summary — Sex-Disaggregated Data</div>
+          <!-- GAD Summary -->
+          <div class="section-head">GAD Summary — Sex-Disaggregated Data</div>
           <div class="card overflow-hidden p-0">
-            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
               <div>
                 <p class="card-title">Institutional GAD Summary</p>
                 <p class="card-sub">RA 9710 — Magna Carta of Women compliance</p>
               </div>
-              <span class="rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-pink-600">Sex-Disaggregated</span>
+              <span class="gad-chip">Sex-Disaggregated</span>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-xs">
                 <thead>
-                  <tr class="border-b border-gray-100 bg-gray-50">
-                    <th class="px-4 py-2.5 text-left font-semibold text-gray-600">Indicator</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-gray-600">Total</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-blue-600">Male</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-blue-600">% M</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-pink-600">Female</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-pink-600">% F</th>
-                    <th class="px-4 py-2.5 text-left font-semibold text-gray-500">Distribution</th>
+                  <tr class="border-b border-slate-100 bg-slate-50/70">
+                    <th class="px-4 py-2.5 text-left font-semibold text-slate-500">Indicator</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-slate-500">Total</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-blue-500">Male</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-blue-400">% M</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-pink-500">Female</th>
+                    <th class="px-3 py-2.5 text-right font-semibold text-pink-400">% F</th>
+                    <th class="px-4 py-2.5 text-left font-semibold text-slate-400">Distribution</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="row in gadSummaryRows" :key="row.label"
-                    class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                    <td class="px-4 py-2.5 font-medium text-gray-800">{{ row.label }}</td>
-                    <td class="px-3 py-2.5 text-right font-bold text-gray-900">{{ row.total.toLocaleString() }}</td>
-                    <td class="px-3 py-2.5 text-right text-blue-700">{{ row.male.toLocaleString() }}</td>
-                    <td class="px-3 py-2.5 text-right text-blue-500 font-medium">{{ row.pctM }}%</td>
-                    <td class="px-3 py-2.5 text-right text-pink-700">{{ row.female.toLocaleString() }}</td>
-                    <td class="px-3 py-2.5 text-right text-pink-500 font-medium">{{ row.pctF }}%</td>
+                    class="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                    <td class="px-4 py-2.5 font-medium text-slate-700">{{ row.label }}</td>
+                    <td class="px-3 py-2.5 text-right font-bold text-slate-800">{{ row.total.toLocaleString() }}</td>
+                    <td class="px-3 py-2.5 text-right text-blue-600">{{ row.male.toLocaleString() }}</td>
+                    <td class="px-3 py-2.5 text-right text-blue-400 font-medium">{{ row.pctM }}%</td>
+                    <td class="px-3 py-2.5 text-right text-pink-600">{{ row.female.toLocaleString() }}</td>
+                    <td class="px-3 py-2.5 text-right text-pink-400 font-medium">{{ row.pctF }}%</td>
                     <td class="px-4 py-2.5">
-                      <div v-if="row.total > 0" class="flex h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div v-if="row.total > 0" class="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                         <div class="h-full bg-blue-400 transition-all" :style="{ width: row.pctM + '%' }"></div>
                         <div class="h-full bg-pink-400 transition-all" :style="{ width: row.pctF + '%' }"></div>
                       </div>
-                      <span v-else class="text-gray-300">—</span>
+                      <span v-else class="text-slate-200">—</span>
                     </td>
                   </tr>
                 </tbody>
@@ -614,87 +602,38 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- L&D Section -->
-          <div class="section-divider">Learning & Development</div>
-          <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div v-for="c in lndCards" :key="c.label"
-              class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div class="flex items-center gap-2 mb-2">
-                <span :class="[c.dot, 'h-2 w-2 rounded-full']"></span>
-                <span class="text-xs text-gray-500">{{ c.sub }}</span>
-              </div>
-              <p class="text-3xl font-bold text-gray-900">{{ c.value.toLocaleString() }}</p>
-              <p :class="[c.color, 'mt-1 text-xs font-semibold']">{{ c.label }}</p>
-            </div>
-          </div>
-
-          <!-- Rewards & Recognition Section -->
-          <div class="section-divider">Rewards & Recognition (PRAISE)</div>
-          <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div v-for="c in rewardsCards" :key="c.label"
-              class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-              <div class="flex items-center gap-2 mb-2">
-                <span :class="[c.dot, 'h-2 w-2 rounded-full']"></span>
-                <span class="text-xs text-gray-500">{{ c.sub }}</span>
-              </div>
-              <p class="text-3xl font-bold text-gray-900">{{ c.value.toLocaleString() }}</p>
-              <p :class="[c.color, 'mt-1 text-xs font-semibold']">{{ c.label }}</p>
-            </div>
-          </div>
-
-        </div>
+        </div><!-- /main-left -->
 
         <!-- RIGHT SIDEBAR -->
-        <div class="space-y-5">
+        <div class="main-right">
 
-          <!-- Calendar -->
+          <!-- Facility Calendar -->
           <div class="card overflow-hidden">
             <p class="card-title mb-3">Facility Calendar</p>
-            <div class="rounded-xl overflow-hidden border border-gray-100 text-xs" ref="calendarContainer">
+            <div class="rounded-xl overflow-hidden border border-slate-100 text-xs" ref="calendarContainer">
               <FullCalendar :options="calendarOptions" />
             </div>
           </div>
 
-          <!-- Module Quick Stats -->
+          <!-- Pending Overview (merged Module Status + All Pending) -->
           <div class="card">
-            <p class="card-title mb-3">Module Status</p>
-            <div class="space-y-2">
-              <div v-for="m in moduleStats" :key="m.label"
-                class="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-gray-50">
-                <div class="flex items-center gap-2">
-                  <span :class="[m.dot, 'h-2 w-2 shrink-0 rounded-full']"></span>
-                  <span class="text-xs text-gray-700 truncate">{{ m.label }}</span>
-                </div>
+            <div class="flex items-center justify-between mb-3">
+              <p class="card-title">Pending Overview</p>
+              <span class="pending-total-badge">{{ totalPendingRequests }}</span>
+            </div>
+            <div class="space-y-1">
+              <div
+                v-for="item in requestOverview"
+                :key="item.label"
+                class="pending-row"
+              >
+                <span class="pending-row-label">{{ item.label }}</span>
                 <div class="flex items-center gap-2 shrink-0">
-                  <span v-if="m.pending > 0"
-                    class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                    {{ m.pending }}
-                  </span>
-                  <span class="text-[10px] text-gray-400">/ {{ m.total }}</span>
+                  <span v-if="item.pending > 0" class="pending-count">{{ item.pending }}</span>
+                  <span v-else class="text-xs text-slate-300">—</span>
+                  <span class="pending-total-small">/ {{ item.total }}</span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <!-- Pending Summary -->
-          <div class="card">
-            <p class="card-title mb-3">All Pending</p>
-            <div class="space-y-1.5">
-              <div v-for="item in requestOverview" :key="item.label"
-                class="flex items-center justify-between rounded-lg px-3 py-1.5 hover:bg-gray-50">
-                <span class="text-xs text-gray-600 truncate mr-2">{{ item.label }}</span>
-                <span v-if="item.pending > 0"
-                  class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                  {{ item.pending }}
-                </span>
-                <span v-else class="shrink-0 text-xs text-gray-300">—</span>
-              </div>
-            </div>
-            <div class="mt-3 border-t pt-3 flex items-center justify-between">
-              <span class="text-xs font-semibold text-gray-500">Total</span>
-              <span class="rounded-full bg-indigo-100 px-3 py-0.5 text-xs font-bold text-indigo-700">
-                {{ totalPendingRequests }}
-              </span>
             </div>
           </div>
 
@@ -702,45 +641,58 @@ onMounted(() => {
           <div class="card">
             <p class="card-title mb-3">Recent IPCR</p>
             <div v-if="recentIPCRs.length" class="space-y-3">
-              <div v-for="ipcr in recentIPCRs" :key="ipcr.id"
-                class="border-l-2 border-indigo-200 pl-3">
-                <p class="text-xs font-semibold text-gray-800 truncate">{{ ipcr.user }}</p>
-                <p class="text-[10px] text-gray-500">{{ ipcr.rating_period }}</p>
-                <div class="mt-0.5 flex items-center gap-2">
-                  <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
-                    {{ ipcr.status }}
-                  </span>
-                  <span class="text-[10px] text-gray-400">{{ ipcr.updated_at }}</span>
+              <div v-for="ipcr in recentIPCRs" :key="ipcr.id" class="ipcr-row">
+                <!-- Avatar initials -->
+                <div class="ipcr-avatar">
+                  {{ (ipcr.user ?? '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() }}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="ipcr-name">{{ ipcr.user }}</p>
+                  <p class="ipcr-period">{{ ipcr.rating_period }}</p>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="ipcr-status-chip">{{ ipcr.status }}</span>
+                    <span class="ipcr-date">{{ ipcr.updated_at }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <p v-else class="text-xs text-gray-400">No recent submissions.</p>
+            <p v-else class="text-xs text-slate-400">No recent submissions.</p>
           </div>
 
-          <!-- HR Summary -->
+          <!-- HR Summary (compact stat grid) -->
           <div class="card">
             <p class="card-title mb-3">HR Summary</p>
-            <div class="space-y-2">
-              <div v-for="row in [
-                { label: 'Total Employees', value: totalEmployees, bold: true },
-                { label: 'Faculty',         value: facultyCount },
-                { label: 'Staff',           value: staffCount },
-                { label: 'Active Divisions',value: activeDivisions },
-                { label: 'Male',            value: employeeMaleCount },
-                { label: 'Female',          value: employeeFemaleCount },
-              ]" :key="row.label"
-                class="flex items-center justify-between text-xs">
-                <span class="text-gray-500">{{ row.label }}</span>
-                <span :class="row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'">
-                  {{ row.value.toLocaleString() }}
-                </span>
+            <div class="hr-stat-grid">
+              <div class="hr-stat">
+                <p class="hr-stat-val">{{ totalEmployees.toLocaleString() }}</p>
+                <p class="hr-stat-lbl">Total Employees</p>
+              </div>
+              <div class="hr-stat">
+                <p class="hr-stat-val">{{ facultyCount.toLocaleString() }}</p>
+                <p class="hr-stat-lbl">Faculty</p>
+              </div>
+              <div class="hr-stat">
+                <p class="hr-stat-val">{{ staffCount.toLocaleString() }}</p>
+                <p class="hr-stat-lbl">Staff</p>
+              </div>
+              <div class="hr-stat">
+                <p class="hr-stat-val">{{ activeDivisions }}</p>
+                <p class="hr-stat-lbl">Divisions</p>
+              </div>
+              <div class="hr-stat hr-stat-male">
+                <p class="hr-stat-val text-blue-700">{{ employeeMaleCount.toLocaleString() }}</p>
+                <p class="hr-stat-lbl">Male</p>
+              </div>
+              <div class="hr-stat hr-stat-female">
+                <p class="hr-stat-val text-pink-700">{{ employeeFemaleCount.toLocaleString() }}</p>
+                <p class="hr-stat-lbl">Female</p>
               </div>
             </div>
           </div>
 
-        </div>
-      </div>
-    </div>
+        </div><!-- /main-right -->
+      </div><!-- /main-grid -->
+    </div><!-- /dash-root -->
 
     <!-- Facility Date Modal -->
     <Teleport to="body">
@@ -748,24 +700,24 @@ onMounted(() => {
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showDateModal = false" />
         <div class="relative z-10 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
           <div class="mb-4 flex items-center justify-between">
-            <h4 class="font-semibold text-gray-800">Facility Requests — {{ selectedDate }}</h4>
-            <button class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" @click="showDateModal = false">✕</button>
+            <h4 class="font-semibold text-slate-800">Facility Requests — {{ selectedDate }}</h4>
+            <button class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" @click="showDateModal = false">✕</button>
           </div>
-          <div v-if="loadingBookings" class="py-8 text-center text-sm text-gray-400">Loading…</div>
+          <div v-if="loadingBookings" class="py-8 text-center text-sm text-slate-400">Loading…</div>
           <div v-else>
             <p v-if="bookingsError" class="mb-3 text-sm text-red-500">{{ bookingsError }}</p>
-            <p v-if="!dateBookings.length" class="text-sm text-gray-400">No facility requests for this date.</p>
+            <p v-if="!dateBookings.length" class="text-sm text-slate-400">No facility requests for this date.</p>
             <ul v-else class="space-y-3 max-h-80 overflow-y-auto">
-              <li v-for="b in dateBookings" :key="b.id" class="rounded-xl border border-gray-100 p-4">
+              <li v-for="b in dateBookings" :key="b.id" class="rounded-xl border border-slate-100 p-4">
                 <div class="flex items-start justify-between gap-4">
                   <div>
-                    <p class="text-sm font-semibold text-gray-800">{{ b.activity || '—' }}</p>
-                    <p class="text-xs text-gray-500 mt-0.5">{{ b.requester_name || '—' }} · {{ b.requester_unit || '' }}</p>
-                    <p class="text-xs text-gray-500">Venue: {{ (b.venue?.length ? b.venue.join(', ') : '—') }}</p>
-                    <p class="text-xs text-gray-500">{{ b.time_start || '—' }} — {{ b.time_end || '—' }}</p>
+                    <p class="text-sm font-semibold text-slate-800">{{ b.activity || '—' }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ b.requester_name || '—' }} · {{ b.requester_unit || '' }}</p>
+                    <p class="text-xs text-slate-500">Venue: {{ (b.venue?.length ? b.venue.join(', ') : '—') }}</p>
+                    <p class="text-xs text-slate-500">{{ b.time_start || '—' }} — {{ b.time_end || '—' }}</p>
                   </div>
                   <div class="shrink-0 text-right space-y-1">
-                    <span :class="b.status?.includes('Approved') ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'"
+                    <span :class="b.status?.includes('Approved') ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
                       class="rounded-full px-2 py-0.5 text-xs font-medium">{{ b.status || '—' }}</span>
                     <div>
                       <span v-if="b.has_it_job" class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
@@ -783,49 +735,414 @@ onMounted(() => {
   </AdminLayout>
 </template>
 
-<!-- Reusable local component via script -->
+<!-- Reusable local component -->
 <script>
 const EmptyState = {
   props: ['text'],
-  template: `<div class="flex h-full min-h-[120px] items-center justify-center text-sm text-gray-300">{{ text }}</div>`,
+  template: `<div class="flex h-full min-h-[120px] items-center justify-center text-sm text-slate-300 gap-2"><span>—</span><span>{{ text }}</span></div>`,
 }
 export default { components: { EmptyState } }
 </script>
 
 <style>
-/* Dashboard utility classes — plain CSS, no @apply needed */
-.card {
-  border-radius: 1rem;
-  border: 1px solid #f3f4f6;
-  background: #ffffff;
-  padding: 1.25rem;
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  transition: box-shadow 0.2s;
+/* ════════════════════════════════════════════════════════════
+   ROOT
+════════════════════════════════════════════════════════════ */
+.dash-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
-.card:hover { box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); }
 
-.card-header { margin-bottom: 1rem; display: flex; align-items: flex-start; justify-content: space-between; }
+/* ════════════════════════════════════════════════════════════
+   HERO BANNER
+════════════════════════════════════════════════════════════ */
+.hero-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #060e50 0%, #1447c0 65%, #0093b8 100%);
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 4px 24px rgba(6,14,80,.35);
+}
 
-.card-title { font-size: 0.875rem; font-weight: 600; color: #1f2937; letter-spacing: -0.01em; }
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
 
-.card-sub { font-size: 0.75rem; color: #9ca3af; margin-top: 0.125rem; }
-
-.section-divider {
+.hero-inner {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #9ca3af;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
-.section-divider::before,
-.section-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #f3f4f6;
+
+.hero-left { display: flex; align-items: center; gap: 1rem; }
+
+.hero-avatar {
+  height: 3.5rem;
+  width: 3.5rem;
+  border-radius: 99px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,.15);
+  border: 2px solid rgba(255,255,255,.3);
+  box-shadow: 0 0 0 3px rgba(0,200,232,.25), 0 4px 16px rgba(0,0,0,.2);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: .02em;
+  backdrop-filter: blur(6px);
+}
+
+.hero-greeting {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+}
+
+.hero-date {
+  font-size: .75rem;
+  color: rgba(255,255,255,.6);
+  margin-top: .2rem;
+}
+
+.hero-right { text-align: right; }
+
+.hero-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: rgba(0,200,232,.18);
+  border: 1px solid rgba(0,200,232,.35);
+  border-radius: 99px;
+  padding: .35rem .85rem;
+  font-size: .8rem;
+  color: #7eeeff;
+  backdrop-filter: blur(4px);
+}
+
+.hero-pending-sub {
+  font-size: .7rem;
+  color: rgba(255,255,255,.4);
+  margin-top: .3rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   GAD BANNER
+════════════════════════════════════════════════════════════ */
+.gad-banner {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  border-radius: .875rem;
+  background: linear-gradient(90deg, #eff6ff 0%, #fff 50%, #fdf2f8 100%);
+  border: 1px solid #e0e7ff;
+  padding: .65rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+
+.gad-icon { font-size: 1.1rem; color: #7c3aed; flex-shrink: 0; }
+
+.gad-text { font-size: .75rem; color: #475569; flex: 1; }
+
+.gad-bold { font-weight: 700; color: #4c1d95; }
+
+.gad-legend {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-shrink: 0;
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.gad-dot { display: inline-block; height: .55rem; width: .55rem; border-radius: 99px; flex-shrink: 0; }
+.gad-dot-m { background: #3b82f6; }
+.gad-dot-f { background: #ec4899; }
+.gad-legend-label { color: #64748b; }
+
+/* ════════════════════════════════════════════════════════════
+   KPI GRID
+════════════════════════════════════════════════════════════ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .875rem;
+}
+@media (min-width: 640px)  { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1280px) { .kpi-grid { grid-template-columns: repeat(5, 1fr); } }
+
+.kpi-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 1rem;
+  border: 1px solid rgba(0,0,0,.06);
+  border-left-width: 4px;
+  padding: 1.25rem 1.125rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.03);
+  transition: transform .18s, box-shadow .18s;
+  overflow: hidden;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.05);
+}
+
+.kpi-icon-float {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  opacity: .4;
+}
+
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -.045em;
+  line-height: 1;
+  margin-top: .375rem;
+}
+
+.kpi-label {
+  font-size: .75rem;
+  font-weight: 600;
+  color: #475569;
+  margin-top: .375rem;
+  line-height: 1.3;
+}
+
+.kpi-sub {
+  font-size: .7rem;
+  color: #94a3b8;
+  margin-top: .3rem;
+}
+
+.kpi-sex-bar {
+  display: flex;
+  height: .25rem;
+  border-radius: 99px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+.kpi-sex-male  { background: #60a5fa; }
+.kpi-sex-female{ background: #f472b6; }
+
+.kpi-sex-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: .25rem;
+}
+.kpi-sex-m { font-size: .6rem; font-weight: 600; color: #3b82f6; }
+.kpi-sex-f { font-size: .6rem; font-weight: 600; color: #ec4899; }
+
+/* ════════════════════════════════════════════════════════════
+   MAIN LAYOUT
+════════════════════════════════════════════════════════════ */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+@media (min-width: 1024px) {
+  .main-grid { grid-template-columns: 1fr 280px; }
+}
+
+.main-left  { display: flex; flex-direction: column; gap: 1.25rem; }
+.main-right { display: flex; flex-direction: column; gap: 1rem; }
+
+/* ════════════════════════════════════════════════════════════
+   CARDS
+════════════════════════════════════════════════════════════ */
+.card {
+  background: #ffffff;
+  border-radius: .875rem;
+  border: 1px solid rgba(0,0,0,.055);
+  padding: 1.125rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.03);
+  transition: box-shadow .2s;
+}
+.card:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.04);
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: .875rem;
+}
+
+.card-title {
+  font-size: .8125rem;
+  font-weight: 700;
+  color: #0d1f8a;
+  letter-spacing: -.01em;
+}
+
+.card-sub {
+  font-size: .7rem;
+  color: #94a3b8;
+  margin-top: .125rem;
+}
+
+/* ════════════════════════════════════════════════════════════
+   SECTION HEADS
+════════════════════════════════════════════════════════════ */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  font-size: .7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #0d1f8a;
+  padding-left: .625rem;
+  border-left: 3px solid #1447c0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   SEX PILLS (employee / student breakdown)
+════════════════════════════════════════════════════════════ */
+.sex-pills { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.sex-pill {
+  border-radius: .625rem;
+  padding: .5rem .625rem;
+  text-align: center;
+}
+.sex-pill-m { background: #eff6ff; }
+.sex-pill-f { background: #fdf2f8; }
+.sex-pill-val { font-size: 1rem; font-weight: 700; color: inherit; }
+.sex-pill-m .sex-pill-val { color: #1d4ed8; }
+.sex-pill-f .sex-pill-val { color: #be185d; }
+.sex-pill-lbl { font-size: .65rem; margin-top: .1rem; }
+.sex-pill-m .sex-pill-lbl { color: #60a5fa; }
+.sex-pill-f .sex-pill-lbl { color: #f472b6; }
+
+/* ════════════════════════════════════════════════════════════
+   GAD CHIP
+════════════════════════════════════════════════════════════ */
+.gad-chip {
+  border-radius: 99px;
+  background: #fdf2f8;
+  padding: .2rem .65rem;
+  font-size: .65rem;
+  font-weight: 700;
+  color: #be185d;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR — PENDING OVERVIEW
+════════════════════════════════════════════════════════════ */
+.pending-total-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: .7rem;
+  font-weight: 800;
+  padding: .1rem .55rem;
+  border-radius: 99px;
+  min-width: 1.75rem;
+}
+
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .35rem .5rem;
+  border-radius: .5rem;
+  transition: background .12s;
+}
+.pending-row:hover { background: #f8fafc; }
+.pending-row-label { font-size: .7rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: .5rem; }
+.pending-count {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: .65rem;
+  font-weight: 700;
+  padding: .1rem .4rem;
+  border-radius: 99px;
+}
+.pending-total-small { font-size: .6rem; color: #cbd5e1; }
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR — RECENT IPCR
+════════════════════════════════════════════════════════════ */
+.ipcr-row { display: flex; align-items: flex-start; gap: .625rem; }
+
+.ipcr-avatar {
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #1447c0, #00c8e8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .55rem;
+  font-weight: 800;
+  color: white;
+  flex-shrink: 0;
+  letter-spacing: .02em;
+}
+
+.ipcr-name   { font-size: .75rem; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ipcr-period { font-size: .65rem; color: #94a3b8; }
+.ipcr-status-chip {
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: .6rem;
+  font-weight: 600;
+  padding: .1rem .45rem;
+  border-radius: 99px;
+}
+.ipcr-date { font-size: .6rem; color: #cbd5e1; }
+
+/* ════════════════════════════════════════════════════════════
+   SIDEBAR — HR SUMMARY STAT GRID
+════════════════════════════════════════════════════════════ */
+.hr-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .5rem;
+}
+
+.hr-stat {
+  background: #f8fafc;
+  border-radius: .5rem;
+  padding: .5rem .5rem .4rem;
+  text-align: center;
+}
+.hr-stat-male   { background: #eff6ff; }
+.hr-stat-female { background: #fdf2f8; }
+
+.hr-stat-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -.03em;
+}
+.hr-stat-lbl {
+  font-size: .6rem;
+  color: #94a3b8;
+  margin-top: .1rem;
 }
 </style>
-

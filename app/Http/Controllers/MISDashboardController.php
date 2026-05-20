@@ -156,4 +156,9 @@ class MISDashboardController extends Controller
             'recentRequests'     => $recentRequests,
         ]);
     }
+
+    public function architecture()
+    {
+        return \Inertia\Inertia::render('MIS/Architecture');
+    }
 }
