@@ -32,7 +32,7 @@ class ChatController extends Controller
                 'id'     => $user->id,
                 'name'   => $user->name,
                 'avatar' => $user->profile_picture
-                    ? asset('storage/' . $user->profile_picture)
+                    ? route('storage.proxy', ['path' =>$user->profile_picture])
                     : null,
             ],
         ]);
@@ -51,11 +51,11 @@ class ChatController extends Controller
             'sender_id'       => $msg->sender_id,
             'sender_name'     => $msg->sender?->name ?? 'Unknown',
             'sender_avatar'   => $msg->sender?->profile_picture
-                                    ? asset('storage/' . $msg->sender->profile_picture)
+                                    ? route('storage.proxy', ['path' =>$msg->sender->profile_picture])
                                     : null,
             'body'            => $msg->body,
             'attachment_path' => $msg->attachment_path
-                                    ? asset('storage/' . $msg->attachment_path)
+                                    ? route('storage.proxy', ['path' =>$msg->attachment_path])
                                     : null,
             'attachment_type' => $msg->attachment_type,
             'read_at'         => $msg->read_at?->toIso8601String(),
@@ -80,13 +80,13 @@ class ChatController extends Controller
                                     ?->name,
             'avatar'       => $conv->type === 'direct'
                                 ? ($conv->participants->firstWhere('id', '!=', $userId)?->profile_picture
-                                    ? asset('storage/' . $conv->participants->firstWhere('id', '!=', $userId)->profile_picture)
+                                    ? route('storage.proxy', ['path' =>$conv->participants->firstWhere('id', '!=', $userId)->profile_picture])
                                     : null)
                                 : null,
             'participants' => $conv->participants->map(fn (User $u) => [
                 'id'     => $u->id,
                 'name'   => $u->name,
-                'avatar' => $u->profile_picture ? asset('storage/' . $u->profile_picture) : null,
+                'avatar' => $u->profile_picture ? route('storage.proxy', ['path' =>$u->profile_picture]) : null,
             ])->values(),
             'unread_count' => $conv->unreadCountFor($userId),
             'latest_message' => $latest ? [
@@ -352,7 +352,7 @@ class ChatController extends Controller
                 'id'       => $u->id,
                 'name'     => $u->name,
                 'position' => $u->position,
-                'avatar'   => $u->profile_picture ? asset('storage/' . $u->profile_picture) : null,
+                'avatar'   => $u->profile_picture ? route('storage.proxy', ['path' =>$u->profile_picture]) : null,
             ]);
 
         return response()->json(['users' => $users]);

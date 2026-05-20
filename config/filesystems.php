@@ -45,7 +45,7 @@ return [
             'region'     => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
             'bucket'     => env('AWS_BUCKET'),
             'url'        => env('AWS_URL'),
-            'visibility' => 'public',
+            'visibility' => 'private',
             'throw'      => false,
             'report'     => false,
         ] : [

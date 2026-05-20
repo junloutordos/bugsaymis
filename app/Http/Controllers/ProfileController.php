@@ -36,11 +36,11 @@ class ProfileController extends Controller
         $user = $request->user();
         $data = $request->validated();
 
-        // Handle file uploads if present and store them on the `public` disk.
+        // Store uploads on the private S3 disk — served through the storage proxy.
         if ($request->hasFile('profile_picture')) {
             $file = $request->file('profile_picture');
             Log::info('Profile picture received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
-            $path = $file->store('profile_pictures', 'public');
+            $path = \Illuminate\Support\Facades\Storage::disk('s3')->putFile('profile_pictures', $file);
             if (! $path) {
                 return back()->withErrors(['profile_picture' => 'Failed to upload profile picture. Please try again.']);
             }
@@ -52,7 +52,7 @@ class ProfileController extends Controller
         if ($request->hasFile('electronic_signature')) {
             $file = $request->file('electronic_signature');
             Log::info('Electronic signature received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
-            $path = $file->store('signatures', 'public');
+            $path = \Illuminate\Support\Facades\Storage::disk('s3')->putFile('signatures', $file);
             if (! $path) {
                 return back()->withErrors(['electronic_signature' => 'Failed to upload signature. Please try again.']);
             }
