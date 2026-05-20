@@ -51,17 +51,32 @@ function subscribeToConversation(convId) {
     })
 }
 
+function subscribeToPersonalChannel() {
+  if (!window.Echo) return
+  window.Echo
+    .private(`user.${props.authUser.id}`)
+    .listen('.new.message', ({ message }) => {
+      // Fires when a message arrives in a conversation we may not be viewing.
+      // injectIncomingMessage handles both active-conversation append and badge increment.
+      if (message.sender_id !== props.authUser.id) {
+        injectIncomingMessage(message)
+      }
+    })
+}
+
 function unsubscribeAll() {
   subscribedIds.forEach(id => {
     try { window.Echo?.leave(`conversation.${id}`) } catch (_) {}
   })
   subscribedIds.clear()
+  try { window.Echo?.leave(`user.${props.authUser.id}`) } catch (_) {}
 }
 
-// Subscribe to all loaded conversations (so we get badges for non-active ones)
+// Subscribe to all loaded conversations — immediate:true catches conversations
+// already loaded before the watcher is registered (avoids race condition)
 watch(conversations, (list) => {
   list.forEach(c => subscribeToConversation(c.id))
-}, { deep: false })
+}, { deep: false, immediate: true })
 
 // Subscribe immediately when a new conversation becomes active
 watch(activeConversation, (conv) => {
@@ -133,6 +148,7 @@ function handleKeydown(e) {
 onMounted(() => {
   fetchConversations()
   monitorEchoConnection()
+  subscribeToPersonalChannel()
 })
 </script>
 

@@ -289,13 +289,7 @@ class ChatController extends Controller
             ->each(function (User $recipient) use ($conversation, $payload) {
                 broadcast(new NewMessageNotification($recipient->id, [
                     'conversation_id' => $conversation->id,
-                    'message'         => [
-                        'id'         => $payload['id'],
-                        'body'       => $payload['body'],
-                        'sender_id'  => $payload['sender_id'],
-                        'sender_name'=> $payload['sender_name'],
-                        'created_at' => $payload['created_at'],
-                    ],
+                    'message'         => $payload,
                 ]));
             });
 
