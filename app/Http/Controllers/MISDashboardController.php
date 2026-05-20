@@ -80,17 +80,22 @@ class MISDashboardController extends Controller
         })->values();
 
         // ── MIS Personnel Workload ─────────────────────────────────────────────
+        // Group by users.id (not the free-text attendedby column) so each MIS
+        // person appears exactly once regardless of name-formatting variations.
 
-        $personnelWorkload = DB::table('it_job_requests')
-            ->whereNotNull('attendedby')
-            ->where('attendedby', '!=', '')
-            ->selectRaw("
-                attendedby,
-                COUNT(*) as total,
-                ROUND(AVG(CASE WHEN rating IS NOT NULL THEN rating END), 1) as avg_rating,
-                SUM(CASE WHEN status = 'Acted by MIS' THEN 1 ELSE 0 END) as pending
-            ")
-            ->groupBy('attendedby')
+        $personnelWorkload = DB::table('users')
+            ->join('role_user', 'role_user.user_id', '=', 'users.id')
+            ->join('roles', 'roles.id', '=', 'role_user.role_id')
+            ->where('roles.name', 'MIS')
+            ->leftJoin('it_job_requests', 'it_job_requests.assignedto', '=', 'users.id')
+            ->select([
+                'users.id',
+                DB::raw("users.name as attendedby"),
+                DB::raw("COUNT(it_job_requests.id) as total"),
+                DB::raw("ROUND(AVG(CASE WHEN it_job_requests.rating IS NOT NULL THEN it_job_requests.rating END), 1) as avg_rating"),
+                DB::raw("SUM(CASE WHEN it_job_requests.status = 'Acted by MIS' THEN 1 ELSE 0 END) as pending"),
+            ])
+            ->groupBy('users.id', 'users.name')
             ->orderByDesc('total')
             ->get();
 
