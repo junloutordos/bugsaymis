@@ -5,18 +5,27 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\FacilityRequest;
+use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use App\Mail\FacilityRequestCreatedMail;
+use App\Services\NotificationService;
 use App\Models\Division;
+use App\Services\NotificationService;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Models\Facility;
+use App\Services\NotificationService;
 use App\Enums\ApprovalStep;
+use App\Services\NotificationService;
 use App\Services\SnapshotService;
+use App\Services\NotificationService;
 use App\Services\DigitalSignatureService;
+use App\Services\NotificationService;
 use App\Http\Traits\SignsDocuments;
+use App\Services\NotificationService;
 
 class FacilityRequestController extends Controller
 {
@@ -929,6 +938,7 @@ class FacilityRequestController extends Controller
 
         if ($request->action === 'approve') {
             $facilityRequest->update(['status' => 'Approved']);
+            if ($facilityRequest->requester) { NotificationService::notifyUser($facilityRequest->requester, 'Facility Request', "#{$facilityRequest->id}", 'Approved by FAD', route('facility-requests.index')); }
 
             $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
                 'fad_approval',
@@ -948,6 +958,7 @@ class FacilityRequestController extends Controller
         } else {
             $request->validate(['reason' => 'nullable|string|max:1000']);
             $facilityRequest->update(['status' => 'Declined', 'decline_reason' => $request->input('reason') ?? 'Declined by FAD Chief.', 'declined_at' => now()]);
+            if ($facilityRequest->requester) { NotificationService::notifyUser($facilityRequest->requester, 'Facility Request', "#{$facilityRequest->id}", 'Declined by FAD', route('facility-requests.index')); }
             try {
                 $requesterEmail = $facilityRequest->requester?->email ?? null;
                 if ($requesterEmail) {

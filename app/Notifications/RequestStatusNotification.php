@@ -20,22 +20,7 @@ class RequestStatusNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        // Include webpush only if the package is installed and user has a subscription
-        $channels = ['database', 'broadcast'];
-        if (class_exists(\NotificationChannels\WebPush\WebPushChannel::class)) {
-            $channels[] = \NotificationChannels\WebPush\WebPushChannel::class;
-        }
-        return $channels;
-    }
-
-    public function toWebPush(object $notifiable, $notification): \NotificationChannels\WebPush\WebPushMessage
-    {
-        return \NotificationChannels\WebPush\WebPushMessage::create()
-            ->title("{$this->requestType} — {$this->newStatus}")
-            ->body($this->referenceNo . ($this->remarks ? ": {$this->remarks}" : ''))
-            ->icon('/images/pshslogo.png')
-            ->data(['url' => $this->url])
-            ->option('TTL', 3600);
+        return ['database', 'broadcast'];
     }
 
     public function toArray(object $notifiable): array

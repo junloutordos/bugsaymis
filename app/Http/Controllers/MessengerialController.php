@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\MessengerialRequest;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use App\Models\Division;
@@ -234,6 +235,7 @@ class MessengerialController extends Controller
 
         $messengerialRequest->status = 'Approved';
         $messengerialRequest->save();
+        if ($messengerialRequest->user) { NotificationService::notifyUser($messengerialRequest->user, 'Messengerial Request', $messengerialRequest->reference_no ?? "#{$messengerialRequest->id}", 'Approved by Division Chief', route('messengerial.index')); }
 
         $approver = User::find($chief);
 
@@ -310,6 +312,7 @@ class MessengerialController extends Controller
         }
 
         $messengerialRequest->status = 'Declined';
+        if ($messengerialRequest->user) { NotificationService::notifyUser($messengerialRequest->user, 'Messengerial Request', $messengerialRequest->reference_no ?? "#{$messengerialRequest->id}", 'Rejected by Division Chief', route('messengerial.index')); }
         $messengerialRequest->decline_reason = $request->input('reason');
         $messengerialRequest->declined_at = now();
         $messengerialRequest->save();
@@ -407,6 +410,7 @@ class MessengerialController extends Controller
         if ($request->action === 'approve') {
             $messengerialRequest->status = 'Approved';
             $messengerialRequest->save();
+            if ($messengerialRequest->user) { NotificationService::notifyUser($messengerialRequest->user, 'Messengerial Request', $messengerialRequest->reference_no ?? "#{$messengerialRequest->id}", 'Approved by Division Chief', route('messengerial.index')); }
 
             $this->performSign($request, MessengerialRequest::class, $messengerialRequest->id,
                 'division_chief',
@@ -444,6 +448,7 @@ class MessengerialController extends Controller
         } else {
             $request->validate(['reason' => 'nullable|string|max:1000']);
             $messengerialRequest->status       = 'Declined';
+            if ($messengerialRequest->user) { NotificationService::notifyUser($messengerialRequest->user, 'Messengerial Request', $messengerialRequest->reference_no ?? "#{$messengerialRequest->id}", 'Rejected by Division Chief', route('messengerial.index')); }
             $messengerialRequest->decline_reason = $request->input('reason');
             $messengerialRequest->declined_at  = now();
             $messengerialRequest->save();
@@ -611,6 +616,7 @@ class MessengerialController extends Controller
 
         $messengerialRequest->proof_of_delivery = $path;
         $messengerialRequest->status = 'Completed';
+        if ($messengerialRequest->user) { NotificationService::notifyUser($messengerialRequest->user, 'Messengerial Request', $messengerialRequest->reference_no ?? "#{$messengerialRequest->id}", 'Delivery Completed', route('messengerial.index')); }
         $messengerialRequest->completed_at = now();
 
         // assign additional fields
@@ -705,6 +711,7 @@ class MessengerialController extends Controller
 
         if ($request->action === 'approve') {
             $messengerialRequest->update(['status' => 'OCD Approved']);
+        if ($messengerialRequest->user) { NotificationService::notifyUser($messengerialRequest->user, 'Messengerial Request', $messengerialRequest->reference_no ?? "#{$messengerialRequest->id}", 'Approved by OCD', route('messengerial.index')); }
         } else {
             $request->validate(['reason' => 'nullable|string|max:1000']);
             $messengerialRequest->update([

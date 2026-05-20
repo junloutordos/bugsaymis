@@ -20,7 +20,7 @@
         "league/csv": "^9.24",
         "league/flysystem-aws-s3-v3": "^3.32",
         "maatwebsite/excel": "^3.1",
-        "laravel-notification-channels/webpush": "^9.0",
+        "minishlink/web-push": "^9.0",
         "mpdf/mpdf": "^8.2",
         "setasign/fpdi": "^2.6.7",
         "phpoffice/phpspreadsheet": "^1.30",
