@@ -6,6 +6,7 @@ use App\Enums\ApprovalStep;
 use App\Models\HR\LeaveApplication;
 use App\Models\User;
 use App\Services\HR\DTRService;
+use App\Services\NotificationService;
 use App\Services\SnapshotService;
 use Illuminate\Support\Facades\DB;
 
@@ -112,6 +113,17 @@ class ApprovalService
                         $this->dtr->applyLeaveToExistingDtrRecords($application);
                     } else {
                         $this->credits->restoreLeaveCredits($application->id, $approver->id);
+                    }
+                    // Push notification to applicant on final decision
+                    if ($application->user) {
+                        NotificationService::notifyUser(
+                            $application->user,
+                            'Leave Application',
+                            "Leave #{$application->id}",
+                            $action === 'approved' ? 'Approved by Campus Director' : 'Rejected by Campus Director',
+                            route('hr.leave.index'),
+                            $remarks,
+                        );
                     }
                     break;
             }

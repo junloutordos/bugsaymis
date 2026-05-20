@@ -6,6 +6,7 @@ use App\Models\ITJobRequest;
 use App\Models\ITJRTrackingLog;
 use App\Models\ITJobCategory;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Models\ICTEquipment;
 use App\Models\ICTPMSHistory;
 use App\Mail\DivisionChiefITJRApprovalMail;
@@ -213,6 +214,15 @@ public function index(Request $request)
             Mail::to($jobRequest->user->email)
                 ->send(new ITJRStatusMail($jobRequest, 'Division Chief Approved', null, 'Division Chief'));
         }
+        if ($jobRequest->user) {
+            NotificationService::notifyUser(
+                $jobRequest->user,
+                'IT Job Request',
+                $jobRequest->itjr_no,
+                'Approved by Division Chief',
+                route('jobrequests.index'),
+            );
+        }
 
         // Notify OCD users
         $ocdUsers = User::havingRole('OCD')->get();
@@ -336,6 +346,15 @@ public function index(Request $request)
                 'error' => $e->getMessage()
             ]);
         }
+    }
+    if ($jobRequest->user) {
+        NotificationService::notifyUser(
+            $jobRequest->user,
+            'IT Job Request',
+            $jobRequest->itjr_no,
+            'Approved by OCD — now In Progress',
+            route('jobrequests.index'),
+        );
     }
     if ($jobRequest->assignedto) {
         $admin = User::find($jobRequest->assignedto);
@@ -480,6 +499,15 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+    if ($jobRequest->user) {
+        NotificationService::notifyUser(
+            $jobRequest->user,
+            'IT Job Request',
+            $jobRequest->itjr_no,
+            $isActedByMIS ? 'Acted by MIS — please confirm completion' : 'Assessed by MIS',
+            route('jobrequests.index'),
+        );
     }
 
     // Auto-generate PDF when status becomes "Acted by MIS"

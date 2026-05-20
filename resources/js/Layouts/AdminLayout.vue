@@ -6,6 +6,7 @@ const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
 import ProfileEditModal from '@/Components/ProfileEditModal.vue';
+import NotificationBell from '@/Components/NotificationBell.vue';
 import {
   HomeIcon,
   UsersIcon,
@@ -2056,8 +2057,9 @@ filteredMenu.value.forEach((item) => {
           <span v-if="title" class="hidden md:block text-sm font-medium text-gray-700">{{ title }}</span>
         </div>
 
-        <!-- Right: chat + profile -->
+        <!-- Right: notifications + chat + profile -->
         <div class="flex items-center gap-2">
+          <NotificationBell v-if="user?.id" :user-id="user.id" />
 
         <!-- Privacy Policy -->
         <a
