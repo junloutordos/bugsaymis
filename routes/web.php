@@ -204,6 +204,13 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
+// ── Web Push subscriptions ────────────────────────────────────────────────────
+Route::get('/api/push-subscriptions/vapid-public-key', [\App\Http\Controllers\PushSubscriptionController::class, 'vapidPublicKey'])->name('push.vapid-key');
+Route::middleware(['auth'])->group(function () {
+    Route::post('/api/push-subscriptions',   [\App\Http\Controllers\PushSubscriptionController::class, 'store'])->name('push.subscribe');
+    Route::delete('/api/push-subscriptions', [\App\Http\Controllers\PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
+});
+
 // ── In-app notifications ──────────────────────────────────────────────────────
 Route::middleware(['auth'])->prefix('api/notifications')->group(function () {
     Route::get('/',           [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
