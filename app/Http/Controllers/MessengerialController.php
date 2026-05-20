@@ -378,8 +378,10 @@ class MessengerialController extends Controller
             ->withQueryString();
 
         return Inertia::render('Messengerial/ForApprovalMessengerial', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
         ]);
     }
 

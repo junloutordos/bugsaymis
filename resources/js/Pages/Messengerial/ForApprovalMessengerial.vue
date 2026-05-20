@@ -6,15 +6,23 @@ import { CheckCircleIcon, XCircleIcon, EyeIcon } from "@heroicons/vue/24/outline
 import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
-  requests: Object,
-  filters: Object,
+  requests:     Object,
+  filters:      Object,
+  hasPin:       { type: Boolean, default: false },
+  signatureUri: { type: String,  default: null },
 })
 
 const showModal = ref(false)
 const selectedRequest = ref(null)
 const isSubmitting = ref(false)
+
+// ── Digital signature PIN ─────────────────────────────────────────────────────
+const sigShow          = ref(false)
+const sigLoading       = ref(false)
+const pendingApproveId = ref(null)
 
 const search = ref(props.filters?.search ?? '')
 const isLoading = ref(false)
@@ -66,25 +74,27 @@ const closeModal = () => {
   showModal.value = false
 }
 
-const approveRequest = async (id) => {
-  const result = await Swal.fire({
-    title: "Approve this request?",
-    text: "The request will be approved and Records will be notified.",
-    icon: "question",
-    showCancelButton: true,
-    confirmButtonText: "Yes, approve it!",
-    cancelButtonText: "Cancel",
-    reverseButtons: true,
-  })
+const approveRequest = (id) => {
+  pendingApproveId.value = id
+  sigShow.value = true
+}
 
-  if (result.isConfirmed) {
-    isSubmitting.value = true
-    Swal.fire({ title: 'Approving...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
-    router.post(route('messengerial.division-chief-action', id), { action: 'approve' }, {
-      onSuccess: () => Swal.fire("Approved!", "The request has been approved.", "success"),
-      onFinish: () => { isSubmitting.value = false },
-    })
-  }
+const handleApproveConfirm = (pin) => {
+  sigShow.value   = false
+  sigLoading.value = false
+  const id = pendingApproveId.value
+  pendingApproveId.value = null
+  isSubmitting.value = true
+  Swal.fire({ title: 'Approving...', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false, didOpen: () => { Swal.showLoading() } })
+  router.post(route('messengerial.division-chief-action', id), { action: 'approve', pin }, {
+    onSuccess: () => Swal.fire('Approved!', 'The request has been approved.', 'success'),
+    onFinish:  () => { isSubmitting.value = false },
+  })
+}
+
+const handleApproveCancel = () => {
+  sigShow.value          = false
+  pendingApproveId.value = null
 }
 
 const rejectRequest = async (id) => {
@@ -217,6 +227,17 @@ const rejectRequest = async (id) => {
           <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Next</button>
         </div>
       </div>
+
+      <!-- Digital Signature PIN modal -->
+      <DigitalSignaturePin
+        :show="sigShow"
+        :has-pin="props.hasPin"
+        :signature-uri="props.signatureUri"
+        :loading="sigLoading"
+        confirm-label="Sign & Approve"
+        @confirm="handleApproveConfirm"
+        @cancel="handleApproveCancel"
+      />
 
       <!-- Detail Modal -->
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
