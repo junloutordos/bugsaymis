@@ -32,6 +32,9 @@ jobs:
           extensions: pdo_mysql, mbstring, exif, pcntl, bcmath, gd, zip
           coverage: none
 
+      - name: Update pinned security dependencies
+        run: composer update setasign/fpdi --no-interaction --no-progress
+
       - name: Install Composer dependencies
         run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
