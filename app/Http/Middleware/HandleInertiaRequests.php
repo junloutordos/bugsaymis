@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Middleware;
 use App\Models\Consultation;
 use App\Models\ITJobRequest;
@@ -64,8 +65,12 @@ class HandleInertiaRequests extends Middleware
                         // expose numeric/string role ids for client-side checks (may be CSV)
                         'role_id' => $authUser->role_id ?? $userRoles->pluck('id')->implode(','),
                         'sex' => $authUser->sex,
-                        'profile_picture' => $authUser->profile_picture,
-                        'electronic_signature' => $authUser->electronic_signature,
+                        'profile_picture' => $authUser->profile_picture
+                            ? $this->s3Url($authUser->profile_picture)
+                            : null,
+                        'electronic_signature' => $authUser->electronic_signature
+                            ? $this->s3Url($authUser->electronic_signature)
+                            : null,
                         'permissions' => $authUser->getPermissions(),
                         'primary_unit' => fn () => $authUser->primaryUnitAssignment?->unit
                             ? [
@@ -236,6 +241,17 @@ class HandleInertiaRequests extends Middleware
                 }
             },
         ]);
+    }
+
+    private function s3Url(?string $path): ?string
+    {
+        if (! $path) return null;
+        if (str_starts_with($path, 'http')) return $path;
+        try {
+            return Storage::disk('s3')->temporaryUrl($path, now()->addHour());
+        } catch (\Throwable) {
+            return route('storage.proxy', ['path' => $path]);
+        }
     }
 
 }

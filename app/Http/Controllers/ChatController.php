@@ -32,7 +32,7 @@ class ChatController extends Controller
                 'id'     => $user->id,
                 'name'   => $user->name,
                 'avatar' => $user->profile_picture
-                    ? route('storage.proxy', ['path' =>$user->profile_picture])
+                    ? $this->s3Url($user->profile_picture)
                     : null,
             ],
         ]);
@@ -41,8 +41,21 @@ class ChatController extends Controller
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     /**
-     * Serialize a message for API / broadcast payloads.
+     * Generate a temporary (1-hour) presigned S3 URL for a private file.
+     * Falls back to the storage proxy route when S3 is not configured (local dev).
      */
+    private function s3Url(?string $path): ?string
+    {
+        if (! $path) return null;
+        if (str_starts_with($path, 'http')) return $path;
+
+        try {
+            return Storage::disk('s3')->temporaryUrl($path, now()->addHour());
+        } catch (\Throwable) {
+            return route('storage.proxy', ['path' => $path]);
+        }
+    }
+
     private function serializeMessage(Message $msg): array
     {
         return [
@@ -50,13 +63,9 @@ class ChatController extends Controller
             'conversation_id' => $msg->conversation_id,
             'sender_id'       => $msg->sender_id,
             'sender_name'     => $msg->sender?->name ?? 'Unknown',
-            'sender_avatar'   => $msg->sender?->profile_picture
-                                    ? route('storage.proxy', ['path' =>$msg->sender->profile_picture])
-                                    : null,
+            'sender_avatar'   => $this->s3Url($msg->sender?->profile_picture),
             'body'            => $msg->body,
-            'attachment_path' => $msg->attachment_path
-                                    ? route('storage.proxy', ['path' =>$msg->attachment_path])
-                                    : null,
+            'attachment_path' => $this->s3Url($msg->attachment_path),
             'attachment_type' => $msg->attachment_type,
             'read_at'         => $msg->read_at?->toIso8601String(),
             'created_at'      => $msg->created_at->toIso8601String(),
@@ -80,13 +89,13 @@ class ChatController extends Controller
                                     ?->name,
             'avatar'       => $conv->type === 'direct'
                                 ? ($conv->participants->firstWhere('id', '!=', $userId)?->profile_picture
-                                    ? route('storage.proxy', ['path' =>$conv->participants->firstWhere('id', '!=', $userId)->profile_picture])
+                                    ? $this->s3Url($conv->participants->firstWhere('id', '!=', $userId)->profile_picture)
                                     : null)
                                 : null,
             'participants' => $conv->participants->map(fn (User $u) => [
                 'id'     => $u->id,
                 'name'   => $u->name,
-                'avatar' => $u->profile_picture ? route('storage.proxy', ['path' =>$u->profile_picture]) : null,
+                'avatar' => $u->profile_picture ? $this->s3Url($u->profile_picture) : null,
             ])->values(),
             'unread_count' => $conv->unreadCountFor($userId),
             'latest_message' => $latest ? [
@@ -352,7 +361,7 @@ class ChatController extends Controller
                 'id'       => $u->id,
                 'name'     => $u->name,
                 'position' => $u->position,
-                'avatar'   => $u->profile_picture ? route('storage.proxy', ['path' =>$u->profile_picture]) : null,
+                'avatar'   => $u->profile_picture ? $this->s3Url($u->profile_picture) : null,
             ]);
 
         return response()->json(['users' => $users]);
