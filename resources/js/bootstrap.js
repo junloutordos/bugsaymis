@@ -15,9 +15,12 @@ window.Echo = new Echo({
     wsHost:            import.meta.env.VITE_PUSHER_HOST       ?? 'localhost',
     wsPort:            Number(import.meta.env.VITE_PUSHER_PORT ?? 9601),
     wssPort:           Number(import.meta.env.VITE_PUSHER_PORT ?? 9601),
+    httpHost:          import.meta.env.VITE_PUSHER_HOST       ?? 'localhost',
+    httpPort:          Number(import.meta.env.VITE_PUSHER_PORT ?? 9601),
     cluster:           import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
     forceTLS:          (import.meta.env.VITE_PUSHER_SCHEME ?? 'http') === 'https',
-    enabledTransports: ['ws', 'wss'],
+    // Try WebSocket first; fall back to HTTP polling if WebSocket is blocked (e.g. Cloudflare WAF)
+    enabledTransports: ['ws', 'wss', 'xhr_streaming', 'xhr_polling'],
     disableStats:      true,
 });
 
