@@ -204,6 +204,23 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
+// ── Temporary: test push notification (admin only) ───────────────────────────
+Route::middleware(['auth'])->get('/_test-push', function (\Illuminate\Http\Request $req) {
+    $user = $req->user();
+    $subs = $user->pushSubscriptions()->count();
+    \App\Services\NotificationService::notifyUser(
+        $user, 'Test Notification', 'CRCMIS-TEST-001',
+        '🎉 Web Push is working!', '/dashboard',
+        'Tap to open CRCMIS dashboard.'
+    );
+    return response()->json([
+        'sent_to'       => $user->name,
+        'subscriptions' => $subs,
+        'in_app_bell'   => true,
+        'web_push'      => $subs > 0 ? 'sent' : 'no subscriptions — allow notifications in browser first',
+    ]);
+});
+
 // ── Web Push subscriptions ────────────────────────────────────────────────────
 Route::get('/api/push-subscriptions/vapid-public-key', [\App\Http\Controllers\PushSubscriptionController::class, 'vapidPublicKey'])->name('push.vapid-key');
 Route::middleware(['auth'])->group(function () {
