@@ -134,7 +134,7 @@ class GatePassController extends Controller
     public function store(Request $request)
     {
         $input = $request->only([
-            'controlno','badgeNumber','badgeID','gatepass_type','gatepass_timeout','gatepass_timein','gatepass_date','gatepass_datefiled','destination','purpose','date_time_approved','actual_timeout','actual_timein','time_consumed','status'
+            'controlno','badgeNumber','badgeID','gatepass_type','gatepass_timeout','gatepass_timein','gatepass_date','gatepass_datefiled','destination','purpose','date_time_approved','actual_timeout','actual_timein','time_consumed'
         ]);
 
         $validator = \Illuminate\Support\Facades\Validator::make($input, [
@@ -152,7 +152,6 @@ class GatePassController extends Controller
             'actual_timeout' => 'nullable|string|max:100',
             'actual_timein' => 'nullable|string|max:100',
             'time_consumed' => 'nullable|string|max:50',
-            'status' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -228,9 +227,8 @@ class GatePassController extends Controller
             strtolower(trim($submitterDivision->division_name)) === strtolower('Office of the Campus Director');
         $bypassDivisionChief = $submitter && ($submitter->hasRole('DivisionChief') || $isOCDDivision);
 
-        // Status: skip to 'Division Approved' when DC step is bypassed so OCD sees it immediately
-        $insert['status'] = !empty($data['status']) ? $data['status']
-            : ($bypassDivisionChief ? 'Division Approved' : 'Pending');
+        // Status is always computed server-side — never trust client-supplied status.
+        $insert['status'] = $bypassDivisionChief ? 'Division Approved' : 'Pending';
 
         $id = DB::table('gatepass')->insertGetId(array_merge($insert, ['created_at' => now(), 'updated_at' => now()]));
 
@@ -315,14 +313,17 @@ class GatePassController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        // If the authenticated user is a DivisionChief, enforce approval/decline
-        // behavior and do not allow changing the requestor's badgeNumber.
-        $role = $request->user()?->role->name ?? '';
-        if ($role === 'DivisionChief') {
-            // If the Division Chief intentionally set the status to 'Division Declined',
-            // preserve that; otherwise treat the action as approval and set to
-            // 'Division Approved'. This prevents client-side tampering with badgeNumber
-            // while allowing the chief to explicitly decline with a reason.
+        // Status transitions are only allowed through dedicated approval endpoints.
+        // Non-approver roles (regular staff filing updates) must never set status directly.
+        $user = $request->user();
+        $role = $user?->role->name ?? '';
+        $isApprover = in_array($role, ['DivisionChief', 'OCD', 'Administrator']);
+
+        if (! $isApprover) {
+            // Strip status entirely — regular users can only update form fields
+            unset($data['status']);
+        } elseif ($role === 'DivisionChief') {
+            // Division Chief may only set the two allowed transition values
             if (isset($data['status']) && $data['status'] === 'Division Declined') {
                 $data['status'] = 'Division Declined';
             } else {

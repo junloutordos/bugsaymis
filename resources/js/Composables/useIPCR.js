@@ -1,6 +1,5 @@
 import { ref, reactive, computed } from "vue"
 import { router } from "@inertiajs/vue3"
-import * as XLSX from "xlsx"
 import Swal from "sweetalert2"
 
 export function useIPCR(props) {
