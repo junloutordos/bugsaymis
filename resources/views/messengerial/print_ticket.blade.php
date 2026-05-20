@@ -203,11 +203,7 @@
         </div>
 
         <div class="sig-box">
-            @if(isset($sigs['division_chief']['uri']))
-                <img src="{{ $sigs['division_chief']['uri'] }}" alt="Signature" class="sig-img" />
-            @endif
             <div class="sig-line"></div>
-            @if(isset($sigs['division_chief'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['division_chief']['name'] }} · {{ optional($sigs['division_chief']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             Received by
         </div>
     </div>
@@ -307,11 +303,7 @@
         </div>
 
         <div class="sig-box">
-            @if(isset($sigs['division_chief']['uri']))
-                <img src="{{ $sigs['division_chief']['uri'] }}" alt="Signature" class="sig-img" />
-            @endif
             <div class="sig-line"></div>
-            @if(isset($sigs['division_chief'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['division_chief']['name'] }} · {{ optional($sigs['division_chief']['signed_at'])->format('M d, Y H:i') }}</div> @endif
             Received by
         </div>
     </div>
