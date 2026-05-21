@@ -284,10 +284,6 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
-    // ── Technical Documentation (Admin only) ─────────────────────────────────
-    Route::get('/technical-docs', [\App\Http\Controllers\TechnicalDocsController::class, 'index'])
-        ->middleware('role:Administrator')
-        ->name('technical-docs.index');
 
     // ── Data Privacy Policy ───────────────────────────────────────────────────
     Route::get('/privacy', fn () => inertia('Privacy/Index'))->name('privacy.index');
