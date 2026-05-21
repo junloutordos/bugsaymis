@@ -2,101 +2,71 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class ProfileController extends Controller
 {
-    /**
-     * Display the user's profile form.
-     */
-    public function edit(Request $request): Response
+    public function edit(Request $request)
     {
-        return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => session('status'),
+        $user = $request->user()->load(['division', 'office', 'roles']);
+
+        return Inertia::render('Profile/Index', [
+            'profile' => [
+                'id'                  => $user->id,
+                'name'                => $user->name,
+                'email'               => $user->email,
+                'position'            => $user->position,
+                'specialization'      => $user->specialization,
+                'sex'                 => $user->sex,
+                'emp_category'        => $user->emp_category,
+                'employee_no'         => $user->employee_no,
+                'salary_grade'        => $user->salary_grade,
+                'salary_step'         => $user->salary_step,
+                'status'              => $user->status,
+                'division'            => $user->division?->only('id', 'name'),
+                'office'              => $user->office?->only('id', 'name'),
+                'roles'               => $user->roles->pluck('name'),
+                'profile_picture_url' => $user->profile_picture
+                    ? Storage::disk('s3')->temporaryUrl($user->profile_picture, now()->addMinutes(30))
+                    : null,
+                'has_signature'       => (bool) $user->electronic_signature,
+            ],
         ]);
     }
 
-    /**
-     * Update the user's profile information.
-     */
-    public function update(ProfileUpdateRequest $request)
+    public function update(Request $request)
     {
-        Log::info('ProfileController::update called', ['has_files' => count($request->files->all()), 'files_keys' => array_keys($request->files->all())]);
-        Log::info('Request input keys', ['keys' => array_keys($request->all())]);
+        $validated = $request->validate([
+            'name'                => 'required|string|max:255',
+            'specialization'      => 'nullable|string|max:255',
+            'profile_photo_base64'=> 'nullable|string',
+            'profile_photo_mime'  => 'nullable|string|in:image/jpeg,image/jpg,image/png',
+        ]);
+
         $user = $request->user();
-        $data = $request->validated();
+        $user->name            = $validated['name'];
+        $user->specialization  = $validated['specialization'] ?? $user->specialization;
 
-        // Store uploads on the private S3 disk — served through the storage proxy.
-        if ($request->hasFile('profile_picture')) {
-            $file = $request->file('profile_picture');
-            Log::info('Profile picture received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
-            $path = \Illuminate\Support\Facades\Storage::disk('s3')->putFile('profile_pictures', $file);
-            if (! $path) {
-                return back()->withErrors(['profile_picture' => 'Failed to upload profile picture. Please try again.']);
+        if (! empty($validated['profile_photo_base64'])) {
+            $raw  = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $validated['profile_photo_base64']));
+            $ext  = str_contains($validated['profile_photo_mime'] ?? '', 'png') ? 'png' : 'jpg';
+            $path = 'profile_pictures/' . $user->id . '_' . time() . '.' . $ext;
+
+            Storage::disk('s3')->put($path, $raw);
+
+            // Delete old photo from S3
+            if ($user->profile_picture && $user->profile_picture !== $path) {
+                Storage::disk('s3')->delete($user->profile_picture);
             }
-            $data['profile_picture'] = $path;
-        } else {
-            Log::info('No profile picture file received.');
-        }
 
-        if ($request->hasFile('electronic_signature')) {
-            $file = $request->file('electronic_signature');
-            Log::info('Electronic signature received', ['original' => $file->getClientOriginalName(), 'mime' => $file->getClientMimeType()]);
-            $path = \Illuminate\Support\Facades\Storage::disk('s3')->putFile('signatures', $file);
-            if (! $path) {
-                return back()->withErrors(['electronic_signature' => 'Failed to upload signature. Please try again.']);
-            }
-            Log::info('Electronic signature stored', ['path' => $path]);
-            $data['electronic_signature'] = $path;
-        } else {
-            Log::info('No electronic signature file received.');
-        }
-
-        $user->fill($data);
-
-        if ($user->isDirty('email')) {
-            $user->email_verified_at = null;
+            $user->profile_picture = $path;
         }
 
         $user->save();
 
-        // If this is a normal AJAX request (not an Inertia request), return JSON so the client can handle it.
-        if ($request->ajax() && ! $request->header('X-Inertia')) {
-            return response()->json(['message' => 'Profile updated']);
-        }
-
-        // Otherwise return a RedirectResponse (Inertia or normal form submit will follow it).
-        return Redirect::route('profile.edit');
-    }
-
-    /**
-     * Delete the user's account.
-     */
-    public function destroy(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'password' => ['required', 'current_password'],
-        ]);
-
-        $user = $request->user();
-
-        Auth::logout();
-
-        $user->delete();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return Redirect::to('/');
+        return back()->with('success', 'Profile updated successfully.');
     }
 }
