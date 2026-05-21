@@ -321,6 +321,111 @@ const typeColors = {
   ops:  'bg-slate-100 text-slate-600',
 }
 
+// ── Conventions data (kept in script to avoid template parser issues) ─────
+const conventions = [
+  {
+    title: 'PHP / Laravel',
+    items: [
+      'Thin controllers — move business logic to Service classes in app/Services/',
+      "Always eager load to avoid N+1: User::with(['role', 'division', 'office'])",
+      'Permission middleware: permission:a|b (ANY) · permission:a,b (ALL)',
+      "Soft delete = set status = 'inactive' (no Laravel SoftDeletes trait)",
+      "After mutation: return back()->with('success', 'Message.')",
+      "After create: return redirect()->route('resource.index')->with('success', '...')",
+      'mPDF tempDir must use sys_get_temp_dir() — never storage_path()',
+      "File uploads: base64 decode → Storage::disk('s3')->put() — never multipart",
+    ],
+  },
+  {
+    title: 'Vue / Frontend',
+    items: [
+      'Always use script setup (Composition API) — no Options API',
+      'Icons only from @heroicons/vue/24/outline',
+      'Form submissions: useForm() from @inertiajs/vue3 or axios JSON',
+      "Currency: toLocaleString('en-PH', { minimumFractionDigits: 2 })",
+      "Dates: toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })",
+      'Pagination: PER_PAGE = 15, local computed slice',
+      'No TypeScript, no .ts files, no @ts-check',
+      'No Vuex / Pinia — use Inertia props + local ref()',
+    ],
+  },
+  {
+    title: 'Database / Migrations',
+    items: [
+      'Filename: YYYY_MM_DD_HHMMSS_description_snake_case.php',
+      'Always write down() to reverse the migration',
+      "Add columns with ->after('existing_column')",
+      'Run via: docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan migrate"',
+      'Never modify an existing migration — add a new one',
+      'Foreign keys: use constrained() with appropriate onDelete behavior',
+    ],
+  },
+  {
+    title: 'Git Workflow',
+    items: [
+      'Stage specific files by name — never git add -A or git add .',
+      'Commit messages: imperative mood, short summary',
+      'Deploy: git checkout main && git merge junlou && git push origin main',
+      'Never force push to main',
+      'Never skip hooks (--no-verify)',
+    ],
+  },
+]
+
+const infraBlocks = [
+  {
+    title: 'CI/CD Pipeline',
+    icon: RocketLaunchIcon,
+    colorCls: 'text-indigo-500',
+    items: [
+      'Push to main → GitHub Actions triggers',
+      'docker buildx build with VITE_* as --build-arg',
+      'Pushes to ECR with immutable tag (commit SHA)',
+      'Updates ECS task definition with new image',
+      'ECS rolling deployment (2 tasks, circuit breaker ON)',
+      'Migrations run automatically on container start (docker-entrypoint.sh)',
+    ],
+  },
+  {
+    title: 'Secrets Management',
+    icon: KeyIcon,
+    colorCls: 'text-amber-500',
+    items: [
+      'SSM Parameter Store: /crcmis/prod/* (DB, mail, Redis, VAPID, S3)',
+      'AWS Secrets Manager: crcmis/google-drive-credentials (service account JSON)',
+      'VAPID public key baked into Vite bundle as VITE_VAPID_PUBLIC_KEY',
+      'Never put secrets in code or plaintext env vars',
+      'ECS task role pulls SSM params at startup via docker-entrypoint.sh',
+    ],
+  },
+  {
+    title: 'Database Operations',
+    icon: CircleStackIcon,
+    colorCls: 'text-emerald-500',
+    items: [
+      'RDS MySQL 8.0, Multi-AZ, encrypted at rest (KMS), deletion protection ON',
+      'Automated backups: 7-day retention',
+      'Daily backup cron: mysqldump → gzip → Google Drive (service account)',
+      'Production Artisan: aws ecs execute-command --cluster crcmis-prod',
+      "tinker in prod: env HOME=/tmp php /var/www/artisan tinker --execute='...'",
+      'Restore: base64 exfiltrate from ECS exec session',
+    ],
+  },
+  {
+    title: 'PHP Security Config',
+    icon: ServerIcon,
+    colorCls: 'text-red-500',
+    items: [
+      'open_basedir = /var/www:/tmp:/usr/local/etc/php',
+      'max_execution_time = 120 (scripts time out after 2 min)',
+      'allow_url_fopen = Off (no remote URL fetching)',
+      'disable_functions: system, shell_exec, passthru, proc_open, popen, pcntl_exec',
+      'exec() is ALLOWED (needed for mysqldump backup cron)',
+      'session.cookie_httponly = 1, cookie_secure = 1, use_strict_mode = 1',
+    ],
+  },
+]
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtType(t) {
   const map = { varchar: 'varchar', int: 'int', bigint: 'bigint', text: 'text', timestamp: 'ts', tinyint: 'bool', enum: 'enum', json: 'json', date: 'date', decimal: 'decimal' }
@@ -691,55 +796,7 @@ function fmtType(t) {
         <section v-if="activeSection === 'conventions'" class="space-y-5">
           <h1 class="text-2xl font-bold text-slate-800">Code Conventions</h1>
 
-          <div v-for="block in [
-            {
-              title: 'PHP / Laravel',
-              items: [
-                'Thin controllers — move business logic to Service classes in app/Services/',
-                'Always eager load to avoid N+1: User::with([\'role\', \'division\', \'office\'])',
-                'Permission middleware: permission:a|b (ANY) · permission:a,b (ALL)',
-                'Soft delete = set status = \'inactive\' (no Laravel SoftDeletes trait)',
-                'After mutation: return back()->with(\'success\', \'Message.\')',
-                'After create: return redirect()->route(\'resource.index\')->with(\'success\', \'...\')',
-                'mPDF tempDir must use sys_get_temp_dir() — never storage_path()',
-                'File uploads: base64 decode → Storage::disk(\'s3\')->put() — never multipart',
-              ],
-            },
-            {
-              title: 'Vue / Frontend',
-              items: [
-                'Always use <script setup> (Composition API) — no Options API',
-                'Icons only from @heroicons/vue/24/outline',
-                'Form submissions: useForm() from @inertiajs/vue3 or axios JSON',
-                'Currency: toLocaleString(\'en-PH\', { minimumFractionDigits: 2 })',
-                'Dates: toLocaleDateString(\'en-PH\', { year: \'numeric\', month: \'long\', day: \'numeric\' })',
-                'Pagination: PER_PAGE = 15, local computed slice',
-                'No TypeScript, no .ts files, no @ts-check',
-                'No Vuex / Pinia — use Inertia props + local ref()',
-              ],
-            },
-            {
-              title: 'Database / Migrations',
-              items: [
-                'Filename: YYYY_MM_DD_HHMMSS_description_snake_case.php',
-                'Always write down() to reverse the migration',
-                'Add columns with ->after(\'existing_column\')',
-                'Run via: docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan migrate"',
-                'Never modify an existing migration — add a new one',
-                'Foreign keys: use constrained() with appropriate onDelete behavior',
-              ],
-            },
-            {
-              title: 'Git Workflow',
-              items: [
-                'Stage specific files by name — never git add -A or git add .',
-                'Commit messages: imperative mood, short summary',
-                'Deploy: git checkout main && git merge junlou && git push origin main',
-                'Never force push to main',
-                'Never skip hooks (--no-verify)',
-              ],
-            },
-          ]" :key="block.title"
+          <div v-for="block in conventions" :key="block.title"
             class="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
             <h2 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <CodeBracketIcon class="h-4 w-4 text-indigo-500" />
@@ -760,63 +817,10 @@ function fmtType(t) {
           <h1 class="text-2xl font-bold text-slate-800">Infrastructure & Deployment</h1>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="block in [
-              {
-                title: 'CI/CD Pipeline',
-                icon: RocketLaunchIcon,
-                color: 'indigo',
-                items: [
-                  'Push to main → GitHub Actions triggers',
-                  'docker buildx build with VITE_* as --build-arg',
-                  'Pushes to ECR with immutable tag (commit SHA)',
-                  'Updates ECS task definition with new image',
-                  'ECS rolling deployment (2 tasks, circuit breaker ON)',
-                  'Migrations run automatically on container start (docker-entrypoint.sh)',
-                ],
-              },
-              {
-                title: 'Secrets Management',
-                icon: KeyIcon,
-                color: 'amber',
-                items: [
-                  'SSM Parameter Store: /crcmis/prod/* (DB, mail, Redis, VAPID, S3)',
-                  'AWS Secrets Manager: crcmis/google-drive-credentials (service account JSON)',
-                  'VAPID public key baked into Vite bundle as VITE_VAPID_PUBLIC_KEY',
-                  'Never put secrets in code or plaintext env vars',
-                  'ECS task role pulls SSM params at startup via docker-entrypoint.sh',
-                ],
-              },
-              {
-                title: 'Database Operations',
-                icon: CircleStackIcon,
-                color: 'emerald',
-                items: [
-                  'RDS MySQL 8.0, Multi-AZ, encrypted at rest (KMS), deletion protection ON',
-                  'Automated backups: 7-day retention',
-                  'Daily backup cron: mysqldump → gzip → Google Drive (service account)',
-                  'Production Artisan: aws ecs execute-command --cluster crcmis-prod',
-                  'tinker in prod: env HOME=/tmp php /var/www/artisan tinker --execute=\'...\'',
-                  'Restore: base64 exfiltrate from ECS exec session',
-                ],
-              },
-              {
-                title: 'PHP Security Config',
-                icon: ServerIcon,
-                color: 'red',
-                items: [
-                  'open_basedir = /var/www:/tmp:/usr/local/etc/php',
-                  'max_execution_time = 120 (scripts time out after 2 min)',
-                  'allow_url_fopen = Off (no remote URL fetching)',
-                  'disable_functions: system, shell_exec, passthru, proc_open, popen, pcntl_exec',
-                  'exec() is ALLOWED (needed for mysqldump backup cron)',
-                  'session.cookie_httponly = 1, cookie_secure = 1, use_strict_mode = 1',
-                ],
-              },
-            ]" :key="block.title"
+            <div v-for="block in infraBlocks" :key="block.title"
               class="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
               <h2 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <component :is="block.icon" class="h-4 w-4 shrink-0"
-                  :class="`text-${block.color}-500`" />
+                <component :is="block.icon" class="h-4 w-4 shrink-0" :class="block.colorCls" />
                 {{ block.title }}
               </h2>
               <ul class="space-y-1.5">
