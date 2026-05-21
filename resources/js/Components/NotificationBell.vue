@@ -155,7 +155,7 @@ onUnmounted(() => {
     <!-- Bell button -->
     <button
       @click.stop="open = !open"
-      class="relative p-1.5 rounded-lg text-blue-200/70 hover:bg-white/10 hover:text-white transition-all duration-150 focus:outline-none"
+      class="relative p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors focus:outline-none"
       aria-label="Notifications"
     >
       <component :is="unreadCount > 0 ? BellAlertIcon : BellIcon" class="h-5 w-5" />
