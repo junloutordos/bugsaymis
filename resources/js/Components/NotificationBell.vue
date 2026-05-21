@@ -91,22 +91,39 @@ function urlBase64ToUint8Array(base64) {
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
   const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
-  if (!vapidKey) return  // not configured in this build
+  if (!vapidKey) return
 
   try {
+    // Unregister any stale SW registrations that aren't crcmis-sw.js so their
+    // push subscriptions stop receiving FCM deliveries bound to the wrong SW.
+    const allRegs = await navigator.serviceWorker.getRegistrations()
+    for (const r of allRegs) {
+      const script = r.active?.scriptURL ?? r.installing?.scriptURL ?? r.waiting?.scriptURL ?? ''
+      if (!script.endsWith('/crcmis-sw.js')) {
+        const oldSub = await r.pushManager.getSubscription().catch(() => null)
+        if (oldSub) await oldSub.unsubscribe().catch(() => null)
+        await r.unregister()
+      }
+    }
+
     const reg = await navigator.serviceWorker.register('/crcmis-sw.js')
     const perm = await Notification.requestPermission()
     if (perm !== 'granted') return
 
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
-    })
+    // Re-use existing subscription if already under this registration, else create one.
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      })
+    }
+
     const json = sub.toJSON()
     await axios.post(route('push.subscribe'), {
       endpoint:         json.endpoint,
       keys:             json.keys,
-      content_encoding: (sub.options?.applicationServerKey ? 'aes128gcm' : 'aesgcm'),
+      content_encoding: 'aes128gcm',
     })
     pushEnabled.value = true
   } catch (e) {

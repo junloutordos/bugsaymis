@@ -204,6 +204,12 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
+// ── Temporary: clear this user's push subscriptions (debug) ─────────────────
+Route::middleware(['auth'])->get('/_clear-push', function (\Illuminate\Http\Request $req) {
+    $deleted = $req->user()->pushSubscriptions()->delete();
+    return response()->json(['cleared' => $deleted]);
+});
+
 // ── Temporary: test push notification (admin only) ───────────────────────────
 Route::middleware(['auth'])->get('/_test-push', function (\Illuminate\Http\Request $req) {
     $user = $req->user();
