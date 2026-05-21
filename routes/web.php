@@ -682,32 +682,33 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
     // ── Document Tracking System ──────────────────────────────────────────────
     Route::prefix('document-tracking')->name('document-tracking.')->group(function () {
-        // Document CRUD
-        Route::get('/',          [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('index');
-        Route::post('/',         [\App\Http\Controllers\DocumentTrackingController::class, 'store'])->name('store');
-        Route::get('/{document}',[\App\Http\Controllers\DocumentTrackingController::class, 'show'])->name('show');
-        Route::post('/{document}/complete', [\App\Http\Controllers\DocumentTrackingController::class, 'complete'])->name('complete');
-        Route::post('/{document}/annotate', [\App\Http\Controllers\DocumentTrackingController::class, 'annotate'])->name('annotate');
-        Route::get('/{document}/scan/{attachment}', [\App\Http\Controllers\DocumentTrackingController::class, 'viewScan'])->name('scan');
+        // Static/prefix routes MUST come before the /{document} wildcard
+        Route::get('/',    [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('index');
+        Route::post('/',   [\App\Http\Controllers\DocumentTrackingController::class, 'store'])->name('store');
 
-        // Routing step actions
+        // Routing step actions (static path segment "routings" — before wildcard)
         Route::post('/routings/{routing}/receive', [\App\Http\Controllers\DocumentTrackingController::class, 'receive'])->name('receive');
         Route::post('/routings/{routing}/act',     [\App\Http\Controllers\DocumentTrackingController::class, 'act'])->name('act');
         Route::post('/routings/{routing}/forward', [\App\Http\Controllers\DocumentTrackingController::class, 'forward'])->name('forward');
         Route::post('/routings/{routing}/return',  [\App\Http\Controllers\DocumentTrackingController::class, 'returnDoc'])->name('return');
 
-        // Document Type management (admin)
+        // Document Type management ("types" prefix — before wildcard)
         Route::prefix('types')->name('types.')->group(function () {
             Route::get('/',    [\App\Http\Controllers\DocumentTypeController::class, 'index'])->name('index');
             Route::post('/',   [\App\Http\Controllers\DocumentTypeController::class, 'store'])->name('store');
             Route::put('/{documentType}',   [\App\Http\Controllers\DocumentTypeController::class, 'update'])->name('update');
             Route::delete('/{documentType}',[\App\Http\Controllers\DocumentTypeController::class, 'destroy'])->name('destroy');
-            // Routing steps
             Route::post('/{documentType}/steps',  [\App\Http\Controllers\DocumentTypeController::class, 'storeStep'])->name('steps.store');
             Route::post('/{documentType}/reorder',[\App\Http\Controllers\DocumentTypeController::class, 'reorderSteps'])->name('steps.reorder');
             Route::put('/steps/{step}',    [\App\Http\Controllers\DocumentTypeController::class, 'updateStep'])->name('steps.update');
             Route::delete('/steps/{step}', [\App\Http\Controllers\DocumentTypeController::class, 'destroyStep'])->name('steps.destroy');
         });
+
+        // Wildcard /{document} LAST — after all static segments
+        Route::get('/{document}',                   [\App\Http\Controllers\DocumentTrackingController::class, 'show'])->name('show');
+        Route::post('/{document}/complete',          [\App\Http\Controllers\DocumentTrackingController::class, 'complete'])->name('complete');
+        Route::post('/{document}/annotate',          [\App\Http\Controllers\DocumentTrackingController::class, 'annotate'])->name('annotate');
+        Route::get('/{document}/scan/{attachment}',  [\App\Http\Controllers\DocumentTrackingController::class, 'viewScan'])->name('scan');
     });
 
     // Messengerial CRUD routes (any authenticated user may create; controller enforces edit/delete rules)

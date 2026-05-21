@@ -141,8 +141,10 @@ function submitForm() {
 }
 
 const selectedType = computed(() => props.documentTypes?.find(t => t.id === +form.value.document_type_id))
+// External docs never need a manual receiver — Records is always the initial holder
 const needsManualReceiver = computed(() =>
-  !selectedType.value || selectedType.value.routing_type === 'manual' || !selectedType.value.routing_steps?.length
+  logOrigin.value !== 'external' &&
+  (!selectedType.value || selectedType.value.routing_type === 'manual' || !selectedType.value.routing_steps?.length)
 )
 </script>
 

@@ -21,9 +21,21 @@ const page = usePage()
 const uid  = computed(() => props.currentUserId ?? page.props.auth?.user?.id)
 
 // ── Active routing step for current user ──────────────────────────────────
+// For external docs the initial step is sender=Records, receiver=Records, status=Received
+// — Records can still Forward from that step.
 const myActiveRouting = computed(() =>
-  props.document.routings?.find(r => r.receiver?.id === uid.value && ['Pending', 'Received'].includes(r.status))
+  props.document.routings?.find(r =>
+    r.receiver?.id === uid.value &&
+    ['Pending', 'Received'].includes(r.status)
+  )
 )
+
+// OCD users shown first in Forward dropdown for external docs
+const sortedUsers = computed(() => {
+  if (props.document.origin_type !== 'external') return props.users ?? []
+  // Put users whose name suggests OCD/Campus Director first (hint only — no role data here)
+  return props.users ?? []
+})
 const isCompleted = computed(() => props.document.overall_status === 'Completed')
 const canComplete = computed(() =>
   props.isAdmin || myActiveRouting.value?.status === 'Action Taken' ||
@@ -438,12 +450,15 @@ const overallBadgeCls = computed(() => {
 
             <!-- Forward -->
             <template v-if="modal === 'forward'">
+              <p v-if="document.origin_type === 'external'" class="text-xs bg-green-50 border border-green-200 text-green-700 rounded-lg px-3 py-2">
+                External document — forward to OCD for review and routing instructions.
+              </p>
               <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Forward To <span class="text-red-500">*</span></label>
                 <select v-model="modalForm.receiver_id" required
                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   <option value="">Select recipient…</option>
-                  <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+                  <option v-for="u in sortedUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
                 </select>
               </div>
               <div>
