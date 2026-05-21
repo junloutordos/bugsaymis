@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Division;
+use App\Models\Office;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -10,26 +12,31 @@ class ProfileController extends Controller
 {
     public function edit(Request $request)
     {
-        $user = $request->user()->load(['division', 'office', 'roles']);
+        $user = $request->user()->load(['roles']);
+
+        // Resolve by FK to avoid naming conflict — users table has both
+        // an 'office' string column and an office() relationship.
+        $division = $user->division_id ? Division::select('id', 'name')->find($user->division_id) : null;
+        $office   = $user->office_id   ? Office::select('id', 'name')->find($user->office_id)     : null;
 
         return Inertia::render('Profile/Index', [
             'profile' => [
-                'id'                  => $user->id,
-                'name'                => $user->name,
-                'email'               => $user->email,
-                'position'            => $user->position,
-                'specialization'      => $user->specialization,
-                'sex'                 => $user->sex,
-                'emp_category'        => $user->emp_category,
-                'employee_no'         => $user->employee_no,
-                'salary_grade'        => $user->salary_grade,
-                'salary_step'         => $user->salary_step,
-                'status'              => $user->status,
-                'division'            => $user->division?->only('id', 'name'),
-                'office'              => $user->office?->only('id', 'name'),
-                'roles'               => $user->roles->pluck('name'),
-                'profile_picture'     => $user->profile_picture, // raw S3 path — storageUrl() in frontend
-                'has_signature'       => (bool) $user->electronic_signature,
+                'id'              => $user->id,
+                'name'            => $user->name,
+                'email'           => $user->email,
+                'position'        => $user->position,
+                'specialization'  => $user->specialization,
+                'sex'             => $user->sex,
+                'emp_category'    => $user->emp_category,
+                'employee_no'     => $user->employee_no,
+                'salary_grade'    => $user->salary_grade,
+                'salary_step'     => $user->salary_step,
+                'status'          => $user->status,
+                'division'        => $division ? $division->only('id', 'name') : null,
+                'office'          => $office   ? $office->only('id', 'name')   : null,
+                'roles'           => $user->roles->pluck('name'),
+                'profile_picture' => $user->profile_picture,
+                'has_signature'   => (bool) $user->electronic_signature,
             ],
         ]);
     }
