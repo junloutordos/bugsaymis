@@ -23,7 +23,9 @@
       "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis checkout development)",
       "Bash(git cherry-pick *)",
       "Bash(git -C /Users/junlou/bugsaymis-docker/src/bugsaymis stash)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(npm show *)",
+      "Bash(curl -sv https://mis.crc.pshs.edu.ph/ -H 'User-Agent: Mozilla/5.0 Chrome/125.0')"
     ]
   }
 }
