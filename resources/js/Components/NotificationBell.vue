@@ -90,15 +90,17 @@ function urlBase64ToUint8Array(base64) {
 
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
+  if (!vapidKey) return  // not configured in this build
+
   try {
     const reg = await navigator.serviceWorker.register('/sw.js')
     const perm = await Notification.requestPermission()
     if (perm !== 'granted') return
 
-    const { data } = await axios.get(route('push.vapid-key'))
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(data.public_key),
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
     })
     const json = sub.toJSON()
     await axios.post(route('push.subscribe'), {
