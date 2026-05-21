@@ -94,7 +94,7 @@ async function registerServiceWorker() {
   if (!vapidKey) return  // not configured in this build
 
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js')
+    const reg = await navigator.serviceWorker.register('/crcmis-sw.js')
     const perm = await Notification.requestPermission()
     if (perm !== 'granted') return
 
