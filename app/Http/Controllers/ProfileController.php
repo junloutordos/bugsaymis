@@ -16,7 +16,7 @@ class ProfileController extends Controller
 
         // Resolve by FK to avoid naming conflict — users table has both
         // an 'office' string column and an office() relationship.
-        $division = $user->division_id ? Division::select('id', 'name')->find($user->division_id) : null;
+        $division = $user->division_id ? Division::select('id', 'division_name as name')->find($user->division_id) : null;
         $office   = $user->office_id   ? Office::select('id', 'name')->find($user->office_id)     : null;
 
         return Inertia::render('Profile/Index', [
