@@ -2059,7 +2059,6 @@ filteredMenu.value.forEach((item) => {
 
         <!-- Right: notifications + chat + profile -->
         <div class="flex items-center gap-2">
-          <NotificationBell v-if="user?.id" :user-id="user.id" />
 
         <!-- Privacy Policy -->
         <a
@@ -2096,6 +2095,9 @@ filteredMenu.value.forEach((item) => {
           <QuestionMarkCircleIcon class="h-4 w-4" />
           Need Help?
         </a>
+
+        <!-- Notification Bell -->
+        <NotificationBell v-if="user?.id" :user-id="user.id" />
 
         <!-- Chat Icon -->
         <a
