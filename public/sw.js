@@ -1,4 +1,4 @@
-// CRCMIS Service Worker — handles Web Push notifications
+// CRCMIS Service Worker v2 — handles Web Push notifications
 self.addEventListener('push', function (event) {
   if (!event.data) return;
 
