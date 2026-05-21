@@ -42,8 +42,10 @@ return [
     ],
 
     'google_drive' => [
-        'credentials' => env('GOOGLE_DRIVE_CREDENTIALS'),   // path to service-account JSON
-        'folder_id'   => env('GOOGLE_DRIVE_FOLDER_ID'),     // shared Drive folder ID
+        'credentials'  => env('GOOGLE_DRIVE_CREDENTIALS'),
+        'folder_id'    => env('GOOGLE_DRIVE_FOLDER_ID'),
+        // DTS documents folder — falls back to the backup folder until a dedicated one is configured
+        'dts_folder_id' => env('GOOGLE_DRIVE_DTS_FOLDER_ID', env('GOOGLE_DRIVE_FOLDER_ID')),
     ],
 
     'firebase' => [

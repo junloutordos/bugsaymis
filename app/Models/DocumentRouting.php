@@ -20,8 +20,12 @@ class DocumentRouting extends Model
         'action_taken_at',
         'action_taken',
         'remarks',
+        'instructions',
         'due_at',
         'forwarded_at',
+        'is_terminal',
+        'returned_at',
+        'return_reason',
     ];
 
     protected $casts = [
@@ -29,6 +33,8 @@ class DocumentRouting extends Model
         'action_taken_at' => 'datetime',
         'due_at'          => 'datetime',
         'forwarded_at'    => 'datetime',
+        'returned_at'     => 'datetime',
+        'is_terminal'     => 'boolean',
     ];
 
     public function document()

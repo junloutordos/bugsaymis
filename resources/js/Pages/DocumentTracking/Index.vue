@@ -1,462 +1,454 @@
 <script setup>
-import { Head, useForm, usePage, router } from '@inertiajs/vue3'
 import { ref, computed, watch } from 'vue'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import Swal from 'sweetalert2'
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import {
-  PlusIcon,
-  EyeIcon,
-  PaperClipIcon,
-  ExclamationTriangleIcon,
-  LockClosedIcon,
-  MagnifyingGlassIcon,
-  XMarkIcon,
+  PlusIcon, ArrowUpTrayIcon, Cog6ToothIcon, MagnifyingGlassIcon,
+  LockClosedIcon, ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  documents:     Array,
-  documentTypes: Array,
-  users:         Array,
+  documents:      Array,
+  documentTypes:  Array,
+  users:          Array,
+  canLogExternal: Boolean,
+  isAdmin:        Boolean,
 })
 
-const page = usePage()
-const authId = computed(() => page.props.auth?.user?.id)
+const page          = usePage()
+const currentUserId = computed(() => page.props.auth?.user?.id)
 
-// ─── Search & filter ─────────────────────────────────────────────────────────
-const searchQuery  = ref('')
-const activeTab    = ref('all') // all | mine | pending | overdue
-const currentPage  = ref(1)
-const perPage      = 10
+// ── Tabs ───────────────────────────────────────────────────────────────────
+const activeTab = ref('all')
+const tabs = [
+  { key: 'all',       label: 'All' },
+  { key: 'mine',      label: 'For My Action' },
+  { key: 'external',  label: 'External Incoming' },
+  { key: 'internal',  label: 'Internal' },
+  { key: 'completed', label: 'Completed' },
+]
 
-watch(searchQuery, () => { currentPage.value = 1 })
-watch(activeTab,   () => { currentPage.value = 1 })
-
-const filteredAll = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return props.documents.filter(doc => {
-    const matches = !q ||
-      (doc.tracking_no    || '').toLowerCase().includes(q) ||
-      (doc.subject        || '').toLowerCase().includes(q) ||
-      (doc.document_type?.name || '').toLowerCase().includes(q) ||
-      (doc.document_type?.code || '').toLowerCase().includes(q) ||
-      (doc.creator?.name  || '').toLowerCase().includes(q) ||
-      (doc.current_holder?.name || '').toLowerCase().includes(q) ||
-      (doc.urgency        || '').toLowerCase().includes(q) ||
-      (doc.overall_status || '').toLowerCase().includes(q)
-
-    if (!matches) return false
-    if (activeTab.value === 'mine')    return doc.creator?.id === authId.value
-    if (activeTab.value === 'pending') return doc.routings?.some(r => r.receiver_id === authId.value && ['Pending','Received'].includes(r.status))
-    if (activeTab.value === 'overdue') return doc.has_overdue
-    return true
-  })
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredAll.value.length / perPage)))
-
-const filteredDocs = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filteredAll.value.slice(start, start + perPage)
-})
-
-const myPendingCount = computed(() =>
-  props.documents.filter(doc =>
-    doc.routings?.some(r => r.receiver_id === authId.value && ['Pending','Received'].includes(r.status))
+const myActionCount = computed(() =>
+  (props.documents ?? []).filter(d =>
+    d.routings?.some(r => r.receiver?.id === currentUserId.value && ['Pending', 'Received'].includes(r.status))
   ).length
 )
 
-const overdueCount = computed(() =>
-  props.documents.filter(doc => doc.has_overdue).length
-)
+// ── Filters ────────────────────────────────────────────────────────────────
+const search          = ref('')
+const filterTypeId    = ref('')
+const filterPriority  = ref('')
+const currentPage     = ref(1)
+const PER_PAGE        = 15
 
-// ─── Create modal ─────────────────────────────────────────────────────────────
-const showCreateModal = ref(false)
+watch([search, filterTypeId, filterPriority, activeTab], () => { currentPage.value = 1 })
 
-const form = useForm({
-  document_type_id: '',
-  subject:          '',
-  description:      '',
-  urgency:          'Normal',
-  is_confidential:  false,
-  receiver_id:      '',
-  remarks:          '',
-  attachments:      [],
+function matchesTab(doc) {
+  if (activeTab.value === 'external')  return doc.origin_type === 'external'
+  if (activeTab.value === 'internal')  return doc.origin_type === 'internal'
+  if (activeTab.value === 'completed') return doc.overall_status === 'Completed'
+  if (activeTab.value === 'mine')
+    return doc.routings?.some(r => r.receiver?.id === currentUserId.value && ['Pending', 'Received'].includes(r.status))
+  return true
+}
+
+const filtered = computed(() => {
+  const q = search.value.toLowerCase().trim()
+  return (props.documents ?? []).filter(doc => {
+    if (!matchesTab(doc)) return false
+    if (filterTypeId.value  && doc.document_type?.id !== +filterTypeId.value)  return false
+    if (filterPriority.value && doc.priority !== filterPriority.value)          return false
+    if (!q) return true
+    return (doc.tracking_no    ?? '').toLowerCase().includes(q)
+        || (doc.subject        ?? '').toLowerCase().includes(q)
+        || (doc.source_office  ?? '').toLowerCase().includes(q)
+        || (doc.sender_name    ?? '').toLowerCase().includes(q)
+        || (doc.document_number?? '').toLowerCase().includes(q)
+        || (doc.document_type?.name ?? '').toLowerCase().includes(q)
+  })
 })
 
-const attachmentFiles = ref([])
-const userSearch = ref('')
-
-const filteredUsers = computed(() => {
-  const q = userSearch.value.trim().toLowerCase()
-  if (!q) return props.users.slice(0, 30)
-  return props.users.filter(u =>
-    (u.name || '').toLowerCase().includes(q) ||
-    (u.position || '').toLowerCase().includes(q)
-  ).slice(0, 30)
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PER_PAGE)))
+const displayed  = computed(() => {
+  const s = (currentPage.value - 1) * PER_PAGE
+  return filtered.value.slice(s, s + PER_PAGE)
 })
 
-const selectedType = computed(() =>
-  props.documentTypes.find(t => t.id == form.document_type_id)
-)
+// ── Status helpers ─────────────────────────────────────────────────────────
+function overallBadge(doc) {
+  if (doc.overall_status === 'Completed') return 'bg-emerald-100 text-emerald-700'
+  if (doc.overall_status === 'Returned')  return 'bg-red-100 text-red-700'
+  if (doc.routings?.some(r => r.is_overdue)) return 'bg-red-100 text-red-700'
+  if (doc.routings?.some(r => r.status === 'Pending')) return 'bg-amber-100 text-amber-700'
+  return 'bg-blue-100 text-blue-700'
+}
+function overallLabel(doc) {
+  if (doc.overall_status === 'Completed') return 'Completed'
+  if (doc.overall_status === 'Returned')  return 'Returned'
+  if (doc.routings?.some(r => r.is_overdue)) return 'Overdue'
+  if (doc.routings?.some(r => r.status === 'Pending')) return 'Pending Action'
+  return doc.overall_status
+}
+const priorityCls = { Normal: 'bg-slate-100 text-slate-600', Urgent: 'bg-amber-100 text-amber-700', Rush: 'bg-red-100 text-red-700' }
+const originCls   = { external: 'bg-green-100 text-green-700', internal: 'bg-indigo-100 text-indigo-700' }
 
-const onFilesChange = (e) => {
-  attachmentFiles.value = Array.from(e.target.files || [])
+function fmtDate(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-const openCreate = () => {
-  form.reset()
-  attachmentFiles.value = []
-  userSearch.value = ''
-  showCreateModal.value = true
+// ── Modal ──────────────────────────────────────────────────────────────────
+const showModal  = ref(false)
+const logOrigin  = ref('external')
+const submitting = ref(false)
+const errors     = ref({})
+
+const form = ref({
+  origin_type: 'external', document_type_id: '', subject: '', description: '',
+  priority: 'Normal', urgency: 'Normal', is_confidential: false,
+  source_office: '', sender_name: '', date_of_document: '',
+  date_received: new Date().toISOString().slice(0, 10),
+  document_number: '', deadline_at: '', receiver_id: '', instructions: '',
+  scan_base64: null, scan_filename: '', scan_mime: '',
+})
+
+function openModal(origin) {
+  logOrigin.value       = origin
+  form.value.origin_type = origin
+  errors.value          = {}
+  showModal.value       = true
 }
 
-const closeCreate = () => {
-  showCreateModal.value = false
-  form.reset()
-  attachmentFiles.value = []
+function handleScan(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  form.value.scan_filename = file.name
+  form.value.scan_mime     = file.type
+  const reader = new FileReader()
+  reader.onload = ev => { form.value.scan_base64 = ev.target.result }
+  reader.readAsDataURL(file)
 }
 
-const submitCreate = () => {
-  if (!form.document_type_id) { Swal.fire({ icon: 'warning', title: 'Select a document type' }); return }
-  if (!form.subject.trim())   { Swal.fire({ icon: 'warning', title: 'Enter a subject' }); return }
-  if (!form.receiver_id)      { Swal.fire({ icon: 'warning', title: 'Select a receiver' }); return }
-
-  // Build FormData manually for file upload
-  const fd = new FormData()
-  fd.append('document_type_id', form.document_type_id)
-  fd.append('subject',          form.subject)
-  fd.append('description',      form.description || '')
-  fd.append('urgency',          form.urgency)
-  fd.append('is_confidential',  form.is_confidential ? '1' : '0')
-  fd.append('receiver_id',      form.receiver_id)
-  fd.append('remarks',          form.remarks || '')
-  attachmentFiles.value.forEach(f => fd.append('attachments[]', f))
-
-  form.transform(() => fd).post(route('document-tracking.store'), {
-    forceFormData: true,
-    onSuccess: () => {
-      closeCreate()
-      Swal.fire({ icon: 'success', title: 'Document created!', text: 'The receiver has been notified.', timer: 2000, showConfirmButton: false })
-    },
-    onError: (errors) => {
-      Swal.fire({ icon: 'error', title: 'Failed', text: Object.values(errors).flat().join('\n') || 'Please check all fields.' })
-    },
+function submitForm() {
+  submitting.value = true
+  errors.value     = {}
+  router.post(route('document-tracking.store'), { ...form.value }, {
+    onSuccess: () => { showModal.value = false },
+    onError:   e  => { errors.value = e },
+    onFinish:  ()  => { submitting.value = false },
+    preserveScroll: true,
   })
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const urgencyBadge = (urgency) => {
-  if (urgency === 'Very Urgent') return 'bg-red-50 text-red-600'
-  if (urgency === 'Urgent')      return 'bg-amber-50 text-amber-700'
-  return 'bg-blue-50 text-blue-700'
-}
-
-const formatDate = (iso) => {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+const selectedType = computed(() => props.documentTypes?.find(t => t.id === +form.value.document_type_id))
+const needsManualReceiver = computed(() =>
+  !selectedType.value || selectedType.value.routing_type === 'manual' || !selectedType.value.routing_steps?.length
+)
 </script>
 
 <template>
   <Head title="Document Tracking" />
   <AdminLayout title="Document Tracking">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Document Tracking</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Track and route documents across the organization</p>
-        </div>
-        <button
-          @click="openCreate"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          <PlusIcon class="h-4 w-4" /> New Document
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+      <div>
+        <h2 class="text-lg font-bold text-slate-800">Document Tracking System</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Track internal and external document routing across all offices</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a v-if="isAdmin" :href="route('document-tracking.types.index')"
+          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+          <Cog6ToothIcon class="h-4 w-4" /> Document Types
+        </a>
+        <button @click="openModal('internal')"
+          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
+          <PlusIcon class="h-4 w-4" /> Internal
+        </button>
+        <button v-if="canLogExternal" @click="openModal('external')"
+          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">
+          <ArrowUpTrayIcon class="h-4 w-4" /> Log External
         </button>
       </div>
+    </div>
 
-      <!-- Tab bar -->
-      <div class="flex gap-2 mb-4 flex-wrap">
-        <button
-          v-for="tab in [
-            { key: 'all',     label: 'All' },
-            { key: 'mine',    label: 'Created by Me' },
-            { key: 'pending', label: 'Pending My Action', count: myPendingCount },
-            { key: 'overdue', label: 'Overdue', count: overdueCount },
-          ]"
-          :key="tab.key"
-          @click="activeTab = tab.key"
-          :class="[
-            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-            activeTab === tab.key
-              ? 'bg-indigo-600 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          ]"
-        >
-          {{ tab.label }}
-          <span v-if="tab.count" class="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold"
-            :class="activeTab === tab.key ? 'bg-white text-indigo-700' : 'bg-red-500 text-white'"
-          >{{ tab.count }}</span>
-        </button>
+    <!-- Tabs -->
+    <div class="flex gap-0 border-b border-slate-200 mb-4 overflow-x-auto">
+      <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key"
+        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2"
+        :class="activeTab === tab.key ? 'text-indigo-600 border-indigo-600' : 'text-slate-500 border-transparent hover:text-slate-700'">
+        {{ tab.label }}
+        <span v-if="tab.key === 'mine' && myActionCount > 0"
+          class="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+          {{ myActionCount > 9 ? '9+' : myActionCount }}
+        </span>
+      </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-col sm:flex-row gap-2 mb-4">
+      <div class="relative flex-1">
+        <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <input v-model="search" type="text" placeholder="Tracking no., subject, source office, sender…"
+          class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
       </div>
+      <select v-model="filterTypeId"
+        class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">All Types</option>
+        <option v-for="t in documentTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
+      </select>
+      <select v-model="filterPriority"
+        class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">All Priorities</option>
+        <option>Normal</option><option>Urgent</option><option>Rush</option>
+      </select>
+    </div>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100">
-          <div class="relative w-full sm:max-w-sm">
-            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search tracking no., subject, type…"
-              class="w-full pl-9 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-            />
-          </div>
-        </div>
-
-        <!-- Desktop table -->
-        <div class="hidden sm:block overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Tracking #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Subject</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Urgency</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created By</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Current Holder</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="doc in filteredDocs" :key="doc.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm font-mono font-semibold text-indigo-700 whitespace-nowrap">
-                  {{ doc.tracking_no }}
-                  <span v-if="doc.has_overdue" class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500" title="Overdue"></span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
-                  <span class="font-medium text-slate-800">{{ doc.document_type?.code }}</span>
-                  <span class="text-slate-400 text-xs ml-1">{{ doc.document_type?.name }}</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700 max-w-xs">
-                  <div class="flex items-center gap-1">
-                    <LockClosedIcon v-if="doc.is_confidential" class="h-3.5 w-3.5 text-purple-500 shrink-0" title="Confidential" />
-                    <span class="truncate">{{ doc.subject }}</span>
-                  </div>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', urgencyBadge(doc.urgency)]">
-                    {{ doc.urgency }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ doc.creator?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">{{ doc.current_holder?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="[badgeBase, statusBadgeClass(doc.overall_status)]">{{ doc.overall_status }}</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">{{ formatDate(doc.created_at) }}</td>
-                <td class="px-4 py-3 text-center">
-                  <button
-                    @click="router.visit(route('document-tracking.show', doc.id))"
-                    class="p-1.5 rounded-lg hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 transition-colors"
-                    title="View"
-                  >
-                    <EyeIcon class="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="filteredDocs.length === 0">
-                <td colspan="9" class="py-16 text-center text-slate-400 text-sm">No documents found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Mobile cards -->
-        <div class="sm:hidden p-4 space-y-3">
-          <div
-            v-for="doc in filteredDocs"
-            :key="doc.id"
-            class="bg-white border rounded-xl p-3 shadow-sm"
-            :class="doc.has_overdue ? 'border-red-200' : 'border-slate-100'"
-          >
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <div class="flex items-center gap-1 mb-0.5">
-                  <span class="font-mono text-xs font-bold text-indigo-600">{{ doc.tracking_no }}</span>
-                  <ExclamationTriangleIcon v-if="doc.has_overdue" class="h-3.5 w-3.5 text-red-500" title="Overdue" />
-                  <LockClosedIcon v-if="doc.is_confidential" class="h-3.5 w-3.5 text-purple-500" title="Confidential" />
-                </div>
-                <p class="text-sm font-semibold text-slate-800 truncate">{{ doc.subject }}</p>
-                <p class="text-xs text-slate-500">{{ doc.document_type?.name }}</p>
+    <!-- Table -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div v-if="displayed.length === 0" class="py-16 text-center text-slate-400 text-sm">No documents found.</div>
+      <table v-else class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Tracking No.</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Origin / Type</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Holder</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+            <th class="px-3 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr v-for="doc in displayed" :key="doc.id" class="hover:bg-slate-50 transition-colors cursor-pointer"
+            @click="router.visit(route('document-tracking.show', doc.id))">
+            <td class="px-4 py-3">
+              <span class="font-mono text-xs font-bold text-indigo-600">{{ doc.tracking_no }}</span>
+              <div v-if="doc.document_number" class="text-[11px] text-slate-400">Ref: {{ doc.document_number }}</div>
+            </td>
+            <td class="px-4 py-3 max-w-[220px]">
+              <div class="flex items-center gap-1">
+                <LockClosedIcon v-if="doc.is_confidential" class="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                <ExclamationTriangleIcon v-if="doc.routings?.some(r => r.is_overdue)" class="h-3.5 w-3.5 text-red-500 shrink-0" />
+                <span class="font-medium text-slate-800 truncate text-xs">{{ doc.subject }}</span>
               </div>
-              <div class="shrink-0 flex flex-col items-end gap-1">
-                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', urgencyBadge(doc.urgency)]">
-                  {{ doc.urgency }}
+              <div v-if="doc.source_office" class="text-[11px] text-emerald-600 mt-0.5">{{ doc.source_office }}</div>
+            </td>
+            <td class="hidden md:table-cell px-4 py-3">
+              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold mr-1"
+                :class="originCls[doc.origin_type]">
+                {{ doc.origin_type === 'external' ? 'Ext' : 'Int' }}
+              </span>
+              <span class="text-xs text-slate-500">{{ doc.document_type?.name ?? '—' }}</span>
+            </td>
+            <td class="hidden lg:table-cell px-4 py-3">
+              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                :class="priorityCls[doc.priority] ?? priorityCls.Normal">{{ doc.priority }}</span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="overallBadge(doc)">
+                {{ overallLabel(doc) }}
+              </span>
+            </td>
+            <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-600">{{ doc.current_holder?.name ?? '—' }}</td>
+            <td class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">
+              {{ fmtDate(doc.date_received ?? doc.created_at) }}
+            </td>
+            <td class="px-3 py-3 text-right">
+              <span class="text-indigo-600 text-xs font-medium">View →</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-600">
+        <span>Page {{ currentPage }} of {{ totalPages }} ({{ filtered.length }} records)</span>
+        <div class="flex gap-2">
+          <button @click="currentPage--" :disabled="currentPage === 1"
+            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Prev</button>
+          <button @click="currentPage++" :disabled="currentPage === totalPages"
+            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log / Create Modal -->
+    <Teleport to="body">
+      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div class="fixed inset-0 bg-black/40" @click="showModal = false" />
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
+            <div>
+              <h3 class="font-bold text-slate-800">
+                {{ logOrigin === 'external' ? '📥 Log External Incoming Document' : '📄 Create Internal Document' }}
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">
+                {{ logOrigin === 'external'
+                  ? 'Record a document received from an external agency/office'
+                  : 'Route an internal document across offices or personnel' }}
+              </p>
+            </div>
+            <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">✕</button>
+          </div>
+
+          <!-- Body -->
+          <form @submit.prevent="submitForm" class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+
+            <!-- Document Type -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Document Type <span class="text-red-500">*</span></label>
+              <select v-model="form.document_type_id" required
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">Select type…</option>
+                <option v-for="t in documentTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
+              </select>
+              <p v-if="selectedType" class="text-xs text-slate-500 mt-1">
+                Routing: <strong class="capitalize">{{ selectedType.routing_type }}</strong>
+                · Lead time: {{ selectedType.lead_time_hours }}h
+                <span v-if="selectedType.routing_steps?.length > 0">
+                  · {{ selectedType.routing_steps.length }} auto-configured step(s)
                 </span>
-                <span :class="[badgeBase, statusBadgeClass(doc.overall_status)]">{{ doc.overall_status }}</span>
-              </div>
-            </div>
-            <div class="mt-2 text-xs text-slate-500 flex flex-wrap gap-x-3">
-              <span>By: {{ doc.creator?.name ?? '—' }}</span>
-              <span>Holder: {{ doc.current_holder?.name ?? '—' }}</span>
-            </div>
-            <div class="mt-2">
-              <button
-                @click="router.visit(route('document-tracking.show', doc.id))"
-                class="w-full inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              >
-                <EyeIcon class="h-3.5 w-3.5" /> View Document
-              </button>
-            </div>
-          </div>
-          <div v-if="filteredDocs.length === 0" class="py-16 text-center text-slate-400 text-sm">No documents found.</div>
-        </div>
-
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage === totalPages"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ─── Create Document Modal ──────────────────────────────────────────── -->
-      <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-        <div class="bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:max-w-2xl sm:shadow-xl relative overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">Create & Route Document</h2>
-            <button @click="closeCreate" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
-          </div>
-
-          <div class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto">
-            <!-- Type + Urgency row -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Document Type <span class="text-red-500">*</span></label>
-                <select v-model="form.document_type_id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option value="">— Select Type —</option>
-                  <option v-for="t in documentTypes" :key="t.id" :value="t.id">
-                    [{{ t.code }}] {{ t.name }}
-                  </option>
-                </select>
-                <p v-if="selectedType" class="mt-1 text-xs text-slate-500">
-                  Lead time: <strong>{{ selectedType.lead_time_hours }}h</strong> per ARTA/CSC guidelines
-                </p>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Urgency <span class="text-red-500">*</span></label>
-                <select v-model="form.urgency" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option>Normal</option>
-                  <option>Urgent</option>
-                  <option>Very Urgent</option>
-                </select>
-              </div>
+              </p>
+              <p v-if="errors.document_type_id" class="text-xs text-red-500 mt-1">{{ errors.document_type_id }}</p>
             </div>
 
             <!-- Subject -->
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Subject <span class="text-red-500">*</span></label>
-              <input
-                v-model="form.subject"
-                type="text"
-                placeholder="e.g. Leave Application — Juan dela Cruz"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-              />
+              <label class="block text-sm font-medium text-slate-700 mb-1">Subject <span class="text-red-500">*</span></label>
+              <input v-model="form.subject" type="text" required
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Brief subject / title of the document" />
+              <p v-if="errors.subject" class="text-xs text-red-500 mt-1">{{ errors.subject }}</p>
+            </div>
+
+            <!-- External fields -->
+            <template v-if="logOrigin === 'external'">
+              <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+                <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">External Document Details</p>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Source Office <span class="text-red-500">*</span></label>
+                    <input v-model="form.source_office" type="text" required
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g. DepEd Region XIII" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Sender Name</label>
+                    <input v-model="form.sender_name" type="text"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Signing official" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Doc Date</label>
+                    <input v-model="form.date_of_document" type="date"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Date Received</label>
+                    <input v-model="form.date_received" type="date"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Ref. No.</label>
+                    <input v-model="form.document_number" type="text"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Control no." />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Priority / Urgency -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Priority</label>
+                <select v-model="form.priority"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option>Normal</option><option>Urgent</option><option>Rush</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Urgency</label>
+                <select v-model="form.urgency"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option>Normal</option><option>Urgent</option><option>Very Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Manual receiver -->
+            <div v-if="needsManualReceiver">
+              <label class="block text-sm font-medium text-slate-700 mb-1">Route To <span class="text-red-500">*</span></label>
+              <select v-model="form.receiver_id"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">Select recipient…</option>
+                <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+            </div>
+
+            <!-- Instructions -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Instructions / Routing Notes</label>
+              <textarea v-model="form.instructions" rows="2"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Instructions for the first receiver or routing notes…" />
+            </div>
+
+            <!-- Deadline -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Deadline (optional)</label>
+              <input v-model="form.deadline_at" type="datetime-local"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <!-- Scan / Attachment -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Attachment</label>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleScan"
+                class="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+              <p class="text-xs text-slate-400 mt-1">PDF, JPG, PNG · Max 20 MB · Saved to Google Drive Records folder</p>
+              <p v-if="form.scan_filename" class="text-xs text-emerald-600 mt-1">✓ {{ form.scan_filename }}</p>
             </div>
 
             <!-- Description -->
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Description / Particulars</label>
-              <textarea
-                v-model="form.description"
-                rows="3"
-                placeholder="Brief description of the document…"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-              ></textarea>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Description (optional)</label>
+              <textarea v-model="form.description" rows="2"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Additional details about the document…" />
             </div>
 
-            <!-- Receiver -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Route To (Receiver) <span class="text-red-500">*</span></label>
-              <input
-                v-model="userSearch"
-                type="text"
-                placeholder="Search by name or position…"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 mb-1"
-              />
-              <select v-model="form.receiver_id" size="4" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option v-for="u in filteredUsers" :key="u.id" :value="u.id">
-                  {{ u.name }}{{ u.position ? ' — ' + u.position : '' }}
-                </option>
-              </select>
-            </div>
+            <!-- Confidential -->
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" v-model="form.is_confidential" class="rounded border-slate-300 text-indigo-600" />
+              <span class="text-sm text-slate-700 flex items-center gap-1">
+                <LockClosedIcon class="h-3.5 w-3.5 text-purple-500" /> Mark as confidential
+              </span>
+            </label>
 
-            <!-- Remarks -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks / Instructions to Receiver</label>
-              <textarea
-                v-model="form.remarks"
-                rows="2"
-                placeholder="Any special instructions for the receiver…"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-              ></textarea>
-            </div>
+          </form>
 
-            <!-- Confidential + Attachments -->
-            <div class="flex flex-col sm:flex-row gap-4">
-              <div class="flex items-center gap-2">
-                <input id="conf" type="checkbox" v-model="form.is_confidential" class="h-4 w-4 rounded border-slate-300 text-indigo-600" />
-                <label for="conf" class="text-sm text-slate-700 flex items-center gap-1">
-                  <LockClosedIcon class="h-4 w-4 text-purple-500" /> Mark as Confidential
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                <PaperClipIcon class="inline h-4 w-4 mr-1" />Attach Files
-              </label>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
-                @change="onFilesChange"
-                class="w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-indigo-700 file:text-sm hover:file:bg-indigo-100"
-              />
-              <p class="text-xs text-slate-400 mt-0.5">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG — max 10 MB each</p>
-              <ul v-if="attachmentFiles.length" class="mt-1 space-y-0.5">
-                <li v-for="f in attachmentFiles" :key="f.name" class="text-xs text-slate-600 flex items-center gap-1">
-                  <PaperClipIcon class="h-3 w-3 shrink-0 text-slate-400" />{{ f.name }}
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="closeCreate" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button
-              @click="submitCreate"
-              :disabled="form.processing"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60"
-            >
-              <span v-if="form.processing">Routing…</span>
-              <span v-else>Create & Route</span>
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 rounded-b-2xl bg-white">
+            <button type="button" @click="showModal = false"
+              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+              Cancel
+            </button>
+            <button @click="submitForm" :disabled="submitting"
+              class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
+              :class="logOrigin === 'external' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'">
+              {{ submitting ? 'Logging…' : (logOrigin === 'external' ? 'Log Document' : 'Create & Route') }}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
+
   </AdminLayout>
 </template>

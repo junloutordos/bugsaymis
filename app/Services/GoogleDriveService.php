@@ -63,6 +63,43 @@ class GoogleDriveService
     }
 
     /**
+     * Upload raw bytes to a specific folder (base64-decoded content, Cloudflare-safe path).
+     * Pass null for $folderId to use the instance default.
+     *
+     * @return array{ file_id: string, link: string }
+     */
+    public function uploadRaw(string $bytes, string $fileName, string $mimeType, ?string $folderId = null): array
+    {
+        $folder = $folderId ?? $this->folderId;
+
+        $metadata = new DriveFile([
+            'name'    => $fileName,
+            'parents' => $folder ? [$folder] : [],
+        ]);
+
+        $uploaded = $this->getDrive()->files->create($metadata, [
+            'data'              => $bytes,
+            'mimeType'          => $mimeType,
+            'uploadType'        => 'multipart',
+            'fields'            => 'id',
+            'supportsAllDrives' => true,
+        ]);
+
+        $fileId = $uploaded->id;
+
+        $this->getDrive()->permissions->create(
+            $fileId,
+            new Permission(['type' => 'anyone', 'role' => 'reader']),
+            ['supportsAllDrives' => true]
+        );
+
+        return [
+            'file_id' => $fileId,
+            'link'    => "https://drive.google.com/file/d/{$fileId}/view",
+        ];
+    }
+
+    /**
      * Upload a file to the configured Shared Drive folder.
      *
      * @return array{ file_id: string, link: string }

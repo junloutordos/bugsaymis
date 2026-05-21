@@ -16,13 +16,26 @@ class Document extends Model
         'description',
         'is_confidential',
         'urgency',
+        'origin_type',
+        'source_office',
+        'sender_name',
+        'date_of_document',
+        'date_received',
+        'document_number',
+        'priority',
+        'deadline_at',
+        'completed_at',
         'created_by',
         'current_holder_id',
         'overall_status',
     ];
 
     protected $casts = [
-        'is_confidential' => 'boolean',
+        'is_confidential'  => 'boolean',
+        'date_of_document' => 'date',
+        'date_received'    => 'date',
+        'deadline_at'      => 'datetime',
+        'completed_at'     => 'datetime',
     ];
 
     protected static function booted(): void
