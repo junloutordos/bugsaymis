@@ -6,6 +6,7 @@ const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
 import NotificationBell from '@/Components/NotificationBell.vue';
+import ProfileEditModal from '@/Components/ProfileEditModal.vue';
 import {
   HomeIcon,
   UsersIcon,
@@ -58,7 +59,7 @@ import {
 // --- State ---
 const collapsed = ref(false);
 const mobileOpen = ref(false);
-const showDropdown = ref(false);
+
 const expanded = ref({});
 const showVersionModal = ref(false);
 const showAddVersionModal = ref(false);
@@ -173,8 +174,6 @@ const isAdmin = hasPerm('roles.assign');
 
 
 // --- Helpers ---
-const toggleDropdown = () => (showDropdown.value = !showDropdown.value);
-const logout = () => router.post(route("logout"));
 const isActive = (name) => name && route().current(name); // ✅ check via routeName
 
 // Safely coerce a raw Inertia prop value to a non-negative integer
@@ -223,6 +222,8 @@ const getGroupBadge = (item) => {
   const total = item.children.reduce((sum, child) => sum + getBadge(child), 0);
   return Math.min(total, 99);
 };
+
+const showProfileModal = ref(false);
 
 // Consultation Log modal state
 const showConsultationLogModal = ref(false);
@@ -2102,51 +2103,21 @@ filteredMenu.value.forEach((item) => {
           >{{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}</span>
         </a>
 
-        <!-- Profile Dropdown -->
-        <div class="relative">
-          <button
-            @click="toggleDropdown"
-            class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <img
-              :src="storageUrl(user.profile_picture) ?? 'https://i.pravatar.cc/40'"
-              alt="User Avatar"
-              class="w-7 h-7 rounded-full object-cover ring-2 ring-gray-200"
-            />
-            <div class="hidden md:block text-left">
-              <p class="text-sm font-medium text-gray-800 leading-none">{{ user.name }}</p>
-              <p class="text-[11px] text-gray-500 leading-none mt-0.5">{{ roleName }}</p>
-            </div>
-            <ChevronDownIcon class="h-4 w-4 text-gray-400" />
-          </button>
-
-          <div
-            v-if="showDropdown"
-            class="absolute right-0 mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1"
-          >
-            <button
-              type="button"
-              @click="router.visit(route('profile.edit')); showDropdown = false"
-              class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Edit Profile
-            </button>
-            <button
-              type="button"
-              @click="router.visit(route('profile.signature')); showDropdown = false"
-              class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Digital Signature
-            </button>
-            <div class="my-1 border-t border-gray-100"></div>
-            <button
-              @click="logout"
-              class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50"
-            >
-              Logout
-            </button>
+        <!-- Profile Panel trigger -->
+        <button
+          @click="showProfileModal = true"
+          class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <img
+            :src="storageUrl(user.profile_picture) ?? 'https://i.pravatar.cc/40'"
+            alt="User Avatar"
+            class="w-7 h-7 rounded-full object-cover ring-2 ring-gray-200"
+          />
+          <div class="hidden md:block text-left">
+            <p class="text-sm font-medium text-gray-800 leading-none">{{ user.name }}</p>
+            <p class="text-[11px] text-gray-500 leading-none mt-0.5">{{ roleName }}</p>
           </div>
-        </div>
+        </button>
 
         </div><!-- end right group -->
       </header>
@@ -2156,6 +2127,7 @@ filteredMenu.value.forEach((item) => {
         <slot />
       </main>
     </div>
+  <ProfileEditModal :show="showProfileModal" @close="showProfileModal = false" />
   <!-- Consultation Log Date Range Modal -->
   <div v-if="showConsultationLogModal" class="fixed inset-0 z-50 flex items-center justify-center">
     <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeConsultationLogModal"></div>
