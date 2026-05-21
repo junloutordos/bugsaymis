@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
-import { UserCircleIcon, FingerPrintIcon, ArrowRightIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { router, useForm, usePage } from '@inertiajs/vue3'
+import { UserCircleIcon, FingerPrintIcon, ArrowRightIcon, XMarkIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ show: Boolean })
 const emit  = defineEmits(['close'])
@@ -13,14 +13,15 @@ function initials(n) {
   return (n ?? '').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function goProfile() {
+function go(url) {
   emit('close')
-  router.visit(route('profile.edit'))
+  router.visit(url)
 }
 
-function goSignature() {
+const logoutForm = useForm({})
+function logout() {
   emit('close')
-  router.visit(route('profile.signature'))
+  logoutForm.post(route('logout'))
 }
 </script>
 
@@ -68,7 +69,7 @@ function goSignature() {
 
           <!-- Links -->
           <div class="p-3 space-y-1">
-            <button @click="goProfile"
+            <button @click="go(route('profile.edit'))"
               class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group">
               <UserCircleIcon class="h-4 w-4 text-slate-400 group-hover:text-indigo-500 shrink-0" />
               <div class="flex-1 min-w-0">
@@ -78,7 +79,7 @@ function goSignature() {
               <ArrowRightIcon class="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400" />
             </button>
 
-            <button @click="goSignature"
+            <button @click="go(route('profile.signature'))"
               class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group">
               <FingerPrintIcon class="h-4 w-4 text-slate-400 group-hover:text-indigo-500 shrink-0" />
               <div class="flex-1 min-w-0">
@@ -86,6 +87,14 @@ function goSignature() {
                 <p class="text-xs text-slate-400">Manage signature & PIN</p>
               </div>
               <ArrowRightIcon class="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400" />
+            </button>
+
+            <div class="border-t border-slate-100 my-1" />
+
+            <button @click="logout"
+              class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 transition-colors text-left group">
+              <ArrowLeftStartOnRectangleIcon class="h-4 w-4 text-slate-400 group-hover:text-red-500 shrink-0" />
+              <p class="text-sm font-medium text-slate-600 group-hover:text-red-600">Logout</p>
             </button>
           </div>
 
