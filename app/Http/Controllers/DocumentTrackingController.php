@@ -199,62 +199,72 @@ class DocumentTrackingController extends Controller
                 'overall_status'   => 'In-Transit',
             ]);
 
-            // Build routing chain from template OR manual
+            // ── External documents: Records holds it first, then forwards to OCD ──
+            // Records Officer is always the initial holder. They use the Forward
+            // button to send to OCD. No auto-routing from the type template.
+            if ($isExternal) {
+                DocumentRouting::create([
+                    'document_id'  => $doc->id,
+                    'sequence'     => 1,
+                    'sender_id'    => $user->id,
+                    'receiver_id'  => $user->id,
+                    'status'       => 'Received',
+                    'instructions' => 'Document received and logged by Records Office. Forward to OCD for review.',
+                    'received_at'  => now(),
+                    'is_terminal'  => false,
+                ]);
+                $doc->update(['current_holder_id' => $user->id]);
+                return $doc;
+            }
+
+            // ── Internal documents: route from type template ───────────────────
             $steps = $docType->routingSteps;
             if ($docType->routing_type === 'manual' || $steps->isEmpty()) {
-                // Manual: first receiver must be provided
                 $receiverId = $data['receiver_id'] ?? null;
                 if ($receiverId) {
                     DocumentRouting::create([
-                        'document_id' => $doc->id,
-                        'sequence'    => 1,
-                        'sender_id'   => $user->id,
-                        'receiver_id' => $receiverId,
-                        'status'      => 'Pending',
-                        'instructions'=> $data['instructions'] ?? null,
-                        'due_at'      => now()->addHours($docType->lead_time_hours),
-                        'is_terminal' => false,
+                        'document_id'  => $doc->id,
+                        'sequence'     => 1,
+                        'sender_id'    => $user->id,
+                        'receiver_id'  => $receiverId,
+                        'status'       => 'Pending',
+                        'instructions' => $data['instructions'] ?? null,
+                        'due_at'       => now()->addHours($docType->lead_time_hours),
+                        'is_terminal'  => false,
                     ]);
                     $doc->update(['current_holder_id' => $receiverId]);
                 }
             } elseif ($docType->routing_type === 'parallel') {
-                // Parallel: all steps notified at once (sequence = 1 for all)
                 foreach ($steps as $step) {
-                    $receivers = $step->role_name
-                        ? User::havingRole($step->role_name)->get()
-                        : collect();
-
+                    $receivers = $step->role_name ? User::havingRole($step->role_name)->get() : collect();
                     foreach ($receivers as $recv) {
                         DocumentRouting::create([
-                            'document_id' => $doc->id,
-                            'sequence'    => 1,
-                            'sender_id'   => $user->id,
-                            'receiver_id' => $recv->id,
-                            'status'      => 'Pending',
-                            'instructions'=> $step->action_required,
-                            'due_at'      => now()->addHours($step->lead_time_hours),
-                            'is_terminal' => false,
+                            'document_id'  => $doc->id,
+                            'sequence'     => 1,
+                            'sender_id'    => $user->id,
+                            'receiver_id'  => $recv->id,
+                            'status'       => 'Pending',
+                            'instructions' => $step->action_required,
+                            'due_at'       => now()->addHours($step->lead_time_hours),
+                            'is_terminal'  => false,
                         ]);
                     }
                 }
             } else {
-                // Sequential: create all steps; activate only first (status=Pending), rest=Queued
+                // Sequential: activate first step, queue the rest
                 foreach ($steps as $i => $step) {
-                    $isFirst = $i === 0;
-                    $receivers = $step->role_name
-                        ? User::havingRole($step->role_name)->get()
-                        : collect();
-
+                    $isFirst   = $i === 0;
+                    $receivers = $step->role_name ? User::havingRole($step->role_name)->get() : collect();
                     foreach ($receivers as $recv) {
                         DocumentRouting::create([
-                            'document_id' => $doc->id,
-                            'sequence'    => $step->step_order,
-                            'sender_id'   => $user->id,
-                            'receiver_id' => $recv->id,
-                            'status'      => $isFirst ? 'Pending' : 'Queued',
-                            'instructions'=> $step->action_required,
-                            'due_at'      => $isFirst ? now()->addHours($step->lead_time_hours) : null,
-                            'is_terminal' => ($i === $steps->count() - 1),
+                            'document_id'  => $doc->id,
+                            'sequence'     => $step->step_order,
+                            'sender_id'    => $user->id,
+                            'receiver_id'  => $recv->id,
+                            'status'       => $isFirst ? 'Pending' : 'Queued',
+                            'instructions' => $step->action_required,
+                            'due_at'       => $isFirst ? now()->addHours($step->lead_time_hours) : null,
+                            'is_terminal'  => ($i === $steps->count() - 1),
                         ]);
                         if ($isFirst) $doc->update(['current_holder_id' => $recv->id]);
                     }
@@ -286,15 +296,21 @@ class DocumentTrackingController extends Controller
             }
         }
 
-        // Notify first active receivers
-        $firstRoutings = $document->routings()->with(['sender', 'receiver', 'document.documentType'])
-            ->where('status', 'Pending')->get();
+        $url = route('document-tracking.show', $document->id);
 
-        foreach ($firstRoutings as $routing) {
-            $recv = $routing->receiver;
-            if (! $recv) continue;
-            $this->sendMail(fn() => Mail::to($recv->email)->send(new DocumentCreatedMail($document, $recv->name)));
-            $this->notify($recv, 'Document Tracking', $document->tracking_no, 'New document requires your review', route('document-tracking.show', $document->id));
+        if ($document->origin_type === 'external') {
+            // External: Records already holds it — no notification to self.
+            // Nothing to send here; Records will notify OCD when they forward.
+        } else {
+            // Internal: notify first active (Pending) receivers
+            $firstRoutings = $document->routings()->with(['sender', 'receiver', 'document.documentType'])
+                ->where('status', 'Pending')->get();
+            foreach ($firstRoutings as $routing) {
+                $recv = $routing->receiver;
+                if (! $recv) continue;
+                $this->sendMail(fn() => Mail::to($recv->email)->send(new DocumentCreatedMail($document, $recv->name)));
+                $this->notify($recv, 'Document Tracking', $document->tracking_no, 'New document requires your review', $url);
+            }
         }
 
         return redirect()->route('document-tracking.show', $document->id)
