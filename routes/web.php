@@ -367,9 +367,6 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/mis/dashboard', [\App\Http\Controllers\MISDashboardController::class, 'index'])
         ->middleware('permission:it.requests.manage')
         ->name('mis.dashboard');
-    Route::get('/mis/architecture', [\App\Http\Controllers\MISDashboardController::class, 'architecture'])
-        ->middleware('permission:it.requests.manage')
-        ->name('mis.architecture');
     Route::get('/job-requests/check-pending-itjr', [ITJobRequestController::class, 'checkPendingActedByMis'])->name('jobrequests.check-pending');
     Route::get('/job-requests/export-pdf', [ITJobRequestController::class, 'exportPdf'])->name('jobrequests.export-pdf');
     Route::get('/job-requests/queue', [ITJobRequestController::class, 'queue'])->name('jobrequests.queue');
