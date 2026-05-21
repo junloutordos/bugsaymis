@@ -551,13 +551,6 @@ function fmtType(t) {
                 <span class="text-slate-700 font-mono text-xs break-all">{{ row[1] }}</span>
               </div>
             </div>
-            <div class="mt-4">
-              <a :href="route('mis.architecture')" target="_blank"
-                class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-                <RocketLaunchIcon class="h-3.5 w-3.5" />
-                View interactive architecture diagram
-              </a>
-            </div>
           </div>
 
           <!-- Critical Rules -->
