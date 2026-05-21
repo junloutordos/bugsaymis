@@ -89,7 +89,7 @@ class NotificationService
             'body'  => $referenceNo . ($remarks ? ": {$remarks}" : ''),
             'icon'  => '/images/pshslogo.png',
             'data'  => ['url' => $url],
-            'tag'   => 'crcmis-' . md5($requestType . $referenceNo),
+            'tag'   => 'crcmis-' . $user->id . '-' . time(),
         ]);
 
         foreach ($subscriptions as $sub) {
