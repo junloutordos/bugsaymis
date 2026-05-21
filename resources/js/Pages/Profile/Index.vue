@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { storageUrl } from '@/Composables/useStorage.js'
 import {
   UserCircleIcon, PencilSquareIcon, CheckCircleIcon,
   CameraIcon, FingerPrintIcon, ShieldCheckIcon,
@@ -13,7 +14,7 @@ const page    = usePage()
 const success = computed(() => page.props.flash?.success)
 
 // ── Photo upload ───────────────────────────────────────────────────────────
-const photoPreview   = ref(props.profile.profile_picture_url)
+const photoPreview   = ref(storageUrl(props.profile.profile_picture))
 const photoBase64    = ref(null)
 const photoMime      = ref(null)
 const photoInputRef  = ref(null)

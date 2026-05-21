@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -29,9 +28,7 @@ class ProfileController extends Controller
                 'division'            => $user->division?->only('id', 'name'),
                 'office'              => $user->office?->only('id', 'name'),
                 'roles'               => $user->roles->pluck('name'),
-                'profile_picture_url' => $user->profile_picture
-                    ? Storage::disk('s3')->temporaryUrl($user->profile_picture, now()->addMinutes(30))
-                    : null,
+                'profile_picture'     => $user->profile_picture, // raw S3 path — storageUrl() in frontend
                 'has_signature'       => (bool) $user->electronic_signature,
             ],
         ]);

@@ -5,7 +5,6 @@ const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
 import SidebarLink from "@/Components/SidebarLink.vue";
-import ProfileEditModal from '@/Components/ProfileEditModal.vue';
 import NotificationBell from '@/Components/NotificationBell.vue';
 import {
   HomeIcon,
@@ -225,15 +224,6 @@ const getGroupBadge = (item) => {
   return Math.min(total, 99);
 };
 
-// --- Profile Modal State ---
-const showProfileModal = ref(false);
-const openProfileModal = () => {
-  showDropdown.value = false;
-  showProfileModal.value = true;
-};
-const closeProfileModal = () => {
-  showProfileModal.value = false;
-};
 // Consultation Log modal state
 const showConsultationLogModal = ref(false);
 const consultationLogStart = ref("");
@@ -2132,14 +2122,21 @@ filteredMenu.value.forEach((item) => {
 
           <div
             v-if="showDropdown"
-            class="absolute right-0 mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1"
+            class="absolute right-0 mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-100 z-50 py-1"
           >
             <button
               type="button"
-              @click.prevent="openProfileModal"
+              @click="router.visit(route('profile.edit')); showDropdown = false"
               class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
-              Profile
+              Edit Profile
+            </button>
+            <button
+              type="button"
+              @click="router.visit(route('profile.signature')); showDropdown = false"
+              class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Digital Signature
             </button>
             <div class="my-1 border-t border-gray-100"></div>
             <button
@@ -2159,8 +2156,6 @@ filteredMenu.value.forEach((item) => {
         <slot />
       </main>
     </div>
-    <!-- Profile Edit Modal -->
-    <ProfileEditModal :show="showProfileModal" :user="user" @close="closeProfileModal" />
   <!-- Consultation Log Date Range Modal -->
   <div v-if="showConsultationLogModal" class="fixed inset-0 z-50 flex items-center justify-center">
     <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeConsultationLogModal"></div>
