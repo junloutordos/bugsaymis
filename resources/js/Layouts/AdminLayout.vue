@@ -512,6 +512,13 @@ const menuItems = [
         permissions: ["it.requests.manage"],
       },
       {
+        label: "Technical Docs",
+        routeName: "technical-docs.index",
+        href: route("technical-docs.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator"],
+      },
+      {
         label: "IT Job Requests",
         routeName: "jobrequests.index",
         href: route("jobrequests.index"),
