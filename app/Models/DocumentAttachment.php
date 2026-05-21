@@ -13,6 +13,8 @@ class DocumentAttachment extends Model
         'document_id',
         'file_name',
         'file_path',
+        'gdrive_file_id',
+        'gdrive_link',
         'mime_type',
         'file_size',
         'uploaded_by',

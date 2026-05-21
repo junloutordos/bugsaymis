@@ -15,6 +15,7 @@ class DocumentType extends Model
         'description',
         'lead_time_hours',
         'is_active',
+        'routing_type',
     ];
 
     protected $casts = [
@@ -24,5 +25,10 @@ class DocumentType extends Model
     public function documents()
     {
         return $this->hasMany(Document::class);
+    }
+
+    public function routingSteps()
+    {
+        return $this->hasMany(DocumentTypeRoutingStep::class)->orderBy('step_order');
     }
 }

@@ -680,15 +680,35 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/messengerial/{messengerialRequest}/proof', [\App\Http\Controllers\MessengerialController::class, 'viewProof'])
         ->name('messengerial.proof');
 
-    // Document Tracking
-    Route::get('/document-tracking', [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('document-tracking.index');
-    Route::post('/document-tracking', [\App\Http\Controllers\DocumentTrackingController::class, 'store'])->name('document-tracking.store');
-    Route::get('/document-tracking/attachments/{attachment}/download', [\App\Http\Controllers\DocumentTrackingController::class, 'download'])->name('document-tracking.download');
-    Route::get('/document-tracking/{document}', [\App\Http\Controllers\DocumentTrackingController::class, 'show'])->name('document-tracking.show');
-    Route::post('/document-tracking/routings/{routing}/receive', [\App\Http\Controllers\DocumentTrackingController::class, 'receive'])->name('document-tracking.receive');
-    Route::post('/document-tracking/routings/{routing}/action', [\App\Http\Controllers\DocumentTrackingController::class, 'action'])->name('document-tracking.action');
-    Route::post('/document-tracking/routings/{routing}/forward', [\App\Http\Controllers\DocumentTrackingController::class, 'forward'])->name('document-tracking.forward');
-    Route::post('/document-tracking/routings/{routing}/complete', [\App\Http\Controllers\DocumentTrackingController::class, 'complete'])->name('document-tracking.complete');
+    // ── Document Tracking System ──────────────────────────────────────────────
+    Route::prefix('document-tracking')->name('document-tracking.')->group(function () {
+        // Document CRUD
+        Route::get('/',          [\App\Http\Controllers\DocumentTrackingController::class, 'index'])->name('index');
+        Route::post('/',         [\App\Http\Controllers\DocumentTrackingController::class, 'store'])->name('store');
+        Route::get('/{document}',[\App\Http\Controllers\DocumentTrackingController::class, 'show'])->name('show');
+        Route::post('/{document}/complete', [\App\Http\Controllers\DocumentTrackingController::class, 'complete'])->name('complete');
+        Route::post('/{document}/annotate', [\App\Http\Controllers\DocumentTrackingController::class, 'annotate'])->name('annotate');
+        Route::get('/{document}/scan/{attachment}', [\App\Http\Controllers\DocumentTrackingController::class, 'viewScan'])->name('scan');
+
+        // Routing step actions
+        Route::post('/routings/{routing}/receive', [\App\Http\Controllers\DocumentTrackingController::class, 'receive'])->name('receive');
+        Route::post('/routings/{routing}/act',     [\App\Http\Controllers\DocumentTrackingController::class, 'act'])->name('act');
+        Route::post('/routings/{routing}/forward', [\App\Http\Controllers\DocumentTrackingController::class, 'forward'])->name('forward');
+        Route::post('/routings/{routing}/return',  [\App\Http\Controllers\DocumentTrackingController::class, 'returnDoc'])->name('return');
+
+        // Document Type management (admin)
+        Route::prefix('types')->name('types.')->group(function () {
+            Route::get('/',    [\App\Http\Controllers\DocumentTypeController::class, 'index'])->name('index');
+            Route::post('/',   [\App\Http\Controllers\DocumentTypeController::class, 'store'])->name('store');
+            Route::put('/{documentType}',   [\App\Http\Controllers\DocumentTypeController::class, 'update'])->name('update');
+            Route::delete('/{documentType}',[\App\Http\Controllers\DocumentTypeController::class, 'destroy'])->name('destroy');
+            // Routing steps
+            Route::post('/{documentType}/steps',  [\App\Http\Controllers\DocumentTypeController::class, 'storeStep'])->name('steps.store');
+            Route::post('/{documentType}/reorder',[\App\Http\Controllers\DocumentTypeController::class, 'reorderSteps'])->name('steps.reorder');
+            Route::put('/steps/{step}',    [\App\Http\Controllers\DocumentTypeController::class, 'updateStep'])->name('steps.update');
+            Route::delete('/steps/{step}', [\App\Http\Controllers\DocumentTypeController::class, 'destroyStep'])->name('steps.destroy');
+        });
+    });
 
     // Messengerial CRUD routes (any authenticated user may create; controller enforces edit/delete rules)
     Route::get('/messengerial', [\App\Http\Controllers\MessengerialController::class, 'index'])->name('messengerial.index');

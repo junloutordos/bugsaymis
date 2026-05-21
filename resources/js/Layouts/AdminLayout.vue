@@ -1076,11 +1076,11 @@ const menuItems = [
     roles: ["Administrator", "Records", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD"],
     children: [
       {
-        label: "Docu Track",
+        label: "Document Tracking",
         routeName: "document-tracking.index",
         href: route("document-tracking.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Records", "Faculty", "Staff", "Student", "Parent", "GSU Head", "DivisionChief"],
+        roles: ["Administrator", "Records", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD"],
       },
       {
         label: "Messengerial",
