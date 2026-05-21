@@ -1,121 +1,96 @@
-<template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-    <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative">
-      <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800" @click="$emit('close')">✕</button>
-      <h2 class="text-xl font-semibold mb-4">Edit Profile</h2>
-      <form @submit.prevent="submit" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Name</label>
-          <input v-model="form.name" type="text" class="mt-1 block w-full rounded border-gray-300" required />
-          <p v-if="form.errors.name" class="text-red-600 text-sm mt-1">{{ form.errors.name }}</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Email</label>
-          <input v-model="form.email" type="email" class="mt-1 block w-full rounded border-gray-300 bg-gray-100" disabled />
-          <p v-if="form.errors.email" class="text-red-600 text-sm mt-1">{{ form.errors.email }}</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Profile Picture (JPEG/JPG)</label>
-          <input ref="profileFile" @change="onProfileFileChange" type="file" accept=".jpeg,.jpg,image/jpeg" class="mt-1 block w-full" />
-          <p v-if="form.errors.profile_picture" class="text-red-600 text-sm mt-1">{{ form.errors.profile_picture }}</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Electronic Signature (PNG)</label>
-          <input ref="signatureFile" @change="onSignatureFileChange" type="file" accept=".png,image/png" class="mt-1 block w-full" />
-          <p v-if="form.errors.electronic_signature" class="text-red-600 text-sm mt-1">{{ form.errors.electronic_signature }}</p>
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" @click="$emit('close')" class="px-4 py-2 rounded border">Cancel</button>
-            <button :disabled="form.processing" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60">Save</button>
-        </div>
-          <div v-if="statusMessage" class="mt-2 text-sm text-green-600">{{ statusMessage }}</div>
-          <div v-if="errorMessage" class="mt-2 text-sm text-red-600">{{ errorMessage }}</div>
-      </form>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { useForm, usePage } from '@inertiajs/vue3';
-import axios from 'axios';
-import { watch, toRefs, ref } from 'vue';
+import { computed } from 'vue'
+import { router, usePage } from '@inertiajs/vue3'
+import { UserCircleIcon, FingerPrintIcon, ArrowRightIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps({
-  show: Boolean,
-  user: Object,
-});
-const emit = defineEmits(['close']);
+const props = defineProps({ show: Boolean })
+const emit  = defineEmits(['close'])
 
-const { user } = toRefs(props);
-const page = usePage();
-const pageUser = page.props.auth?.user || {};
-console.log('ProfileEditModal props on init', { show: props.show, propUser: props.user, pageUser });
-watch(() => props.show, (v) => console.log('ProfileEditModal show changed:', v));
+const page = usePage()
+const user = computed(() => page.props.auth?.user)
 
-const form = useForm({
-  name: user.value?.name || pageUser.name || '',
-  email: user.value?.email || pageUser.email || '',
-});
+function initials(n) {
+  return (n ?? '').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+}
 
-watch(
-  () => props.user,
-  (val) => {
-    console.log('ProfileEditModal prop user changed:', val);
-    form.name = val?.name || pageUser.name || '';
-    form.email = val?.email || pageUser.email || '';
-  },
-  { immediate: true }
-);
+function goProfile() {
+  emit('close')
+  router.visit(route('profile.edit'))
+}
 
-const statusMessage = ref('');
-const errorMessage = ref('');
-const profileFile = ref(null);
-const signatureFile = ref(null);
-
-const onProfileFileChange = (e) => {
-  profileFile.value = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-};
-
-const onSignatureFileChange = (e) => {
-  signatureFile.value = e.target.files && e.target.files[0] ? e.target.files[0] : null;
-};
-
-const submit = () => {
-  console.log('ProfileEditModal submit', { name: form.name, email: form.email });
-  statusMessage.value = '';
-  errorMessage.value = '';
-  form.processing = true;
-
-  const payload = new FormData();
-  payload.append('name', form.name);
-  payload.append('email', form.email);
-  if (profileFile.value) payload.append('profile_picture', profileFile.value);
-  if (signatureFile.value) payload.append('electronic_signature', signatureFile.value);
-
-  payload.append('_method', 'PATCH');
-
-  axios.post(route('profile.update'), payload, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-    .then(() => {
-      console.log('Profile update success');
-      statusMessage.value = 'Profile updated successfully.';
-      emit('close');
-      setTimeout(() => window.location.reload(), 300);
-    })
-    .catch((err) => {
-      console.log('Profile update error', err);
-      if (err.response && err.response.status === 422) {
-        const errors = err.response.data.errors || {};
-        form.errors = errors;
-        errorMessage.value = Object.values(errors).flat().join(' ');
-      } else {
-        errorMessage.value = 'An unexpected error occurred.';
-      }
-    })
-    .finally(() => {
-      form.processing = false;
-    });
-};
-
+function goSignature() {
+  emit('close')
+  router.visit(route('profile.signature'))
+}
 </script>
+
+<template>
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div v-if="show" class="fixed inset-0 z-50 flex items-start justify-end pt-14 pr-3">
+        <div class="fixed inset-0 bg-black/20" @click="emit('close')" />
+
+        <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-100 w-72 overflow-hidden z-10">
+
+          <!-- Header gradient -->
+          <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 px-5 py-5">
+            <div class="flex items-center gap-3">
+              <div class="w-14 h-14 rounded-full overflow-hidden ring-2 ring-white/40 bg-white/20 flex items-center justify-center shrink-0">
+                <img v-if="user?.profile_picture" :src="user.profile_picture" alt="Profile"
+                  class="w-full h-full object-cover" />
+                <span v-else class="text-lg font-bold text-white select-none">
+                  {{ initials(user?.name) }}
+                </span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="font-semibold text-white text-sm truncate">{{ user?.name }}</p>
+                <p class="text-indigo-200 text-xs truncate">{{ user?.email }}</p>
+                <p v-if="user?.position" class="text-indigo-300 text-[11px] truncate mt-0.5">{{ user.position }}</p>
+              </div>
+              <button @click="emit('close')" class="text-white/60 hover:text-white shrink-0">
+                <XMarkIcon class="h-4 w-4" />
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-1 mt-3">
+              <span v-for="role in (user?.roles ?? [])" :key="role.id ?? role"
+                class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/20 text-white">
+                {{ role.name ?? role }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Links -->
+          <div class="p-3 space-y-1">
+            <button @click="goProfile"
+              class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group">
+              <UserCircleIcon class="h-4 w-4 text-slate-400 group-hover:text-indigo-500 shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-700">Edit Profile</p>
+                <p class="text-xs text-slate-400">Photo, name, specialization</p>
+              </div>
+              <ArrowRightIcon class="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400" />
+            </button>
+
+            <button @click="goSignature"
+              class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors text-left group">
+              <FingerPrintIcon class="h-4 w-4 text-slate-400 group-hover:text-indigo-500 shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-700">Digital Signature</p>
+                <p class="text-xs text-slate-400">Manage signature & PIN</p>
+              </div>
+              <ArrowRightIcon class="h-3.5 w-3.5 text-slate-300 group-hover:text-indigo-400" />
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
