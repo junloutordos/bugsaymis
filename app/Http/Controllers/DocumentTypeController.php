@@ -11,29 +11,36 @@ class DocumentTypeController extends Controller
 {
     public function index()
     {
-        $types = DocumentType::with('routingSteps')
+        $types = DocumentType::with(['routingSteps.office', 'routingSteps.assignedUser'])
             ->orderBy('name')
             ->get()
             ->map(fn($t) => [
-                'id'            => $t->id,
-                'name'          => $t->name,
-                'code'          => $t->code,
-                'description'   => $t->description,
+                'id'              => $t->id,
+                'name'            => $t->name,
+                'code'            => $t->code,
+                'description'     => $t->description,
                 'lead_time_hours' => $t->lead_time_hours,
-                'routing_type'  => $t->routing_type,
-                'is_active'     => $t->is_active,
-                'routing_steps' => $t->routingSteps->map(fn($s) => [
-                    'id'             => $s->id,
-                    'step_order'     => $s->step_order,
-                    'role_name'      => $s->role_name,
-                    'action_required'=> $s->action_required,
-                    'lead_time_hours'=> $s->lead_time_hours,
-                    'is_required'    => $s->is_required,
+                'routing_type'    => $t->routing_type,
+                'is_active'       => $t->is_active,
+                'routing_steps'   => $t->routingSteps->map(fn($s) => [
+                    'id'               => $s->id,
+                    'step_order'       => $s->step_order,
+                    'office_id'        => $s->office_id,
+                    'office_name'      => $s->office?->name,
+                    'assigned_user_id' => $s->assigned_user_id,
+                    'assigned_user'    => $s->assignedUser?->only('id', 'name'),
+                    'action_required'  => $s->action_required,
+                    'lead_time_hours'  => $s->lead_time_hours,
+                    'is_required'      => $s->is_required,
                 ]),
             ]);
 
         return Inertia::render('DocumentTracking/Types/Index', [
             'documentTypes' => $types,
+            'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
+            'users'         => \App\Models\User::where('status', '<>', 'inactive')
+                                ->orderBy('name')
+                                ->get(['id', 'name', 'office_id']),
         ]);
     }
 
@@ -85,10 +92,11 @@ class DocumentTypeController extends Controller
     public function storeStep(Request $request, DocumentType $documentType)
     {
         $data = $request->validate([
-            'role_name'       => 'nullable|string|max:100',
-            'action_required' => 'required|string|max:500',
-            'lead_time_hours' => 'required|integer|min:1|max:720',
-            'is_required'     => 'boolean',
+            'office_id'        => 'nullable|exists:offices,id',
+            'assigned_user_id' => 'nullable|exists:users,id',
+            'action_required'  => 'required|string|max:500',
+            'lead_time_hours'  => 'required|integer|min:1|max:720',
+            'is_required'      => 'boolean',
         ]);
 
         $maxOrder = $documentType->routingSteps()->max('step_order') ?? 0;
@@ -103,11 +111,12 @@ class DocumentTypeController extends Controller
     public function updateStep(Request $request, DocumentTypeRoutingStep $step)
     {
         $data = $request->validate([
-            'role_name'       => 'nullable|string|max:100',
-            'action_required' => 'required|string|max:500',
-            'lead_time_hours' => 'required|integer|min:1|max:720',
-            'is_required'     => 'boolean',
-            'step_order'      => 'required|integer|min:1',
+            'office_id'        => 'nullable|exists:offices,id',
+            'assigned_user_id' => 'nullable|exists:users,id',
+            'action_required'  => 'required|string|max:500',
+            'lead_time_hours'  => 'required|integer|min:1|max:720',
+            'is_required'      => 'boolean',
+            'step_order'       => 'required|integer|min:1',
         ]);
 
         $step->update($data);
