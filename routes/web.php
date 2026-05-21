@@ -204,33 +204,6 @@ Route::prefix('it-job-requests')->group(function () {
 
 });
 
-// ── Temporary: clear this user's push subscriptions (debug) ─────────────────
-Route::middleware(['auth'])->get('/_clear-push', function (\Illuminate\Http\Request $req) {
-    $deleted = $req->user()->pushSubscriptions()->delete();
-    return response()->json(['cleared' => $deleted]);
-});
-
-// ── Temporary: test push notification (admin only) ───────────────────────────
-Route::middleware(['auth'])->get('/_test-push', function (\Illuminate\Http\Request $req) {
-    $user = $req->user();
-    $rows = $user->pushSubscriptions()->get(['endpoint', 'content_encoding', 'created_at']);
-    \App\Services\NotificationService::notifyUser(
-        $user, 'Test Notification', 'CRCMIS-TEST-001',
-        '🎉 Web Push is working!', '/dashboard',
-        'Tap to open CRCMIS dashboard.'
-    );
-    return response()->json([
-        'sent_to'       => $user->name,
-        'subscriptions' => $rows->count(),
-        'web_push'      => $rows->count() > 0 ? 'sent' : 'no subscriptions',
-        'debug'         => $rows->map(fn($s) => [
-            'endpoint_tail'    => substr($s->endpoint, -30),
-            'content_encoding' => $s->content_encoding,
-            'created_at'       => $s->created_at,
-        ]),
-    ]);
-});
-
 // ── Web Push subscriptions ────────────────────────────────────────────────────
 Route::get('/api/push-subscriptions/vapid-public-key', [\App\Http\Controllers\PushSubscriptionController::class, 'vapidPublicKey'])->name('push.vapid-key');
 Route::middleware(['auth'])->group(function () {
