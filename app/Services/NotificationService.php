@@ -33,16 +33,22 @@ class NotificationService
                 remarks:     $remarks,
             ));
 
-            // 2 — Real-time Soketi broadcast
-            Broadcast::private("user.{$user->id}")
-                ->event('request.status.updated', [
+            // 2 — Real-time Soketi broadcast on user.{id} channel
+            event(new \Illuminate\Broadcasting\BroadcastEvent(
+                new class($user->id, [
                     'request_type' => $requestType,
                     'reference_no' => $referenceNo,
                     'status'       => $newStatus,
                     'url'          => $url,
                     'remarks'      => $remarks,
                     'created_at'   => now()->toIso8601String(),
-                ]);
+                ]) implements \Illuminate\Contracts\Broadcasting\ShouldBroadcastNow {
+                    public function __construct(private int $userId, private array $payload) {}
+                    public function broadcastOn() { return [new \Illuminate\Broadcasting\PrivateChannel("user.{$this->userId}")]; }
+                    public function broadcastWith() { return $this->payload; }
+                    public function broadcastAs() { return 'request.status.updated'; }
+                }
+            ));
         } catch (\Throwable $e) {
             logger()->error('Failed to send in-app notification', ['user_id' => $user->id, 'error' => $e->getMessage()]);
         }
@@ -102,8 +108,17 @@ class NotificationService
         }
 
         foreach ($webPush->flush() as $report) {
-            if ($report->isSubscriptionExpired()) {
-                PushSubscription::where('endpoint', $report->getRequest()->getUri()->__toString())->delete();
+            if ($report->isSuccess()) {
+                logger()->info('Push notification sent', ['endpoint' => substr($report->getEndpoint(), 0, 60)]);
+            } else {
+                logger()->warning('Push notification failed', [
+                    'endpoint' => substr($report->getEndpoint(), 0, 60),
+                    'reason'   => $report->getReason(),
+                    'expired'  => $report->isSubscriptionExpired(),
+                ]);
+                if ($report->isSubscriptionExpired()) {
+                    PushSubscription::where('endpoint', $report->getEndpoint())->delete();
+                }
             }
         }
     }
