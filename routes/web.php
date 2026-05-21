@@ -213,7 +213,7 @@ Route::middleware(['auth'])->get('/_clear-push', function (\Illuminate\Http\Requ
 // ── Temporary: test push notification (admin only) ───────────────────────────
 Route::middleware(['auth'])->get('/_test-push', function (\Illuminate\Http\Request $req) {
     $user = $req->user();
-    $subs = $user->pushSubscriptions()->count();
+    $rows = $user->pushSubscriptions()->get(['endpoint', 'content_encoding', 'created_at']);
     \App\Services\NotificationService::notifyUser(
         $user, 'Test Notification', 'CRCMIS-TEST-001',
         '🎉 Web Push is working!', '/dashboard',
@@ -221,9 +221,13 @@ Route::middleware(['auth'])->get('/_test-push', function (\Illuminate\Http\Reque
     );
     return response()->json([
         'sent_to'       => $user->name,
-        'subscriptions' => $subs,
-        'in_app_bell'   => true,
-        'web_push'      => $subs > 0 ? 'sent' : 'no subscriptions — allow notifications in browser first',
+        'subscriptions' => $rows->count(),
+        'web_push'      => $rows->count() > 0 ? 'sent' : 'no subscriptions',
+        'debug'         => $rows->map(fn($s) => [
+            'endpoint_tail'    => substr($s->endpoint, -30),
+            'content_encoding' => $s->content_encoding,
+            'created_at'       => $s->created_at,
+        ]),
     ]);
 });
 
