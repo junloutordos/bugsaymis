@@ -90,6 +90,20 @@ class DocumentTrackingController extends Controller
         ];
     }
 
+    private function resolveStepReceivers(\App\Models\DocumentTypeRoutingStep $step): \Illuminate\Support\Collection
+    {
+        // Preferred: specific assigned user
+        if ($step->assigned_user_id) {
+            $u = User::find($step->assigned_user_id);
+            return $u ? collect([$u]) : collect();
+        }
+        // Fallback: all users of a role (legacy)
+        if ($step->role_name) {
+            return User::havingRole($step->role_name)->get();
+        }
+        return collect();
+    }
+
     private function sendMail(callable $fn): void
     {
         try { $fn(); } catch (\Throwable $e) {
@@ -138,9 +152,10 @@ class DocumentTrackingController extends Controller
         return Inertia::render('DocumentTracking/Index', [
             'documents'     => $documents,
             'documentTypes' => DocumentType::where('is_active', true)->orderBy('name')
-                                ->with('routingSteps')
+                                ->with(['routingSteps.office', 'routingSteps.assignedUser'])
                                 ->get(['id', 'name', 'code', 'routing_type', 'lead_time_hours']),
-            'users'         => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
+            'users'         => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
+            'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'canLogExternal'=> $user->hasAnyRole(['Administrator', 'Records']),
             'isAdmin'       => $isAdmin,
         ]);
@@ -236,7 +251,7 @@ class DocumentTrackingController extends Controller
                 }
             } elseif ($docType->routing_type === 'parallel') {
                 foreach ($steps as $step) {
-                    $receivers = $step->role_name ? User::havingRole($step->role_name)->get() : collect();
+                    $receivers = $this->resolveStepReceivers($step);
                     foreach ($receivers as $recv) {
                         DocumentRouting::create([
                             'document_id'  => $doc->id,
@@ -254,7 +269,7 @@ class DocumentTrackingController extends Controller
                 // Sequential: activate first step, queue the rest
                 foreach ($steps as $i => $step) {
                     $isFirst   = $i === 0;
-                    $receivers = $step->role_name ? User::havingRole($step->role_name)->get() : collect();
+                    $receivers = $this->resolveStepReceivers($step);
                     foreach ($receivers as $recv) {
                         DocumentRouting::create([
                             'document_id'  => $doc->id,
@@ -332,10 +347,11 @@ class DocumentTrackingController extends Controller
         }
 
         return Inertia::render('DocumentTracking/Show', [
-            'document'       => $this->formatDoc($document),
-            'users'          => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']),
-            'isAdmin'        => $isAdmin,
-            'currentUserId'  => $user->id,
+            'document'      => $this->formatDoc($document),
+            'users'         => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
+            'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
+            'isAdmin'       => $isAdmin,
+            'currentUserId' => $user->id,
         ]);
     }
 

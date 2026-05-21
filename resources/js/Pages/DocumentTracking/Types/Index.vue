@@ -8,7 +8,11 @@ import {
   ChevronUpIcon, ChevronDownIcon, Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 
-const props = defineProps({ documentTypes: Array })
+const props = defineProps({
+  documentTypes: Array,
+  offices:       Array,
+  users:         Array,
+})
 
 // ── Type modal ────────────────────────────────────────────────────────────
 const typeModal  = ref(null) // null | 'create' | 'edit'
@@ -53,16 +57,22 @@ function deleteType(type) {
 // ── Step modal ────────────────────────────────────────────────────────────
 const stepModal    = ref(false)
 const stepTypeId   = ref(null)
-const stepTarget   = ref(null) // null = new step
-const stepForm     = ref({ role_name: '', action_required: '', lead_time_hours: 24, is_required: true, step_order: 1 })
+const stepTarget   = ref(null)
+const stepForm     = ref({ office_id: '', assigned_user_id: '', action_required: '', lead_time_hours: 24, is_required: true, step_order: 1 })
 const stepErrors   = ref({})
+
+// Users filtered by the selected office in the step form
+const stepOfficeUsers = computed(() => {
+  if (!stepForm.value.office_id) return props.users ?? []
+  return (props.users ?? []).filter(u => u.office_id === +stepForm.value.office_id)
+})
 
 function openStep(typeId, step = null) {
   stepTypeId.value = typeId
   stepTarget.value = step
   stepForm.value   = step
-    ? { role_name: step.role_name ?? '', action_required: step.action_required, lead_time_hours: step.lead_time_hours, is_required: step.is_required, step_order: step.step_order }
-    : { role_name: '', action_required: '', lead_time_hours: 24, is_required: true, step_order: 99 }
+    ? { office_id: step.office_id ?? '', assigned_user_id: step.assigned_user_id ?? '', action_required: step.action_required, lead_time_hours: step.lead_time_hours, is_required: step.is_required, step_order: step.step_order }
+    : { office_id: '', assigned_user_id: '', action_required: '', lead_time_hours: 24, is_required: true, step_order: 99 }
   stepErrors.value = {}
   stepModal.value  = true
 }
@@ -106,7 +116,8 @@ function moveStep(type, step, dir) {
 const routingTypeLabel = { sequential: 'Sequential', parallel: 'Parallel', manual: 'Manual' }
 const routingTypeCls   = { sequential: 'bg-indigo-100 text-indigo-700', parallel: 'bg-amber-100 text-amber-700', manual: 'bg-slate-100 text-slate-600' }
 
-const availableRoles = ['Records', 'OCD', 'Administrator', 'DivisionChief', 'HR', 'MIS', 'Faculty', 'Staff']
+// watch office change → reset user selection
+function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
 </script>
 
 <template>
@@ -208,8 +219,11 @@ const availableRoles = ['Records', 'OCD', 'Administrator', 'DivisionChief', 'HR'
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-sm font-medium text-slate-800">{{ step.action_required }}</span>
-                  <span v-if="step.role_name" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                    → {{ step.role_name }}
+                  <span v-if="step.office_name" class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                    {{ step.office_name }}
+                  </span>
+                  <span v-if="step.assigned_user" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                    → {{ step.assigned_user.name }}
                   </span>
                   <span v-if="!step.is_required" class="text-xs text-slate-400">(optional)</span>
                 </div>
@@ -308,14 +322,31 @@ const availableRoles = ['Records', 'OCD', 'Administrator', 'DivisionChief', 'HR'
             <button @click="stepModal = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">✕</button>
           </div>
           <div class="px-6 py-5 space-y-4">
+            <!-- Office -->
             <div>
-              <label class="block text-xs font-medium text-slate-700 mb-1">Route To Role</label>
-              <select v-model="stepForm.role_name"
+              <label class="block text-xs font-medium text-slate-700 mb-1">Office <span class="text-red-500">*</span></label>
+              <select v-model="stepForm.office_id" @change="onStepOfficeChange" required
                 class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">— No specific role (manual pick) —</option>
-                <option v-for="r in availableRoles" :key="r" :value="r">{{ r }}</option>
+                <option value="">Select office…</option>
+                <option v-for="o in offices" :key="o.id" :value="o.id">{{ o.name }}</option>
               </select>
-              <p class="text-xs text-slate-400 mt-1">All users with this role will receive the document at this step.</p>
+              <p v-if="stepErrors.office_id" class="text-xs text-red-500 mt-1">{{ stepErrors.office_id }}</p>
+            </div>
+
+            <!-- User from that office -->
+            <div>
+              <label class="block text-xs font-medium text-slate-700 mb-1">
+                Assigned To
+                <span class="text-slate-400 font-normal">(from selected office)</span>
+              </label>
+              <select v-model="stepForm.assigned_user_id"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">Select person…</option>
+                <option v-for="u in stepOfficeUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+              <p v-if="!stepForm.office_id" class="text-xs text-slate-400 mt-1">Select an office first to filter personnel.</p>
+              <p v-else-if="stepOfficeUsers.length === 0" class="text-xs text-amber-600 mt-1">No active users found in this office.</p>
+              <p v-if="stepErrors.assigned_user_id" class="text-xs text-red-500 mt-1">{{ stepErrors.assigned_user_id }}</p>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-700 mb-1">Action Required <span class="text-red-500">*</span></label>
