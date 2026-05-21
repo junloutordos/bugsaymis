@@ -153,30 +153,35 @@ public function index(Request $request)
             return $jobRequest;
         });
 
-        // Send email to Division Chief with signed approve/decline links
+        // Send email + in-app notification to Division Chief
         if ($jobRequest->divisionchief_id) {
             $chief = User::find($jobRequest->divisionchief_id);
-            if ($chief && $chief->email) {
-                $approveUrl = URL::signedRoute('it-job-requests.dc.approve', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
-                $declineUrl = URL::signedRoute('it-job-requests.dc.decline', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
-
-                try {
-                    Mail::to($chief->email)->send(new DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
-                } catch (\Throwable $e) {
-                    logger()->error('Failed to send Division Chief ITJR email', ['error' => $e->getMessage()]);
+            if ($chief) {
+                if ($chief->email) {
+                    $approveUrl = URL::signedRoute('it-job-requests.dc.approve', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('it-job-requests.dc.decline', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
+                    try {
+                        Mail::to($chief->email)->send(new DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
+                    } catch (\Throwable $e) {
+                        logger()->error('Failed to send Division Chief ITJR email', ['error' => $e->getMessage()]);
+                    }
                 }
+                NotificationService::notifyUser($chief, 'IT Job Request', $jobRequest->itjr_no, 'New request awaiting your approval', route('jobrequests.index'));
             }
         }
 
-        // Send email to Assigned Administrator
+        // Send email + in-app notification to Assigned Administrator
         if ($jobRequest->assignedto) {
             $admin = User::find($jobRequest->assignedto);
-            if ($admin && $admin->email) {
-                try {
-                    Mail::to($admin->email)->send(new ITJRStatusMail($jobRequest, 'New Request Assigned', 'You have been assigned to this request.', 'Administrator'));
-                } catch (\Throwable $e) {
-                    logger()->error('Failed to send Administrator ITJR email', ['error' => $e->getMessage()]);
+            if ($admin) {
+                if ($admin->email) {
+                    try {
+                        Mail::to($admin->email)->send(new ITJRStatusMail($jobRequest, 'New Request Assigned', 'You have been assigned to this request.', 'Administrator'));
+                    } catch (\Throwable $e) {
+                        logger()->error('Failed to send Administrator ITJR email', ['error' => $e->getMessage()]);
+                    }
                 }
+                NotificationService::notifyUser($admin, 'IT Job Request', $jobRequest->itjr_no, 'New request assigned to you', route('jobrequests.index'));
             }
         }
 
