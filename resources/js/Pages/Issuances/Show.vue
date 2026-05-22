@@ -178,7 +178,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                 <p class="text-sm font-bold uppercase tracking-widest text-slate-800">{{ issuance.type_label }}</p>
                 <p class="text-xs text-slate-500 mt-0.5">No. {{ issuance.control_number.split('-')[2] }}, S. {{ issuance.control_number.split('-')[1] }}</p>
               </div>
-              <div class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{{ issuance.content }}</div>
+              <div class="text-sm text-slate-700 leading-relaxed prose prose-sm max-w-none" v-html="issuance.content"></div>
             </div>
           </div>
 
