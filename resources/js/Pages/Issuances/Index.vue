@@ -79,8 +79,7 @@ const years = computed(() => {
         <p class="text-xs text-slate-500 mt-0.5">Special Orders, Travel Orders, Memorandums and other official issuances from OCD</p>
       </div>
       <a v-if="isAdmin" :href="route('issuances.create')"
-        class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg"
-        class="bg-indigo-600 hover:bg-indigo-700">
+        class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
         <PlusIcon class="h-4 w-4" /> New Issuance
       </a>
     </div>

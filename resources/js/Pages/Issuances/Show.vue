@@ -127,8 +127,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               <!-- Acknowledge (staff) -->
               <button v-if="!isAdmin && issuance.status === 'released' && !ackDone"
                 @click="acknowledge" :disabled="ackForm.processing"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg"
-                class="bg-indigo-600 hover:bg-indigo-700">
+                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
                 <CheckCircleIcon class="h-4 w-4" /> Acknowledge Receipt
               </button>
               <div v-else-if="!isAdmin && ackDone"
@@ -139,8 +138,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               <!-- Release (admin, draft) -->
               <button v-if="isAdmin && issuance.status === 'draft'"
                 @click="openRelease"
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg"
-                class="bg-indigo-600 hover:bg-indigo-700">
+                class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
                 Sign & Release
               </button>
 
@@ -283,8 +281,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
             </p>
 
             <button @click="showPinModal = true"
-              class="w-full py-2 text-sm font-medium text-white rounded-lg"
-              class="bg-indigo-600 hover:bg-indigo-700">
+              class="w-full py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
               Sign & Release Now
             </button>
           </div>

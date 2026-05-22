@@ -204,8 +204,7 @@ watch(type, (t) => {
 
         <div class="flex justify-end pt-2">
           <button @click="step = 2" :disabled="!type || !title.trim()"
-            class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40"
-            class="bg-indigo-600 hover:bg-indigo-700">
+            class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700">
             Next: Content →
           </button>
         </div>
@@ -257,8 +256,7 @@ watch(type, (t) => {
         <div class="flex justify-between pt-2">
           <button @click="step = 1" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">← Back</button>
           <button @click="step = 3" :disabled="!canAdvance()"
-            class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40"
-            class="bg-indigo-600 hover:bg-indigo-700">
+            class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 bg-indigo-600 hover:bg-indigo-700">
             Next: Recipients →
           </button>
         </div>
@@ -342,8 +340,7 @@ watch(type, (t) => {
             </button>
           </div>
           <button @click="openPinModal"
-            class="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white rounded-lg"
-            class="bg-indigo-600 hover:bg-indigo-700">
+            class="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
             Sign & Release
           </button>
         </div>
