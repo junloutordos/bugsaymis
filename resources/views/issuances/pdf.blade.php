@@ -16,6 +16,23 @@ body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height
 .body-content { margin:14px 0; text-align:justify; }
 .body-content p { margin-bottom:8px; }
 
+/* Rich text content styles */
+.body-content h1 { font-size:16pt; font-weight:bold; margin:8px 0 6px; }
+.body-content h2 { font-size:13pt; font-weight:bold; margin:7px 0 5px; }
+.body-content h3 { font-size:11pt; font-weight:bold; margin:6px 0 4px; }
+.body-content ul { padding-left:18px; margin:4px 0; list-style-type:disc; }
+.body-content ol { padding-left:18px; margin:4px 0; list-style-type:decimal; }
+.body-content li { margin:2px 0; }
+.body-content strong { font-weight:bold; }
+.body-content em { font-style:italic; }
+.body-content u { text-decoration:underline; }
+.body-content s { text-decoration:line-through; }
+.body-content blockquote { border-left:3px solid #cbd5e1; padding-left:10px; color:#475569; margin:5px 0; font-style:italic; }
+.body-content hr { border:none; border-top:1px solid #e2e8f0; margin:8px 0; }
+.body-content table { width:100%; border-collapse:collapse; margin:8px 0; font-size:9pt; }
+.body-content th, .body-content td { border:1px solid #cbd5e1; padding:5px 8px; vertical-align:top; }
+.body-content th { background:#f1f5f9; font-weight:bold; }
+
 /* ── Signature block ── */
 .sig-block { margin-top:30px; }
 .sig-block .signed-by { font-size:8.5pt; color:#64748b; margin-bottom:4px; }

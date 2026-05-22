@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import RichTextEditor from '@/Components/RichTextEditor.vue'
 import {
   DocumentTextIcon, PaperClipIcon, UserGroupIcon,
   BuildingOfficeIcon, UserIcon, CheckCircleIcon, ChevronLeftIcon,
@@ -80,7 +81,11 @@ const errors         = ref({})
 function canAdvance() {
   if (step.value === 1) return type.value && title.value.trim()
   if (step.value === 2) {
-    if (contentMode.value === 'editor') return content.value.trim().length > 10
+    if (contentMode.value === 'editor') {
+      // Strip HTML tags to get plain text length
+      const plain = content.value.replace(/<[^>]*>/g, '').trim()
+      return plain.length > 10
+    }
     return !!scanBase64.value
   }
   return true
@@ -127,13 +132,13 @@ function onPinConfirm(pin) {
 const typeOptions = Object.entries(props.typeLabels ?? {}).map(([k, v]) => ({ code: k, label: v }))
 
 const editorTemplates = {
-  SO:     'GREETINGS:\n\nThis Special Order is hereby issued to ...\n\nThis Order is effective immediately.\n\nAll concerned are hereby notified.',
-  TO:     'This Travel Order authorizes ...\n\nPurpose of Travel: ...\n\nDestination: ...\n\nDate(s) of Travel: ...',
-  MEMO:   'TO: All Concerned\nFROM: Office of the Campus Director\nSUBJECT: ...\n\n',
-  OO:     'Pursuant to ..., this Office Order is hereby issued:\n\n1. ...\n\n2. ...\n\nAll concerned are hereby advised to comply.',
+  SO:     '<p>GREETINGS:</p><p>This Special Order is hereby issued to ...</p><p>This Order is effective immediately.</p><p>All concerned are hereby notified.</p>',
+  TO:     '<p>This Travel Order authorizes ...</p><p><strong>Purpose of Travel:</strong> ...</p><p><strong>Destination:</strong> ...</p><p><strong>Date(s) of Travel:</strong> ...</p>',
+  MEMO:   '<p><strong>TO:</strong> All Concerned<br><strong>FROM:</strong> Office of the Campus Director<br><strong>SUBJECT:</strong> ...</p><p></p>',
+  OO:     '<p>Pursuant to ..., this Office Order is hereby issued:</p><ol><li>...</li><li>...</li></ol><p>All concerned are hereby advised to comply.</p>',
   AO:     '',
-  CIRC:   'For the information and guidance of all concerned, ...',
-  NOTICE: 'This is to inform all ...',
+  CIRC:   '<p>For the information and guidance of all concerned, ...</p>',
+  NOTICE: '<p>This is to inform all ...</p>',
 }
 
 watch(type, (t) => {
@@ -230,10 +235,7 @@ watch(type, (t) => {
             <span>The system auto-generates the official header ({{ type }} No., year) and signature block.</span>
             <span>Type only the body content below.</span>
           </div>
-          <textarea v-model="content" rows="16"
-            class="w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
-            :placeholder="editorTemplates[type] ?? 'Type the body of the issuance here...'" />
-          <p class="text-xs text-slate-400">{{ content.length }} characters</p>
+          <RichTextEditor v-model="content" :placeholder="editorTemplates[type] ? undefined : 'Type the body of the issuance here…'" />
         </div>
 
         <!-- Upload mode -->
