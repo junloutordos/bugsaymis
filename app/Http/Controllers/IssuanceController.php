@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Traits\SignsDocuments;
+use App\Jobs\ProcessIssuanceRelease;
 use App\Mail\IssuanceReleasedMail;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
@@ -160,6 +161,7 @@ class IssuanceController extends Controller
             $issuance->recipients()->update(['notified_at' => now()]);
         });
 
+        // Sign synchronously (fast — just a DB write)
         try {
             $this->performSign(
                 $request,
@@ -173,20 +175,9 @@ class IssuanceController extends Controller
             logger()->error('Issuance sign failed', ['id' => $issuance->id, 'error' => $e->getMessage()]);
         }
 
-        try { $this->svc->generatePdf($issuance->fresh()); } catch (\Throwable $e) {
-            logger()->error('Issuance PDF failed', ['id' => $issuance->id, 'error' => $e->getMessage()]);
-        }
-
-        $recipients = $issuance->recipients()->with('user')->get();
-        foreach ($recipients as $recipient) {
-            $u = $recipient->user;
-            if (! $u) continue;
-            try { Mail::to($u->email)->send(new IssuanceReleasedMail($issuance, $u->name)); } catch (\Throwable) {}
-            try {
-                NotificationService::notifyUser($u, 'Issuance', $issuance->control_number,
-                    "{$issuance->type_label}: {$issuance->title}", route('issuances.show', $issuance->id));
-            } catch (\Throwable) {}
-        }
+        // Dispatch PDF generation + email/notifications to the queue worker
+        // (avoids 504 timeout — queue worker has 300s timeout vs 60s web timeout)
+        ProcessIssuanceRelease::dispatch($issuance->fresh());
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
