@@ -11,7 +11,6 @@ use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
-use setasign\Fpdi\Fpdi;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class IssuanceService
@@ -178,44 +177,50 @@ class IssuanceService
         return $result;
     }
 
-    // Stamp QR onto each page of a PDF scan using fpdi
+    // Stamp QR onto each page of a PDF scan using mPDF's built-in FpdiTrait
     private function stampQrOnPdf(string $pdfContent, string $qrPngPath, Issuance $issuance): string
     {
         $tmpPdf = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.pdf';
         file_put_contents($tmpPdf, $pdfContent);
 
         try {
-            $fpdi       = new Fpdi();
-            $pageCount  = $fpdi->setSourceFile($tmpPdf);
+            $mpdf      = new Mpdf([
+                'mode'    => 'utf-8',
+                'tempDir' => sys_get_temp_dir(),
+                'fontdata'=> (new FontVariables())->getDefaults()['fontdata'],
+                'fontDir' => (new ConfigVariables())->getDefaults()['fontDir'],
+            ]);
+
+            $pageCount = $mpdf->setSourceFile($tmpPdf);
 
             for ($page = 1; $page <= $pageCount; $page++) {
-                $tplId = $fpdi->importPage($page);
-                $size  = $fpdi->getTemplateSize($tplId);
+                $tplId = $mpdf->importPage($page);
+                $size  = $mpdf->getTemplateSize($tplId);
 
-                $w = $size['width']  ?? 210;
-                $h = $size['height'] ?? 297;
+                $w      = $size['width']  ?? 210;
+                $h      = $size['height'] ?? 297;
                 $orient = ($w > $h) ? 'L' : 'P';
 
-                $fpdi->AddPage($orient, [$w, $h]);
-                $fpdi->useTemplate($tplId, 0, 0, $w, $h);
+                $mpdf->AddPage($orient, [$w, $h]);
+                $mpdf->useTemplate($tplId, 0, 0, $w, $h);
 
-                // QR — 22mm × 22mm, 8mm from bottom-right corner
-                $qrSize  = 22;
-                $marginR = 8;
-                $marginB = 8;
-                $qrX     = $w - $qrSize - $marginR;
-                $qrY     = $h - $qrSize - $marginB - 4; // 4mm for label below
+                // QR stamp — 22mm × 22mm, 9mm from edges
+                $qrSize = 22;
+                $qrX    = $w - $qrSize - 9;
+                $qrY    = $h - $qrSize - 9 - 5; // 5mm for label below
 
-                $fpdi->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize);
-
-                // Small label under QR
-                $fpdi->SetFont('Helvetica', '', 5);
-                $fpdi->SetTextColor(100, 116, 139);
-                $fpdi->SetXY($qrX - 1, $qrY + $qrSize + 0.5);
-                $fpdi->Cell($qrSize + 2, 3, 'Scan to verify', 0, 0, 'C');
+                // Write QR + label as fixed HTML overlay at absolute position
+                $qrHtml = '
+                    <div style="position:fixed; left:' . $qrX . 'mm; top:' . $qrY . 'mm; width:' . $qrSize . 'mm; text-align:center;">
+                        <img src="' . $qrPngPath . '" style="width:' . $qrSize . 'mm; height:' . $qrSize . 'mm; display:block; margin:0 auto;" />
+                        <div style="font-size:4.5pt; color:#94a3b8; margin-top:0.5mm;">Scan to verify</div>
+                        <div style="font-size:4pt; color:#94a3b8; letter-spacing:0.5pt;">— — — — — — —</div>
+                        <div style="font-size:4pt; color:#94a3b8; font-family:Courier,monospace;">' . substr($issuance->content_hash ?? '', 0, 16) . '…</div>
+                    </div>';
+                $mpdf->WriteHTML($qrHtml);
             }
 
-            return $fpdi->Output('', 'S');
+            return $mpdf->Output('', 'S');
         } finally {
             @unlink($tmpPdf);
         }
