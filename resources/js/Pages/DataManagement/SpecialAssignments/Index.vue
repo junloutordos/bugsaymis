@@ -98,7 +98,7 @@ const {
       </div>
 
       <!-- MODAL -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">

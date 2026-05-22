@@ -3,6 +3,9 @@ import { ref, computed, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass } from '@/Composables/useStatusBadge.js'
+import FlashMessage from '@/Components/FlashMessage.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   PlusIcon, ArrowUpTrayIcon, Cog6ToothIcon, MagnifyingGlassIcon,
   LockClosedIcon, ExclamationTriangleIcon,
@@ -208,7 +211,7 @@ const needsManualReceiver = computed(() =>
 
     <!-- Table -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div v-if="displayed.length === 0" class="py-16 text-center text-slate-400 text-sm">No documents found.</div>
+      <EmptyState v-if="displayed.length === 0" title="No documents found" subtitle="Try adjusting your filters." />
       <table v-else class="w-full text-sm">
         <thead class="bg-slate-50 border-b border-slate-200">
           <tr>
@@ -264,16 +267,9 @@ const needsManualReceiver = computed(() =>
         </tbody>
       </table>
 
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-600">
-        <span>Page {{ currentPage }} of {{ totalPages }} ({{ filtered.length }} records)</span>
-        <div class="flex gap-2">
-          <button @click="currentPage--" :disabled="currentPage === 1"
-            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Prev</button>
-          <button @click="currentPage++" :disabled="currentPage === totalPages"
-            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Next</button>
-        </div>
-      </div>
+      <PaginationControl
+        :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
+        @prev="currentPage--" @next="currentPage++" />
     </div>
 
     <!-- Log / Create Modal -->

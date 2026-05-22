@@ -1,12 +1,18 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { badgeBase, statusBadgeClass, issuanceTypeBadgeClass } from '@/Composables/useStatusBadge.js'
+import FlashMessage from '@/Components/FlashMessage.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   PlusIcon, MagnifyingGlassIcon, DocumentTextIcon,
   CheckCircleIcon, ClockIcon, ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
+
+const page = usePage()
+const flash = computed(() => page.props.flash ?? {})
 
 const props = defineProps({
   issuances:  Array,
@@ -66,6 +72,8 @@ const years = computed(() => {
   <Head title="Issuances" />
   <AdminLayout title="Issuances">
 
+    <FlashMessage :success="flash.success" :error="flash.error" />
+
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div>
@@ -122,9 +130,9 @@ const years = computed(() => {
 
     <!-- Table -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div v-if="displayed.length === 0" class="py-16 text-center text-slate-400 text-sm">
-        No issuances found.
-      </div>
+      <EmptyState v-if="displayed.length === 0"
+        title="No issuances found"
+        :subtitle="activeTab === 'pending' ? 'No unacknowledged issuances for you.' : 'Try adjusting your filters.'" />
       <table v-else class="w-full text-sm">
         <thead class="bg-slate-50 border-b border-slate-200">
           <tr>
@@ -175,16 +183,9 @@ const years = computed(() => {
         </tbody>
       </table>
 
-      <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <div class="flex gap-2">
-          <button @click="currentPage--" :disabled="currentPage === 1"
-            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Prev</button>
-          <button @click="currentPage++" :disabled="currentPage === totalPages"
-            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Next</button>
-        </div>
-      </div>
+      <PaginationControl
+        :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
+        @prev="currentPage--" @next="currentPage++" />
     </div>
 
   </AdminLayout>

@@ -182,7 +182,7 @@ const submitUpload = async () => {
 
       <!-- Division Modal -->
       <div
-        v-show="showModal"
+        v-if="showModal"
         class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
@@ -299,7 +299,7 @@ const submitUpload = async () => {
     </div>
 
     <!-- Upload Signature Modal -->
-    <div v-show="showUploadModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+    <div v-if="showUploadModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-base font-semibold text-slate-800">Upload Electronic Signature</h3>
