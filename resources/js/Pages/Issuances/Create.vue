@@ -96,7 +96,7 @@ function saveDraft() {
 
 function buildPayload(pin = null) {
   return {
-    type, title: title.value,
+    type: type.value, title: title.value,
     content:      contentMode.value === 'editor' ? content.value : null,
     scan_base64:  contentMode.value === 'upload'  ? scanBase64.value : null,
     scan_filename:contentMode.value === 'upload'  ? scanFilename.value : null,
