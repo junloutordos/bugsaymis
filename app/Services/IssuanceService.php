@@ -177,8 +177,8 @@ class IssuanceService
         return $result;
     }
 
-    // Stamp QR onto each page of a PDF scan
-    // Uses SetDocTemplate (each scan page as background) + Image() for QR overlay
+    // Stamp QR onto each page of a PDF scan.
+    // importPage()+useTemplate() embeds the real scan content; Image() draws QR on top.
     private function stampQrOnPdf(string $pdfContent, string $qrPngPath, Issuance $issuance): string
     {
         $tmpPdf = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.pdf';
@@ -199,31 +199,31 @@ class IssuanceService
                 'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
             ]);
 
-            // Get page count + detect first-page dimensions
             $pageCount = $mpdf->setSourceFile($tmpPdf);
-            $tplId     = $mpdf->importPage(1);
-            $size      = $mpdf->getTemplateSize($tplId);
-            $w         = $size['width']  ?? 210;
-            $h         = $size['height'] ?? 297;
-            $orient    = ($w > $h) ? 'L' : 'P';
-
-            // SetDocTemplate makes each page of the scan the background of each output page
-            $mpdf->SetDocTemplate($tmpPdf, 1);
-
-            $qrSize  = 22;   // mm
-            $marginR = 9;    // mm from right edge
-            $marginB = 9;    // mm from bottom edge
-            $qrX     = $w - $qrSize - $marginR;
-            $qrY     = $h - $qrSize - $marginB - 8; // 8mm for labels below
-            $hash    = substr($issuance->content_hash ?? '', 0, 16);
+            $qrSize    = 22;
+            $marginR   = 9;
+            $marginB   = 9;
+            $hash      = substr($issuance->content_hash ?? '', 0, 16);
 
             for ($page = 1; $page <= $pageCount; $page++) {
+                // Import and detect size for each page (handles mixed orientations)
+                $tplId  = $mpdf->importPage($page);
+                $size   = $mpdf->getTemplateSize($tplId);
+                $w      = $size['width']  ?? 210;
+                $h      = $size['height'] ?? 297;
+                $orient = ($w > $h) ? 'L' : 'P';
+
                 $mpdf->AddPage($orient, [$w, $h]);
 
-                // Place QR image at absolute coordinates
+                // useTemplate() places the actual scan page content on this page
+                $mpdf->useTemplate($tplId, 0, 0, $w, $h);
+
+                // QR + labels drawn on top of the scan content
+                $qrX = $w - $qrSize - $marginR;
+                $qrY = $h - $qrSize - $marginB - 8;
+
                 $mpdf->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize, 'png');
 
-                // Labels below QR
                 $mpdf->SetFont('Helvetica', '', 4.5);
                 $mpdf->SetTextColor(148, 163, 184);
                 $mpdf->SetXY($qrX - 2, $qrY + $qrSize + 0.5);
