@@ -177,47 +177,67 @@ class IssuanceService
         return $result;
     }
 
-    // Stamp QR onto each page of a PDF scan using mPDF's built-in FpdiTrait
+    // Stamp QR onto each page of a PDF scan
+    // Uses SetDocTemplate (each scan page as background) + Image() for QR overlay
     private function stampQrOnPdf(string $pdfContent, string $qrPngPath, Issuance $issuance): string
     {
         $tmpPdf = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.pdf';
         file_put_contents($tmpPdf, $pdfContent);
 
         try {
-            $mpdf      = new Mpdf([
-                'mode'    => 'utf-8',
-                'tempDir' => sys_get_temp_dir(),
-                'fontdata'=> (new FontVariables())->getDefaults()['fontdata'],
-                'fontDir' => (new ConfigVariables())->getDefaults()['fontDir'],
+            $mpdf = new Mpdf([
+                'mode'          => 'utf-8',
+                'format'        => 'A4',
+                'margin_left'   => 0,
+                'margin_right'  => 0,
+                'margin_top'    => 0,
+                'margin_bottom' => 0,
+                'margin_header' => 0,
+                'margin_footer' => 0,
+                'tempDir'       => sys_get_temp_dir(),
+                'fontdata'      => (new FontVariables())->getDefaults()['fontdata'],
+                'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
             ]);
 
+            // Get page count + detect first-page dimensions
             $pageCount = $mpdf->setSourceFile($tmpPdf);
+            $tplId     = $mpdf->importPage(1);
+            $size      = $mpdf->getTemplateSize($tplId);
+            $w         = $size['width']  ?? 210;
+            $h         = $size['height'] ?? 297;
+            $orient    = ($w > $h) ? 'L' : 'P';
+
+            // SetDocTemplate makes each page of the scan the background of each output page
+            $mpdf->SetDocTemplate($tmpPdf, 1);
+
+            $qrSize  = 22;   // mm
+            $marginR = 9;    // mm from right edge
+            $marginB = 9;    // mm from bottom edge
+            $qrX     = $w - $qrSize - $marginR;
+            $qrY     = $h - $qrSize - $marginB - 8; // 8mm for labels below
+            $hash    = substr($issuance->content_hash ?? '', 0, 16);
 
             for ($page = 1; $page <= $pageCount; $page++) {
-                $tplId = $mpdf->importPage($page);
-                $size  = $mpdf->getTemplateSize($tplId);
-
-                $w      = $size['width']  ?? 210;
-                $h      = $size['height'] ?? 297;
-                $orient = ($w > $h) ? 'L' : 'P';
-
                 $mpdf->AddPage($orient, [$w, $h]);
-                $mpdf->useTemplate($tplId, 0, 0, $w, $h);
 
-                // QR stamp — 22mm × 22mm, 9mm from edges
-                $qrSize = 22;
-                $qrX    = $w - $qrSize - 9;
-                $qrY    = $h - $qrSize - 9 - 5; // 5mm for label below
+                // Place QR image at absolute coordinates
+                $mpdf->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize, 'png');
 
-                // Write QR + label as fixed HTML overlay at absolute position
-                $qrHtml = '
-                    <div style="position:fixed; left:' . $qrX . 'mm; top:' . $qrY . 'mm; width:' . $qrSize . 'mm; text-align:center;">
-                        <img src="' . $qrPngPath . '" style="width:' . $qrSize . 'mm; height:' . $qrSize . 'mm; display:block; margin:0 auto;" />
-                        <div style="font-size:4.5pt; color:#94a3b8; margin-top:0.5mm;">Scan to verify</div>
-                        <div style="font-size:4pt; color:#94a3b8; letter-spacing:0.5pt;">— — — — — — —</div>
-                        <div style="font-size:4pt; color:#94a3b8; font-family:Courier,monospace;">' . substr($issuance->content_hash ?? '', 0, 16) . '…</div>
-                    </div>';
-                $mpdf->WriteHTML($qrHtml);
+                // Labels below QR
+                $mpdf->SetFont('Helvetica', '', 4.5);
+                $mpdf->SetTextColor(148, 163, 184);
+                $mpdf->SetXY($qrX - 2, $qrY + $qrSize + 0.5);
+                $mpdf->Cell($qrSize + 4, 3, 'Scan to verify', 0, 1, 'C');
+
+                $mpdf->SetFont('Helvetica', '', 4);
+                $mpdf->SetX($qrX - 2);
+                $mpdf->Cell($qrSize + 4, 2.5, '- - - - - - -', 0, 1, 'C');
+
+                if ($hash) {
+                    $mpdf->SetFont('Courier', '', 4);
+                    $mpdf->SetX($qrX - 2);
+                    $mpdf->Cell($qrSize + 4, 2.5, $hash . chr(133), 0, 0, 'C');
+                }
             }
 
             return $mpdf->Output('', 'S');
@@ -226,7 +246,7 @@ class IssuanceService
         }
     }
 
-    // Stamp QR onto an image scan (JPG/PNG) using mPDF
+    // Stamp QR onto an image scan (JPG/PNG) using mPDF Image()
     private function stampQrOnImage(string $imgContent, string $mime, string $qrPngPath, Issuance $issuance): string
     {
         $ext    = str_contains($mime, 'png') ? 'png' : 'jpg';
@@ -247,14 +267,32 @@ class IssuanceService
                 'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
             ]);
 
-            // Full-page image + fixed QR overlay bottom-right
-            $html  = '<img src="' . $tmpImg . '" style="width:210mm; display:block;" />';
-            $html .= '<div style="position:fixed; bottom:8mm; right:8mm; width:22mm; text-align:center;">';
-            $html .= '<img src="' . $qrPngPath . '" style="width:22mm; height:22mm;" />';
-            $html .= '<div style="font-size:5pt; color:#64748b; margin-top:0.5mm;">Scan to verify</div>';
-            $html .= '</div>';
+            $mpdf->AddPage();
+            $mpdf->Image($tmpImg, 0, 0, 210, 297);  // full-page scan
 
-            $mpdf->WriteHTML($html);
+            // QR at bottom-right
+            $qrSize = 22;
+            $qrX    = 210 - $qrSize - 9;
+            $qrY    = 297 - $qrSize - 9 - 8;
+            $hash   = substr($issuance->content_hash ?? '', 0, 16);
+
+            $mpdf->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize, 'png');
+
+            $mpdf->SetFont('Helvetica', '', 4.5);
+            $mpdf->SetTextColor(148, 163, 184);
+            $mpdf->SetXY($qrX - 2, $qrY + $qrSize + 0.5);
+            $mpdf->Cell($qrSize + 4, 3, 'Scan to verify', 0, 1, 'C');
+
+            $mpdf->SetFont('Helvetica', '', 4);
+            $mpdf->SetX($qrX - 2);
+            $mpdf->Cell($qrSize + 4, 2.5, '- - - - - - -', 0, 1, 'C');
+
+            if ($hash) {
+                $mpdf->SetFont('Courier', '', 4);
+                $mpdf->SetX($qrX - 2);
+                $mpdf->Cell($qrSize + 4, 2.5, $hash . chr(133), 0, 0, 'C');
+            }
+
             return $mpdf->Output('', 'S');
         } finally {
             @unlink($tmpImg);
