@@ -3,15 +3,16 @@ import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { storageUrl } from '@/Composables/useStorage.js'
+import FlashMessage from '@/Components/FlashMessage.vue'
 import {
-  UserCircleIcon, PencilSquareIcon, CheckCircleIcon,
+  UserCircleIcon, PencilSquareIcon,
   CameraIcon, FingerPrintIcon, ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ profile: Object })
 
-const page    = usePage()
-const success = computed(() => page.props.flash?.success)
+const page  = usePage()
+const flash = computed(() => page.props.flash ?? {})
 
 // ── Photo upload ───────────────────────────────────────────────────────────
 const photoPreview   = ref(storageUrl(props.profile.profile_picture))
@@ -76,12 +77,7 @@ const empCategoryLabel = {
   <Head title="My Profile" />
   <AdminLayout title="My Profile">
 
-    <!-- Success flash -->
-    <div v-if="success"
-      class="mb-4 flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-sm">
-      <CheckCircleIcon class="h-4 w-4 shrink-0" />
-      {{ success }}
-    </div>
+    <FlashMessage :success="flash.success" :error="flash.error" />
 
     <div class="max-w-3xl space-y-5">
 

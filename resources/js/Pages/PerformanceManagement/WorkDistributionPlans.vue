@@ -145,7 +145,7 @@ const tagTypeLabel = (type) => {
       </div>
 
       <!-- MODAL -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
             <h2 class="text-base font-semibold text-slate-800">

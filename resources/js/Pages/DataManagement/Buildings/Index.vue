@@ -116,7 +116,7 @@
       </div>
 
       <!-- Remarks Modal -->
-      <div v-show="showRemarksModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+      <div v-if="showRemarksModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-base font-semibold text-slate-800">Remarks</h3>
@@ -135,7 +135,7 @@
       </div>
 
       <!-- Rooms Modal -->
-      <div v-show="showRoomsModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+      <div v-if="showRoomsModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-base font-semibold text-slate-800">Rooms — {{ currentBuildingName }}</h3>
@@ -168,7 +168,7 @@
       </div>
 
       <!-- Create/Edit Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
+      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Building' : 'New Building' }}</h2>

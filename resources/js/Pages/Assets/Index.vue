@@ -322,7 +322,7 @@ const conditionBadge = (condition) => {
       </div>
 
       <!-- View Photo Modal -->
-      <div v-show="viewModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+      <div v-if="viewModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">Asset Photo</h2>
@@ -340,7 +340,7 @@ const conditionBadge = (condition) => {
       </div>
 
       <!-- Add / Edit Asset Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
 
           <!-- Header -->
