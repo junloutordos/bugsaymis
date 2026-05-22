@@ -284,6 +284,18 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
+    // ── Issuances ─────────────────────────────────────────────────────────────
+    Route::prefix('issuances')->name('issuances.')->group(function () {
+        Route::get('/',                       [\App\Http\Controllers\IssuanceController::class, 'index'])->name('index');
+        Route::get('/create',                 [\App\Http\Controllers\IssuanceController::class, 'create'])->name('create')->middleware('role:Administrator,OCD');
+        Route::post('/',                      [\App\Http\Controllers\IssuanceController::class, 'store'])->name('store')->middleware('role:Administrator,OCD');
+        Route::get('/{issuance}',             [\App\Http\Controllers\IssuanceController::class, 'show'])->name('show');
+        Route::post('/{issuance}/release',    [\App\Http\Controllers\IssuanceController::class, 'release'])->name('release')->middleware('role:Administrator,OCD');
+        Route::post('/{issuance}/acknowledge',[\App\Http\Controllers\IssuanceController::class, 'acknowledge'])->name('acknowledge');
+        Route::get('/{issuance}/pdf',         [\App\Http\Controllers\IssuanceController::class, 'downloadPdf'])->name('pdf');
+        Route::get('/{issuance}/scan',        [\App\Http\Controllers\IssuanceController::class, 'viewScan'])->name('scan');
+    });
+
 
     // ── Data Privacy Policy ───────────────────────────────────────────────────
     Route::get('/privacy', fn () => inertia('Privacy/Index'))->name('privacy.index');
@@ -1879,6 +1891,10 @@ Route::get('/verify/{token}', [\App\Http\Controllers\DocumentVerificationControl
 Route::get('/verify/itjr/{itjrNo}', [\App\Http\Controllers\DocumentVerificationController::class, 'showItjr'])
     ->name('itjr.verify')
     ->where('itjrNo', '[0-9\-]+');
+
+Route::get('/verify/issuance/{token}', [\App\Http\Controllers\DocumentVerificationController::class, 'showIssuance'])
+    ->name('issuances.verify')
+    ->where('token', '[0-9a-f\-]{36}');
 
 /*
 |--------------------------------------------------------------------------

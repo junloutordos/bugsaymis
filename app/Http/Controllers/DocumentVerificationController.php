@@ -3,13 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\DigitalSignature;
+use App\Models\Issuance;
 use App\Models\ITJobRequest;
 use App\Services\DigitalSignatureService;
+use App\Services\IssuanceService;
 use Inertia\Inertia;
 
 class DocumentVerificationController extends Controller
 {
-    public function __construct(private DigitalSignatureService $svc) {}
+    public function __construct(
+        private DigitalSignatureService $svc,
+        private IssuanceService         $issuanceSvc,
+    ) {}
 
     private const STAGE_LABELS = [
         'submission'  => 'Submission',
@@ -90,6 +95,32 @@ class DocumentVerificationController extends Controller
                 ],
             ],
             'signerSignatureUri' => $signerSignatureUri,
+        ]);
+    }
+
+    /**
+     * Public QR verification page for issuances — no authentication required.
+     */
+    public function showIssuance(string $token)
+    {
+        $issuance = Issuance::where('qr_token', $token)->with(['creator:id,name,position', 'signature.signer:id,name,position,electronic_signature'])->first();
+
+        if (! $issuance || $issuance->status !== 'released') {
+            return view('issuances.verify', ['valid' => false, 'issuance' => null, 'tampered' => false, 'sigUri' => null]);
+        }
+
+        // Tamper detection: recompute hash and compare
+        $computedHash = app(IssuanceService::class)->computeHash($issuance);
+        $tampered     = $issuance->content_hash && $computedHash !== $issuance->content_hash;
+        $sig          = $issuance->signature;
+        $sigUri       = $sig?->signer ? $this->svc->getSignatureDataUri($sig->signer) : null;
+
+        return view('issuances.verify', [
+            'valid'    => true,
+            'tampered' => $tampered,
+            'issuance' => $issuance,
+            'sig'      => $sig,
+            'sigUri'   => $sigUri,
         ]);
     }
 }
