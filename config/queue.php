@@ -67,7 +67,12 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            // Must exceed every job's $timeout. ProcessIssuanceRelease can run
+            // up to 600s (PDF stamping + 300+ recipient emails); we set 900s
+            // so the queue never releases a still-running job back to another
+            // worker mid-flight (which used to cause duplicate processing and
+            // "MaxAttemptsExceededException" after the first attempt finished).
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 900),
             'block_for' => null,
             'after_commit' => false,
         ],

@@ -36,5 +36,11 @@ php /var/www/artisan config:cache
 php /var/www/artisan route:cache
 php /var/www/artisan view:cache
 
+# Signal any queue worker from a previous (still draining) ECS task to exit
+# gracefully so it stops processing jobs with the OLD codebase. The fresh
+# worker started below by supervisord will pick up the new code.
+# Prevents "__PHP_Incomplete_Class" errors on jobs dispatched right after a deploy.
+php /var/www/artisan queue:restart || true
+
 # ── Start services via supervisord ─────────────────────────────────────────────
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/bugsaymis.conf

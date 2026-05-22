@@ -176,8 +176,24 @@ class IssuanceController extends Controller
         }
 
         // Dispatch PDF generation + email/notifications to the queue worker
-        // (avoids 504 timeout — queue worker has 300s timeout vs 60s web timeout)
-        ProcessIssuanceRelease::dispatch($issuance->fresh());
+        // (avoids 504 timeout — queue worker has 600s timeout vs 60s web timeout).
+        // Pass primitive ID only — passing the Eloquent model would route through
+        // SerializesModels and previously caused "__PHP_Incomplete_Class" errors
+        // when an older worker picked up a payload referencing a not-yet-loaded class.
+        try {
+            ProcessIssuanceRelease::dispatch($issuance->id);
+            logger()->info('Issuance release job dispatched', [
+                'issuance_id'    => $issuance->id,
+                'control_number' => $issuance->control_number,
+                'queue'          => config('queue.default'),
+            ]);
+        } catch (\Throwable $e) {
+            logger()->error('Issuance release job dispatch FAILED', [
+                'issuance_id' => $issuance->id,
+                'error'       => $e->getMessage(),
+                'trace'       => $e->getTraceAsString(),
+            ]);
+        }
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
