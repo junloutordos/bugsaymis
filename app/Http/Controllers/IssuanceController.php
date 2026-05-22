@@ -32,7 +32,7 @@ class IssuanceController extends Controller
     public function index(Request $request)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'OCD']);
+        $isAdmin = $user->hasPermission('issuances.manage');
 
         $query = Issuance::with(['creator:id,name,position'])
             ->withCount([
@@ -201,7 +201,7 @@ class IssuanceController extends Controller
     public function show(Request $request, Issuance $issuance)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'OCD']);
+        $isAdmin = $user->hasPermission('issuances.manage');
 
         // Staff can only view released issuances addressed to them
         if (! $isAdmin) {
@@ -270,7 +270,7 @@ class IssuanceController extends Controller
 
     public function release(Request $request, Issuance $issuance)
     {
-        abort_if(! $request->user()->hasAnyRole(['Administrator', 'OCD']), 403);
+        abort_if(! $request->user()->hasPermission('issuances.manage'), 403);
         abort_if(! $issuance->isEditable(), 422, 'Only draft issuances can be released.');
 
         $validated = $request->validate([
@@ -316,7 +316,7 @@ class IssuanceController extends Controller
     public function downloadPdf(Request $request, Issuance $issuance)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'OCD']);
+        $isAdmin = $user->hasPermission('issuances.manage');
 
         if (! $isAdmin) {
             $isRecipient = $issuance->recipients()->where('user_id', $user->id)->exists();
@@ -338,7 +338,7 @@ class IssuanceController extends Controller
     public function viewScan(Request $request, Issuance $issuance)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'OCD']);
+        $isAdmin = $user->hasPermission('issuances.manage');
 
         if (! $isAdmin) {
             $isRecipient = $issuance->recipients()->where('user_id', $user->id)->exists();

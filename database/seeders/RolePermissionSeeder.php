@@ -364,6 +364,21 @@ class RolePermissionSeeder extends Seeder
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
         $assign('Parent',  ['library.view', 'messengerial.view', 'messengerial.create']);
 
+        // ── Issuances (Special Orders, Memorandums, Travel Orders, etc.) ──────
+        // OCD + Administrator can create, sign, and release
+        $assign('OCD', ['issuances.view', 'issuances.manage']);
+
+        // All staff roles can VIEW issuances addressed to them or their office
+        $issuanceViewRoles = [
+            'Records', 'DivisionChief', 'Faculty', 'Staff', 'CID Chief', 'FAD Chief',
+            'GSU Head', 'HR', 'HRMPSB', 'MIS', 'Registrar', 'Librarian', 'Nurse',
+            'Guidance', 'InformationOfficer', 'Recruitment Officer', 'Payroll Officer',
+            'Cashier', 'PMT', 'Dorm Manager',
+        ];
+        foreach ($issuanceViewRoles as $roleName) {
+            $assign($roleName, ['issuances.view']);
+        }
+
         $this->command->info('Role permissions assigned successfully.');
     }
 }

@@ -534,13 +534,14 @@ const menuItems = [
     label: "Administration",
     icon: DocumentTextIcon,
     roles: ["Administrator", "OCD"],
+    permissions: ["issuances.manage"],
     children: [
       {
         label: "Issuances",
         routeName: "issuances.index",
         href: route("issuances.index"),
         icon: DocumentTextIcon,
-        roles: ["Administrator", "OCD"],
+        permissions: ["issuances.manage"],
       },
     ],
   },
@@ -1077,7 +1078,7 @@ const menuItems = [
         routeName: "issuances.index",
         href: route("issuances.index"),
         icon: DocumentTextIcon,
-        roles: ["Administrator", "Records", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD"],
+        permissions: ["issuances.view"],
       },
       {
         label: "Document Tracking",
