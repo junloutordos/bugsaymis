@@ -76,7 +76,9 @@ const years = computed(() => {
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div>
         <h2 class="text-lg font-bold text-slate-800">Official Issuances</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Special Orders, Travel Orders, Memorandums and other official issuances from OCD</p>
+        <p class="text-xs text-slate-500 mt-0.5">
+          {{ isAdmin ? 'Create and manage official issuances released to staff' : 'Official issuances from OCD addressed to you or your office' }}
+        </p>
       </div>
       <a v-if="isAdmin" :href="route('issuances.create')"
         class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
@@ -86,11 +88,13 @@ const years = computed(() => {
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b border-slate-200 mb-4 overflow-x-auto">
-      <button v-for="tab in [
-        { key:'all', label:'All' },
-        ...(!isAdmin ? [{ key:'pending', label:'For My Acknowledgment' }] : []),
+      <button v-for="tab in isAdmin ? [
+        { key:'all',      label:'All' },
         { key:'released', label:'Released' },
-        ...(isAdmin ? [{ key:'draft', label:'Drafts' }] : []),
+        { key:'draft',    label:'Drafts' },
+      ] : [
+        { key:'all',     label:'My Issuances' },
+        { key:'pending', label:'For My Acknowledgment' },
       ]" :key="tab.key"
         @click="activeTab = tab.key"
         class="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2"
