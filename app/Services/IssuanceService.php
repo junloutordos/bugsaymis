@@ -94,10 +94,16 @@ class IssuanceService
         return QrCode::format('svg')->size($size)->margin(1)->generate($url);
     }
 
-    private function generateQrPng(Issuance $issuance, int $size = 90): string
+    private function qrOverlayHtml(Issuance $issuance, float $qrX, float $qrY): string
     {
-        $url = route('issuances.verify', $issuance->qr_token);
-        return QrCode::format('png')->size($size)->margin(1)->generate($url);
+        $svgB64 = base64_encode($this->generateQrSvg($issuance, 90));
+        $hash   = substr($issuance->content_hash ?? '', 0, 16);
+        return '<div style="position:fixed;left:' . $qrX . 'mm;top:' . $qrY . 'mm;width:26mm;text-align:center;">'
+            . '<img src="data:image/svg+xml;base64,' . $svgB64 . '" style="width:22mm;height:22mm;display:block;margin:0 auto;" />'
+            . '<div style="font-size:4.5pt;color:#94a3b8;margin-top:0.5mm;">Scan to verify</div>'
+            . '<div style="font-size:4pt;color:#94a3b8;">- - - - - - -</div>'
+            . ($hash ? '<div style="font-size:4pt;color:#94a3b8;font-family:Courier,monospace;">' . $hash . chr(133) . '</div>' : '')
+            . '</div>';
     }
 
     // ── PDF generation — public entry point ──────────────────────────────────
@@ -159,27 +165,17 @@ class IssuanceService
         $scanContent = Storage::disk('s3')->get($issuance->attachment_path);
         $mime        = $issuance->attachment_mime ?? 'application/pdf';
 
-        // Write QR PNG to temp file for fpdi/mPDF use
-        $qrPng    = $this->generateQrPng($issuance, 90);
-        $tmpQr    = sys_get_temp_dir() . '/issuance_qr_' . $issuance->id . '.png';
-        file_put_contents($tmpQr, $qrPng);
-
-        try {
-            if (str_contains($mime, 'pdf')) {
-                $result = $this->stampQrOnPdf($scanContent, $tmpQr, $issuance);
-            } else {
-                $result = $this->stampQrOnImage($scanContent, $mime, $tmpQr, $issuance);
-            }
-        } finally {
-            @unlink($tmpQr);
+        if (str_contains($mime, 'pdf')) {
+            $result = $this->stampQrOnPdf($scanContent, $issuance);
+        } else {
+            $result = $this->stampQrOnImage($scanContent, $mime, $issuance);
         }
 
         return $result;
     }
 
-    // Stamp QR onto each page of a PDF scan.
-    // importPage()+useTemplate() embeds the real scan content; Image() draws QR on top.
-    private function stampQrOnPdf(string $pdfContent, string $qrPngPath, Issuance $issuance): string
+    // Stamp QR onto each page of a PDF scan using importPage+useTemplate+WriteHTML overlay
+    private function stampQrOnPdf(string $pdfContent, Issuance $issuance): string
     {
         $tmpPdf = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.pdf';
         file_put_contents($tmpPdf, $pdfContent);
@@ -188,56 +184,29 @@ class IssuanceService
             $mpdf = new Mpdf([
                 'mode'          => 'utf-8',
                 'format'        => 'A4',
-                'margin_left'   => 0,
-                'margin_right'  => 0,
-                'margin_top'    => 0,
-                'margin_bottom' => 0,
-                'margin_header' => 0,
-                'margin_footer' => 0,
+                'margin_left'   => 0, 'margin_right'  => 0,
+                'margin_top'    => 0, 'margin_bottom' => 0,
+                'margin_header' => 0, 'margin_footer' => 0,
                 'tempDir'       => sys_get_temp_dir(),
                 'fontdata'      => (new FontVariables())->getDefaults()['fontdata'],
                 'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
             ]);
 
             $pageCount = $mpdf->setSourceFile($tmpPdf);
-            $qrSize    = 22;
-            $marginR   = 9;
-            $marginB   = 9;
-            $hash      = substr($issuance->content_hash ?? '', 0, 16);
 
             for ($page = 1; $page <= $pageCount; $page++) {
-                // Import and detect size for each page (handles mixed orientations)
                 $tplId  = $mpdf->importPage($page);
                 $size   = $mpdf->getTemplateSize($tplId);
                 $w      = $size['width']  ?? 210;
                 $h      = $size['height'] ?? 297;
                 $orient = ($w > $h) ? 'L' : 'P';
 
-                $mpdf->AddPage($orient, [$w, $h]);
-
-                // useTemplate() places the actual scan page content on this page
+                // AddPageByArray correctly sets custom page dimensions
+                $mpdf->AddPageByArray(['orientation' => $orient, 'newformat' => [$w, $h]]);
                 $mpdf->useTemplate($tplId, 0, 0, $w, $h);
 
-                // QR + labels drawn on top of the scan content
-                $qrX = $w - $qrSize - $marginR;
-                $qrY = $h - $qrSize - $marginB - 8;
-
-                $mpdf->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize, 'png');
-
-                $mpdf->SetFont('Helvetica', '', 4.5);
-                $mpdf->SetTextColor(148, 163, 184);
-                $mpdf->SetXY($qrX - 2, $qrY + $qrSize + 0.5);
-                $mpdf->Cell($qrSize + 4, 3, 'Scan to verify', 0, 1, 'C');
-
-                $mpdf->SetFont('Helvetica', '', 4);
-                $mpdf->SetX($qrX - 2);
-                $mpdf->Cell($qrSize + 4, 2.5, '- - - - - - -', 0, 1, 'C');
-
-                if ($hash) {
-                    $mpdf->SetFont('Courier', '', 4);
-                    $mpdf->SetX($qrX - 2);
-                    $mpdf->Cell($qrSize + 4, 2.5, $hash . chr(133), 0, 0, 'C');
-                }
+                // QR overlay via position:fixed HTML (SVG data URI — no Imagick needed)
+                $mpdf->WriteHTML($this->qrOverlayHtml($issuance, $w - 35, $h - 39));
             }
 
             return $mpdf->Output('', 'S');
@@ -246,8 +215,8 @@ class IssuanceService
         }
     }
 
-    // Stamp QR onto an image scan (JPG/PNG) using mPDF Image()
-    private function stampQrOnImage(string $imgContent, string $mime, string $qrPngPath, Issuance $issuance): string
+    // Stamp QR onto an image scan (JPG/PNG)
+    private function stampQrOnImage(string $imgContent, string $mime, Issuance $issuance): string
     {
         $ext    = str_contains($mime, 'png') ? 'png' : 'jpg';
         $tmpImg = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.' . $ext;
@@ -256,43 +225,18 @@ class IssuanceService
         try {
             $mpdf = new Mpdf([
                 'format'        => 'A4',
-                'margin_left'   => 0,
-                'margin_right'  => 0,
-                'margin_top'    => 0,
-                'margin_bottom' => 0,
-                'margin_header' => 0,
-                'margin_footer' => 0,
+                'margin_left'   => 0, 'margin_right'  => 0,
+                'margin_top'    => 0, 'margin_bottom' => 0,
+                'margin_header' => 0, 'margin_footer' => 0,
                 'tempDir'       => sys_get_temp_dir(),
                 'fontdata'      => (new FontVariables())->getDefaults()['fontdata'],
                 'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
             ]);
 
-            $mpdf->AddPage();
-            $mpdf->Image($tmpImg, 0, 0, 210, 297);  // full-page scan
+            $html = '<img src="' . $tmpImg . '" style="width:210mm;display:block;" />'
+                  . $this->qrOverlayHtml($issuance, 210 - 35, 297 - 39);
 
-            // QR at bottom-right
-            $qrSize = 22;
-            $qrX    = 210 - $qrSize - 9;
-            $qrY    = 297 - $qrSize - 9 - 8;
-            $hash   = substr($issuance->content_hash ?? '', 0, 16);
-
-            $mpdf->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize, 'png');
-
-            $mpdf->SetFont('Helvetica', '', 4.5);
-            $mpdf->SetTextColor(148, 163, 184);
-            $mpdf->SetXY($qrX - 2, $qrY + $qrSize + 0.5);
-            $mpdf->Cell($qrSize + 4, 3, 'Scan to verify', 0, 1, 'C');
-
-            $mpdf->SetFont('Helvetica', '', 4);
-            $mpdf->SetX($qrX - 2);
-            $mpdf->Cell($qrSize + 4, 2.5, '- - - - - - -', 0, 1, 'C');
-
-            if ($hash) {
-                $mpdf->SetFont('Courier', '', 4);
-                $mpdf->SetX($qrX - 2);
-                $mpdf->Cell($qrSize + 4, 2.5, $hash . chr(133), 0, 0, 'C');
-            }
-
+            $mpdf->WriteHTML($html);
             return $mpdf->Output('', 'S');
         } finally {
             @unlink($tmpImg);
