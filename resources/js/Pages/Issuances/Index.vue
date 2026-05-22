@@ -88,7 +88,7 @@ const years = computed(() => {
     <div class="flex gap-0 border-b border-slate-200 mb-4 overflow-x-auto">
       <button v-for="tab in [
         { key:'all', label:'All' },
-        { key:'pending', label:'For My Acknowledgment' },
+        ...(!isAdmin ? [{ key:'pending', label:'For My Acknowledgment' }] : []),
         { key:'released', label:'Released' },
         ...(isAdmin ? [{ key:'draft', label:'Drafts' }] : []),
       ]" :key="tab.key"
