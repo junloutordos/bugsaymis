@@ -4,6 +4,7 @@ import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { storageUrl } from '@/Composables/useStorage.js'
 import FlashMessage from '@/Components/FlashMessage.vue'
+import AppInput from '@/Components/AppInput.vue'
 import {
   UserCircleIcon, PencilSquareIcon,
   CameraIcon, FingerPrintIcon, ShieldCheckIcon,
@@ -131,31 +132,15 @@ const empCategoryLabel = {
         </h3>
 
         <div class="space-y-4">
-          <!-- Name -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Full Name <span class="text-red-500">*</span></label>
-            <input v-model="name" type="text" required
-              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Your full name" />
-            <p v-if="errors.name" class="text-xs text-red-500 mt-1">{{ errors.name }}</p>
-          </div>
+          <AppInput v-model="name" label="Full Name" :required="true" :error="errors.name" placeholder="Your full name" />
+          <AppInput v-model="specialization" label="Specialization / Field" :error="errors.specialization" placeholder="e.g. Biology, Mathematics, Guidance Counseling" />
 
-          <!-- Specialization -->
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Specialization / Field</label>
-            <input v-model="specialization" type="text"
-              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g. Biology, Mathematics, Guidance Counseling" />
-            <p v-if="errors.specialization" class="text-xs text-red-500 mt-1">{{ errors.specialization }}</p>
-          </div>
-
-          <!-- Email (read-only) -->
+          <!-- Email (read-only — HR managed) -->
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
             <div class="flex items-center gap-2">
-              <input :value="profile.email" type="email" disabled
-                class="flex-1 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-500 cursor-not-allowed" />
-              <span class="text-xs text-slate-400 whitespace-nowrap">HR-managed</span>
+              <AppInput :model-value="profile.email" :disabled="true" class="flex-1" />
+              <span class="text-xs text-slate-400 whitespace-nowrap shrink-0">HR-managed</span>
             </div>
           </div>
         </div>

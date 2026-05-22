@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import {
   PlusIcon, PencilSquareIcon, TrashIcon, ChevronLeftIcon,
   ChevronUpIcon, ChevronDownIcon, Cog6ToothIcon,
@@ -260,41 +262,17 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
           </div>
           <div class="px-6 py-5 space-y-4">
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Name <span class="text-red-500">*</span></label>
-                <input v-model="typeForm.name" type="text" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="e.g. Memorandum" />
-                <p v-if="typeErrors.name" class="text-xs text-red-500 mt-1">{{ typeErrors.name }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Code <span class="text-red-500">*</span></label>
-                <input v-model="typeForm.code" type="text" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="e.g. MEMO" />
-                <p v-if="typeErrors.code" class="text-xs text-red-500 mt-1">{{ typeErrors.code }}</p>
-              </div>
+              <AppInput v-model="typeForm.name" label="Name" :required="true" :error="typeErrors.name" placeholder="e.g. Memorandum" />
+              <AppInput v-model="typeForm.code" label="Code" :required="true" :error="typeErrors.code" placeholder="e.g. MEMO" />
             </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-700 mb-1">Description</label>
-              <input v-model="typeForm.description" type="text"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
+            <AppInput v-model="typeForm.description" label="Description" />
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Default Lead Time (hours)</label>
-                <input v-model="typeForm.lead_time_hours" type="number" min="1" max="720"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Routing Mode</label>
-                <select v-model="typeForm.routing_type"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="sequential">Sequential — one at a time</option>
-                  <option value="parallel">Parallel — all at once</option>
-                  <option value="manual">Manual — sender picks each time</option>
-                </select>
-              </div>
+              <AppInput v-model="typeForm.lead_time_hours" label="Default Lead Time (hours)" type="number" />
+              <AppSelect v-model="typeForm.routing_type" label="Routing Mode" :show-blank="false">
+                <option value="sequential">Sequential — one at a time</option>
+                <option value="parallel">Parallel — all at once</option>
+                <option value="manual">Manual — sender picks each time</option>
+              </AppSelect>
             </div>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" v-model="typeForm.is_active" class="rounded border-slate-300 text-indigo-600" />
