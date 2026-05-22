@@ -1073,6 +1073,13 @@ const menuItems = [
     roles: ["Administrator", "Records", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD"],
     children: [
       {
+        label: "Issuances",
+        routeName: "issuances.index",
+        href: route("issuances.index"),
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "Records", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD"],
+      },
+      {
         label: "Document Tracking",
         routeName: "document-tracking.index",
         href: route("document-tracking.index"),
