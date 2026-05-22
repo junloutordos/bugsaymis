@@ -1,5 +1,4 @@
 <script setup>
-import { computed } from 'vue'
 import { router, useForm, usePage } from '@inertiajs/vue3'
 import { UserCircleIcon, FingerPrintIcon, ArrowRightIcon, XMarkIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/vue/24/outline'
 
@@ -7,7 +6,8 @@ const props = defineProps({ show: Boolean })
 const emit  = defineEmits(['close'])
 
 const page = usePage()
-const user = computed(() => page.props.auth?.user)
+// Read directly — no deep computed over reactive props to avoid tracking loops
+const user = page.props.auth?.user
 
 function initials(n) {
   return (n ?? '').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -40,8 +40,8 @@ function logout() {
 
         <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-100 w-72 overflow-hidden z-10">
 
-          <!-- Header gradient -->
-          <div class="bg-gradient-to-br from-indigo-600 to-indigo-700 px-5 py-5">
+          <!-- Header gradient — matches dashboard hero banner -->
+          <div style="background: linear-gradient(135deg, #060e50 0%, #1447c0 65%, #0093b8 100%);" class="px-5 py-5">
             <div class="flex items-center gap-3">
               <div class="w-14 h-14 rounded-full overflow-hidden ring-2 ring-white/40 bg-white/20 flex items-center justify-center shrink-0">
                 <img v-if="user?.profile_picture" :src="user.profile_picture" alt="Profile"

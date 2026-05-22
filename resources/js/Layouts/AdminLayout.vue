@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, markRaw, onMounted, onUnmounted, watch } from "vue";
 import { storageUrl } from "@/Composables/useStorage.js";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
@@ -1743,7 +1743,7 @@ const filterMenuByRole = (items, userRoleNames) =>
     })
     .map((item) =>
       item.children
-        ? { ...item, children: filterMenuByRole(item.children, userRoleNames) }
+        ? { ...item, icon: item.icon ? markRaw(item.icon) : item.icon, children: filterMenuByRole(item.children, userRoleNames) }
         : item
     );
 
