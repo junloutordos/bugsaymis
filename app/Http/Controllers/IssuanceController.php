@@ -99,6 +99,8 @@ class IssuanceController extends Controller
             'office_ids.*'       => 'exists:offices,id',
             'user_ids'           => 'nullable|array',
             'user_ids.*'         => 'exists:users,id',
+            'should_release'     => 'nullable|boolean',
+            'pin'                => 'nullable|string',
         ]);
 
         $year = now()->year;
@@ -135,8 +137,52 @@ class IssuanceController extends Controller
             ]);
         });
 
+        // If Sign & Release was requested, do it in the same request
+        if ($validated['should_release'] ?? false) {
+            $this->doRelease($request, $issuance, $validated);
+            return redirect()->route('issuances.show', $issuance->id)
+                ->with('success', "{$issuance->control_number} signed and released.");
+        }
+
         return redirect()->route('issuances.show', $issuance->id)
             ->with('success', "Draft {$issuance->control_number} saved.");
+    }
+
+    private function doRelease(Request $request, Issuance $issuance, array $data): void
+    {
+        DB::transaction(function () use ($issuance, $data) {
+            $issuance->content_hash   = $this->svc->computeHash($issuance);
+            $issuance->recipient_type = $data['recipient_type'];
+            $issuance->status         = 'released';
+            $issuance->released_at    = now();
+            $issuance->save();
+            $this->svc->buildRecipients($issuance, $data);
+            $issuance->recipients()->update(['notified_at' => now()]);
+        });
+
+        $this->performSign(
+            $request,
+            Issuance::class,
+            $issuance->id,
+            'release',
+            "{$issuance->type_label}: {$issuance->title}",
+            $issuance->content_hash,
+        );
+
+        try { $this->svc->generatePdf($issuance->fresh()); } catch (\Throwable $e) {
+            logger()->error('Issuance PDF failed', ['id' => $issuance->id, 'error' => $e->getMessage()]);
+        }
+
+        $recipients = $issuance->recipients()->with('user')->get();
+        foreach ($recipients as $recipient) {
+            $u = $recipient->user;
+            if (! $u) continue;
+            try { Mail::to($u->email)->send(new IssuanceReleasedMail($issuance, $u->name)); } catch (\Throwable) {}
+            try {
+                NotificationService::notifyUser($u, 'Issuance', $issuance->control_number,
+                    "{$issuance->type_label}: {$issuance->title}", route('issuances.show', $issuance->id));
+            } catch (\Throwable) {}
+        }
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
@@ -223,54 +269,7 @@ class IssuanceController extends Controller
             'pin'            => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($issuance, $validated, $request) {
-            // Compute tamper-detection hash
-            $issuance->content_hash  = $this->svc->computeHash($issuance);
-            $issuance->recipient_type = $validated['recipient_type'];
-            $issuance->status        = 'released';
-            $issuance->released_at   = now();
-            $issuance->save();
-
-            // Build recipient rows
-            $this->svc->buildRecipients($issuance, $validated);
-
-            // Mark all as notified now
-            $issuance->recipients()->update(['notified_at' => now()]);
-        });
-
-        // Digital signature
-        $this->performSign(
-            $request,
-            Issuance::class,
-            $issuance->id,
-            'release',
-            "{$issuance->type_label}: {$issuance->title}",
-            $issuance->content_hash,
-        );
-
-        // Generate PDF in background (non-blocking)
-        try {
-            $this->svc->generatePdf($issuance->fresh());
-        } catch (\Throwable $e) {
-            logger()->error('Issuance PDF generation failed', ['id' => $issuance->id, 'error' => $e->getMessage()]);
-        }
-
-        // Notify recipients
-        $recipients = $issuance->recipients()->with('user')->get();
-        foreach ($recipients as $recipient) {
-            $u = $recipient->user;
-            if (! $u) continue;
-            try {
-                Mail::to($u->email)->send(new IssuanceReleasedMail($issuance, $u->name));
-            } catch (\Throwable) {}
-            try {
-                NotificationService::notifyUser(
-                    $u, 'Issuance', $issuance->control_number,
-                    "{$issuance->type_label}: {$issuance->title}",
-                    route('issuances.show', $issuance->id),
-                );
-            } catch (\Throwable) {}
-        }
+        $this->doRelease($request, $issuance, $validated);
 
         return back()->with('success', "{$issuance->control_number} released to recipients.");
     }

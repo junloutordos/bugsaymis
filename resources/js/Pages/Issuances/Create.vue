@@ -113,17 +113,13 @@ function openPinModal() {
   showPinModal.value = true
 }
 
-function onPinVerified(pin) {
+function onPinConfirm(pin) {
   showPinModal.value = false
   saving.value = true
-  // First store, then release
-  router.post(route('issuances.store'), buildPayload(), {
-    onSuccess: (page) => {
-      // Get the new issuance id from flash or redirect
-      // The controller redirects to show, so we just submit release from there
-      saving.value = false
-    },
-    onError: e => { errors.value = e; saving.value = false },
+  // Store + release in one request (controller handles both when should_release=true)
+  router.post(route('issuances.store'), { ...buildPayload(pin), should_release: true }, {
+    onError:  e  => { errors.value = e; saving.value = false },
+    onFinish: () => { saving.value = false },
   })
 }
 
@@ -354,8 +350,8 @@ watch(type, (t) => {
       :show="showPinModal"
       :has-pin="hasPin"
       :signature-uri="signatureUri"
-      @close="showPinModal = false"
-      @verified="onPinVerified"
+      @cancel="showPinModal = false"
+      @confirm="onPinConfirm"
     />
 
   </AdminLayout>

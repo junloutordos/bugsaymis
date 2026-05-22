@@ -296,7 +296,8 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
       :has-pin="hasPin"
       :signature-uri="signatureUri"
       @close="showPinModal = false"
-      @verified="onPinVerified"
+      @cancel="showPinModal = false"
+      @confirm="onPinVerified"
     />
 
     <!-- Scan preview modal -->
