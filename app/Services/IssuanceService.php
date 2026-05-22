@@ -110,15 +110,18 @@ class IssuanceService
 
         $html = view('issuances.pdf', compact('issuance', 'sig', 'sigUri', 'ocdUser', 'qrB64'))->render();
 
+        $headerImg = public_path('images/report_header.jpeg');
+        $footerImg = public_path('images/report_footer.jpeg');
+
         $mpdf = new Mpdf([
             'mode'           => 'utf-8',
             'format'         => 'A4',
-            'margin_left'    => 25,
-            'margin_right'   => 25,
-            'margin_top'     => 20,
-            'margin_bottom'  => 20,
-            'margin_header'  => 8,
-            'margin_footer'  => 8,
+            'margin_left'    => 15,
+            'margin_right'   => 15,
+            'margin_top'     => 42,   // space for the header image
+            'margin_bottom'  => 22,   // space for the footer image
+            'margin_header'  => 0,
+            'margin_footer'  => 0,
             'tempDir'        => sys_get_temp_dir(),
             'fontdata'       => (new FontVariables())->getDefaults()['fontdata'],
             'fontDir'        => (new ConfigVariables())->getDefaults()['fontDir'],
@@ -126,13 +129,16 @@ class IssuanceService
 
         $mpdf->SetTitle($issuance->type_label . ' — ' . $issuance->control_number);
 
+        $mpdf->SetHTMLHeader('
+            <div style="margin:0; padding:0;">
+                <img src="' . $headerImg . '" style="width:100%; display:block;" />
+            </div>
+        ');
+
         $mpdf->SetHTMLFooter('
-            <table width="100%" style="font-size:7.5pt; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:3px;">
-                <tr>
-                    <td>' . $issuance->control_number . ' · PSHS-CRC</td>
-                    <td style="text-align:right;">Page {PAGENO} of {nbpg}</td>
-                </tr>
-            </table>
+            <div style="margin:0; padding:0;">
+                <img src="' . $footerImg . '" style="width:100%; display:block;" />
+            </div>
         ');
 
         $mpdf->WriteHTML($html);

@@ -6,12 +6,6 @@
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height:1.6; }
 
-/* ── Letterhead ── */
-.letterhead { text-align:center; border-bottom:2px solid #060e50; padding-bottom:10px; margin-bottom:14px; }
-.school-name { font-size:11pt; font-weight:bold; color:#060e50; letter-spacing:.5px; }
-.campus-name { font-size:9pt; color:#475569; }
-.address     { font-size:8pt; color:#64748b; }
-
 /* ── Issuance type header ── */
 .issuance-header { text-align:center; margin:16px 0 12px; }
 .issuance-type   { font-size:13pt; font-weight:bold; color:#060e50; text-transform:uppercase; letter-spacing:1px; }
@@ -39,12 +33,7 @@ body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height
 </head>
 <body>
 
-{{-- Letterhead --}}
-<div class="letterhead">
-  <div class="school-name">Philippine Science High School</div>
-  <div class="campus-name">Caraga Region Campus</div>
-  <div class="address">Ampayon, Butuan City 8600 · portal@crc.pshs.edu.ph</div>
-</div>
+{{-- Letterhead is provided by the mPDF header image (report_header.jpeg) --}}
 
 {{-- Issuance type header --}}
 <div class="issuance-header">
