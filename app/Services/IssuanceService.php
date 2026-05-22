@@ -112,12 +112,28 @@ class IssuanceService
     {
         ini_set('memory_limit', '256M');
 
-        $pdfContent = $issuance->attachment_path
+        $mode = $issuance->attachment_path ? 'scan' : 'editor';
+        logger()->info('Issuance generatePdf start', [
+            'id'              => $issuance->id,
+            'control_number'  => $issuance->control_number,
+            'mode'            => $mode,
+            'attachment_path' => $issuance->attachment_path,
+            'attachment_mime' => $issuance->attachment_mime,
+        ]);
+
+        $pdfContent = $mode === 'scan'
             ? $this->stampQrOnScan($issuance)
             : $this->generateContentPdf($issuance);
 
         $path = 'issuances/' . $issuance->control_number . '.pdf';
         Storage::disk('s3')->put($path, $pdfContent);
+
+        logger()->info('Issuance generatePdf done', [
+            'id'    => $issuance->id,
+            'mode'  => $mode,
+            'path'  => $path,
+            'bytes' => strlen($pdfContent),
+        ]);
 
         return $path;
     }
@@ -174,44 +190,64 @@ class IssuanceService
         return $result;
     }
 
-    // Stamp QR onto each page of a PDF scan using importPage+useTemplate+WriteHTML overlay
+    // Stamp QR onto each page of a PDF scan using TCPDF + FPDI.
+    // TCPDF is the standard PHP PDF stamping engine — proven reliable for this use case.
     private function stampQrOnPdf(string $pdfContent, Issuance $issuance): string
     {
         $tmpPdf = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.pdf';
+        $tmpQr  = sys_get_temp_dir() . '/issuance_qr_' . $issuance->id . '.svg';
         file_put_contents($tmpPdf, $pdfContent);
+        file_put_contents($tmpQr, $this->generateQrSvg($issuance, 120));
 
         try {
-            $mpdf = new Mpdf([
-                'mode'          => 'utf-8',
-                'format'        => 'A4',
-                'margin_left'   => 0, 'margin_right'  => 0,
-                'margin_top'    => 0, 'margin_bottom' => 0,
-                'margin_header' => 0, 'margin_footer' => 0,
-                'tempDir'       => sys_get_temp_dir(),
-                'fontdata'      => (new FontVariables())->getDefaults()['fontdata'],
-                'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
-            ]);
+            $pdf = new \setasign\Fpdi\Tcpdf\Fpdi('P', 'mm', 'A4', true, 'UTF-8', false);
+            $pdf->SetCreator('CRCMIS');
+            $pdf->SetTitle($issuance->type_label . ' — ' . $issuance->control_number);
+            $pdf->SetPrintHeader(false);
+            $pdf->SetPrintFooter(false);
+            $pdf->SetAutoPageBreak(false);
+            $pdf->SetMargins(0, 0, 0);
 
-            $pageCount = $mpdf->setSourceFile($tmpPdf);
+            $pageCount = $pdf->setSourceFile($tmpPdf);
+            logger()->info('Issuance stampQrOnPdf', ['id' => $issuance->id, 'pages' => $pageCount]);
 
-            for ($page = 1; $page <= $pageCount; $page++) {
-                $tplId  = $mpdf->importPage($page);
-                $size   = $mpdf->getTemplateSize($tplId);
-                $w      = $size['width']  ?? 210;
-                $h      = $size['height'] ?? 297;
-                $orient = ($w > $h) ? 'L' : 'P';
+            $qrSize = 22;
+            $hash   = substr($issuance->content_hash ?? '', 0, 16);
 
-                // AddPageByArray correctly sets custom page dimensions
-                $mpdf->AddPageByArray(['orientation' => $orient, 'newformat' => [$w, $h]]);
-                $mpdf->useTemplate($tplId, 0, 0, $w, $h);
+            for ($p = 1; $p <= $pageCount; $p++) {
+                $tplId  = $pdf->importPage($p);
+                $size   = $pdf->getTemplateSize($tplId);
+                $w      = $size['width'];
+                $h      = $size['height'];
+                $orient = $size['orientation'] ?? ($w > $h ? 'L' : 'P');
 
-                // QR overlay via position:fixed HTML (SVG data URI — no Imagick needed)
-                $mpdf->WriteHTML($this->qrOverlayHtml($issuance, $w - 35, $h - 39));
+                $pdf->AddPage($orient, [$w, $h]);
+                $pdf->useTemplate($tplId);
+
+                $qrX = $w - $qrSize - 9;
+                $qrY = $h - $qrSize - 9 - 8;
+
+                // Place SVG QR at absolute coordinates on top of imported page
+                $pdf->ImageSVG($tmpQr, $qrX, $qrY, $qrSize, $qrSize, '', '', '', 0, false);
+
+                // Labels under QR
+                $pdf->SetFont('helvetica', '', 4.5);
+                $pdf->SetTextColor(148, 163, 184);
+                $pdf->SetXY($qrX - 2, $qrY + $qrSize + 0.5);
+                $pdf->Cell($qrSize + 4, 3, 'Scan to verify', 0, 1, 'C');
+                $pdf->SetX($qrX - 2);
+                $pdf->Cell($qrSize + 4, 2.5, '- - - - - - -', 0, 1, 'C');
+                if ($hash) {
+                    $pdf->SetFont('courier', '', 4);
+                    $pdf->SetX($qrX - 2);
+                    $pdf->Cell($qrSize + 4, 2.5, $hash . chr(133), 0, 0, 'C');
+                }
             }
 
-            return $mpdf->Output('', 'S');
+            return $pdf->Output('', 'S');
         } finally {
             @unlink($tmpPdf);
+            @unlink($tmpQr);
         }
     }
 
