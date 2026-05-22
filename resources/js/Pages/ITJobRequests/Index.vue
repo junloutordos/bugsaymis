@@ -509,7 +509,7 @@ function handleSigCancel() {
             <h2 class="text-base font-semibold text-slate-800">
               {{ modalMode==='create' ? 'New IT Job Request' : modalMode==='mis-assessment' ? 'MIS Assessment' : 'View Request' }}
             </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
 
           <div class="px-6 py-5">
@@ -792,7 +792,7 @@ function handleSigCancel() {
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-base font-semibold text-slate-800">Export IT Job Request Report</h3>
-            <button @click="showExportModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+            <button @click="showExportModal = false" class="text-slate-400 hover:text-slate-600"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
 
           <div class="space-y-4">

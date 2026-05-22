@@ -418,7 +418,7 @@ const overallBadgeCls = computed(() => {
             <h3 class="font-bold text-slate-800">
               {{ { act: 'Record Action', forward: 'Forward Document', return: 'Return Document', annotate: 'Add Note', complete: 'Complete & File' }[modal] }}
             </h3>
-            <button @click="closeModal" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">✕</button>
+            <button @click="closeModal" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
 
           <div class="px-6 py-5 space-y-4">
@@ -513,7 +513,7 @@ const overallBadgeCls = computed(() => {
         <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
           <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <p class="text-sm font-semibold text-slate-800">{{ previewAtt.file_name }}</p>
-            <button @click="closePreview" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">✕</button>
+            <button @click="closePreview" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="flex-1 overflow-auto p-2">
             <div v-if="previewLoading" class="flex items-center justify-center h-64 text-slate-400 text-sm">

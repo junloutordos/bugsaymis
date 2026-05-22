@@ -245,7 +245,7 @@ async function handleNewRequest() {
     <!-- Calendar Modal -->
     <div v-if="showCalendar" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
       <div class="bg-white w-full sm:rounded-2xl sm:shadow-xl sm:max-w-4xl p-4 sm:p-6 relative overflow-auto max-h-[90vh]">
-        <button class="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click.prevent="showCalendar = false">✕</button>
+        <button class="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click.prevent="showCalendar = false"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
             <button @click.prevent="prevMonth" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm">‹</button>
@@ -282,7 +282,7 @@ async function handleNewRequest() {
       <div class="bg-white w-full sm:h-auto sm:rounded-2xl sm:shadow-xl sm:max-w-md relative overflow-auto">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-xl font-semibold text-slate-800">Assign Driver</h2>
-          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeAssignDriverModal">✕</button>
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeAssignDriverModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
         <div class="px-6 py-5 space-y-4 max-h-[70vh] overflow-auto">
           <div v-if="assignLoading" class="py-8 text-center text-slate-400 text-sm">Loading drivers...</div>
@@ -315,7 +315,7 @@ async function handleNewRequest() {
       <div class="bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-xl sm:max-w-md relative overflow-auto">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-xl font-semibold text-slate-800">{{ editingRequest ? 'Edit Vehicle Request' : 'New Vehicle Request' }}</h2>
-          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
         <div class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto">
 

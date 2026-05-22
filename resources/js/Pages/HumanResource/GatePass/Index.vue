@@ -146,7 +146,7 @@
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Gate Pass' : 'New Gate Pass' }}</h2>
-            <button @click="formModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+            <button @click="formModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5 space-y-4">
             <div>
@@ -205,7 +205,7 @@
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">Decline Gate Pass</h2>
-            <button @click="declineModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+            <button @click="declineModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5">
             <p class="text-sm text-slate-600 mb-3">
@@ -238,7 +238,7 @@
             </div>
             <div class="flex items-center gap-2">
               <span :class="[badgeBase, statusBadgeClass(viewTarget.status)]">{{ viewTarget.status }}</span>
-              <button @click="viewModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+              <button @click="viewModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
             </div>
           </div>
           <div class="px-6 py-5 space-y-3 text-sm">
@@ -303,7 +303,7 @@
               <h2 class="text-base font-semibold text-slate-800">Record Actual Time</h2>
               <p class="text-xs text-slate-400 mt-0.5">{{ actualTarget.name }} — {{ actualTarget.controlno }}</p>
             </div>
-            <button @click="actualModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">✕</button>
+            <button @click="actualModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5 space-y-4">
             <div class="grid grid-cols-2 gap-3">

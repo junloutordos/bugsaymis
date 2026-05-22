@@ -456,7 +456,7 @@ function formatSg(user) {
             <h2 class="text-base font-semibold text-slate-800">
               {{ modalMode === 'create' ? (isEmployeesPage ? 'New Employee' : 'New User') : modalMode === 'edit' ? 'Edit User' : 'View User' }}
             </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" @click="closeModal">✕</button>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
 
           <div class="px-6 py-5">

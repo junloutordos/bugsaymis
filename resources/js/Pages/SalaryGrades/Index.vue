@@ -95,7 +95,7 @@
                       ref="editInput"
                     />
                     <button @click="saveEdit" class="text-emerald-600 hover:text-emerald-800 font-bold text-xs p-1">✓</button>
-                    <button @click="cancelEdit" class="text-red-400 hover:text-red-600 text-xs p-1">✕</button>
+                    <button @click="cancelEdit" class="text-red-400 hover:text-red-600 text-xs p-1"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
                   </div>
                 </template>
                 <template v-else>

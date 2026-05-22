@@ -453,7 +453,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
           <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 class="text-base font-semibold text-slate-800">New Appointment</h3>
-              <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="openAppointment = null">✕</button>
+              <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="openAppointment = null"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
             </div>
             <div class="px-6 py-5">
               <form @submit.prevent="submitAppointment" class="space-y-3">
@@ -666,7 +666,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-base font-semibold text-slate-800">Schedule Consultation</h3>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="openSchedule = null">✕</button>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="openSchedule = null"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5">
             <form @submit.prevent="submitSchedule" class="space-y-3">
@@ -700,7 +700,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-base font-semibold text-slate-800">Consultation Details</h3>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeView">✕</button>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeView"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5">
             <div class="flex items-start gap-4 mb-4">
@@ -740,7 +740,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl sm:max-w-3xl max-h-[90vh] overflow-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-base font-semibold text-slate-800">Record Vitals / Treatment</h3>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeVitals">✕</button>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeVitals"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5">
             <form @submit.prevent="submitVitals" class="space-y-3">

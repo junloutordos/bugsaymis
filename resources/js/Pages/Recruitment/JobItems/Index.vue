@@ -410,7 +410,7 @@ const fmtSalary = (v) => v ? '₱' + Number(v).toLocaleString('en-PH', { minimum
       <div class="bg-white rounded-2xl w-full max-w-3xl shadow-xl relative max-h-[92vh] overflow-y-auto">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">{{ editingItem ? 'Edit Job Item' : 'New Job Item' }}</h2>
-          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">✕</button>
+          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
 
         <form @submit.prevent="submit" class="px-6 py-5 space-y-5">
@@ -641,7 +641,7 @@ const fmtSalary = (v) => v ? '₱' + Number(v).toLocaleString('en-PH', { minimum
             <h2 class="text-base font-semibold text-slate-800">Required Documents</h2>
             <p class="text-sm text-slate-500">{{ viewReqItem?.position_title }}</p>
           </div>
-          <button @click="showReqModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">✕</button>
+          <button @click="showReqModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
         <div class="px-6 py-5 space-y-2">
           <div v-for="req in viewReqItem?.requirements" :key="req.id"
@@ -667,7 +667,7 @@ const fmtSalary = (v) => v ? '₱' + Number(v).toLocaleString('en-PH', { minimum
             <h2 class="text-base font-semibold text-slate-800">Publish Vacancy</h2>
             <p class="text-sm text-slate-500">{{ publishTarget?.position_title }}</p>
           </div>
-          <button @click="closePublish" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">✕</button>
+          <button @click="closePublish" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
         <form @submit.prevent="submitPublish" class="px-6 py-5 space-y-4">
           <div>
