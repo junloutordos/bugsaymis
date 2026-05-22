@@ -531,6 +531,20 @@ const menuItems = [
     ],
   },
   {
+    label: "Administration",
+    icon: DocumentTextIcon,
+    roles: ["Administrator", "OCD"],
+    children: [
+      {
+        label: "Issuances",
+        routeName: "issuances.index",
+        href: route("issuances.index"),
+        icon: DocumentTextIcon,
+        roles: ["Administrator", "OCD"],
+      },
+    ],
+  },
+  {
     type: "section",
     label: "Finance & Administration",
     roles: ["Administrator", "Faculty", "Staff", "Student", "Parent"],
