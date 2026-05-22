@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { badgeBase, httpMethodBadgeClass, changelogTypeBadgeClass } from '@/Composables/useStatusBadge.js'
 import {
   MagnifyingGlassIcon, ChevronRightIcon, ChevronDownIcon,
   CircleStackIcon, CommandLineIcon, KeyIcon, CodeBracketIcon,
@@ -56,13 +57,7 @@ const pagedRoutes     = computed(() => {
 })
 watch([routeSearch, routeMethod], () => { routePage.value = 1 })
 
-const methodCls = {
-  GET:    'bg-green-100 text-green-700',
-  POST:   'bg-blue-100 text-blue-700',
-  PUT:    'bg-amber-100 text-amber-700',
-  PATCH:  'bg-orange-100 text-orange-700',
-  DELETE: 'bg-red-100 text-red-700',
-}
+// methodCls → httpMethodBadgeClass (from useStatusBadge.js)
 
 // ── Schema section ─────────────────────────────────────────────────────────
 const tableSearch  = ref('')
@@ -315,11 +310,7 @@ const changelog = [
   },
 ]
 
-const typeColors = {
-  feat: 'bg-indigo-100 text-indigo-700',
-  fix:  'bg-red-100 text-red-700',
-  ops:  'bg-slate-100 text-slate-600',
-}
+// typeColors → changelogTypeBadgeClass (from useStatusBadge.js)
 
 // ── Conventions data (kept in script to avoid template parser issues) ─────
 const conventions = [
@@ -666,7 +657,7 @@ function fmtType(t) {
                     <div class="flex flex-wrap gap-1">
                       <span v-for="m in r.methods" :key="m"
                         class="inline-flex px-1.5 py-0.5 rounded font-bold text-[10px]"
-                        :class="methodCls[m] ?? 'bg-slate-100 text-slate-600'">{{ m }}</span>
+                        :class="httpMethodBadgeClass(m)">{{ m }}</span>
                     </div>
                   </td>
                   <td class="px-3 py-2 font-mono text-slate-700 max-w-[200px] truncate">{{ r.uri }}</td>
@@ -836,7 +827,7 @@ function fmtType(t) {
             <div class="flex items-center gap-3 mb-3">
               <span class="font-mono font-bold text-slate-800 text-base">v{{ release.version }}</span>
               <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="typeColors[release.type] ?? typeColors.feat">
+                :class="changelogTypeBadgeClass(release.type)">
                 {{ release.type }}
               </span>
               <span class="text-sm text-slate-400">{{ release.date }}</span>

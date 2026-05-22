@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { badgeBase, statusBadgeClass, issuanceTypeBadgeClass } from '@/Composables/useStatusBadge.js'
 import {
   PlusIcon, MagnifyingGlassIcon, DocumentTextIcon,
   CheckCircleIcon, ClockIcon, ExclamationTriangleIcon,
@@ -48,14 +49,7 @@ const displayed  = computed(() => {
   return filtered.value.slice(s, s + PER_PAGE)
 })
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-const typeCls = {
-  SO: 'bg-indigo-100 text-indigo-700', TO: 'bg-blue-100 text-blue-700',
-  MEMO: 'bg-violet-100 text-violet-700', OO: 'bg-cyan-100 text-cyan-700',
-  AO: 'bg-amber-100 text-amber-700', CIRC: 'bg-emerald-100 text-emerald-700',
-  NOTICE: 'bg-rose-100 text-rose-700',
-}
-const statusCls = { draft: 'bg-slate-100 text-slate-600', released: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600' }
+// ── Helpers — badge classes from centralised composable ────────────────────
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -156,7 +150,7 @@ const years = computed(() => {
             </td>
             <td class="hidden md:table-cell px-4 py-3">
               <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="typeCls[i.type] ?? 'bg-slate-100 text-slate-600'">
+                :class="issuanceTypeBadgeClass(i.type)">
                 {{ i.type }}
               </span>
             </td>
@@ -164,7 +158,7 @@ const years = computed(() => {
             <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-500">{{ fmtDate(i.released_at ?? i.created_at) }}</td>
             <td class="px-4 py-3">
               <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize"
-                :class="statusCls[i.status] ?? 'bg-slate-100 text-slate-600'">
+                :class="statusBadgeClass(i.status)">
                 {{ i.status }}
               </span>
             </td>
