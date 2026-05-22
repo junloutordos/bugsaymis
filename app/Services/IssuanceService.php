@@ -7,9 +7,11 @@ use App\Models\IssuanceRecipient;
 use App\Models\Office;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Mpdf\Mpdf;
 use Mpdf\Config\ConfigVariables;
 use Mpdf\Config\FontVariables;
+use setasign\Fpdi\Fpdi;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class IssuanceService
@@ -61,7 +63,6 @@ class IssuanceService
             IssuanceRecipient::insert($rows);
 
         } elseif ($issuance->recipient_type === 'office') {
-            // Recipient rows per user in each selected office
             $officeIds = $data['office_ids'] ?? [];
             $users = User::whereIn('office_id', $officeIds)
                 ->where('status', '<>', 'inactive')
@@ -86,7 +87,7 @@ class IssuanceService
         }
     }
 
-    // ── QR code SVG ──────────────────────────────────────────────────────────
+    // ── QR helpers ────────────────────────────────────────────────────────────
 
     public function generateQrSvg(Issuance $issuance, int $size = 120): string
     {
@@ -94,19 +95,36 @@ class IssuanceService
         return QrCode::format('svg')->size($size)->margin(1)->generate($url);
     }
 
-    // ── PDF generation ────────────────────────────────────────────────────────
+    private function generateQrPng(Issuance $issuance, int $size = 90): string
+    {
+        $url = route('issuances.verify', $issuance->qr_token);
+        return QrCode::format('png')->size($size)->margin(1)->generate($url);
+    }
+
+    // ── PDF generation — public entry point ──────────────────────────────────
 
     public function generatePdf(Issuance $issuance): string
     {
         ini_set('memory_limit', '256M');
 
-        $sig    = $issuance->signature;
-        $sigUri = $sig?->signer ? app(DigitalSignatureService::class)->getSignatureDataUri($sig->signer) : null;
-        $qrSvg  = $this->generateQrSvg($issuance, 80);
-        $qrB64  = base64_encode($qrSvg);
+        $pdfContent = $issuance->attachment_path
+            ? $this->stampQrOnScan($issuance)
+            : $this->generateContentPdf($issuance);
 
-        // OCD user for signing block
+        $path = 'issuances/' . $issuance->control_number . '.pdf';
+        Storage::disk('s3')->put($path, $pdfContent);
+
+        return $path;
+    }
+
+    // ── Mode A: typed content → mPDF with QR fixed lower-right ───────────────
+
+    private function generateContentPdf(Issuance $issuance): string
+    {
+        $sig     = $issuance->signature;
+        $sigUri  = $sig?->signer ? app(DigitalSignatureService::class)->getSignatureDataUri($sig->signer) : null;
         $ocdUser = $sig?->signer ?? $issuance->creator;
+        $qrB64   = base64_encode($this->generateQrSvg($issuance, 80));
 
         $html = view('issuances.pdf', compact('issuance', 'sig', 'sigUri', 'ocdUser', 'qrB64'))->render();
 
@@ -114,38 +132,127 @@ class IssuanceService
         $footerImg = public_path('images/report_footer.jpeg');
 
         $mpdf = new Mpdf([
-            'mode'           => 'utf-8',
-            'format'         => 'A4',
-            'margin_left'    => 15,
-            'margin_right'   => 15,
-            'margin_top'     => 42,   // space for the header image
-            'margin_bottom'  => 22,   // space for the footer image
-            'margin_header'  => 0,
-            'margin_footer'  => 0,
-            'tempDir'        => sys_get_temp_dir(),
-            'fontdata'       => (new FontVariables())->getDefaults()['fontdata'],
-            'fontDir'        => (new ConfigVariables())->getDefaults()['fontDir'],
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'margin_left'   => 15,
+            'margin_right'  => 15,
+            'margin_top'    => 42,
+            'margin_bottom' => 22,
+            'margin_header' => 0,
+            'margin_footer' => 0,
+            'tempDir'       => sys_get_temp_dir(),
+            'fontdata'      => (new FontVariables())->getDefaults()['fontdata'],
+            'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
         ]);
 
         $mpdf->SetTitle($issuance->type_label . ' — ' . $issuance->control_number);
-
-        $mpdf->SetHTMLHeader('
-            <div style="margin:0; padding:0;">
-                <img src="' . $headerImg . '" style="width:100%; display:block;" />
-            </div>
-        ');
-
-        $mpdf->SetHTMLFooter('
-            <div style="margin:0; padding:0;">
-                <img src="' . $footerImg . '" style="width:100%; display:block;" />
-            </div>
-        ');
-
+        $mpdf->SetHTMLHeader('<div style="margin:0;padding:0;"><img src="' . $headerImg . '" style="width:100%;display:block;" /></div>');
+        $mpdf->SetHTMLFooter('<div style="margin:0;padding:0;"><img src="' . $footerImg . '" style="width:100%;display:block;" /></div>');
         $mpdf->WriteHTML($html);
 
-        $path = 'issuances/' . $issuance->control_number . '.pdf';
-        \Illuminate\Support\Facades\Storage::disk('s3')->put($path, $mpdf->Output('', 'S'));
+        return $mpdf->Output('', 'S');
+    }
 
-        return $path;
+    // ── Mode B: scanned upload → stamp QR onto original document ─────────────
+
+    private function stampQrOnScan(Issuance $issuance): string
+    {
+        $scanContent = Storage::disk('s3')->get($issuance->attachment_path);
+        $mime        = $issuance->attachment_mime ?? 'application/pdf';
+
+        // Write QR PNG to temp file for fpdi/mPDF use
+        $qrPng    = $this->generateQrPng($issuance, 90);
+        $tmpQr    = sys_get_temp_dir() . '/issuance_qr_' . $issuance->id . '.png';
+        file_put_contents($tmpQr, $qrPng);
+
+        try {
+            if (str_contains($mime, 'pdf')) {
+                $result = $this->stampQrOnPdf($scanContent, $tmpQr, $issuance);
+            } else {
+                $result = $this->stampQrOnImage($scanContent, $mime, $tmpQr, $issuance);
+            }
+        } finally {
+            @unlink($tmpQr);
+        }
+
+        return $result;
+    }
+
+    // Stamp QR onto each page of a PDF scan using fpdi
+    private function stampQrOnPdf(string $pdfContent, string $qrPngPath, Issuance $issuance): string
+    {
+        $tmpPdf = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.pdf';
+        file_put_contents($tmpPdf, $pdfContent);
+
+        try {
+            $fpdi       = new Fpdi();
+            $pageCount  = $fpdi->setSourceFile($tmpPdf);
+
+            for ($page = 1; $page <= $pageCount; $page++) {
+                $tplId = $fpdi->importPage($page);
+                $size  = $fpdi->getTemplateSize($tplId);
+
+                $w = $size['width']  ?? 210;
+                $h = $size['height'] ?? 297;
+                $orient = ($w > $h) ? 'L' : 'P';
+
+                $fpdi->AddPage($orient, [$w, $h]);
+                $fpdi->useTemplate($tplId, 0, 0, $w, $h);
+
+                // QR — 22mm × 22mm, 8mm from bottom-right corner
+                $qrSize  = 22;
+                $marginR = 8;
+                $marginB = 8;
+                $qrX     = $w - $qrSize - $marginR;
+                $qrY     = $h - $qrSize - $marginB - 4; // 4mm for label below
+
+                $fpdi->Image($qrPngPath, $qrX, $qrY, $qrSize, $qrSize);
+
+                // Small label under QR
+                $fpdi->SetFont('Helvetica', '', 5);
+                $fpdi->SetTextColor(100, 116, 139);
+                $fpdi->SetXY($qrX - 1, $qrY + $qrSize + 0.5);
+                $fpdi->Cell($qrSize + 2, 3, 'Scan to verify', 0, 0, 'C');
+            }
+
+            return $fpdi->Output('', 'S');
+        } finally {
+            @unlink($tmpPdf);
+        }
+    }
+
+    // Stamp QR onto an image scan (JPG/PNG) using mPDF
+    private function stampQrOnImage(string $imgContent, string $mime, string $qrPngPath, Issuance $issuance): string
+    {
+        $ext    = str_contains($mime, 'png') ? 'png' : 'jpg';
+        $tmpImg = sys_get_temp_dir() . '/issuance_scan_' . $issuance->id . '.' . $ext;
+        file_put_contents($tmpImg, $imgContent);
+
+        try {
+            $mpdf = new Mpdf([
+                'format'        => 'A4',
+                'margin_left'   => 0,
+                'margin_right'  => 0,
+                'margin_top'    => 0,
+                'margin_bottom' => 0,
+                'margin_header' => 0,
+                'margin_footer' => 0,
+                'tempDir'       => sys_get_temp_dir(),
+                'fontdata'      => (new FontVariables())->getDefaults()['fontdata'],
+                'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
+            ]);
+
+            // Full-page image + fixed QR overlay bottom-right
+            $html  = '<img src="' . $tmpImg . '" style="width:210mm; display:block;" />';
+            $html .= '<div style="position:fixed; bottom:8mm; right:8mm; width:22mm; text-align:center;">';
+            $html .= '<img src="' . $qrPngPath . '" style="width:22mm; height:22mm;" />';
+            $html .= '<div style="font-size:5pt; color:#64748b; margin-top:0.5mm;">Scan to verify</div>';
+            $html .= '</div>';
+
+            $mpdf->WriteHTML($html);
+            return $mpdf->Output('', 'S');
+        } finally {
+            @unlink($tmpImg);
+        }
     }
 }

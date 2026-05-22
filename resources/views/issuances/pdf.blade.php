@@ -23,63 +23,48 @@ body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height
 .sig-name  { font-weight:bold; font-size:10pt; border-top:1px solid #334155; padding-top:4px; margin-top:4px; display:inline-block; min-width:200px; }
 .sig-pos   { font-size:8.5pt; color:#475569; }
 
-/* ── QR block ── */
-.qr-block  { position:absolute; bottom:0; right:0; text-align:center; width:100px; }
-.qr-label  { font-size:6.5pt; color:#64748b; margin-top:2px; }
-
 /* ── Footer note ── */
 .auth-note { margin-top:20px; border-top:1px dashed #e2e8f0; padding-top:8px; font-size:7.5pt; color:#94a3b8; }
 </style>
 </head>
 <body>
 
-{{-- Letterhead is provided by the mPDF header image (report_header.jpeg) --}}
+{{-- QR code: position:fixed → mPDF stamps it at absolute lower-right on every page --}}
+@if($qrB64)
+<div style="position:fixed; bottom:9mm; right:9mm; width:22mm; text-align:center; z-index:100;">
+  <img src="data:image/svg+xml;base64,{{ $qrB64 }}" style="width:22mm; height:22mm; display:block;" alt="QR" />
+  <div style="font-size:5pt; color:#64748b; margin-top:0.8mm; line-height:1.3;">Scan to verify<br>authenticity</div>
+</div>
+@endif
+
+{{-- Letterhead provided by mPDF header image (report_header.jpeg) --}}
 
 {{-- Issuance type header --}}
 <div class="issuance-header">
   <div class="issuance-type">{{ $issuance->type_label }}</div>
   <div class="control-no">No. {{ $issuance->series_no }}, S. {{ $issuance->year }}</div>
-  @if($issuance->attachment_path)
-  {{-- Scan mode: just the header info --}}
-  <p class="subject-line"><strong>Re:</strong> {{ $issuance->title }}</p>
-  @endif
 </div>
 
+{{-- Body content (editor mode only — scan mode uses stampQrOnScan) --}}
 @if($issuance->content)
-{{-- Editor mode: render the body content --}}
 <div class="body-content">
   {!! $issuance->content !!}
 </div>
-@else
-{{-- Scan mode note --}}
-<p style="color:#64748b; font-size:8.5pt; margin:10px 0;">
-  (See attached scanned document: {{ $issuance->attachment_filename }})
-</p>
 @endif
 
 {{-- Signature block --}}
-<div style="position:relative; margin-top:30px;">
-  <div class="sig-block">
-    <div class="signed-by">Signed by:</div>
-    @if($sigUri)
-    <img src="{{ $sigUri }}" class="sig-img" alt="Digital Signature" />
-    @else
-    <div style="height:50px;"></div>
-    @endif
-    <div class="sig-name">{{ $ocdUser?->name ?? 'Campus Director' }}</div>
-    <div class="sig-pos">{{ $ocdUser?->position ?? 'Campus Director, PSHS-CRC' }}</div>
-    @if($sig)
-    <div style="font-size:7.5pt; color:#64748b; margin-top:3px;">
-      Digitally signed: {{ $sig->signed_at?->format('F d, Y \a\t h:i A') }}
-    </div>
-    @endif
-  </div>
-
-  {{-- QR Code --}}
-  @if($qrB64)
-  <div class="qr-block">
-    <img src="data:image/svg+xml;base64,{{ $qrB64 }}" width="85" height="85" alt="QR Code" />
-    <div class="qr-label">Scan to verify<br>authenticity</div>
+<div class="sig-block" style="margin-top:30px;">
+  <div class="signed-by">Signed by:</div>
+  @if($sigUri)
+  <img src="{{ $sigUri }}" class="sig-img" alt="Digital Signature" />
+  @else
+  <div style="height:50px;"></div>
+  @endif
+  <div class="sig-name">{{ $ocdUser?->name ?? 'Campus Director' }}</div>
+  <div class="sig-pos">{{ $ocdUser?->position ?? 'Campus Director, PSHS-CRC' }}</div>
+  @if($sig)
+  <div style="font-size:7.5pt; color:#64748b; margin-top:3px;">
+    Digitally signed: {{ $sig->signed_at?->format('F d, Y \a\t h:i A') }}
   </div>
   @endif
 </div>
