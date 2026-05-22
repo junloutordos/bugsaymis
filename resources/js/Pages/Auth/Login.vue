@@ -88,22 +88,6 @@ const modules = [
   <div class="site">
 
     <!-- ╔══════════════════════════════════════════
-         ║  NAVBAR
-         ╚═════════════════════════════════════════ -->
-    <header class="navbar">
-      <div class="nav-inner">
-        <div class="nav-brand">
-          <img src="/images/pshslogo.png" alt="PSHS-CRC" class="nav-logo" />
-          <div>
-            <span class="nav-name">CRCMIS</span>
-            <span class="nav-tag">Campus Management Information System</span>
-          </div>
-        </div>
-        <span class="nav-ver">v{{ appVersion }}</span>
-      </div>
-    </header>
-
-    <!-- ╔══════════════════════════════════════════
          ║  HERO — SPLIT SCREEN
          ╚═════════════════════════════════════════ -->
     <section class="hero">
@@ -233,31 +217,12 @@ const modules = [
 }
 
 /* ══════════════════════════════
-   NAVBAR
-══════════════════════════════ */
-.navbar {
-  position: sticky; top: 0; z-index: 100;
-  background: #060e50;
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  height: 52px;
-}
-.nav-inner {
-  max-width: 1280px; margin: 0 auto; padding: 0 32px;
-  height: 100%; display: flex; align-items: center;
-}
-.nav-brand { display: flex; align-items: center; gap: 10px; }
-.nav-logo  { width: 28px; height: 28px; }
-.nav-name  { font-size: .82rem; font-weight: 800; color: #fff; letter-spacing: .07em; display: block; }
-.nav-tag   { font-size: .56rem; color: #93c5fd; display: block; margin-top: 1px; }
-.nav-ver   { margin-left: auto; font-size: .62rem; color: #334155; }
-
-/* ══════════════════════════════
    HERO — SPLIT SCREEN
 ══════════════════════════════ */
 .hero {
   flex: 1;
   display: flex;
-  min-height: calc(100vh - 52px);
+  min-height: 100vh;
 }
 
 /* ── LEFT PANEL ── */
@@ -476,8 +441,6 @@ const modules = [
 
 /* Mobile */
 @media (max-width: 640px) {
-  .nav-inner    { padding: 0 16px; }
-  .nav-tag      { display: none; }
   .panel-left   { padding: 40px 20px; }
   .panel-right  { padding: 40px 20px; }
   .seal         { width: 64px; height: 64px; }
