@@ -80,7 +80,7 @@ const years = computed(() => {
       </div>
       <a v-if="isAdmin" :href="route('issuances.create')"
         class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg"
-        style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+        class="bg-indigo-600 hover:bg-indigo-700">
         <PlusIcon class="h-4 w-4" /> New Issuance
       </a>
     </div>

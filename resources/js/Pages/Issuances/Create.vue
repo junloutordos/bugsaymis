@@ -165,8 +165,7 @@ watch(type, (t) => {
           class="flex items-center gap-2">
           <div class="flex items-center gap-1.5">
             <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-              :class="step === i+1 ? 'text-white' : step > i+1 ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'"
-              :style="step === i+1 ? 'background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)' : ''">
+              :class="step === i+1 ? 'bg-indigo-600 text-white' : step > i+1 ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'">
               <span v-if="step > i+1">✓</span>
               <span v-else>{{ i+1 }}</span>
             </div>
@@ -206,7 +205,7 @@ watch(type, (t) => {
         <div class="flex justify-end pt-2">
           <button @click="step = 2" :disabled="!type || !title.trim()"
             class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40"
-            style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+            class="bg-indigo-600 hover:bg-indigo-700">
             Next: Content →
           </button>
         </div>
@@ -259,7 +258,7 @@ watch(type, (t) => {
           <button @click="step = 1" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">← Back</button>
           <button @click="step = 3" :disabled="!canAdvance()"
             class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40"
-            style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+            class="bg-indigo-600 hover:bg-indigo-700">
             Next: Recipients →
           </button>
         </div>
@@ -344,7 +343,7 @@ watch(type, (t) => {
           </div>
           <button @click="openPinModal"
             class="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white rounded-lg"
-            style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+            class="bg-indigo-600 hover:bg-indigo-700">
             Sign & Release
           </button>
         </div>

@@ -99,7 +99,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
       <!-- ── Document Header ─────────────────────────────────────────────── -->
       <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <!-- Colour band -->
-        <div class="h-1.5" style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)"></div>
+        <div class="h-1.5 bg-indigo-600"></div>
 
         <div class="p-6">
           <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -128,7 +128,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               <button v-if="!isAdmin && issuance.status === 'released' && !ackDone"
                 @click="acknowledge" :disabled="ackForm.processing"
                 class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg"
-                style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+                class="bg-indigo-600 hover:bg-indigo-700">
                 <CheckCircleIcon class="h-4 w-4" /> Acknowledge Receipt
               </button>
               <div v-else-if="!isAdmin && ackDone"
@@ -140,7 +140,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
               <button v-if="isAdmin && issuance.status === 'draft'"
                 @click="openRelease"
                 class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg"
-                style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+                class="bg-indigo-600 hover:bg-indigo-700">
                 Sign & Release
               </button>
 
@@ -284,7 +284,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
 
             <button @click="showPinModal = true"
               class="w-full py-2 text-sm font-medium text-white rounded-lg"
-              style="background:linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%)">
+              class="bg-indigo-600 hover:bg-indigo-700">
               Sign & Release Now
             </button>
           </div>
