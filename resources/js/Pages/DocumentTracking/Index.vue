@@ -158,7 +158,7 @@ const needsManualReceiver = computed(() =>
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div>
-        <h2 class="text-lg font-bold text-slate-800">Document Tracking System</h2>
+        <h2 class="text-xl font-semibold text-slate-800">Document Tracking System</h2>
         <p class="text-xs text-slate-500 mt-0.5">Track internal and external document routing across all offices</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
@@ -290,7 +290,7 @@ const needsManualReceiver = computed(() =>
                   : 'Route an internal document across offices or personnel' }}
               </p>
             </div>
-            <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">✕</button>
+            <button @click="showModal = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
 
           <!-- Body -->

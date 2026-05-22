@@ -250,7 +250,7 @@ const statusColor = (status) => {
             </h2>
             <p class="text-xs text-slate-400 mt-0.5">Period: {{ modalEntry?.period?.rating_period }}</p>
           </div>
-          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
 
         <form @submit.prevent="submitEdit">

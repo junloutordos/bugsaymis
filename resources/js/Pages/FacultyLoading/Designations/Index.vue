@@ -251,7 +251,7 @@
               <span class="ml-1 font-medium text-indigo-600">{{ selectedDesig?.load_units }} units</span>
             </p>
           </div>
-          <button @click="assignModal = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 mt-0.5">✕</button>
+          <button @click="assignModal = false" class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 mt-0.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
         </div>
 
         <!-- Current holders from any module -->

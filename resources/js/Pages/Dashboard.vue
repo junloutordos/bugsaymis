@@ -701,7 +701,7 @@ onMounted(() => {
         <div class="relative z-10 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
           <div class="mb-4 flex items-center justify-between">
             <h4 class="font-semibold text-slate-800">Facility Requests — {{ selectedDate }}</h4>
-            <button class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" @click="showDateModal = false">✕</button>
+            <button class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" @click="showDateModal = false"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div v-if="loadingBookings" class="py-8 text-center text-sm text-slate-400">Loading…</div>
           <div v-else>

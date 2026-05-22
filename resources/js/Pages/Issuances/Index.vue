@@ -77,7 +77,7 @@ const years = computed(() => {
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
       <div>
-        <h2 class="text-lg font-bold text-slate-800">Official Issuances</h2>
+        <h2 class="text-xl font-semibold text-slate-800">Official Issuances</h2>
         <p class="text-xs text-slate-500 mt-0.5">
           {{ isAdmin ? 'Create and manage official issuances released to staff' : 'Official issuances from OCD addressed to you or your office' }}
         </p>

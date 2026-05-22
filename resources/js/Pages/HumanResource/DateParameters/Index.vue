@@ -74,7 +74,7 @@
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md relative">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-xl font-semibold text-slate-800">{{ editing ? 'Edit' : 'Add' }} Date Parameter</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">✕</button>
+            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="px-6 py-5">
             <div class="grid grid-cols-1 gap-3">

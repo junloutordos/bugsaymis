@@ -115,7 +115,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                   {{ issuance.status }}
                 </span>
               </div>
-              <h1 class="text-lg font-bold text-slate-800">{{ issuance.title }}</h1>
+              <h1 class="text-xl font-semibold text-slate-800">{{ issuance.title }}</h1>
               <p class="text-xs text-slate-500 mt-1">
                 Issued by <strong>{{ issuance.creator?.name }}</strong>
                 <span v-if="issuance.released_at"> · Released {{ fmtDt(issuance.released_at) }}</span>
@@ -306,7 +306,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
         <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
           <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <p class="text-sm font-semibold text-slate-800">{{ issuance.attachment_filename }}</p>
-            <button @click="showScanModal = false" class="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none">✕</button>
+            <button @click="showScanModal = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
           <div class="flex-1 overflow-auto p-2">
             <iframe :src="route('issuances.scan', issuance.id)"
