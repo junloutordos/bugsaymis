@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass } from '@/Composables/useStatusBadge.js'
 import {
   PlusIcon, ArrowUpTrayIcon, Cog6ToothIcon, MagnifyingGlassIcon,
   LockClosedIcon, ExclamationTriangleIcon,
@@ -89,8 +90,7 @@ function overallLabel(doc) {
   if (doc.routings?.some(r => r.status === 'Pending')) return 'Pending Action'
   return doc.overall_status
 }
-const priorityCls = { Normal: 'bg-slate-100 text-slate-600', Urgent: 'bg-amber-100 text-amber-700', Rush: 'bg-red-100 text-red-700' }
-const originCls   = { external: 'bg-green-100 text-green-700', internal: 'bg-indigo-100 text-indigo-700' }
+// priorityBadgeClass + originBadgeClass imported from useStatusBadge.js
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -239,14 +239,14 @@ const needsManualReceiver = computed(() =>
             </td>
             <td class="hidden md:table-cell px-4 py-3">
               <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold mr-1"
-                :class="originCls[doc.origin_type]">
+                :class="originBadgeClass(doc.origin_type)">
                 {{ doc.origin_type === 'external' ? 'Ext' : 'Int' }}
               </span>
               <span class="text-xs text-slate-500">{{ doc.document_type?.name ?? '—' }}</span>
             </td>
             <td class="hidden lg:table-cell px-4 py-3">
               <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="priorityCls[doc.priority] ?? priorityCls.Normal">{{ doc.priority }}</span>
+                :class="priorityBadgeClass(doc.priority)">{{ doc.priority }}</span>
             </td>
             <td class="px-4 py-3">
               <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="overallBadge(doc)">

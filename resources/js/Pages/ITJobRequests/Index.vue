@@ -3,6 +3,8 @@ import { ref, computed, watch } from "vue"
 import { Head, usePage, router } from "@inertiajs/vue3"
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import { badgeBase, statusBadgeClass, priorityBadgeClass } from '@/Composables/useStatusBadge.js'
+// ↑ combined import — priorityBadgeClass replaces the old inline PRIORITY_COLORS object
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -16,7 +18,6 @@ import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import MISAssessmentModal from '@/Components/MISAssessmentModal.vue'
 import { useJobRequests } from "@/Composables/useJobRequests.js"
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 
 // Props from backend — requests is now a paginator object
 const props = defineProps({
@@ -179,13 +180,7 @@ function runExport() {
   showExportModal.value = false
 }
 
-// ── Priority helpers ──────────────────────────────────────────────────────────
-const PRIORITY_COLORS = {
-  urgent: 'bg-red-100 text-red-700',
-  high:   'bg-orange-100 text-orange-700',
-  normal: 'bg-blue-100 text-blue-700',
-  low:    'bg-slate-100 text-slate-500',
-}
+// ── Priority helpers — colours from centralised composable ───────────────────
 const PRIORITY_LABELS = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' }
 
 // Clear event_date when category changes away from Technical Assistance on Events
@@ -380,7 +375,7 @@ function handleSigCancel() {
                   <span
                     v-if="['In Progress', 'MIS Assessed the Request'].includes(req.status)"
                     class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold"
-                    :class="PRIORITY_COLORS[req.priority] ?? PRIORITY_COLORS.normal"
+                    :class="priorityBadgeClass(req.priority)"
                   >
                     {{ PRIORITY_LABELS[req.priority] ?? 'Normal' }}
                   </span>
@@ -506,7 +501,7 @@ function handleSigCancel() {
       </div>
 
       <!-- Modal -->
-      <div v-show="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
+      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
         <div
           class="bg-white w-full max-w-2xl rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto"
         >

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
+import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass, routingStatusBadgeClass } from '@/Composables/useStatusBadge.js'
 import {
   ChevronLeftIcon, LockClosedIcon, ExclamationTriangleIcon,
   CheckCircleIcon, ClockIcon, ArrowRightIcon, ArrowUturnLeftIcon,
@@ -147,16 +148,7 @@ function statusLabel(r) {
   if (r.is_overdue && ['Pending','Received'].includes(r.status)) return 'Overdue'
   return r.status
 }
-function statusBadgeCls(r) {
-  if (r.is_overdue && ['Pending','Received'].includes(r.status)) return 'bg-red-600 text-white'
-  if (r.status === 'Action Taken') return 'bg-emerald-100 text-emerald-700'
-  if (r.status === 'Forwarded')    return 'bg-blue-100 text-blue-700'
-  if (r.status === 'Received')     return 'bg-indigo-100 text-indigo-700'
-  if (r.status === 'Returned')     return 'bg-red-100 text-red-700'
-  if (r.status === 'Queued')       return 'bg-slate-100 text-slate-400'
-  return 'bg-amber-100 text-amber-700'
-}
-
+// statusBadgeCls → routingStatusBadgeClass (from useStatusBadge.js)
 const overallBadgeCls = computed(() => {
   const s = props.document.overall_status
   if (s === 'Completed') return 'bg-emerald-100 text-emerald-700'
@@ -355,7 +347,7 @@ const overallBadgeCls = computed(() => {
                   <div class="flex items-center gap-1.5">
                     <ExclamationTriangleIcon v-if="r.is_overdue && ['Pending','Received'].includes(r.status)"
                       class="h-3.5 w-3.5 text-red-500" />
-                    <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="statusBadgeCls(r)">
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="routingStatusBadgeClass(r)">
                       {{ statusLabel(r) }}
                     </span>
                   </div>
