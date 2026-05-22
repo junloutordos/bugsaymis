@@ -57,8 +57,14 @@
       </div>
 
       <div class="actions">
-        <a href="{{ $viewUrl }}" class="btn">View & Acknowledge</a>
-        <a href="{{ $verifyUrl }}" class="btn btn-verify">Verify Authenticity</a>
+        <a href="{{ $viewUrl }}"
+           style="display:inline-block;background:#1447c0;color:#ffffff !important;padding:11px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;margin:4px;">
+          View &amp; Acknowledge
+        </a>
+        <a href="{{ $verifyUrl }}"
+           style="display:inline-block;background:#0093b8;color:#ffffff !important;padding:11px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;margin:4px;">
+          Verify Authenticity
+        </a>
       </div>
 
       <div class="footer">
