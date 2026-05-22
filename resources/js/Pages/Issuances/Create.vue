@@ -4,6 +4,9 @@ import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import RichTextEditor from '@/Components/RichTextEditor.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
 import {
   DocumentTextIcon, PaperClipIcon, UserGroupIcon,
   BuildingOfficeIcon, UserIcon, CheckCircleIcon, ChevronLeftIcon,
@@ -195,13 +198,13 @@ watch(type, (t) => {
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Title / Subject <span class="text-red-500">*</span></label>
-          <input v-model="title" type="text" required
-            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            :placeholder="{ SO: 'e.g. Designation of Committee Members for...', TO: 'e.g. Official Travel of...', MEMO: 'e.g. Submission of IPCR for...' }[type] ?? 'Title or subject of the issuance'" />
-          <p v-if="errors.title" class="text-xs text-red-500 mt-1">{{ errors.title }}</p>
-        </div>
+        <AppInput
+          v-model="title"
+          label="Title / Subject"
+          :required="true"
+          :error="errors.title"
+          :placeholder="{ SO: 'e.g. Designation of Committee Members for...', TO: 'e.g. Official Travel of...', MEMO: 'e.g. Submission of IPCR for...' }[type] ?? 'Title or subject of the issuance'"
+        />
 
         <div class="flex justify-end pt-2">
           <button @click="step = 2" :disabled="!type || !title.trim()"
