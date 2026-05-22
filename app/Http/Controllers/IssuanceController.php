@@ -160,14 +160,18 @@ class IssuanceController extends Controller
             $issuance->recipients()->update(['notified_at' => now()]);
         });
 
-        $this->performSign(
-            $request,
-            Issuance::class,
-            $issuance->id,
-            'release',
-            "{$issuance->type_label}: {$issuance->title}",
-            $issuance->content_hash,
-        );
+        try {
+            $this->performSign(
+                $request,
+                Issuance::class,
+                $issuance->id,
+                'release',
+                "{$issuance->type_label}: {$issuance->title}",
+                $issuance->content_hash,
+            );
+        } catch (\Throwable $e) {
+            logger()->error('Issuance sign failed', ['id' => $issuance->id, 'error' => $e->getMessage()]);
+        }
 
         try { $this->svc->generatePdf($issuance->fresh()); } catch (\Throwable $e) {
             logger()->error('Issuance PDF failed', ['id' => $issuance->id, 'error' => $e->getMessage()]);
