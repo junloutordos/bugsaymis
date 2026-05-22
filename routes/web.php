@@ -285,12 +285,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
     // ── Issuances ─────────────────────────────────────────────────────────────
-    Route::prefix('issuances')->name('issuances.')->group(function () {
+    Route::prefix('issuances')->name('issuances.')->middleware('permission:issuances.view')->group(function () {
         Route::get('/',                       [\App\Http\Controllers\IssuanceController::class, 'index'])->name('index');
-        Route::get('/create',                 [\App\Http\Controllers\IssuanceController::class, 'create'])->name('create')->middleware('role:Administrator,OCD');
-        Route::post('/',                      [\App\Http\Controllers\IssuanceController::class, 'store'])->name('store')->middleware('role:Administrator,OCD');
+        Route::get('/create',                 [\App\Http\Controllers\IssuanceController::class, 'create'])->name('create')->middleware('permission:issuances.manage');
+        Route::post('/',                      [\App\Http\Controllers\IssuanceController::class, 'store'])->name('store')->middleware('permission:issuances.manage');
         Route::get('/{issuance}',             [\App\Http\Controllers\IssuanceController::class, 'show'])->name('show');
-        Route::post('/{issuance}/release',    [\App\Http\Controllers\IssuanceController::class, 'release'])->name('release')->middleware('role:Administrator,OCD');
+        Route::post('/{issuance}/release',    [\App\Http\Controllers\IssuanceController::class, 'release'])->name('release')->middleware('permission:issuances.manage');
         Route::post('/{issuance}/acknowledge',[\App\Http\Controllers\IssuanceController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{issuance}/pdf',         [\App\Http\Controllers\IssuanceController::class, 'downloadPdf'])->name('pdf');
         Route::get('/{issuance}/scan',        [\App\Http\Controllers\IssuanceController::class, 'viewScan'])->name('scan');

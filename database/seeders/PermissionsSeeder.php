@@ -210,6 +210,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Payroll', 'name' => 'payroll.view_all',  'description' => 'View all payroll batches and employee payslips'],
             ['module' => 'Payroll', 'name' => 'payroll.view_own',  'description' => 'View own payslip history'],
 
+            // ── Issuances (Special Orders, Memos, Travel Orders, etc.) ───────
+            ['module' => 'Issuances', 'name' => 'issuances.view',   'description' => 'View issuances addressed to the user or their office'],
+            ['module' => 'Issuances', 'name' => 'issuances.manage', 'description' => 'Create, sign, release, and manage official issuances (OCD)'],
+
         ];
 
         foreach ($permissions as $data) {
