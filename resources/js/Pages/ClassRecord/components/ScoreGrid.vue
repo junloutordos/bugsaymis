@@ -1,12 +1,10 @@
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import {
   computeStudentGrade,
   adjectivalColor,
-  fmtPct,
-  fmtGE,
 } from '@/Utils/ClassRecord/gradeUtils.js'
 import ManageStudentsModal from './ManageStudentsModal.vue'
 import { LockClosedIcon, UsersIcon } from '@heroicons/vue/24/outline'
@@ -162,23 +160,50 @@ const computedGrades = computed(() => {
   return result
 })
 
-// Class statistics
+// Class statistics (GE scale: lower = better, 1.000 = Excellent, 5.000 = Failed)
 const classStats = computed(() => {
-  const grades = Object.values(computedGrades.value)
+  const grades = students.value.map(s => computedGrades.value[s.id]).filter(Boolean)
   if (!grades.length) return null
 
-  const twPcts   = grades.map(g => g.twPct * 100)
+  const twPcts = grades.map(g => g.twPct * 100)
+  const ges    = grades.map(g => g.gradeEquivalent)
   const adjCounts = {}
   for (const g of grades) {
     adjCounts[g.adjectivalEquivalent] = (adjCounts[g.adjectivalEquivalent] ?? 0) + 1
   }
+  const avgGE = ges.reduce((s, v) => s + v, 0) / ges.length
   return {
-    avg:       twPcts.reduce((s, v) => s + v, 0) / twPcts.length,
-    highest:   Math.max(...grades.map(g => g.gradeEquivalent)),
-    lowest:    Math.min(...grades.map(g => g.gradeEquivalent)),
+    count:   grades.length,
+    avg:     twPcts.reduce((s, v) => s + v, 0) / twPcts.length,
+    avgGE,
+    bestGE:  Math.min(...ges),   // lowest GE = best performance
+    worstGE: Math.max(...ges),   // highest GE = weakest performance
     adjCounts,
   }
 })
+
+// At-risk students (by quarter grade this quarter)
+const atRiskCounts = computed(() => {
+  const failed = [], conditional = [], fair = []
+  for (const student of students.value) {
+    const grade = computedGrades.value[student.id]
+    if (!grade) continue
+    const adj = (grade.adjectivalEquivalent ?? '').toLowerCase()
+    if (adj === 'failed') failed.push(student)
+    else if (adj.includes('condition')) conditional.push(student)
+    else if (adj === 'fair') fair.push(student)
+  }
+  return { failed, conditional, fair }
+})
+
+function rowBg(studentId, isEven) {
+  const grade = computedGrades.value[studentId]
+  const adj = (grade?.adjectivalEquivalent ?? '').toLowerCase()
+  if (adj === 'failed') return 'bg-red-50'
+  if (adj.includes('condition')) return 'bg-orange-50'
+  if (adj === 'fair') return 'bg-amber-50'
+  return isEven ? 'bg-white' : 'bg-slate-50/40'
+}
 
 // ── Keyboard navigation ───────────────────────────────────────────────────────
 
@@ -269,6 +294,24 @@ const showRunning = computed(() => props.quarterNumber > 1)
       </div>
     </div>
 
+    <!-- At-risk summary chips -->
+    <div v-if="atRiskCounts.failed.length || atRiskCounts.conditional.length || atRiskCounts.fair.length"
+      class="flex flex-wrap items-center gap-2 text-xs">
+      <span class="text-slate-400 font-medium">At Risk (Q{{ quarterNumber }}):</span>
+      <span v-if="atRiskCounts.failed.length"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+        {{ atRiskCounts.failed.length }} Failed
+      </span>
+      <span v-if="atRiskCounts.conditional.length"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-semibold">
+        {{ atRiskCounts.conditional.length }} Conditional
+      </span>
+      <span v-if="atRiskCounts.fair.length"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
+        {{ atRiskCounts.fair.length }} Fair
+      </span>
+    </div>
+
     <!-- Locked banner -->
     <div v-if="isLocked"
       class="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-2.5 text-sm">
@@ -351,29 +394,29 @@ const showRunning = computed(() => props.quarterNumber > 1)
         <!-- ── Student rows ───────────────────────────────────────── -->
         <tbody>
           <tr v-for="(student, sIdx) in students" :key="student.id"
-            :class="sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'">
+            :class="rowBg(student.id, sIdx % 2 === 0)">
 
             <!-- Fixed left columns -->
-            <td :class="['sticky left-0 z-10 border border-slate-200 px-2 py-1 text-center text-slate-400', sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50']">
+            <td :class="['sticky left-0 z-10 border border-slate-200 px-2 py-1 text-center text-slate-400', rowBg(student.id, sIdx % 2 === 0)]">
               {{ student.sequence_number }}
             </td>
-            <td :class="['sticky left-8 z-10 border border-slate-200 px-2 py-1 font-medium text-slate-700 whitespace-nowrap', sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50']">
+            <td :class="['sticky left-8 z-10 border border-slate-200 px-2 py-1 font-medium text-slate-700 whitespace-nowrap', rowBg(student.id, sIdx % 2 === 0)]">
               {{ student.family_name }}
             </td>
-            <td :class="['sticky left-32 z-10 border border-slate-200 px-2 py-1 text-slate-600 whitespace-nowrap', sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50']">
+            <td :class="['sticky left-32 z-10 border border-slate-200 px-2 py-1 text-slate-600 whitespace-nowrap', rowBg(student.id, sIdx % 2 === 0)]">
               {{ student.given_name }}
             </td>
-            <td :class="['sticky left-56 z-10 border border-slate-200 px-2 py-1 text-slate-500', sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50']">
+            <td :class="['sticky left-56 z-10 border border-slate-200 px-2 py-1 text-slate-500', rowBg(student.id, sIdx % 2 === 0)]">
               {{ student.middle_initial ?? '' }}
             </td>
-            <td :class="['sticky left-64 z-10 border border-slate-200 px-2 py-1 text-center text-slate-500', sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50']">
+            <td :class="['sticky left-64 z-10 border border-slate-200 px-2 py-1 text-center text-slate-500', rowBg(student.id, sIdx % 2 === 0)]">
               {{ student.sex }}
             </td>
 
             <!-- Score inputs + computed per category -->
             <template v-for="cat in categories" :key="cat.id">
               <!-- Assessment inputs -->
-              <td v-for="(a, aIdx) in assessmentsByCategory[cat.id]" :key="a.id"
+              <td v-for="a in assessmentsByCategory[cat.id]" :key="a.id"
                 class="border border-slate-200 p-0.5">
                 <input
                   type="number"
@@ -447,26 +490,36 @@ const showRunning = computed(() => props.quarterNumber > 1)
 
     <!-- Class statistics summary -->
     <div v-if="classStats && students.length" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
-      <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Class Summary — Q{{ quarterNumber }}</h3>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Class Summary — Q{{ quarterNumber }}</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
         <div class="bg-slate-50 rounded-lg p-3 text-center">
-          <div class="text-xs text-slate-400">Class Average</div>
+          <div class="text-xs text-slate-400">Students</div>
+          <div class="text-lg font-bold text-slate-800 tabular-nums">{{ classStats.count }}</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-3 text-center">
+          <div class="text-xs text-slate-400">Avg Score</div>
           <div class="text-lg font-bold text-slate-800 tabular-nums">{{ classStats.avg.toFixed(2) }}%</div>
+        </div>
+        <div class="bg-indigo-50 rounded-lg p-3 text-center">
+          <div class="text-xs text-slate-400">Avg GE</div>
+          <div class="text-lg font-bold text-indigo-700 tabular-nums">{{ classStats.avgGE.toFixed(3) }}</div>
         </div>
         <div class="bg-emerald-50 rounded-lg p-3 text-center">
           <div class="text-xs text-slate-400">Best GE</div>
-          <div class="text-lg font-bold text-emerald-700 tabular-nums">{{ classStats.highest.toFixed(3) }}</div>
+          <div class="text-lg font-bold text-emerald-700 tabular-nums">{{ classStats.bestGE.toFixed(3) }}</div>
         </div>
         <div class="bg-red-50 rounded-lg p-3 text-center">
-          <div class="text-xs text-slate-400">Lowest GE</div>
-          <div class="text-lg font-bold text-red-600 tabular-nums">{{ classStats.lowest.toFixed(3) }}</div>
+          <div class="text-xs text-slate-400">Weakest GE</div>
+          <div class="text-lg font-bold text-red-600 tabular-nums">{{ classStats.worstGE.toFixed(3) }}</div>
         </div>
-        <div class="bg-slate-50 rounded-lg p-3">
-          <div class="text-xs text-slate-400 mb-1">Distribution</div>
-          <div v-for="(count, adj) in classStats.adjCounts" :key="adj"
-            :class="['text-[11px] flex justify-between', adjectivalColor(adj)]">
-            <span>{{ adj }}</span><span class="font-semibold">{{ count }}</span>
-          </div>
+      </div>
+      <!-- Adjectival distribution -->
+      <div class="mt-3 flex flex-wrap gap-2">
+        <div v-for="(count, adj) in classStats.adjCounts" :key="adj"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-xs">
+          <span :class="adjectivalColor(adj)">{{ adj }}</span>
+          <span class="font-semibold text-slate-700">{{ count }}</span>
+          <span class="text-slate-400">({{ ((count / classStats.count) * 100).toFixed(0) }}%)</span>
         </div>
       </div>
     </div>

@@ -65,12 +65,20 @@ class ClassRecordPageController extends Controller
         $currentSY   = SchoolYear::where('is_current', true)->first();
         $isCurrentSY = $currentSY && $classRecord->school_year_id === $currentSY->id;
 
+        // Other class records by the same teacher for the same subject (for copy-from-section feature)
+        $sameSubjectRecords = ClassRecord::where('teacher_id', $classRecord->teacher_id)
+            ->where('id', '!=', $classRecord->id)
+            ->whereRaw('LOWER(subject_name) = LOWER(?)', [$classRecord->subject_name])
+            ->orderByDesc('school_year')
+            ->get(['id', 'subject_name', 'year_level_section', 'school_year']);
+
         return Inertia::render('ClassRecord/Show', [
-            'classRecord'   => $classRecord,
-            'isAdmin'       => $this->isAdmin(),
-            'stanineLookup' => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
-            'isCurrentSY'   => $isCurrentSY,
-            'currentSYName' => $currentSY?->name,
+            'classRecord'        => $classRecord,
+            'isAdmin'            => $this->isAdmin(),
+            'stanineLookup'      => StanineLookup::orderByDesc('percentage')->get(['percentage', 'grade_equivalent', 'adjectival_equivalent']),
+            'isCurrentSY'        => $isCurrentSY,
+            'currentSYName'      => $currentSY?->name,
+            'sameSubjectRecords' => $sameSubjectRecords,
         ]);
     }
 }

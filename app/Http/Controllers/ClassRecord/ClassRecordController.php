@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\ClassRecord;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ClassRecord\ClassRecordCheckedMail;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\GradingOption;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class ClassRecordController extends Controller
 {
@@ -168,6 +171,19 @@ class ClassRecordController extends Controller
             'checked_at'    => now(),
             'checked_by_id' => Auth::id(),
         ]);
+
+        $classRecord->load('teacher');
+        $checker = Auth::user();
+
+        NotificationService::notifyUser(
+            user:        $classRecord->teacher,
+            requestType: 'Class Record',
+            referenceNo: "{$classRecord->subject_name} — {$classRecord->year_level_section}",
+            newStatus:   'Checked',
+            url:         route('class-records.page.show', $classRecord),
+        );
+
+        Mail::to($classRecord->teacher)->queue(new ClassRecordCheckedMail($classRecord, $checker));
 
         return response()->json(['message' => 'Class record marked as checked.']);
     }
