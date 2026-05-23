@@ -13,15 +13,18 @@ import {
   ArrowDownTrayIcon,
   PlusIcon,
   XMarkIcon,
+  DocumentDuplicateIcon,
 } from '@heroicons/vue/24/outline'
 import ScoreGrid from './components/ScoreGrid.vue'
+import { adjectivalColor } from '@/Utils/ClassRecord/gradeUtils.js'
 
 const props = defineProps({
-  classRecord:   Object,
-  isAdmin:       { type: Boolean, default: false },
-  stanineLookup: { type: Array, default: () => [] },
-  isCurrentSY:   { type: Boolean, default: true },
-  currentSYName: { type: String, default: null },
+  classRecord:        Object,
+  isAdmin:            { type: Boolean, default: false },
+  stanineLookup:      { type: Array, default: () => [] },
+  isCurrentSY:        { type: Boolean, default: true },
+  currentSYName:      { type: String, default: null },
+  sameSubjectRecords: { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -156,6 +159,94 @@ async function saveSetup() {
   }
 }
 
+// ── Copy assessments ──────────────────────────────────────────────────────────
+
+const copyingFrom = ref(false)
+const showCopyFromRecordModal = ref(false)
+
+const currentHasAssessments = computed(() =>
+  (currentQuarterData.value?.assessments?.length ?? 0) > 0
+)
+
+const quartersWithAssessments = computed(() =>
+  (props.classRecord.quarters ?? [])
+    .filter(q => q.quarter !== activeQuarter.value && (q.assessments?.length ?? 0) > 0)
+    .sort((a, b) => a.quarter - b.quarter)
+)
+
+const sameSubjectRecords = computed(() =>
+  (props.sameSubjectRecords ?? []).filter(r => r.id !== props.classRecord.id)
+)
+
+async function copyFromQuarter(sourceQ) {
+  copyingFrom.value = true
+  try {
+    await axios.post(
+      route('class-records.assessments.copy-from', { classRecord: props.classRecord.id, q: activeQuarter.value }),
+      { source_quarter: sourceQ }
+    )
+    router.reload({ only: ['classRecord'] })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to copy assessments.', 'error')
+  } finally {
+    copyingFrom.value = false
+  }
+}
+
+const copyFromRecordId   = ref(null)
+const copyFromRecordQ    = ref(1)
+const copyingFromRecord  = ref(false)
+
+async function copyFromRecord() {
+  if (!copyFromRecordId.value) return
+  copyingFromRecord.value = true
+  try {
+    await axios.post(
+      route('class-records.assessments.copy-from-record', { classRecord: props.classRecord.id, q: activeQuarter.value }),
+      { source_class_record_id: copyFromRecordId.value, source_quarter: copyFromRecordQ.value }
+    )
+    showCopyFromRecordModal.value = false
+    router.reload({ only: ['classRecord'] })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to copy.', 'error')
+  } finally {
+    copyingFromRecord.value = false
+  }
+}
+
+// ── Final annual grades ───────────────────────────────────────────────────────
+const showFinalGrades    = ref(false)
+const finalGrades        = ref([])
+const finalGradesLoading = ref(false)
+const finalGradesError   = ref(null)
+
+const allQuartersExist = computed(() =>
+  [1, 2, 3, 4].every(q => (props.classRecord.quarters ?? []).some(qt => qt.quarter === q))
+)
+
+async function loadFinalGrades() {
+  finalGradesLoading.value = true
+  finalGradesError.value   = null
+  try {
+    const { data } = await axios.get(route('class-records.final-grades', props.classRecord.id))
+    finalGrades.value = data.students ?? []
+    if (data.message && !data.students?.length) {
+      finalGradesError.value = data.message
+    }
+  } catch (err) {
+    finalGradesError.value = err.response?.data?.message ?? 'Failed to load final grades.'
+  } finally {
+    finalGradesLoading.value = false
+  }
+}
+
+function openFinalGrades() {
+  showFinalGrades.value = true
+  if (!finalGrades.value.length && !finalGradesLoading.value) {
+    loadFinalGrades()
+  }
+}
+
 // ── Quarter lock / unlock ─────────────────────────────────────────────────────
 async function lockQuarter() {
   const result = await Swal.fire({
@@ -276,10 +367,10 @@ async function checkRecord() {
         <!-- Quarter tab bar -->
         <div class="flex border-b border-slate-100">
           <button v-for="q in [1,2,3,4]" :key="q"
-            @click="activeQuarter = q"
+            @click="showFinalGrades = false; activeQuarter = q"
             :class="[
               'px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px',
-              activeQuarter === q
+              !showFinalGrades && activeQuarter === q
                 ? 'border-indigo-500 text-indigo-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700',
             ]">
@@ -287,13 +378,32 @@ async function checkRecord() {
             <span v-if="classRecord.quarters?.find(qt => qt.quarter === q)?.is_locked"
               class="ml-1.5 inline-flex"><LockClosedIcon class="h-3 w-3 text-amber-500" /></span>
           </button>
+          <button
+            @click="openFinalGrades"
+            :disabled="!allQuartersExist"
+            :title="!allQuartersExist ? 'All 4 quarters must exist first' : ''"
+            :class="[
+              'px-6 py-3 text-sm font-medium transition-colors border-b-2 -mb-px',
+              showFinalGrades
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700',
+              !allQuartersExist ? 'opacity-40 cursor-not-allowed' : '',
+            ]">
+            Final Grades
+          </button>
         </div>
 
-        <!-- Quarter export button -->
-        <div class="flex justify-end px-4 pt-2">
+        <template v-if="!showFinalGrades">
+        <!-- Quarter export buttons -->
+        <div class="flex justify-end gap-1 px-4 pt-2">
           <a :href="route('class-records.quarters.export', { classRecord: classRecord.id, q: activeQuarter })"
             class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 px-2 py-1 rounded hover:bg-slate-50">
-            <ArrowDownTrayIcon class="h-3.5 w-3.5" /> Export Q{{ activeQuarter }}
+            <ArrowDownTrayIcon class="h-3.5 w-3.5" /> Excel Q{{ activeQuarter }}
+          </a>
+          <a :href="route('class-records.quarters.pdf', { classRecord: classRecord.id, q: activeQuarter })"
+            target="_blank"
+            class="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-600 px-2 py-1 rounded hover:bg-slate-50">
+            <ArrowDownTrayIcon class="h-3.5 w-3.5" /> PDF Q{{ activeQuarter }}
           </a>
         </div>
 
@@ -341,6 +451,25 @@ async function checkRecord() {
                 <LockClosedIcon class="h-3.5 w-3.5" /> Past School Year
               </span>
             </div>
+          </div>
+
+          <!-- Copy-from banner (shown only when quarter has no assessments yet) -->
+          <div v-if="!isLocked && !isReadOnly && !currentHasAssessments && (quartersWithAssessments.length || sameSubjectRecords.length)"
+            class="mb-4 flex flex-wrap items-center gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-xs">
+            <DocumentDuplicateIcon class="h-4 w-4 text-indigo-400 shrink-0" />
+            <span class="text-slate-600">No assessments yet. Copy structure from:</span>
+            <button v-for="q in quartersWithAssessments" :key="q.quarter"
+              @click="copyFromQuarter(q.quarter)"
+              :disabled="copyingFrom"
+              class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-50 transition-colors">
+              {{ copyingFrom ? 'Copying…' : `Q${q.quarter}` }}
+            </button>
+            <button v-if="sameSubjectRecords.length"
+              @click="showCopyFromRecordModal = true"
+              :disabled="copyingFrom"
+              class="px-2.5 py-1 rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-100 font-medium disabled:opacity-50 transition-colors">
+              Another section…
+            </button>
           </div>
 
           <!-- Errors -->
@@ -439,7 +568,123 @@ async function checkRecord() {
             @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>
+        </template>
+
+        <!-- ── Final Grades tab ──────────────────────────────────────────── -->
+        <div v-if="showFinalGrades" class="p-5">
+
+          <!-- Loading -->
+          <div v-if="finalGradesLoading"
+            class="flex items-center justify-center py-12 text-slate-400 text-sm">
+            Loading final grades…
+          </div>
+
+          <!-- Error / not-ready message -->
+          <div v-else-if="finalGradesError"
+            class="flex flex-col items-center gap-3 py-10">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 w-full max-w-lg text-center">
+              {{ finalGradesError }}
+            </div>
+            <button @click="loadFinalGrades"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs">
+              Retry
+            </button>
+          </div>
+
+          <!-- Table -->
+          <template v-else-if="finalGrades.length">
+            <p class="text-xs text-slate-500 mb-4">
+              Final annual grade = simple average of Q1–Q4 grade equivalents, rounded to 3 decimal places.
+            </p>
+            <div class="overflow-x-auto rounded-xl border border-slate-100">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-50">
+                  <tr>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 w-10">#</th>
+                    <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Student</th>
+                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q1 GE</th>
+                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q2 GE</th>
+                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q3 GE</th>
+                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-16">Q4 GE</th>
+                    <th class="px-3 py-2.5 text-center text-xs font-semibold text-slate-500 w-20">Final GE</th>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500">Rating</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="(student, idx) in finalGrades" :key="student.studentId"
+                    :class="idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'">
+                    <td class="px-3 py-2.5 text-xs text-slate-400 text-center">{{ student.sequenceNumber }}</td>
+                    <td class="px-4 py-2.5 text-sm font-medium text-slate-800">
+                      {{ student.familyName }}, {{ student.givenName }}
+                      <span v-if="student.middleInitial"> {{ student.middleInitial }}.</span>
+                    </td>
+                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q1GE).toFixed(3) }}</td>
+                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q2GE).toFixed(3) }}</td>
+                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q3GE).toFixed(3) }}</td>
+                    <td class="px-3 py-2.5 text-center font-mono text-slate-600">{{ Number(student.q4GE).toFixed(3) }}</td>
+                    <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-800">{{ Number(student.finalGE).toFixed(3) }}</td>
+                    <td class="px-3 py-2.5 text-sm" :class="adjectivalColor(student.adjectival)">{{ student.adjectival }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Empty fallback -->
+          <div v-else class="flex flex-col items-center justify-center py-12 text-slate-400 text-sm gap-2">
+            <p>No student data found. Ensure all 4 quarters have scores entered.</p>
+            <button @click="loadFinalGrades"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs">
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </AdminLayout>
+
+  <!-- Copy-from-record modal -->
+  <div v-if="showCopyFromRecordModal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    @click.self="showCopyFromRecordModal = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-slate-800">Copy from Another Section</h3>
+        <button @click="showCopyFromRecordModal = false" class="p-1 rounded hover:bg-slate-100">
+          <XMarkIcon class="h-5 w-5 text-slate-400" />
+        </button>
+      </div>
+      <p class="text-xs text-slate-500">Select a class record with the same subject to copy its assessment structure.</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Source Class Record</label>
+          <select v-model="copyFromRecordId"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option :value="null" disabled>Select section…</option>
+            <option v-for="r in sameSubjectRecords" :key="r.id" :value="r.id">
+              {{ r.year_level_section }} ({{ r.school_year }})
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Copy from Quarter</label>
+          <select v-model="copyFromRecordQ"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option v-for="n in 4" :key="n" :value="n">Quarter {{ n }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button @click="showCopyFromRecordModal = false"
+          class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium">
+          Cancel
+        </button>
+        <button @click="copyFromRecord"
+          :disabled="!copyFromRecordId || copyingFromRecord"
+          class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50 transition-colors">
+          {{ copyingFromRecord ? 'Copying…' : 'Copy Assessments' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>

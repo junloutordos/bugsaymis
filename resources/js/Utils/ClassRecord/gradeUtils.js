@@ -106,6 +106,28 @@ function ge2Pct(ge, stanineLookup) {
   return closest ? Number(closest.percentage) : 39
 }
 
+/**
+ * Compute the final annual grade from 4 quarterly GEs.
+ * Formula: simple average of all 4 quarterly GEs, rounded to 3dp.
+ * Mirrors GradeComputationService::computeFinalGrade().
+ */
+export function computeFinalGrade(q1GE, q2GE, q3GE, q4GE, stanineLookup) {
+  const finalGE = Math.round(((q1GE + q2GE + q3GE + q4GE) / 4) * 1000) / 1000
+  const { adjectivalEquivalent } = lookupGradeEquivalent(
+    // Convert GE back to percentage via nearest stanine row for the lookup
+    (() => {
+      let closest = null, minDiff = Infinity
+      for (const row of stanineLookup) {
+        const diff = Math.abs(Number(row.grade_equivalent) - finalGE)
+        if (diff < minDiff) { minDiff = diff; closest = row }
+      }
+      return closest ? Number(closest.percentage) : 39
+    })(),
+    stanineLookup,
+  )
+  return { finalGE, adjectivalEquivalent }
+}
+
 /** CSS class for adjectival badge coloring */
 export function adjectivalColor(adj) {
   if (!adj) return 'text-slate-400'

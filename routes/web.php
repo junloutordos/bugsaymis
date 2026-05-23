@@ -1861,8 +1861,10 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}/grades',  [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'grades'])->name('class-records.quarters.grades');
 
     // Assessments
-    Route::get('/class-records/{classRecord}/quarters/{q}/assessments',  [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'index'])->name('class-records.assessments.index');
-    Route::post('/class-records/{classRecord}/quarters/{q}/assessments', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'upsert'])->name('class-records.assessments.upsert');
+    Route::get('/class-records/{classRecord}/quarters/{q}/assessments',                   [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'index'])->name('class-records.assessments.index');
+    Route::post('/class-records/{classRecord}/quarters/{q}/assessments',                   [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'upsert'])->name('class-records.assessments.upsert');
+    Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from',        [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFrom'])->name('class-records.assessments.copy-from');
+    Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from-record', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFromRecord'])->name('class-records.assessments.copy-from-record');
 
     // Students
     Route::get('/class-records/{classRecord}/quarters/{q}/students',          [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'index'])->name('class-records.students.index');
@@ -1874,8 +1876,12 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}/scores',  [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'index'])->name('class-records.scores.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/scores', [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'upsert'])->name('class-records.scores.upsert');
 
-    // Export (Phase 7)
+    // Final grades
+    Route::get('/class-records/{classRecord}/final-grades', [\App\Http\Controllers\ClassRecord\ClassRecordFinalGradeController::class, 'index'])->name('class-records.final-grades');
+
+    // Export
     Route::get('/class-records/{classRecord}/quarters/{q}/export', [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportQuarter'])->name('class-records.quarters.export');
+    Route::get('/class-records/{classRecord}/quarters/{q}/pdf',    [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportPdf'])->name('class-records.quarters.pdf');
     Route::get('/class-records/{classRecord}/export',              [\App\Http\Controllers\ClassRecord\ClassRecordQuarterController::class, 'exportAll'])->name('class-records.export');
 });
 

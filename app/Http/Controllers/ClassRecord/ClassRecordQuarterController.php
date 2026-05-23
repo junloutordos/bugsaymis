@@ -8,8 +8,10 @@ use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\StanineLookup;
 use App\Services\ClassRecord\GradeComputationService;
 use App\Services\ClassRecord\ClassRecordExcelService;
+use App\Services\ClassRecord\ClassRecordPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -18,6 +20,7 @@ class ClassRecordQuarterController extends Controller
     public function __construct(
         private readonly GradeComputationService $grader,
         private readonly ClassRecordExcelService $excelService,
+        private readonly ClassRecordPdfService   $pdfService,
     ) {}
 
     private function isAdmin(): bool
@@ -219,6 +222,28 @@ class ClassRecordQuarterController extends Controller
         $filename = $this->buildFilename($classRecord);
 
         return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+    }
+
+    // ── GET /class-records/{cr}/quarters/{q}/pdf ──────────────────────────────
+
+    public function exportPdf(ClassRecord $classRecord, int $q): Response
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless(in_array($q, [1, 2, 3, 4]), 422, 'Quarter must be 1-4.');
+
+        $classRecord->load(['teacher:id,name,position', 'gradingOption.categories']);
+
+        $pdfBytes = $this->pdfService->exportQuarter($classRecord, $q);
+
+        $subject  = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->subject_name);
+        $section  = preg_replace('/[^A-Za-z0-9_-]/', '_', $classRecord->year_level_section);
+        $sy       = str_replace('-', '_', $classRecord->school_year);
+        $filename = "{$subject}_{$section}_Q{$q}_{$sy}.pdf";
+
+        return response($pdfBytes, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
     }
 
     private function buildFilename(ClassRecord $classRecord, ?int $quarter = null): string

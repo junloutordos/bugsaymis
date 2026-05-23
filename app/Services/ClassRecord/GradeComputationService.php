@@ -214,6 +214,37 @@ class GradeComputationService
         return ['students' => $results];
     }
 
+    // ── Method 6 ─────────────────────────────────────────────────────────────
+
+    /**
+     * Compute the final annual grade from 4 quarterly GEs.
+     *
+     * Formula: simple average of all 4 quarterly GEs, rounded to 3 decimal places.
+     * Confirm this formula with the CID Chief / Registrar before shipping.
+     *
+     * @param  float $q1GE  Quarter 1 grade equivalent
+     * @param  float $q2GE  Quarter 2 grade equivalent
+     * @param  float $q3GE  Quarter 3 grade equivalent
+     * @param  float $q4GE  Quarter 4 grade equivalent
+     * @param  iterable $stanineLookup
+     * @return array{ finalGE: float, adjectivalEquivalent: string }
+     */
+    public function computeFinalGrade(
+        float $q1GE,
+        float $q2GE,
+        float $q3GE,
+        float $q4GE,
+        iterable $stanineLookup,
+    ): array {
+        $finalGE    = round(($q1GE + $q2GE + $q3GE + $q4GE) / 4, 3);
+        $adjectival = $this->lookupAdjectivalByGE($finalGE, $stanineLookup);
+
+        return [
+            'finalGE'              => $finalGE,
+            'adjectivalEquivalent' => $adjectival,
+        ];
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
