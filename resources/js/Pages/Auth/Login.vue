@@ -7,10 +7,6 @@ import { auth, provider, signInWithPopup } from '@/firebase'
 import { usePage } from '@inertiajs/vue3'
 import {
   ShieldCheckIcon, BoltIcon, UsersIcon,
-  UsersIcon as UsersIcon2,
-  CalendarDaysIcon, AcademicCapIcon, BriefcaseIcon, ChartBarIcon,
-  DocumentTextIcon, BookOpenIcon, WrenchScrewdriverIcon, IdentificationIcon,
-  HeartIcon, BuildingLibraryIcon, ClipboardDocumentListIcon,
 } from '@heroicons/vue/24/outline'
 
 const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
@@ -66,20 +62,6 @@ const trust = [
   { icon: UsersIcon,       label: 'Role-based' },
 ]
 
-const modules = [
-  { icon: UsersIcon2,              color: '#1447c0', name: 'Human Resources',    desc: 'Leave, DTR, biometrics & employee records' },
-  { icon: CalendarDaysIcon,        color: '#047857', name: 'Activity Management', desc: 'Campus events, co-proponents & tracking' },
-  { icon: AcademicCapIcon,         color: '#6d28d9', name: 'Faculty Loading',     desc: 'AI schedules, overload & assignments' },
-  { icon: BriefcaseIcon,           color: '#b45309', name: 'Recruitment',         desc: 'Postings, interviews & final placement' },
-  { icon: ChartBarIcon,            color: '#0369a1', name: 'IPCR / PMS',          desc: 'Performance evaluation for all levels' },
-  { icon: DocumentTextIcon,        color: '#0f766e', name: 'Document Tracking',   desc: 'Routing, signatures & digital workflow' },
-  { icon: BookOpenIcon,            color: '#be123c', name: 'Library',             desc: 'Collections, borrowing & attendance' },
-  { icon: WrenchScrewdriverIcon,   color: '#c2410c', name: 'Service Requests',    desc: 'IT, vehicles, facilities & messengerial' },
-  { icon: IdentificationIcon,      color: '#0e7490', name: 'Student Attendance',  desc: 'Biometric gate with real-time alerts' },
-  { icon: HeartIcon,               color: '#9f1239', name: 'Health & Guidance',   desc: 'Clinic, counseling & health records' },
-  { icon: BuildingLibraryIcon,     color: '#1e40af', name: 'SALN',                desc: 'Assets & liabilities per CSC rules' },
-  { icon: ClipboardDocumentListIcon, color: '#7e22ce', name: 'PDS',               desc: 'CSC Form 212 management & submission' },
-]
 </script>
 
 <template>
@@ -157,49 +139,13 @@ const modules = [
             </div>
           </div>
 
+          <!-- Copyright -->
+          <p class="copyright">© 2026 PSHS-CRC · v{{ appVersion }}</p>
+
         </div>
       </div>
 
     </section>
-
-    <!-- ╔══════════════════════════════════════════
-         ║  MODULES
-         ╚═════════════════════════════════════════ -->
-    <section id="modules" class="modules-section">
-      <div class="modules-inner">
-
-        <div class="modules-head">
-          <p class="modules-eyebrow">System Modules</p>
-          <h2 class="modules-title">Everything campus operations needs, in one place.</h2>
-        </div>
-
-        <div class="modules-grid">
-          <div v-for="m in modules" :key="m.name" class="mod-card">
-            <div class="mod-icon-bg" :style="{ background: m.color }">
-              <component :is="m.icon" class="mod-icon" />
-            </div>
-            <p class="mod-name">{{ m.name }}</p>
-            <p class="mod-desc">{{ m.desc }}</p>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- ╔══════════════════════════════════════════
-         ║  FOOTER
-         ╚═════════════════════════════════════════ -->
-    <footer class="site-footer">
-      <div class="footer-inner">
-        <div class="footer-left">
-          <img src="/images/pshslogo.png" alt="PSHS-CRC" class="footer-logo" />
-          <span class="footer-name">CRCMIS</span>
-          <span class="footer-sep">·</span>
-          <span class="footer-meta">Philippine Science High School – Caraga Region Campus</span>
-        </div>
-        <span class="footer-copy">© 2026 PSHS-CRC · v{{ appVersion }}</span>
-      </div>
-    </footer>
 
   </div>
 </template>
@@ -357,72 +303,11 @@ const modules = [
 }
 .trust-icon { width: 18px; height: 18px; color: #cbd5e1; }
 
-/* ══════════════════════════════
-   MODULES
-══════════════════════════════ */
-.modules-section {
-  background: #060e50;
-  padding: 80px 32px;
+/* Copyright line inside right panel */
+.copyright {
+  font-size: .62rem; color: #94a3b8;
+  text-align: center; margin-top: 20px;
 }
-
-.modules-inner { max-width: 1280px; margin: 0 auto; }
-
-.modules-head { text-align: center; margin-bottom: 48px; }
-.modules-eyebrow {
-  font-size: .65rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .14em; color: #60a5fa; margin-bottom: 10px;
-}
-.modules-title {
-  font-size: 1.7rem; font-weight: 800; color: #fff;
-  letter-spacing: -.025em; line-height: 1.25;
-}
-
-.modules-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
-}
-
-.mod-card {
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 16px; padding: 22px 18px;
-  display: flex; flex-direction: column; gap: 10px;
-  transition: background .2s, border-color .2s, transform .2s;
-  cursor: default;
-}
-.mod-card:hover {
-  background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.14);
-  transform: translateY(-2px);
-}
-
-.mod-icon-bg {
-  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  opacity: .92;
-}
-.mod-icon { width: 20px; height: 20px; color: #fff; }
-.mod-name { font-size: .8rem; font-weight: 700; color: #e2e8f0; }
-.mod-desc { font-size: .68rem; color: #64748b; line-height: 1.55; }
-
-/* ══════════════════════════════
-   FOOTER
-══════════════════════════════ */
-.site-footer {
-  background: #03071e;
-  border-top: 1px solid rgba(255,255,255,.05);
-  padding: 20px 32px;
-}
-.footer-inner {
-  max-width: 1280px; margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap;
-}
-.footer-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.footer-logo  { width: 24px; height: 24px; opacity: .4; }
-.footer-name  { font-size: .72rem; font-weight: 700; color: #cbd5e1; letter-spacing: .06em; }
-.footer-sep   { color: #334155; font-size: .72rem; }
-.footer-meta  { font-size: .65rem; color: #334155; }
-.footer-copy  { font-size: .65rem; color: #334155; }
 
 /* ══════════════════════════════
    RESPONSIVE
@@ -436,7 +321,6 @@ const modules = [
   .panel-right  { width: 100%; padding: 48px 32px; border-top: 1px solid #f1f5f9; }
   .panel-right-inner { max-width: 100%; }
   .right-title  { font-size: 2.6rem; }
-  .modules-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* Mobile */
@@ -448,15 +332,5 @@ const modules = [
   .right-title  { font-size: 2.2rem; }
   .stats-row    { gap: 20px; }
   .stat-val     { font-size: 1.3rem; }
-  .modules-section { padding: 56px 16px; }
-  .modules-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .modules-title { font-size: 1.4rem; }
-  .footer-meta  { display: none; }
-  .site-footer  { padding: 16px; }
-}
-
-@media (max-width: 400px) {
-  .modules-grid { grid-template-columns: 1fr; }
-  .mod-card     { flex-direction: row; align-items: flex-start; gap: 12px; }
 }
 </style>
