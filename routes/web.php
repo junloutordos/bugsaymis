@@ -9,6 +9,9 @@ use App\Http\Controllers\ApprovalInboxController;
 // ECS container health check — no auth, no session
 Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
 
+// Developer portfolio — public, no auth
+Route::get('/developer', fn () => inertia('Developer'))->name('developer');
+
     // Library Borrowings
     Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
         ->name('library.borrowings.index');

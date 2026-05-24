@@ -328,6 +328,7 @@ const stats = [
         <div class="footer-right">
           <p class="footer-copy">© 2026 PSHS-CRC. All rights reserved.</p>
           <p class="footer-ver">v{{ appVersion }}</p>
+          <p class="footer-ver"><a href="/developer" class="dev-link">Developer Information</a></p>
         </div>
       </div>
     </footer>
@@ -531,6 +532,13 @@ const stats = [
 }
 .lc-notice strong { white-space: nowrap; }
 .notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: #00c8e8; }
+
+.dev-link {
+  font-size: .64rem; color: #4a5568;
+  text-decoration: none; letter-spacing: .03em;
+  transition: color .2s;
+}
+.dev-link:hover { color: #93c5fd; }
 
 /* ── Hero left (hero text + stats + chips) ─────────── */
 .hero-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
