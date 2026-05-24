@@ -13,11 +13,7 @@ class Kernel extends ConsoleKernel
 
     protected function schedule(Schedule $schedule)
     {
-        // Run daily at 12:00 NN
-        $schedule->command('db:backup')->dailyAt('12:00');
-
-        // Run daily at 5:00 PM
-        $schedule->command('db:backup')->dailyAt('17:00');
+        // Schedule is defined in routes/console.php
     }
 
     protected function commands()

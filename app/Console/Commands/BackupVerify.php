@@ -2,106 +2,82 @@
 
 namespace App\Console\Commands;
 
+use Google\Client as GoogleClient;
+use Google\Service\Drive as GoogleDrive;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
 class BackupVerify extends Command
 {
-    protected $signature   = 'backup:verify {--file= : Specific .sql file to verify (defaults to latest)}';
-    protected $description = 'Verify the integrity of the most recent database backup';
+    protected $signature   = 'backup:verify';
+    protected $description = 'Verify that a database backup was uploaded to Google Drive within the last 25 hours';
 
-    // Minimum acceptable backup size (bytes) — anything smaller is almost certainly corrupt/empty
-    const MIN_SIZE_BYTES = 10_000;
-
-    // SQL structure markers that must be present in a valid mysqldump file
-    const REQUIRED_MARKERS = [
-        'MySQL dump',
-        'CREATE TABLE',
-        'INSERT INTO',
-    ];
+    // A backup must have been uploaded within this window to be considered current
+    const MAX_AGE_SECONDS = 25 * 3600;
 
     public function handle(): int
     {
-        $backupPath = storage_path('app/db_backups/');
-        $target     = $this->option('file');
+        $credentialsPath = env('GOOGLE_DRIVE_CREDENTIALS');
+        $folderId        = env('GOOGLE_DRIVE_FOLDER_ID');
 
-        if ($target) {
-            $file = str_starts_with($target, '/') ? $target : $backupPath . $target;
-        } else {
-            // Latest backup by mtime
-            $files = glob($backupPath . 'backup_*.sql');
+        if (! $credentialsPath || ! $folderId || ! file_exists($credentialsPath)) {
+            $this->warn('Google Drive credentials not configured — cannot verify backup.');
+            Log::channel('security')->warning('Backup verification skipped: Drive credentials not configured');
+            return self::FAILURE;
+        }
+
+        try {
+            $client = new GoogleClient();
+            $client->setAuthConfig($credentialsPath);
+            $client->addScope(GoogleDrive::DRIVE);
+
+            $service  = new GoogleDrive($client);
+            $response = $service->files->listFiles([
+                'q'                         => "'{$folderId}' in parents and name contains 'backup_' and trashed = false",
+                'fields'                    => 'files(id,name,createdTime)',
+                'orderBy'                   => 'createdTime desc',
+                'pageSize'                  => 1,
+                'includeItemsFromAllDrives' => true,
+                'supportsAllDrives'         => true,
+            ]);
+
+            $files = $response->getFiles();
+
             if (empty($files)) {
-                $this->error('No backup files found in ' . $backupPath);
+                $this->error('FAIL: No backup files found in Google Drive folder.');
+                Log::channel('security')->error('Backup verification failed: no backups found in Drive');
                 return self::FAILURE;
             }
-            usort($files, fn ($a, $b) => filemtime($b) - filemtime($a));
-            $file = $files[0];
-        }
 
-        $basename = basename($file);
+            $latest      = $files[0];
+            $createdTime = $latest->getCreatedTime(); // RFC 3339 UTC string
+            $ageSeconds  = time() - (new \DateTimeImmutable($createdTime))->getTimestamp();
+            $ageHours    = round($ageSeconds / 3600, 1);
 
-        if (! file_exists($file)) {
-            $this->error("File not found: {$file}");
-            Log::channel('security')->error("Backup verification failed: file not found", ['file' => $basename]);
-            return self::FAILURE;
-        }
+            $this->line("Latest Drive backup: {$latest->getName()} (uploaded {$createdTime})");
 
-        // ── Size check ────────────────────────────────────────────────────────
-        $size = filesize($file);
-        $sizeMb = round($size / 1024 / 1024, 2);
-        $this->line("Verifying: {$basename} ({$sizeMb} MB)");
-
-        if ($size < self::MIN_SIZE_BYTES) {
-            $this->error("FAIL: File is suspiciously small ({$size} bytes). May be corrupt or empty.");
-            Log::channel('security')->error("Backup verification failed: file too small", [
-                'file'  => $basename,
-                'bytes' => $size,
-            ]);
-            return self::FAILURE;
-        }
-
-        // ── SQL structure markers ─────────────────────────────────────────────
-        $content = file_get_contents($file, false, null, 0, 65536); // read first 64 KB
-        $missing = [];
-
-        foreach (self::REQUIRED_MARKERS as $marker) {
-            if (! str_contains($content, $marker)) {
-                // Some smaller dumps may have no INSERT INTO yet — check full file for INSERT
-                if ($marker === 'INSERT INTO') {
-                    $full = file_get_contents($file);
-                    if (! str_contains($full, 'INSERT INTO')) {
-                        $missing[] = $marker;
-                    }
-                } else {
-                    $missing[] = $marker;
-                }
+            if ($ageSeconds > self::MAX_AGE_SECONDS) {
+                $this->error("FAIL: Most recent backup is {$ageHours}h old — exceeds 25-hour threshold.");
+                Log::channel('security')->error('Backup verification failed: backup too old', [
+                    'file'        => $latest->getName(),
+                    'age_hours'   => $ageHours,
+                    'created_utc' => $createdTime,
+                ]);
+                return self::FAILURE;
             }
-        }
 
-        if (! empty($missing)) {
-            $this->error('FAIL: Missing expected SQL markers: ' . implode(', ', $missing));
-            Log::channel('security')->error("Backup verification failed: missing SQL markers", [
-                'file'    => $basename,
-                'missing' => $missing,
+            $this->info("OK: Backup is current ({$ageHours}h old) — {$latest->getName()}");
+            Log::info('Backup verification passed', [
+                'file'      => $latest->getName(),
+                'age_hours' => $ageHours,
             ]);
+
+            return self::SUCCESS;
+
+        } catch (\Throwable $e) {
+            $this->error('Backup verification error: ' . $e->getMessage());
+            Log::channel('security')->error('Backup verification error', ['error' => $e->getMessage()]);
             return self::FAILURE;
         }
-
-        // ── Line count sanity check ───────────────────────────────────────────
-        $lineCount = substr_count(file_get_contents($file), "\n");
-        $this->line("  Lines: {$lineCount}");
-
-        if ($lineCount < 50) {
-            $this->warn("WARNING: Only {$lineCount} lines — backup may be incomplete.");
-            Log::channel('security')->warning("Backup verification warning: low line count", [
-                'file'  => $basename,
-                'lines' => $lineCount,
-            ]);
-        }
-
-        $this->info("OK: {$basename} passed integrity checks ({$sizeMb} MB, {$lineCount} lines)");
-        Log::info("Backup verified OK: {$basename}", ['mb' => $sizeMb, 'lines' => $lineCount]);
-
-        return self::SUCCESS;
     }
 }
