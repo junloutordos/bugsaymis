@@ -20,6 +20,7 @@ Artisan::command('inspire', function () {
 |--------------------------------------------------------------------------
 */
 //Schedule::command('db:backup')->everyMinute();
+Schedule::command('db:backup')->dailyAt('06:00'); // 6 AM — early window, survives fresh deploys
 Schedule::command('db:backup')->dailyAt('08:00'); // 8 AM
 Schedule::command('db:backup')->dailyAt('12:00'); // 12 NN
 Schedule::command('db:backup')->dailyAt('17:00'); // 5 PM
@@ -33,6 +34,6 @@ Schedule::command('payroll:accrue-leave')->monthlyOn(1, '00:10')->withoutOverlap
 // ── Log health check: disk, file sizes, error spikes ─────────────────────
 Schedule::command('log:health')->dailyAt('06:00');
 
-// ── Backup integrity check: verify latest backup each morning ────────────
-Schedule::command('backup:verify')->dailyAt('09:00')->withoutOverlapping();
+// ── Backup recency check: was a backup uploaded to Drive in the last 25h? ─
+Schedule::command('backup:verify')->dailyAt('06:30')->withoutOverlapping();
 
