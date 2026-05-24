@@ -328,7 +328,7 @@ const stats = [
         <div class="footer-right">
           <p class="footer-copy">© 2026 PSHS-CRC. All rights reserved.</p>
           <p class="footer-ver">v{{ appVersion }}</p>
-          <p class="footer-ver"><a href="/developer" class="dev-link">Developer Information</a></p>
+          <p class="footer-ver"><a href="/developer" class="dev-link">Developers' Information</a></p>
         </div>
       </div>
     </footer>
