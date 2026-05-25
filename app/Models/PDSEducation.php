@@ -21,8 +21,6 @@ class PDSEducation extends Model
     ];
 
     protected $casts = [
-        'from' => 'integer',
-        'to' => 'integer',
         'year_graduated' => 'integer',
     ];
 

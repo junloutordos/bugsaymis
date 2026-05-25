@@ -3,17 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pds;
+use App\Models\PDSTraining;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Pdf\Mpdf as PdfWriter;
 use Carbon\Carbon;
-
-use DateTime;
 class PDSController extends Controller
 {
     /* =====================================================
@@ -271,7 +271,7 @@ public function exportPDS(Pds $pds)
     $sheet->setCellValue('N11', $pds->personalInfo->name_ext ?? '');
 
     $dateOfBirth = $pds->personalInfo->date_of_birth ?? null;
-    $formattedDob = $dateOfBirth ? (new \DateTime($dateOfBirth))->format('m-d-Y') : '';
+    $formattedDob = $dateOfBirth ? Carbon::parse($dateOfBirth)->format('m-d-Y') : '';
     $sheet->setCellValue('D13', $formattedDob);
 
     $sheet->setCellValue('D15', $pds->personalInfo->place_of_birth ?? '');
@@ -388,7 +388,7 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
         $sheet->setCellValue(
             "M{$childRow}",
             $child->child_date_of_birth
-                ? (new \DateTime($child->child_date_of_birth))->format('m-d-Y')
+                ? Carbon::parse($child->child_date_of_birth)->format('m-d-Y')
                 : ''
         );
         $childRow++;
@@ -400,10 +400,10 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
         $sheet->setCellValue("A{$eduRow}", $edu->level ?? '');
         $sheet->setCellValue("D{$eduRow}", $edu->school_name ?? '');
         $sheet->setCellValue("G{$eduRow}", $edu->degree ?? '');
-        $sheet->setCellValue("J{$eduRow}", $edu->from ?? '');
-        $sheet->setCellValue("K{$eduRow}", $edu->to ?? '');
+        $sheet->setCellValue("J{$eduRow}", $edu->from ?: '');
+        $sheet->setCellValue("K{$eduRow}", $edu->to ?: '');
         $sheet->setCellValue("L{$eduRow}", $edu->highest_level ?? '');
-        $sheet->setCellValue("M{$eduRow}", $edu->year_graduated ?? '');
+        $sheet->setCellValue("M{$eduRow}", $edu->year_graduated ?: '');
         $sheet->setCellValue("N{$eduRow}", $edu->honors ?? '');
         $eduRow++;
     }
@@ -417,21 +417,10 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
     foreach ($pds->eligibility ?? [] as $e) {
         $sheet->setCellValue("A{$row}", $e->eligibility ?? '');
         $sheet->setCellValue("F{$row}", $e->rating ?? '');
-
-        // Format exam_date as mm-dd-yyyy if not empty
-        $sheet->setCellValue(
-            "G{$row}",
-            !empty($e->exam_date) ? (new DateTime($e->exam_date))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("G{$row}", $e->exam_date ? Carbon::parse($e->exam_date)->format('m-d-Y') : '');
         $sheet->setCellValue("I{$row}", $e->place_taken ?? '');
         $sheet->setCellValue("J{$row}", $e->license_number ?? '');
-
-        // Format license_validity as mm-dd-yyyy if not empty
-        $sheet->setCellValue(
-            "N{$row}",
-            !empty($e->license_validity) ? (new DateTime($e->license_validity))->format('m-d-Y') : ''
-        );
+        $sheet->setCellValue("N{$row}", $e->license_validity ? Carbon::parse($e->license_validity)->format('m-d-Y') : '');
 
         $row++;
     }
@@ -439,18 +428,8 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
 
     $row = 18;
     foreach ($pds->workExperience ?? [] as $w) {
-    // Format from_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "A{$row}",
-            !empty($w->from_date) ? (new DateTime($w->from_date))->format('m-d-Y') : ''
-        );
-
-        // Format to_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "C{$row}",
-            !empty($w->to_date) ? (new DateTime($w->to_date))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("A{$row}", $w->from_date ? Carbon::parse($w->from_date)->format('m-d-Y') : '');
+        $sheet->setCellValue("C{$row}", $w->to_date ? Carbon::parse($w->to_date)->format('m-d-Y') : '');
         $sheet->setCellValue("D{$row}", $w->position ?? '');
         $sheet->setCellValue("G{$row}", $w->agency ?? '');
         $sheet->setCellValue("J{$row}", $w->appointment_status ?? '');
@@ -469,19 +448,8 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
     $row = 6;
     foreach ($pds->voluntaryWork ?? [] as $v) {
         $sheet->setCellValue("A{$row}", $v->organization ?? '');
-
-        // Format from_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "D{$row}",
-            !empty($v->from_date) ? (new DateTime($v->from_date))->format('m-d-Y') : ''
-        );
-
-        // Format to_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "G{$row}",
-            !empty($v->to_date) ? (new DateTime($v->to_date))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("D{$row}", $v->from_date ? Carbon::parse($v->from_date)->format('m-d-Y') : '');
+        $sheet->setCellValue("G{$row}", $v->to_date ? Carbon::parse($v->to_date)->format('m-d-Y') : '');
         $sheet->setCellValue("J{$row}", $v->hours ?? '');
         $sheet->setCellValue("H{$row}", $v->nature_of_work ?? '');
 
@@ -493,19 +461,8 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
     $row = 18;
     foreach ($pds->trainings ?? [] as $t) {
         $sheet->setCellValue("A{$row}", $t->training_title ?? '');
-
-        // Format date_from as mm-dd-yyyy
-        $sheet->setCellValue(
-            "E{$row}",
-            !empty($t->date_from) ? (new DateTime($t->date_from))->format('m-d-Y') : ''
-        );
-
-        // Format date_to as mm-dd-yyyy
-        $sheet->setCellValue(
-            "F{$row}",
-            !empty($t->date_to) ? (new DateTime($t->date_to))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("E{$row}", $t->date_from ? Carbon::parse($t->date_from)->format('m-d-Y') : '');
+        $sheet->setCellValue("F{$row}", $t->date_to ? Carbon::parse($t->date_to)->format('m-d-Y') : '');
         $sheet->setCellValue("G{$row}", $t->hours ?? '');
         $sheet->setCellValue("H{$row}", $t->training_type ?? '');
         $sheet->setCellValue("I{$row}", $t->conducted_by ?? '');
@@ -581,7 +538,8 @@ $questions = [
         'field'        => 'q35b_criminal_charge',
         'yesCell'      => 'H18',
         'noCell'       => 'K18',
-        
+        'detailsCell'  => 'H20',
+        'detailsField' => 'q35b_details',
         'dateCell'     => 'K20',
         'dateField'    => 'q35b_date_filed',
         'statusCell'   => 'K21',
@@ -678,7 +636,7 @@ foreach ($questions as $q) {
     if ($value === 1 && isset($q['dateCell'], $q['dateField']) && !empty($c4?->{$q['dateField']})) {
         $sheet->setCellValue(
             $q['dateCell'],
-            (new DateTime($c4->{$q['dateField']}))->format('m-d-Y')
+            Carbon::parse($c4->{$q['dateField']})->format('m-d-Y')
         );
     }
 
@@ -761,7 +719,7 @@ public function exportPDSPdf(Pds $pds)
     $sheet->setCellValue('N11', $pds->personalInfo->name_ext ?? '');
 
     $dateOfBirth = $pds->personalInfo->date_of_birth ?? null;
-    $formattedDob = $dateOfBirth ? (new \DateTime($dateOfBirth))->format('m-d-Y') : '';
+    $formattedDob = $dateOfBirth ? Carbon::parse($dateOfBirth)->format('m-d-Y') : '';
     $sheet->setCellValue('D13', $formattedDob);
 
     $sheet->setCellValue('D15', $pds->personalInfo->place_of_birth ?? '');
@@ -878,7 +836,7 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
         $sheet->setCellValue(
             "M{$childRow}",
             $child->child_date_of_birth
-                ? (new \DateTime($child->child_date_of_birth))->format('m-d-Y')
+                ? Carbon::parse($child->child_date_of_birth)->format('m-d-Y')
                 : ''
         );
         $childRow++;
@@ -890,10 +848,10 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
         $sheet->setCellValue("A{$eduRow}", $edu->level ?? '');
         $sheet->setCellValue("D{$eduRow}", $edu->school_name ?? '');
         $sheet->setCellValue("G{$eduRow}", $edu->degree ?? '');
-        $sheet->setCellValue("J{$eduRow}", $edu->from ?? '');
-        $sheet->setCellValue("K{$eduRow}", $edu->to ?? '');
+        $sheet->setCellValue("J{$eduRow}", $edu->from ?: '');
+        $sheet->setCellValue("K{$eduRow}", $edu->to ?: '');
         $sheet->setCellValue("L{$eduRow}", $edu->highest_level ?? '');
-        $sheet->setCellValue("M{$eduRow}", $edu->year_graduated ?? '');
+        $sheet->setCellValue("M{$eduRow}", $edu->year_graduated ?: '');
         $sheet->setCellValue("N{$eduRow}", $edu->honors ?? '');
         $eduRow++;
     }
@@ -907,21 +865,10 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
     foreach ($pds->eligibility ?? [] as $e) {
         $sheet->setCellValue("A{$row}", $e->eligibility ?? '');
         $sheet->setCellValue("F{$row}", $e->rating ?? '');
-
-        // Format exam_date as mm-dd-yyyy if not empty
-        $sheet->setCellValue(
-            "G{$row}",
-            !empty($e->exam_date) ? (new DateTime($e->exam_date))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("G{$row}", $e->exam_date ? Carbon::parse($e->exam_date)->format('m-d-Y') : '');
         $sheet->setCellValue("I{$row}", $e->place_taken ?? '');
         $sheet->setCellValue("J{$row}", $e->license_number ?? '');
-
-        // Format license_validity as mm-dd-yyyy if not empty
-        $sheet->setCellValue(
-            "N{$row}",
-            !empty($e->license_validity) ? (new DateTime($e->license_validity))->format('m-d-Y') : ''
-        );
+        $sheet->setCellValue("N{$row}", $e->license_validity ? Carbon::parse($e->license_validity)->format('m-d-Y') : '');
 
         $row++;
     }
@@ -929,18 +876,8 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
 
     $row = 18;
     foreach ($pds->workExperience ?? [] as $w) {
-    // Format from_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "A{$row}",
-            !empty($w->from_date) ? (new DateTime($w->from_date))->format('m-d-Y') : ''
-        );
-
-        // Format to_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "C{$row}",
-            !empty($w->to_date) ? (new DateTime($w->to_date))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("A{$row}", $w->from_date ? Carbon::parse($w->from_date)->format('m-d-Y') : '');
+        $sheet->setCellValue("C{$row}", $w->to_date ? Carbon::parse($w->to_date)->format('m-d-Y') : '');
         $sheet->setCellValue("D{$row}", $w->position ?? '');
         $sheet->setCellValue("G{$row}", $w->agency ?? '');
         $sheet->setCellValue("J{$row}", $w->appointment_status ?? '');
@@ -959,19 +896,8 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
     $row = 6;
     foreach ($pds->voluntaryWork ?? [] as $v) {
         $sheet->setCellValue("A{$row}", $v->organization ?? '');
-
-        // Format from_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "D{$row}",
-            !empty($v->from_date) ? (new DateTime($v->from_date))->format('m-d-Y') : ''
-        );
-
-        // Format to_date as mm-dd-yyyy
-        $sheet->setCellValue(
-            "G{$row}",
-            !empty($v->to_date) ? (new DateTime($v->to_date))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("D{$row}", $v->from_date ? Carbon::parse($v->from_date)->format('m-d-Y') : '');
+        $sheet->setCellValue("G{$row}", $v->to_date ? Carbon::parse($v->to_date)->format('m-d-Y') : '');
         $sheet->setCellValue("J{$row}", $v->hours ?? '');
         $sheet->setCellValue("H{$row}", $v->nature_of_work ?? '');
 
@@ -983,19 +909,8 @@ $sheet->setCellValue('M14', strtolower($dualType) === 'by naturalization' ? '☑
     $row = 18;
     foreach ($pds->trainings ?? [] as $t) {
         $sheet->setCellValue("A{$row}", $t->training_title ?? '');
-
-        // Format date_from as mm-dd-yyyy
-        $sheet->setCellValue(
-            "E{$row}",
-            !empty($t->date_from) ? (new DateTime($t->date_from))->format('m-d-Y') : ''
-        );
-
-        // Format date_to as mm-dd-yyyy
-        $sheet->setCellValue(
-            "F{$row}",
-            !empty($t->date_to) ? (new DateTime($t->date_to))->format('m-d-Y') : ''
-        );
-
+        $sheet->setCellValue("E{$row}", $t->date_from ? Carbon::parse($t->date_from)->format('m-d-Y') : '');
+        $sheet->setCellValue("F{$row}", $t->date_to ? Carbon::parse($t->date_to)->format('m-d-Y') : '');
         $sheet->setCellValue("G{$row}", $t->hours ?? '');
         $sheet->setCellValue("H{$row}", $t->training_type ?? '');
         $sheet->setCellValue("I{$row}", $t->conducted_by ?? '');
@@ -1071,7 +986,8 @@ $questions = [
         'field'        => 'q35b_criminal_charge',
         'yesCell'      => 'H18',
         'noCell'       => 'K18',
-        
+        'detailsCell'  => 'H20',
+        'detailsField' => 'q35b_details',
         'dateCell'     => 'K20',
         'dateField'    => 'q35b_date_filed',
         'statusCell'   => 'K21',
@@ -1168,7 +1084,7 @@ foreach ($questions as $q) {
     if ($value === 1 && isset($q['dateCell'], $q['dateField']) && !empty($c4?->{$q['dateField']})) {
         $sheet->setCellValue(
             $q['dateCell'],
-            (new DateTime($c4->{$q['dateField']}))->format('m-d-Y')
+            Carbon::parse($c4->{$q['dateField']})->format('m-d-Y')
         );
     }
 
@@ -1225,13 +1141,13 @@ foreach ($questions as $q) {
             'tempDir'       => $tmpDir,
         ]);
 
-        $mpdf->SetTitle('Work Experience Sheet — ' . ($pds->personalInfo?->last_name ?? ''));
+        $mpdf->SetTitle('Work Experience Sheet — ' . ($pds->personalInfo?->surname ?? ''));
         $mpdf->WriteHTML($html);
 
         $tempFile = tempnam($tmpDir, 'wes_') . '.pdf';
         $mpdf->Output($tempFile, 'F');
 
-        $name = ($pds->personalInfo?->last_name ?? 'WES') . '_WorkExperienceSheet.pdf';
+        $name = ($pds->personalInfo?->surname ?? 'WES') . '_WorkExperienceSheet.pdf';
 
         return response()->download($tempFile, $name)->deleteFileAfterSend(true);
     }
@@ -1253,7 +1169,7 @@ public function uploadCsv(Request $request, Pds $pds)
         foreach ($rows as $row) {
             $data = array_combine($header, $row);
 
-            Training::create([
+            PDSTraining::create([
                 'pds_id' => $pds->id,
                 'training_title' => $data['training_title'] ?? '',
                 'date_from' => $data['date_from'] ?? null,

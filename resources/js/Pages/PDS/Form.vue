@@ -134,7 +134,7 @@ const form = useForm(
     })),
 
     work_experience: (props.pds?.work_experience ?? [
-      { position: '', agency: '', salary: '', salary_grade: '', appointment_status: '', government_service: '', from_date: '', to_date: '' },
+      { position: '', agency: '', appointment_status: '', government_service: '', from_date: '', to_date: '' },
     ]).map((w) => ({
       ...w,
       from_date: normalizeDate(w.from_date),
@@ -739,8 +739,11 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             @click="addRow('education', {
             level: '',
             school_name: '',
-            year_graduated: '',
             degree: '',
+            from: '',
+            to: '',
+            highest_level: '',
+            year_graduated: '',
             honors: ''
             })"
             class="btn-icon h-10 w-10 mt-2"
@@ -779,7 +782,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <button
             v-if="editMode"
-            @click="addRow('eligibility', { eligibility: '', rating: '', date_of_examination: '', place_of_examination: '', license_no: '', date_validity: '' })"
+            @click="addRow('eligibility', { eligibility: '', rating: '', exam_date: '', place_taken: '', license_number: '', license_validity: '' })"
             class="btn-icon h-10 w-10 mt-2"
         >
             <PlusIcon class="h-5 w-5 text-white" />
@@ -814,7 +817,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <button
             v-if="editMode"
-            @click="addRow('work_experience', { position: '', agency: '', salary: '', salary_grade: '', status_of_appointment: '', government_service: '', date_from: '', date_to: '' })"
+            @click="addRow('work_experience', { position: '', agency: '', appointment_status: '', government_service: '', from_date: '', to_date: '' })"
             class="btn-icon h-10 w-10 mt-2"
         >
             <PlusIcon class="h-5 w-5 text-white" />
@@ -850,7 +853,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <button
             v-if="editMode"
-            @click="addRow('voluntary_work', { organization: '', position: '', date_from: '', date_to: '', hours: '' })"
+            @click="addRow('voluntary_work', { organization: '', nature_of_work: '', from_date: '', to_date: '', hours: '' })"
             class="btn-icon h-10 w-10 mt-2"
         >
             <PlusIcon class="h-5 w-5 text-white" />
