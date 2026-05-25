@@ -458,60 +458,91 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
   <!-- Name Fields -->
   <div class="grid grid-cols-3 gap-4">
-    <input v-model="form.personal_info.surname" placeholder="Surname" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.first_name" placeholder="First Name" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.middle_name" placeholder="Middle Name" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Surname</label>
+      <input v-model="form.personal_info.surname" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">First Name</label>
+      <input v-model="form.personal_info.first_name" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Middle Name</label>
+      <input v-model="form.personal_info.middle_name" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.name_ext" placeholder="Extension" class="input" :readonly="!editMode" />
-    <input type="date" v-model="form.personal_info.date_of_birth" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.place_of_birth" placeholder="Place of Birth" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Extension (Jr., Sr., III)</label>
+      <input v-model="form.personal_info.name_ext" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Date of Birth</label>
+      <input type="date" v-model="form.personal_info.date_of_birth" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Place of Birth</label>
+      <input v-model="form.personal_info.place_of_birth" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <!-- Sex, Civil Status, Citizenship -->
   <div class="grid grid-cols-3 gap-4 mt-2">
   <!-- Sex at Birth -->
-  <select v-model="form.personal_info.sex_at_birth" class="input" :disabled="!editMode">
-    <option value="" disabled>Select Sex</option>
-    <option value="Male">Male</option>
-    <option value="Female">Female</option>
-  </select>
+  <div>
+    <label class="block text-xs font-medium text-slate-500 mb-1">Sex at Birth</label>
+    <select v-model="form.personal_info.sex_at_birth" class="input w-full" :disabled="!editMode">
+      <option value="" disabled>Select Sex</option>
+      <option value="Male">Male</option>
+      <option value="Female">Female</option>
+    </select>
+  </div>
 
   <!-- Civil Status -->
-  <select v-model="form.personal_info.civil_status" class="input" :disabled="!editMode">
-    <option value="" disabled>Select Civil Status</option>
-    <option value="Single">Single</option>
-    <option value="Married">Married</option>
-    <option value="Widowed">Widowed</option>
-    <option value="Separated">Separated</option>
-  </select>
+  <div>
+    <label class="block text-xs font-medium text-slate-500 mb-1">Civil Status</label>
+    <select v-model="form.personal_info.civil_status" class="input w-full" :disabled="!editMode">
+      <option value="" disabled>Select Civil Status</option>
+      <option value="Single">Single</option>
+      <option value="Married">Married</option>
+      <option value="Widowed">Widowed</option>
+      <option value="Separated">Separated</option>
+    </select>
+  </div>
 
   <!-- Citizenship Type -->
-  <select v-model="form.personal_info.citizenship_type" class="input" :disabled="!editMode">
-    <option value="" disabled>Select Citizenship</option>
-    <option value="Filipino">Filipino</option>
-    <option value="Dual">Dual Citizenship</option>
-  </select>
+  <div>
+    <label class="block text-xs font-medium text-slate-500 mb-1">Citizenship</label>
+    <select v-model="form.personal_info.citizenship_type" class="input w-full" :disabled="!editMode">
+      <option value="" disabled>Select Citizenship</option>
+      <option value="Filipino">Filipino</option>
+      <option value="Dual">Dual Citizenship</option>
+    </select>
+  </div>
 
   <!-- Dual Citizenship Fields -->
   <template v-if="form.personal_info.citizenship_type === 'Dual'">
-    <select
-      v-model="form.personal_info.citizenship_dual_type"
-      class="input col-span-1"
-      :disabled="!editMode"
-    >
-      <option value="" disabled>Select Type</option>
-      <option value="By Birth">By Birth</option>
-      <option value="By Naturalization">By Naturalization</option>
-    </select>
-
-    <input
-      v-model="form.personal_info.citizenship_dual_country"
-      placeholder="Country"
-      class="input col-span-1"
-      :readonly="!editMode"
-    />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Dual Citizenship Type</label>
+      <select
+        v-model="form.personal_info.citizenship_dual_type"
+        class="input w-full"
+        :disabled="!editMode"
+      >
+        <option value="" disabled>Select Type</option>
+        <option value="By Birth">By Birth</option>
+        <option value="By Naturalization">By Naturalization</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Country</label>
+      <input
+        v-model="form.personal_info.citizenship_dual_country"
+        class="input w-full"
+        :readonly="!editMode"
+      />
+    </div>
   </template>
 </div>
 
@@ -519,44 +550,101 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
   <!-- Physical Info -->
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.height" placeholder="Height" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.weight" placeholder="Weight" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.blood_type" placeholder="Blood Type" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Height (m)</label>
+      <input v-model="form.personal_info.height" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Weight (kg)</label>
+      <input v-model="form.personal_info.weight" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Blood Type</label>
+      <input v-model="form.personal_info.blood_type" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <!-- Government Numbers -->
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.umid_id_no" placeholder="UMID ID No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.pagibig_id_no" placeholder="PAG-IBIG ID No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.philhealth_no" placeholder="PhilHealth No." class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">UMID ID No.</label>
+      <input v-model="form.personal_info.umid_id_no" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">PAG-IBIG ID No.</label>
+      <input v-model="form.personal_info.pagibig_id_no" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">PhilHealth No.</label>
+      <input v-model="form.personal_info.philhealth_no" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.philsys_no" placeholder="PhilSys No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.tin_no" placeholder="TIN No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.agency_employee_no" placeholder="Agency Employee No." class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">PhilSys No.</label>
+      <input v-model="form.personal_info.philsys_no" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">TIN No.</label>
+      <input v-model="form.personal_info.tin_no" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Agency Employee No.</label>
+      <input v-model="form.personal_info.agency_employee_no" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.telephone_no" placeholder="Telephone No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.mobile_no" placeholder="Mobile No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.email_address" placeholder="Email Address" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Telephone No.</label>
+      <input v-model="form.personal_info.telephone_no" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Mobile No.</label>
+      <input v-model="form.personal_info.mobile_no" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Email Address</label>
+      <input v-model="form.personal_info.email_address" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <!-- Residential Address -->
   <h4 class="font-semibold text-lg mt-4 mb-2">Residential Address</h4>
   <div class="grid grid-cols-3 gap-4">
-    <input v-model="form.personal_info.residential_house" placeholder="House/Block/Lot No." class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.residential_street" placeholder="Street" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.residential_subdivision" placeholder="Subdivision/Village" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">House/Block/Lot No.</label>
+      <input v-model="form.personal_info.residential_house" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
+      <input v-model="form.personal_info.residential_street" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Subdivision/Village</label>
+      <input v-model="form.personal_info.residential_subdivision" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.residential_barangay" placeholder="Barangay" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.residential_city" placeholder="City/Municipality" class="input" :readonly="!editMode" />
-    <input v-model="form.personal_info.residential_province" placeholder="Province" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
+      <input v-model="form.personal_info.residential_barangay" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">City/Municipality</label>
+      <input v-model="form.personal_info.residential_city" class="input w-full" :readonly="!editMode" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
+      <input v-model="form.personal_info.residential_province" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
   <div class="grid grid-cols-4 gap-4 mt-2">
-    <input v-model="form.personal_info.residential_zip_code" placeholder="Zip Code" class="input" :readonly="!editMode" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Zip Code</label>
+      <input v-model="form.personal_info.residential_zip_code" class="input w-full" :readonly="!editMode" />
+    </div>
   </div>
 
   <!-- Permanent Address -->
@@ -567,17 +655,38 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
   <h4 class="font-semibold text-lg mt-2 mb-2">Permanent Address</h4>
   <div class="grid grid-cols-3 gap-4">
-    <input v-model="form.personal_info.permanent_house" placeholder="House/Block/Lot No." class="input" :readonly="!editMode || sameAsResidential" />
-    <input v-model="form.personal_info.permanent_street" placeholder="Street" class="input" :readonly="!editMode || sameAsResidential" />
-    <input v-model="form.personal_info.permanent_subdivision" placeholder="Subdivision/Village" class="input" :readonly="!editMode || sameAsResidential" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">House/Block/Lot No.</label>
+      <input v-model="form.personal_info.permanent_house" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
+      <input v-model="form.personal_info.permanent_street" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Subdivision/Village</label>
+      <input v-model="form.personal_info.permanent_subdivision" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
   </div>
   <div class="grid grid-cols-3 gap-4 mt-2">
-    <input v-model="form.personal_info.permanent_barangay" placeholder="Barangay" class="input" :readonly="!editMode || sameAsResidential" />
-    <input v-model="form.personal_info.permanent_city" placeholder="City/Municipality" class="input" :readonly="!editMode || sameAsResidential" />
-    <input v-model="form.personal_info.permanent_province" placeholder="Province" class="input" :readonly="!editMode || sameAsResidential" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
+      <input v-model="form.personal_info.permanent_barangay" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">City/Municipality</label>
+      <input v-model="form.personal_info.permanent_city" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
+      <input v-model="form.personal_info.permanent_province" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
   </div>
   <div class="grid grid-cols-4 gap-4 mt-2">
-    <input v-model="form.personal_info.permanent_zip_code" placeholder="Zip Code" class="input" :readonly="!editMode || sameAsResidential" />
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1">Zip Code</label>
+      <input v-model="form.personal_info.permanent_zip_code" class="input w-full" :readonly="!editMode || sameAsResidential" />
+    </div>
   </div>
 </section>
         <br>
@@ -587,33 +696,78 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
         <!-- Spouse -->
         <div class="grid grid-cols-4 gap-4">
-            <input v-model="form.family_background.spouse_surname" placeholder="Spouse's Surname" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.spouse_first_name" placeholder="Spouse's First Name" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.spouse_middle_name" placeholder="Spouse's Middle Name" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.spouse_name_ext" placeholder="Spouse's Name Extension" class="input" :readonly="!editMode" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Spouse's Surname</label>
+              <input v-model="form.family_background.spouse_surname" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Spouse's First Name</label>
+              <input v-model="form.family_background.spouse_first_name" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Spouse's Middle Name</label>
+              <input v-model="form.family_background.spouse_middle_name" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Spouse's Name Extension</label>
+              <input v-model="form.family_background.spouse_name_ext" class="input w-full" :readonly="!editMode" />
+            </div>
         </div>
         <div class="grid grid-cols-4 gap-4 mt-2">
-            <input v-model="form.family_background.spouse_occupation" placeholder="Spouse's Occupation" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.spouse_employer" placeholder="Spouse's Employer/Business" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.spouse_business_address" placeholder="Business Address" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.spouse_telephone_no" placeholder="Telephone No." class="input" :readonly="!editMode" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Spouse's Occupation</label>
+              <input v-model="form.family_background.spouse_occupation" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Employer/Business</label>
+              <input v-model="form.family_background.spouse_employer" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Business Address</label>
+              <input v-model="form.family_background.spouse_business_address" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Telephone No.</label>
+              <input v-model="form.family_background.spouse_telephone_no" class="input w-full" :readonly="!editMode" />
+            </div>
         </div>
 
         <!-- Father -->
         <div class="grid grid-cols-3 gap-4 mt-4">
-            <input v-model="form.family_background.father_surname" placeholder="Father's Surname" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.father_first_name" placeholder="Father's First Name" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.father_middle_name" placeholder="Father's Middle Name" class="input" :readonly="!editMode" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Father's Surname</label>
+              <input v-model="form.family_background.father_surname" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Father's First Name</label>
+              <input v-model="form.family_background.father_first_name" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Father's Middle Name</label>
+              <input v-model="form.family_background.father_middle_name" class="input w-full" :readonly="!editMode" />
+            </div>
         </div>
         <div class="grid grid-cols-4 gap-4 mt-2">
-            <input v-model="form.family_background.father_name_ext" placeholder="Father's Name Extension (Jr., Sr., III)" class="input" :readonly="!editMode" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Father's Name Extension (Jr., Sr., III)</label>
+              <input v-model="form.family_background.father_name_ext" class="input w-full" :readonly="!editMode" />
+            </div>
         </div>
 
         <!-- Mother -->
         <div class="grid grid-cols-3 gap-4 mt-4">
-            <input v-model="form.family_background.mother_maiden_surname" placeholder="Mother's Maiden Surname" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.mother_maiden_first_name" placeholder="Mother's First Name" class="input" :readonly="!editMode" />
-            <input v-model="form.family_background.mother_maiden_middle_name" placeholder="Mother's Maiden Middle Name" class="input" :readonly="!editMode" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Mother's Maiden Surname</label>
+              <input v-model="form.family_background.mother_maiden_surname" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Mother's First Name</label>
+              <input v-model="form.family_background.mother_maiden_first_name" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Mother's Maiden Middle Name</label>
+              <input v-model="form.family_background.mother_maiden_middle_name" class="input w-full" :readonly="!editMode" />
+            </div>
         </div>
         </section>
         <br>
@@ -621,6 +775,12 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <!-- III. Children -->
         <section>
         <h2 class="font-semibold text-lg mb-4">Children</h2>
+
+        <div class="grid grid-cols-[1fr_1fr_auto] gap-4 mb-1 px-1 text-xs font-medium text-slate-500">
+          <span>Child Name</span>
+          <span>Date of Birth</span>
+          <span></span>
+        </div>
 
         <div
             v-for="(child, index) in form.children"
@@ -663,6 +823,17 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <!-- IV. Educational Background -->
         <section>
         <h2 class="font-semibold text-lg mb-4">III. Educational Background</h2>
+
+        <div class="grid grid-cols-[1fr_3fr_3fr_1fr_1fr_1fr_1fr_1fr] gap-4 mb-1 px-1 text-xs font-medium text-slate-500">
+          <span>Level</span>
+          <span>School Name</span>
+          <span>Degree/Course</span>
+          <span>From</span>
+          <span>To</span>
+          <span>Highest Level</span>
+          <span>Year Graduated</span>
+          <span>Honors</span>
+        </div>
 
         <div
             v-for="(edu, index) in form.education"
@@ -759,6 +930,16 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <section>
         <h2 class="font-semibold text-lg mb-4">IV. Civil Service Eligibility</h2>
 
+        <div class="grid grid-cols-[2fr_1fr_1fr_2fr_1fr_1fr_auto] gap-4 mb-1 px-1 text-xs font-medium text-slate-500">
+          <span>Eligibility / Exam</span>
+          <span>Rating</span>
+          <span>Exam Date</span>
+          <span>Place of Exam</span>
+          <span>License No.</span>
+          <span>License Validity</span>
+          <span></span>
+        </div>
+
         <div
             v-for="(elig, index) in form.eligibility"
             :key="index"
@@ -793,6 +974,16 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <!-- VI. Work Experience -->
         <section>
         <h2 class="font-semibold text-lg mb-4">V. Work Experience</h2>
+
+        <div class="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_auto] gap-4 mb-1 px-1 text-xs font-medium text-slate-500">
+          <span>Position</span>
+          <span>Department / Agency</span>
+          <span>Appointment Status</span>
+          <span>Govt Service</span>
+          <span>Date From</span>
+          <span>Date To</span>
+          <span></span>
+        </div>
 
         <div
             v-for="(work, index) in form.work_experience"
@@ -830,6 +1021,15 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <div v-show="activeTab === 3">
           <section>
         <h2 class="font-semibold text-lg mb-4">VI. Voluntary Work</h2>
+
+        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-4 mb-1 px-1 text-xs font-medium text-slate-500">
+          <span>Organization</span>
+          <span>Position / Nature of Work</span>
+          <span>Date From</span>
+          <span>Date To</span>
+          <span>Hours</span>
+          <span></span>
+        </div>
 
         <div
             v-for="(vol, index) in form.voluntary_work"
@@ -904,16 +1104,16 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
           </div>
         </div>
 
-        <!-- Table Header 
-        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 font-semibold text-gray-700 mb-2">
-          <div>Title</div>
-          <div>Date From</div>
-          <div>Date To</div>
-          <div>Hours</div>
-          <div>L&D Type</div>
-          <div>Conducted By</div>
-          <div v-if="editMode">Actions</div>
-        </div> -->
+        <!-- Table Header -->
+        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 px-1 text-xs font-medium text-slate-500">
+          <span>Title</span>
+          <span>Date From</span>
+          <span>Date To</span>
+          <span>Hours</span>
+          <span>L&amp;D Type</span>
+          <span>Conducted By</span>
+          <span></span>
+        </div>
 
         <!-- Training Rows -->
         <div v-for="(train, index) in form.trainings" :key="index" class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr_auto] gap-4 mb-2 items-center">
@@ -1103,24 +1303,33 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
             Have you been criminally charged?
             </label>
             <div class="grid grid-cols-3 gap-4 mt-1">
-            <input
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Date Filed</label>
+              <input
                 type="date"
                 v-model="form.questions.q35b_date_filed"
-                class="input"
+                class="input w-full"
                 :readonly="!editMode"
-            />
-            <input
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Status</label>
+              <input
                 v-model="form.questions.q35b_status"
                 placeholder="Status"
-                class="input"
+                class="input w-full"
                 :readonly="!editMode"
-            />
-            <input
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Details</label>
+              <input
                 v-model="form.questions.q35b_details"
                 placeholder="Details"
-                class="input"
+                class="input w-full"
                 :readonly="!editMode"
-            />
+              />
+            </div>
             </div>
         </div>
 
@@ -1280,6 +1489,13 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <section>
         <h2 class="font-semibold text-lg mb-4">X. References</h2>
 
+        <div class="grid grid-cols-[1fr_2fr_1fr_auto] gap-4 mb-1 px-1 text-xs font-medium text-slate-500">
+          <span>Name</span>
+          <span>Office Address</span>
+          <span>Contact No. / Email</span>
+          <span></span>
+        </div>
+
         <div
             v-for="(ref, index) in form.references"
             :key="index"
@@ -1334,13 +1550,25 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
         <h2 class="font-semibold text-lg mb-4">XI. Other Information</h2>
 
         <div class="grid grid-cols-2 gap-4">
-            <input v-model="form.other_info.government_id" placeholder="Government ID" class="input" :readonly="!editMode" />
-            <input v-model="form.other_info.id_no" placeholder="ID Number" class="input" :readonly="!editMode" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Government ID</label>
+              <input v-model="form.other_info.government_id" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">ID Number</label>
+              <input v-model="form.other_info.id_no" class="input w-full" :readonly="!editMode" />
+            </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 mt-2">
-            <input v-model="form.other_info.date_place_issuance" placeholder="Date & Place of Issuance" class="input" :readonly="!editMode" />
-            <input v-if="editMode" type="file" @change="e => form.other_info.path_passport_photo = e.target.files[0]" class="input" />
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Date &amp; Place of Issuance</label>
+              <input v-model="form.other_info.date_place_issuance" class="input w-full" :readonly="!editMode" />
+            </div>
+            <div v-if="editMode">
+              <label class="block text-xs font-medium text-slate-500 mb-1">Passport Photo</label>
+              <input type="file" @change="e => form.other_info.path_passport_photo = e.target.files[0]" class="input" />
+            </div>
         </div>
 
         <!-- Display existing photo if editing -->
