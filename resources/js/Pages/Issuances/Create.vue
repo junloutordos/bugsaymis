@@ -203,8 +203,12 @@ watch(type, (t) => {
           label="Title / Subject"
           :required="true"
           :error="errors.title"
+          maxlength="500"
           :placeholder="{ SO: 'e.g. Designation of Committee Members for...', TO: 'e.g. Official Travel of...', MEMO: 'e.g. Submission of IPCR for...' }[type] ?? 'Title or subject of the issuance'"
         />
+        <p class="text-xs -mt-2" :class="title.length > 400 ? 'text-amber-500 font-medium' : 'text-slate-400'">
+          {{ title.length }} / 500 characters
+        </p>
 
         <div class="flex justify-end pt-2">
           <button @click="step = 2" :disabled="!type || !title.trim()"
