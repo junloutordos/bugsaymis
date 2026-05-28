@@ -6,9 +6,11 @@ import { badgeBase, statusBadgeClass, issuanceTypeBadgeClass } from '@/Composabl
 import FlashMessage from '@/Components/FlashMessage.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import IssuanceSettingsModal from './IssuanceSettingsModal.vue'
 import {
   PlusIcon, MagnifyingGlassIcon, DocumentTextIcon,
   CheckCircleIcon, ClockIcon, ExclamationTriangleIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 
 const page = usePage()
@@ -66,6 +68,8 @@ const years = computed(() => {
   const y = new Set((props.issuances ?? []).map(i => i.control_number.split('-')[1]).filter(Boolean))
   return [...y].sort().reverse()
 })
+
+const showSettings = ref(false)
 </script>
 
 <template>
@@ -82,10 +86,16 @@ const years = computed(() => {
           {{ isAdmin ? 'Create and manage official issuances released to staff' : 'Official issuances from OCD addressed to you or your office' }}
         </p>
       </div>
-      <a v-if="isAdmin" :href="route('issuances.create')"
-        class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
-        <PlusIcon class="h-4 w-4" /> New Issuance
-      </a>
+      <div v-if="isAdmin" class="flex items-center gap-2">
+        <button @click="showSettings = true" title="Issuance Settings"
+          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 rounded-lg border border-slate-200 hover:bg-slate-50">
+          <Cog6ToothIcon class="h-4 w-4" />
+        </button>
+        <a :href="route('issuances.create')"
+          class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
+          <PlusIcon class="h-4 w-4" /> New Issuance
+        </a>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -187,6 +197,8 @@ const years = computed(() => {
         :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
         @prev="currentPage--" @next="currentPage++" />
     </div>
+
+    <IssuanceSettingsModal :show="showSettings" @close="showSettings = false" />
 
   </AdminLayout>
 </template>
