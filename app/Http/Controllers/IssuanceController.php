@@ -7,6 +7,7 @@ use App\Jobs\ProcessIssuanceRelease;
 use App\Mail\IssuanceReleasedMail;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
+use App\Models\IssuanceType;
 use App\Models\Office;
 use App\Models\User;
 use App\Services\DigitalSignatureService;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class IssuanceController extends Controller
@@ -66,7 +68,7 @@ class IssuanceController extends Controller
         return Inertia::render('Issuances/Index', [
             'issuances'  => $issuances,
             'isAdmin'    => $isAdmin,
-            'typeLabels' => Issuance::$typeLabels,
+            'typeLabels' => Issuance::typeLabels(),
         ]);
     }
 
@@ -75,7 +77,7 @@ class IssuanceController extends Controller
     public function create()
     {
         return Inertia::render('Issuances/Create', [
-            'typeLabels' => Issuance::$typeLabels,
+            'typeLabels' => Issuance::typeLabels(),
             'offices'    => Office::orderBy('name')->get(['id', 'name']),
             'users'      => User::where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']),
@@ -89,7 +91,7 @@ class IssuanceController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'type'               => 'required|in:SO,TO,MEMO,OO,AO,CIRC,NOTICE',
+            'type'               => ['required', Rule::in(array_keys(IssuanceType::activeLabels()))],
             'title'              => 'required|string|max:500',
             'content'            => 'nullable|string',
             'scan_base64'        => 'nullable|string',

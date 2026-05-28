@@ -19,14 +19,24 @@ class IssuanceService
 
     public function nextControlNumber(string $type, int $year): array
     {
+        $offset = DB::table('issuance_series_settings')
+            ->where('type_code', $type)
+            ->where('year', $year)
+            ->value('series_start') ?? 0;
+
         $max = DB::table('issuances')
             ->where('type', $type)
             ->where('year', $year)
             ->lockForUpdate()
             ->max('series_no') ?? 0;
 
-        $seriesNo      = $max + 1;
-        $controlNumber = strtoupper($type) . '-' . $year . '-' . str_pad($seriesNo, 3, '0', STR_PAD_LEFT);
+        $seriesNo = max($offset, $max) + 1;
+
+        $padding = DB::table('issuance_types')
+            ->where('code', $type)
+            ->value('series_padding') ?? 3;
+
+        $controlNumber = strtoupper($type) . '-' . $year . '-' . str_pad($seriesNo, $padding, '0', STR_PAD_LEFT);
 
         return [$controlNumber, $seriesNo];
     }

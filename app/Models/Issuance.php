@@ -19,15 +19,10 @@ class Issuance extends Model
         'year'        => 'integer',
     ];
 
-    public static $typeLabels = [
-        'SO'     => 'Special Order',
-        'TO'     => 'Travel Order',
-        'MEMO'   => 'Memorandum',
-        'OO'     => 'Office Order',
-        'AO'     => 'Administrative Order',
-        'CIRC'   => 'Circular',
-        'NOTICE' => 'Notice',
-    ];
+    public static function typeLabels(): array
+    {
+        return IssuanceType::activeLabels();
+    }
 
     protected static function booted(): void
     {
@@ -55,7 +50,7 @@ class Issuance extends Model
 
     public function getTypeLabelAttribute(): string
     {
-        return self::$typeLabels[$this->type] ?? $this->type;
+        return static::typeLabels()[$this->type] ?? $this->type;
     }
 
     public function isEditable(): bool

@@ -292,6 +292,16 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/',                       [\App\Http\Controllers\IssuanceController::class, 'index'])->name('index');
         Route::get('/create',                 [\App\Http\Controllers\IssuanceController::class, 'create'])->name('create')->middleware('permission:issuances.manage');
         Route::post('/',                      [\App\Http\Controllers\IssuanceController::class, 'store'])->name('store')->middleware('permission:issuances.manage');
+
+        // Settings (manage only) — must be defined before /{issuance} to avoid route clash
+        Route::middleware('permission:issuances.manage')->group(function () {
+            Route::get('/settings',              [\App\Http\Controllers\IssuanceSettingsController::class, 'index'])->name('settings.index');
+            Route::post('/settings/types',       [\App\Http\Controllers\IssuanceSettingsController::class, 'storeType'])->name('settings.types.store');
+            Route::put('/settings/types/{code}', [\App\Http\Controllers\IssuanceSettingsController::class, 'updateType'])->name('settings.types.update');
+            Route::delete('/settings/types/{code}', [\App\Http\Controllers\IssuanceSettingsController::class, 'destroyType'])->name('settings.types.destroy');
+            Route::put('/settings/series',       [\App\Http\Controllers\IssuanceSettingsController::class, 'upsertSeries'])->name('settings.series.upsert');
+        });
+
         Route::get('/{issuance}',             [\App\Http\Controllers\IssuanceController::class, 'show'])->name('show');
         Route::post('/{issuance}/release',    [\App\Http\Controllers\IssuanceController::class, 'release'])->name('release')->middleware('permission:issuances.manage');
         Route::post('/{issuance}/acknowledge',[\App\Http\Controllers\IssuanceController::class, 'acknowledge'])->name('acknowledge');
