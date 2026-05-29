@@ -1,44 +1,82 @@
-<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { background:#f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:#334155; margin:0; padding:20px; }
-        .container { max-width:600px; margin:28px auto; }
-        .card { background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(16,24,40,0.06); overflow:hidden; }
-        .card-header { background:linear-gradient(90deg,#7c3aed,#6366f1); padding:20px 24px; color:#fff; }
-        .card-header h1 { font-size:18px; margin:0 0 4px; }
-        .card-header p { margin:0; font-size:13px; opacity:.85; }
-        .card-body { padding:24px; }
-        .details { width:100%; border-collapse:collapse; margin:14px 0; }
-        .details td { padding:8px 6px; border-bottom:1px solid #f1f5f9; font-size:14px; }
-        .label { color:#64748b; width:42%; font-weight:600; }
-        .value { color:#0f172a; }
-        .badge { display:inline-block; padding:2px 10px; border-radius:9999px; font-size:12px; font-weight:600; background:#e0e7ff; color:#4f46e5; }
-        .btn { display:inline-block; background:#7c3aed; color:#fff; padding:11px 22px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px; margin-top:16px; }
-        .footer { padding:14px 24px; font-size:12px; color:#94a3b8; border-top:1px solid #f1f5f9; }
-    </style>
-</head>
-<body>
-<div class="container">
-    <div class="card">
-        <div class="card-header">
-            <h1>Your IPCR Has Been Rated</h1>
-            <p>Individual Performance Commitment and Review</p>
-        </div>
-        <div class="card-body">
-            <p>Dear {{ $recipientName }},</p>
-            <p>Your IPCR has been <strong>rated by your Division Chief</strong> and is now being processed for PMT review. You will be notified of further updates.</p>
-            <table class="details" role="presentation">
-                <tr><td class="label">Rating Period</td><td class="value">{{ $ipcr->rating_period }}</td></tr>
-                <tr><td class="label">Title</td><td class="value">{{ $ipcr->title }}</td></tr>
-                <tr><td class="label">Status</td><td class="value"><span class="badge">{{ $ipcr->status }}</span></td></tr>
-                <tr><td class="label">Date Rated</td><td class="value">{{ now()->format('F j, Y, g:i A') }}</td></tr>
-            </table>
-            <a class="btn" href="{{ route('employee-ipcr.show', $ipcr->id) }}">View IPCR</a>
-        </div>
-        <div class="footer">This is an automated notification from {{ config('app.name') }}. Please do not reply to this email.</div>
-    </div>
+@extends('emails.layouts.base')
+
+@section('header-gradient','linear-gradient(90deg,#7c3aed,#6366f1)')
+@section('header-title','Your IPCR Has Been Rated')
+@section('header-subtitle','Individual Performance Commitment and Review')
+
+@section('content')
+@php
+    $plans = $ipcr->plans;
+    $ratedPlans = $plans->filter(fn($p) => !is_null($p->pivot->sup_average));
+    $overallAvg = $ratedPlans->count()
+        ? round($ratedPlans->sum(fn($p) => (float) $p->pivot->sup_average) / $ratedPlans->count(), 2)
+        : null;
+    $adjectival = null;
+    if ($overallAvg !== null) {
+        $adjectival = $overallAvg >= 4.5 ? 'Outstanding'
+            : ($overallAvg >= 3.5 ? 'Very Satisfactory'
+            : ($overallAvg >= 2.5 ? 'Satisfactory'
+            : ($overallAvg >= 1.5 ? 'Unsatisfactory' : 'Poor')));
+    }
+    $dc = $ipcr->user?->division?->divisionchief;
+@endphp
+
+<p class="greeting">Dear <strong>{{ $recipientName }}</strong>,</p>
+<p class="lead">Your IPCR has been <strong>rated by your Division Chief</strong> and will be forwarded to the PMT for review. Your ratings are shown below.</p>
+
+<table class="details" role="presentation">
+    <tr><td class="lbl">Rating Period</td><td class="val">{{ $ipcr->rating_period }}</td></tr>
+    <tr><td class="lbl">IPCR Title</td><td class="val">{{ $ipcr->title }}</td></tr>
+    <tr><td class="lbl">Rated By</td><td class="val">{{ $dc?->name ?? '—' }}<br><span style="font-size:12px;color:#64748b;">{{ $dc?->position ?? '' }}</span></td></tr>
+    <tr><td class="lbl">Date Rated</td><td class="val">{{ $ipcr->submitted_rating_at?->format('F j, Y, g:i A') ?? now()->format('F j, Y, g:i A') }}</td></tr>
+    <tr><td class="lbl">Status</td><td class="val"><span class="badge badge-purple">{{ $ipcr->status }}</span></td></tr>
+</table>
+
+@if($ratedPlans->count())
+<p style="font-weight:600;color:#334155;margin:18px 0 6px;font-size:14px;">Supervisor Ratings by Plan</p>
+<table class="rating-grid" role="presentation">
+    <thead>
+        <tr>
+            <th style="text-align:left;width:40%">Work Plan</th>
+            <th>Quality</th>
+            <th>Efficiency</th>
+            <th>Timeliness</th>
+            <th>Average</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($plans as $plan)
+        <tr>
+            <td class="plan-col">{{ $plan->success_indicator }}</td>
+            <td>{{ $plan->pivot->sup_quality ?? '—' }}</td>
+            <td>{{ $plan->pivot->sup_efficiency ?? '—' }}</td>
+            <td>{{ $plan->pivot->sup_timeliness ?? '—' }}</td>
+            <td class="avg-val">{{ $plan->pivot->sup_average ?? '—' }}</td>
+        </tr>
+        @endforeach
+        @if($overallAvg)
+        <tr class="overall-row">
+            <td class="plan-col" style="font-weight:700;color:#334155;">Overall Average</td>
+            <td colspan="3"></td>
+            <td class="avg-val" style="font-size:16px;">{{ number_format($overallAvg, 2) }}</td>
+        </tr>
+        @endif
+    </tbody>
+</table>
+
+@if($adjectival)
+<p style="text-align:center;font-size:15px;margin:8px 0 0;">
+    Adjectival Rating: <strong style="color:#4f46e5;">{{ $adjectival }}</strong>
+</p>
+@endif
+@endif
+
+<div class="callout callout-blue" style="margin-top:16px;">
+    <div class="callout-title">What to do next</div>
+    No action needed at this time. Your IPCR is being processed for PMT review. You will receive a notification once the PMT has reviewed it.
 </div>
-</body>
-</html>
+@endsection
+
+@section('actions')
+<a class="btn btn-primary" href="{{ route('employee-ipcr.show', $ipcr->id) }}">View My IPCR →</a>
+@endsection

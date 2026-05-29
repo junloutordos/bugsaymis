@@ -25,6 +25,6 @@ class DivisionChiefITJRApprovalMail extends Mailable
     public function build()
     {
         return $this->subject("IT Job Request Approval Needed: {$this->jobRequest->itjr_no}")
-                    ->markdown('emails.itjr.division-chief-approval');
+                    ->view('emails.itjr.division-chief-approval');
     }
 }

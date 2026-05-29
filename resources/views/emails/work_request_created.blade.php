@@ -1,93 +1,38 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Work Request Approval</title>
-  <style>
-    body { background:#f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:#334155; margin:0; padding:20px; }
-    .container { max-width:600px; margin:28px auto; }
-    .card { background:#ffffff; border-radius:10px; box-shadow:0 4px 18px rgba(16,24,40,0.06); overflow:hidden; }
-    .card-header { background:linear-gradient(90deg,#0ea5e9,#3b82f6); padding:18px 20px; color:#fff; }
-    .card-body { padding:20px; }
-    h1 { font-size:18px; margin:0 0 6px; }
-    p.lead { margin:0 0 12px; color:#475569; }
-    .details { width:100%; border-collapse:collapse; margin:12px 0; }
-    .details td { padding:8px 6px; border-bottom:1px solid #f1f5f9; }
-    .label { color:#64748b; width:42%; font-weight:600; }
-    .value { color:#0f172a; }
-    .actions { padding:18px 20px; text-align:center; }
-    .btn { display:inline-block; background:#10b981; color:white; padding:12px 18px; border-radius:8px; text-decoration:none; font-weight:600; }
-    .muted { color:#94a3b8; font-size:13px; }
-    .footer { padding:14px 20px; font-size:13px; color:#94a3b8; }
-    @media (max-width:480px){ .container{padding:12px} .card-body{padding:14px} }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="card">
-      <div class="card-header">
-        <h1>Work Request — Approval Needed</h1>
-      </div>
-      <div class="card-body">
-        <p class="lead">Hello {{ $request->gsu_head?->name ?? 'GSU Head' }},</p>
-        <p>A new work request has been submitted and assigned to you for review and approval.</p>
+@extends('emails.layouts.base')
 
-        <table class="details" role="presentation">
-          <tr>
-            <td class="label">Request ID</td>
-            <td class="value">{{ $request->id }}</td>
-          </tr>
-          <tr>
-            <td class="label">Issue</td>
-            <td class="value">{{ $request->issue ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Description</td>
-            <td class="value">{{ $request->description ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Priority</td>
-            <td class="value">{{ $request->priority ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Location</td>
-            <td class="value">{{ $request->division?->name ?? ($request->location_division_id ? $request->location_division_id : '—') }}{{ $request->office?->name ? ' / ' . $request->office->name : '' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Expected Completion</td>
-            <td class="value">{{ $request->expected_completion_date ? \Illuminate\Support\Carbon::parse($request->expected_completion_date)->toDateString() : '—' }}</td>
-          </tr>
-        </table>
-        {{-- Assignment dropdown for skilled personnel (visual only in email) --}}
-        <div style="margin:12px 0;">
-          <label style="display:block;font-weight:600;color:#64748b;margin-bottom:6px;">Assign Personnel</label>
-        </div>
+@section('header-gradient','linear-gradient(90deg,#7c3aed,#8b5cf6)')
+@section('header-title','Work Request — Approval Needed')
+@section('header-subtitle','PSHS-CRC MIS — GSU Work Requests')
 
-        {{-- Quick assign & approve links (each is a signed link that sets assigned_user_id) --}}
-        @if(!empty($approveWithAssign))
-          <div style="margin:8px 0 14px;">
-            @foreach($skilledUsers as $u)
-              @php $link = $approveWithAssign[$u->id] ?? null; @endphp
-              @if($link)
-                <a href="{{ $link }}" style="display:inline-block;margin:6px 6px 0 0;padding:8px 10px;background:#eef2ff;border-radius:8px;color:#1e293b;text-decoration:none;font-size:13px;">Assign to {{ $u->name }}</a>
-              @endif
-            @endforeach
-          </div>
+@section('content')
+<p class="greeting">Hello <strong>{{ $request->gsu_head?->name ?? 'GSU Head' }}</strong>,</p>
+<p class="lead">A new work request has been submitted and requires your approval. Please act within <strong>24 hours</strong>.</p>
+
+<table class="details" role="presentation">
+    <tr><td class="lbl">Request ID</td><td class="val"><strong>#{{ $request->id }}</strong></td></tr>
+    <tr><td class="lbl">Issue</td><td class="val">{{ $request->issue ?? '—' }}</td></tr>
+    <tr><td class="lbl">Description</td><td class="val">{{ $request->description ?? '—' }}</td></tr>
+    <tr><td class="lbl">Priority</td><td class="val"><span class="badge priority-{{ strtolower($request->priority ?? 'normal') }}">{{ ucfirst($request->priority ?? 'Normal') }}</span></td></tr>
+    <tr><td class="lbl">Location</td><td class="val">{{ $request->division?->name ?? ($request->location_division_id ?? '—') }}{{ $request->office?->name ? ' / ' . $request->office->name : '' }}</td></tr>
+    <tr><td class="lbl">Expected Completion</td><td class="val">{{ $request->expected_completion_date ? \Carbon\Carbon::parse($request->expected_completion_date)->toDateString() : '—' }}</td></tr>
+    <tr><td class="lbl">Date Filed</td><td class="val">{{ $request->created_at?->format('F j, Y g:i A') ?? '—' }}</td></tr>
+</table>
+
+@if(!empty($approveWithAssign))
+<div style="margin:16px 0 4px;">
+    <p style="font-weight:600;color:#64748b;font-size:13px;margin-bottom:8px;">Quick Assign &amp; Approve</p>
+    @foreach($skilledUsers as $u)
+        @php $link = $approveWithAssign[$u->id] ?? null; @endphp
+        @if($link)
+        <a href="{{ $link }}" style="display:inline-block;margin:4px 4px 4px 0;padding:8px 12px;background:#ede9fe;border-radius:8px;color:#1e293b;text-decoration:none;font-size:13px;font-weight:500;">Assign to {{ $u->name }}</a>
         @endif
+    @endforeach
+</div>
+@endif
+@endsection
 
-        <div class="actions">
-          @if(!empty($declineUrl))
-            <a class="btn" style="background:#ef4444;margin-left:8px;" href="{{ $declineUrl }}">Decline</a>
-          @endif
-        </div>
+@section('actions')
+@if(!empty($declineUrl))<a class="btn btn-red" href="{{ $declineUrl }}">Decline</a>@endif
+@endsection
 
-        <p class="muted">If the button above does not work, copy and paste the following link into your browser:</p>
-        @if(!empty($approveUrl))
-          <p class="muted"><a href="{{ $approveUrl }}">{{ $approveUrl }}</a></p>
-        @endif
-      </div>
-      <div class="footer">If you do not have permission to approve this request, you may ignore this email.<br>Thanks — BUGSAYMIS</div>
-    </div>
-  </div>
-</body>
-</html>
+@section('footer-note')If you do not have permission to approve this request, you may ignore this email.@endsection

@@ -27,6 +27,6 @@ class ITJRStatusMail extends Mailable
     public function build()
     {
         return $this->subject("IT Job Request Status Update: {$this->jobRequest->itjr_no}")
-                    ->markdown('emails.itjr.status');
+                    ->view('emails.itjr.status');
     }
 }

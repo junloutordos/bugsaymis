@@ -25,6 +25,6 @@ class OCDITJRApprovalMail extends Mailable
     public function build()
     {
         return $this->subject("IT Job Request OCD Approval Needed: {$this->jobRequest->itjr_no}")
-                    ->markdown('emails.itjr.ocd-approval');
+                    ->view('emails.itjr.ocd-approval');
     }
 }
