@@ -1,45 +1,41 @@
-<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        body { background:#f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:#334155; margin:0; padding:20px; }
-        .container { max-width:600px; margin:28px auto; }
-        .card { background:#fff; border-radius:10px; box-shadow:0 4px 18px rgba(16,24,40,0.06); overflow:hidden; }
-        .card-header { background:linear-gradient(90deg,#0891b2,#06b6d4); padding:20px 24px; color:#fff; }
-        .card-header h1 { font-size:18px; margin:0 0 4px; }
-        .card-header p { margin:0; font-size:13px; opacity:.85; }
-        .card-body { padding:24px; }
-        .details { width:100%; border-collapse:collapse; margin:14px 0; }
-        .details td { padding:8px 6px; border-bottom:1px solid #f1f5f9; font-size:14px; }
-        .label { color:#64748b; width:42%; font-weight:600; }
-        .value { color:#0f172a; }
-        .badge { display:inline-block; padding:2px 10px; border-radius:9999px; font-size:12px; font-weight:600; background:#cffafe; color:#155e75; }
-        .btn { display:inline-block; background:#0891b2; color:#fff; padding:11px 22px; border-radius:8px; text-decoration:none; font-weight:600; font-size:14px; margin-top:16px; }
-        .footer { padding:14px 24px; font-size:12px; color:#94a3b8; border-top:1px solid #f1f5f9; }
-    </style>
-</head>
-<body>
-<div class="container">
-    <div class="card">
-        <div class="card-header">
-            <h1>IPCR Submitted to HR for Review</h1>
-            <p>Individual Performance Commitment and Review</p>
-        </div>
-        <div class="card-body">
-            <p>Dear {{ $recipientName }},</p>
-            <p>An IPCR has been submitted to HR for review by the Division Chief. Please log in to {{ config('app.name') }} to process.</p>
-            <table class="details" role="presentation">
-                <tr><td class="label">Employee</td><td class="value">{{ $ipcr->user->name ?? '—' }}</td></tr>
-                <tr><td class="label">Rating Period</td><td class="value">{{ $ipcr->rating_period }}</td></tr>
-                <tr><td class="label">Title</td><td class="value">{{ $ipcr->title }}</td></tr>
-                <tr><td class="label">Status</td><td class="value"><span class="badge">{{ $ipcr->status }}</span></td></tr>
-                <tr><td class="label">Date Submitted</td><td class="value">{{ now()->format('F j, Y, g:i A') }}</td></tr>
-            </table>
-            <a class="btn" href="{{ route('hr-ipcr.show', $ipcr->id) }}">View IPCR</a>
-        </div>
-        <div class="footer">This is an automated notification from {{ config('app.name') }}. Please do not reply to this email.</div>
-    </div>
+@extends('emails.layouts.base')
+
+@section('header-gradient','linear-gradient(90deg,#0891b2,#06b6d4)')
+@section('header-title','IPCR Submitted to HR')
+@section('header-subtitle','Individual Performance Commitment and Review')
+
+@section('content')
+@php
+    $plans = $ipcr->plans;
+    $ratedPlans = $plans->filter(fn($p) => !is_null($p->pivot->sup_average));
+    $overallAvg = $ratedPlans->count()
+        ? round($ratedPlans->sum(fn($p) => (float) $p->pivot->sup_average) / $ratedPlans->count(), 2)
+        : null;
+@endphp
+
+<p class="greeting">Dear <strong>{{ $recipientName }}</strong>,</p>
+<p class="lead">An IPCR has been submitted to HR by the Division Chief for processing and submission to PMT.</p>
+
+<table class="details" role="presentation">
+    <tr><td class="lbl">Employee</td><td class="val"><strong>{{ $ipcr->user?->name ?? '—' }}</strong></td></tr>
+    <tr><td class="lbl">Division</td><td class="val">{{ $ipcr->user?->division?->division_name ?? '—' }}</td></tr>
+    <tr><td class="lbl">Position</td><td class="val">{{ $ipcr->user?->position ?? '—' }}</td></tr>
+    <tr><td class="lbl">Rating Period</td><td class="val">{{ $ipcr->rating_period }}</td></tr>
+    <tr><td class="lbl">IPCR Title</td><td class="val">{{ $ipcr->title }}</td></tr>
+    <tr><td class="lbl">Plans</td><td class="val">{{ $plans->count() }}</td></tr>
+    @if($overallAvg)
+    <tr><td class="lbl">Overall Average</td><td class="val"><strong>{{ number_format($overallAvg, 2) }}</strong></td></tr>
+    @endif
+    <tr><td class="lbl">Submitted On</td><td class="val">{{ $ipcr->submitted_to_hr_at?->format('F j, Y, g:i A') ?? now()->format('F j, Y, g:i A') }}</td></tr>
+    <tr><td class="lbl">Status</td><td class="val"><span class="badge badge-cyan">{{ $ipcr->status }}</span></td></tr>
+</table>
+
+<div class="callout callout-blue">
+    <div class="callout-title">For HR Action</div>
+    Review this IPCR in CRCMIS and submit it to the PMT for review when ready.
 </div>
-</body>
-</html>
+@endsection
+
+@section('actions')
+<a class="btn btn-cyan" href="{{ route('hr-ipcr.show', $ipcr->id) }}">Process IPCR →</a>
+@endsection

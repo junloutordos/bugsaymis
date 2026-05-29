@@ -1,69 +1,28 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Student Attendance Notification</title>
-  <style>
-    body { background:#f5f7fb; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial; color:#334155; margin:0; padding:20px; }
-    .container { max-width:600px; margin:28px auto; }
-    .card { background:#ffffff; border-radius:10px; box-shadow:0 4px 18px rgba(16,24,40,0.06); overflow:hidden; }
-    .card-header-in  { background:linear-gradient(90deg,#059669,#10b981); padding:18px 20px; color:#fff; }
-    .card-header-out { background:linear-gradient(90deg,#d97706,#f59e0b); padding:18px 20px; color:#fff; }
-    .card-body { padding:24px 20px; }
-    h1 { font-size:20px; margin:0 0 4px; }
-    .badge { display:inline-block; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:700; letter-spacing:.06em; margin-bottom:16px; }
-    .badge-in  { background:#d1fae5; color:#065f46; }
-    .badge-out { background:#fef3c7; color:#92400e; }
-    .student-name { font-size:22px; font-weight:700; color:#0f172a; }
-    .details { width:100%; border-collapse:collapse; margin:16px 0; }
-    .details td { padding:8px 6px; border-bottom:1px solid #f1f5f9; font-size:14px; }
-    .label { color:#64748b; width:40%; font-weight:600; }
-    .value { color:#0f172a; }
-    .footer { padding:14px 20px; font-size:12px; color:#94a3b8; border-top:1px solid #f1f5f9; }
-    .muted { color:#94a3b8; font-size:13px; margin-top:16px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="card">
-      <div class="{{ $scanType === 'in' ? 'card-header-in' : 'card-header-out' }}">
-        <h1>Student Attendance Alert</h1>
-        <p style="margin:0;opacity:.85;font-size:14px;">Philippine Science High School – Caraga Campus</p>
-      </div>
+@extends('emails.layouts.base')
 
-      <div class="card-body">
-        <p>Hello <strong>{{ $parentName }}</strong>,</p>
-        <p>This is an automated notification to inform you that your child has been logged at the school gate.</p>
+@section('header-gradient'){{ $scanType === 'in' ? 'linear-gradient(90deg,#059669,#10b981)' : 'linear-gradient(90deg,#d97706,#f59e0b)' }}@endsection
+@section('header-title','Student Attendance Alert')
+@section('header-subtitle','Philippine Science High School – Caraga Region Campus')
 
-        <span class="badge {{ $scanType === 'in' ? 'badge-in' : 'badge-out' }}">{{ $scanTypeLabel }}</span>
+@section('content')
+<p class="greeting">Hello <strong>{{ $parentName }}</strong>,</p>
+<p class="lead">This is an automated notification to inform you that your child has been logged at the school gate.</p>
 
-        <p class="student-name">{{ $studentName }}</p>
+<div style="text-align:center;margin:16px 0;">
+    <span class="badge {{ $scanType === 'in' ? 'badge-green' : 'badge-amber' }}" style="font-size:14px;padding:6px 16px;">
+        {{ $scanTypeLabel }}
+    </span>
+</div>
 
-        <table class="details" role="presentation">
-          <tr>
-            <td class="label">Status</td>
-            <td class="value">{{ $scanType === 'in' ? 'Arrived at school' : 'Left school' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Date &amp; Time</td>
-            <td class="value">{{ $scanTime }}</td>
-          </tr>
-          @if($gateLocation)
-          <tr>
-            <td class="label">Gate</td>
-            <td class="value">{{ $gateLocation }}</td>
-          </tr>
-          @endif
-        </table>
+<p style="text-align:center;font-size:22px;font-weight:700;color:#0f172a;margin:8px 0 16px;">{{ $studentName }}</p>
 
-        <p class="muted">If you believe this notification was sent in error, please contact the school office.</p>
-      </div>
+<table class="details" role="presentation">
+    <tr><td class="lbl">Status</td><td class="val">{{ $scanType === 'in' ? 'Arrived at school' : 'Left school' }}</td></tr>
+    <tr><td class="lbl">Date & Time</td><td class="val"><strong>{{ $scanTime }}</strong></td></tr>
+    @if($gateLocation)
+    <tr><td class="lbl">Gate</td><td class="val">{{ $gateLocation }}</td></tr>
+    @endif
+</table>
 
-      <div class="footer">
-        This is an automated message from BUGSAYMIS — PSHS Caraga Campus MIS.<br>
-        Please do not reply to this email.
-      </div>
-    </div>
-  </div>
-</body>
-</html>
+<p style="font-size:13px;color:#64748b;margin-top:12px;">If you believe this notification was sent in error, please contact the school office.</p>
+@endsection

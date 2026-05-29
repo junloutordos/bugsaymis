@@ -1,83 +1,34 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Gate Pass Approval</title>
-  <style>
-    body { background:#f5f7fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; color:#334155; margin:0; padding:20px; }
-    .container { max-width:600px; margin:28px auto; }
-    .card { background:#ffffff; border-radius:10px; box-shadow:0 4px 18px rgba(16,24,40,0.06); overflow:hidden; }
-    .card-header { background:linear-gradient(90deg,#0ea5e9,#3b82f6); padding:18px 20px; color:#fff; }
-    .card-body { padding:20px; }
-    h1 { font-size:18px; margin:0 0 6px; }
-    p.lead { margin:0 0 12px; color:#475569; }
-    .details { width:100%; border-collapse:collapse; margin:12px 0; }
-    .details td { padding:8px 6px; border-bottom:1px solid #f1f5f9; }
-    .label { color:#64748b; width:42%; font-weight:600; }
-    .value { color:#0f172a; }
-    .actions { padding:18px 20px; text-align:center; }
-    .btn { display:inline-block; background:#10b981; color:white; padding:12px 18px; border-radius:8px; text-decoration:none; font-weight:600; }
-    .muted { color:#94a3b8; font-size:13px; }
-    .footer { padding:14px 20px; font-size:13px; color:#94a3b8; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="card">
-      <div class="card-header">
-        <h1>Gate Pass — Approval Needed</h1>
-      </div>
-      <div class="card-body">
-        <p class="lead">Hello {{ $gatepass->name ?? 'Division Chief' }},</p>
-        <p>A new gate pass has been submitted and assigned to you for review and approval.</p>
+@extends('emails.layouts.base')
 
-        <table class="details" role="presentation">
-          <tr>
-            <td class="label">Control No</td>
-            <td class="value">{{ $gatepass->controlno ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Requestor</td>
-            <td class="value">{{ $gatepass->name ?? ($gatepass->employee_name ?? '—') }}</td>
-          </tr>
-          <tr>
-            <td class="label">Badge</td>
-            <td class="value">{{ $gatepass->badgeNumber ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Type</td>
-            <td class="value">{{ $gatepass->gatepass_type ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Date</td>
-            <td class="value">{{ $gatepass->gatepass_date ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Time Out / In</td>
-            <td class="value">{{ ($gatepass->gatepass_timeout ?? '—') }} / {{ ($gatepass->gatepass_timein ?? '—') }}</td>
-          </tr>
-          <tr>
-            <td class="label">Destination</td>
-            <td class="value">{{ $gatepass->destination ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="label">Purpose</td>
-            <td class="value">{{ $gatepass->purpose ?? '—' }}</td>
-          </tr>
-        </table>
+@section('header-gradient','linear-gradient(90deg,#0891b2,#06b6d4)')
+@section('header-title','Gate Pass — Approval Needed')
+@section('header-subtitle','PSHS-CRC MIS — Gate Pass System')
 
-        <div class="actions">
-          <a class="btn" href="{{ $approveUrl }}">Approve Gate Pass</a>
-          @if(!empty($declineUrl))
-            <a class="btn" style="background:#ef4444;margin-left:8px;" href="{{ $declineUrl }}">Decline</a>
-          @endif
-        </div>
+@section('content')
+<p class="greeting">Hello <strong>{{ $gatepass->divisionChief?->name ?? 'Division Chief' }}</strong>,</p>
+<p class="lead">A new gate pass has been submitted and assigned to you for approval. Please act within <strong>24 hours</strong>.</p>
 
-        <p class="muted">If the button above does not work, copy and paste the following link into your browser:</p>
-        <p class="muted"><a href="{{ $approveUrl }}">{{ $approveUrl }}</a></p>
-      </div>
-      <div class="footer">If you do not have permission to approve this request, you may ignore this email.<br>Thanks — BUGSAYMIS</div>
-    </div>
-  </div>
-</body>
-</html>
+<table class="details" role="presentation">
+    <tr><td class="lbl">Control No.</td><td class="val"><strong>{{ $gatepass->controlno ?? '—' }}</strong></td></tr>
+    <tr><td class="lbl">Requestor</td><td class="val">{{ $gatepass->name ?? ($gatepass->employee_name ?? '—') }}</td></tr>
+    <tr><td class="lbl">Badge No.</td><td class="val">{{ $gatepass->badgeNumber ?? '—' }}</td></tr>
+    <tr><td class="lbl">Gate Pass Type</td><td class="val">{{ $gatepass->gatepass_type ?? '—' }}</td></tr>
+    <tr><td class="lbl">Date</td><td class="val">{{ $gatepass->gatepass_date ?? '—' }}</td></tr>
+    <tr><td class="lbl">Time Out / In</td><td class="val">{{ ($gatepass->gatepass_timeout ?? '—') }} / {{ ($gatepass->gatepass_timein ?? '—') }}</td></tr>
+    <tr><td class="lbl">Destination</td><td class="val">{{ $gatepass->destination ?? '—' }}</td></tr>
+    <tr><td class="lbl">Purpose</td><td class="val">{{ $gatepass->purpose ?? '—' }}</td></tr>
+    <tr><td class="lbl">Date Filed</td><td class="val">{{ $gatepass->created_at?->format('F j, Y g:i A') ?? '—' }}</td></tr>
+</table>
+@endsection
+
+@section('actions')
+<a class="btn btn-green" href="{{ $approveUrl }}">Approve Gate Pass</a>
+@if(!empty($declineUrl))<a class="btn btn-red" href="{{ $declineUrl }}">Decline</a>@endif
+@endsection
+
+@section('fallback-links')
+<p>Approve: <a href="{{ $approveUrl }}">{{ $approveUrl }}</a></p>
+@if(!empty($declineUrl))<p>Decline: <a href="{{ $declineUrl }}">{{ $declineUrl }}</a></p>@endif
+@endsection
+
+@section('footer-note')If you do not have permission to approve this request, you may ignore this email.@endsection
