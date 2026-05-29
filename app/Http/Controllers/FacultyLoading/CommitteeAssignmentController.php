@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Committee;
+use App\Models\EmployeeIPCR;
 use App\Models\FacultyLoading\FacultyCommitteeAccomplishment;
 use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\FacultyLoading\FacultyLoad;
@@ -354,6 +355,8 @@ class CommitteeAssignmentController extends Controller
         $ratings = collect([$data['sup_quality'] ?? null, $data['sup_efficiency'] ?? null, $data['sup_timeliness'] ?? null])
             ->filter(fn ($v) => ! is_null($v));
 
+        $supAverage = $ratings->count() ? round($ratings->avg(), 2) : null;
+
         FacultyCommitteeAccomplishment::updateOrCreate(
             [
                 'faculty_committee_assignment_id' => $committeeAssignment->id,
@@ -365,9 +368,33 @@ class CommitteeAssignmentController extends Controller
                 'sup_quality'    => $data['sup_quality'] ?? null,
                 'sup_efficiency' => $data['sup_efficiency'] ?? null,
                 'sup_timeliness' => $data['sup_timeliness'] ?? null,
-                'sup_average'    => $ratings->count() ? round($ratings->avg(), 2) : null,
+                'sup_average'    => $supAverage,
             ]
         );
+
+        // Mirror the supervisor rating into the teacher's active IPCR plan pivot so
+        // the chairperson only needs to rate once (in Faculty Loading) and it flows into IPCR.
+        $activeIpcr = EmployeeIPCR::where('user_id', $committeeAssignment->user_id)
+            ->whereIn('status', ['Targets Approved', 'Submitted for Rating'])
+            ->whereHas('plans', fn ($q) => $q->where('work_distribution_plans.id', $data['work_distribution_plan_id']))
+            ->latest()
+            ->first();
+
+        if ($activeIpcr) {
+            $ipcrPivot = [
+                'sup_quality'    => $data['sup_quality'] ?? null,
+                'sup_efficiency' => $data['sup_efficiency'] ?? null,
+                'sup_timeliness' => $data['sup_timeliness'] ?? null,
+                'sup_average'    => $supAverage,
+            ];
+            if (! empty($data['accomplishment'])) {
+                $ipcrPivot['accomplishment'] = $data['accomplishment'];
+            }
+            if (! empty($data['mov_link'])) {
+                $ipcrPivot['mov_link'] = $data['mov_link'];
+            }
+            $activeIpcr->plans()->updateExistingPivot($data['work_distribution_plan_id'], $ipcrPivot);
+        }
 
         return back()->with('success', 'Rating saved.');
     }

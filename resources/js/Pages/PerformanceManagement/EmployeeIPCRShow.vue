@@ -10,12 +10,14 @@ import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
 const props = defineProps({
-  ipcr: Object,
-  employee: Object,
-  supervisor: Object,
-  ocdUser: { type: Object, default: null },
-  plans: Array,
-  workPlans: { type: Array, default: () => [] },
+  ipcr:             Object,
+  employee:         Object,
+  supervisor:       Object,
+  ocdUser:          { type: Object,  default: null },
+  plans:            Array,
+  workPlans:        { type: Array,   default: () => [] },
+  isFaculty:        { type: Boolean, default: false },
+  suggestedPlanIds: { type: Array,   default: () => [] },
 });
 
 const { isSubmitting, submit } = useSubmit();
@@ -485,12 +487,18 @@ const planSearchQuery = ref("");
 const filteredWorkPlans = computed(() => {
   const q = planSearchQuery.value.toLowerCase();
   const existingIds = new Set((props.plans || []).map(p => p.id));
-  return props.workPlans.filter(p =>
+  const results = props.workPlans.filter(p =>
     !existingIds.has(p.id) && (
       p.success_indicator?.toLowerCase().includes(q) ||
       p.performance_indicator?.description?.toLowerCase().includes(q)
     )
   );
+  // Suggested plans (from FL committee assignments) float to top
+  return results.sort((a, b) => {
+    const aS = props.suggestedPlanIds.includes(a.id) ? 0 : 1;
+    const bS = props.suggestedPlanIds.includes(b.id) ? 0 : 1;
+    return aS - bS;
+  });
 });
 
 const isPlanSelected = (id) => selectedPlans.value.includes(id);
@@ -551,6 +559,24 @@ const resubmit = () => {
   });
 };
 
+// ---------- Faculty Loading sync (CID teachers only) ----------
+const pullFLAccomplishments = () => {
+  Swal.fire({
+    title: "Sync from Faculty Loading?",
+    text: "This will copy your committee accomplishments and any supervisor ratings from Faculty Loading into this IPCR. Existing accomplishment text will be overwritten.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Yes, sync!",
+  }).then((result) => {
+    if (result.isConfirmed) {
+      submit.post(route("employee-ipcr.pullFL", props.ipcr.id), {}, {
+        onSuccess: () => Swal.fire({ icon: "success", title: "Synced!", timer: 1500, showConfirmButton: false }),
+        onError: () => Swal.fire("Error", "Failed to sync from Faculty Loading.", "error"),
+      });
+    }
+  });
+};
+
 </script>
 
 <template>
@@ -603,6 +629,20 @@ const resubmit = () => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>
               {{ isSubmitting ? 'Processing…' : 'Submit for Rating of the Accomplishment' }}
+            </button>
+
+            <!-- Faculty Loading sync — CID teachers only, available before submission -->
+            <button
+              v-if="isFaculty && ['New Target', 'For Review', 'Targets Approved', 'Returned for Revision'].includes(ipcr.status)"
+              @click="pullFLAccomplishments"
+              :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Copy accomplishments and ratings from your Faculty Loading committee assignments"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {{ isSubmitting ? 'Processing…' : 'Sync from Faculty Loading' }}
             </button>
 
             <button
@@ -1165,7 +1205,13 @@ const resubmit = () => {
                 class="mt-1"
               />
               <label :for="`add-plan-${plan.id}`" class="flex-1 cursor-pointer text-sm">
-                <div class="font-medium text-slate-800">{{ plan.success_indicator }}</div>
+                <div class="font-medium text-slate-800 flex items-center gap-2">
+                  {{ plan.success_indicator }}
+                  <span v-if="suggestedPlanIds.includes(plan.id)"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700">
+                    ★ Suggested
+                  </span>
+                </div>
                 <div class="text-slate-500">{{ plan.performance_indicator?.description }}</div>
               </label>
             </div>

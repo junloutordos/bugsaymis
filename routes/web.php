@@ -1106,6 +1106,7 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         Route::post('/employee-ipcr/{employeeIPCR}/submit-rating', [EmployeeIPCRController::class, 'submitForRating'])->name('employee-ipcr.submitRating');
         Route::delete('/employee-ipcr/{employeeIPCR}/plans/{plan}', [EmployeeIPCRController::class, 'removePlan'])->name('employee-ipcr.removePlan');
         Route::post('/employee-ipcr/{employeeIPCR}/resubmit', [EmployeeIPCRController::class, 'resubmit'])->name('employee-ipcr.resubmit');
+        Route::post('/employee-ipcr/{employeeIPCR}/pull-fl-accomplishments', [EmployeeIPCRController::class, 'pullFLAccomplishments'])->name('employee-ipcr.pullFL');
 
         // ── Division Chief IPCR ─────────────────────────────────────────────
         Route::get('/division-chief/ipcrs', [DivisionChiefIPCRController::class, 'index'])->name('division-chief-ipcr.index');

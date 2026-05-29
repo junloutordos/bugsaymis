@@ -358,9 +358,28 @@ const statusBadgeClass = ipcrStatusClass;
 
 const printIPCR = () => window.print();
 
+// ---------- Rating completeness (multi-rater awareness for CID) ----------
+const allPlansRated = computed(() =>
+  (props.plans ?? []).every(p => p.pivot?.sup_average !== null && p.pivot?.sup_average !== undefined)
+)
+const unratedPlans = computed(() =>
+  (props.plans ?? []).filter(p => p.pivot?.sup_average === null || p.pivot?.sup_average === undefined)
+)
+const ratingStatusChip = (plan) => {
+  const rated = plan.pivot?.sup_average !== null && plan.pivot?.sup_average !== undefined
+  return {
+    rated,
+    label: rated ? 'Rated ✓' : `Awaiting ${plan.rated_by || 'Division Chief'}`,
+    cls:   rated ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+  }
+}
+
 // ---------- Submit actions ----------
 const saveRatings = () => {
-  Swal.fire({ title: "Save Ratings?", text: "Are you sure you want to save these ratings?", icon: "question", showCancelButton: true, confirmButtonText: "Yes, save it!" })
+  const text = allPlansRated.value
+    ? "Are you sure you want to save these ratings?"
+    : `${unratedPlans.value.length} plan(s) still have no supervisor rating. Save anyway?`
+  Swal.fire({ title: "Save Ratings?", text, icon: "question", showCancelButton: true, confirmButtonText: "Yes, save it!" })
     .then(result => {
       if (result.isConfirmed) submit.post(route("division-chief-employee-ipcr.saveratings", props.ipcr.id), {}, {
         onSuccess: () => Swal.fire("Saved!", "Ratings for the rating period successfully saved!", "success"),
@@ -411,11 +430,16 @@ const approveTargets = () => {
           </div>
         </div>
         <div class="p-5 flex flex-wrap gap-2">
-          <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="saveRatings"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ isSubmitting ? 'Processing…' : 'Save Ratings' }}
-          </button>
+          <template v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'">
+            <button @click="saveRatings" :disabled="isSubmitting"
+              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+              {{ isSubmitting ? 'Processing…' : 'Save Ratings' }}
+            </button>
+            <span v-if="!allPlansRated"
+              class="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              ⚠ {{ unratedPlans.length }} plan(s) still awaiting rating
+            </span>
+          </template>
           <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="approveTargets"
             :disabled="isSubmitting"
             class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
@@ -564,8 +588,11 @@ const approveTargets = () => {
 
                         <td class="px-4 py-3 border border-slate-200 text-sm text-slate-700">
                           <div>{{ piPlans[0].success_indicator }}</div>
-                          <div class="text-xs text-slate-400 mt-1">
-                            Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template>
+                          <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                            <span>Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template></span>
+                            <span :class="['inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold', ratingStatusChip(piPlans[0]).cls]">
+                              {{ ratingStatusChip(piPlans[0]).label }}
+                            </span>
                           </div>
                         </td>
 
