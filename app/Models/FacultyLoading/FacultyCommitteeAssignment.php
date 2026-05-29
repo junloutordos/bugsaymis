@@ -6,6 +6,7 @@ use App\Models\Committee;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FacultyCommitteeAssignment extends Model
 {
@@ -51,6 +52,11 @@ class FacultyCommitteeAssignment extends Model
     public function loadAssignment(): BelongsTo
     {
         return $this->belongsTo(LoadAssignment::class);
+    }
+
+    public function accomplishments(): HasMany
+    {
+        return $this->hasMany(FacultyCommitteeAccomplishment::class, 'faculty_committee_assignment_id');
     }
 
     public function isChairperson(): bool

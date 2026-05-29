@@ -23,8 +23,13 @@
         <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
       </div>
 
-      <!-- Filters -->
+      <!-- Filters + Search -->
       <div class="flex flex-wrap gap-2">
+        <div class="relative">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input v-model="search" type="text" placeholder="Search faculty or committee…"
+            class="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-56" />
+        </div>
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option v-for="t in terms" :key="t.id" :value="t.id">
@@ -39,9 +44,9 @@
       </div>
 
       <!-- Empty -->
-      <div v-if="assignments.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
+      <div v-if="displayed.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
         <UserGroupIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No committee assignments for this term</p>
+        <p class="text-sm font-medium text-slate-500">No committee assignments found</p>
       </div>
 
       <!-- Table -->
@@ -58,7 +63,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
-            <tr v-for="a in assignments" :key="a.id" class="hover:bg-slate-50/50">
+            <tr v-for="a in displayed" :key="a.id" class="hover:bg-slate-50/50">
               <td class="px-4 py-3 font-medium text-slate-800">{{ a.faculty?.name ?? '—' }}</td>
               <td class="px-4 py-3">
                 <p class="text-slate-800">{{ a.committee_name }}</p>
@@ -80,10 +85,15 @@
               </td>
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-1">
-                  <button @click="openForm(a)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
+                  <a v-if="a.committee_id"
+                    :href="route('faculty-loading.committee-assignments.show', a.committee_id)"
+                    class="p-1.5 text-slate-400 hover:text-indigo-600 rounded" title="View detail">
+                    <ArrowRightIcon class="h-4 w-4" />
+                  </a>
+                  <button @click="openForm(a)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded" title="Edit">
                     <PencilIcon class="h-4 w-4" />
                   </button>
-                  <button @click="remove(a)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
+                  <button @click="remove(a)" class="p-1.5 text-slate-400 hover:text-red-600 rounded" title="Remove">
                     <TrashIcon class="h-4 w-4" />
                   </button>
                 </div>
@@ -91,11 +101,23 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+          <span>{{ filtered.length }} record{{ filtered.length !== 1 ? 's' : '' }}</span>
+          <div class="flex gap-2">
+            <button @click="page--" :disabled="page === 1"
+              class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 text-sm">Prev</button>
+            <span class="px-3 py-1.5 text-slate-500">{{ page }} / {{ totalPages }}</span>
+            <button @click="page++" :disabled="page === totalPages"
+              class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 text-sm">Next</button>
+          </div>
+        </div>
       </div>
 
     </div>
 
-    <!-- Modal -->
+    <!-- Create / Edit Modal -->
     <div v-if="modal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 my-8">
         <h2 class="text-lg font-semibold text-slate-800">{{ form.id ? 'Edit' : 'Assign' }} Committee</h2>
@@ -169,6 +191,22 @@
             <textarea v-model="form.remarks" rows="2"
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
           </div>
+
+          <!-- Tagged WDP Plans -->
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
+            <div class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
+              <label v-for="p in plans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+                <input type="checkbox" :checked="form.plan_ids.includes(p.id)" @change="togglePlan(p.id)"
+                  class="mt-0.5 rounded border-slate-300 text-indigo-600" />
+                <span class="text-slate-700 leading-snug">{{ p.success_indicator }}
+                  <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
+                </span>
+              </label>
+              <p v-if="!plans.length" class="text-slate-400 text-xs px-1">No plans available.</p>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
+          </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-1">
@@ -185,20 +223,25 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { CheckCircleIcon, PencilIcon, PlusIcon, StarIcon, TrashIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowRightIcon, CheckCircleIcon, MagnifyingGlassIcon,
+  PencilIcon, PlusIcon, StarIcon, TrashIcon, UserGroupIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   assignments: { type: Array,  default: () => [] },
   terms:       { type: Array,  default: () => [] },
   faculty:     { type: Array,  default: () => [] },
   committees:  { type: Array,  default: () => [] },
+  plans:       { type: Array,  default: () => [] },
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
 })
 
+const PER_PAGE = 15
 const roles = [
   { value: 'member',      label: 'Member' },
   { value: 'secretary',   label: 'Secretary' },
@@ -206,40 +249,52 @@ const roles = [
   { value: 'chairperson', label: 'Chairperson' },
 ]
 
+// ── Filters + search + pagination ─────────────────────────────────────────
+const search = ref('')
+const page   = ref(1)
+
 const filters = reactive({
   term_id:    props.filters.term_id    ?? props.currentTerm?.id ?? null,
   faculty_id: props.filters.faculty_id ?? null,
 })
 
+watch(search, () => { page.value = 1 })
+
 function applyFilters() {
   router.get(route('faculty-loading.committee-assignments.index'), filters, { preserveState: true })
 }
 
+const filtered = computed(() => {
+  const q = search.value.toLowerCase()
+  if (!q) return props.assignments
+  return props.assignments.filter(a =>
+    a.faculty?.name?.toLowerCase().includes(q) ||
+    a.committee_name?.toLowerCase().includes(q)
+  )
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PER_PAGE)))
+const displayed  = computed(() => {
+  const s = (page.value - 1) * PER_PAGE
+  return filtered.value.slice(s, s + PER_PAGE)
+})
+
+// ── Modal form ─────────────────────────────────────────────────────────────
 const modal = ref(false)
-const form = useForm({
-  id: null,
-  user_id: null,
-  school_year_id: null,
-  academic_term_id: null,
-  committee_id: null,
-  committee_name: '',
-  role: 'member',
-  load_units: 0.5,
-  status: 'active',
-  remarks: '',
+const form  = useForm({
+  id: null, user_id: null, school_year_id: null, academic_term_id: null,
+  committee_id: null, committee_name: '', role: 'member',
+  load_units: 0.5, status: 'active', remarks: '', plan_ids: [],
 })
 
 function openForm(a = null) {
   if (a) {
+    const committee = props.committees.find(c => c.id === a.committee_id)
     Object.assign(form, {
-      id: a.id,
-      user_id: null, school_year_id: null, academic_term_id: null,
-      committee_id: a.committee_id,
-      committee_name: a.committee_name,
-      role: a.role,
-      load_units: a.load_units,
-      status: a.status,
-      remarks: a.remarks ?? '',
+      id: a.id, user_id: null, school_year_id: null, academic_term_id: null,
+      committee_id: a.committee_id, committee_name: a.committee_name,
+      role: a.role, load_units: a.load_units, status: a.status,
+      remarks: a.remarks ?? '', plan_ids: committee?.plan_ids ? [...committee.plan_ids] : [],
     })
   } else {
     form.reset()
@@ -247,6 +302,7 @@ function openForm(a = null) {
     form.role = 'member'
     form.load_units = 0.5
     form.status = 'active'
+    form.plan_ids = []
     form.academic_term_id = filters.term_id ?? null
   }
   modal.value = true
@@ -256,6 +312,7 @@ function onCommitteeChange() {
   const c = props.committees.find(c => c.id === form.committee_id)
   if (c) {
     form.committee_name = c.name
+    form.plan_ids = [...(c.plan_ids ?? [])]
     onRoleChange()
   }
 }
@@ -265,6 +322,12 @@ function onRoleChange() {
   if (!c) return
   const isChair = ['chairperson', 'co_chair'].includes(form.role)
   form.load_units = isChair ? c.chairperson_load_units : c.member_load_units
+}
+
+function togglePlan(id) {
+  const idx = form.plan_ids.indexOf(id)
+  if (idx === -1) form.plan_ids.push(id)
+  else form.plan_ids.splice(idx, 1)
 }
 
 function save() {
@@ -284,6 +347,7 @@ function remove(a) {
   useForm({}).delete(route('faculty-loading.committee-assignments.destroy', a.id))
 }
 
+// ── Badge helpers ──────────────────────────────────────────────────────────
 function roleBadge(role) {
   return {
     chairperson: 'bg-amber-50 text-amber-700',
@@ -293,9 +357,7 @@ function roleBadge(role) {
   }[role] ?? 'bg-slate-100 text-slate-600'
 }
 
-function roleLabel(role) {
-  return roles.find(r => r.value === role)?.label ?? role
-}
+function roleLabel(role) { return roles.find(r => r.value === role)?.label ?? role }
 
 function statusBadge(status) {
   return {
