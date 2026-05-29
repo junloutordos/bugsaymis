@@ -7,11 +7,14 @@ use App\Mail\IPCRSubmittedForRatingMail;
 use App\Mail\IPCRSubmittedForReviewMail;
 use App\Models\Division;
 use App\Models\EmployeeIPCR;
+use App\Models\FacultyLoading\FacultyCommitteeAssignment;
 use App\Models\IPCRRatingPeriod;
 use App\Models\User;
 use App\Models\WorkDistributionPlan;
 use App\Services\AuditLogger;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
@@ -192,15 +195,36 @@ class EmployeeIPCRController extends Controller
             return $plan;
         });
 
-        $ocdUser = \App\Models\User::havingRole('OCD')->first();
+        $ocdUser   = \App\Models\User::havingRole('OCD')->first();
+        $isFaculty = $ipcr->user->hasRole('Faculty');
+
+        // For faculty (CID teachers), surface WDP plans linked to their active FL committee assignments
+        $suggestedPlanIds = [];
+        if ($isFaculty) {
+            $committeeIds = FacultyCommitteeAssignment::where('user_id', $ipcr->user->id)
+                ->where('status', 'active')
+                ->whereNotNull('committee_id')
+                ->pluck('committee_id');
+
+            if ($committeeIds->isNotEmpty()) {
+                $suggestedPlanIds = DB::table('committee_work_distribution_plan')
+                    ->whereIn('committee_id', $committeeIds)
+                    ->pluck('work_distribution_plan_id')
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
+        }
 
         return Inertia::render('PerformanceManagement/EmployeeIPCRShow', [
-            'ipcr'       => $ipcr,
-            'employee'   => $ipcr->user,
-            'supervisor' => $supervisor,
-            'ocdUser'    => $ocdUser ? ['name' => $ocdUser->name, 'position' => $ocdUser->position] : null,
-            'plans'      => $plans,
-            'workPlans'  => $workPlans,
+            'ipcr'             => $ipcr,
+            'employee'         => $ipcr->user,
+            'supervisor'       => $supervisor,
+            'ocdUser'          => $ocdUser ? ['name' => $ocdUser->name, 'position' => $ocdUser->position] : null,
+            'plans'            => $plans,
+            'workPlans'        => $workPlans,
+            'isFaculty'        => $isFaculty,
+            'suggestedPlanIds' => $suggestedPlanIds,
         ]);
     }
 
@@ -248,6 +272,59 @@ class EmployeeIPCRController extends Controller
             ->with('success', 'Accomplishment and ratings saved successfully.');
     }
 
+
+    /**
+     * Pull accomplishments (and supervisor ratings if already given) from Faculty Loading
+     * committee assignments into this IPCR's plan pivots.
+     * Only available to faculty members before the IPCR is submitted for rating.
+     */
+    public function pullFLAccomplishments(EmployeeIPCR $employeeIPCR): RedirectResponse
+    {
+        abort_if($employeeIPCR->user_id !== auth()->id(), 403);
+        abort_if(
+            ! in_array($employeeIPCR->status, ['New Target', 'For Review', 'Targets Approved', 'Returned for Revision']),
+            422,
+            'Faculty Loading sync is not available at this stage.'
+        );
+
+        $ipcrPlanIds = $employeeIPCR->plans()->pluck('work_distribution_plans.id');
+
+        if ($ipcrPlanIds->isEmpty()) {
+            return back()->with('success', 'No plans in this IPCR to sync.');
+        }
+
+        $assignments = FacultyCommitteeAssignment::with('accomplishments')
+            ->where('user_id', auth()->id())
+            ->where('status', 'active')
+            ->whereNotNull('committee_id')
+            ->get();
+
+        $updated = 0;
+        foreach ($assignments as $assignment) {
+            foreach ($assignment->accomplishments as $acc) {
+                if (! $ipcrPlanIds->contains($acc->work_distribution_plan_id)) {
+                    continue;
+                }
+
+                $pivot = ['accomplishment' => $acc->accomplishment, 'mov_link' => $acc->mov_link];
+
+                // Carry over supervisor ratings if the chairperson has already rated
+                if (! is_null($acc->sup_average)) {
+                    $pivot['sup_quality']    = $acc->sup_quality;
+                    $pivot['sup_efficiency'] = $acc->sup_efficiency;
+                    $pivot['sup_timeliness'] = $acc->sup_timeliness;
+                    $pivot['sup_average']    = $acc->sup_average;
+                }
+
+                $employeeIPCR->plans()->updateExistingPivot($acc->work_distribution_plan_id, $pivot);
+                $updated++;
+            }
+        }
+
+        return back()->with('success', $updated > 0
+            ? "{$updated} plan(s) synced from Faculty Loading."
+            : 'No Faculty Loading accomplishments found to sync. Make sure your committee chairperson has rated your work in the Faculty Loading module.');
+    }
 
     private function resolveDivisionChief(User $employee): ?User
     {
