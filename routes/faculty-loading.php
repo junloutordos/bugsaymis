@@ -123,11 +123,14 @@ Route::middleware(['web', 'auth', 'verified'])
 
                 // Committee Assignments
                 Route::prefix('committee-assignments')->name('committee-assignments.')->group(function () {
-                    Route::get('/',                                 [CommitteeAssignmentController::class, 'index'])->name('index');
-                    Route::get('/compliance',                       [CommitteeAssignmentController::class, 'compliance'])->name('compliance');
-                    Route::post('/',                                [CommitteeAssignmentController::class, 'store'])->name('store');
-                    Route::put('/{committeeAssignment}',            [CommitteeAssignmentController::class, 'update'])->name('update');
-                    Route::delete('/{committeeAssignment}',         [CommitteeAssignmentController::class, 'destroy'])->name('destroy');
+                    Route::get('/',                                         [CommitteeAssignmentController::class, 'index'])->name('index');
+                    Route::get('/compliance',                               [CommitteeAssignmentController::class, 'compliance'])->name('compliance');
+                    Route::get('/committee/{committee}',                    [CommitteeAssignmentController::class, 'show'])->name('show');
+                    Route::post('/',                                        [CommitteeAssignmentController::class, 'store'])->name('store');
+                    Route::put('/{committeeAssignment}',                    [CommitteeAssignmentController::class, 'update'])->name('update');
+                    Route::delete('/{committeeAssignment}',                 [CommitteeAssignmentController::class, 'destroy'])->name('destroy');
+                    Route::post('/{committeeAssignment}/accomplishment',    [CommitteeAssignmentController::class, 'saveAccomplishment'])->name('accomplishment');
+                    Route::post('/{committeeAssignment}/rate',              [CommitteeAssignmentController::class, 'rateAssignment'])->name('rate');
                 });
 
                 // Supervisory Positions

@@ -3,6 +3,7 @@
 namespace App\Models\FacultyLoading;
 
 use App\Models\User;
+use App\Models\WorkDistributionPlan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -58,6 +59,12 @@ class Committee extends Model
     public function facultyAssignments(): HasMany
     {
         return $this->hasMany(FacultyCommitteeAssignment::class, 'committee_id');
+    }
+
+    /** WDP plans tagged to this committee (shared pivot with PMS). */
+    public function workDistributionPlans(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkDistributionPlan::class, 'committee_work_distribution_plan');
     }
 
     // ── Scopes ─────────────────────────────────────────────────────────────────
