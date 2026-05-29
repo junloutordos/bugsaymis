@@ -41,16 +41,7 @@
         </table>
 
         <!-- Pagination -->
-        <div v-if="rewards.last_page > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <Link v-for="link in rewards.links" :key="link.label"
-            :href="link.url ?? '#'"
-            v-html="link.label"
-            :class="[
-              'rounded px-3 py-1 text-sm',
-              link.active ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100',
-              !link.url ? 'pointer-events-none opacity-40' : '',
-            ]" />
-        </div>
+        <PaginationControl :links="rewards.links" :total="rewards.total" />
       </div>
     </div>
   </AdminLayout>
@@ -59,6 +50,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({ rewards: Object })
 

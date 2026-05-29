@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import axios from 'axios'
 import { storageUrl } from "@/Composables/useStorage.js"
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   vacancies:          { type: Object, required: true },
@@ -236,17 +237,7 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
       </div>
 
       <!-- Pagination -->
-      <div v-if="vacancies.last_page > 1" class="mt-4 flex justify-center gap-2">
-        <a v-for="link in vacancies.links" :key="link.label"
-           :href="link.url ?? '#'"
-           v-html="link.label"
-           :class="[
-             'px-3 py-1.5 rounded-lg text-sm border backdrop-blur-sm',
-             link.active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/80 text-gray-700 border-gray-200 hover:bg-white',
-             !link.url && 'opacity-40 pointer-events-none',
-           ]"
-           @click.prevent="link.url && router.get(link.url)" />
-      </div>
+      <PaginationControl :links="vacancies.links" :total="vacancies.total" />
     </div>
   </div>
 
