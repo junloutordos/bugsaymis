@@ -12,9 +12,6 @@
 </template>
 
 <script setup>
-import { usePage } from '@inertiajs/vue3'
-import { useForm } from '@inertiajs/vue3'
-import Pagination from '@/Components/Pagination.vue'
 import Swal from 'sweetalert2'
 
 // Doctor schedules UI removed — no client-side actions required

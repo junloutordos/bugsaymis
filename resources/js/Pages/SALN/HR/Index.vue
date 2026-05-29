@@ -115,19 +115,7 @@
         </table>
 
         <!-- Pagination -->
-        <div v-if="records.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-          <p class="text-xs text-slate-500">Showing {{ records.from }}–{{ records.to }} of {{ records.total }}</p>
-          <div class="flex gap-1">
-            <Link v-for="link in records.links" :key="link.label"
-              :href="link.url ?? '#'"
-              :class="[
-                'px-3 py-1 text-xs rounded-lg border transition-colors',
-                link.active ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-600 border-slate-200 hover:bg-slate-50',
-                !link.url ? 'opacity-40 pointer-events-none' : ''
-              ]"
-              v-html="link.label" />
-          </div>
-        </div>
+        <PaginationControl :links="records.links" :total="records.total" />
       </div>
 
     </div>
@@ -152,6 +140,7 @@ import { ref, reactive } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ConfirmModal from '../Partials/ConfirmModal.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import {
   CheckCircleIcon, DocumentTextIcon, EyeIcon,
   DocumentArrowDownIcon, ArchiveBoxArrowDownIcon, ChartBarIcon,

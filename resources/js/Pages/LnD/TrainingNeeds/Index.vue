@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   needs:     { type: Object, required: true },
@@ -330,17 +331,7 @@ const deleteNeed = (n) => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="needs.last_page > 1"
-        class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-        <span>Showing {{ needs.from }}–{{ needs.to }} of {{ needs.total }}</span>
-        <div class="flex gap-1">
-          <button v-for="p in needs.links" :key="p.label"
-            @click="p.url && goToPage(new URL(p.url).searchParams.get('page'))"
-            :disabled="!p.url"
-            :class="['px-3 py-1 rounded border text-xs', p.active ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-slate-600']"
-            v-html="p.label" />
-        </div>
-      </div>
+      <PaginationControl :links="needs.links" :total="needs.total" />
     </div>
 
     <!-- Create / Edit Modal -->
