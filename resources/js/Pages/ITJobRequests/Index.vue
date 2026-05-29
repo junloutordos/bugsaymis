@@ -24,8 +24,7 @@ const props = defineProps({
   requests: Object,
   filters: Object,
   categories: Array,
-  divisionChiefs: Array,
-  misPersonnel: Array,
+  // divisionChiefs and misPersonnel removed — auto-resolved server-side
   ictEquipment: Array,
   isAdmin: { type: Boolean, default: false },
   hasPin: { type: Boolean, default: false },
@@ -183,10 +182,16 @@ function runExport() {
 // ── Priority helpers — colours from centralised composable ───────────────────
 const PRIORITY_LABELS = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' }
 
-// Clear event_date when category changes away from Technical Assistance on Events
+const POSTING_CATEGORIES = ['Posting to Website', 'Posting to Social Media']
+const isPostingCategory = computed(() => POSTING_CATEGORIES.includes(form.category))
+
+// Clear dependent fields when category changes
 watch(() => form.category, (val) => {
   if (val !== 'Technical Assistance on Events') {
     form.event_date = ''
+  }
+  if (!POSTING_CATEGORIES.includes(val)) {
+    form.posting_type = null
   }
 })
 
@@ -703,39 +708,37 @@ function handleSigCancel() {
                   <p class="text-xs text-slate-400 mt-1">MIS may adjust the final priority based on workload.</p>
                 </div>
 
-                <!-- Division Approval -->
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Division Approval</label>
-                  <select
-                    v-model="form.divisionchief_id"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                    required
-                  >
-                    <option value="">-- Select Division Chief --</option>
-                    <option
-                      v-for="chief in props.divisionChiefs"
-                      :key="chief.id"
-                      :value="chief.id"
-                    >
-                      {{ chief.name }}
-                    </option>
-                  </select>
-
+                <!-- Posting Content Type — only for posting categories -->
+                <div v-if="isPostingCategory">
+                  <label class="block text-xs font-medium text-slate-600 mb-2">
+                    Posting Content Type <span class="text-red-500">*</span>
+                  </label>
+                  <div class="flex gap-3">
+                    <label v-for="opt in [
+                      { value: 'financial', label: 'Financial', sub: 'Routed to your Division Chief' },
+                      { value: 'general',   label: 'General / Informational', sub: 'Routed to the Information Officer' },
+                    ]" :key="opt.value"
+                      class="flex-1 flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors"
+                      :class="form.posting_type === opt.value
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-slate-200 hover:border-slate-300'">
+                      <input type="radio" v-model="form.posting_type" :value="opt.value" class="mt-0.5 accent-indigo-600" required />
+                      <div>
+                        <p class="text-sm font-semibold" :class="form.posting_type === opt.value ? 'text-indigo-700' : 'text-slate-700'">{{ opt.label }}</p>
+                        <p class="text-xs text-slate-400 mt-0.5">{{ opt.sub }}</p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
-                <!-- Assign Personnel -->
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Assign Personnel</label>
-                  <select
-                    v-model="form.assignedto"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-                    required
-                  >
-                    <option value="">-- Select MIS Personnel --</option>
-                    <option v-for="mis in props.misPersonnel" :key="mis.id" :value="mis.id">
-                      {{ mis.name }}
-                    </option>
-                  </select>
+                <!-- Approver info (auto-resolved) -->
+                <div v-if="!isPostingCategory" class="flex items-start gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5">
+                  <svg class="h-4 w-4 text-slate-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p class="text-xs text-slate-500 leading-relaxed">
+                    Your request will be automatically sent to your <strong>Division Chief</strong> for approval. MIS personnel will be auto-assigned based on workload.
+                  </p>
                 </div>
 
               </template>
