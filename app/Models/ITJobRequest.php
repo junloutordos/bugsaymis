@@ -19,6 +19,7 @@ class ITJobRequest extends Model
         'facility_request_id',
         'category',
         'event_date',
+        'posting_type',
         'title',
         'description',
         'status',

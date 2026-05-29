@@ -78,8 +78,7 @@ public function index(Request $request)
         'requests'       => $requests,
         'filters'        => ['search' => $search, 'category' => $category, 'status' => $status, 'per_page' => $perPage],
         'categories'     => ITJobCategory::orderBy('name')->get(['id', 'name']),
-        'divisionChiefs' => User::whereHas('roles', fn ($q) => $q->whereIn('name', ['DivisionChief', 'InformationOfficer']))->select('id', 'name')->orderBy('name')->get(),
-        'misPersonnel'   => User::havingRole('MIS')->select('id', 'name')->orderBy('name')->get(),
+        // divisionChiefs and misPersonnel removed — now auto-resolved on store()
         'ictEquipment'   => ICTEquipment::with(['room:id,name,code', 'owner:id,name'])
             ->orderBy('description')
             ->get(['id', 'description', 'room_id', 'owner_id', 'serial_no']),
@@ -96,27 +95,96 @@ public function index(Request $request)
         return $user->getRoleName();
     }
 
+    /**
+     * Determine who must approve this request.
+     *
+     * Default: the Division Chief of the requestor's division.
+     * Exception: "Posting to Website" / "Posting to Social Media" with posting_type = 'general'
+     *            routes to the Information Officer instead of the DC.
+     */
+    private function resolveApprover(User $user, string $category, ?string $postingType): int
+    {
+        $postingCategories = ['Posting to Website', 'Posting to Social Media'];
+
+        if (in_array($category, $postingCategories) && $postingType === 'general') {
+            $io = User::havingRole('InformationOfficer')->first();
+            if (! $io) {
+                throw new \RuntimeException('No Information Officer is currently configured. Please contact your administrator.');
+            }
+            return $io->id;
+        }
+
+        // All other categories → user's Division Chief
+        $chiefId = $user->division_id
+            ? \App\Models\Division::where('id', $user->division_id)->value('division_chief_id')
+            : null;
+
+        if (! $chiefId) {
+            throw new \RuntimeException('You are not assigned to a division with a Division Chief. Please contact HR.');
+        }
+
+        return $chiefId;
+    }
+
+    /**
+     * Auto-assign to the MIS member with the fewest active (non-terminal) requests.
+     * Falls back to null if no MIS users exist.
+     */
+    private function autoAssignMIS(): ?int
+    {
+        $misIds = User::havingRole('MIS')->pluck('id');
+        if ($misIds->isEmpty()) {
+            return null;
+        }
+
+        $terminalStatuses = ['Request Completed', 'Rejected by Division Chief', 'Rejected by OCD'];
+
+        $activeCounts = ITJobRequest::whereIn('assignedto', $misIds)
+            ->whereNotIn('status', $terminalStatuses)
+            ->groupBy('assignedto')
+            ->selectRaw('assignedto, COUNT(*) as cnt')
+            ->pluck('cnt', 'assignedto');
+
+        // Sort by active count ASC, break ties by user ID ASC for determinism
+        return $misIds->sortBy(fn ($id) => [$activeCounts->get($id, 0), $id])->first();
+    }
+
     /* =====================================================
      | STORE
      |=====================================================*/
     public function store(Request $request)
     {
-        $isTechEvent = $request->input('category') === 'Technical Assistance on Events';
+        $isTechEvent   = $request->input('category') === 'Technical Assistance on Events';
+        $isPosting     = in_array($request->input('category'), ['Posting to Website', 'Posting to Social Media']);
 
         $validated = $request->validate([
-            'category'         => 'required|string',
-            'event_date'       => $isTechEvent
+            'category'     => 'required|string',
+            'event_date'   => $isTechEvent
                 ? 'required|date|after_or_equal:' . now()->addDays(3)->toDateString()
                 : 'nullable|date',
-            'title'            => 'required|string|max:255',
-            'description'      => 'required|string',
-            'divisionchief_id' => 'required|exists:users,id',
-            'assignedto'       => 'required|exists:users,id',
-            'priority'         => 'nullable|in:urgent,high,normal,low',
+            'posting_type' => $isPosting ? 'required|in:financial,general' : 'nullable',
+            'title'        => 'required|string|max:255',
+            'description'  => 'required|string',
+            'priority'     => 'nullable|in:urgent,high,normal,low',
         ], [
-            'event_date.required'         => 'The date of the event is required for Technical Assistance requests.',
-            'event_date.after_or_equal'   => 'Filing a Technical Assistance request less than 3 days before the event is not allowed.',
+            'event_date.required'       => 'The date of the event is required for Technical Assistance requests.',
+            'event_date.after_or_equal' => 'Filing a Technical Assistance request less than 3 days before the event is not allowed.',
+            'posting_type.required'     => 'Please specify whether this posting is Financial or General.',
         ]);
+
+        // Auto-resolve approver (Division Chief or Information Officer)
+        try {
+            $validated['divisionchief_id'] = $this->resolveApprover(
+                $request->user(),
+                $validated['category'],
+                $validated['posting_type'] ?? null
+            );
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['category' => $e->getMessage()]);
+        }
+
+        // Auto-assign MIS personnel (load-balanced by active request count)
+        $validated['assignedto'] = $this->autoAssignMIS();
 
         // Duplicate guard: same user submitted identical title+category within the last 30 seconds
         $isDuplicate = ITJobRequest::where('user_id', $request->user()->id)
@@ -612,7 +680,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     {
         $user = $request->user();
 
-        if (! $user->hasRole('DivisionChief')) {
+        if (! $user->hasAnyRole(['DivisionChief', 'InformationOfficer'])) {
             abort(403, 'Unauthorized');
         }
 
