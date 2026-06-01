@@ -337,7 +337,7 @@ class FacilityRequestController extends Controller
 
     public function update(Request $request, FacilityRequest $facilityRequest)
     {
-        $isAdmin = $request->user()->hasRole('Administrator');
+        $isAdmin = $request->user()->isSuperAdmin();
         if (! $isAdmin) abort(403);
 
         $facilityRequest->update($request->all());
@@ -388,7 +388,7 @@ class FacilityRequestController extends Controller
     public function approveInApp(Request $request, FacilityRequest $facilityRequest)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasRole('DivisionChief')) {
+        if (! $user || ! $user->hasPermission('facilities.dc-approve')) {
             logger()->warning('Blocked facility approve in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->getRoleName(), 'facility_request_id' => $facilityRequest->id]);
             abort(403);
         }
@@ -455,7 +455,7 @@ class FacilityRequestController extends Controller
     public function declineInApp(Request $request, FacilityRequest $facilityRequest)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasRole('DivisionChief')) {
+        if (! $user || ! $user->hasPermission('facilities.dc-approve')) {
             logger()->warning('Blocked facility decline in-app: role mismatch', ['user_id' => $user?->id, 'role' => $user?->getRoleName(), 'facility_request_id' => $facilityRequest->id]);
             abort(403);
         }
@@ -717,7 +717,7 @@ class FacilityRequestController extends Controller
 
     public function destroy(FacilityRequest $facilityRequest)
     {
-        $isAdmin = auth()->user()->hasRole('Administrator');
+        $isAdmin = auth()->user()->isSuperAdmin();
         if (! $isAdmin) abort(403);
         $facilityRequest->delete();
         return redirect()->route('facility-requests.index');
@@ -840,7 +840,7 @@ class FacilityRequestController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->hasAnyRole(['Administrator', 'GSU Head'])) {
+        if (! $user->hasPermission('facilities.manage')) {
             abort(403);
         }
 
@@ -859,7 +859,7 @@ class FacilityRequestController extends Controller
     public function divisionChiefApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+        if (! $user->hasPermission('facilities.dc-approve')) {
             abort(403);
         }
 

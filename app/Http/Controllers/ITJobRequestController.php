@@ -37,7 +37,7 @@ class ITJobRequestController extends Controller
 public function index(Request $request)
 {
     $user    = $request->user();
-    $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+    $isAdmin = $user->hasPermission('it.requests.manage');
     $search   = trim($request->query('search', ''));
     $category = trim($request->query('category', ''));
     $status   = trim($request->query('status', ''));
@@ -771,7 +771,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     {
         $user = $request->user();
 
-        if (! $user->hasRole('OCD')) {
+        if (! $user->hasPermission('it.requests.manage')) {
             abort(403, 'Unauthorized');
         }
 
@@ -884,7 +884,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     public function exportPdf(Request $request)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+        $isAdmin = $user->hasPermission('it.requests.manage');
 
         $dateFrom = $request->input('date_from');
         $dateTo   = $request->input('date_to');
@@ -943,7 +943,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     public function queue(Request $request)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+        $isAdmin = $user->hasPermission('it.requests.manage');
 
         if (! $isAdmin) {
             abort(403, 'Unauthorized');
@@ -992,7 +992,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     public function updatePriority(Request $request, ITJobRequest $jobRequest)
     {
         $user    = $request->user();
-        $isAdmin = $user->hasRole('Administrator') || $user->hasRole('MIS');
+        $isAdmin = $user->hasPermission('it.requests.manage');
 
         if (! $isAdmin) {
             abort(403, 'Unauthorized');

@@ -20,7 +20,7 @@ class ConsultationController extends Controller
     {
         $user = $request->user();
         // Build base query; Nurses and admins see all; others only their own
-        if ($user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
+        if ($user->hasPermission('health.manage')) {
             $query = Consultation::query();
         } else {
             // Prefer requestor_id (added by migrations). Fall back to old `requestor` string column if necessary.
@@ -503,7 +503,7 @@ class ConsultationController extends Controller
         $user = $request->user();
 
         // Only Nurse, Clinic, or Admin can schedule
-        if (! $user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
+        if (! $user->hasPermission('health.manage')) {
             abort(403);
         }
 
@@ -708,7 +708,7 @@ class ConsultationController extends Controller
         $user = $request->user();
 
         // Only allow clinic/nurse/admin per route middleware but double-check here
-        if (! $user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
+        if (! $user->hasPermission('health.manage')) {
             abort(403);
         }
 
@@ -858,7 +858,7 @@ class ConsultationController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->hasAnyRole(['Administrator', 'Nurse'])) {
+        if (! $user->hasPermission('health.manage')) {
             abort(403);
         }
 

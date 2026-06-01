@@ -16,7 +16,7 @@ class ClassRecordPageController extends Controller
 {
     private function isAdmin(): bool
     {
-        return Auth::user()->hasAnyRole(['Administrator', 'AUH', 'CID Chief']);
+        return Auth::user()->hasPermission('class-records.admin');
     }
 
     /**

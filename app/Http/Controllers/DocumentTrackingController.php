@@ -126,7 +126,7 @@ class DocumentTrackingController extends Controller
     public function index()
     {
         $user    = Auth::user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'Records']);
+        $isAdmin = $user->hasPermission('documents.approve');
 
         $query = Document::with([
             'documentType:id,name,code',
@@ -156,7 +156,7 @@ class DocumentTrackingController extends Controller
                                 ->get(['id', 'name', 'code', 'routing_type', 'lead_time_hours']),
             'users'         => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
             'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
-            'canLogExternal'=> $user->hasAnyRole(['Administrator', 'Records']),
+            'canLogExternal'=> $user->hasPermission('documents.approve'),
             'isAdmin'       => $isAdmin,
         ]);
     }
@@ -337,7 +337,7 @@ class DocumentTrackingController extends Controller
     public function show(Document $document)
     {
         $user    = Auth::user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'Records']);
+        $isAdmin = $user->hasPermission('documents.approve');
 
         if (! $isAdmin) {
             $uid       = $user->id;
@@ -380,7 +380,7 @@ class DocumentTrackingController extends Controller
         $uid = Auth::id();
         $canAnnotate = $document->created_by === $uid
             || $document->routings()->where('receiver_id', $uid)->exists()
-            || Auth::user()->hasAnyRole(['Administrator', 'Records', 'OCD']);
+            || Auth::user()->hasAnyPermission(['documents.approve', 'documents.update']);
         abort_if(! $canAnnotate, 403);
 
         $data = $request->validate(['remarks' => 'required|string|max:2000']);
@@ -538,7 +538,7 @@ class DocumentTrackingController extends Controller
     public function complete(Request $request, Document $document)
     {
         $user      = Auth::user();
-        $canClose  = $user->hasAnyRole(['Administrator', 'Records', 'OCD'])
+        $canClose  = $user->hasAnyPermission(['documents.approve', 'documents.update'])
             || $document->routings()->where('receiver_id', $user->id)->whereIn('status', ['Received', 'Action Taken'])->exists();
         abort_if(! $canClose, 403);
 
@@ -581,7 +581,7 @@ class DocumentTrackingController extends Controller
     public function viewScan(Document $document, DocumentAttachment $attachment)
     {
         $user    = Auth::user();
-        $isAdmin = $user->hasAnyRole(['Administrator', 'Records']);
+        $isAdmin = $user->hasPermission('documents.approve');
 
         if (! $isAdmin) {
             $uid       = $user->id;

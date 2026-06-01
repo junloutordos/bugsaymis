@@ -15,7 +15,7 @@ class HealthStatisticsController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->hasAnyRole(['Administrator', 'Nurse', 'Clinic'])) {
+        if (! $user->hasPermission('health.manage')) {
             abort(403);
         }
 

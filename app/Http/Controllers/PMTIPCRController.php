@@ -92,7 +92,7 @@ class PMTIPCRController extends Controller
             'plans'      => $ipcr->plans,
             'employee'   => $ipcr->user,
             'supervisor' => $ipcr->user?->division?->divisionchief,
-            'isOCD'      => auth()->user()->hasRole('OCD'),
+            'isOCD'      => auth()->user()->hasPermission('ipcr.approve'),
         ]);
     }
 
@@ -157,7 +157,7 @@ class PMTIPCRController extends Controller
 
     public function directorSign(EmployeeIPCR $employeeIPCR)
     {
-        abort_unless(auth()->user()->hasRole('OCD'), 403);
+        abort_unless(auth()->user()->hasPermission('ipcr.approve'), 403);
 
         $user = auth()->user();
         $employeeIPCR->update([

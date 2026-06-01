@@ -33,7 +33,7 @@ class MessengerialController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $canViewAll = $user->hasAnyRole(['Administrator', 'Records']);
+        $canViewAll = $user->hasPermission('messengerial.manage');
 
         $requests = MessengerialRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email))
             ->latest()
@@ -355,7 +355,7 @@ class MessengerialController extends Controller
     public function forApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['DivisionChief', 'OCD', 'Administrator'])) {
+        if (! $user->hasAnyPermission(['messengerial.dc-approve', 'messengerial.ocd-approve'])) {
             abort(403, 'Unauthorized');
         }
 
@@ -394,12 +394,12 @@ class MessengerialController extends Controller
     public function divisionChiefAction(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['DivisionChief', 'OCD', 'Administrator'])) {
+        if (! $user->hasAnyPermission(['messengerial.dc-approve', 'messengerial.ocd-approve'])) {
             abort(403);
         }
 
-        // OCD and DivisionChief can only act on requests assigned to them
-        if ($user->hasAnyRole(['DivisionChief', 'OCD']) && ! $user->hasRole('Administrator')) {
+        // DC/OCD can only act on requests assigned to them
+        if ($user->hasAnyPermission(['messengerial.dc-approve', 'messengerial.ocd-approve']) && ! $user->isSuperAdmin()) {
             if ((int) $messengerialRequest->division_chief_id !== $user->id) {
                 abort(403);
             }
@@ -470,7 +470,7 @@ class MessengerialController extends Controller
     public function update(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        $isAdmin = $user->hasRole('Administrator');
+        $isAdmin = $user->isSuperAdmin();
 
         // Non-admins may update only when the request is still Pending
         if (! $isAdmin) {
@@ -487,7 +487,7 @@ class MessengerialController extends Controller
     public function destroy(MessengerialRequest $messengerialRequest)
     {
         $user = auth()->user();
-        $isAdmin = $user->hasRole('Administrator');
+        $isAdmin = $user->isSuperAdmin();
 
         // Non-admins may delete only when the request is still Pending
         if (! $isAdmin) {
@@ -509,7 +509,7 @@ class MessengerialController extends Controller
         $user = $request->user();
 
         // Allow if Administrator or Records, otherwise allow the original requester
-        if (! $user->hasAnyRole(['Administrator', 'Records'])) {
+        if (! $user->hasPermission('messengerial.manage')) {
             $userEmail = $user->email ?? null;
             $requestorEmail = $messengerialRequest->email ?? null;
             $requestorName = $messengerialRequest->requestor ?? null;
@@ -549,7 +549,7 @@ class MessengerialController extends Controller
      */
     private function isOcdDivision(User $user): bool
     {
-        if ($user->hasRole('OCD')) {
+        if ($user->hasPermission('messengerial.ocd-approve')) {
             return true;
         }
 
@@ -571,7 +571,7 @@ class MessengerialController extends Controller
     public function uploadProof(Request $request, MessengerialRequest $messengerialRequest)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['Administrator', 'Records'])) {
+        if (! $user->hasPermission('messengerial.manage')) {
             abort(403);
         }
 
@@ -651,7 +651,7 @@ class MessengerialController extends Controller
         $user = $request->user();
         $isOwner   = $messengerialRequest->user_id === $user->id
                   || $messengerialRequest->email   === $user->email;
-        $isStaff   = $user->hasAnyRole(['Administrator', 'Records', 'DivisionChief', 'OCD']);
+        $isStaff   = $user->hasAnyPermission(['messengerial.manage', 'messengerial.dc-approve', 'messengerial.ocd-approve']);
 
         if (! $isOwner && ! $isStaff) {
             abort(403);

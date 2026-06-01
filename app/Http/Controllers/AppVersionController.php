@@ -10,7 +10,7 @@ class AppVersionController extends Controller
 {
     public function store(Request $request)
     {
-        abort_unless($request->user()?->hasRole('Administrator'), 403);
+        abort_unless($request->user()?->isSuperAdmin(), 403);
 
         $validated = $request->validate([
             'version'    => 'required|string|max:30|unique:app_versions,version',

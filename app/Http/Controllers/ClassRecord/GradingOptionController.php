@@ -15,7 +15,7 @@ class GradingOptionController extends Controller
 {
     private function isAdmin(): bool
     {
-        return Auth::user()->hasAnyRole(['Administrator', 'CID Chief']);
+        return Auth::user()->hasPermission('class-records.admin');
     }
 
     /**

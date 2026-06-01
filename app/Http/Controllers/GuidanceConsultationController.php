@@ -19,7 +19,7 @@ class GuidanceConsultationController extends Controller
     {
         $user = $request->user();
 
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.manage')) {
             abort(403, 'Forbidden');
         }
 
@@ -52,7 +52,7 @@ class GuidanceConsultationController extends Controller
     public function searchStudents(Request $request)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Faculty', 'Staff', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.refer')) {
             abort(403, 'Forbidden');
         }
 
@@ -148,7 +148,7 @@ class GuidanceConsultationController extends Controller
     public function storeReferral(Request $request)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Faculty', 'Staff', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.refer')) {
             abort(403, 'Forbidden');
         }
 
@@ -200,7 +200,7 @@ class GuidanceConsultationController extends Controller
     public function assign(Request $request, $id)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.manage')) {
             abort(403, 'Forbidden');
         }
 
@@ -349,7 +349,7 @@ class GuidanceConsultationController extends Controller
     public function intervention(Request $request, $id)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.manage')) {
             abort(403, 'Forbidden');
         }
 
@@ -462,7 +462,7 @@ class GuidanceConsultationController extends Controller
     public function getIntervention(Request $request, $id)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.manage')) {
             abort(403, 'Forbidden');
         }
 
@@ -662,7 +662,7 @@ class GuidanceConsultationController extends Controller
 
     private function authorizeGuidance($user): void
     {
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.manage')) {
             abort(403, 'Forbidden');
         }
     }
@@ -705,7 +705,7 @@ class GuidanceConsultationController extends Controller
     public function admissionSlip(Request $request, $id)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasAnyRole(['Administrator', 'Guidance'])) {
+        if (! $user || ! $user->hasPermission('guidance.manage')) {
             abort(403, 'Forbidden');
         }
 

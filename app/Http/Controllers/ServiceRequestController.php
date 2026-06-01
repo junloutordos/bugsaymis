@@ -236,7 +236,7 @@ class ServiceRequestController extends Controller
     public function approveInApp(Request $request, ServiceRequest $serviceRequest)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
+        if (! $user || ! $user->hasPermission('facilities.dc-approve')) abort(403);
 
         // Validate that the division chief is responsible for this request
         $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
@@ -301,7 +301,7 @@ class ServiceRequestController extends Controller
     public function declineInApp(Request $request, ServiceRequest $serviceRequest)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
+        if (! $user || ! $user->hasPermission('facilities.dc-approve')) abort(403);
         $assignedChiefId = $this->resolveDivisionChiefId($serviceRequest);
         if ($assignedChiefId && (int) $assignedChiefId !== (int) $user->id) {
             abort(403);
@@ -523,7 +523,7 @@ class ServiceRequestController extends Controller
     public function divisionChiefApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+        if (! $user->hasPermission('facilities.dc-approve')) {
             abort(403);
         }
 
@@ -627,7 +627,7 @@ class ServiceRequestController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->hasAnyRole(['Administrator', 'GSU Head'])) {
+        if (! $user->hasPermission('facilities.manage')) {
             abort(403);
         }
 

@@ -63,7 +63,7 @@ class HandleInertiaRequests extends Middleware
                         'position' => $authUser->position,
                         'email' => $authUser->email,
                         // expose numeric/string role ids for client-side checks (may be CSV)
-                        'role_id' => $authUser->role_id ?? $userRoles->pluck('id')->implode(','),
+                        'role_id' => $userRoles->pluck('id')->implode(','),
                         'sex' => $authUser->sex,
                         'profile_picture' => $authUser->profile_picture
                             ? $this->s3Url($authUser->profile_picture)
@@ -95,7 +95,7 @@ class HandleInertiaRequests extends Middleware
                     $cacheKey = 'badge.consultations.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
                         // Clinic/Nurse/Admin see all pending consultations
-                        if ($user->hasAnyRole(['Administrator', 'Clinic', 'Nurse'])) {
+                        if ($user->hasPermission('health.manage')) {
                             return Consultation::whereIn('status', ['Pending', 'Active'])->count();
                         }
                         // All other roles see only their own consultations
@@ -110,7 +110,7 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.it_requests.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasAnyRole(['MIS', 'Administrator'])) {
+                        if ($user->hasPermission('it.requests.manage')) {
                             return ITJobRequest::whereIn('status', ['In Progress'])->count();
                         }
                         return ITJobRequest::whereIn('status', ['In Progress'])->where('user_id', $user->id)->count();
@@ -133,7 +133,7 @@ class HandleInertiaRequests extends Middleware
                     if (!$user) return 0;
                     $cacheKey = 'badge.messengerial.u' . $user->id;
                     return Cache::remember($cacheKey, 60, function () use ($user) {
-                        if ($user->hasAnyRole(['Records', 'Administrator'])) {
+                        if ($user->hasPermission('messengerial.manage')) {
                             return MessengerialRequest::whereNotIn('status', ['Completed', 'Declined'])->count();
                         }
                         return MessengerialRequest::where('email', $user->email)

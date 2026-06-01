@@ -31,7 +31,7 @@ class GatePassController extends Controller
         $rows = null;
         $chiefDivision = null;
         $user = $request->user();
-        $role = $user?->role->name ?? '';
+        $role = $user?->getRoleName() ?? '';
 
         if ($user) {
             $chiefDivision = DB::table('divisions')->where('division_chief_id', $user->id)->first();
@@ -318,7 +318,7 @@ class GatePassController extends Controller
         // Status transitions are only allowed through dedicated approval endpoints.
         // Non-approver roles (regular staff filing updates) must never set status directly.
         $user = $request->user();
-        $role = $user?->role->name ?? '';
+        $role = $user?->getRoleName() ?? '';
         $isApprover = in_array($role, ['DivisionChief', 'OCD', 'Administrator']);
 
         if (! $isApprover) {

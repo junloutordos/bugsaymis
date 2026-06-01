@@ -198,7 +198,7 @@ class VehicleRequestController extends Controller
         $user = $request->user();
         logger()->info('approveInApp called', ['user_id' => $user->id ?? null, 'role' => $user->getRoleName(), 'vehicle_request_id' => $vehicleRequest->id]);
 
-        if (! $user || ! $user->hasRole('DivisionChief')) {
+        if (! $user || ! $user->hasPermission('vehicles.dc-approve')) {
             logger()->warning('approveInApp forbidden - not division chief', ['user_id' => $user->id ?? null]);
             return back()->with('error', 'You are not authorized to approve this request.');
         }
@@ -266,7 +266,7 @@ class VehicleRequestController extends Controller
         $user = $request->user();
         logger()->info('declineInApp called', ['user_id' => $user->id ?? null, 'role' => $user->getRoleName(), 'vehicle_request_id' => $vehicleRequest->id]);
 
-        if (! $user || ! $user->hasRole('DivisionChief')) {
+        if (! $user || ! $user->hasPermission('vehicles.dc-approve')) {
             logger()->warning('declineInApp forbidden - not division chief', ['user_id' => $user->id ?? null]);
             return back()->with('error', 'You are not authorized to decline this request.');
         }
@@ -494,7 +494,7 @@ class VehicleRequestController extends Controller
      */
     public function update(Request $request, VehicleRequest $vehicleRequest)
     {
-        $isAdmin = $request->user()->hasRole('Administrator');
+        $isAdmin = $request->user()->isSuperAdmin();
         if (! $isAdmin) {
             abort(403);
         }
@@ -535,7 +535,7 @@ class VehicleRequestController extends Controller
      */
     public function destroy(VehicleRequest $vehicleRequest)
     {
-        $isAdmin = auth()->user()->hasRole('Administrator');
+        $isAdmin = auth()->user()->isSuperAdmin();
         if (! $isAdmin) {
             abort(403);
         }
@@ -586,7 +586,7 @@ class VehicleRequestController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->hasAnyRole(['Administrator', 'GSU Head'])) {
+        if (! $user->hasPermission('vehicles.manage')) {
             abort(403);
         }
 
@@ -648,7 +648,7 @@ class VehicleRequestController extends Controller
     public function divisionChiefApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+        if (! $user->hasPermission('vehicles.dc-approve')) {
             abort(403);
         }
 
