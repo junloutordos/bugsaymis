@@ -55,6 +55,12 @@ class User extends Authenticatable
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
+    /** Legacy single-role relationship via role_id FK. */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
     /**
      * New pivot-based many-to-many roles relationship.
      */
