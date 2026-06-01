@@ -34,6 +34,81 @@ class GradingOptionController extends Controller
     }
 
     /**
+     * POST /grading-options
+     * Create a new grading option with its initial categories.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        abort_unless($this->isAdmin(), 403, 'Only administrators can create grading options.');
+
+        $validated = $request->validate([
+            'name'                         => 'required|string|max:255|unique:grading_options,name',
+            'description'                  => 'nullable|string|max:1000',
+            'is_active'                    => 'boolean',
+            'categories'                   => 'required|array|min:1',
+            'categories.*.name'            => 'required|string|max:255',
+            'categories.*.code'            => 'required|string|max:10',
+            'categories.*.weight'          => 'required|numeric|min:0.001|max:1',
+            'categories.*.max_assessments' => 'required|integer|min:1|max:20',
+            'categories.*.sort_order'      => 'required|integer|min:0',
+        ]);
+
+        $totalWeight = array_sum(array_column($validated['categories'], 'weight'));
+        if (abs($totalWeight - 1.0) > 0.005) {
+            return response()->json([
+                'message' => 'Category weights must sum to 100%. Current total: ' . round($totalWeight * 100, 1) . '%.',
+                'errors'  => ['categories' => ['Weights must sum to 100%.']],
+            ], 422);
+        }
+
+        $option = DB::transaction(function () use ($validated) {
+            $option = GradingOption::create([
+                'name'        => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'is_active'   => $validated['is_active'] ?? true,
+            ]);
+
+            foreach ($validated['categories'] as $i => $cat) {
+                GradingCategory::create([
+                    'grading_option_id' => $option->id,
+                    'name'              => $cat['name'],
+                    'code'              => strtoupper($cat['code']),
+                    'weight'            => $cat['weight'],
+                    'max_assessments'   => $cat['max_assessments'],
+                    'sort_order'        => $cat['sort_order'] ?? $i,
+                ]);
+            }
+
+            return $option;
+        });
+
+        return response()->json([
+            'message' => 'Grading option created.',
+            'data'    => $option->fresh()->load('categories'),
+        ], 201);
+    }
+
+    /**
+     * DELETE /grading-options/{gradingOption}
+     * Delete a grading option. Blocked if any class record uses it.
+     */
+    public function destroy(GradingOption $gradingOption): JsonResponse
+    {
+        abort_unless($this->isAdmin(), 403, 'Only administrators can delete grading options.');
+
+        $inUse = \App\Models\ClassRecord\ClassRecord::where('grading_option_id', $gradingOption->id)->exists();
+        if ($inUse) {
+            return response()->json([
+                'message' => 'Cannot delete this grading option — it is used by one or more class records.',
+            ], 422);
+        }
+
+        $gradingOption->delete();
+
+        return response()->json(['message' => 'Grading option deleted.']);
+    }
+
+    /**
      * PUT /grading-options/{gradingOption}
      * Update the option's name, description, and is_active flag.
      */
