@@ -254,6 +254,9 @@ const displayed = computed(() => {
 | Users (Admin) | `users.*` | `UserController` |
 | IT Job Requests | `it-job-requests.*` | 3-day filing rule for Technical Assistance on Events |
 | Facility Requests | `facility-requests.*` | 3-day filing rule |
+| Official Issuances | `issuances.*` | Tiptap editor, TCPDF+FPDI scan stamping, QR code, PIN signing, queue-based PDF+email, `IssuancePermissionSeeder` |
+| Document Tracking | `document-tracking.*` | `DocumentTrackingController` — internal/external docs, Google Drive attachments, routing templates (sequential/parallel/manual) |
+| Developer Info | `GET /developer` | Public page (no auth) — `Developer.vue`; profiles for Junlou Tordos + Michael Francisco |
 
 ---
 
@@ -272,6 +275,21 @@ const displayed = computed(() => {
 - School year lock: records from past `SchoolYear` are fully read-only; guard on all editing endpoints
 - CSV import: parsed client-side via FileReader → JSON POST → `students/import` endpoint; avoids Cloudflare WAF
 - `school_year_id` FK on `class_records` → `school_years.id`; backfilled by matching `school_years.name`
+- At-risk row highlights (red/orange/amber) in `ScoreGrid.vue` based on running grade
+- Final annual grades tab: `ClassRecordFinalGradeController` — per-student Q1–Q4 GEs + annual average
+- Copy assessments from previous quarter: `ClassRecordAssessmentController` copy endpoint
+- PDF export: `ClassRecordPdfService` — A3 landscape via mPDF, stanine legend footer
+- Teacher notified (bell + email via `ClassRecordCheckedMail`) when admin marks record checked
+
+### Profile Module
+- Route: `GET /profile` → `profile.edit`, `PATCH /profile` → `profile.update`
+- Editable fields: `name`, `specialization`, `profile_photo_base64` / `profile_photo_mime`
+- Photo stored at S3 `profile_pictures/{user_id}_{time}.{ext}`; old photo deleted on update
+- Email/password not user-editable (email = HR-managed; password = Google OAuth)
+- Profile panel: slide-in `ProfileEditModal.vue` triggered by avatar click
+- **Gotcha:** `$user->division` returns a legacy string column — use `Division::find($user->division_id)` explicitly, NOT `$user->load(['division'])` (FK vs legacy column conflict)
+- **Gotcha:** `divisions` table uses `division_name` column, NOT `name`
+- **Gotcha:** `Storage::disk('s3')->temporaryUrl()` fails in production — use `storageUrl()` composable (serves via `/media/` proxy)
 
 ### Mail
 - Provider: Gmail SMTP (`smtp.gmail.com:587`, TLS)
@@ -282,8 +300,12 @@ const displayed = computed(() => {
 ### DB Backup (Cron)
 - Runs via cron inside the container (supervisord manages cron service)
 - `exec()` calls `mysqldump` then `gzip -f` — do NOT disable `exec` in PHP
+- Dumps to `sys_get_temp_dir()` temp file (cleaned in `finally`) — no `storage_path` local copy
 - Compressed backup (~3-5MB) uploaded to Google Drive using service account
 - Google credentials fetched from Secrets Manager at container startup
+- `BackupVerify` command checks Google Drive for a backup within the last 25h (no local files to check)
+- Schedule lives in `routes/console.php` (canonical); `app/Console/Kernel.php` must not duplicate entries
+- Windows: 06:00 PHT (backup), 06:30 PHT (verify) — added May 2026
 
 ---
 
@@ -330,3 +352,4 @@ const displayed = computed(() => {
 - Don't add error handling for impossible scenarios
 - Don't design for hypothetical future requirements
 - Don't upgrade to Laravel 13 yet — wait until Laravel 12 nears EOL (~early 2027); `maatwebsite/excel` and other packages may not be compatible
+- Never use `new DateTime()` with Eloquent date-cast attributes — use `Carbon::parse($value)->format('Y-m-d')` (PHP 8 type coercion causes silent 0 values)

@@ -1255,14 +1255,14 @@ const menuItems = [
   {
     label: "Class Records",
     icon: TableCellsIcon,
-    roles: ["Administrator", "Faculty"],
+    roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
     children: [
       {
         label: "My Class Records",
         routeName: "class-records.page.index",
         href: route("class-records.page.index"),
         icon: ClipboardDocumentListIcon,
-        roles: ["Administrator", "Faculty"],
+        roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
       },
     ],
   },
@@ -1270,7 +1270,7 @@ const menuItems = [
   {
     label: "Faculty Loading",
     icon: AcademicCapIcon,
-    roles: [],
+    roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
     permissions: [
       "faculty_loading.view_own", "faculty_loading.view",
       "faculty_loading.manage", "faculty_loading.school_year",
