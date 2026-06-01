@@ -134,32 +134,6 @@ class User extends Authenticatable
         return $this->belongsTo(SstPosition::class, 'sst_position_id');
     }
 
-    // ─── Auto-clear permission cache when roles are modified ─────────────────
-
-    protected static function booted(): void
-    {
-        static::pivotAttached(function (self $model, string $relation) {
-            if ($relation === 'roles') {
-                $model->clearPermissionCache();
-                $model->unsetRelation('roles');
-            }
-        });
-
-        static::pivotDetached(function (self $model, string $relation) {
-            if ($relation === 'roles') {
-                $model->clearPermissionCache();
-                $model->unsetRelation('roles');
-            }
-        });
-
-        static::pivotUpdated(function (self $model, string $relation) {
-            if ($relation === 'roles') {
-                $model->clearPermissionCache();
-                $model->unsetRelation('roles');
-            }
-        });
-    }
-
     // ─── Permission cache (per-request, cleared on role change) ──────────────
 
     /** @var array<string,bool>|null */
