@@ -364,6 +364,40 @@ class RolePermissionSeeder extends Seeder
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
         $assign('Parent',  ['library.view', 'messengerial.view', 'messengerial.create']);
 
+        // ── Class Records ─────────────────────────────────────────────────────
+        $assign('CID Chief', ['class-records.view', 'class-records.manage', 'class-records.admin']);
+        $assign('Faculty',   ['class-records.view', 'class-records.manage']);
+        $assign('Staff',     ['class-records.view']);
+
+        // ── PPMP ──────────────────────────────────────────────────────────────
+        $assign('Faculty', ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
+        $assign('Staff',   ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
+        $assign('DivisionChief', ['ppmp.review', 'ppmp.approve', 'ppmp.view_all', 'ppmp.export']);
+        $assign('OCD',     ['ppmp.review', 'ppmp.approve', 'ppmp.consolidate', 'ppmp.view_all', 'ppmp.export']);
+        $assign('HR',      ['ppmp.view_all', 'ppmp.export']);
+
+        // ── Org Structure ─────────────────────────────────────────────────────
+        $assign('HR', [
+            'org.view', 'org.view_all',
+            'org.units.create', 'org.units.update', 'org.units.delete', 'org.units.manage',
+            'org.assign', 'org.assign.manage',
+            'org.heads.manage',
+            'org.versions.view', 'org.versions.manage',
+            'org.export', 'org.reports',
+        ]);
+        foreach (['OCD', 'DivisionChief', 'PMT'] as $r) {
+            $assign($r, ['org.view', 'org.view_all', 'org.export', 'org.reports', 'org.versions.view']);
+        }
+        $orgViewOnly = [
+            'MIS', 'Payroll Officer', 'HRMPSB', 'Recruitment Officer',
+            'Faculty', 'Staff', 'Registrar', 'Records', 'Librarian',
+            'Nurse', 'Guidance', 'GSU Head', 'InformationOfficer',
+            'Dorm Manager', 'Student', 'Parent',
+        ];
+        foreach ($orgViewOnly as $r) {
+            $assign($r, ['org.view']);
+        }
+
         // ── Issuances (Special Orders, Memorandums, Travel Orders, etc.) ──────
         // OCD + Administrator can create, sign, and release
         $assign('OCD', ['issuances.view', 'issuances.manage']);

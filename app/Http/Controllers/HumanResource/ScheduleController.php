@@ -18,7 +18,7 @@ class ScheduleController extends Controller
         $q = $request->query('q');
 
         $query = Schedule::query();
-        if ($user && $user->hasAnyRole(['Staff', 'Faculty'])) {
+        if ($user && $user->hasPermission('hr.schedule.view') && ! $user->hasPermission('hr.schedule.manage')) {
             $badge = $user->badge_id ?? null;
             $query->where('badgeNumber', $badge);
         }
@@ -43,7 +43,7 @@ class ScheduleController extends Controller
     {
         $user = Auth::user();
         // Allow Administrator, Staff, and Faculty to create their own schedules
-        if (!($user && $user->hasAnyRole(['Administrator', 'Staff', 'Faculty']))) {
+        if (!($user && $user->hasPermission('hr.schedule.view'))) {
             return redirect()->back()->with('error', 'Unauthorized');
         }
 
@@ -73,7 +73,7 @@ class ScheduleController extends Controller
     {
         $user = Auth::user();
         // Only admin may update
-        if (!($user && $user->hasRole('Administrator'))) {
+        if (!($user && $user->hasPermission('hr.schedule.manage'))) {
             return redirect()->back()->with('error', 'Unauthorized');
         }
 
@@ -97,7 +97,7 @@ class ScheduleController extends Controller
     public function destroy($id)
     {
         $user = Auth::user();
-        if (!($user && $user->hasRole('Administrator'))) {
+        if (!($user && $user->hasPermission('hr.schedule.manage'))) {
             return redirect()->back()->with('error', 'Unauthorized');
         }
         $sched = Schedule::findOrFail($id);

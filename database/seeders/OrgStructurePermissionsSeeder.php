@@ -6,10 +6,17 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
 
+/**
+ * @deprecated Merged into PermissionsSeeder + RolePermissionSeeder.
+ *             Kept as stub to avoid breaking DatabaseSeeder references.
+ */
 class OrgStructurePermissionsSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->command->warn('OrgStructurePermissionsSeeder is deprecated. Run PermissionsSeeder + RolePermissionSeeder instead.');
+        return;
+
         // ── 1. Register all Org Structure permissions ─────────────────────────
         $permissions = [
             // Viewing

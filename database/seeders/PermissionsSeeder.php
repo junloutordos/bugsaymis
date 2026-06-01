@@ -214,6 +214,30 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Issuances', 'name' => 'issuances.view',   'description' => 'View issuances addressed to the user or their office'],
             ['module' => 'Issuances', 'name' => 'issuances.manage', 'description' => 'Create, sign, release, and manage official issuances (OCD)'],
 
+            // ── PPMP ──────────────────────────────────────────────────────────
+            ['module' => 'PPMP', 'name' => 'ppmp.create',      'description' => 'Create and edit own unit PPMP'],
+            ['module' => 'PPMP', 'name' => 'ppmp.submit',      'description' => 'Submit PPMP for review'],
+            ['module' => 'PPMP', 'name' => 'ppmp.review',      'description' => 'View submitted PPMPs from all units'],
+            ['module' => 'PPMP', 'name' => 'ppmp.approve',     'description' => 'Approve or return PPMPs'],
+            ['module' => 'PPMP', 'name' => 'ppmp.consolidate', 'description' => 'Consolidate PPMPs into APP'],
+            ['module' => 'PPMP', 'name' => 'ppmp.export',      'description' => 'Export PPMP/APP to Excel/PDF'],
+            ['module' => 'PPMP', 'name' => 'ppmp.view_all',    'description' => 'View all PPMPs across units'],
+
+            // ── Org Structure ─────────────────────────────────────────────────
+            ['module' => 'OrgStructure', 'name' => 'org.view',              'description' => 'View the organizational chart and unit details'],
+            ['module' => 'OrgStructure', 'name' => 'org.view_all',          'description' => 'View the full org chart including inactive units'],
+            ['module' => 'OrgStructure', 'name' => 'org.units.create',      'description' => 'Create new organizational units'],
+            ['module' => 'OrgStructure', 'name' => 'org.units.update',      'description' => 'Edit existing organizational units'],
+            ['module' => 'OrgStructure', 'name' => 'org.units.delete',      'description' => 'Delete / archive organizational units'],
+            ['module' => 'OrgStructure', 'name' => 'org.units.manage',      'description' => 'Full CRUD management of organizational units'],
+            ['module' => 'OrgStructure', 'name' => 'org.assign',            'description' => 'Assign or re-assign employees to organizational units'],
+            ['module' => 'OrgStructure', 'name' => 'org.assign.manage',     'description' => 'Full management of employee unit assignments'],
+            ['module' => 'OrgStructure', 'name' => 'org.heads.manage',      'description' => 'Designate and manage unit heads'],
+            ['module' => 'OrgStructure', 'name' => 'org.versions.view',     'description' => 'View org structure version history'],
+            ['module' => 'OrgStructure', 'name' => 'org.versions.manage',   'description' => 'Create, approve, and activate org structure versions'],
+            ['module' => 'OrgStructure', 'name' => 'org.export',            'description' => 'Export the organizational chart (PDF, PNG, Excel)'],
+            ['module' => 'OrgStructure', 'name' => 'org.reports',           'description' => 'Generate organizational structure reports'],
+
         ];
 
         foreach ($permissions as $data) {

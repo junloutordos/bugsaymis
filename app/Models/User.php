@@ -6,7 +6,6 @@ use App\Models\FacultyLoading\SstPosition;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Collection;
 use App\Models\Permission;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -62,14 +61,6 @@ class User extends Authenticatable
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'role_user');
-    }
-
-    /**
-     * Legacy single-role relationship (kept for backward compatibility).
-     */
-    public function role()
-    {
-        return $this->belongsTo(Role::class);
     }
 
     public function division()
@@ -143,6 +134,32 @@ class User extends Authenticatable
         return $this->belongsTo(SstPosition::class, 'sst_position_id');
     }
 
+    // ─── Auto-clear permission cache when roles are modified ─────────────────
+
+    protected static function booted(): void
+    {
+        static::pivotAttached(function (self $model, string $relation) {
+            if ($relation === 'roles') {
+                $model->clearPermissionCache();
+                $model->unsetRelation('roles');
+            }
+        });
+
+        static::pivotDetached(function (self $model, string $relation) {
+            if ($relation === 'roles') {
+                $model->clearPermissionCache();
+                $model->unsetRelation('roles');
+            }
+        });
+
+        static::pivotUpdated(function (self $model, string $relation) {
+            if ($relation === 'roles') {
+                $model->clearPermissionCache();
+                $model->unsetRelation('roles');
+            }
+        });
+    }
+
     // ─── Permission cache (per-request, cleared on role change) ──────────────
 
     /** @var array<string,bool>|null */
@@ -185,29 +202,14 @@ class User extends Authenticatable
         return $this->roles->contains('name', 'Administrator');
     }
 
-    /**
-     * Check if the user has a specific role by name.
-     * Checks the pivot relationship first, falls back to legacy role_id.
-     */
     public function hasRole(string $roleName): bool
     {
-        if ($this->relationLoaded('roles')) {
-            return $this->roles->contains('name', $roleName);
-        }
-
-        return $this->getRolesCollection()->contains('name', $roleName);
+        return $this->roles->contains('name', $roleName);
     }
 
-    /**
-     * Check if the user has any of the given roles.
-     */
     public function hasAnyRole(array $roleNames): bool
     {
-        if ($this->relationLoaded('roles')) {
-            return $this->roles->contains(fn($r) => in_array($r->name, $roleNames));
-        }
-
-        return $this->getRolesCollection()->contains(fn($r) => in_array($r->name, $roleNames));
+        return $this->roles->contains(fn($r) => in_array($r->name, $roleNames));
     }
 
     /**
@@ -288,42 +290,11 @@ class User extends Authenticatable
         return array_keys($this->permissionCache);
     }
 
-    // ─── Legacy helpers (kept for backward compatibility) ─────────────────────
-
-    /**
-     * Returns an array of role IDs from the legacy comma-separated role_id field.
-     */
-    public function getRoleIdsArray(): array
-    {
-        return array_values(array_filter(array_map('trim', explode(',', $this->role_id ?? ''))));
-    }
-
-    /**
-     * Returns a Collection of Role models from the legacy role_id field.
-     */
-    public function getRolesCollection(): Collection
-    {
-        $ids = $this->getRoleIdsArray();
-        if (empty($ids)) return collect();
-        return Role::whereIn('id', $ids)->get();
-    }
-
-    /**
-     * Get the primary (first) role name for display purposes.
-     */
     public function getRoleName(): string
     {
-        if ($this->relationLoaded('roles') && $this->roles->isNotEmpty()) {
-            return $this->roles->first()->name;
-        }
-
-        return $this->getRolesCollection()->first()?->name ?? '';
+        return $this->roles->first()?->name ?? '';
     }
 
-    /**
-     * Query scope: filter users who have a specific role.
-     * Checks the pivot table first, falls back to legacy FIND_IN_SET.
-     */
     public function scopeHavingRole($query, string $roleName)
     {
         return $query->whereHas('roles', fn($q) => $q->where('name', $roleName));

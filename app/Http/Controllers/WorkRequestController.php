@@ -172,7 +172,7 @@ class WorkRequestController extends Controller
     public function approveInApp(Request $request, WorkRequest $workRequest)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
+        if (! $user || ! $user->hasPermission('facilities.dc-approve')) abort(403);
 
         if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
         if (in_array($workRequest->status, ['Approved','Division Approved'])) return back()->with('success', 'Already processed');
@@ -215,7 +215,7 @@ class WorkRequestController extends Controller
     public function declineInApp(Request $request, WorkRequest $workRequest)
     {
         $user = $request->user();
-        if (! $user || ! $user->hasRole('DivisionChief')) abort(403);
+        if (! $user || ! $user->hasPermission('facilities.dc-approve')) abort(403);
         if ($workRequest->division_chief_id && (int) $workRequest->division_chief_id !== (int) $user->id) abort(403);
 
         $data = $request->validate(['reason' => 'required|string|max:1000']);
@@ -518,7 +518,7 @@ class WorkRequestController extends Controller
     public function divisionChiefApproval(Request $request)
     {
         $user = $request->user();
-        if (! $user->hasAnyRole(['Administrator', 'DivisionChief'])) {
+        if (! $user->hasPermission('facilities.dc-approve')) {
             abort(403);
         }
 

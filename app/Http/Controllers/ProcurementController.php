@@ -17,7 +17,7 @@ class ProcurementController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
+        $role = $user->getRoleName();
 
         $query = Procurement::with(['items', 'requester:id,name'])->latest();
 
@@ -99,7 +99,7 @@ class ProcurementController extends Controller
     {
         $user = $request->user();
         // simple authorization: only owner or admin can add items
-        $role = $user->role->name ?? '';
+        $role = $user->getRoleName();
         if ($procurement->requested_by && $procurement->requested_by !== $user->id && $role !== 'Administrator') {
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
@@ -158,7 +158,7 @@ class ProcurementController extends Controller
     public function destroyItem(Request $request, Procurement $procurement, ProcurementItem $item)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
+        $role = $user->getRoleName();
         if ($procurement->requested_by && $procurement->requested_by !== $user->id && $role !== 'Administrator') {
             if ($request->wantsJson()) {
                 return response()->json(['error' => 'Unauthorized'], 403);
@@ -195,7 +195,7 @@ class ProcurementController extends Controller
     {
         // simple authorization: only admins can delete (follow project patterns if needed)
         $user = $request->user();
-        if (($user->role->name ?? '') !== 'Administrator') {
+        if (! $user->isSuperAdmin()) {
             return back()->with('error', 'Unauthorized');
         }
 
@@ -214,7 +214,7 @@ class ProcurementController extends Controller
     public function sendForApproval(Request $request, Procurement $procurement)
     {
         $user = $request->user();
-        $role = $user->role->name ?? '';
+        $role = $user->getRoleName();
 
         // Only owner or admin can send for approval
         if ($procurement->requested_by && $procurement->requested_by !== $user->id && $role !== 'Administrator') {
