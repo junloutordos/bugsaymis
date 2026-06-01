@@ -12,6 +12,9 @@ Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('heal
 // Developer portfolio — public, no auth
 Route::get('/developer', fn () => inertia('Developer'))->name('developer');
 
+// Digital calling card — public, no auth
+Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
+
     // Library Borrowings
     Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
         ->name('library.borrowings.index');
