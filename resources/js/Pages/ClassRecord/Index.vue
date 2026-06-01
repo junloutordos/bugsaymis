@@ -84,7 +84,7 @@ function navigateTo(record) {
 
 // ── Grading Option Management Modal ──────────────────────────────────────────
 const showManageModal   = ref(false)
-const managingOption    = ref(null)   // the option currently being edited
+const managingOption    = ref(null)   // null = create mode, object = edit mode
 const manageOptionForm  = ref({ name: '', description: '', is_active: true })
 const manageCategories  = ref([])
 const manageSaving      = ref(false)
@@ -93,9 +93,37 @@ const manageErrors      = ref({})
 function openManageModal(option) {
   managingOption.value   = option
   manageOptionForm.value = { name: option.name, description: option.description ?? '', is_active: option.is_active }
-  manageCategories.value = option.categories.map(c => ({ ...c }))  // shallow copy
+  manageCategories.value = option.categories.map(c => ({ ...c }))
   manageErrors.value     = {}
   showManageModal.value  = true
+}
+
+function openCreateOptionModal() {
+  managingOption.value   = null
+  manageOptionForm.value = { name: '', description: '', is_active: true }
+  manageCategories.value = [{ id: null, name: '', code: '', weight: 0, max_assessments: 1, sort_order: 1 }]
+  manageErrors.value     = {}
+  showManageModal.value  = true
+}
+
+async function deleteOption(opt, event) {
+  event.stopPropagation()
+  const result = await Swal.fire({
+    title: `Delete "${opt.name}"?`,
+    text: 'This cannot be undone. Will be blocked if any class record uses this option.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#ef4444',
+    confirmButtonText: 'Delete',
+  })
+  if (!result.isConfirmed) return
+  try {
+    await axios.delete(route('grading-options.destroy', opt.id))
+    await Swal.fire({ icon: 'success', title: 'Deleted', timer: 1000, showConfirmButton: false })
+    router.reload({ only: ['gradingOptions'] })
+  } catch (err) {
+    Swal.fire('Cannot Delete', err.response?.data?.message ?? 'Failed to delete.', 'error')
+  }
 }
 
 const weightTotal = computed(() =>
@@ -118,23 +146,27 @@ async function saveManageOption() {
   manageSaving.value = true
   manageErrors.value = {}
 
+  const categories = manageCategories.value.map((c, i) => ({
+    id:              c.id ?? null,
+    name:            c.name,
+    code:            c.code,
+    weight:          Number(c.weight),
+    max_assessments: Number(c.max_assessments),
+    sort_order:      i + 1,
+  }))
+
   try {
-    // Save option meta
-    await axios.put(route('grading-options.update', managingOption.value.id), manageOptionForm.value)
-
-    // Save categories
-    const payload = manageCategories.value.map((c, i) => ({
-      id:              c.id ?? null,
-      name:            c.name,
-      code:            c.code,
-      weight:          Number(c.weight),
-      max_assessments: Number(c.max_assessments),
-      sort_order:      i + 1,
-    }))
-    await axios.put(route('grading-options.categories.update', managingOption.value.id), { categories: payload })
-
+    if (managingOption.value === null) {
+      // Create mode — single POST with categories included
+      await axios.post(route('grading-options.store'), { ...manageOptionForm.value, categories })
+      await Swal.fire({ icon: 'success', title: 'Grading option created!', timer: 1200, showConfirmButton: false })
+    } else {
+      // Edit mode — PUT meta then PUT categories
+      await axios.put(route('grading-options.update', managingOption.value.id), manageOptionForm.value)
+      await axios.put(route('grading-options.categories.update', managingOption.value.id), { categories })
+      await Swal.fire({ icon: 'success', title: 'Grading option updated!', timer: 1200, showConfirmButton: false })
+    }
     showManageModal.value = false
-    await Swal.fire({ icon: 'success', title: 'Grading option updated!', timer: 1200, showConfirmButton: false })
     router.reload({ only: ['gradingOptions'] })
   } catch (err) {
     if (err.response?.status === 422) {
@@ -172,15 +204,25 @@ const selectedOption = computed(() =>
               <Cog6ToothIcon class="h-4 w-4" /> Grading Options
             </button>
             <!-- Dropdown of options to edit -->
-            <div class="absolute right-0 mt-1 w-64 bg-white rounded-xl shadow-lg border border-slate-100 z-10 hidden group-hover:block">
+            <div class="absolute right-0 mt-1 w-72 bg-white rounded-xl shadow-lg border border-slate-100 z-10 hidden group-hover:block">
               <div class="py-1">
-                <p class="px-4 py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Edit an option</p>
-                <button v-for="opt in gradingOptions" :key="opt.id"
-                  @click="openManageModal(opt)"
-                  class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between">
-                  <span>{{ opt.name }}</span>
-                  <span v-if="!opt.is_active" class="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">inactive</span>
+                <button @click="openCreateOptionModal"
+                  class="w-full text-left px-4 py-2.5 text-sm text-indigo-600 hover:bg-indigo-50 flex items-center gap-2 font-medium border-b border-slate-100">
+                  <PlusIcon class="h-4 w-4" /> Add New Grading Option
                 </button>
+                <p class="px-4 py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Edit existing</p>
+                <div v-for="opt in gradingOptions" :key="opt.id"
+                  class="flex items-center justify-between px-4 py-2 hover:bg-slate-50">
+                  <button @click="openManageModal(opt)"
+                    class="text-left text-sm text-slate-700 flex items-center gap-2 flex-1 min-w-0">
+                    <span class="truncate">{{ opt.name }}</span>
+                    <span v-if="!opt.is_active" class="shrink-0 text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">inactive</span>
+                  </button>
+                  <button @click="deleteOption(opt, $event)"
+                    class="ml-2 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 shrink-0">
+                    <TrashIcon class="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -329,8 +371,8 @@ const selectedOption = computed(() =>
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
-              <h2 class="text-base font-semibold text-slate-800">Edit Grading Option</h2>
-              <p class="text-xs text-slate-400 mt-0.5">Changes affect all future class records using this option.</p>
+              <h2 class="text-base font-semibold text-slate-800">{{ managingOption ? 'Edit Grading Option' : 'New Grading Option' }}</h2>
+              <p class="text-xs text-slate-400 mt-0.5">{{ managingOption ? 'Changes affect all future class records using this option.' : 'Define the name and grading categories.' }}</p>
             </div>
             <button @click="showManageModal = false" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
           </div>
@@ -417,7 +459,7 @@ const selectedOption = computed(() =>
               class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
             <button @click="saveManageOption" :disabled="manageSaving || weightTotal !== 100"
               class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-              {{ manageSaving ? 'Saving…' : 'Save Changes' }}
+              {{ manageSaving ? 'Saving…' : (managingOption ? 'Save Changes' : 'Create Option') }}
             </button>
           </div>
         </div>
