@@ -102,8 +102,14 @@
               <div class="tl-sig-sub">{{ employee.position ?? 'Employee' }}</div>
             </div>
 
-            <!-- Division Chief -->
-            <div class="tl-sig-box">
+            <!-- Division Chief → OCD when employee IS the Division Chief -->
+            <div v-if="isDivisionChief" class="tl-sig-box">
+              <div class="tl-sig-line">
+                <span v-if="approvedBy" class="tl-sig-name">{{ approvedBy.name.toUpperCase() }}</span>
+              </div>
+              <div class="tl-sig-sub">{{ approvedBy?.position ?? 'Campus Director' }}</div>
+            </div>
+            <div v-else class="tl-sig-box">
               <div class="tl-sig-line">
                 <span v-if="chiefName" class="tl-sig-name">{{ chiefName.toUpperCase() }}</span>
               </div>
@@ -123,13 +129,15 @@ import { onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 
 const props = defineProps({
-  employee:      Object,
-  records:       Array,
-  mode:          { type: String, default: 'monthly' },
-  dateLabel:     { type: String, default: '' },
-  chiefName:     { type: String, default: null },
-  chiefPosition: { type: String, default: null },
-  divisionName:  { type: String, default: null },
+  employee:        Object,
+  records:         Array,
+  mode:            { type: String, default: 'monthly' },
+  dateLabel:       { type: String, default: '' },
+  chiefName:       { type: String, default: null },
+  chiefPosition:   { type: String, default: null },
+  divisionName:    { type: String, default: null },
+  isDivisionChief: { type: Boolean, default: false },
+  approvedBy:      { type: Object, default: null },
 })
 
 function parseDate(d) {
