@@ -302,16 +302,24 @@ class WFHAttendanceController extends Controller
             ? \App\Models\Division::with('divisionchief')->find($user->division_id)
             : null;
 
+        $isDivisionChief = $user->hasRole('DivisionChief');
+        $ocdUser         = User::havingRole('OCD')->first();
+
         return Inertia::render('HumanResource/WFH/PrintTimeLogs', [
-            'employee'      => $user->only('id', 'name', 'position', 'badge_id'),
-            'records'       => $records->map(fn ($r) => array_merge($r->toArray(), [
+            'employee'        => $user->only('id', 'name', 'position', 'badge_id'),
+            'records'         => $records->map(fn ($r) => array_merge($r->toArray(), [
                 'date' => $r->getRawOriginal('date'),
             ])),
-            'mode'          => $mode,
-            'dateLabel'     => $dateLabel,
-            'chiefName'     => $division?->divisionchief?->name,
-            'chiefPosition' => $division?->divisionchief?->position,
-            'divisionName'  => $division?->division_name,
+            'mode'            => $mode,
+            'dateLabel'       => $dateLabel,
+            'chiefName'       => $division?->divisionchief?->name,
+            'chiefPosition'   => $division?->divisionchief?->position,
+            'divisionName'    => $division?->division_name,
+            'isDivisionChief' => $isDivisionChief,
+            'approvedBy'      => $ocdUser ? [
+                'name'     => $ocdUser->name,
+                'position' => $ocdUser->position ?? 'Campus Director',
+            ] : null,
         ]);
     }
 
