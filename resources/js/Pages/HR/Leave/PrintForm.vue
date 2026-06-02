@@ -148,7 +148,7 @@
           <div class="sig-space"></div>
           <img v-if="sigs['submission']?.uri" :src="sigs['submission'].uri" style="max-height:36px;display:block;margin:0 auto 2px;" alt="applicant signature" />
           <div class="sig-line-el"></div>
-          <div v-if="sigs['submission']" class="dig-badge-sm">✓ Digitally Signed · {{ sigs['submission'].signed_at ? new Date(sigs['submission'].signed_at).toLocaleString('en-PH') : '' }}</div>
+          <div v-if="sigs['submission']" class="dig-badge-sm">✓ Digitally Signed · {{ fmtDatetime(sigs['submission'].signed_at) }}</div>
           <div class="sig-lbl">Signature of Applicant</div>
         </td>
       </tr>
@@ -378,6 +378,13 @@ function fmtDate(d) {
   const dt = new Date(d)
   if (isNaN(dt.getTime())) return ''
   return dt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+function fmtDatetime(d) {
+  if (!d) return ''
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return ''
+  return dt.toLocaleString('en-PH')
 }
 
 onMounted(() => setTimeout(() => window.print(), 500))
