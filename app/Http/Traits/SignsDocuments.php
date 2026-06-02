@@ -82,7 +82,7 @@ trait SignsDocuments
                 'sig'       => $sig,
                 'uri'       => $sig->signer ? $this->sigService->getSignatureDataUri($sig->signer) : null,
                 'name'      => $sig->signer?->name,
-                'signed_at' => $sig->signed_at,
+                'signed_at' => $sig->signed_at?->toIso8601String(),
             ];
         }
 
