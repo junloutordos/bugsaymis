@@ -45,17 +45,7 @@ body { font-family:Arial, sans-serif; font-size:10pt; color:#1e293b; line-height
 </head>
 <body>
 
-{{-- QR code: position:fixed → mPDF stamps at absolute lower-right on every page --}}
-@if($qrB64)
-<div style="position:fixed; bottom:9mm; right:9mm; width:26mm; text-align:center; z-index:100;">
-  <img src="data:image/svg+xml;base64,{{ $qrB64 }}" style="width:22mm; height:22mm; display:block; margin:0 auto;" alt="QR" />
-  <div style="font-size:5pt; color:#64748b; margin-top:0.8mm; line-height:1.3;">Scan to verify authenticity</div>
-  <div style="font-size:4.5pt; color:#94a3b8; margin-top:1mm; letter-spacing:0.5pt;">— — — — — — — —</div>
-  @if($issuance->content_hash)
-  <div style="font-size:4.5pt; color:#94a3b8; margin-top:0.5mm; font-family:Courier,monospace; word-break:break-all;">{{ substr($issuance->content_hash, 0, 16) }}…</div>
-  @endif
-</div>
-@endif
+{{-- QR code is stamped programmatically via mPDF Image() API in IssuanceService::stampQrNative() --}}
 
 {{-- Letterhead provided by mPDF header image (report_header.jpeg) --}}
 

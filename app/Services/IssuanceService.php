@@ -17,7 +17,7 @@ class IssuanceService
 {
     // ── Control number generation ─────────────────────────────────────────────
 
-    public function nextControlNumber(string $type, int $year): array
+    public function nextControlNumber(string $type, int $year, int $month): array
     {
         $offset = DB::table('issuance_series_settings')
             ->where('type_code', $type)
@@ -27,6 +27,7 @@ class IssuanceService
         $max = DB::table('issuances')
             ->where('type', $type)
             ->where('year', $year)
+            ->where('month', $month)
             ->lockForUpdate()
             ->max('series_no') ?? 0;
 
@@ -36,7 +37,7 @@ class IssuanceService
             ->where('code', $type)
             ->value('series_padding') ?? 3;
 
-        $controlNumber = strtoupper($type) . '-' . $year . '-' . str_pad($seriesNo, $padding, '0', STR_PAD_LEFT);
+        $controlNumber = strtoupper($type) . '-' . $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-' . str_pad($seriesNo, $padding, '0', STR_PAD_LEFT);
 
         return [$controlNumber, $seriesNo];
     }
@@ -117,16 +118,34 @@ class IssuanceService
         return QrCode::format('svg')->size($size)->margin(1)->generate($url);
     }
 
-    private function qrOverlayHtml(Issuance $issuance, float $qrX, float $qrY): string
+    // Stamp QR onto an mPDF instance using the native Image() API.
+    // position:fixed/absolute with inline SVG is silently dropped by mPDF;
+    // Image() with a temp SVG file is the only reliable path.
+    // qrX/qrY are page-absolute (from page top-left corner, ignoring margins).
+    // marginLeft must match the Mpdf margin_left so SetXY text labels align correctly
+    // (SetX in mPDF is relative to the left margin, SetY is page-absolute).
+    private function stampQrNative(Mpdf $mpdf, Issuance $issuance, float $qrX, float $qrY, float $marginLeft = 0): void
     {
-        $svgB64 = base64_encode($this->generateQrSvg($issuance, 90));
-        $hash   = substr($issuance->content_hash ?? '', 0, 16);
-        return '<div style="position:fixed;left:' . $qrX . 'mm;top:' . $qrY . 'mm;width:26mm;text-align:center;">'
-            . '<img src="data:image/svg+xml;base64,' . $svgB64 . '" style="width:22mm;height:22mm;display:block;margin:0 auto;" />'
-            . '<div style="font-size:4.5pt;color:#94a3b8;margin-top:0.5mm;">Scan to verify</div>'
-            . '<div style="font-size:4pt;color:#94a3b8;">- - - - - - -</div>'
-            . ($hash ? '<div style="font-size:4pt;color:#94a3b8;font-family:Courier,monospace;">' . $hash . chr(133) . '</div>' : '')
-            . '</div>';
+        $tmpSvg = sys_get_temp_dir() . '/qr_' . $issuance->id . '_' . time() . '.svg';
+        file_put_contents($tmpSvg, $this->generateQrSvg($issuance, 88));
+        try {
+            $mpdf->Image($tmpSvg, $qrX, $qrY, 22, 22);
+            $textX = $qrX - $marginLeft - 2;
+            $textY = $qrY + 22.5;
+            $mpdf->SetFont('helvetica', '', 5);
+            $mpdf->SetTextColor(100, 116, 139);
+            $mpdf->SetXY($textX, $textY);
+            $mpdf->Cell(30, 2.5, 'Scan to verify', 0, 1, 'C');
+            $hash = substr($issuance->content_hash ?? '', 0, 16);
+            if ($hash) {
+                $mpdf->SetFont('courier', '', 4);
+                $mpdf->SetTextColor(148, 163, 184);
+                $mpdf->SetX($textX);
+                $mpdf->Cell(30, 2, $hash . chr(133), 0, 0, 'C');
+            }
+        } finally {
+            @unlink($tmpSvg);
+        }
     }
 
     // ── PDF generation — public entry point ──────────────────────────────────
@@ -168,9 +187,8 @@ class IssuanceService
         $sig     = $issuance->signature;
         $sigUri  = $sig?->signer ? app(DigitalSignatureService::class)->getSignatureDataUri($sig->signer) : null;
         $ocdUser = $sig?->signer ?? $issuance->creator;
-        $qrB64   = base64_encode($this->generateQrSvg($issuance, 80));
 
-        $html = view('issuances.pdf', compact('issuance', 'sig', 'sigUri', 'ocdUser', 'qrB64'))->render();
+        $html = view('issuances.pdf', compact('issuance', 'sig', 'sigUri', 'ocdUser'))->render();
 
         $headerImg = public_path('images/report_header.jpeg');
         $footerImg = public_path('images/report_footer.jpeg');
@@ -193,6 +211,9 @@ class IssuanceService
         $mpdf->SetHTMLHeader('<div style="margin:0;padding:0;"><img src="' . $headerImg . '" style="width:100%;display:block;" /></div>');
         $mpdf->SetHTMLFooter('<div style="margin:0;padding:0;"><img src="' . $footerImg . '" style="width:100%;display:block;" /></div>');
         $mpdf->WriteHTML($html);
+
+        // QR at page-absolute bottom-right: x=179 (210-9-22), y=247 (297-22margin-22qr-6text)
+        $this->stampQrNative($mpdf, $issuance, 179, 247, 15);
 
         return $mpdf->Output('', 'S');
     }
@@ -293,10 +314,11 @@ class IssuanceService
                 'fontDir'       => (new ConfigVariables())->getDefaults()['fontDir'],
             ]);
 
-            $html = '<img src="' . $tmpImg . '" style="width:210mm;display:block;" />'
-                  . $this->qrOverlayHtml($issuance, 210 - 35, 297 - 39);
+            $mpdf->WriteHTML('<img src="' . $tmpImg . '" style="width:210mm;display:block;" />');
 
-            $mpdf->WriteHTML($html);
+            // QR at page-absolute bottom-right (0 margins): x=179 (210-9-22), y=258 (297-9-22-8text)
+            $this->stampQrNative($mpdf, $issuance, 179, 258, 0);
+
             return $mpdf->Output('', 'S');
         } finally {
             @unlink($tmpImg);
