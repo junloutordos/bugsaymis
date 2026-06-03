@@ -86,7 +86,7 @@ class CumulativeRecordController extends Controller
 
         // Load all egcu profile data keyed by grade level
         $profile = [
-            'academic_standing'   => $this->byLevel('egcu_academic_standing', $pisaySystemID),
+            'academic_standing'   => $this->byLevel('egcu_academic_standing', $pisaySystemID, 'gradelevel'),
             'academic_preferences'=> $this->byLevel('egcu_academic_preferences', $pisaySystemID, 'levelid'),
             'club_memberships'    => $this->byLevel('egcu_club_memberships', $pisaySystemID),
             'activity_participations' => $this->byLevel('egcu_activity_participations', $pisaySystemID),
