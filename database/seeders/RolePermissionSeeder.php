@@ -235,6 +235,7 @@ class RolePermissionSeeder extends Seeder
             'documents.view', 'documents.create',
             'messengerial.view', 'messengerial.create',
             'guidance.refer',
+            'guidance.cumulative.view',
             'library.view',
             // L&D — employees view own trainings, submit TNA, manage own IDP
             'lnd.view', 'lnd.create', 'lnd.evaluate',
@@ -304,6 +305,7 @@ class RolePermissionSeeder extends Seeder
         // ── Nurse ─────────────────────────────────────────────────────────────
         $assign('Nurse', [
             'health.view', 'health.manage',
+            'students.health.view', 'students.health.manage',
             'reports.view',
             'chat.access',
         ]);
@@ -311,6 +313,8 @@ class RolePermissionSeeder extends Seeder
         // ── Guidance ──────────────────────────────────────────────────────────
         $assign('Guidance', [
             'guidance.view', 'guidance.refer', 'guidance.manage',
+            'guidance.cumulative.view', 'guidance.cumulative.manage',
+            'students.health.view', 'students.health.manage',
             'reports.view',
             'chat.access',
         ]);

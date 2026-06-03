@@ -104,9 +104,15 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Health',   'name' => 'health.manage',      'description' => 'Manage clinic records'],
 
             // ── Guidance ──────────────────────────────────────────────────────
-            ['module' => 'Guidance', 'name' => 'guidance.view',      'description' => 'View guidance consultations'],
-            ['module' => 'Guidance', 'name' => 'guidance.refer',     'description' => 'Submit student referrals to guidance office'],
-            ['module' => 'Guidance', 'name' => 'guidance.manage',    'description' => 'Manage guidance consultations & interventions'],
+            ['module' => 'Guidance', 'name' => 'guidance.view',              'description' => 'View guidance consultations'],
+            ['module' => 'Guidance', 'name' => 'guidance.refer',             'description' => 'Submit student referrals to guidance office'],
+            ['module' => 'Guidance', 'name' => 'guidance.manage',            'description' => 'Manage guidance consultations & interventions'],
+            ['module' => 'Guidance', 'name' => 'guidance.cumulative.view',   'description' => 'View student cumulative guidance records (EGCU profiles)'],
+            ['module' => 'Guidance', 'name' => 'guidance.cumulative.manage', 'description' => 'Add and edit student cumulative guidance records'],
+
+            // ── Student Health Records ────────────────────────────────────────
+            ['module' => 'Student Health', 'name' => 'students.health.view',   'description' => 'View student medical records (allergies, immunizations, history, vitamins)'],
+            ['module' => 'Student Health', 'name' => 'students.health.manage', 'description' => 'Add and edit student medical records'],
 
             // ── Procurement ───────────────────────────────────────────────────
             ['module' => 'Procurement','name' => 'procurement.view',   'description' => 'View procurement records'],
