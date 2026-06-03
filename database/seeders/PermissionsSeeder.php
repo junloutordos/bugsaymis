@@ -110,6 +110,16 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Guidance', 'name' => 'guidance.cumulative.view',   'description' => 'View student cumulative guidance records (EGCU profiles)'],
             ['module' => 'Guidance', 'name' => 'guidance.cumulative.manage', 'description' => 'Add and edit student cumulative guidance records'],
 
+            // ── Registrar ─────────────────────────────────────────────────────
+            ['module' => 'Registrar', 'name' => 'students.enrollment.view',   'description' => 'View enrollment records, section rosters'],
+            ['module' => 'Registrar', 'name' => 'students.enrollment.manage', 'description' => 'Enroll, drop, transfer students; manage enrollment periods'],
+            ['module' => 'Registrar', 'name' => 'students.policies.manage',   'description' => 'Configure retention, exclusion, and honors policies'],
+            ['module' => 'Registrar', 'name' => 'students.transcript.view',   'description' => 'View student transcripts and download report cards'],
+            ['module' => 'Registrar', 'name' => 'students.transcript.manage', 'description' => 'Compute, recompute, and lock student annual grades'],
+            ['module' => 'Registrar', 'name' => 'students.records.export',    'description' => 'Generate and download COE, Good Moral, and Clearance PDFs'],
+            ['module' => 'Registrar', 'name' => 'students.promotion.process', 'description' => 'Run year-end promotion and advance students to next school year'],
+            ['module' => 'Registrar', 'name' => 'students.analytics.view',    'description' => 'View enrollment analytics and performance dashboard'],
+
             // ── Student Health Records ────────────────────────────────────────
             ['module' => 'Student Health', 'name' => 'students.health.view',   'description' => 'View student medical records (allergies, immunizations, history, vitamins)'],
             ['module' => 'Student Health', 'name' => 'students.health.manage', 'description' => 'Add and edit student medical records'],
