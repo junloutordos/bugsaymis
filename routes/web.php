@@ -1945,6 +1945,33 @@ Route::get('/verify/issuance/{token}', [\App\Http\Controllers\DocumentVerificati
     ->name('issuances.verify')
     ->where('token', '[0-9a-f\-]{36}');
 
+// ── Student Portal ────────────────────────────────────────────────────────────
+// Public (no session required): login page + Google OAuth + logout
+Route::prefix('student-portal')->name('student-portal.')->group(function () {
+    Route::get('/',        [\App\Http\Controllers\StudentPortal\AuthController::class, 'showLogin'])->name('login');
+    Route::get('/login',   [\App\Http\Controllers\StudentPortal\AuthController::class, 'showLogin'])->name('login.page');
+    Route::get('/auth/google',          [\App\Http\Controllers\StudentPortal\AuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('/auth/google/callback', [\App\Http\Controllers\StudentPortal\AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+    Route::post('/logout', [\App\Http\Controllers\StudentPortal\AuthController::class, 'logout'])->name('logout');
+
+    // Requires Google auth (session has google_email) but not yet linked
+    Route::get('/link',  [\App\Http\Controllers\StudentPortal\AuthController::class, 'showLink'])->name('link');
+    Route::post('/link', [\App\Http\Controllers\StudentPortal\AuthController::class, 'submitLink'])->name('link.submit');
+
+    // Requires full student session (linked + authenticated)
+    Route::middleware('student.portal')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\StudentPortal\DashboardController::class, 'index'])->name('dashboard');
+
+        Route::get('/profile',                   [\App\Http\Controllers\StudentPortal\ProfileController::class, 'show'])->name('profile');
+        Route::post('/profile/{section}',        [\App\Http\Controllers\StudentPortal\ProfileController::class, 'saveSection'])->name('profile.save')
+            ->where('section', 'academic|activities|social|career|residence|health');
+
+        Route::get('/medical',                   [\App\Http\Controllers\StudentPortal\MedicalController::class, 'show'])->name('medical');
+        Route::post('/medical/{section}',        [\App\Http\Controllers\StudentPortal\MedicalController::class, 'saveSection'])->name('medical.save')
+            ->where('section', 'allergies|immunizations|medical_history|vitamins');
+    });
+});
+
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
