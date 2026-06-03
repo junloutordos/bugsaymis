@@ -110,10 +110,11 @@ class IssuanceController extends Controller
             'pin'                => 'nullable|string',
         ]);
 
-        $year = now()->year;
+        $year  = now()->year;
+        $month = now()->month;
 
-        $issuance = DB::transaction(function () use ($validated, $year, $request) {
-            [$controlNumber, $seriesNo] = $this->svc->nextControlNumber($validated['type'], $year);
+        $issuance = DB::transaction(function () use ($validated, $year, $month, $request) {
+            [$controlNumber, $seriesNo] = $this->svc->nextControlNumber($validated['type'], $year, $month);
 
             $attachmentPath = null;
             $attachmentFilename = null;
@@ -133,6 +134,7 @@ class IssuanceController extends Controller
                 'control_number'     => $controlNumber,
                 'series_no'          => $seriesNo,
                 'year'               => $year,
+                'month'              => $month,
                 'title'              => $validated['title'],
                 'content'            => $validated['content'] ?? null,
                 'attachment_path'    => $attachmentPath,
