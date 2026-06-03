@@ -69,6 +69,13 @@ class ResearchAdvisoryController extends Controller
             'remarks'          => 'nullable|string|max:500',
         ]);
 
+        $existingLoad = FacultyLoad::where('user_id', $data['user_id'])
+            ->where('academic_term_id', $data['academic_term_id'])
+            ->first();
+        if ($existingLoad?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
         // Check the 5-unit research cap for this faculty + term
         $currentResearchUnits = ResearchAdvisory::where('user_id', $data['user_id'])
             ->where('academic_term_id', $data['academic_term_id'])
@@ -112,6 +119,13 @@ class ResearchAdvisoryController extends Controller
     public function update(Request $request, ResearchAdvisory $researchAdvisory): RedirectResponse
     {
         $this->authorize('faculty_loading.manage');
+
+        $load = FacultyLoad::where('user_id', $researchAdvisory->user_id)
+            ->where('academic_term_id', $researchAdvisory->academic_term_id)
+            ->first();
+        if ($load?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
 
         $data = $request->validate([
             'student_name'   => 'required|string|max:200',
@@ -165,6 +179,13 @@ class ResearchAdvisoryController extends Controller
     public function destroy(ResearchAdvisory $researchAdvisory): RedirectResponse
     {
         $this->authorize('faculty_loading.manage');
+
+        $load = FacultyLoad::where('user_id', $researchAdvisory->user_id)
+            ->where('academic_term_id', $researchAdvisory->academic_term_id)
+            ->first();
+        if ($load?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
 
         $userId  = $researchAdvisory->user_id;
         $termId  = $researchAdvisory->academic_term_id;

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
+use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\SchoolDayConfig;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
@@ -148,6 +149,13 @@ class ClassScheduleController extends Controller
             }
         }
 
+        $facultyLoad = FacultyLoad::where('user_id', $data['faculty_id'])
+            ->where('academic_term_id', $data['academic_term_id'])
+            ->first();
+        if ($facultyLoad?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
         $schedule = ClassSchedule::create([
             'user_id'          => $data['faculty_id'],
             'subject_id'       => $data['subject_id'],
@@ -190,6 +198,13 @@ class ClassScheduleController extends Controller
             'force'              => 'boolean',
         ]);
 
+        $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
+            ->where('academic_term_id', $classSchedule->academic_term_id)
+            ->first();
+        if ($facultyLoad?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
         $validation = $this->validation->validate($data, $classSchedule->id);
 
         if (! $validation['valid'] && ! ($request->boolean('force') && empty($validation['errors']))) {
@@ -218,6 +233,13 @@ class ClassScheduleController extends Controller
     public function destroy(ClassSchedule $classSchedule): RedirectResponse
     {
         $this->authorize('faculty_loading.manage');
+
+        $facultyLoad = FacultyLoad::where('user_id', $classSchedule->user_id)
+            ->where('academic_term_id', $classSchedule->academic_term_id)
+            ->first();
+        if ($facultyLoad?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
 
         $classSchedule->update(['status' => 'cancelled']);
 

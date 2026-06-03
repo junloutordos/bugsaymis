@@ -199,6 +199,13 @@ class CommitteeAssignmentController extends Controller
             ]);
         }
 
+        $existingLoad = FacultyLoad::where('user_id', $data['user_id'])
+            ->where('academic_term_id', $data['academic_term_id'])
+            ->first();
+        if ($existingLoad?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
         if ($data['committee_id']) {
             $committee = Committee::find($data['committee_id']);
             if ($committee) {
@@ -242,6 +249,13 @@ class CommitteeAssignmentController extends Controller
     {
         $this->authorize('faculty_loading.manage');
 
+        $load = FacultyLoad::where('user_id', $committeeAssignment->user_id)
+            ->where('academic_term_id', $committeeAssignment->academic_term_id)
+            ->first();
+        if ($load?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
         $data = $request->validate([
             'role'       => ['required', Rule::in(['chairperson', 'co_chair', 'member', 'secretary'])],
             'load_units' => 'required|numeric|min:0|max:5',
@@ -283,6 +297,13 @@ class CommitteeAssignmentController extends Controller
     public function destroy(FacultyCommitteeAssignment $committeeAssignment): RedirectResponse
     {
         $this->authorize('faculty_loading.manage');
+
+        $load = FacultyLoad::where('user_id', $committeeAssignment->user_id)
+            ->where('academic_term_id', $committeeAssignment->academic_term_id)
+            ->first();
+        if ($load?->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
 
         $userId = $committeeAssignment->user_id;
         $termId = $committeeAssignment->academic_term_id;
