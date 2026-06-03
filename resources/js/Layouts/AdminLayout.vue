@@ -53,6 +53,7 @@ import {
   UserCircleIcon,
   InboxIcon,
   QuestionMarkCircleIcon,
+  ArrowUpCircleIcon,
 
 } from "@heroicons/vue/24/outline";
 
@@ -1477,16 +1478,59 @@ const menuItems = [
   {
     label: "Registrar",
     icon: DocumentTextIcon,
-        routeName: "students.index",
-        href: route("students.index"),
+    routeName: "registrar.enrollment.index",
+    href: route("registrar.enrollment.index"),
     roles: ["Administrator", "Registrar"],
+    permissions: ["students.enrollment.view"],
     children: [
       {
         label: "Students",
-            routeName: "students.index",
-            href: route("students.index"),
+        routeName: "students.index",
+        href: route("students.index"),
         icon: UserGroupIcon,
         roles: ["Administrator", "Registrar"],
+      },
+      {
+        label: "Enrollment",
+        routeName: "registrar.enrollment.index",
+        href: route("registrar.enrollment.index"),
+        icon: AcademicCapIcon,
+        permissions: ["students.enrollment.view"],
+      },
+      {
+        label: "Enrollment Periods",
+        routeName: "registrar.enrollment-periods.index",
+        href: route("registrar.enrollment-periods.index"),
+        icon: CalendarDaysIcon,
+        permissions: ["students.enrollment.manage"],
+      },
+      {
+        label: "Academic Policies",
+        routeName: "registrar.academic-policies.index",
+        href: route("registrar.academic-policies.index"),
+        icon: ScaleIcon,
+        permissions: ["students.policies.manage"],
+      },
+      {
+        label: "Transcripts",
+        routeName: "registrar.transcript.index",
+        href: route("registrar.transcript.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["students.transcript.view"],
+      },
+      {
+        label: "Promotion",
+        routeName: "registrar.promotion.index",
+        href: route("registrar.promotion.index"),
+        icon: ArrowUpCircleIcon,
+        permissions: ["students.promotion.process"],
+      },
+      {
+        label: "Analytics",
+        routeName: "registrar.analytics.index",
+        href: route("registrar.analytics.index"),
+        icon: ChartBarIcon,
+        permissions: ["students.analytics.view"],
       },
     ],
   },

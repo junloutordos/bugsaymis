@@ -9,6 +9,7 @@ use App\Http\Controllers\ApprovalInboxController;
 // ECS container health check — no auth, no session
 Route::get('/health', fn () => response()->json(['status' => 'ok']))->name('health');
 
+
 // Developer portfolio — public, no auth
 Route::get('/developer', fn () => inertia('Developer'))->name('developer');
 
@@ -1981,4 +1982,5 @@ require __DIR__.'/saln.php';
 require __DIR__.'/faculty-loading.php';
 require __DIR__.'/ams.php';
 require __DIR__.'/ppmp.php';
+require __DIR__.'/registrar.php';
 require __DIR__.'/auth.php';
