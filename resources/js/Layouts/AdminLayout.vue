@@ -1604,6 +1604,20 @@ const menuItems = [
         roles: ["Administrator", "Staff"],
         permissions: ["guidance.view"],
       },
+      {
+        label: "Cumulative Records",
+        routeName: "guidance.cumulative.index",
+        href: route('guidance.cumulative.index'),
+        icon: UserIcon,
+        permissions: ["guidance.cumulative.view"],
+      },
+      {
+        label: "Student Medical Records",
+        routeName: "students.health.index",
+        href: route('students.health.index'),
+        icon: HeartIcon,
+        permissions: ["students.health.view"],
+      },
     ],
   },
   {
