@@ -95,6 +95,7 @@ class ClassRecordController extends Controller
     public function update(Request $request, ClassRecord $classRecord): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record belongs to a past school year and cannot be modified.');
         abort_if($classRecord->status === 'submitted' && ! $this->isAdmin(), 403,
             'Cannot edit a submitted class record.');
 
@@ -135,6 +136,7 @@ class ClassRecordController extends Controller
     public function destroy(ClassRecord $classRecord): JsonResponse
     {
         abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_if(! $classRecord->isCurrentSchoolYear(), 403, 'This class record belongs to a past school year and cannot be modified.');
         abort_if($classRecord->status !== 'draft', 422,
             'Only draft class records can be deleted.');
 

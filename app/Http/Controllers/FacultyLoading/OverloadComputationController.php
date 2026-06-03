@@ -118,6 +118,10 @@ class OverloadComputationController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record does not have an overload.']);
         }
 
+        if ($load->is_locked) {
+            return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
+        }
+
         $existing = OverloadComputation::where('faculty_load_id', $load->id)
             ->whereIn('status', ['pending', 'for_approval', 'approved'])
             ->exists();
@@ -183,6 +187,11 @@ class OverloadComputationController extends Controller
         $skipped = 0;
 
         foreach ($loads as $load) {
+            if ($load->is_locked) {
+                $skipped++;
+                continue;
+            }
+
             $salaryGrade = $load->faculty?->sstPosition?->salary_grade;
             $annualRate  = $salaryGrade
                 ? SalarySchedule::lookupAnnualRate($salaryGrade, $step)
