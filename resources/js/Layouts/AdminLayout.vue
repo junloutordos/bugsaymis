@@ -1559,6 +1559,13 @@ const menuItems = [
             roles: ["Administrator","Clinic","Nurse"],
             permissions: ["health.manage"],
           },
+          {
+            label: "Student Medical Records",
+            routeName: "students.health.index",
+            href: route('students.health.index'),
+            icon: UserIcon,
+            permissions: ["students.health.view"],
+          },
         ],
       },
   {
@@ -1610,13 +1617,6 @@ const menuItems = [
         href: route('guidance.cumulative.index'),
         icon: UserIcon,
         permissions: ["guidance.cumulative.view"],
-      },
-      {
-        label: "Student Medical Records",
-        routeName: "students.health.index",
-        href: route('students.health.index'),
-        icon: HeartIcon,
-        permissions: ["students.health.view"],
       },
     ],
   },
