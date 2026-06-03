@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -19,36 +19,31 @@ class AuthController extends Controller
         return Inertia::render('StudentPortal/Login');
     }
 
-    public function redirectToGoogle()
+    /**
+     * POST /student-portal/auth/firebase
+     * Called by the frontend after Firebase signInWithPopup succeeds.
+     * Body: { email, name, uid }
+     */
+    public function handleFirebaseAuth(Request $request): JsonResponse
     {
-        // Store intended destination so callback can redirect correctly
-        session()->put('student_portal_oauth', true);
+        $request->validate([
+            'email' => ['required', 'email'],
+            'name'  => ['required', 'string'],
+            'uid'   => ['required', 'string'],
+        ]);
 
-        return Socialite::driver('google')
-            ->with(['hd' => 'crc.pshs.edu.ph'])
-            ->redirect();
-    }
+        $email = strtolower(trim($request->email));
 
-    public function handleGoogleCallback()
-    {
-        try {
-            $googleUser = Socialite::driver('google')->user();
-        } catch (\Throwable $e) {
-            return redirect()->route('student-portal.login')
-                ->with('error', 'Google sign-in failed. Please try again.');
+        if (! str_ends_with($email, '@crc.pshs.edu.ph')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only official PSHS-CRC accounts (@crc.pshs.edu.ph) are allowed.',
+            ], 403);
         }
 
-        $googleEmail = strtolower(trim($googleUser->getEmail() ?? ''));
-
-        // Enforce @crc.pshs.edu.ph domain
-        if (! str_ends_with($googleEmail, '@crc.pshs.edu.ph')) {
-            return redirect()->route('student-portal.login')
-                ->with('error', 'Only official PSHS-CRC accounts (@crc.pshs.edu.ph) are allowed.');
-        }
-
-        // Check if this Google email is already linked to a student record
+        // Check if already linked to a student record
         $link = DB::table('student_google_links')
-            ->where('google_email', $googleEmail)
+            ->where('google_email', $email)
             ->first();
 
         if ($link) {
@@ -57,19 +52,27 @@ class AuthController extends Controller
                 ->first();
 
             if ($student) {
-                $this->startSession($student, $googleEmail);
-                return redirect()->route('student-portal.dashboard');
+                $this->startSession($student, $email);
+
+                return response()->json([
+                    'success'     => true,
+                    'redirect_to' => route('student-portal.dashboard'),
+                ]);
             }
 
-            // Stale link (student record gone) — delete and re-link
-            DB::table('student_google_links')->where('google_email', $googleEmail)->delete();
+            // Stale link — delete and ask to re-link
+            DB::table('student_google_links')->where('google_email', $email)->delete();
         }
 
-        // First time: store Google email in session and ask for pisaysystemID
-        session()->put('student_portal_google_email', $googleEmail);
-        session()->put('student_portal_google_name', $googleUser->getName());
+        // First time — store Google info in session and send to link page
+        session()->put('student_portal_google_email', $email);
+        session()->put('student_portal_google_name', $request->name);
 
-        return redirect()->route('student-portal.link');
+        return response()->json([
+            'success'    => true,
+            'needs_link' => true,
+            'redirect_to'=> route('student-portal.link'),
+        ]);
     }
 
     public function showLink()
@@ -101,8 +104,6 @@ class AuthController extends Controller
 
         $pisayID = trim($validated['pisaysystemID']);
 
-        // Look up student — pisaysystemID must exist and not already be linked
-        // to a DIFFERENT Google email (prevents one student claiming another's record)
         $student = DB::table('students')
             ->where('pisaysystemID', $pisayID)
             ->whereIn('status', ['Enrolled', 'Grade13'])
@@ -114,7 +115,7 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check if this pisaysystemID is already linked to a different Google account
+        // Prevent one pisaysystemID from being linked to multiple Google accounts
         $existingLink = DB::table('student_google_links')
             ->where('pisaysystemID', $pisayID)
             ->where('google_email', '!=', $googleEmail)
@@ -126,13 +127,12 @@ class AuthController extends Controller
             ]);
         }
 
-        // Create the link
         DB::table('student_google_links')->updateOrInsert(
             ['google_email' => $googleEmail],
             ['pisaysystemID' => $pisayID, 'linked_at' => now()]
         );
 
-        session()->forget(['student_portal_google_email', 'student_portal_google_name', 'student_portal_oauth']);
+        session()->forget(['student_portal_google_email', 'student_portal_google_name']);
 
         $this->startSession($student, $googleEmail);
 
@@ -148,7 +148,6 @@ class AuthController extends Controller
             'student_google_email',
             'student_portal_google_email',
             'student_portal_google_name',
-            'student_portal_oauth',
         ]);
 
         return redirect()->route('student-portal.login')
@@ -176,12 +175,10 @@ class AuthController extends Controller
             return 0;
         }
 
-        // School year name format: "2026-2027" → end year = 2027
+        // "2026-2027" → end year = 2027
         $syEndYear = (int) explode('-', $sy->name)[1];
 
         // grade = 12 − (batch − syEndYear)
-        $grade = 12 - ($batch - $syEndYear);
-
-        return max(7, min(12, $grade));
+        return max(7, min(12, 12 - ($batch - $syEndYear)));
     }
 }
