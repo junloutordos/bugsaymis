@@ -9,12 +9,13 @@ import AppSelect from '@/Components/AppSelect.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import {
   DocumentTextIcon, PaperClipIcon, UserGroupIcon,
-  BuildingOfficeIcon, UserIcon, CheckCircleIcon, ChevronLeftIcon,
+  BuildingOfficeIcon, BuildingLibraryIcon, UserIcon, CheckCircleIcon, ChevronLeftIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   typeLabels:   Object,
   offices:      Array,
+  divisions:    Array,
   users:        Array,
   hasPin:       Boolean,
   signatureUri: String,
@@ -47,11 +48,13 @@ function handleScan(e) {
 
 // ── Step 3: Recipients ─────────────────────────────────────────────────────
 const recipientType = ref('all')
-const selectedOfficeIds = ref([])
-const selectedUserIds   = ref([])
+const selectedOfficeIds    = ref([])
+const selectedUserIds      = ref([])
+const selectedDivisionIds  = ref([])
 
-const officeSearch = ref('')
-const userSearch   = ref('')
+const officeSearch   = ref('')
+const userSearch     = ref('')
+const divisionSearch = ref('')
 
 const filteredOffices = computed(() => {
   const q = officeSearch.value.toLowerCase()
@@ -61,6 +64,11 @@ const filteredOffices = computed(() => {
 const filteredUsers = computed(() => {
   const q = userSearch.value.toLowerCase()
   return (props.users ?? []).filter(u => !q || u.name.toLowerCase().includes(q) || u.position?.toLowerCase().includes(q))
+})
+
+const filteredDivisions = computed(() => {
+  const q = divisionSearch.value.toLowerCase()
+  return (props.divisions ?? []).filter(d => !q || d.division_name.toLowerCase().includes(q) || d.acronym?.toLowerCase().includes(q))
 })
 
 function toggleOffice(id) {
@@ -73,6 +81,12 @@ function toggleUser(id) {
   const idx = selectedUserIds.value.indexOf(id)
   if (idx === -1) selectedUserIds.value.push(id)
   else selectedUserIds.value.splice(idx, 1)
+}
+
+function toggleDivision(id) {
+  const idx = selectedDivisionIds.value.indexOf(id)
+  if (idx === -1) selectedDivisionIds.value.push(id)
+  else selectedDivisionIds.value.splice(idx, 1)
 }
 
 // ── Release (sign + publish) ───────────────────────────────────────────────
@@ -110,8 +124,9 @@ function buildPayload(pin = null) {
     scan_filename:contentMode.value === 'upload'  ? scanFilename.value : null,
     scan_mime:    contentMode.value === 'upload'  ? scanMime.value : null,
     recipient_type: recipientType.value,
-    office_ids:   selectedOfficeIds.value,
-    user_ids:     selectedUserIds.value,
+    office_ids:     selectedOfficeIds.value,
+    user_ids:       selectedUserIds.value,
+    division_ids:   selectedDivisionIds.value,
     pin,
   }
 }
@@ -274,10 +289,11 @@ watch(type, (t) => {
         <!-- Recipient type -->
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-2">Who receives this issuance?</label>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button v-for="opt in [
               { key:'all', icon: UserGroupIcon, label:'All Staff', sub:'Every active user' },
               { key:'office', icon: BuildingOfficeIcon, label:'By Office', sub:'Select offices' },
+              { key:'division', icon: BuildingLibraryIcon, label:'By Division', sub:'Select divisions' },
               { key:'individual', icon: UserIcon, label:'Individual(s)', sub:'Pick specific users' },
             ]" :key="opt.key"
               @click="recipientType = opt.key"
@@ -305,6 +321,24 @@ watch(type, (t) => {
           <p v-if="selectedOfficeIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedOfficeIds.length }} office(s) selected</p>
         </div>
 
+        <!-- Division selection -->
+        <div v-if="recipientType === 'division'" class="space-y-2">
+          <input v-model="divisionSearch" type="text" placeholder="Search divisions…"
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+            <label v-for="d in filteredDivisions" :key="d.id"
+              class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+              <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
+                @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
+              <div>
+                <p class="text-sm text-slate-700">{{ d.division_name }}</p>
+                <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
+              </div>
+            </label>
+          </div>
+          <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
+        </div>
+
         <!-- Individual selection -->
         <div v-if="recipientType === 'individual'" class="space-y-2">
           <input v-model="userSearch" type="text" placeholder="Search by name or position…"
@@ -329,7 +363,7 @@ watch(type, (t) => {
           <p><span class="text-slate-500">Title:</span> <strong>{{ title }}</strong></p>
           <p><span class="text-slate-500">Content:</span> {{ contentMode === 'editor' ? content.length + ' characters typed' : scanFilename }}</p>
           <p><span class="text-slate-500">Recipients:</span>
-            <strong>{{ { all: 'All Staff', office: selectedOfficeIds.length + ' Office(s)', individual: selectedUserIds.length + ' Person(s)' }[recipientType] }}</strong>
+            <strong>{{ { all: 'All Staff', office: selectedOfficeIds.length + ' Office(s)', division: selectedDivisionIds.length + ' Division(s)', individual: selectedUserIds.length + ' Person(s)' }[recipientType] }}</strong>
           </p>
           <p class="text-xs text-amber-600 mt-2">
             ⚠ Releasing is permanent. The issuance will be signed with your digital signature and sent to all recipients.

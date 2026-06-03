@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Traits\SignsDocuments;
 use App\Jobs\ProcessIssuanceRelease;
 use App\Mail\IssuanceReleasedMail;
+use App\Models\Division;
 use App\Models\Issuance;
 use App\Models\IssuanceRecipient;
 use App\Models\IssuanceType;
@@ -79,6 +80,7 @@ class IssuanceController extends Controller
         return Inertia::render('Issuances/Create', [
             'typeLabels' => Issuance::typeLabels(),
             'offices'    => Office::orderBy('name')->get(['id', 'name']),
+            'divisions'  => Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']),
             'users'      => User::where('status', '<>', 'inactive')
                 ->orderBy('name')->get(['id', 'name', 'office_id', 'position']),
             'hasPin'     => ! empty(auth()->user()->signature_pin),
@@ -97,11 +99,13 @@ class IssuanceController extends Controller
             'scan_base64'        => 'nullable|string',
             'scan_filename'      => 'nullable|string|max:255',
             'scan_mime'          => 'nullable|string',
-            'recipient_type'     => 'required|in:all,office,individual',
+            'recipient_type'     => 'required|in:all,office,individual,division',
             'office_ids'         => 'nullable|array',
             'office_ids.*'       => 'exists:offices,id',
             'user_ids'           => 'nullable|array',
             'user_ids.*'         => 'exists:users,id',
+            'division_ids'       => 'nullable|array',
+            'division_ids.*'     => 'exists:divisions,id',
             'should_release'     => 'nullable|boolean',
             'pin'                => 'nullable|string',
         ]);
@@ -233,6 +237,7 @@ class IssuanceController extends Controller
             : $issuance->recipients()->where('user_id', $user->id)->first();
 
         return Inertia::render('Issuances/Show', [
+            'divisions'  => $isAdmin ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym']) : [],
             'issuance'   => [
                 'id'               => $issuance->id,
                 'type'             => $issuance->type,
@@ -276,9 +281,11 @@ class IssuanceController extends Controller
         abort_if(! $issuance->isEditable(), 422, 'Only draft issuances can be released.');
 
         $validated = $request->validate([
-            'recipient_type' => 'required|in:all,office,individual',
+            'recipient_type' => 'required|in:all,office,individual,division',
             'office_ids'     => 'nullable|array',
             'user_ids'       => 'nullable|array',
+            'division_ids'   => 'nullable|array',
+            'division_ids.*' => 'exists:divisions,id',
             'pin'            => 'nullable|string',
         ]);
 

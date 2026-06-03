@@ -6,12 +6,13 @@ import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import {
   ChevronLeftIcon, DocumentArrowDownIcon, QrCodeIcon,
   CheckCircleIcon, UserGroupIcon, ClockIcon, ShieldCheckIcon,
-  PencilSquareIcon, EyeIcon,
+  PencilSquareIcon, EyeIcon, BuildingLibraryIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   issuance:         Object,
   recipients:       Array,
+  divisions:        Array,
   isAdmin:          Boolean,
   hasPin:           Boolean,
   signatureUri:     String,
@@ -20,11 +21,24 @@ const props = defineProps({
 })
 
 // ── Release flow (for drafts) ──────────────────────────────────────────────
-const showReleasePanel = ref(false)
-const showPinModal     = ref(false)
-const recipientType    = ref(props.issuance.recipient_type ?? 'all')
-const submitting       = ref(false)
-const releaseErrors    = ref({})
+const showReleasePanel    = ref(false)
+const showPinModal        = ref(false)
+const recipientType       = ref(props.issuance.recipient_type ?? 'all')
+const selectedDivisionIds = ref([])
+const divisionSearch      = ref('')
+const submitting          = ref(false)
+const releaseErrors       = ref({})
+
+const filteredDivisions = computed(() => {
+  const q = divisionSearch.value.toLowerCase()
+  return (props.divisions ?? []).filter(d => !q || d.division_name.toLowerCase().includes(q) || d.acronym?.toLowerCase().includes(q))
+})
+
+function toggleDivision(id) {
+  const idx = selectedDivisionIds.value.indexOf(id)
+  if (idx === -1) selectedDivisionIds.value.push(id)
+  else selectedDivisionIds.value.splice(idx, 1)
+}
 
 function openRelease() {
   showReleasePanel.value = true
@@ -36,6 +50,7 @@ function onPinVerified(pin) {
   releaseErrors.value = {}
   router.post(route('issuances.release', props.issuance.id), {
     recipient_type: recipientType.value,
+    division_ids:   selectedDivisionIds.value,
     pin,
   }, {
     onSuccess: () => { submitting.value = false; showReleasePanel.value = false },
@@ -268,12 +283,31 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                 <label v-for="opt in [
                   { key:'all', label:'All Staff' },
                   { key:'office', label:'By Office (configure on create)' },
+                  { key:'division', label:'By Division' },
                   { key:'individual', label:'Individual (configure on create)' },
                 ]" :key="opt.key" class="flex items-center gap-2 cursor-pointer">
                   <input type="radio" v-model="recipientType" :value="opt.key" class="text-indigo-600" />
                   <span class="text-sm text-slate-700">{{ opt.label }}</span>
                 </label>
               </div>
+            </div>
+
+            <!-- Division picker (only shown when By Division is selected) -->
+            <div v-if="recipientType === 'division'" class="space-y-2">
+              <input v-model="divisionSearch" type="text" placeholder="Search divisions…"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <div class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                <label v-for="d in filteredDivisions" :key="d.id"
+                  class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" :checked="selectedDivisionIds.includes(d.id)"
+                    @change="toggleDivision(d.id)" class="rounded border-slate-300 text-indigo-600" />
+                  <div>
+                    <p class="text-sm text-slate-700">{{ d.division_name }}</p>
+                    <p v-if="d.acronym" class="text-xs text-slate-400">{{ d.acronym }}</p>
+                  </div>
+                </label>
+              </div>
+              <p v-if="selectedDivisionIds.length" class="text-xs text-indigo-600 font-medium">{{ selectedDivisionIds.length }} division(s) selected</p>
             </div>
 
             <p class="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">

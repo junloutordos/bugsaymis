@@ -93,6 +93,19 @@ class IssuanceService
                 'updated_at'  => now(),
             ])->toArray();
             if (! empty($rows)) IssuanceRecipient::insert($rows);
+
+        } elseif ($issuance->recipient_type === 'division') {
+            $divisionIds = $data['division_ids'] ?? [];
+            $users = User::whereIn('division_id', $divisionIds)
+                ->where('status', '<>', 'inactive')
+                ->pluck('id');
+            $rows  = $users->map(fn($uid) => [
+                'issuance_id' => $issuance->id,
+                'user_id'     => $uid,
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ])->toArray();
+            if (! empty($rows)) IssuanceRecipient::insert($rows);
         }
     }
 
