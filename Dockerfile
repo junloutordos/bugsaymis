@@ -6,8 +6,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis
+    && curl -fsSL https://github.com/phpredis/phpredis/archive/refs/tags/6.2.0.tar.gz \
+       | tar xz -C /tmp \
+    && (cd /tmp/phpredis-6.2.0 && phpize && ./configure && make -j$(nproc) && make install) \
+    && docker-php-ext-enable redis \
+    && rm -rf /tmp/phpredis-6.2.0
 
 # Install Node.js 20 for Vite frontend build
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
