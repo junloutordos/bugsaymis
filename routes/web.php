@@ -1950,8 +1950,7 @@ Route::get('/verify/issuance/{token}', [\App\Http\Controllers\DocumentVerificati
 Route::prefix('student-portal')->name('student-portal.')->group(function () {
     Route::get('/',        [\App\Http\Controllers\StudentPortal\AuthController::class, 'showLogin'])->name('login');
     Route::get('/login',   [\App\Http\Controllers\StudentPortal\AuthController::class, 'showLogin'])->name('login.page');
-    Route::get('/auth/google',          [\App\Http\Controllers\StudentPortal\AuthController::class, 'redirectToGoogle'])->name('auth.google');
-    Route::get('/auth/google/callback', [\App\Http\Controllers\StudentPortal\AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+    Route::post('/auth/firebase', [\App\Http\Controllers\StudentPortal\AuthController::class, 'handleFirebaseAuth'])->name('auth.firebase');
     Route::post('/logout', [\App\Http\Controllers\StudentPortal\AuthController::class, 'logout'])->name('logout');
 
     // Requires Google auth (session has google_email) but not yet linked
