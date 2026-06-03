@@ -494,6 +494,25 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/guidance/session-reports', [\App\Http\Controllers\GuidanceSessionReportController::class, 'store'])->name('guidance.session-reports.store')->middleware('permission:guidance.manage');
     Route::put('/guidance/session-reports/{sessionReport}', [\App\Http\Controllers\GuidanceSessionReportController::class, 'update'])->name('guidance.session-reports.update')->middleware('permission:guidance.manage');
     Route::get('/guidance/session-reports/{sessionReport}/print', [\App\Http\Controllers\GuidanceSessionReportController::class, 'print'])->name('guidance.session-reports.print')->middleware('permission:guidance.manage');
+
+    // ── EGCU Student Cumulative Records ───────────────────────────────────────
+    Route::get('/guidance/cumulative-records', [\App\Http\Controllers\Guidance\CumulativeRecordController::class, 'index'])
+        ->name('guidance.cumulative.index')
+        ->middleware('permission:guidance.cumulative.view');
+    Route::get('/guidance/cumulative-records/{pisaySystemID}', [\App\Http\Controllers\Guidance\CumulativeRecordController::class, 'show'])
+        ->name('guidance.cumulative.show')
+        ->middleware('permission:guidance.cumulative.view')
+        ->where('pisaySystemID', '[A-Za-z0-9\-]+');
+
+    // ── Student Medical Records ───────────────────────────────────────────────
+    Route::get('/students/health', [\App\Http\Controllers\StudentHealth\StudentHealthController::class, 'index'])
+        ->name('students.health.index')
+        ->middleware('permission:students.health.view');
+    Route::get('/students/health/{pisaySystemID}', [\App\Http\Controllers\StudentHealth\StudentHealthController::class, 'show'])
+        ->name('students.health.show')
+        ->middleware('permission:students.health.view')
+        ->where('pisaySystemID', '[A-Za-z0-9\-]+');
+
     Route::get('/work-requests/{workRequest}/print', [WorkRequestController::class, 'print'])
         ->name('work-requests.print')
         ->middleware('permission:facilities.manage');
@@ -1814,6 +1833,11 @@ Route::prefix('student-attendance')->name('student-attendance.')->group(function
         ->name('kiosk');
     Route::post('/scan', [\App\Http\Controllers\StudentAttendance\ScanController::class, 'scan'])
         ->name('scan');
+
+    // Student link confirmation (public — accessed via emailed link)
+    Route::get('/link/{token}',          [\App\Http\Controllers\StudentAttendance\LinkConfirmController::class, 'show'])->name('link.show');
+    Route::post('/link/{token}/confirm', [\App\Http\Controllers\StudentAttendance\LinkConfirmController::class, 'confirm'])->name('link.confirm');
+    Route::post('/link/{token}/deny',    [\App\Http\Controllers\StudentAttendance\LinkConfirmController::class, 'deny'])->name('link.deny');
 });
 
 // Protected: logs and parent contacts management
