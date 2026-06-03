@@ -282,7 +282,7 @@ class ApprovalInboxController extends Controller
             'it_job_requests'      => ['Pending Division Chief Approval', 'Pending OCD Approval'],
             'vehicle_requests'     => ['Pending', 'Approved'],
             'facility_requests'    => ['Pending', 'Pending FAD Approval', 'Pending OCD Approval'],
-            'work_requests'        => ['Pending', 'GSU Approved'],
+            'work_requests'        => ['Pending', 'GSU Approved', 'Pending FAD Approval'],
             'service_requests'     => ['Pending', 'Approved'],
             'messengerial_requests'=> ['Pending Division Chief Approval'],
             'gate_passes'          => ['Pending', 'Division Approved'],
