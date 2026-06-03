@@ -18,12 +18,17 @@ if (appUrl && window.location.origin !== appUrl) {
 }
 
 import { router } from '@inertiajs/vue3';
+import { sessionExpired } from './composables/useSession';
 
-// Reload page on CSRF expiry (419) so the user gets a fresh token
+// 419 = CSRF/session expired; 405 = stale POST URL reloaded as GET after a 419 reload.
+// Both mean the session is no longer valid — show the expired overlay instead of
+// letting Inertia render the raw error body or doing a blind window.location.reload()
+// (which resubmits the last POST and produces the 405 in the first place).
 router.on('invalid', (event) => {
-    if (event.detail.response.status === 419) {
+    const status = event.detail.response.status;
+    if (status === 419 || status === 405) {
         event.preventDefault();
-        window.location.reload();
+        sessionExpired.value = true;
     }
 });
 

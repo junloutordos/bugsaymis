@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, markRaw, onMounted, onUnmounted, watch } from "vue";
 import { storageUrl } from "@/Composables/useStorage.js";
+import { sessionExpired } from "@/composables/useSession.js";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
@@ -2270,6 +2271,28 @@ filteredMenu.value.forEach((item) => {
   </div>
 
 </div>
+
+  <!-- Session-expired overlay — shown when a 419 or 405 is received -->
+  <Teleport to="body">
+    <div v-if="sessionExpired" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="bg-white rounded-2xl shadow-2xl px-8 py-8 max-w-sm w-full mx-4 text-center">
+        <div class="flex items-center justify-center w-14 h-14 rounded-full bg-amber-100 mx-auto mb-4">
+          <svg class="w-7 h-7 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h2 class="text-lg font-semibold text-slate-800 mb-1">Session Expired</h2>
+        <p class="text-sm text-slate-500 mb-6">Your session has timed out. Please reload the page to continue.</p>
+        <button
+          @click="router.visit(window.location.pathname)"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+        >
+          Reload Page
+        </button>
+      </div>
+    </div>
+  </Teleport>
+
 </template>
 
 
