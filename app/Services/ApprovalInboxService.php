@@ -181,7 +181,7 @@ class ApprovalInboxService
             $this->mergeOrAddTab($tabs, 'facility_requests', 'Facility Requests', $frFAD);
 
             $wrFAD = WorkRequest::with(['requester:id,name', 'division:id,name', 'office:id,name'])
-                ->where('status', 'GSU Approved')->latest()->get()
+                ->whereIn('status', ['GSU Approved', 'Pending FAD Approval'])->latest()->get()
                 ->map(fn($r) => $this->normaliseWorkRequest($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'work_requests', 'Work Requests', $wrFAD);
 

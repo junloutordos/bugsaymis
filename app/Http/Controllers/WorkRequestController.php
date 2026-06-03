@@ -561,7 +561,7 @@ class WorkRequestController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 50);
 
         $workRequests = WorkRequest::with(['requester:id,name', 'division:id,name'])
-            ->where('status', 'GSU Approved')
+            ->whereIn('status', ['GSU Approved', 'Pending FAD Approval'])
             ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
                 $inner->where('issue',      'like', "%{$search}%")
                       ->orWhere('category', 'like', "%{$search}%")
@@ -580,7 +580,7 @@ class WorkRequestController extends Controller
     public function fadAction(Request $request, WorkRequest $workRequest)
     {
         $user = $request->user();
-        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('Administrator');
+        $isFAD = str_contains($user->position ?? '', 'FAD') || $user->hasRole('FAD Chief') || $user->hasRole('Administrator');
         if (! $isFAD) abort(403);
 
         $request->validate(['action' => 'required|in:approve,reject']);
