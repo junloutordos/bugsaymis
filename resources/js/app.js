@@ -18,7 +18,7 @@ if (appUrl && window.location.origin !== appUrl) {
 }
 
 import { router } from '@inertiajs/vue3';
-import { sessionExpired } from './composables/useSession';
+import { sessionExpired } from './Composables/useSession';
 
 // 419 = CSRF/session expired; 405 = stale POST URL reloaded as GET after a 419 reload.
 // Both mean the session is no longer valid — show the expired overlay instead of

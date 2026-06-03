@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, markRaw, onMounted, onUnmounted, watch } from "vue";
 import { storageUrl } from "@/Composables/useStorage.js";
-import { sessionExpired } from "@/composables/useSession.js";
+import { sessionExpired } from "@/Composables/useSession.js";
 const props = defineProps({ title: { type: String, default: '' } });
 const title = props.title;
 import { Head, usePage, router, useForm } from "@inertiajs/vue3";
