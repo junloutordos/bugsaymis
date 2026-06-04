@@ -20,11 +20,13 @@ class ParentContact extends Model
         'fcm_device_token',
         'notify_email',
         'notify_push',
+        'notify_sms',
     ];
 
     protected $casts = [
         'notify_email' => 'boolean',
         'notify_push'  => 'boolean',
+        'notify_sms'   => 'boolean',
     ];
 
     // ── Relations ──────────────────────────────────────────────────────────────

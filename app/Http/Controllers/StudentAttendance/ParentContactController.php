@@ -63,6 +63,7 @@ class ParentContactController extends Controller
             'fcm_device_token' => ['nullable', 'string', 'max:500'],
             'notify_email'     => ['boolean'],
             'notify_push'      => ['boolean'],
+            'notify_sms'       => ['boolean'],
         ]);
     }
 }
