@@ -1438,6 +1438,13 @@ const menuItems = [
         permissions: ["students.enrollment.manage"],
       },
       {
+        label: "Section Assignment",
+        routeName: "registrar.section-assignment.index",
+        href: route("registrar.section-assignment.index"),
+        icon: TableCellsIcon,
+        permissions: ["students.enrollment.manage"],
+      },
+      {
         label: "Academic Policies",
         routeName: "registrar.academic-policies.index",
         href: route("registrar.academic-policies.index"),

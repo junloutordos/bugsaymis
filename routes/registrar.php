@@ -6,6 +6,7 @@ use App\Http\Controllers\Registrar\EnrollmentPeriodController;
 use App\Http\Controllers\Registrar\PromotionController;
 use App\Http\Controllers\Registrar\ReportCardController;
 use App\Http\Controllers\Registrar\RetentionPolicyController;
+use App\Http\Controllers\Registrar\SectionAssignmentController;
 use App\Http\Controllers\Registrar\StudentDocumentController;
 use App\Http\Controllers\Registrar\TranscriptController;
 use App\Http\Controllers\StudentPortal\GradesController;
@@ -29,6 +30,16 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth'])->group(function () {
+
+    // ── Legacy Section Assignment (one-time import wizard) ───────────────────
+
+    Route::get('/registrar/section-assignment', [SectionAssignmentController::class, 'index'])
+        ->name('registrar.section-assignment.index')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::post('/registrar/section-assignment', [SectionAssignmentController::class, 'store'])
+        ->name('registrar.section-assignment.store')
+        ->middleware('permission:students.enrollment.manage');
 
     // ── Enrollment Management ─────────────────────────────────────────────────
 
