@@ -373,8 +373,13 @@ class ApprovalInboxController extends Controller
                     ->update($request, $record->id);
 
             case 'leave_applications':
-                $stage = $this->resolveLeaveStage($user, $record);
-                $request->merge(['stage' => $stage, 'action' => 'approve']);
+                $stage  = $this->resolveLeaveStage($user, $record);
+                $action = match ($stage) {
+                    'hr_officer'      => 'certified',
+                    'division_chief'  => 'forwarded',
+                    default           => 'approved',
+                };
+                $request->merge(['stage' => $stage, 'action' => $action]);
                 return app(\App\Http\Controllers\HR\LeaveApplicationController::class)
                     ->approve($request, $record);
         }
@@ -459,7 +464,7 @@ class ApprovalInboxController extends Controller
 
             case 'leave_applications':
                 $stage = $this->resolveLeaveStage($user, $record);
-                $request->merge(['stage' => $stage, 'action' => 'reject']);
+                $request->merge(['stage' => $stage, 'action' => 'rejected']);
                 return app(\App\Http\Controllers\HR\LeaveApplicationController::class)
                     ->approve($request, $record);
         }
