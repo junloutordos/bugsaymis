@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Registrar\AnalyticsController;
+use App\Http\Controllers\Registrar\EnrollmentApplicationController;
 use App\Http\Controllers\Registrar\EnrollmentController;
 use App\Http\Controllers\Registrar\EnrollmentPeriodController;
 use App\Http\Controllers\Registrar\PromotionController;
@@ -30,6 +31,28 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware(['auth'])->group(function () {
+
+    // ── Enrollment Applications (review & approve) ───────────────────────────
+
+    Route::get('/registrar/enrollment-applications', [EnrollmentApplicationController::class, 'index'])
+        ->name('registrar.enrollment-applications.index')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::get('/registrar/enrollment-applications/{enrollmentApplication}', [EnrollmentApplicationController::class, 'show'])
+        ->name('registrar.enrollment-applications.show')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::post('/registrar/enrollment-applications/{enrollmentApplication}/approve', [EnrollmentApplicationController::class, 'approve'])
+        ->name('registrar.enrollment-applications.approve')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::post('/registrar/enrollment-applications/{enrollmentApplication}/reject', [EnrollmentApplicationController::class, 'reject'])
+        ->name('registrar.enrollment-applications.reject')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::post('/registrar/enrollment-applications/{enrollmentApplication}/reopen', [EnrollmentApplicationController::class, 'reopen'])
+        ->name('registrar.enrollment-applications.reopen')
+        ->middleware('permission:students.enrollment.manage');
 
     // ── Legacy Section Assignment (one-time import wizard) ───────────────────
 

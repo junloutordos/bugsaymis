@@ -17,8 +17,11 @@ const props = defineProps({
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-const gradeLevels   = [8, 9, 10, 11, 12]
-const activeTab     = ref(8)
+// Derive active grade levels from whatever students exist (supports G7 new enrollees + G8-12 legacy)
+const gradeLevels = computed(() =>
+  Object.keys(props.students ?? {}).map(Number).sort((a, b) => a - b)
+)
+const activeTab = ref(gradeLevels.value[0] ?? 7)
 const submitting    = ref(false)
 const flashSuccess  = ref('')
 const flashError    = ref('')
@@ -38,7 +41,7 @@ const allStudents = computed(() => {
 })
 
 // Initialise on mount
-for (const grade of gradeLevels) {
+for (const grade of gradeLevels.value) {
   for (const s of (props.students[grade] ?? [])) {
     assignments.value[s.student_id] = null
   }
@@ -67,7 +70,7 @@ const totalAssigned = computed(() => {
 })
 
 const totalStudents = computed(() => {
-  return gradeLevels.reduce((sum, g) => sum + (props.students[g]?.length ?? 0), 0)
+  return gradeLevels.value.reduce((sum, g) => sum + (props.students[g]?.length ?? 0), 0)
 })
 
 const allAssigned = computed(() => totalAssigned.value === totalStudents.value)
@@ -107,7 +110,7 @@ function autoBalance(grade) {
 }
 
 function autoBalanceAll() {
-  for (const grade of gradeLevels) autoBalance(grade)
+  for (const grade of gradeLevels.value) autoBalance(grade)
 }
 
 // ── Submit ────────────────────────────────────────────────────────────────────
