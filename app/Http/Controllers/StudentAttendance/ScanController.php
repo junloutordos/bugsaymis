@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentAttendance;
 
 use App\Events\AttendanceScanEvent;
 use App\Http\Controllers\Controller;
+use App\Jobs\StudentAttendance\SendAttendanceSmsJob;
 use App\Models\Student;
 use App\Models\StudentAttendance\StudentAttendanceLog;
 use Illuminate\Http\JsonResponse;
@@ -110,6 +111,14 @@ class ScanController extends Controller
         // ── 6. Broadcast for real-time gate monitor ───────────────────────────
         $payload = $this->buildPayload($student, $type, $log->scan_time, false);
         event(new AttendanceScanEvent($payload));
+
+        // ── 7. Queue SMS notification to linked parents ───────────────────────
+        SendAttendanceSmsJob::dispatch(
+            $student->id,
+            $type,
+            $log->scan_time->toIso8601String(),
+            $gateLocation,
+        );
 
         return response()->json([
             'status'  => 'ok',

@@ -18,6 +18,7 @@ const form = useForm({
   fcm_device_token: '',
   notify_email:     true,
   notify_push:      true,
+  notify_sms:       false,
 })
 
 function openCreate() {
@@ -25,6 +26,7 @@ function openCreate() {
   form.reset()
   form.notify_email = true
   form.notify_push  = true
+  form.notify_sms   = false
   showModal.value   = true
 }
 
@@ -36,6 +38,7 @@ function openEdit(contact) {
   form.fcm_device_token   = contact.fcm_device_token ?? ''
   form.notify_email       = !! contact.notify_email
   form.notify_push        = !! contact.notify_push
+  form.notify_sms         = !! contact.notify_sms
   showModal.value         = true
 }
 
@@ -120,7 +123,8 @@ function studentList(contact) {
                 <div class="flex gap-1.5 flex-wrap">
                   <span v-if="contact.notify_email" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium">Email</span>
                   <span v-if="contact.notify_push"  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-violet-100 text-violet-700 font-medium">Push</span>
-                  <span v-if="!contact.notify_email && !contact.notify_push" class="text-slate-400 text-xs">None</span>
+                  <span v-if="contact.notify_sms"   class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700 font-medium">SMS</span>
+                  <span v-if="!contact.notify_email && !contact.notify_push && !contact.notify_sms" class="text-slate-400 text-xs">None</span>
                 </div>
               </td>
               <td class="px-4 py-3">
@@ -195,16 +199,23 @@ function studentList(contact) {
               <p class="text-slate-400 text-xs mt-1">Leave blank — mobile app registers this automatically</p>
             </div>
 
-            <div class="flex gap-6">
+            <div class="flex flex-wrap gap-4">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input v-model="form.notify_email" type="checkbox" class="rounded text-indigo-600" />
-                <span class="text-sm text-slate-700">Email notifications</span>
+                <span class="text-sm text-slate-700">Email</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
                 <input v-model="form.notify_push" type="checkbox" class="rounded text-indigo-600" />
-                <span class="text-sm text-slate-700">Push notifications</span>
+                <span class="text-sm text-slate-700">Push</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input v-model="form.notify_sms" type="checkbox" class="rounded text-indigo-600" />
+                <span class="text-sm text-slate-700">SMS</span>
               </label>
             </div>
+            <p v-if="form.notify_sms && !form.mobile_phone" class="text-amber-600 text-xs -mt-2">
+              SMS requires a mobile phone number above.
+            </p>
 
             <div class="flex justify-end gap-3 pt-2">
               <button type="button" @click="closeModal"

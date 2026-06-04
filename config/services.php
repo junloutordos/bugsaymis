@@ -60,4 +60,13 @@ return [
         'region'          => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
     ],
 
+    'sms_gate' => [
+        // Local mode:  http://<phone-lan-ip>:8080/message
+        // Cloud mode:  https://api.sms-gate.app/3rdparty/v1/messages
+        'url'       => env('SMS_GATE_URL'),
+        'username'  => env('SMS_GATE_USERNAME'),
+        'password'  => env('SMS_GATE_PASSWORD'),
+        'device_id' => env('SMS_GATE_DEVICE_ID'),
+    ],
+
 ];
