@@ -16,6 +16,7 @@ class DocumentType extends Model
         'lead_time_hours',
         'is_active',
         'routing_type',
+        'applicable_to',
     ];
 
     protected $casts = [

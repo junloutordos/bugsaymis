@@ -117,10 +117,11 @@ const form = ref({
 })
 
 function openModal(origin) {
-  logOrigin.value       = origin
-  form.value.origin_type = origin
-  errors.value          = {}
-  showModal.value       = true
+  logOrigin.value            = origin
+  form.value.origin_type     = origin
+  form.value.document_type_id = ''   // reset so stale selection from opposite category is cleared
+  errors.value               = {}
+  showModal.value            = true
 }
 
 function handleScan(e) {
@@ -144,8 +145,15 @@ function submitForm() {
   })
 }
 
-const selectedType = computed(() => props.documentTypes?.find(t => t.id === +form.value.document_type_id))
-// External docs never need a manual receiver — Records is always the initial holder
+// Filter types by the current log origin
+const availableTypes = computed(() =>
+  (props.documentTypes ?? []).filter(t =>
+    t.applicable_to === logOrigin.value || t.applicable_to === 'both'
+  )
+)
+
+const selectedType = computed(() => availableTypes.value.find(t => t.id === +form.value.document_type_id))
+// External docs never need a manual receiver — Records → OCD is auto-routed
 const needsManualReceiver = computed(() =>
   logOrigin.value !== 'external' &&
   (!selectedType.value || selectedType.value.routing_type === 'manual' || !selectedType.value.routing_steps?.length)
@@ -201,7 +209,7 @@ const needsManualReceiver = computed(() =>
       <select v-model="filterTypeId"
         class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
         <option value="">All Types</option>
-        <option v-for="t in documentTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
+        <option v-for="t in availableTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
       </select>
       <select v-model="filterPriority"
         class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -303,7 +311,7 @@ const needsManualReceiver = computed(() =>
               <select v-model="form.document_type_id" required
                 class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">Select type…</option>
-                <option v-for="t in documentTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
+                <option v-for="t in availableTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
               </select>
               <p v-if="selectedType" class="text-xs text-slate-500 mt-1">
                 Routing: <strong class="capitalize">{{ selectedType.routing_type }}</strong>
