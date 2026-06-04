@@ -1899,6 +1899,9 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::put('/grading-options/{gradingOption}/categories', [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'updateCategories'])->name('grading-options.categories.update');
     Route::delete('/grading-options/{gradingOption}',         [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'destroy'])->name('grading-options.destroy');
 
+    // Teaching load pre-fill (must be before {classRecord} route)
+    Route::get('/class-records/my-teaching-load', [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'myTeachingLoad'])->name('class-records.my-teaching-load');
+
     // Class Records CRUD + workflow
     Route::get('/class-records',                        [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'index'])->name('class-records.index');
     Route::post('/class-records',                       [\App\Http\Controllers\ClassRecord\ClassRecordController::class, 'store'])->name('class-records.store');
@@ -1921,6 +1924,7 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::post('/class-records/{classRecord}/quarters/{q}/assessments/copy-from-record', [\App\Http\Controllers\ClassRecord\ClassRecordAssessmentController::class, 'copyFromRecord'])->name('class-records.assessments.copy-from-record');
 
     // Students
+    Route::get('/class-records/{classRecord}/quarters/{q}/students/from-enrollment', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'fromEnrollment'])->name('class-records.students.from-enrollment');
     Route::get('/class-records/{classRecord}/quarters/{q}/students',          [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'index'])->name('class-records.students.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/students',         [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'upsert'])->name('class-records.students.upsert');
     Route::get('/class-records/{classRecord}/quarters/{q}/students/template', [\App\Http\Controllers\ClassRecord\ClassRecordStudentController::class, 'template'])->name('class-records.students.template');

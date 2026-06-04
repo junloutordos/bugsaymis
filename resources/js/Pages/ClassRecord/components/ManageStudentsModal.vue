@@ -2,21 +2,24 @@
 import { ref, watch } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
-import { PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, TrashIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, BoltIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   show:            { type: Boolean, default: false },
   classRecordId:   { type: Number,  required: true },
   quarter:         { type: Number,  required: true },
   initialStudents: { type: Array,   default: () => [] },
+  subjectType:     { type: String,  default: null },   // 'elective' | 'lecture' | etc.
+  sectionId:       { type: Number,  default: null },
 })
 
 const emit = defineEmits(['close', 'saved'])
 
-const students   = ref([])
-const saving     = ref(false)
-const csvInput   = ref(null)
-const csvErrors  = ref([])
+const students       = ref([])
+const saving         = ref(false)
+const csvInput       = ref(null)
+const csvErrors      = ref([])
+const autoPopulating = ref(false)
 
 watch(() => props.show, (v) => {
   if (v) {
@@ -51,6 +54,40 @@ function removeRow(idx) {
   }
   let seq = 1
   students.value.filter(s => !s._delete).forEach(s => { s.sequence_number = seq++ })
+}
+
+// ── Auto-populate from enrollment ─────────────────────────────────────────────
+async function autoPopulate() {
+  const confirm = await Swal.fire({
+    title:             'Auto-populate from Enrollment?',
+    text:              'This will replace the current roster with all enrolled students in this section. Continue?',
+    icon:              'question',
+    showCancelButton:  true,
+    confirmButtonText: 'Yes, populate',
+    confirmButtonColor: '#4f46e5',
+  })
+  if (!confirm.isConfirmed) return
+
+  autoPopulating.value = true
+  try {
+    const { data } = await axios.get(
+      route('class-records.students.from-enrollment', { classRecord: props.classRecordId, q: props.quarter })
+    )
+    // Preserve existing DB IDs by matching sequence_number where possible
+    const existingById = Object.fromEntries(
+      props.initialStudents.map(s => [s.sequence_number, s.id])
+    )
+    students.value = (data.students ?? []).map(row => ({
+      ...row,
+      id: existingById[row.sequence_number] ?? null,
+    }))
+    csvErrors.value = []
+    Swal.fire({ icon: 'success', title: `${data.count} student(s) loaded.`, timer: 1200, showConfirmButton: false })
+  } catch (err) {
+    Swal.fire('Error', err.response?.data?.message ?? 'Failed to load from enrollment.', 'error')
+  } finally {
+    autoPopulating.value = false
+  }
 }
 
 // ── CSV Import ─────────────────────────────────────────────────────────────────
@@ -140,16 +177,32 @@ async function save() {
           <button @click="$emit('close')" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
 
-        <!-- CSV import toolbar -->
-        <div class="px-6 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-3 shrink-0">
-          <span class="text-xs text-slate-500 mr-auto">Add students one-by-one or import from a CSV file.</span>
+        <!-- Toolbar -->
+        <div class="px-6 py-3 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-2 shrink-0">
+
+          <!-- Elective badge -->
+          <span v-if="subjectType === 'elective'"
+                class="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2.5 py-1 text-xs font-medium mr-auto">
+            ⚡ Elective subject — add students individually
+          </span>
+          <span v-else class="text-xs text-slate-500 mr-auto">Add students one-by-one, import CSV, or auto-populate from enrollment.</span>
+
+          <!-- Auto-populate (non-elective + has section) -->
+          <button v-if="subjectType !== 'elective' && sectionId"
+                  @click="autoPopulate"
+                  :disabled="autoPopulating"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-300 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-medium transition-colors">
+            <BoltIcon class="h-3.5 w-3.5" />
+            {{ autoPopulating ? 'Loading…' : 'Auto-populate from Enrollment' }}
+          </button>
+
           <a :href="route('class-records.students.template', { classRecord: classRecordId, q: quarter })"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 text-xs font-medium transition-colors">
-            <ArrowDownTrayIcon class="h-3.5 w-3.5" /> Download Template
+            <ArrowDownTrayIcon class="h-3.5 w-3.5" /> Template
           </a>
           <button @click="csvInput?.click()"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-medium transition-colors">
-            <ArrowUpTrayIcon class="h-3.5 w-3.5" /> Upload CSV
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 text-xs font-medium transition-colors">
+            <ArrowUpTrayIcon class="h-3.5 w-3.5" /> CSV
           </button>
           <input ref="csvInput" type="file" accept=".csv" class="hidden" @change="onCsvSelected" />
         </div>

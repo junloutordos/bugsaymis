@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\ClassRecordQuarter;
 use App\Models\ClassRecord\ClassRecordStudent;
+use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Registrar\StudentEnrollment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClassRecordStudentController extends Controller
@@ -25,6 +28,65 @@ class ClassRecordStudentController extends Controller
             ['class_record_id' => $classRecord->id, 'quarter' => $q],
             ['is_locked' => false]
         );
+    }
+
+    // ── GET /class-records/{cr}/quarters/{q}/students/from-enrollment ────────
+
+    public function fromEnrollment(ClassRecord $classRecord, int $q): JsonResponse
+    {
+        abort_unless($this->isAdmin() || $classRecord->teacher_id === Auth::id(), 403);
+        abort_unless($classRecord->isCurrentSchoolYear(), 403, 'This class record is from a past school year.');
+
+        // Block auto-populate for elective subjects
+        $subjectType = $classRecord->subject?->subject_type;
+        abort_if(
+            $subjectType === 'elective',
+            422,
+            'Elective subjects cannot be auto-populated. Students choose their electives individually.'
+        );
+
+        abort_unless(
+            $classRecord->section_id,
+            422,
+            'This class record is not linked to a section. Edit the record and set a section first.'
+        );
+
+        $currentSyId = SchoolYear::where('is_current', true)->value('id');
+
+        // Pull enrolled students for this section
+        $enrollments = StudentEnrollment::where('section_id', $classRecord->section_id)
+            ->where('school_year_id', $currentSyId)
+            ->where('status', 'enrolled')
+            ->pluck('student_id');
+
+        if ($enrollments->isEmpty()) {
+            return response()->json([
+                'students' => [],
+                'message'  => 'No enrolled students found for this section.',
+            ]);
+        }
+
+        $students = DB::table('students')
+            ->whereIn('id', $enrollments)
+            ->orderBy('lastname')
+            ->orderBy('firstname')
+            ->get(['id', 'lastname', 'firstname', 'middlename', 'sex']);
+
+        $rows = $students->values()->map(fn ($s, $idx) => [
+            'id'              => null,
+            'sequence_number' => $idx + 1,
+            'family_name'     => strtoupper(trim($s->lastname ?? '')),
+            'given_name'      => strtoupper(trim($s->firstname ?? '')),
+            'middle_initial'  => $s->middlename ? strtoupper(substr(trim($s->middlename), 0, 1)) : '',
+            'sex'             => $s->sex === 'Female' ? 'F' : ($s->sex === 'Male' ? 'M' : strtoupper(substr($s->sex ?? 'M', 0, 1))),
+            'student_id'      => $s->id,
+            '_delete'         => false,
+        ]);
+
+        return response()->json([
+            'students' => $rows,
+            'count'    => $rows->count(),
+        ]);
     }
 
     // ── GET /class-records/{cr}/quarters/{q}/students ────────────────────────

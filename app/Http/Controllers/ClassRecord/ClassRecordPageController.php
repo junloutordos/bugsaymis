@@ -57,6 +57,7 @@ class ClassRecordPageController extends Controller
 
         $classRecord->load([
             'teacher:id,name,position',
+            'subject:id,name,subject_type,grade_level',
             'gradingOption.categories',
             'quarters.assessments.gradingCategory',
             'quarters.students',

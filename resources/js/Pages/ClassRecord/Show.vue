@@ -565,6 +565,8 @@ async function checkRecord() {
             :stanine-lookup="stanineLookup"
             :previous-grades="{}"
             :is-locked="isLocked || isReadOnly"
+            :subject-type="classRecord.subject?.subject_type ?? null"
+            :section-id="classRecord.section_id ?? null"
             @reload="router.reload({ only: ['classRecord'] })"
           />
         </div>
