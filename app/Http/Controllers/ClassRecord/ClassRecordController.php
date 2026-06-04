@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\ClassRecord\ClassRecordCheckedMail;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\ClassRecord\GradingOption;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,54 @@ class ClassRecordController extends Controller
     private function isAdmin(): bool
     {
         return Auth::user()->hasPermission('class-records.admin');
+    }
+
+    // ── GET /class-records/my-teaching-load ──────────────────────────────────
+
+    public function myTeachingLoad(): JsonResponse
+    {
+        $currentSY = SchoolYear::where('is_current', true)->first(['id', 'name']);
+
+        if (! $currentSY) {
+            return response()->json(['assignments' => [], 'school_year' => null]);
+        }
+
+        $assignments = LoadAssignment::with([
+                'subject:id,name,subject_type,grade_level',
+                'section:id,levelid,sectionname',
+            ])
+            ->where('user_id', Auth::id())
+            ->where('school_year_id', $currentSY->id)
+            ->where('assignment_type', 'teaching')
+            ->whereNotNull('subject_id')
+            ->whereNotNull('section_id')
+            ->get();
+
+        // Flag assignments that already have a class record this SY
+        $existingPairs = ClassRecord::where('teacher_id', Auth::id())
+            ->where('school_year_id', $currentSY->id)
+            ->whereNotNull('subject_id')
+            ->whereNotNull('section_id')
+            ->get(['subject_id', 'section_id'])
+            ->map(fn ($r) => $r->subject_id . '_' . $r->section_id)
+            ->flip();
+
+        $result = $assignments->map(fn ($la) => [
+            'load_assignment_id' => $la->id,
+            'subject_id'         => $la->subject_id,
+            'subject_name'       => $la->subject?->name,
+            'subject_type'       => $la->subject?->subject_type,
+            'grade_level'        => $la->subject?->grade_level,
+            'section_id'         => $la->section_id,
+            'section_name'       => $la->section?->sectionname,
+            'display_label'      => ($la->subject?->name ?? '—') . ' — ' . ($la->section?->sectionname ?? '—'),
+            'already_created'    => $existingPairs->has($la->subject_id . '_' . $la->section_id),
+        ]);
+
+        return response()->json([
+            'assignments' => $result,
+            'school_year' => $currentSY->name,
+        ]);
     }
 
     // ── GET /class-records ────────────────────────────────────────────────────

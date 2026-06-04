@@ -5,7 +5,7 @@ import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { badgeBase } from '@/Composables/useStatusBadge.js'
 import Swal from 'sweetalert2'
-import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, ArrowRightIcon, Cog6ToothIcon, TrashIcon, BoltIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   classRecords:      Array,
@@ -52,12 +52,40 @@ const form = ref({
   subject_name:       '',
   year_level_section: '',
   grading_option_id:  '',
+  subject_id:         null,
+  section_id:         null,
 })
 
+// Teaching load pre-fill
+const myLoad        = ref([])
+const loadFetching  = ref(false)
+const loadSyName    = ref(null)
+
+async function fetchMyLoad() {
+  loadFetching.value = true
+  try {
+    const { data } = await axios.get(route('class-records.my-teaching-load'))
+    myLoad.value   = data.assignments ?? []
+    loadSyName.value = data.school_year ?? null
+  } catch {
+    myLoad.value = []
+  } finally {
+    loadFetching.value = false
+  }
+}
+
+function selectLoad(assignment) {
+  form.value.subject_name       = assignment.subject_name ?? ''
+  form.value.year_level_section = `G-${assignment.grade_level} ${assignment.section_name ?? ''}`
+  form.value.subject_id         = assignment.subject_id
+  form.value.section_id         = assignment.section_id
+}
+
 function openCreate() {
-  form.value = { subject_name: '', year_level_section: '', grading_option_id: '' }
+  form.value = { subject_name: '', year_level_section: '', grading_option_id: '', subject_id: null, section_id: null }
   createErrors.value = {}
   showModal.value = true
+  fetchMyLoad()
 }
 
 async function handleCreate() {
@@ -312,6 +340,51 @@ const selectedOption = computed(() =>
             <h2 class="text-base font-semibold text-slate-800">New Class Record</h2>
             <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
           </div>
+
+          <!-- From Teaching Load panel -->
+          <div class="px-6 pt-4 pb-2">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <BoltIcon class="h-3.5 w-3.5 text-indigo-400" />
+              From Your Teaching Load
+            </p>
+
+            <div v-if="loadFetching" class="text-xs text-slate-400 py-2">Loading assignments…</div>
+
+            <div v-else-if="myLoad.length" class="space-y-1 max-h-40 overflow-y-auto pr-1">
+              <button v-for="la in myLoad" :key="la.load_assignment_id"
+                      type="button"
+                      @click="selectLoad(la)"
+                      class="w-full text-left flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm border transition"
+                      :class="form.subject_id === la.subject_id && form.section_id === la.section_id
+                        ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
+                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50 text-slate-700'">
+                <span class="font-medium truncate">{{ la.display_label }}</span>
+                <span class="flex items-center gap-1.5 shrink-0">
+                  <span class="rounded-full px-1.5 py-0.5 text-xs font-medium"
+                        :class="la.subject_type === 'elective'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-500'">
+                    {{ la.subject_type }}
+                  </span>
+                  <span v-if="la.already_created" class="rounded-full px-1.5 py-0.5 text-xs bg-green-100 text-green-600">
+                    created
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div v-else class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-400">
+              No teaching assignments found for {{ loadSyName ?? 'the current school year' }} yet.
+              Faculty Loading must be completed first, or fill in manually below.
+            </div>
+
+            <div v-if="form.subject_id" class="mt-2 text-xs text-indigo-600 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
+              Selected — fields pre-filled below. You can still edit them.
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 mx-6"></div>
 
           <form @submit.prevent="handleCreate" class="px-6 py-5 space-y-4">
             <div>

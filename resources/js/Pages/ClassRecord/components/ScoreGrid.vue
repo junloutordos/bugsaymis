@@ -17,6 +17,8 @@ const props = defineProps({
   stanineLookup:   { type: Array,   required: true },
   previousGrades:  { type: Object,  default: () => ({}) }, // { studentId: runningGrade }
   isLocked:        { type: Boolean, default: false },
+  subjectType:     { type: String,  default: null },
+  sectionId:       { type: Number,  default: null },
 })
 
 const emit = defineEmits(['reload'])
@@ -541,6 +543,8 @@ const showRunning = computed(() => props.quarterNumber > 1)
     :class-record-id="classRecordId"
     :quarter="quarterNumber"
     :initial-students="students"
+    :subject-type="subjectType"
+    :section-id="sectionId"
     @close="showStudentsModal = false"
     @saved="onStudentsSaved"
   />
