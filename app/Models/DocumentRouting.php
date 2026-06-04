@@ -18,6 +18,7 @@ class DocumentRouting extends Model
         'status',
         'received_at',
         'action_taken_at',
+        'reviewed_at',
         'action_taken',
         'remarks',
         'instructions',
@@ -31,6 +32,7 @@ class DocumentRouting extends Model
     protected $casts = [
         'received_at'     => 'datetime',
         'action_taken_at' => 'datetime',
+        'reviewed_at'     => 'datetime',
         'due_at'          => 'datetime',
         'forwarded_at'    => 'datetime',
         'returned_at'     => 'datetime',

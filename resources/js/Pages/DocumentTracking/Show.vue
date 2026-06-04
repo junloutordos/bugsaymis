@@ -8,22 +8,24 @@ import {
   ChevronLeftIcon, LockClosedIcon, ExclamationTriangleIcon,
   CheckCircleIcon, ClockIcon, ArrowRightIcon, ArrowUturnLeftIcon,
   PaperClipIcon, PencilSquareIcon, EyeIcon, DocumentCheckIcon,
-  UserIcon, ArrowTopRightOnSquareIcon,
+  UserIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  document:      Object,
-  users:         Array,
-  isAdmin:       Boolean,
-  currentUserId: Number,
+  document:              Object,
+  users:                 Array,
+  isAdmin:               Boolean,
+  currentUserId:         Number,
+  routingChain:          Array,
+  originalSender:        Object,
+  latestActionTaker:     Object,
+  canCompleteAsReceiver: Boolean,
 })
 
 const page = usePage()
 const uid  = computed(() => props.currentUserId ?? page.props.auth?.user?.id)
 
 // ── Active routing step for current user ──────────────────────────────────
-// For external docs the initial step is sender=Records, receiver=Records, status=Received
-// — Records can still Forward from that step.
 const myActiveRouting = computed(() =>
   props.document.routings?.find(r =>
     r.receiver?.id === uid.value &&
@@ -31,17 +33,76 @@ const myActiveRouting = computed(() =>
   )
 )
 
-// OCD users shown first in Forward dropdown for external docs
-const sortedUsers = computed(() => {
-  if (props.document.origin_type !== 'external') return props.users ?? []
-  // Put users whose name suggests OCD/Campus Director first (hint only — no role data here)
-  return props.users ?? []
-})
 const isCompleted = computed(() => props.document.overall_status === 'Completed')
+
+// For admin "Complete & File" button (unchanged)
 const canComplete = computed(() =>
-  props.isAdmin || myActiveRouting.value?.status === 'Action Taken' ||
-  props.document.routings?.some(r => r.receiver?.id === uid.value && r.status === 'Action Taken')
+  props.isAdmin || props.document.routings?.some(r => r.receiver?.id === uid.value && r.status === 'Action Taken')
 )
+
+// ── Review modal state ────────────────────────────────────────────────────
+const reviewOpen       = ref(false)
+const reviewTab        = ref('return')   // 'return' | 'forward' | 'complete'
+const reviewSubmitting = ref(false)
+const reviewErrors     = ref({})
+const reviewForm       = ref({
+  return_target:             'original',
+  return_target_routing_id:  null,
+  return_reason:             '',
+  forward_to:                null,
+  instructions:              '',
+  completion_notes:          '',
+})
+
+// User search for forward-to field
+const forwardSearch = ref('')
+const filteredUsers = computed(() => {
+  const q = forwardSearch.value.toLowerCase()
+  return (props.users ?? []).filter(u => u.id !== uid.value && (!q || u.name.toLowerCase().includes(q)))
+})
+
+function openReviewModal() {
+  reviewOpen.value = true
+  reviewTab.value  = 'return'
+  reviewForm.value = {
+    return_target:            props.latestActionTaker ? 'latest_action_taker' : 'original',
+    return_target_routing_id: null,
+    return_reason:            '',
+    forward_to:               null,
+    instructions:             '',
+    completion_notes:         '',
+  }
+  forwardSearch.value = ''
+  reviewErrors.value  = {}
+}
+
+function closeReviewModal() { reviewOpen.value = false }
+
+function doReview() {
+  reviewSubmitting.value = true
+  reviewErrors.value     = {}
+
+  const payload = { decision: reviewTab.value }
+  if (reviewTab.value === 'return') {
+    payload.return_target  = reviewForm.value.return_target
+    if (reviewForm.value.return_target === 'step') {
+      payload.return_target_routing_id = reviewForm.value.return_target_routing_id
+    }
+    payload.return_reason = reviewForm.value.return_reason
+  } else if (reviewTab.value === 'forward') {
+    payload.forward_to    = reviewForm.value.forward_to
+    payload.instructions  = reviewForm.value.instructions
+  } else {
+    payload.completion_notes = reviewForm.value.completion_notes
+  }
+
+  router.post(route('document-tracking.review', myActiveRouting.value.id), payload, {
+    onSuccess: closeReviewModal,
+    onError:   e  => { reviewErrors.value = e },
+    onFinish:  () => { reviewSubmitting.value = false },
+    preserveScroll: true,
+  })
+}
 
 // ── Scan preview ──────────────────────────────────────────────────────────
 const previewAtt     = ref(null)
@@ -251,17 +312,14 @@ const overallBadgeCls = computed(() => {
             class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
             <CheckCircleIcon class="h-4 w-4" /> Acknowledge Receipt
           </button>
+          <!-- Primary review action -->
+          <button @click="openReviewModal()"
+            class="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
+            <DocumentCheckIcon class="h-4 w-4" /> Review Document
+          </button>
           <button @click="openModal('act')"
-            class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">
-            <DocumentCheckIcon class="h-4 w-4" /> Record Action
-          </button>
-          <button @click="openModal('forward')"
-            class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
-            <ArrowRightIcon class="h-4 w-4" /> Forward
-          </button>
-          <button @click="openModal('return')"
             class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
-            <ArrowUturnLeftIcon class="h-4 w-4" /> Return
+            <PencilSquareIcon class="h-4 w-4" /> Record Action
           </button>
           <button @click="openModal('annotate')"
             class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
@@ -365,6 +423,7 @@ const overallBadgeCls = computed(() => {
                       ({{ duration(r.received_at ?? r.created_at, r.action_taken_at) }})
                     </span>
                   </span>
+                  <span v-if="r.reviewed_at" class="text-violet-500">⊙ Reviewed: {{ fmtDt(r.reviewed_at) }}</span>
                   <span v-if="r.forwarded_at">↪ Forwarded: {{ fmtDt(r.forwarded_at) }}</span>
                   <span v-if="r.returned_at" class="text-red-400">↩ Returned: {{ fmtDt(r.returned_at) }}</span>
                 </div>
@@ -409,6 +468,153 @@ const overallBadgeCls = computed(() => {
 
     </div>
 
+    <!-- ── Review Document Modal ─────────────────────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="reviewOpen" class="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div class="fixed inset-0 bg-black/40" @click="closeReviewModal" />
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 class="font-bold text-slate-800">Review Document</h3>
+            <button @click="closeReviewModal" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <!-- Tabs -->
+          <div class="flex border-b border-slate-100 shrink-0">
+            <button
+              @click="reviewTab = 'return'"
+              class="flex-1 py-2.5 text-sm font-medium transition-colors"
+              :class="reviewTab === 'return' ? 'border-b-2 border-red-500 text-red-600' : 'text-slate-500 hover:text-slate-700'">
+              Return to Sender
+            </button>
+            <button
+              @click="reviewTab = 'forward'"
+              class="flex-1 py-2.5 text-sm font-medium transition-colors"
+              :class="reviewTab === 'forward' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-slate-500 hover:text-slate-700'">
+              Forward
+            </button>
+            <button
+              v-if="canCompleteAsReceiver"
+              @click="reviewTab = 'complete'"
+              class="flex-1 py-2.5 text-sm font-medium transition-colors"
+              :class="reviewTab === 'complete' ? 'border-b-2 border-emerald-500 text-emerald-600' : 'text-slate-500 hover:text-slate-700'">
+              Complete
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+
+            <!-- Return tab -->
+            <template v-if="reviewTab === 'return'">
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Return to</p>
+                <div class="space-y-2">
+                  <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                    :class="reviewForm.return_target === 'original' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
+                    <input type="radio" value="original" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
+                    <div>
+                      <p class="text-sm font-medium text-slate-800">Original Sender</p>
+                      <p class="text-xs text-slate-500">{{ originalSender?.name ?? '—' }}</p>
+                    </div>
+                  </label>
+                  <label v-if="latestActionTaker && latestActionTaker.id !== originalSender?.id"
+                    class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                    :class="reviewForm.return_target === 'latest_action_taker' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
+                    <input type="radio" value="latest_action_taker" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
+                    <div>
+                      <p class="text-sm font-medium text-slate-800">Latest Action Taker <span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold ml-1">Recommended</span></p>
+                      <p class="text-xs text-slate-500">{{ latestActionTaker?.name }} — most recently processed this document</p>
+                    </div>
+                  </label>
+                  <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+                    :class="reviewForm.return_target === 'step' ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:bg-slate-50'">
+                    <input type="radio" value="step" v-model="reviewForm.return_target" class="mt-0.5 shrink-0" />
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-slate-800">Choose a previous step</p>
+                      <select
+                        v-if="reviewForm.return_target === 'step'"
+                        v-model="reviewForm.return_target_routing_id"
+                        class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option :value="null">Select step…</option>
+                        <option v-for="r in routingChain" :key="r.id" :value="r.id">
+                          Step {{ r.sequence }} — {{ r.receiver?.name }} ({{ r.status }})
+                        </option>
+                      </select>
+                    </div>
+                  </label>
+                </div>
+                <p v-if="reviewErrors.return_target" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_target }}</p>
+                <p v-if="reviewErrors.return_target_routing_id" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_target_routing_id }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Reason <span class="text-red-500">*</span></label>
+                <textarea v-model="reviewForm.return_reason" rows="3" required
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Explain why this document is being returned…" />
+                <p v-if="reviewErrors.return_reason" class="text-xs text-red-500 mt-1">{{ reviewErrors.return_reason }}</p>
+              </div>
+            </template>
+
+            <!-- Forward tab -->
+            <template v-if="reviewTab === 'forward'">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Forward To <span class="text-red-500">*</span></label>
+                <div class="relative mb-1">
+                  <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <input v-model="forwardSearch" type="text" placeholder="Search name…"
+                    class="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <select v-model="reviewForm.forward_to" required size="5"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option v-for="u in filteredUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+                </select>
+                <p v-if="reviewErrors.forward_to" class="text-xs text-red-500 mt-1">{{ reviewErrors.forward_to }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Instructions for Receiver</label>
+                <textarea v-model="reviewForm.instructions" rows="2"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="What should the next person do?" />
+              </div>
+            </template>
+
+            <!-- Complete tab -->
+            <template v-if="reviewTab === 'complete'">
+              <div class="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+                <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                <p>You are the final step in this routing chain. Completing will close the document process and notify the creator.</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Completion Notes (optional)</label>
+                <textarea v-model="reviewForm.completion_notes" rows="3"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g. Filed in Records. No further action required." />
+              </div>
+            </template>
+
+          </div>
+
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+            <button @click="closeReviewModal"
+              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button :disabled="reviewSubmitting" @click="doReview()"
+              class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
+              :class="{
+                'bg-red-600 hover:bg-red-700':     reviewTab === 'return',
+                'bg-blue-600 hover:bg-blue-700':   reviewTab === 'forward',
+                'bg-emerald-600 hover:bg-emerald-700': reviewTab === 'complete',
+              }">
+              {{ reviewSubmitting ? 'Saving…' : { return: 'Return Document', forward: 'Forward Document', complete: 'Complete Document' }[reviewTab] }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ── Modals ──────────────────────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="modal" class="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -416,7 +622,7 @@ const overallBadgeCls = computed(() => {
         <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="font-bold text-slate-800">
-              {{ { act: 'Record Action', forward: 'Forward Document', return: 'Return Document', annotate: 'Add Note', complete: 'Complete & File' }[modal] }}
+              {{ { act: 'Record Action', annotate: 'Add Note', complete: 'Complete & File' }[modal] }}
             </h3>
             <button @click="closeModal" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
@@ -437,37 +643,6 @@ const overallBadgeCls = computed(() => {
                 <textarea v-model="modalForm.remarks" rows="2"
                   class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Additional notes…" />
-              </div>
-            </template>
-
-            <!-- Forward -->
-            <template v-if="modal === 'forward'">
-              <p v-if="document.origin_type === 'external'" class="text-xs bg-green-50 border border-green-200 text-green-700 rounded-lg px-3 py-2">
-                External document — forward to OCD for review and routing instructions.
-              </p>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Forward To <span class="text-red-500">*</span></label>
-                <select v-model="modalForm.receiver_id" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="">Select recipient…</option>
-                  <option v-for="u in sortedUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Instructions for Receiver</label>
-                <textarea v-model="modalForm.instructions" rows="2"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="What should the next person do?" />
-              </div>
-            </template>
-
-            <!-- Return -->
-            <template v-if="modal === 'return'">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Return Reason <span class="text-red-500">*</span></label>
-                <textarea v-model="modalForm.return_reason" rows="3" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Explain why the document is being returned…" />
               </div>
             </template>
 
@@ -498,9 +673,9 @@ const overallBadgeCls = computed(() => {
             <button @click="closeModal"
               class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
             <button :disabled="submitting"
-              @click="{ act: doAct, forward: doForward, return: doReturn, annotate: doAnnotate, complete: doComplete }[modal]()"
+              @click="{ act: doAct, annotate: doAnnotate, complete: doComplete }[modal]()"
               class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
-              {{ submitting ? 'Saving…' : { act: 'Record Action', forward: 'Forward', return: 'Return', annotate: 'Save Note', complete: 'Complete & File' }[modal] }}
+              {{ submitting ? 'Saving…' : { act: 'Record Action', annotate: 'Save Note', complete: 'Complete & File' }[modal] }}
             </button>
           </div>
         </div>

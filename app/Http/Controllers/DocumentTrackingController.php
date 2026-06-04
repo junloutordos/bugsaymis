@@ -81,6 +81,7 @@ class DocumentTrackingController extends Controller
                 'is_terminal'     => $r->is_terminal,
                 'received_at'     => $r->received_at?->toISOString(),
                 'action_taken_at' => $r->action_taken_at?->toISOString(),
+                'reviewed_at'     => $r->reviewed_at?->toISOString(),
                 'forwarded_at'    => $r->forwarded_at?->toISOString(),
                 'returned_at'     => $r->returned_at?->toISOString(),
                 'due_at'          => $r->due_at?->toISOString(),
@@ -346,13 +347,229 @@ class DocumentTrackingController extends Controller
             abort_if(! $hasAccess, 403);
         }
 
+        $document->loadMissing('documentType:id,name,code,lead_time_hours,routing_type');
+
+        // Current user's active routing step
+        $myRouting = $document->routings()
+            ->where('receiver_id', $user->id)
+            ->whereIn('status', ['Pending', 'Received'])
+            ->orderBy('sequence')
+            ->first();
+
+        // All other steps (for return target picker)
+        $routingChain = $myRouting
+            ? $document->routings()
+                ->where('id', '<>', $myRouting->id)
+                ->with('receiver:id,name', 'sender:id,name')
+                ->orderBy('sequence')
+                ->get()
+                ->map(fn($r) => [
+                    'id'             => $r->id,
+                    'sequence'       => $r->sequence,
+                    'receiver'       => $r->receiver?->only('id', 'name'),
+                    'sender'         => $r->sender?->only('id', 'name'),
+                    'status'         => $r->status,
+                    'action_taken_at'=> $r->action_taken_at?->toISOString(),
+                ])
+            : [];
+
+        // Original sender = first step's sender or document creator
+        $firstStep      = $document->routings()->orderBy('sequence')->first();
+        $originalSender = User::find($firstStep?->sender_id ?? $document->created_by)?->only('id', 'name');
+
+        // Latest action taker = highest-sequence "Action Taken" step's receiver (excluding current)
+        $latestActed      = $myRouting
+            ? $document->routings()
+                ->where('id', '<>', $myRouting->id)
+                ->where('status', 'Action Taken')
+                ->orderByDesc('sequence')
+                ->first()
+            : null;
+        $latestActionTaker = $latestActed
+            ? User::find($latestActed->receiver_id)?->only('id', 'name')
+            : null;
+
+        // Receiver can complete if they are the terminal step or routing is manual
+        $canCompleteAsReceiver = $myRouting && (
+            $myRouting->is_terminal ||
+            $document->documentType?->routing_type === 'manual'
+        );
+
         return Inertia::render('DocumentTracking/Show', [
-            'document'      => $this->formatDoc($document),
-            'users'         => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
-            'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
-            'isAdmin'       => $isAdmin,
-            'currentUserId' => $user->id,
+            'document'              => $this->formatDoc($document),
+            'users'                 => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
+            'offices'               => \App\Models\Office::orderBy('name')->get(['id', 'name']),
+            'isAdmin'               => $isAdmin,
+            'currentUserId'         => $user->id,
+            'routingChain'          => $routingChain,
+            'originalSender'        => $originalSender,
+            'latestActionTaker'     => $latestActionTaker,
+            'canCompleteAsReceiver' => $canCompleteAsReceiver,
         ]);
+    }
+
+    // ── Review (unified: return / forward / complete) ──────────────────────────
+
+    public function review(Request $request, DocumentRouting $routing)
+    {
+        $user = Auth::user();
+        abort_if($user->id !== $routing->receiver_id, 403);
+        abort_if(! in_array($routing->status, ['Pending', 'Received']), 422, 'Cannot review this step.');
+        abort_if($routing->reviewed_at !== null, 422, 'Already reviewed.');
+
+        $data = $request->validate([
+            'decision'                 => 'required|in:return,forward,complete',
+            'return_target'            => 'required_if:decision,return|nullable|in:original,latest_action_taker,step',
+            'return_target_routing_id' => 'required_if:return_target,step|nullable|exists:document_routings,id',
+            'return_reason'            => 'required_if:decision,return|nullable|string|max:2000',
+            'forward_to'               => 'required_if:decision,forward|nullable|exists:users,id',
+            'instructions'             => 'nullable|string|max:2000',
+            'completion_notes'         => 'nullable|string|max:2000',
+        ]);
+
+        $doc = $routing->document()->with('documentType')->first();
+
+        if ($data['decision'] === 'complete') {
+            $canComplete = $routing->is_terminal || $doc->documentType?->routing_type === 'manual';
+            abort_if(! $canComplete, 403, 'You are not the final step in this routing chain.');
+        }
+
+        DB::transaction(function () use ($data, $routing, $doc, $user) {
+            match ($data['decision']) {
+                'return'   => $this->execReturn($data, $routing, $doc, $user),
+                'forward'  => $this->execForward($data, $routing, $doc, $user),
+                'complete' => $this->execComplete($data, $routing, $doc, $user),
+            };
+        });
+
+        return back()->with('success', match ($data['decision']) {
+            'return'   => 'Document returned.',
+            'forward'  => 'Document forwarded.',
+            'complete' => 'Document completed and filed.',
+        });
+    }
+
+    private function execReturn(array $data, DocumentRouting $routing, Document $doc, User $user): void
+    {
+        $targetId = match ($data['return_target']) {
+            'original'            => $this->resolveOriginalSenderId($doc),
+            'latest_action_taker' => $this->resolveLatestActionTakerId($doc, $routing->id),
+            'step'                => DocumentRouting::findOrFail($data['return_target_routing_id'])->receiver_id,
+        };
+        abort_if(! $targetId, 422, 'Could not resolve return target.');
+
+        $routing->update([
+            'status'        => 'Returned',
+            'returned_at'   => now(),
+            'reviewed_at'   => now(),
+            'return_reason' => $data['return_reason'],
+            'received_at'   => $routing->received_at ?? now(),
+        ]);
+
+        $newRouting = DocumentRouting::create([
+            'document_id'  => $routing->document_id,
+            'sequence'     => $routing->sequence + 1,
+            'sender_id'    => $user->id,
+            'receiver_id'  => $targetId,
+            'status'       => 'Pending',
+            'instructions' => 'Returned: ' . $data['return_reason'],
+            'due_at'       => now()->addHours($doc->documentType?->lead_time_hours ?? 24),
+            'is_terminal'  => false,
+        ]);
+
+        $doc->update([
+            'current_holder_id' => $targetId,
+            'overall_status'    => 'Returned',
+        ]);
+
+        $newRouting->load(['sender', 'receiver', 'document']);
+        $target = User::find($targetId);
+        if ($target) {
+            $this->sendMail(fn() => Mail::to($target->email)->send(new DocumentReturnedMail($newRouting)));
+            $this->notify($target, 'Document Tracking', $doc->tracking_no, "Document returned to you by {$user->name}", route('document-tracking.show', $doc->id));
+        }
+    }
+
+    private function execForward(array $data, DocumentRouting $routing, Document $doc, User $user): void
+    {
+        $routing->update([
+            'status'       => 'Forwarded',
+            'forwarded_at' => now(),
+            'reviewed_at'  => now(),
+            'received_at'  => $routing->received_at ?? now(),
+        ]);
+
+        $newRouting = DocumentRouting::create([
+            'document_id'  => $routing->document_id,
+            'sequence'     => $routing->sequence + 1,
+            'sender_id'    => $user->id,
+            'receiver_id'  => $data['forward_to'],
+            'status'       => 'Pending',
+            'instructions' => $data['instructions'] ?? null,
+            'due_at'       => now()->addHours($doc->documentType?->lead_time_hours ?? 24),
+            'is_terminal'  => false,
+        ]);
+
+        $doc->update(['current_holder_id' => $data['forward_to']]);
+
+        $newRouting->load(['document.documentType', 'sender', 'receiver']);
+        if ($newRouting->receiver) {
+            $this->sendMail(fn() => Mail::to($newRouting->receiver->email)->send(new DocumentRoutedMail($newRouting, 'forwarded')));
+            $this->notify($newRouting->receiver, 'Document Tracking', $doc->tracking_no, 'Document forwarded to you', route('document-tracking.show', $doc->id));
+        }
+    }
+
+    private function execComplete(array $data, DocumentRouting $routing, Document $doc, User $user): void
+    {
+        $routing->update([
+            'status'          => 'Action Taken',
+            'action_taken_at' => now(),
+            'reviewed_at'     => now(),
+            'received_at'     => $routing->received_at ?? now(),
+            'action_taken'    => $data['completion_notes'] ?? 'Document reviewed and process completed.',
+        ]);
+
+        $doc->update([
+            'overall_status'    => 'Completed',
+            'completed_at'      => now(),
+            'current_holder_id' => null,
+        ]);
+
+        $doc->routings()
+            ->where('id', '<>', $routing->id)
+            ->whereIn('status', ['Pending', 'Received', 'Queued'])
+            ->update([
+                'status'          => 'Action Taken',
+                'action_taken'    => 'Document completed.',
+                'action_taken_at' => now(),
+                'received_at'     => now(),
+            ]);
+
+        $url     = route('document-tracking.show', $doc->id);
+        $creator = $doc->creator;
+        if ($creator && $creator->id !== $user->id) {
+            $this->sendMail(fn() => Mail::to($creator->email)->send(new DocumentCompletedMail($doc, $creator->name, $user->name)));
+            $this->notify($creator, 'Document Tracking', $doc->tracking_no, 'Document completed and filed', $url);
+        }
+        foreach (User::havingRole('OCD')->where('id', '<>', $user->id)->get() as $ocd) {
+            $this->sendMail(fn() => Mail::to($ocd->email)->send(new DocumentCompletedMail($doc, $ocd->name, $user->name)));
+            $this->notify($ocd, 'Document Tracking', $doc->tracking_no, 'Document completed and filed', $url);
+        }
+    }
+
+    private function resolveOriginalSenderId(Document $doc): ?int
+    {
+        $first = $doc->routings()->orderBy('sequence')->first();
+        return $first?->sender_id ?? $doc->created_by;
+    }
+
+    private function resolveLatestActionTakerId(Document $doc, int $excludeRoutingId): ?int
+    {
+        return $doc->routings()
+            ->where('id', '<>', $excludeRoutingId)
+            ->where('status', 'Action Taken')
+            ->orderByDesc('sequence')
+            ->value('receiver_id');
     }
 
     // ── Receive ───────────────────────────────────────────────────────────────
