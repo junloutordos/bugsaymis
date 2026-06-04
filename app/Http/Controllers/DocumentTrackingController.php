@@ -165,7 +165,7 @@ class DocumentTrackingController extends Controller
             'documents'       => $documents,
             'documentTypes'   => DocumentType::where('is_active', true)->orderBy('name')
                                     ->with(['routingSteps.office', 'routingSteps.assignedUser'])
-                                    ->get(['id', 'name', 'code', 'routing_type', 'lead_time_hours']),
+                                    ->get(['id', 'name', 'code', 'routing_type', 'applicable_to', 'lead_time_hours']),
             'users'           => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
             'offices'         => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'canLogExternal'  => $isAdmin || $isRecords,

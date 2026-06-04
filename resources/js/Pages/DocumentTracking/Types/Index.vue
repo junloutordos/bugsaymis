@@ -19,18 +19,18 @@ const props = defineProps({
 // ── Type modal ────────────────────────────────────────────────────────────
 const typeModal  = ref(null) // null | 'create' | 'edit'
 const editTarget = ref(null)
-const typeForm   = ref({ name: '', code: '', description: '', lead_time_hours: 24, routing_type: 'sequential', is_active: true })
+const typeForm   = ref({ name: '', code: '', description: '', lead_time_hours: 24, routing_type: 'sequential', applicable_to: 'internal', is_active: true })
 const typeErrors = ref({})
 const submitting = ref(false)
 
 function openCreate() {
-  typeForm.value  = { name: '', code: '', description: '', lead_time_hours: 24, routing_type: 'sequential', is_active: true }
+  typeForm.value  = { name: '', code: '', description: '', lead_time_hours: 24, routing_type: 'sequential', applicable_to: 'internal', is_active: true }
   typeErrors.value = {}
   typeModal.value = 'create'
 }
 function openEdit(type) {
   editTarget.value = type
-  typeForm.value   = { name: type.name, code: type.code, description: type.description ?? '', lead_time_hours: type.lead_time_hours, routing_type: type.routing_type, is_active: type.is_active }
+  typeForm.value   = { name: type.name, code: type.code, description: type.description ?? '', lead_time_hours: type.lead_time_hours, routing_type: type.routing_type, applicable_to: type.applicable_to ?? 'both', is_active: type.is_active }
   typeErrors.value = {}
   typeModal.value  = 'edit'
 }
@@ -118,6 +118,9 @@ function moveStep(type, step, dir) {
 const routingTypeLabel = { sequential: 'Sequential', parallel: 'Parallel', manual: 'Manual' }
 const routingTypeCls   = { sequential: 'bg-indigo-100 text-indigo-700', parallel: 'bg-amber-100 text-amber-700', manual: 'bg-slate-100 text-slate-600' }
 
+const applicableLabel = { internal: 'Internal', external: 'External', both: 'Internal & External' }
+const applicableCls   = { internal: 'bg-blue-100 text-blue-700', external: 'bg-green-100 text-green-700', both: 'bg-purple-100 text-purple-700' }
+
 // watch office change → reset user selection
 function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
 </script>
@@ -161,6 +164,10 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
                 <span class="font-bold text-slate-800">{{ type.name }}</span>
                 <span class="font-mono text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{{ type.code }}</span>
                 <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                  :class="applicableCls[type.applicable_to] ?? applicableCls.both">
+                  {{ applicableLabel[type.applicable_to] ?? type.applicable_to }}
+                </span>
+                <span v-if="type.applicable_to !== 'external'" class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
                   :class="routingTypeCls[type.routing_type] ?? routingTypeCls.manual">
                   {{ routingTypeLabel[type.routing_type] ?? type.routing_type }}
                 </span>
@@ -175,7 +182,7 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <button @click="openStep(type.id)"
+            <button v-if="type.applicable_to !== 'external'" @click="openStep(type.id)"
               class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50">
               <PlusIcon class="h-3.5 w-3.5" /> Add Step
             </button>
@@ -190,8 +197,8 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
           </div>
         </div>
 
-        <!-- Routing steps -->
-        <div v-if="type.routing_steps?.length" class="border-t border-slate-100">
+        <!-- Routing steps (not applicable for external-only types) -->
+        <div v-if="type.applicable_to !== 'external' && type.routing_steps?.length" class="border-t border-slate-100">
           <div class="px-4 py-2 bg-slate-50 flex items-center gap-2">
             <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Routing Steps</span>
             <span class="text-xs text-slate-400">({{ type.routing_type === 'parallel' ? 'all notified at once' : 'one at a time' }})</span>
@@ -266,13 +273,37 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
               <AppInput v-model="typeForm.code" label="Code" :required="true" :error="typeErrors.code" placeholder="e.g. MEMO" />
             </div>
             <AppInput v-model="typeForm.description" label="Description" />
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Applicable To <span class="text-red-500">*</span></label>
+              <div class="flex gap-3">
+                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border transition-colors flex-1 justify-center"
+                  :class="typeForm.applicable_to === 'internal' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'">
+                  <input type="radio" value="internal" v-model="typeForm.applicable_to" class="shrink-0" />
+                  <span class="text-sm font-medium text-slate-700">Internal</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border transition-colors flex-1 justify-center"
+                  :class="typeForm.applicable_to === 'external' ? 'border-green-400 bg-green-50' : 'border-slate-200 hover:bg-slate-50'">
+                  <input type="radio" value="external" v-model="typeForm.applicable_to" class="shrink-0" />
+                  <span class="text-sm font-medium text-slate-700">External</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg border transition-colors flex-1 justify-center"
+                  :class="typeForm.applicable_to === 'both' ? 'border-purple-400 bg-purple-50' : 'border-slate-200 hover:bg-slate-50'">
+                  <input type="radio" value="both" v-model="typeForm.applicable_to" class="shrink-0" />
+                  <span class="text-sm font-medium text-slate-700">Both</span>
+                </label>
+              </div>
+              <p v-if="typeErrors.applicable_to" class="text-xs text-red-500 mt-1">{{ typeErrors.applicable_to }}</p>
+            </div>
             <div class="grid grid-cols-2 gap-3">
               <AppInput v-model="typeForm.lead_time_hours" label="Default Lead Time (hours)" type="number" />
-              <AppSelect v-model="typeForm.routing_type" label="Routing Mode" :show-blank="false">
+              <AppSelect v-if="typeForm.applicable_to !== 'external'" v-model="typeForm.routing_type" label="Routing Mode" :show-blank="false">
                 <option value="sequential">Sequential — one at a time</option>
                 <option value="parallel">Parallel — all at once</option>
                 <option value="manual">Manual — sender picks each time</option>
               </AppSelect>
+              <div v-else class="flex items-end pb-2">
+                <p class="text-xs text-slate-400 italic">Routing mode not applicable — external docs use the fixed Records → OCD → Employee flow.</p>
+              </div>
             </div>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" v-model="typeForm.is_active" class="rounded border-slate-300 text-indigo-600" />

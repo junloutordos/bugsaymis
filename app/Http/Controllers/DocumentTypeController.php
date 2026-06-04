@@ -21,6 +21,7 @@ class DocumentTypeController extends Controller
                 'description'     => $t->description,
                 'lead_time_hours' => $t->lead_time_hours,
                 'routing_type'    => $t->routing_type,
+                'applicable_to'   => $t->applicable_to,
                 'is_active'       => $t->is_active,
                 'routing_steps'   => $t->routingSteps->map(fn($s) => [
                     'id'               => $s->id,
@@ -52,6 +53,7 @@ class DocumentTypeController extends Controller
             'description'    => 'nullable|string|max:1000',
             'lead_time_hours'=> 'required|integer|min:1|max:720',
             'routing_type'   => 'required|in:sequential,parallel,manual',
+            'applicable_to'  => 'required|in:internal,external,both',
             'is_active'      => 'boolean',
         ]);
 
@@ -68,6 +70,7 @@ class DocumentTypeController extends Controller
             'description'    => 'nullable|string|max:1000',
             'lead_time_hours'=> 'required|integer|min:1|max:720',
             'routing_type'   => 'required|in:sequential,parallel,manual',
+            'applicable_to'  => 'required|in:internal,external,both',
             'is_active'      => 'boolean',
         ]);
 
