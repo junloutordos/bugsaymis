@@ -54,7 +54,7 @@ class SectionAssignmentController extends Controller
                 's.pisaysystemID',
                 DB::raw('ss.levelid + 1 as new_grade_level'),
             )
-            ->orderBy('ss.levelid')
+            ->orderByRaw('new_grade_level')
             ->orderBy('s.lastname')
             ->orderBy('s.firstname')
             ->distinct()
