@@ -45,27 +45,22 @@ function quarterDot(record, q) {
 }
 
 // ── Create modal ──────────────────────────────────────────────────────────────
-const showModal    = ref(false)
-const creating     = ref(false)
-const createErrors = ref({})
-const form = ref({
-  subject_name:       '',
-  year_level_section: '',
-  grading_option_id:  '',
-  subject_id:         null,
-  section_id:         null,
-})
+const showModal       = ref(false)
+const creating        = ref(false)
+const createErrors    = ref({})
+const selectedLoad    = ref(null)   // the chosen load assignment object
+const gradingOptionId = ref('')
 
-// Teaching load pre-fill
-const myLoad        = ref([])
-const loadFetching  = ref(false)
-const loadSyName    = ref(null)
+// Teaching load list
+const myLoad       = ref([])
+const loadFetching = ref(false)
+const loadSyName   = ref(null)
 
 async function fetchMyLoad() {
   loadFetching.value = true
   try {
     const { data } = await axios.get(route('class-records.my-teaching-load'))
-    myLoad.value   = data.assignments ?? []
+    myLoad.value    = data.assignments ?? []
     loadSyName.value = data.school_year ?? null
   } catch {
     myLoad.value = []
@@ -74,25 +69,48 @@ async function fetchMyLoad() {
   }
 }
 
-function selectLoad(assignment) {
-  form.value.subject_name       = assignment.subject_name ?? ''
-  form.value.year_level_section = `G-${assignment.grade_level} ${assignment.section_name ?? ''}`
-  form.value.subject_id         = assignment.subject_id
-  form.value.section_id         = assignment.section_id
-}
-
 function openCreate() {
-  form.value = { subject_name: '', year_level_section: '', grading_option_id: '', subject_id: null, section_id: null }
-  createErrors.value = {}
-  showModal.value = true
+  selectedLoad.value    = null
+  gradingOptionId.value = ''
+  createErrors.value    = {}
+  showModal.value       = true
   fetchMyLoad()
 }
 
+function pickLoad(assignment) {
+  // Deselect if clicking the same one
+  if (selectedLoad.value?.load_assignment_id === assignment.load_assignment_id) {
+    selectedLoad.value = null
+  } else {
+    selectedLoad.value = assignment
+  }
+}
+
 async function handleCreate() {
-  creating.value     = true
   createErrors.value = {}
+
+  if (!selectedLoad.value) {
+    createErrors.value = { assignment: ['Please select a teaching assignment.'] }
+    return
+  }
+  if (!gradingOptionId.value) {
+    createErrors.value = { grading_option_id: ['Please select a grading option.'] }
+    return
+  }
+
+  creating.value = true
   try {
-    const { data } = await axios.post(route('class-records.store'), form.value)
+    const payload = {
+      subject_id:        selectedLoad.value.subject_id,
+      section_id:        selectedLoad.value.section_id,
+      grading_option_id: gradingOptionId.value,
+    }
+    // Admins creating on behalf of another teacher
+    if (props.isAdmin && selectedLoad.value.teacher_id) {
+      payload.teacher_id = selectedLoad.value.teacher_id
+    }
+
+    const { data } = await axios.post(route('class-records.store'), payload)
     showModal.value = false
     router.visit(route('class-records.page.show', data.data.id))
   } catch (err) {
@@ -209,9 +227,6 @@ async function saveManageOption() {
   }
 }
 
-const selectedOption = computed(() =>
-  props.gradingOptions?.find(o => o.id == form.value.grading_option_id) ?? null
-)
 </script>
 
 <template>
@@ -335,106 +350,121 @@ const selectedOption = computed(() =>
     <!-- Create modal -->
     <Teleport to="body">
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">New Class Record</h2>
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div>
+              <h2 class="text-base font-semibold text-slate-800">New Class Record</h2>
+              <p v-if="currentSchoolYear" class="text-xs text-slate-400 mt-0.5">SY {{ currentSchoolYear }}</p>
+            </div>
             <button @click="showModal = false" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
           </div>
 
-          <!-- From Teaching Load panel -->
-          <div class="px-6 pt-4 pb-2">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <BoltIcon class="h-3.5 w-3.5 text-indigo-400" />
-              From Your Teaching Load
+          <!-- Step 1: Select assignment -->
+          <div class="px-6 py-4 flex-1 overflow-y-auto">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+              {{ isAdmin ? 'Step 1 — Select a teaching assignment' : 'Select your teaching assignment' }}
             </p>
 
-            <div v-if="loadFetching" class="text-xs text-slate-400 py-2">Loading assignments…</div>
+            <!-- Loading -->
+            <div v-if="loadFetching" class="flex items-center gap-2 text-sm text-slate-400 py-4">
+              <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>
+              Loading assignments…
+            </div>
 
-            <div v-else-if="myLoad.length" class="space-y-1 max-h-40 overflow-y-auto pr-1">
+            <!-- No assignments -->
+            <div v-else-if="!myLoad.length"
+                 class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+              <p class="font-medium mb-1">No teaching assignments found for SY {{ loadSyName ?? currentSchoolYear ?? '—' }}.</p>
+              <p class="text-xs text-amber-700">Faculty Loading for the current school year must be completed first. Contact the Academic Affairs Office.</p>
+            </div>
+
+            <!-- Assignment list -->
+            <div v-else class="space-y-1.5">
               <button v-for="la in myLoad" :key="la.load_assignment_id"
                       type="button"
-                      @click="selectLoad(la)"
-                      class="w-full text-left flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm border transition"
-                      :class="form.subject_id === la.subject_id && form.section_id === la.section_id
-                        ? 'border-indigo-400 bg-indigo-50 text-indigo-800'
-                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50 text-slate-700'">
-                <span class="font-medium truncate">{{ la.display_label }}</span>
-                <span class="flex items-center gap-1.5 shrink-0">
-                  <span class="rounded-full px-1.5 py-0.5 text-xs font-medium"
-                        :class="la.subject_type === 'elective'
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-slate-100 text-slate-500'">
-                    {{ la.subject_type }}
-                  </span>
-                  <span v-if="la.already_created" class="rounded-full px-1.5 py-0.5 text-xs bg-green-100 text-green-600">
-                    created
-                  </span>
-                </span>
+                      @click="pickLoad(la)"
+                      class="w-full text-left rounded-xl px-4 py-3 border transition"
+                      :class="selectedLoad?.load_assignment_id === la.load_assignment_id
+                        ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
+                        : 'border-slate-200 hover:border-indigo-200 hover:bg-slate-50'">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <p class="font-medium text-sm text-slate-800 truncate">{{ la.subject_name }}</p>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      G-{{ la.grade_level }} {{ la.section_name }}
+                      <span v-if="isAdmin && la.teacher_name" class="ml-1 text-slate-400">· {{ la.teacher_name }}</span>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="rounded-full px-2 py-0.5 text-xs font-medium"
+                          :class="la.subject_type === 'elective'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-slate-100 text-slate-500'">
+                      {{ la.subject_type }}
+                    </span>
+                    <span v-if="la.already_created"
+                          class="rounded-full px-2 py-0.5 text-xs bg-green-100 text-green-600 font-medium">
+                      ✓ created
+                    </span>
+                    <span v-if="selectedLoad?.load_assignment_id === la.load_assignment_id"
+                          class="text-indigo-600">
+                      <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                      </svg>
+                    </span>
+                  </div>
+                </div>
               </button>
             </div>
 
-            <div v-else class="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-400">
-              No teaching assignments found for {{ loadSyName ?? 'the current school year' }} yet.
-              Faculty Loading must be completed first, or fill in manually below.
-            </div>
+            <p v-if="createErrors.assignment" class="text-xs text-red-500 mt-2">{{ createErrors.assignment[0] }}</p>
 
-            <div v-if="form.subject_id" class="mt-2 text-xs text-indigo-600 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>
-              Selected — fields pre-filled below. You can still edit them.
-            </div>
-          </div>
+            <!-- Step 2: Grading option (only shown when assignment selected) -->
+            <div v-if="selectedLoad" class="mt-5 pt-4 border-t border-slate-100">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                Step 2 — Grading Option
+              </p>
 
-          <div class="border-t border-slate-100 mx-6"></div>
-
-          <form @submit.prevent="handleCreate" class="px-6 py-5 space-y-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Subject Name <span class="text-red-500">*</span></label>
-              <input v-model="form.subject_name" type="text" placeholder="e.g. Chemistry" required
-                class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                :class="createErrors.subject_name ? 'border-red-400' : 'border-slate-200'" />
-              <p v-if="createErrors.subject_name" class="text-xs text-red-500 mt-1">{{ createErrors.subject_name[0] }}</p>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Year Level &amp; Section <span class="text-red-500">*</span></label>
-              <input v-model="form.year_level_section" type="text" placeholder="e.g. G-10 Graviton" required
-                class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                :class="createErrors.year_level_section ? 'border-red-400' : 'border-slate-200'" />
-              <p v-if="createErrors.year_level_section" class="text-xs text-red-500 mt-1">{{ createErrors.year_level_section[0] }}</p>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
-              <div v-if="currentSchoolYear"
-                class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 font-medium">
-                {{ currentSchoolYear }}
+              <!-- Confirmation card -->
+              <div class="rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-3 mb-4 text-sm">
+                <p class="font-semibold text-indigo-800">{{ selectedLoad.subject_name }}</p>
+                <p class="text-indigo-600 text-xs mt-0.5">
+                  G-{{ selectedLoad.grade_level }} {{ selectedLoad.section_name }}
+                  <span v-if="isAdmin && selectedLoad.teacher_name"> · {{ selectedLoad.teacher_name }}</span>
+                  · <span :class="selectedLoad.subject_type === 'elective' ? 'text-amber-600 font-medium' : ''">
+                    {{ selectedLoad.subject_type }}
+                  </span>
+                </p>
               </div>
-              <div v-else class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                No active school year is configured. Please contact the administrator.
-              </div>
-            </div>
 
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Grading Option <span class="text-red-500">*</span></label>
-              <select v-model="form.grading_option_id" required
+              <select v-model="gradingOptionId"
                 class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 :class="createErrors.grading_option_id ? 'border-red-400' : 'border-slate-200'">
                 <option value="">— Select a grading option —</option>
                 <option v-for="opt in gradingOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
               </select>
-              <p v-if="selectedOption?.description" class="text-xs text-slate-400 mt-1">{{ selectedOption.description }}</p>
               <p v-if="createErrors.grading_option_id" class="text-xs text-red-500 mt-1">{{ createErrors.grading_option_id[0] }}</p>
             </div>
+          </div>
 
-            <div class="flex gap-3 justify-end pt-2">
-              <button type="button" @click="showModal = false"
-                class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-              <button type="submit" :disabled="creating || !currentSchoolYear"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
-                {{ creating ? 'Creating…' : 'Create Class Record' }}
-              </button>
-            </div>
-          </form>
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end shrink-0">
+            <button type="button" @click="showModal = false"
+              class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+              Cancel
+            </button>
+            <button @click="handleCreate"
+              :disabled="creating || !selectedLoad || !gradingOptionId || !currentSchoolYear"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
+              {{ creating ? 'Creating…' : 'Create Class Record' }}
+            </button>
+          </div>
+
         </div>
       </div>
     </Teleport>
