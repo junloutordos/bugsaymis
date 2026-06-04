@@ -419,6 +419,8 @@ class DocumentTrackingController extends Controller
 
         $data = $request->validate([
             'decision'                 => 'required|in:return,forward,complete',
+            'action_taken'             => 'nullable|string|max:2000',
+            'remarks'                  => 'nullable|string|max:2000',
             'return_target'            => 'required_if:decision,return|nullable|in:original,latest_action_taker,step',
             'return_target_routing_id' => 'required_if:return_target,step|nullable|exists:document_routings,id',
             'return_reason'            => 'required_if:decision,return|nullable|string|max:2000',
@@ -463,6 +465,8 @@ class DocumentTrackingController extends Controller
             'returned_at'   => now(),
             'reviewed_at'   => now(),
             'return_reason' => $data['return_reason'],
+            'action_taken'  => $data['action_taken'] ?? null,
+            'remarks'       => $data['remarks'] ?? null,
             'received_at'   => $routing->received_at ?? now(),
         ]);
 
@@ -496,6 +500,8 @@ class DocumentTrackingController extends Controller
             'status'       => 'Forwarded',
             'forwarded_at' => now(),
             'reviewed_at'  => now(),
+            'action_taken' => $data['action_taken'] ?? null,
+            'remarks'      => $data['remarks'] ?? null,
             'received_at'  => $routing->received_at ?? now(),
         ]);
 

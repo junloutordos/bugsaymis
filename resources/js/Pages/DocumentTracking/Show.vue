@@ -33,19 +33,17 @@ const myActiveRouting = computed(() =>
   )
 )
 
-const isCompleted = computed(() => props.document.overall_status === 'Completed')
+const isCompleted   = computed(() => props.document.overall_status === 'Completed')
+const isPending     = computed(() => myActiveRouting.value?.status === 'Pending')
 
-// For admin "Complete & File" button (unchanged)
-const canComplete = computed(() =>
-  props.isAdmin || props.document.routings?.some(r => r.receiver?.id === uid.value && r.status === 'Action Taken')
-)
-
-// ── Review modal state ────────────────────────────────────────────────────
+// ── Review & Process modal ────────────────────────────────────────────────
 const reviewOpen       = ref(false)
-const reviewTab        = ref('return')   // 'return' | 'forward' | 'complete'
+const reviewTab        = ref('forward')  // 'forward' | 'return' | 'complete'
 const reviewSubmitting = ref(false)
 const reviewErrors     = ref({})
 const reviewForm       = ref({
+  action_taken:              '',
+  remarks:                   '',
   return_target:             'original',
   return_target_routing_id:  null,
   return_reason:             '',
@@ -63,8 +61,10 @@ const filteredUsers = computed(() => {
 
 function openReviewModal() {
   reviewOpen.value = true
-  reviewTab.value  = 'return'
+  reviewTab.value  = 'forward'
   reviewForm.value = {
+    action_taken:             '',
+    remarks:                  '',
     return_target:            props.latestActionTaker ? 'latest_action_taker' : 'original',
     return_target_routing_id: null,
     return_reason:            '',
@@ -82,7 +82,12 @@ function doReview() {
   reviewSubmitting.value = true
   reviewErrors.value     = {}
 
-  const payload = { decision: reviewTab.value }
+  const payload = {
+    decision:     reviewTab.value,
+    action_taken: reviewForm.value.action_taken || null,
+    remarks:      reviewForm.value.remarks || null,
+  }
+
   if (reviewTab.value === 'return') {
     payload.return_target  = reviewForm.value.return_target
     if (reviewForm.value.return_target === 'step') {
@@ -90,8 +95,8 @@ function doReview() {
     }
     payload.return_reason = reviewForm.value.return_reason
   } else if (reviewTab.value === 'forward') {
-    payload.forward_to    = reviewForm.value.forward_to
-    payload.instructions  = reviewForm.value.instructions
+    payload.forward_to   = reviewForm.value.forward_to
+    payload.instructions = reviewForm.value.instructions
   } else {
     payload.completion_notes = reviewForm.value.completion_notes
   }
@@ -100,6 +105,21 @@ function doReview() {
     onSuccess: closeReviewModal,
     onError:   e  => { reviewErrors.value = e },
     onFinish:  () => { reviewSubmitting.value = false },
+    preserveScroll: true,
+  })
+}
+
+// ── Acknowledge (with auto-preview) ──────────────────────────────────────
+const acknowledging = ref(false)
+
+function doReceive() {
+  acknowledging.value = true
+  router.post(route('document-tracking.receive', myActiveRouting.value.id), {}, {
+    onSuccess: () => {
+      const first = props.document.attachments?.find(a => a.has_preview)
+      if (first) openPreview(first)
+    },
+    onFinish:       () => { acknowledging.value = false },
     preserveScroll: true,
   })
 }
@@ -158,11 +178,7 @@ function submit(routeKey, params, body) {
   })
 }
 
-function doReceive()  { submit('document-tracking.receive', myActiveRouting.value.id, {}) }
 function doAnnotate() { submit('document-tracking.annotate', props.document.id, { remarks: modalForm.value.remarks }) }
-function doAct()      { submit('document-tracking.act', myActiveRouting.value.id, { action_taken: modalForm.value.action_taken, remarks: modalForm.value.remarks }) }
-function doForward()  { submit('document-tracking.forward',  myActiveRouting.value.id, { receiver_id: modalForm.value.receiver_id, instructions: modalForm.value.instructions, remarks: modalForm.value.remarks }) }
-function doReturn()   { submit('document-tracking.return',   myActiveRouting.value.id, { return_reason: modalForm.value.return_reason }) }
 function doComplete() { submit('document-tracking.complete', props.document.id, { action_taken: modalForm.value.action_taken }) }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -307,28 +323,45 @@ const overallBadgeCls = computed(() => {
         </div>
 
         <!-- Action buttons for current receiver -->
-        <div v-if="myActiveRouting && !isCompleted" class="mt-4 flex flex-wrap gap-2 pt-4 border-t border-slate-100">
-          <button v-if="myActiveRouting.status === 'Pending'" @click="doReceive()"
-            class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
-            <CheckCircleIcon class="h-4 w-4" /> Acknowledge Receipt
-          </button>
-          <!-- Primary review action -->
-          <button @click="openReviewModal()"
-            class="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
-            <DocumentCheckIcon class="h-4 w-4" /> Review Document
-          </button>
-          <button @click="openModal('act')"
-            class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
-            <PencilSquareIcon class="h-4 w-4" /> Record Action
-          </button>
-          <button @click="openModal('annotate')"
-            class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">
-            <PencilSquareIcon class="h-4 w-4" /> Add Note
-          </button>
+        <div v-if="myActiveRouting && !isCompleted" class="mt-4 pt-4 border-t border-slate-100 space-y-2">
+          <div class="flex flex-wrap gap-2">
+            <!-- Acknowledge Receipt — only when Pending -->
+            <button v-if="isPending"
+              :disabled="acknowledging"
+              @click="doReceive()"
+              class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed">
+              <CheckCircleIcon class="h-4 w-4" />
+              {{ acknowledging ? 'Acknowledging…' : 'Acknowledge Receipt' }}
+            </button>
+
+            <!-- Review & Process — primary action, disabled until acknowledged -->
+            <button
+              :disabled="isPending"
+              @click="!isPending && openReviewModal()"
+              :title="isPending ? 'Acknowledge receipt first' : ''"
+              class="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              <DocumentCheckIcon class="h-4 w-4" /> Review & Process
+            </button>
+
+            <!-- Add Note — disabled until acknowledged -->
+            <button
+              :disabled="isPending"
+              @click="!isPending && openModal('annotate')"
+              :title="isPending ? 'Acknowledge receipt first' : ''"
+              class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              <PencilSquareIcon class="h-4 w-4" /> Add Note
+            </button>
+          </div>
+
+          <!-- Hint shown while status is Pending -->
+          <p v-if="isPending" class="text-xs text-amber-600 flex items-center gap-1">
+            <ExclamationTriangleIcon class="h-3.5 w-3.5 shrink-0" />
+            Acknowledge receipt first to enable further actions.
+          </p>
         </div>
 
-        <!-- Complete document (admin / OCD) -->
-        <div v-if="!isCompleted && (isAdmin || canComplete)" class="mt-3 flex justify-end">
+        <!-- Mark Complete & File — admin or terminal/manual receiver -->
+        <div v-if="!isCompleted && (isAdmin || canCompleteAsReceiver)" class="mt-3 flex justify-end">
           <button @click="openModal('complete')"
             class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
             <CheckCircleIcon class="h-4 w-4 text-emerald-500" /> Mark Complete & File
@@ -484,16 +517,16 @@ const overallBadgeCls = computed(() => {
           <!-- Tabs -->
           <div class="flex border-b border-slate-100 shrink-0">
             <button
-              @click="reviewTab = 'return'"
-              class="flex-1 py-2.5 text-sm font-medium transition-colors"
-              :class="reviewTab === 'return' ? 'border-b-2 border-red-500 text-red-600' : 'text-slate-500 hover:text-slate-700'">
-              Return to Sender
-            </button>
-            <button
               @click="reviewTab = 'forward'"
               class="flex-1 py-2.5 text-sm font-medium transition-colors"
               :class="reviewTab === 'forward' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-slate-500 hover:text-slate-700'">
               Forward
+            </button>
+            <button
+              @click="reviewTab = 'return'"
+              class="flex-1 py-2.5 text-sm font-medium transition-colors"
+              :class="reviewTab === 'return' ? 'border-b-2 border-red-500 text-red-600' : 'text-slate-500 hover:text-slate-700'">
+              Return to Sender
             </button>
             <button
               v-if="canCompleteAsReceiver"
@@ -506,6 +539,23 @@ const overallBadgeCls = computed(() => {
 
           <!-- Body -->
           <div class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+
+            <!-- Action notes (shared across all tabs) -->
+            <div class="space-y-3 pb-3 border-b border-slate-100">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Action Taken <span class="text-slate-400 font-normal">(optional)</span></label>
+                <textarea v-model="reviewForm.action_taken" rows="2"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="What did you do with this document? e.g. Reviewed, signed, and initialled." />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Remarks <span class="text-slate-400 font-normal">(optional)</span></label>
+                <textarea v-model="reviewForm.remarks" rows="2"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Additional notes…" />
+              </div>
+              <p class="text-xs text-slate-400 font-medium uppercase tracking-wide">Route to next step ↓</p>
+            </div>
 
             <!-- Return tab -->
             <template v-if="reviewTab === 'return'">
@@ -604,11 +654,11 @@ const overallBadgeCls = computed(() => {
             <button :disabled="reviewSubmitting" @click="doReview()"
               class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors"
               :class="{
-                'bg-red-600 hover:bg-red-700':     reviewTab === 'return',
-                'bg-blue-600 hover:bg-blue-700':   reviewTab === 'forward',
+                'bg-blue-600 hover:bg-blue-700':       reviewTab === 'forward',
+                'bg-red-600 hover:bg-red-700':         reviewTab === 'return',
                 'bg-emerald-600 hover:bg-emerald-700': reviewTab === 'complete',
               }">
-              {{ reviewSubmitting ? 'Saving…' : { return: 'Return Document', forward: 'Forward Document', complete: 'Complete Document' }[reviewTab] }}
+              {{ reviewSubmitting ? 'Saving…' : { forward: 'Forward Document', return: 'Return Document', complete: 'Complete Document' }[reviewTab] }}
             </button>
           </div>
         </div>
@@ -622,29 +672,12 @@ const overallBadgeCls = computed(() => {
         <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="font-bold text-slate-800">
-              {{ { act: 'Record Action', annotate: 'Add Note', complete: 'Complete & File' }[modal] }}
+              {{ { annotate: 'Add Note', complete: 'Complete & File' }[modal] }}
             </h3>
             <button @click="closeModal" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
           </div>
 
           <div class="px-6 py-5 space-y-4">
-
-            <!-- Act -->
-            <template v-if="modal === 'act'">
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Action Taken <span class="text-red-500">*</span></label>
-                <textarea v-model="modalForm.action_taken" rows="3" required
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Describe the action you took on this document…" />
-                <p v-if="modalErrors.action_taken" class="text-xs text-red-500 mt-1">{{ modalErrors.action_taken }}</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Remarks (optional)</label>
-                <textarea v-model="modalForm.remarks" rows="2"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Additional notes…" />
-              </div>
-            </template>
 
             <!-- Annotate -->
             <template v-if="modal === 'annotate'">
@@ -673,9 +706,9 @@ const overallBadgeCls = computed(() => {
             <button @click="closeModal"
               class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
             <button :disabled="submitting"
-              @click="{ act: doAct, annotate: doAnnotate, complete: doComplete }[modal]()"
+              @click="{ annotate: doAnnotate, complete: doComplete }[modal]()"
               class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
-              {{ submitting ? 'Saving…' : { act: 'Record Action', annotate: 'Save Note', complete: 'Complete & File' }[modal] }}
+              {{ submitting ? 'Saving…' : { annotate: 'Save Note', complete: 'Complete & File' }[modal] }}
             </button>
           </div>
         </div>
