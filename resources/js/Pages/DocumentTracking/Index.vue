@@ -12,11 +12,12 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  documents:      Array,
-  documentTypes:  Array,
-  users:          Array,
-  canLogExternal: Boolean,
-  isAdmin:        Boolean,
+  documents:       Array,
+  documentTypes:   Array,
+  users:           Array,
+  canLogExternal:  Boolean,
+  canSeeExternal:  Boolean,
+  isAdmin:         Boolean,
 })
 
 const page          = usePage()
@@ -24,13 +25,13 @@ const currentUserId = computed(() => page.props.auth?.user?.id)
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 const activeTab = ref('all')
-const tabs = [
+const tabs = computed(() => [
   { key: 'all',       label: 'All' },
   { key: 'mine',      label: 'For My Action' },
-  { key: 'external',  label: 'External Incoming' },
+  ...(props.canSeeExternal ? [{ key: 'external', label: 'External Incoming' }] : []),
   { key: 'internal',  label: 'Internal' },
   { key: 'completed', label: 'Completed' },
-]
+])
 
 const myActionCount = computed(() =>
   (props.documents ?? []).filter(d =>
