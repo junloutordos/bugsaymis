@@ -27,7 +27,7 @@
       .page { width: 100%; padding: 0; }
     }
     .dig-badge { font-size:9px; color:#166534; background:#f0fdf4; border:1px solid #86efac; border-radius:3px; padding:2px 6px; margin-top:3px; display:inline-block; }
-    .sig-img { max-height:55px; display:block; margin:0 auto 4px; }
+    .sig-img { max-height:55px; display:block; margin:0 0 4px; }
   </style>
 </head>
 <body onload="window.print()">
@@ -163,10 +163,10 @@
         @if(isset($sigs['ocd_approval'])) <div class="dig-badge">✓ Digitally Signed · {{ $sigs['ocd_approval']['name'] }} · {{ optional($sigs['ocd_approval']['signed_at'])->format('M d, Y H:i') }}</div> @endif
         @if(!empty($director['name']))
           <div class="bold" style="text-decoration: underline; text-transform: uppercase;">{{ $director['name'] }}</div>
-          <div>OIC - Campus Director</div>
+          <div>Campus Director</div>
         @else
           <div style="height: 40px;">&nbsp;</div>
-          <div>OIC - Campus Director</div>
+          <div>Campus Director</div>
         @endif
       </td>
     </tr>
