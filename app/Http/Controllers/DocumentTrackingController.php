@@ -126,8 +126,9 @@ class DocumentTrackingController extends Controller
 
     public function index()
     {
-        $user    = Auth::user();
-        $isAdmin = $user->hasPermission('documents.approve');
+        $user      = Auth::user();
+        $isAdmin   = $user->hasPermission('documents.approve');
+        $isRecords = $user->hasRole('Records');
 
         $query = Document::with([
             'documentType:id,name,code',
@@ -140,25 +141,36 @@ class DocumentTrackingController extends Controller
 
         if (! $isAdmin) {
             $uid = $user->id;
-            $query->where(function ($q) use ($uid) {
-                $q->where('created_by', $uid)
-                  ->orWhereHas('routings', fn($r) =>
-                      $r->where('sender_id', $uid)->orWhere('receiver_id', $uid)
-                  );
-            });
+            if ($isRecords) {
+                // Records sees all docs they are involved in (including external)
+                $query->where(fn($q) => $q->where('created_by', $uid)
+                    ->orWhereHas('routings', fn($r) =>
+                        $r->where('sender_id', $uid)->orWhere('receiver_id', $uid)
+                    )
+                );
+            } else {
+                // All other roles: internal docs only; external docs accessed via notification link
+                $query->where('origin_type', 'internal')
+                      ->where(fn($q) => $q->where('created_by', $uid)
+                          ->orWhereHas('routings', fn($r) =>
+                              $r->where('sender_id', $uid)->orWhere('receiver_id', $uid)
+                          )
+                      );
+            }
         }
 
         $documents = $query->get()->map(fn($d) => $this->formatDoc($d));
 
         return Inertia::render('DocumentTracking/Index', [
-            'documents'     => $documents,
-            'documentTypes' => DocumentType::where('is_active', true)->orderBy('name')
-                                ->with(['routingSteps.office', 'routingSteps.assignedUser'])
-                                ->get(['id', 'name', 'code', 'routing_type', 'lead_time_hours']),
-            'users'         => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
-            'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
-            'canLogExternal'=> $user->hasPermission('documents.approve'),
-            'isAdmin'       => $isAdmin,
+            'documents'       => $documents,
+            'documentTypes'   => DocumentType::where('is_active', true)->orderBy('name')
+                                    ->with(['routingSteps.office', 'routingSteps.assignedUser'])
+                                    ->get(['id', 'name', 'code', 'routing_type', 'lead_time_hours']),
+            'users'           => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
+            'offices'         => \App\Models\Office::orderBy('name')->get(['id', 'name']),
+            'canLogExternal'  => $isAdmin || $isRecords,
+            'canSeeExternal'  => $isAdmin || $isRecords,
+            'isAdmin'         => $isAdmin,
         ]);
     }
 
@@ -215,21 +227,42 @@ class DocumentTrackingController extends Controller
                 'overall_status'   => 'In-Transit',
             ]);
 
-            // ── External documents: Records holds it first, then forwards to OCD ──
-            // Records Officer is always the initial holder. They use the Forward
-            // button to send to OCD. No auto-routing from the type template.
+            // ── External documents: auto-route to all OCD users for review ────────
+            // Flow: Records logs → OCD reviews/comments → OCD forwards back to Records
+            //       → Records forwards to target employee (terminal step).
             if ($isExternal) {
-                DocumentRouting::create([
-                    'document_id'  => $doc->id,
-                    'sequence'     => 1,
-                    'sender_id'    => $user->id,
-                    'receiver_id'  => $user->id,
-                    'status'       => 'Received',
-                    'instructions' => 'Document received and logged by Records Office. Forward to OCD for review.',
-                    'received_at'  => now(),
-                    'is_terminal'  => false,
-                ]);
-                $doc->update(['current_holder_id' => $user->id]);
+                $ocdUsers = User::havingRole('OCD')->where('status', '<>', 'inactive')->get();
+
+                if ($ocdUsers->isNotEmpty()) {
+                    foreach ($ocdUsers as $ocd) {
+                        DocumentRouting::create([
+                            'document_id'  => $doc->id,
+                            'sequence'     => 1,
+                            'sender_id'    => $user->id,
+                            'receiver_id'  => $ocd->id,
+                            'status'       => 'Pending',
+                            'instructions' => 'Please review and provide comments. Forward back to Records Office after review.',
+                            'due_at'       => now()->addHours($docType->lead_time_hours),
+                            'is_terminal'  => false,
+                        ]);
+                    }
+                    $doc->update(['current_holder_id' => $ocdUsers->first()->id]);
+                } else {
+                    // Fallback: no OCD users found — Records holds the document
+                    logger()->warning("DTS: No active OCD users found for external document {$doc->tracking_no}. Records retains the document.");
+                    DocumentRouting::create([
+                        'document_id'  => $doc->id,
+                        'sequence'     => 1,
+                        'sender_id'    => $user->id,
+                        'receiver_id'  => $user->id,
+                        'status'       => 'Received',
+                        'instructions' => 'No OCD user found. Please route manually.',
+                        'received_at'  => now(),
+                        'is_terminal'  => false,
+                    ]);
+                    $doc->update(['current_holder_id' => $user->id]);
+                }
+
                 return $doc;
             }
 
@@ -315,8 +348,15 @@ class DocumentTrackingController extends Controller
         $url = route('document-tracking.show', $document->id);
 
         if ($document->origin_type === 'external') {
-            // External: Records already holds it — no notification to self.
-            // Nothing to send here; Records will notify OCD when they forward.
+            // External: notify OCD users who were auto-routed to
+            $pendingRoutings = $document->routings()->with(['receiver', 'document.documentType'])
+                ->where('status', 'Pending')->get();
+            foreach ($pendingRoutings as $routing) {
+                $recv = $routing->receiver;
+                if (! $recv) continue;
+                $this->sendMail(fn() => Mail::to($recv->email)->send(new DocumentCreatedMail($document, $recv->name)));
+                $this->notify($recv, 'Document Tracking', $document->tracking_no, 'External document routed to you for review', $url);
+            }
         } else {
             // Internal: notify first active (Pending) receivers
             $firstRoutings = $document->routings()->with(['sender', 'receiver', 'document.documentType'])
@@ -505,6 +545,9 @@ class DocumentTrackingController extends Controller
             'received_at'  => $routing->received_at ?? now(),
         ]);
 
+        // For external docs, Records forwarding to an employee is the terminal step
+        $isTerminal = $doc->origin_type === 'external' && $user->hasRole('Records');
+
         $newRouting = DocumentRouting::create([
             'document_id'  => $routing->document_id,
             'sequence'     => $routing->sequence + 1,
@@ -513,7 +556,7 @@ class DocumentTrackingController extends Controller
             'status'       => 'Pending',
             'instructions' => $data['instructions'] ?? null,
             'due_at'       => now()->addHours($doc->documentType?->lead_time_hours ?? 24),
-            'is_terminal'  => false,
+            'is_terminal'  => $isTerminal,
         ]);
 
         $doc->update(['current_holder_id' => $data['forward_to']]);
