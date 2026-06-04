@@ -16,6 +16,15 @@ Route::get('/developer', fn () => inertia('Developer'))->name('developer');
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
 
+// ── Self-service Enrollment Application — public, no auth ────────────────────
+Route::get('/enroll', [\App\Http\Controllers\Registrar\EnrollmentApplicationController::class, 'create'])
+    ->name('enrollment-application.create');
+Route::post('/enroll', [\App\Http\Controllers\Registrar\EnrollmentApplicationController::class, 'store'])
+    ->name('enrollment-application.store');
+Route::get('/enroll/success/{referenceNo}', [\App\Http\Controllers\Registrar\EnrollmentApplicationController::class, 'success'])
+    ->name('enrollment-application.success')
+    ->where('referenceNo', 'ENR-[0-9]{4}-[0-9]+');
+
     // Library Borrowings
     Route::get('/library/borrowings', [\App\Http\Controllers\LibraryBorrowingsController::class, 'index'])
         ->name('library.borrowings.index');
