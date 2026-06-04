@@ -737,6 +737,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('/routings/{routing}/act',     [\App\Http\Controllers\DocumentTrackingController::class, 'act'])->name('act');
         Route::post('/routings/{routing}/forward', [\App\Http\Controllers\DocumentTrackingController::class, 'forward'])->name('forward');
         Route::post('/routings/{routing}/return',  [\App\Http\Controllers\DocumentTrackingController::class, 'returnDoc'])->name('return');
+        Route::post('/routings/{routing}/review',  [\App\Http\Controllers\DocumentTrackingController::class, 'review'])->name('review');
 
         // Document Type management ("types" prefix — before wildcard)
         Route::prefix('types')->name('types.')->group(function () {
