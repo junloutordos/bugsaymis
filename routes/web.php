@@ -64,9 +64,9 @@ use App\Http\Controllers\PDSTrainingController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
-// ── System health check (unauthenticated, internal monitoring) ────────────────
+// ── System health check (auth required — internal monitoring only) ────────────
 Route::get('/_status', [\App\Http\Controllers\HealthController::class, 'check'])
-    ->middleware('throttle:30,1')
+    ->middleware(['auth', 'throttle:30,1'])
     ->name('system.health');
 
 // Data Management - Offices
@@ -201,9 +201,9 @@ Route::prefix('it-job-requests')->group(function () {
         ->name('it-job-requests.dc.decline')
         ->middleware('signed');
 
-    // POST — submit decline (no signed middleware, CSRF only)
     Route::post('dc/decline/{jobRequest}/{chief}', [ITJobRequestController::class, 'submitDivisionChiefDecline'])
-        ->name('it-job-requests.dc.decline.submit');
+        ->name('it-job-requests.dc.decline.submit')
+        ->middleware('signed');
 
 
     // OCD signed routes
