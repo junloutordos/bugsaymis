@@ -342,9 +342,6 @@ onUnmounted(() => {
         </div>
       </aside>
 
-      <!-- Backdrop for mobile sidebar (tap to close) -->
-      <div v-if="!showSidebar" class="absolute inset-0 z-[9] sm:hidden bg-transparent"
-           @click="showSidebar = true" />
 
       <!-- ══════════════════════════════════════════════
            MAIN — Chat Window

@@ -507,7 +507,12 @@ async function approveDC(r) {
       headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
       body: JSON.stringify({ status: 'Division Approved', date_time_approved: new Date().toISOString() }),
     })
-    if (res.ok) router.reload({ only: ['rows'] })
+    if (res.ok) {
+      router.reload({ only: ['rows'] })
+    } else {
+      const body = await res.json().catch(() => ({}))
+      alert(body.message || `Approval failed (HTTP ${res.status}). Please try again.`)
+    }
   } catch (e) { alert(e.message || 'Approve failed') }
   finally { saving.value = false }
 }

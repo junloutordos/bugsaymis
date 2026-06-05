@@ -318,13 +318,14 @@ class GatePassController extends Controller
         // Status transitions are only allowed through dedicated approval endpoints.
         // Non-approver roles (regular staff filing updates) must never set status directly.
         $user = $request->user();
-        $role = $user?->getRoleName() ?? '';
-        $isApprover = in_array($role, ['DivisionChief', 'OCD', 'Administrator']);
+        $isDC    = $user?->hasAnyRole(['DivisionChief', 'Administrator']) ?? false;
+        $isOCD   = $user?->hasAnyRole(['OCD', 'Administrator']) ?? false;
+        $isApprover = $isDC || $isOCD;
 
         if (! $isApprover) {
             // Strip status entirely — regular users can only update form fields
             unset($data['status']);
-        } elseif ($role === 'DivisionChief') {
+        } elseif ($isDC && ! $isOCD) {
             // Division Chief may only set the two allowed transition values
             if (isset($data['status']) && $data['status'] === 'Division Declined') {
                 $data['status'] = 'Division Declined';

@@ -268,7 +268,15 @@ class ApprovalInboxController extends Controller
                 abort(403);
 
             case 'leave_applications':
-                if ($isHR) break;
+                // HR officers (with hr.leave.approve permission) can act on any leave
+                if ($user->hasPermission('hr.leave.approve') && ! $user->hasRole('DivisionChief')) break;
+                // Division Chiefs may only act on their own division's employees
+                if ($isDC) {
+                    $divisionIds = \App\Models\Division::where('division_chief_id', $user->id)->pluck('id');
+                    $applicantDivisionId = $record->user?->division_id;
+                    if ($applicantDivisionId && $divisionIds->contains($applicantDivisionId)) break;
+                }
+                if ($user->isSuperAdmin()) break;
                 abort(403);
         }
     }
