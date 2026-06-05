@@ -71,4 +71,12 @@ Route::prefix('api/chat')
         // Mark all messages in a conversation as read
         Route::post('conversations/{conversation}/read', [ChatController::class, 'markAsRead'])
             ->name('conversations.read');
+
+        // Delete a single message (sender only, soft-delete)
+        Route::delete('conversations/{conversation}/messages/{message}', [ChatController::class, 'deleteMessage'])
+            ->name('conversations.messages.delete');
+
+        // Archive / unarchive a conversation (per-user toggle)
+        Route::post('conversations/{conversation}/archive', [ChatController::class, 'archiveConversation'])
+            ->name('conversations.archive');
     });
