@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\StudentAttendance\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
+use App\Models\StudentMobileLink;
 use App\Models\StudentAttendance\ParentContact;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -35,11 +37,38 @@ class AuthController extends Controller
             ]);
         }
 
+        if (isset($user->status) && $user->status === 'pending_verification') {
+            return response()->json([
+                'message'              => 'Please verify your email before signing in.',
+                'requires_verification' => true,
+                'email'                => $user->email,
+            ], 403);
+        }
+
         if (isset($user->status) && $user->status === 'inactive') {
             return response()->json(['message' => 'Account is inactive.'], 403);
         }
 
-        // Auto-create or retrieve the parent contact linked to this user
+        // Revoke all existing tokens for this device to prevent accumulation
+        $user->tokens()->where('name', $validated['device_name'])->delete();
+        $token = $user->createToken($validated['device_name'], ['mobile'])->plainTextToken;
+
+        // Detect student vs parent role
+        $studentRole = Role::where('name', 'Student')->first();
+        $isStudent   = $studentRole && (string) $user->role_id === (string) $studentRole->id;
+
+        if ($isStudent) {
+            $link = StudentMobileLink::where('user_id', $user->id)->first();
+
+            return response()->json([
+                'token'      => $token,
+                'role'       => 'student',
+                'user'       => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
+                'student_id' => $link?->student_id,
+            ]);
+        }
+
+        // Parent path — auto-create or retrieve parent contact
         $parentContact = ParentContact::firstOrCreate(
             ['user_id' => $user->id],
             [
@@ -50,16 +79,43 @@ class AuthController extends Controller
             ]
         );
 
-        // Revoke all existing tokens for this device to prevent accumulation
-        $user->tokens()->where('name', $validated['device_name'])->delete();
-
-        $token = $user->createToken($validated['device_name'], ['mobile'])->plainTextToken;
-
         return response()->json([
             'token'          => $token,
+            'role'           => 'parent',
             'user'           => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email],
             'parent_contact' => ['id' => $parentContact->id],
         ]);
+    }
+
+    /**
+     * GET /api/mobile/notification-preferences
+     * Returns the parent's current push/email notification settings.
+     */
+    public function getNotificationPreferences(Request $request): JsonResponse
+    {
+        $contact = ParentContact::where('user_id', $request->user()->id)->first();
+
+        return response()->json([
+            'notify_push'  => (bool) ($contact?->notify_push ?? true),
+            'notify_email' => (bool) ($contact?->notify_email ?? true),
+        ]);
+    }
+
+    /**
+     * PUT /api/mobile/notification-preferences
+     * Updates the parent's push/email notification settings.
+     */
+    public function updateNotificationPreferences(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'notify_push'  => ['required', 'boolean'],
+            'notify_email' => ['required', 'boolean'],
+        ]);
+
+        ParentContact::where('user_id', $request->user()->id)
+            ->update($validated);
+
+        return response()->json(['message' => 'Preferences updated.']);
     }
 
     /**

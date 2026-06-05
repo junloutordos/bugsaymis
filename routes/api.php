@@ -1,8 +1,13 @@
 <?php
 
-use App\Http\Controllers\StudentAttendance\Api\AuthController;
 use App\Http\Controllers\StudentAttendance\Api\AttendanceApiController;
+use App\Http\Controllers\StudentAttendance\Api\AuthController;
+use App\Http\Controllers\StudentAttendance\Api\GradeApiController;
+use App\Http\Controllers\StudentAttendance\Api\LinkRequestController;
+use App\Http\Controllers\StudentAttendance\Api\RegisterController;
+use App\Http\Controllers\StudentAttendance\Api\ScheduleApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentApiController;
+use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,8 +26,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('mobile')->name('mobile.')->group(function () {
 
-    // ── Public: obtain a Sanctum token ────────────────────────────────────────
-    Route::post('/login',  [AuthController::class, 'login'])->name('login');
+    // ── Public ────────────────────────────────────────────────────────────────
+    Route::post('/login',               [AuthController::class,  'login'])->name('login');
+    Route::post('/register',            [RegisterController::class, 'register'])->name('register');
+    Route::post('/student/register',    [RegisterController::class, 'registerStudent'])->name('student.register');
+    Route::post('/verify-email',        [RegisterController::class, 'verifyEmail'])->name('verify-email');
+    Route::post('/resend-verification', [RegisterController::class, 'resendVerification'])->name('resend-verification');
 
     // ── Authenticated ─────────────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {
@@ -31,6 +40,10 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
 
         // Update FCM device token (called on app startup / token refresh)
         Route::put('/fcm-token', [AuthController::class, 'updateFcmToken'])->name('fcm-token');
+
+        // Notification preferences (push + email toggles)
+        Route::get('/notification-preferences',  [AuthController::class, 'getNotificationPreferences'])->name('notification-preferences.show');
+        Route::put('/notification-preferences',  [AuthController::class, 'updateNotificationPreferences'])->name('notification-preferences.update');
 
         // List all students linked to this parent
         Route::get('/students', [StudentApiController::class, 'index'])->name('students.index');
@@ -42,11 +55,30 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
         Route::post('/students/{barcode}/link',   [StudentApiController::class, 'link'])->name('students.link');
         Route::delete('/students/{barcode}/link', [StudentApiController::class, 'unlink'])->name('students.unlink');
 
+        // Secure child linking via student email confirmation
+        Route::get('/link-requests',        [LinkRequestController::class, 'index'])->name('link-requests.index');
+        Route::post('/link-requests',       [LinkRequestController::class, 'store'])->name('link-requests.store');
+        Route::delete('/link-requests/{id}',[LinkRequestController::class, 'destroy'])->name('link-requests.destroy');
+
         // Paginated attendance log for all linked students
         Route::get('/attendance', [AttendanceApiController::class, 'index'])->name('attendance.index');
 
         // Attendance summary for a specific student (today's IN/OUT)
         Route::get('/attendance/{studentId}/today', [AttendanceApiController::class, 'today'])->name('attendance.today');
+
+        // Grades for a specific linked student (current school year)
+        Route::get('/students/{studentId}/grades', [GradeApiController::class, 'show'])->name('students.grades');
+
+        // Class schedule for a specific linked student (current school year)
+        Route::get('/students/{studentId}/schedule', [ScheduleApiController::class, 'show'])->name('students.schedule');
+
+        // ── Student self-access (logged-in as student) ────────────────────────
+        Route::prefix('student')->name('student.')->group(function () {
+            Route::get('/profile',    [StudentSelfController::class, 'profile'])->name('profile');
+            Route::get('/grades',     [StudentSelfController::class, 'grades'])->name('grades');
+            Route::get('/schedule',   [StudentSelfController::class, 'schedule'])->name('schedule');
+            Route::get('/attendance', [StudentSelfController::class, 'attendance'])->name('attendance');
+        });
     });
 });
 
