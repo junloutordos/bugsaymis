@@ -16,6 +16,10 @@ Route::get('/developer', fn () => inertia('Developer'))->name('developer');
 // Digital calling card — public, no auth
 Route::get('/card/junlou', fn () => inertia('PublicCard'))->name('public.card');
 
+// ── GAD Data Dashboard — public, no auth ─────────────────────────────────────
+Route::get('/gad-data', [\App\Http\Controllers\GadDataController::class, 'index'])
+    ->name('gad-data');
+
 // ── Self-service Enrollment Application — public, no auth ────────────────────
 Route::get('/enroll', [\App\Http\Controllers\Registrar\EnrollmentApplicationController::class, 'create'])
     ->name('enrollment-application.create');
