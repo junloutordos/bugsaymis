@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
+import DOMPurify from 'dompurify'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import {
@@ -193,7 +194,7 @@ const ackPercent  = computed(() => totalCount.value ? Math.round((ackCount.value
                 <p class="text-sm font-bold uppercase tracking-widest text-slate-800">{{ issuance.type_label }}</p>
                 <p class="text-xs text-slate-500 mt-0.5">No. {{ issuance.control_number.split('-').slice(-1)[0] }}, S. {{ issuance.control_number.split('-')[1] }}</p>
               </div>
-              <div class="text-sm text-slate-700 leading-relaxed prose prose-sm max-w-none" v-html="issuance.content"></div>
+              <div class="text-sm text-slate-700 leading-relaxed prose prose-sm max-w-none" v-html="DOMPurify.sanitize(issuance.content ?? '')"></div>
             </div>
           </div>
 

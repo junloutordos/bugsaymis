@@ -27,11 +27,11 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('mobile')->name('mobile.')->group(function () {
 
     // ── Public ────────────────────────────────────────────────────────────────
-    Route::post('/login',               [AuthController::class,  'login'])->name('login');
-    Route::post('/register',            [RegisterController::class, 'register'])->name('register');
-    Route::post('/student/register',    [RegisterController::class, 'registerStudent'])->name('student.register');
-    Route::post('/verify-email',        [RegisterController::class, 'verifyEmail'])->name('verify-email');
-    Route::post('/resend-verification', [RegisterController::class, 'resendVerification'])->name('resend-verification');
+    Route::post('/login',               [AuthController::class,  'login'])->name('login')->middleware('throttle:10,1');
+    Route::post('/register',            [RegisterController::class, 'register'])->name('register')->middleware('throttle:5,1');
+    Route::post('/student/register',    [RegisterController::class, 'registerStudent'])->name('student.register')->middleware('throttle:5,1');
+    Route::post('/verify-email',        [RegisterController::class, 'verifyEmail'])->name('verify-email')->middleware('throttle:5,1');
+    Route::post('/resend-verification', [RegisterController::class, 'resendVerification'])->name('resend-verification')->middleware('throttle:3,1');
 
     // ── Authenticated ─────────────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function () {

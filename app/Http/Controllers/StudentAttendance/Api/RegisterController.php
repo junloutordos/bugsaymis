@@ -106,17 +106,15 @@ class RegisterController extends Controller
             ->where('student_email', $validated['student_email'])
             ->first(['id', 'firstname', 'lastname']);
 
+        $genericMessage = 'If that email belongs to a registered student, a verification code has been sent.';
+
         if (! $student) {
-            return response()->json([
-                'message' => 'No student found with that email address.',
-            ], 422);
+            return response()->json(['message' => $genericMessage]);
         }
 
-        // Prevent duplicate accounts
+        // Prevent duplicate accounts — same generic response to prevent enumeration
         if (User::where('email', $validated['student_email'])->exists()) {
-            return response()->json([
-                'message' => 'An account with this email already exists.',
-            ], 422);
+            return response()->json(['message' => $genericMessage]);
         }
 
         $studentRole = Role::where('name', 'Student')->firstOrFail();
