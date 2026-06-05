@@ -33,13 +33,12 @@ const navSections = [
   { id: 'csm',       label: 'CSM' },
 ]
 
-/** Return '< 5' for suppressed values, otherwise format with commas. */
 function fmt(n) {
-  if (n === null || n === undefined) return '< 5'
+  if (n === null || n === undefined) return '0'
   return Number(n).toLocaleString('en-PH')
 }
 
-/** Bar width as % of the larger sibling. Returns '0%' when suppressed. */
+/** Bar width as % of the larger sibling. */
 function barW(val, male, female) {
   const m = male   ?? 0
   const f = female ?? 0
@@ -99,7 +98,7 @@ function sumMF(obj) {
         </h1>
         <p class="text-indigo-200 text-sm max-w-xl leading-relaxed">
           Sex-disaggregated aggregate data across all campus modules for GAD mainstreaming
-          assessment and reporting. Counts below 5 are suppressed to protect individual privacy.
+          assessment and reporting. All counts are exact figures.
         </p>
         <!-- Legend -->
         <div class="flex flex-wrap gap-4 mt-6 text-sm">
@@ -110,10 +109,6 @@ function sumMF(obj) {
           <span class="flex items-center gap-2">
             <span class="w-4 h-4 rounded bg-rose-300 block"></span>
             <span class="text-indigo-100">Female</span>
-          </span>
-          <span class="flex items-center gap-2">
-            <span class="w-4 h-4 rounded bg-white/20 block border border-white/30"></span>
-            <span class="text-indigo-100">&lt;&nbsp;5 (suppressed)</span>
           </span>
         </div>
       </div>
@@ -545,7 +540,6 @@ function sumMF(obj) {
     <footer class="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-400 space-y-1">
       <p class="font-medium text-slate-500">Philippine Science High School – Caraga Region Campus in Butuan City</p>
       <p>GFPS / GAD Committee Dashboard &mdash; Data refreshes every hour</p>
-      <p>Counts below 5 are suppressed per statistical disclosure standards</p>
       <p class="mt-2">Generated: {{ formattedDate }}</p>
     </footer>
 

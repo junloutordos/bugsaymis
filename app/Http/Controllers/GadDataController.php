@@ -9,12 +9,11 @@ use Inertia\Response;
 
 class GadDataController extends Controller
 {
-    private const SUPPRESS_THRESHOLD = 5;
     private const CACHE_TTL = 3600;
 
     public function index(): Response
     {
-        $data = Cache::remember('gad_data_v1', self::CACHE_TTL, fn () => $this->buildData());
+        $data = Cache::remember('gad_data_v2', self::CACHE_TTL, fn () => $this->buildData());
 
         return Inertia::render('GadData/Index', $data);
     }
@@ -34,12 +33,6 @@ class GadDataController extends Controller
         ];
     }
 
-    /** Return null for counts below threshold (statistical suppression). */
-    private function s(int $n): ?int
-    {
-        return $n < self::SUPPRESS_THRESHOLD ? null : $n;
-    }
-
     /**
      * Normalize a raw query result (rows with sex + total) into {male, female}.
      * Accepts 'male'/'m' and 'female'/'f' (case-insensitive).
@@ -50,13 +43,13 @@ class GadDataController extends Controller
         $female = 0;
         foreach ($rows as $row) {
             $sex = strtolower((string) ($row->$sexCol ?? ''));
-            if (in_array($sex, ['male', 'm'], true))   $male   += (int) $row->total;
+            if (in_array($sex, ['male', 'm'], true))       $male   += (int) $row->total;
             elseif (in_array($sex, ['female', 'f'], true)) $female += (int) $row->total;
         }
-        return ['male' => $this->s($male), 'female' => $this->s($female)];
+        return ['male' => $male, 'female' => $female];
     }
 
-    /** Collapse a raw grouped result into [{name, male, female}] applying suppression. */
+    /** Collapse a raw grouped result into [{name, male, female}]. */
     private function buildBreakdown(\Illuminate\Support\Collection $raw, string $groupKey, string $sexCol = 'sex'): array
     {
         $map = [];
@@ -68,7 +61,7 @@ class GadDataController extends Controller
             elseif (in_array($sex, ['female', 'f'], true)) $map[$key]['female'] += (int) $row->total;
         }
         return array_values(array_map(
-            fn ($d) => ['name' => $d['name'], 'male' => $this->s($d['male']), 'female' => $this->s($d['female'])],
+            fn ($d) => ['name' => $d['name'], 'male' => $d['male'], 'female' => $d['female']],
             $map
         ));
     }
@@ -145,9 +138,9 @@ class GadDataController extends Controller
         }
 
         return [
-            'total'   => ['male' => $this->s($total['male']), 'female' => $this->s($total['female'])],
+            'total'   => ['male' => $total['male'], 'female' => $total['female']],
             'byGrade' => array_values(array_map(
-                fn ($g) => ['name' => $g['name'], 'male' => $this->s($g['male']), 'female' => $this->s($g['female'])],
+                fn ($g) => ['name' => $g['name'], 'male' => $g['male'], 'female' => $g['female']],
                 $grades
             )),
         ];
