@@ -163,12 +163,25 @@ class LeaveApplicationController extends Controller
             'remarks' => 'nullable|string|max:500',
         ]);
 
+        $approver = Auth::user();
+
+        // Division Chiefs may only act on leave from their own division
+        if ($data['stage'] === 'division_chief' && ! $approver->isSuperAdmin()) {
+            $divisionIds = \App\Models\Division::where('division_chief_id', $approver->id)
+                ->pluck('id');
+            abort_unless(
+                $divisionIds->contains($leaveApplication->user?->division_id),
+                403,
+                'You can only act on leave applications from employees in your division.'
+            );
+        }
+
         $this->approvals->processLeave(
             application: $leaveApplication,
             stage:       $data['stage'],
             action:      $data['action'],
             remarks:     $data['remarks'] ?? '',
-            approver:    Auth::user(),
+            approver:    $approver,
         );
 
         if ($data['action'] === 'approve') {
