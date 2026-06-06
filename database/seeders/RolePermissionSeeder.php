@@ -417,6 +417,57 @@ class RolePermissionSeeder extends Seeder
             $assign($roleName, ['issuances.view']);
         }
 
+        // ── Purchase Requests (PR) ────────────────────────────────────────────
+        $prBasic = ['procurement.view', 'procurement.create', 'procurement.pr.view', 'procurement.pr.create'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD', 'HR', 'MIS',
+                  'Registrar', 'Librarian', 'Nurse', 'Guidance', 'GSU Head',
+                  'Records', 'InformationOfficer', 'PMT', 'Dorm Manager',
+                  'Payroll Officer', 'Cashier', 'Recruitment Officer', 'HRMPSB',
+                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer'] as $r) {
+            $assign($r, $prBasic);
+        }
+        $assign('DivisionChief',      ['procurement.pr.dc_sign']);
+        $assign('Procurement Officer', ['procurement.pr.number']);
+        $assign('OCD',                ['procurement.pr.ocd_sign']);
+        $assign('Budget Officer',     ['procurement.pr.bo_initial']);
+        $assign('FAD Chief', array_merge($prBasic, [
+            'procurement.pr.dc_sign', 'procurement.pr.number',
+            'procurement.pr.ocd_sign', 'procurement.pr.bo_initial',
+        ]));
+
+        // ── Obligation Request Status (ORS) ───────────────────────────────────
+        $orsBasic = ['procurement.ors.view', 'procurement.ors.create'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
+                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer', 'FAD Chief'] as $r) {
+            $assign($r, $orsBasic);
+        }
+        $assign('DivisionChief',  ['procurement.ors.dc_sign']);
+        $assign('Budget Officer', ['procurement.ors.budget_sign']);
+        $assign('Bookkeeper',     ['procurement.ors.bookkeep']);
+        $assign('Accountant',     ['procurement.ors.account']);
+        $assign('OCD',            ['procurement.ors.ocd_sign']);
+        $assign('FAD Chief', [
+            'procurement.ors.dc_sign', 'procurement.ors.budget_sign',
+            'procurement.ors.bookkeep', 'procurement.ors.account', 'procurement.ors.ocd_sign',
+        ]);
+
+        // ── Disbursement Vouchers (DV) ────────────────────────────────────────
+        $dvBasic = ['procurement.dv.view', 'procurement.dv.create'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
+                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Cashier',
+                  'Procurement Officer', 'FAD Chief'] as $r) {
+            $assign($r, $dvBasic);
+        }
+        $assign('GSU Head',   ['procurement.dv.view', 'procurement.dv.delivery']);
+        $assign('Bookkeeper', ['procurement.dv.bookkeep']);
+        $assign('Accountant', ['procurement.dv.account']);
+        $assign('OCD',        ['procurement.dv.ocd_sign']);
+        $assign('Cashier',    ['procurement.dv.cashier']);
+        $assign('FAD Chief', [
+            'procurement.dv.delivery', 'procurement.dv.bookkeep',
+            'procurement.dv.account', 'procurement.dv.ocd_sign', 'procurement.dv.cashier',
+        ]);
+
         $this->command->info('Role permissions assigned successfully.');
     }
 }

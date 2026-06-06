@@ -46,6 +46,12 @@ class RolesSeeder extends Seeder
             ['name' => 'Recruitment Officer','description' => 'Manages the full recruitment and selection process.'],
             ['name' => 'HRMPSB',             'description' => 'Human Resource Merit Promotion and Selection Board member. Evaluates, interviews, and ranks applicants.'],
 
+            // ── Finance / Procurement ─────────────────────────────────────────
+            ['name' => 'Budget Officer',      'description' => 'Verifies account codes and numbers Obligation Request Status (ORS) documents.'],
+            ['name' => 'Bookkeeper',          'description' => 'Verifies completeness of ORS and Disbursement Voucher documents.'],
+            ['name' => 'Accountant',          'description' => 'Reviews data correctness in ORS and Disbursement Voucher documents.'],
+            ['name' => 'Procurement Officer', 'description' => 'Assigns official PR numbers and processes Purchase Requests.'],
+
             // ── Non-staff ─────────────────────────────────────────────────────
             ['name' => 'Student',            'description' => 'Student with limited read-only access.'],
             ['name' => 'Parent',             'description' => 'Parent/Guardian with limited access to student information.'],

@@ -578,25 +578,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::put('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'update'])->name('assets.update');
     Route::delete('/assets/{asset}', [\App\Http\Controllers\AssetController::class, 'destroy'])->name('assets.destroy');
 
-    // Procurement
-    Route::get('/procurements', [\App\Http\Controllers\ProcurementController::class, 'index'])->name('procurements.index');
-    Route::post('/procurements', [\App\Http\Controllers\ProcurementController::class, 'store'])->name('procurements.store');
-    Route::put('/procurements/{procurement}', [\App\Http\Controllers\ProcurementController::class, 'update'])->name('procurements.update');
-    Route::delete('/procurements/{procurement}', [\App\Http\Controllers\ProcurementController::class, 'destroy'])->name('procurements.destroy');
-    Route::post('/procurements/{procurement}/items', [\App\Http\Controllers\ProcurementController::class, 'storeItem'])->name('procurements.items.store');
-    Route::delete('/procurements/{procurement}/items/{item}', [\App\Http\Controllers\ProcurementController::class, 'destroyItem'])->name('procurements.items.destroy');
-    // Send procurement for approval (notifies Budget Officers)
-    Route::post('/procurements/{procurement}/send-for-approval', [\App\Http\Controllers\ProcurementController::class, 'sendForApproval'])->name('procurements.sendForApproval');
-    // Signed approval/decline links for Budget Officer
-    Route::get('/procurements/{procurement}/approve/{approver}', [\App\Http\Controllers\ProcurementController::class, 'approveByBudgetOfficer'])
-        ->name('procurements.approve')
-        ->middleware(['signed']);
-    Route::get('/procurements/{procurement}/decline/{approver}', [\App\Http\Controllers\ProcurementController::class, 'showBudgetOfficerDeclineForm'])
-        ->name('procurements.decline')
-        ->middleware(['signed']);
-    Route::post('/procurements/{procurement}/decline/{approver}', [\App\Http\Controllers\ProcurementController::class, 'submitBudgetOfficerDecline'])
-        ->name('procurements.decline.submit')
-        ->middleware(['signed']);
+    // Procurement (PR, ORS, DV) — see routes/procurement.php
     // Driver assignment API
     Route::get('/api/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('api.drivers.index');
     Route::post('/vehicle-requests/{vehicleRequest}/assign-driver', [\App\Http\Controllers\DriverController::class, 'assign'])->name('vehicle-requests.assign-driver');
@@ -2000,5 +1982,6 @@ require __DIR__.'/saln.php';
 require __DIR__.'/faculty-loading.php';
 require __DIR__.'/ams.php';
 require __DIR__.'/ppmp.php';
+require __DIR__.'/procurement.php';
 require __DIR__.'/registrar.php';
 require __DIR__.'/auth.php';
