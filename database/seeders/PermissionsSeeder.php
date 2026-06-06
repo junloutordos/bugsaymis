@@ -124,10 +124,34 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Student Health', 'name' => 'students.health.view',   'description' => 'View student medical records (allergies, immunizations, history, vitamins)'],
             ['module' => 'Student Health', 'name' => 'students.health.manage', 'description' => 'Add and edit student medical records'],
 
-            // ── Procurement ───────────────────────────────────────────────────
-            ['module' => 'Procurement','name' => 'procurement.view',   'description' => 'View procurement records'],
-            ['module' => 'Procurement','name' => 'procurement.create', 'description' => 'Create procurement requests'],
-            ['module' => 'Procurement','name' => 'procurement.approve','description' => 'Approve procurement requests'],
+            // ── Procurement — Purchase Request (PR) ───────────────────────────
+            ['module' => 'Procurement','name' => 'procurement.view',          'description' => 'View procurement records (legacy)'],
+            ['module' => 'Procurement','name' => 'procurement.create',        'description' => 'Create procurement requests (legacy)'],
+            ['module' => 'Procurement','name' => 'procurement.approve',       'description' => 'Approve procurement requests (legacy)'],
+            ['module' => 'Procurement','name' => 'procurement.pr.view',       'description' => 'View Purchase Requests'],
+            ['module' => 'Procurement','name' => 'procurement.pr.create',     'description' => 'Create and edit own Purchase Requests'],
+            ['module' => 'Procurement','name' => 'procurement.pr.dc_sign',    'description' => 'Division Chief: sign Purchase Requests'],
+            ['module' => 'Procurement','name' => 'procurement.pr.number',     'description' => 'Procurement Officer: assign official PR numbers'],
+            ['module' => 'Procurement','name' => 'procurement.pr.ocd_sign',   'description' => 'OCD: sign and approve Purchase Requests'],
+            ['module' => 'Procurement','name' => 'procurement.pr.bo_initial', 'description' => 'Budget Officer: initial supplemental PR documents'],
+
+            // ── Procurement — Obligation Request Status (ORS) ─────────────────
+            ['module' => 'ORS',        'name' => 'procurement.ors.view',         'description' => 'View ORS records'],
+            ['module' => 'ORS',        'name' => 'procurement.ors.create',       'description' => 'Create and log ORS records'],
+            ['module' => 'ORS',        'name' => 'procurement.ors.dc_sign',      'description' => 'Division Chief: sign ORS'],
+            ['module' => 'ORS',        'name' => 'procurement.ors.budget_sign',  'description' => 'Budget Officer: verify and number ORS'],
+            ['module' => 'ORS',        'name' => 'procurement.ors.bookkeep',     'description' => 'Bookkeeper: verify ORS completeness'],
+            ['module' => 'ORS',        'name' => 'procurement.ors.account',      'description' => 'Accountant: review ORS data'],
+            ['module' => 'ORS',        'name' => 'procurement.ors.ocd_sign',     'description' => 'OCD: sign ORS and PO'],
+
+            // ── Procurement — Disbursement Voucher (DV) ───────────────────────
+            ['module' => 'DV',         'name' => 'procurement.dv.view',          'description' => 'View Disbursement Vouchers'],
+            ['module' => 'DV',         'name' => 'procurement.dv.create',        'description' => 'Create and prepare Disbursement Vouchers'],
+            ['module' => 'DV',         'name' => 'procurement.dv.delivery',      'description' => 'Record delivery and acceptance (IAR, RIS, DR)'],
+            ['module' => 'DV',         'name' => 'procurement.dv.bookkeep',      'description' => 'Bookkeeper: verify DV completeness'],
+            ['module' => 'DV',         'name' => 'procurement.dv.account',       'description' => 'Accountant: review DV data'],
+            ['module' => 'DV',         'name' => 'procurement.dv.ocd_sign',      'description' => 'OCD: sign DV and authorize payment'],
+            ['module' => 'DV',         'name' => 'procurement.dv.cashier',       'description' => 'Cashier: process DV payment'],
 
             // ── Reports ───────────────────────────────────────────────────────
             ['module' => 'Reports',  'name' => 'reports.view',       'description' => 'View system reports'],

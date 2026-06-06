@@ -1086,7 +1086,7 @@ const menuItems = [
   {
     label: "Procurement",
     icon: ShoppingCartIcon,
-    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief"],
+    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief", "Budget Officer", "Bookkeeper", "Accountant", "Procurement Officer"],
     children: [
       {
         label: "PPMP",
@@ -1100,7 +1100,21 @@ const menuItems = [
         routeName: "procurements.index",
         href: route("procurements.index"),
         icon: ClipboardDocumentListIcon,
-        permissions: ["procurement.view"],
+        permissions: ["procurement.pr.view", "procurement.pr.create", "procurement.view"],
+      },
+      {
+        label: "ORS",
+        routeName: "ors.index",
+        href: route("ors.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["procurement.ors.view", "procurement.ors.create"],
+      },
+      {
+        label: "Disbursement Vouchers",
+        routeName: "dv.index",
+        href: route("dv.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["procurement.dv.view", "procurement.dv.create"],
       },
     ],
   },
