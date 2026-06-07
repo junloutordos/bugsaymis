@@ -1090,7 +1090,7 @@ const menuItems = [
   {
     label: "Procurement",
     icon: ShoppingCartIcon,
-    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief", "Budget Officer", "Bookkeeper", "Accountant", "Procurement Officer"],
+    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD", "Budget Officer", "Bookkeeper", "Accountant", "Procurement Officer", "FAD Chief"],
     children: [
       {
         label: "PPMP",
@@ -1119,6 +1119,13 @@ const menuItems = [
         href: route("dv.index"),
         icon: ClipboardDocumentListIcon,
         permissions: ["procurement.dv.view", "procurement.dv.create"],
+      },
+      {
+        label: "Purchase Orders",
+        routeName: "po.index",
+        href: route("po.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["procurement.po.view", "procurement.po.create", "procurement.po.review", "procurement.po.sign"],
       },
     ],
   },

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Procurement\DisbursementVoucherController;
 use App\Http\Controllers\Procurement\OblRequestController;
+use App\Http\Controllers\Procurement\PurchaseOrderController;
 use App\Http\Controllers\Procurement\PurchaseRequestController;
 use Illuminate\Support\Facades\Route;
 
@@ -130,6 +131,33 @@ Route::middleware(['web', 'auth', 'pshs.email'])
             [OblRequestController::class, 'print'])
             ->name('ors.print')
             ->middleware('permission:procurement.ors.view|procurement.ors.create');
+
+        // ── Purchase Orders (PO) ─────────────────────────────────────────────
+        Route::middleware('permission:procurement.po.view|procurement.po.create|procurement.po.review|procurement.po.sign')
+            ->group(function () {
+                Route::get('/po', [PurchaseOrderController::class, 'index'])->name('po.index');
+                Route::get('/po/{po}', [PurchaseOrderController::class, 'show'])->name('po.show');
+            });
+
+        Route::middleware('permission:procurement.po.create')->group(function () {
+            Route::post('/po', [PurchaseOrderController::class, 'store'])->name('po.store');
+            Route::post('/po/{po}/items', [PurchaseOrderController::class, 'storeItem'])->name('po.store-item');
+            Route::delete('/po/{po}/items/{item}', [PurchaseOrderController::class, 'destroyItem'])->name('po.destroy-item');
+            Route::post('/po/{po}/submit', [PurchaseOrderController::class, 'submit'])->name('po.submit');
+            Route::post('/po/{po}/cancel', [PurchaseOrderController::class, 'cancel'])->name('po.cancel');
+        });
+
+        Route::post('/po/{po}/procurement-review', [PurchaseOrderController::class, 'procurementReview'])
+            ->name('po.procurement-review')
+            ->middleware('permission:procurement.po.review');
+
+        Route::post('/po/{po}/ocd-sign', [PurchaseOrderController::class, 'ocdSign'])
+            ->name('po.ocd-sign')
+            ->middleware('permission:procurement.po.sign');
+
+        Route::get('/po/{po}/print', [PurchaseOrderController::class, 'print'])
+            ->name('po.print')
+            ->middleware('permission:procurement.po.view|procurement.po.create|procurement.po.review|procurement.po.sign');
 
         // ── Disbursement Vouchers (DV) ────────────────────────────────────────
         Route::middleware('permission:procurement.dv.view|procurement.dv.create')

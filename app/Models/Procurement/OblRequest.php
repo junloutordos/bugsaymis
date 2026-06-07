@@ -15,7 +15,7 @@ class OblRequest extends Model
     protected $table = 'obligation_requests';
 
     protected $fillable = [
-        'ors_number', 'procurement_id', 'po_number', 'supplier_name',
+        'ors_number', 'procurement_id', 'purchase_order_id', 'po_number', 'supplier_name',
         'account_title', 'object_code', 'activity_title', 'activity_date', 'amount',
         'division_id', 'created_by', 'status',
         'logged_at', 'log_po_number', 'log_activity_title', 'log_activity_date', 'log_amount',
@@ -48,6 +48,11 @@ class OblRequest extends Model
     public function procurement(): BelongsTo
     {
         return $this->belongsTo(Procurement::class, 'procurement_id');
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
     }
 
     public function creator(): BelongsTo

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Division;
 use App\Models\Procurement;
 use App\Models\Procurement\OblRequest;
+use App\Models\Procurement\PurchaseOrder;
 use App\Services\Procurement\ORSPdfService;
 use App\Services\Procurement\ORSService;
 use Illuminate\Http\Request;
@@ -105,21 +106,31 @@ class OblRequestController extends Controller
         abort_unless($user->hasPermission('procurement.ors.create') || $user->isSuperAdmin(), 403);
 
         $data = $request->validate([
-            'procurement_id'  => 'nullable|exists:procurements,id',
-            'po_number'       => 'nullable|string|max:50',
-            'supplier_name'   => 'nullable|string|max:200',
-            'account_title'   => 'nullable|string|max:200',
-            'object_code'     => 'nullable|string|max:50',
-            'activity_title'  => 'nullable|string|max:200',
-            'activity_date'   => 'nullable|date',
-            'amount'          => 'required|numeric|min:0',
-            'division_id'     => 'nullable|exists:divisions,id',
+            'procurement_id'    => 'nullable|exists:procurements,id',
+            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
+            'po_number'         => 'nullable|string|max:50',
+            'supplier_name'     => 'nullable|string|max:200',
+            'account_title'     => 'nullable|string|max:200',
+            'object_code'       => 'nullable|string|max:50',
+            'activity_title'    => 'nullable|string|max:200',
+            'activity_date'     => 'nullable|date',
+            'amount'            => 'required|numeric|min:0',
+            'division_id'       => 'nullable|exists:divisions,id',
         ]);
 
+        // Auto-populate PO details from linked issued PO
+        if (! empty($data['purchase_order_id'])) {
+            $linkedPo = PurchaseOrder::find($data['purchase_order_id']);
+            if ($linkedPo && $linkedPo->status === 'issued') {
+                $data['po_number']    = $data['po_number']    ?: $linkedPo->po_number;
+                $data['supplier_name']= $data['supplier_name']?: $linkedPo->supplier_name;
+            }
+        }
+
         OblRequest::create(array_merge($data, [
-            'created_by' => $user->id,
+            'created_by'  => $user->id,
             'division_id' => $data['division_id'] ?? $user->division_id,
-            'status'     => 'draft',
+            'status'      => 'draft',
         ]));
 
         return back()->with('success', 'ORS record created.');
