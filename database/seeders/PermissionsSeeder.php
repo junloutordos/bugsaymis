@@ -263,6 +263,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'PPMP', 'name' => 'ppmp.export',      'description' => 'Export PPMP/APP to Excel/PDF'],
             ['module' => 'PPMP', 'name' => 'ppmp.view_all',    'description' => 'View all PPMPs across units'],
 
+            // ── Teacher Class Attendance (NFC Tap-In) ────────────────────────
+            ['module' => 'Teacher Attendance', 'name' => 'class-attendance.view',   'description' => 'View teacher class attendance dashboard and history (CID Chief, AUH)'],
+            ['module' => 'Teacher Attendance', 'name' => 'class-attendance.manage', 'description' => 'Override or correct teacher tap records (Admin only)'],
+
             // ── Org Structure ─────────────────────────────────────────────────
             ['module' => 'OrgStructure', 'name' => 'org.view',              'description' => 'View the organizational chart and unit details'],
             ['module' => 'OrgStructure', 'name' => 'org.view_all',          'description' => 'View the full org chart including inactive units'],
