@@ -214,10 +214,11 @@ Route::middleware(['web', 'auth', 'verified'])
         // Classrooms
         Route::middleware('permission:faculty_loading.classrooms')
             ->prefix('classrooms')->name('classrooms.')->group(function () {
-                Route::get('/',               [ClassroomController::class, 'index'])->name('index');
-                Route::post('/',              [ClassroomController::class, 'store'])->name('store');
-                Route::put('/{classroom}',    [ClassroomController::class, 'update'])->name('update');
-                Route::delete('/{classroom}', [ClassroomController::class, 'destroy'])->name('destroy');
+                Route::get('/',                            [ClassroomController::class, 'index'])->name('index');
+                Route::post('/',                           [ClassroomController::class, 'store'])->name('store');
+                Route::put('/{classroom}',                 [ClassroomController::class, 'update'])->name('update');
+                Route::delete('/{classroom}',              [ClassroomController::class, 'destroy'])->name('destroy');
+                Route::post('/{classroom}/regenerate-nfc', [ClassroomController::class, 'regenerateNfc'])->name('regenerate-nfc');
             });
 
         // ══════════════════════════════════════════════════════════════════════
