@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
 const props = defineProps({
@@ -150,12 +150,17 @@ const canReject = computed(() => (perms.value.canDcSign || perms.value.canNumber
     <Head :title="`PR — ${procurement.pr_no}`" />
     <AdminLayout :title="`PR — ${procurement.pr_no}`">
 
-        <!-- Back -->
-        <div class="mb-5">
+        <!-- Back + Print -->
+        <div class="mb-5 flex items-center justify-between">
             <a :href="route('procurements.index')"
                 class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 transition-colors">
                 <ArrowLeftIcon class="w-4 h-4" />
                 Back to Purchase Requests
+            </a>
+            <a :href="route('procurements.print', procurement.id)" target="_blank"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                <PrinterIcon class="w-4 h-4" />
+                Print / Save PDF
             </a>
         </div>
 

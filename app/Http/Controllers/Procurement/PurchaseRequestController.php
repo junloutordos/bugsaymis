@@ -7,9 +7,11 @@ use App\Models\Division;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
 use App\Models\Unit;
+use App\Services\Procurement\PRPdfService;
 use App\Services\Procurement\PRService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchaseRequestController extends Controller
 {
@@ -308,6 +310,12 @@ class PurchaseRequestController extends Controller
         }
 
         return $base;
+    }
+
+    public function print(Procurement $procurement, PRPdfService $pdf): StreamedResponse
+    {
+        $this->checkPerm('procurement.pr.view');
+        return $pdf->stream($procurement);
     }
 
     private function checkPerm(string $permission): void

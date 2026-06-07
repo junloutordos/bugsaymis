@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Procurement;
 use App\Http\Controllers\Controller;
 use App\Models\Procurement\DisbursementVoucher;
 use App\Models\Procurement\OblRequest;
+use App\Services\Procurement\DVPdfService;
 use App\Services\Procurement\DVService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DisbursementVoucherController extends Controller
 {
@@ -276,6 +278,15 @@ class DisbursementVoucherController extends Controller
         $this->service->ocdPaymentSign($dv, $request->user());
 
         return back()->with('success', 'Payment signed by Campus Director — released to supplier.');
+    }
+
+    public function print(DisbursementVoucher $dv, DVPdfService $pdf): StreamedResponse
+    {
+        abort_unless(
+            request()->user()->hasAnyPermission(['procurement.dv.view', 'procurement.dv.create']) || request()->user()->isSuperAdmin(),
+            403
+        );
+        return $pdf->stream($dv);
     }
 
     // ── Format helper ─────────────────────────────────────────────────────────

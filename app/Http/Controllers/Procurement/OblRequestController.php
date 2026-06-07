@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Division;
 use App\Models\Procurement;
 use App\Models\Procurement\OblRequest;
+use App\Services\Procurement\ORSPdfService;
 use App\Services\Procurement\ORSService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OblRequestController extends Controller
 {
@@ -226,6 +228,15 @@ class OblRequestController extends Controller
         $this->service->canvaserReceive($ors, $request->user());
 
         return back()->with('success', 'ORS marked as completed — forwarded to supplier.');
+    }
+
+    public function print(OblRequest $ors, ORSPdfService $pdf): StreamedResponse
+    {
+        abort_unless(
+            request()->user()->hasAnyPermission(['procurement.ors.view', 'procurement.ors.create']) || request()->user()->isSuperAdmin(),
+            403
+        );
+        return $pdf->stream($ors);
     }
 
     // ── Format helper ─────────────────────────────────────────────────────────
