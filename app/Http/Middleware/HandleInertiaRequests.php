@@ -18,6 +18,7 @@ use App\Models\Committee;
 use App\Models\DocumentRouting;
 use App\Models\SpecialAssignment;
 use App\Services\ApprovalInboxService;
+use App\Models\FacultyLoading\AcademicUnit;
 use Carbon\Carbon;
 
 class HandleInertiaRequests extends Middleware
@@ -203,6 +204,13 @@ class HandleInertiaRequests extends Middleware
                             ->whereIn('status', ['Pending', 'Received'])->count()
                     );
                 } catch (\Throwable $e) { return 0; }
+            },
+            'isAUH' => function () use ($request) {
+                $user = $request->user();
+                if (!$user) return false;
+                return Cache::remember('badge.auh.u' . $user->id, 300, fn () =>
+                    AcademicUnit::where('head_user_id', $user->id)->where('is_active', true)->exists()
+                );
             },
             'isPMRater' => function () use ($request) {
                 $user = $request->user();
