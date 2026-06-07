@@ -164,7 +164,11 @@ const roleName = user.role?.name || "Guest";
 // Support multiple roles: array of role name strings
 const baseRoleNames = user.roleNames?.length ? user.roleNames : (roleName !== "Guest" ? [roleName] : []);
 // Inject synthetic 'PMRater' role when user is a committee head or SA coordinator
-const roleNames = page.props.isPMRater ? [...baseRoleNames, 'PMRater'] : baseRoleNames;
+const roleNames = [
+  ...baseRoleNames,
+  ...(page.props.isPMRater ? ['PMRater'] : []),
+  ...(page.props.isAUH    ? ['AUH']     : []),
+];
 
 // Permission set — populated by HandleInertiaRequests via shared Inertia props
 // Using a Set for O(1) lookups on every sidebar render
@@ -1212,6 +1216,21 @@ const menuItems = [
         href: route("class-records.page.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
+      },
+    ],
+  },
+
+  {
+    label: "Teacher Attendance",
+    icon: ClockIcon,
+    roles: ["Administrator", "CID Chief", "AUH"],
+    children: [
+      {
+        label: "Attendance Monitor",
+        routeName: "teacher-attendance.index",
+        href: route("teacher-attendance.index"),
+        icon: ClipboardDocumentListIcon,
+        roles: ["Administrator", "CID Chief", "AUH"],
       },
     ],
   },
