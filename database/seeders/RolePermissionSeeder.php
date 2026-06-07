@@ -383,6 +383,8 @@ class RolePermissionSeeder extends Seeder
         $assign('DivisionChief', ['ppmp.review', 'ppmp.approve', 'ppmp.view_all', 'ppmp.export']);
         $assign('OCD',     ['ppmp.review', 'ppmp.approve', 'ppmp.consolidate', 'ppmp.view_all', 'ppmp.export']);
         $assign('HR',      ['ppmp.view_all', 'ppmp.export']);
+        $assign('Procurement Officer', ['ppmp.bac_review', 'ppmp.view_all', 'ppmp.export']);
+        $assign('FAD Chief',           ['ppmp.bac_review', 'ppmp.view_all', 'ppmp.export']);
 
         // ── Org Structure ─────────────────────────────────────────────────────
         $assign('HR', [
@@ -481,6 +483,22 @@ class RolePermissionSeeder extends Seeder
         $assign('Procurement Officer', ['procurement.po.review']);
         $assign('OCD',                 ['procurement.po.sign']);
         $assign('FAD Chief',           ['procurement.po.review', 'procurement.po.sign']);
+
+        // ── Request for Quotation (RFQ) ───────────────────────────────────────
+        $rfqView = ['procurement.rfq.view'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
+                  'Budget Officer', 'Bookkeeper', 'Accountant',
+                  'Procurement Officer', 'FAD Chief'] as $r) {
+            $assign($r, $rfqView);
+        }
+        $assign('Procurement Officer', [
+            'procurement.rfq.create', 'procurement.rfq.upload',
+            'procurement.rfq.evaluate', 'procurement.rfq.award',
+        ]);
+        $assign('FAD Chief', [
+            'procurement.rfq.create', 'procurement.rfq.upload',
+            'procurement.rfq.evaluate', 'procurement.rfq.award',
+        ]);
 
         $this->command->info('Role permissions assigned successfully.');
     }

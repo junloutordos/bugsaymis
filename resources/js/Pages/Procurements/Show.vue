@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, usePage, router } from '@inertiajs/vue3'
+import { Head, usePage, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon, PrinterIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon, PrinterIcon, DocumentArrowDownIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
 const props = defineProps({
@@ -144,6 +144,28 @@ const canAssignNumber = computed(() => perms.value.canNumber && p.value.status =
 const canOcdSign = computed(() => perms.value.canOcdSign && p.value.status === 'pending_ocd')
 const canReject = computed(() => (perms.value.canDcSign || perms.value.canNumber || perms.value.canOcdSign || perms.value.canBoInitial)
     && !['approved', 'rejected', 'draft'].includes(p.value.status))
+
+// ── Create RFQ modal ───────────────────────────────────────────────────────
+const showRfqModal = ref(false)
+const rfqForm = useForm({
+    procurement_id: props.procurement.id,
+    rfq_date: new Date().toISOString().slice(0, 10),
+    validity_days: 30,
+    delivery_place: 'PSHS-CRC, Ampayon, Butuan City',
+    payment_terms: '30 days after acceptance',
+})
+const canCreateRfq = computed(() =>
+    p.value.status === 'approved' && perms.value.canCreateRfq && !(p.value.rfqs?.length)
+)
+const createRfq = () => {
+    rfqForm.post(route('rfq.store'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showRfqModal.value = false
+            router.reload({ preserveScroll: true })
+        },
+    })
+}
 </script>
 
 <template>
@@ -157,11 +179,18 @@ const canReject = computed(() => (perms.value.canDcSign || perms.value.canNumber
                 <ArrowLeftIcon class="w-4 h-4" />
                 Back to Purchase Requests
             </a>
-            <a :href="route('procurements.print', procurement.id)" target="_blank"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
-                <PrinterIcon class="w-4 h-4" />
-                Print / Save PDF
-            </a>
+            <div class="flex items-center gap-2">
+                <a v-if="p.has_market_study" :href="route('procurements.market-study', procurement.id)"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                    <DocumentArrowDownIcon class="w-4 h-4" />
+                    Market Study
+                </a>
+                <a :href="route('procurements.print', procurement.id)" target="_blank"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                    <PrinterIcon class="w-4 h-4" />
+                    Print / Save PDF
+                </a>
+            </div>
         </div>
 
         <!-- Flash -->
@@ -250,6 +279,38 @@ const canReject = computed(() => (perms.value.canDcSign || perms.value.canNumber
                             <dd class="text-red-700 font-medium mt-0.5">{{ p.rejection_reason }}</dd>
                         </div>
                     </dl>
+                </div>
+
+                <!-- RFQ Section -->
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Request for Quotation</h3>
+                        <button v-if="canCreateRfq" @click="showRfqModal = true"
+                            class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                            <PlusIcon class="w-4 h-4" />
+                            Create RFQ
+                        </button>
+                    </div>
+                    <div v-if="(p.rfqs || []).length" class="space-y-2">
+                        <a v-for="rfq in p.rfqs" :key="rfq.id" :href="route('rfq.show', rfq.id)"
+                            class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                            <div>
+                                <span class="font-mono text-sm font-medium text-slate-800">{{ rfq.rfq_number }}</span>
+                                <span :class="['ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium',
+                                    rfq.status === 'awarded' ? 'bg-emerald-100 text-emerald-700' :
+                                    rfq.status === 'closed' ? 'bg-slate-100 text-slate-600' :
+                                    rfq.status === 'open' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-amber-100 text-amber-700']">
+                                    {{ rfq.status_label }}
+                                </span>
+                            </div>
+                            <ArrowLeftIcon class="w-4 h-4 text-slate-400 rotate-180" />
+                        </a>
+                    </div>
+                    <p v-else class="text-sm text-slate-400">
+                        <span v-if="p.status === 'approved'">No RFQ created yet.</span>
+                        <span v-else>RFQ can be created once this PR is approved.</span>
+                    </p>
                 </div>
 
                 <!-- Items -->
@@ -363,6 +424,50 @@ const canReject = computed(() => (perms.value.canDcSign || perms.value.canNumber
                         :class="['inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60 transition-colors',
                             actionModal === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700']">
                         {{ actionSubmitting ? 'Processing…' : 'Confirm' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create RFQ Modal -->
+        <div v-if="showRfqModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+            <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl">
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="text-base font-semibold text-slate-800">Create Request for Quotation</h3>
+                    <button @click="showRfqModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                        <XMarkIcon class="h-5 w-5" />
+                    </button>
+                </div>
+                <div class="px-6 py-5 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">RFQ Date <span class="text-red-500">*</span></label>
+                            <input v-model="rfqForm.rfq_date" type="date"
+                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Validity (days) <span class="text-red-500">*</span></label>
+                            <input v-model.number="rfqForm.validity_days" type="number" min="1" max="365"
+                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Delivery Place</label>
+                        <input v-model="rfqForm.delivery_place"
+                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Payment Terms</label>
+                        <input v-model="rfqForm.payment_terms"
+                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <p v-if="rfqForm.errors?.procurement_id" class="text-xs text-red-600">{{ rfqForm.errors.procurement_id }}</p>
+                </div>
+                <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button @click="showRfqModal = false" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button @click="createRfq" :disabled="rfqForm.processing"
+                        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
+                        {{ rfqForm.processing ? 'Creating…' : 'Create RFQ' }}
                     </button>
                 </div>
             </div>

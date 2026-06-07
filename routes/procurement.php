@@ -4,6 +4,7 @@ use App\Http\Controllers\Procurement\DisbursementVoucherController;
 use App\Http\Controllers\Procurement\OblRequestController;
 use App\Http\Controllers\Procurement\PurchaseOrderController;
 use App\Http\Controllers\Procurement\PurchaseRequestController;
+use App\Http\Controllers\Procurement\RfqController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -78,6 +79,11 @@ Route::middleware(['web', 'auth', 'pshs.email'])
         Route::get('/procurements/{procurement}/print',
             [PurchaseRequestController::class, 'print'])
             ->name('procurements.print')
+            ->middleware('permission:procurement.pr.view|procurement.pr.create');
+
+        Route::get('/procurements/{procurement}/market-study',
+            [PurchaseRequestController::class, 'downloadMarketStudy'])
+            ->name('procurements.market-study')
             ->middleware('permission:procurement.pr.view|procurement.pr.create');
 
         // ── ORS ───────────────────────────────────────────────────────────────
@@ -213,4 +219,56 @@ Route::middleware(['web', 'auth', 'pshs.email'])
             [DisbursementVoucherController::class, 'print'])
             ->name('dv.print')
             ->middleware('permission:procurement.dv.view|procurement.dv.create');
+
+        // ── Request for Quotation (RFQ) ──────────────────────────────────────
+        Route::middleware('permission:procurement.rfq.view|procurement.rfq.create|procurement.rfq.evaluate|procurement.rfq.award')
+            ->group(function () {
+                Route::get('/rfq', [RfqController::class, 'index'])->name('rfq.index');
+                Route::get('/rfq/{rfq}', [RfqController::class, 'show'])->name('rfq.show');
+            });
+
+        Route::middleware('permission:procurement.rfq.create')->group(function () {
+            Route::post('/rfq', [RfqController::class, 'store'])->name('rfq.store');
+            Route::put('/rfq/{rfq}', [RfqController::class, 'update'])->name('rfq.update');
+            Route::post('/rfq/{rfq}/suppliers', [RfqController::class, 'addSupplier'])->name('rfq.suppliers.add');
+            Route::delete('/rfq/{rfq}/suppliers/{supplier}', [RfqController::class, 'removeSupplier'])->name('rfq.suppliers.remove');
+            Route::post('/rfq/{rfq}/open', [RfqController::class, 'open'])->name('rfq.open');
+            Route::post('/rfq/{rfq}/suppliers/{supplier}/sent', [RfqController::class, 'markSent'])->name('rfq.suppliers.sent');
+        });
+
+        Route::post('/rfq/{rfq}/suppliers/{supplier}/quotation', [RfqController::class, 'uploadQuotation'])
+            ->name('rfq.suppliers.upload')
+            ->middleware('permission:procurement.rfq.upload|procurement.rfq.create');
+
+        Route::post('/rfq/{rfq}/suppliers/{supplier}/quotations', [RfqController::class, 'saveQuotations'])
+            ->name('rfq.suppliers.quotations')
+            ->middleware('permission:procurement.rfq.evaluate|procurement.rfq.create');
+
+        Route::post('/rfq/{rfq}/close', [RfqController::class, 'close'])
+            ->name('rfq.close')
+            ->middleware('permission:procurement.rfq.evaluate');
+
+        Route::post('/rfq/{rfq}/award', [RfqController::class, 'award'])
+            ->name('rfq.award')
+            ->middleware('permission:procurement.rfq.award');
+
+        Route::post('/rfq/{rfq}/generate-pos', [RfqController::class, 'generatePos'])
+            ->name('rfq.generate-pos')
+            ->middleware('permission:procurement.rfq.award');
+
+        Route::get('/rfq/{rfq}/suppliers/{supplier}/download', [RfqController::class, 'downloadQuotation'])
+            ->name('rfq.suppliers.download')
+            ->middleware('permission:procurement.rfq.view|procurement.rfq.evaluate');
+
+        Route::get('/rfq/{rfq}/print', [RfqController::class, 'printRfq'])
+            ->name('rfq.print')
+            ->middleware('permission:procurement.rfq.view|procurement.rfq.create');
+
+        Route::get('/rfq/{rfq}/aoq', [RfqController::class, 'printAoq'])
+            ->name('rfq.aoq')
+            ->middleware('permission:procurement.rfq.view|procurement.rfq.evaluate');
+
+        Route::get('/rfq/{rfq}/suppliers/{supplier}/noa', [RfqController::class, 'printNoa'])
+            ->name('rfq.noa')
+            ->middleware('permission:procurement.rfq.view|procurement.rfq.award');
     });

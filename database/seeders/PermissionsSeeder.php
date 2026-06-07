@@ -159,6 +159,13 @@ class PermissionsSeeder extends Seeder
             ['module' => 'DV',         'name' => 'procurement.dv.ocd_sign',      'description' => 'OCD: sign DV and authorize payment'],
             ['module' => 'DV',         'name' => 'procurement.dv.cashier',       'description' => 'Cashier: process DV payment'],
 
+            // ── Procurement — Request for Quotation (RFQ) ─────────────────────
+            ['module' => 'RFQ',        'name' => 'procurement.rfq.view',     'description' => 'View RFQ list and details'],
+            ['module' => 'RFQ',        'name' => 'procurement.rfq.create',   'description' => 'Create RFQs and manage suppliers'],
+            ['module' => 'RFQ',        'name' => 'procurement.rfq.upload',   'description' => 'Upload scanned quotations from suppliers'],
+            ['module' => 'RFQ',        'name' => 'procurement.rfq.evaluate', 'description' => 'Enter/edit quotation prices and build Abstract of Quotations'],
+            ['module' => 'RFQ',        'name' => 'procurement.rfq.award',    'description' => 'Award items to suppliers and generate Purchase Orders'],
+
             // ── Reports ───────────────────────────────────────────────────────
             ['module' => 'Reports',  'name' => 'reports.view',       'description' => 'View system reports'],
             ['module' => 'Reports',  'name' => 'reports.export',     'description' => 'Export reports'],
@@ -263,6 +270,7 @@ class PermissionsSeeder extends Seeder
             // ── PPMP ──────────────────────────────────────────────────────────
             ['module' => 'PPMP', 'name' => 'ppmp.create',      'description' => 'Create and edit own unit PPMP'],
             ['module' => 'PPMP', 'name' => 'ppmp.submit',      'description' => 'Submit PPMP for review'],
+            ['module' => 'PPMP', 'name' => 'ppmp.bac_review',  'description' => 'BAC/Procurement Officer: endorse or return PPMPs pending BAC review'],
             ['module' => 'PPMP', 'name' => 'ppmp.review',      'description' => 'View submitted PPMPs from all units'],
             ['module' => 'PPMP', 'name' => 'ppmp.approve',     'description' => 'Approve or return PPMPs'],
             ['module' => 'PPMP', 'name' => 'ppmp.consolidate', 'description' => 'Consolidate PPMPs into APP'],

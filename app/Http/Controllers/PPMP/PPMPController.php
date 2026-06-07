@@ -11,6 +11,7 @@ use App\Models\PPMP\PpmpStatusHistory;
 use App\Services\PPMP\ComplianceValidationService;
 use App\Services\PPMP\CostComputationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class PPMPController extends Controller
@@ -103,11 +104,19 @@ class PPMPController extends Controller
             ->latest('fiscal_year')
             ->get(['id', 'ppmp_number', 'title', 'fiscal_year', 'division_id']);
 
+        // Approved PPMPs that can be supplemented (same year)
+        $supplementablePpmps = Ppmp::forDivision($user->division_id)
+            ->whereIn('status', [Ppmp::STATUS_APPROVED, Ppmp::STATUS_CONSOLIDATED])
+            ->where('is_supplemental', false)
+            ->latest('fiscal_year')
+            ->get(['id', 'ppmp_number', 'title', 'fiscal_year']);
+
         return Inertia::render('PPMP/Create', [
-            'userDivision' => $user->division,
-            'userOffice'   => $user->office,
-            'fiscalYears'  => range((int) date('Y'), (int) date('Y') + 2),
-            'previousPpmps' => $previousPpmps,
+            'userDivision'        => $user->division,
+            'userOffice'          => $user->office,
+            'fiscalYears'         => range((int) date('Y'), (int) date('Y') + 2),
+            'previousPpmps'       => $previousPpmps,
+            'supplementablePpmps' => $supplementablePpmps,
         ]);
     }
 
@@ -121,19 +130,26 @@ class PPMPController extends Controller
         $user = $request->user();
 
         $data = $request->validate([
-            'fiscal_year'    => 'required|integer|min:2020',
-            'title'          => 'required|string|max:255',
-            'source_ppmp_id' => 'nullable|integer|exists:ppmp,id',
+            'fiscal_year'      => 'required|integer|min:2020',
+            'title'            => 'required|string|max:255',
+            'source_ppmp_id'   => 'nullable|integer|exists:ppmp,id',
+            'is_supplemental'  => 'boolean',
+            'parent_ppmp_id'   => 'nullable|integer|exists:ppmp,id',
         ]);
 
-        // Check for existing active PPMP
-        $exists = Ppmp::forDivision($user->division_id)
-            ->forYear($data['fiscal_year'])
-            ->whereIn('status', [Ppmp::STATUS_DRAFT, Ppmp::STATUS_SUBMITTED])
-            ->exists();
+        $isSupplemental = ! empty($data['is_supplemental']);
 
-        if ($exists) {
-            return back()->with('error', 'An active PPMP already exists for your unit for this fiscal year.');
+        // For regular PPMPs, check for existing active one
+        if (! $isSupplemental) {
+            $exists = Ppmp::forDivision($user->division_id)
+                ->forYear($data['fiscal_year'])
+                ->where('is_supplemental', false)
+                ->whereIn('status', [Ppmp::STATUS_DRAFT, Ppmp::STATUS_PENDING_BAC, Ppmp::STATUS_SUBMITTED])
+                ->exists();
+
+            if ($exists) {
+                return back()->with('error', 'An active PPMP already exists for your unit for this fiscal year.');
+            }
         }
 
         $division = $user->division;
@@ -141,14 +157,22 @@ class PPMPController extends Controller
             return back()->with('error', 'You must be assigned to a division to create a PPMP.');
         }
 
+        $parentNumber = null;
+        if ($isSupplemental && ! empty($data['parent_ppmp_id'])) {
+            $parent = Ppmp::find($data['parent_ppmp_id']);
+            $parentNumber = $parent?->ppmp_number;
+        }
+
         $ppmp = Ppmp::create([
-            'ppmp_number' => Ppmp::generateNumber($data['fiscal_year'], $division),
-            'title'       => $data['title'],
-            'fiscal_year' => $data['fiscal_year'],
-            'division_id' => $user->division_id,
-            'office_id'   => $user->office_id,
-            'prepared_by' => $user->id,
-            'status'      => Ppmp::STATUS_DRAFT,
+            'ppmp_number'    => Ppmp::generateNumber($data['fiscal_year'], $division, $isSupplemental, $parentNumber),
+            'title'          => $data['title'],
+            'fiscal_year'    => $data['fiscal_year'],
+            'division_id'    => $user->division_id,
+            'office_id'      => $user->office_id,
+            'prepared_by'    => $user->id,
+            'status'         => Ppmp::STATUS_DRAFT,
+            'is_supplemental'=> $isSupplemental,
+            'parent_ppmp_id' => $isSupplemental ? ($data['parent_ppmp_id'] ?? null) : null,
         ]);
 
         // Log initial status
@@ -190,11 +214,20 @@ class PPMPController extends Controller
             'office:id,name',
             'preparer:id,name,position',
             'approver:id,name,position',
+            'bacReviewer:id,name',
+            'parentPpmp:id,ppmp_number,title',
             'statusHistory.actor:id,name',
         ]);
 
         $items = $ppmp->items()->get();
         $summary = $this->costService->computePPMPSummary($ppmp->id);
+
+        // PR utilization: PRs linked to this PPMP
+        $utilization = DB::table('procurement_items')
+            ->join('procurements', 'procurement_items.procurement_id', '=', 'procurements.id')
+            ->where('procurements.ppmp_id', $ppmp->id)
+            ->selectRaw('COUNT(DISTINCT procurements.id) as pr_count, COALESCE(SUM(procurement_items.quantity * procurement_items.unit_cost), 0) as pr_total')
+            ->first();
 
         return Inertia::render('PPMP/Show', [
             'ppmp'           => $ppmp,
@@ -203,10 +236,17 @@ class PPMPController extends Controller
             'grandTotal'     => $ppmp->grandTotal(),
             'categories'     => PpmpItem::CATEGORY_LABELS,
             'methods'        => PpmpItem::PROCUREMENT_METHODS,
+            'fundSources'    => PpmpItem::FUND_SOURCES,
+            'quarters'       => PpmpItem::QUARTERS,
             'canEdit'        => $user->can('update', $ppmp),
             'canSubmit'      => $user->can('submit', $ppmp),
+            'canBacReview'   => ($user->hasPermission('ppmp.bac_review') || $user->isSuperAdmin()) && $ppmp->canBacReview(),
             'canApprove'     => $user->can('approve', $ppmp),
             'canExport'      => $user->can('export', $ppmp),
+            'utilization'    => [
+                'pr_count' => (int) $utilization->pr_count,
+                'pr_total' => (float) $utilization->pr_total,
+            ],
         ]);
     }
 
@@ -298,5 +338,29 @@ class PPMPController extends Controller
         $ppmp->returnForRevision(auth()->user(), $data['remarks']);
 
         return back()->with('success', 'PPMP returned for revision.');
+    }
+
+    /**
+     * BAC / Procurement Officer endorsement or return.
+     */
+    public function bacReview(Request $request, Ppmp $ppmp)
+    {
+        $user = $request->user();
+        abort_unless($user->hasPermission('ppmp.bac_review') || $user->isSuperAdmin(), 403);
+        abort_unless($ppmp->canBacReview(), 422, 'PPMP is not awaiting BAC review.');
+
+        $data = $request->validate([
+            'action'  => 'required|in:endorse,return',
+            'remarks' => 'nullable|string|max:1000',
+        ]);
+
+        if ($data['action'] === 'return') {
+            abort_unless(filled($data['remarks']), 422, 'Remarks are required when returning a PPMP.');
+            $ppmp->bacReturn($user, $data['remarks']);
+            return back()->with('success', 'PPMP returned to end-user for revision.');
+        }
+
+        $ppmp->endorse($user);
+        return back()->with('success', 'PPMP endorsed and forwarded to approver.');
     }
 }

@@ -127,9 +127,10 @@ class ComplianceValidationService
             }
         }
 
-        if ($item->procurement_method === 'direct_contracting') {
+        if (in_array($item->procurement_method, ['direct_contracting', 'emergency', 'lease_real_property', 'two_failed_biddings'])) {
             if (empty(trim($item->remarks ?? ''))) {
-                $errors[] = $this->itemError($item, 'remarks', 'justification_required', 'Justification is required for Direct Contracting.');
+                $label = PpmpItem::PROCUREMENT_METHODS[$item->procurement_method] ?? $item->procurement_method;
+                $errors[] = $this->itemError($item, 'remarks', 'justification_required', "Justification/remarks required for {$label}.");
             }
         }
 
@@ -138,8 +139,26 @@ class ComplianceValidationService
                 $item,
                 'procurement_method',
                 'repeat_order_reminder',
-                'Repeat Order should not exceed 25% of the original contract value.'
+                'Repeat Order should not exceed 25% of the original contract value (RA 9184 Sec. 51).'
             );
+        }
+
+        if ($item->procurement_method === 'svp') {
+            $threshold = $this->thresholds->getThreshold('shopping', $item->category);
+            if ($threshold !== null && $item->total_cost > $threshold) {
+                $formatted = number_format($threshold, 0);
+                $label = PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category;
+                $warnings[] = $this->itemWarning(
+                    $item,
+                    'procurement_method',
+                    'svp_threshold',
+                    "SVP threshold exceeded for {$label} (₱{$formatted}). Consider Competitive Bidding."
+                );
+            }
+        }
+
+        if (empty($item->fund_source)) {
+            $warnings[] = $this->itemWarning($item, 'fund_source', 'fund_source_missing', 'Fund source not specified (MOOE/CO/PS). Required for COA audit.');
         }
 
         return ['errors' => $errors, 'warnings' => $warnings];

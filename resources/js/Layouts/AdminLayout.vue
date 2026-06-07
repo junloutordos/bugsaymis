@@ -1127,6 +1127,13 @@ const menuItems = [
         icon: ClipboardDocumentListIcon,
         permissions: ["procurement.po.view", "procurement.po.create", "procurement.po.review", "procurement.po.sign"],
       },
+      {
+        label: "RFQ",
+        routeName: "rfq.index",
+        href: route("rfq.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["procurement.rfq.view", "procurement.rfq.create", "procurement.rfq.evaluate", "procurement.rfq.award"],
+      },
     ],
   },
   {

@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Procurement;
 
 use App\Http\Controllers\Controller;
 use App\Models\Division;
+use App\Models\PPMP\Ppmp;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
 use App\Models\Unit;
 use App\Services\Procurement\PRPdfService;
 use App\Services\Procurement\PRService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -44,11 +46,20 @@ class PurchaseRequestController extends Controller
             $pendingQuery->whereRaw('0=1');
         }
 
+        // Approved PPMPs for the user's division (for linking a PR to a PPMP)
+        $availablePpmps = Ppmp::whereIn('status', [Ppmp::STATUS_APPROVED, Ppmp::STATUS_CONSOLIDATED])
+            ->when($user->division_id && ! $canViewAll, fn ($q) => $q->where('division_id', $user->division_id))
+            ->orderByDesc('fiscal_year')
+            ->get(['id', 'ppmp_number', 'title', 'fiscal_year', 'division_id'])
+            ->map(fn ($p) => ['id' => $p->id, 'label' => "{$p->ppmp_number} — {$p->title} (FY {$p->fiscal_year})"])
+            ->values();
+
         return Inertia::render('Procurements/Index', [
             'procurements'        => $query->get()->map(fn ($p) => $this->formatPR($p)),
             'pendingAction'       => $pendingQuery->get()->map(fn ($p) => $this->formatPR($p)),
             'units'               => Unit::orderBy('name')->get(['id', 'name']),
             'divisions'           => Division::where('status', '<>', 'inactive')->orderBy('division_name')->get(['id', 'division_name']),
+            'availablePpmps'      => $availablePpmps,
             'canViewAll'          => $canViewAll,
             'currentUser'         => [
                 'id'          => $user->id,
@@ -76,7 +87,7 @@ class PurchaseRequestController extends Controller
 
         abort_unless($canView, 403);
 
-        $procurement->load(['items', 'requester:id,name', 'divisionChief:id,name', 'procurementOfficer:id,name', 'ocd:id,name', 'rejectedByUser:id,name', 'division:id,division_name']);
+        $procurement->load(['items', 'requester:id,name', 'divisionChief:id,name', 'procurementOfficer:id,name', 'ocd:id,name', 'rejectedByUser:id,name', 'division:id,division_name', 'rfqs']);
 
         return Inertia::render('Procurements/Show', [
             'procurement' => $this->formatPR($procurement, detailed: true),
@@ -87,6 +98,7 @@ class PurchaseRequestController extends Controller
                     'canNumber'    => $user->hasPermission('procurement.pr.number'),
                     'canOcdSign'   => $user->hasPermission('procurement.pr.ocd_sign'),
                     'canBoInitial' => $user->hasPermission('procurement.pr.bo_initial'),
+                    'canCreateRfq' => $user->hasAnyPermission(['procurement.rfq.create']) || $user->isSuperAdmin(),
                 ],
             ],
         ]);
@@ -98,11 +110,14 @@ class PurchaseRequestController extends Controller
         $this->checkPerm('procurement.pr.create');
 
         $data = $request->validate([
-            'pr_date'        => 'nullable|date',
-            'purpose'        => 'required|string|max:500',
-            'division_id'    => 'nullable|exists:divisions,id',
-            'is_supplemental' => 'boolean',
-            'ppmp_checked'   => 'boolean',
+            'pr_date'             => 'nullable|date',
+            'purpose'             => 'required|string|max:500',
+            'division_id'         => 'nullable|exists:divisions,id',
+            'is_supplemental'     => 'boolean',
+            'ppmp_checked'        => 'boolean',
+            'ppmp_id'             => 'nullable|exists:ppmp,id',
+            'market_study_base64' => 'nullable|string',
+            'market_study_name'   => 'nullable|string|max:255',
         ]);
 
         $procurement = Procurement::create([
@@ -112,14 +127,19 @@ class PurchaseRequestController extends Controller
             'requested_by'   => $user->id,
             'division_id'    => $data['division_id'] ?? $user->division_id,
             'status'         => 'draft',
-            'is_supplemental' => $data['is_supplemental'] ?? false,
+            'is_supplemental'=> $data['is_supplemental'] ?? false,
             'ppmp_checked'   => $data['ppmp_checked'] ?? true,
+            'ppmp_id'        => $data['ppmp_id'] ?? null,
         ]);
 
         $year  = now()->format('Y');
         $month = now()->format('m');
         $seq   = str_pad($procurement->id, 4, '0', STR_PAD_LEFT);
         $procurement->update(['pr_no' => "PR-{$year}-{$month}-{$seq}"]);
+
+        if (! empty($data['market_study_base64'])) {
+            $this->saveMarketStudy($procurement, $data['market_study_base64'], $data['market_study_name'] ?? 'market-study.pdf');
+        }
 
         return back()->with('success', 'Purchase request created.');
     }
@@ -131,13 +151,20 @@ class PurchaseRequestController extends Controller
         abort_unless($procurement->status === 'draft', 422, 'Only draft PRs can be edited.');
 
         $data = $request->validate([
-            'pr_date'        => 'nullable|date',
-            'purpose'        => 'required|string|max:500',
-            'is_supplemental' => 'boolean',
-            'ppmp_checked'   => 'boolean',
+            'pr_date'             => 'nullable|date',
+            'purpose'             => 'required|string|max:500',
+            'is_supplemental'     => 'boolean',
+            'ppmp_checked'        => 'boolean',
+            'ppmp_id'             => 'nullable|exists:ppmp,id',
+            'market_study_base64' => 'nullable|string',
+            'market_study_name'   => 'nullable|string|max:255',
         ]);
 
         $procurement->update($data);
+
+        if (! empty($data['market_study_base64'])) {
+            $this->saveMarketStudy($procurement, $data['market_study_base64'], $data['market_study_name'] ?? 'market-study.pdf');
+        }
 
         return back()->with('success', 'Purchase request updated.');
     }
@@ -289,6 +316,8 @@ class PurchaseRequestController extends Controller
             'items_count'      => $p->items->count(),
             'items'            => $detailed ? $p->items->toArray() : [],
             'created_at'       => $p->created_at?->toDateString(),
+            'market_study_filename' => $p->market_study_filename,
+            'has_market_study'      => (bool) $p->market_study_s3_key,
         ];
 
         if ($detailed) {
@@ -306,6 +335,12 @@ class PurchaseRequestController extends Controller
                 'rejected_at'         => $p->rejected_at?->toISOString(),
                 'rejection_reason'    => $p->rejection_reason,
                 'supplemental_bo_at'  => $p->supplemental_budget_officer_at?->toISOString(),
+                'rfqs'                => $p->rfqs?->map(fn ($r) => [
+                    'id'          => $r->id,
+                    'rfq_number'  => $r->rfq_number,
+                    'status'      => $r->status,
+                    'status_label'=> $r->statusLabel(),
+                ])->values() ?? [],
             ]);
         }
 
@@ -316,6 +351,47 @@ class PurchaseRequestController extends Controller
     {
         $this->checkPerm('procurement.pr.view');
         return $pdf->stream($procurement);
+    }
+
+    public function downloadMarketStudy(Procurement $procurement, Request $request)
+    {
+        $canView = $procurement->requested_by == $request->user()->id
+            || $request->user()->isSuperAdmin()
+            || $request->user()->hasAnyPermission(['procurement.pr.dc_sign', 'procurement.pr.number', 'procurement.pr.ocd_sign']);
+
+        abort_unless($canView, 403);
+        abort_unless($procurement->market_study_s3_key, 404, 'No market study attached.');
+
+        $bytes = Storage::disk('s3')->get($procurement->market_study_s3_key);
+        $filename = $procurement->market_study_filename ?? 'market-study.pdf';
+
+        return response($bytes, 200, [
+            'Content-Type'        => 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    private function saveMarketStudy(Procurement $procurement, string $base64Data, string $filename): void
+    {
+        if (preg_match('/^data:[^;]+;base64,/', $base64Data)) {
+            $base64Data = preg_replace('/^data:[^;]+;base64,/', '', $base64Data);
+        }
+        $bytes = base64_decode($base64Data);
+        abort_if($bytes === false || strlen($bytes) < 100, 422, 'Invalid file data.');
+        abort_if(strlen($bytes) > 15 * 1024 * 1024, 422, 'File too large (max 15 MB).');
+
+        if ($procurement->market_study_s3_key) {
+            Storage::disk('s3')->delete($procurement->market_study_s3_key);
+        }
+
+        $ext    = strtolower(pathinfo($filename, PATHINFO_EXTENSION)) ?: 'pdf';
+        $s3Key  = "procurement-market-study/{$procurement->id}.{$ext}";
+        Storage::disk('s3')->put($s3Key, $bytes);
+
+        $procurement->update([
+            'market_study_s3_key'  => $s3Key,
+            'market_study_filename'=> basename($filename),
+        ]);
     }
 
     private function checkPerm(string $permission): void
