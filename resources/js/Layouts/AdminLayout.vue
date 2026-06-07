@@ -1137,7 +1137,7 @@ const menuItems = [
     ],
   },
   {
-    label: "Supply & Property",
+    label: "Supply Chain",
     icon: ArchiveBoxIcon,
     permissions: ["supply.view", "supply.receive", "supply.issue", "supply.manage"],
     children: [
@@ -1172,7 +1172,7 @@ const menuItems = [
     ],
   },
   {
-    label: "Property",
+    label: "Property & Equipment",
     icon: WrenchScrewdriverIcon,
     permissions: ["property.view", "property.manage", "property.transfer", "property.reports", "property.dispose", "work-orders.view", "work-orders.manage"],
     children: [
