@@ -1,0 +1,659 @@
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
+import { Head, usePage, router } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import axios from 'axios'
+import {
+  CalendarDaysIcon,
+  ClipboardDocumentCheckIcon,
+  ExclamationTriangleIcon,
+  UserGroupIcon,
+  DocumentTextIcon,
+  CheckCircleIcon,
+  XMarkIcon,
+  PlusIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PencilIcon,
+  TrashIcon,
+} from '@heroicons/vue/24/outline'
+import { Bar, Line, Doughnut } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, BarElement, LineElement,
+  PointElement, ArcElement, Tooltip, Legend, Title,
+} from 'chart.js'
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Tooltip, Legend, Title)
+
+const props = defineProps({
+  schoolYear:     Object,
+  calendarEvents: Array,
+  todayEvents:    Array,
+  cards:          Object,
+  charts:         Object,
+  sections:       Array,
+  subjects:       Array,
+  currentMonth:   Number,
+  currentYear:    Number,
+})
+
+// ── Calendar state ──────────────────────────────────────────────────────────
+
+const calMonth = ref(props.currentMonth)
+const calYear  = ref(props.currentYear)
+const events   = ref([...props.calendarEvents])
+const loading  = ref(false)
+
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+]
+
+const TYPE_COLORS = {
+  assessment: { bg: 'bg-red-100',    text: 'text-red-700',    dot: 'bg-red-500'   },
+  meeting:    { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-blue-500'  },
+  event:      { bg: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-green-500' },
+  training:   { bg: 'bg-amber-100',  text: 'text-amber-700',  dot: 'bg-amber-500' },
+  other:      { bg: 'bg-slate-100',  text: 'text-slate-700',  dot: 'bg-slate-400' },
+}
+
+const calendarDays = computed(() => {
+  const first   = new Date(calYear.value, calMonth.value - 1, 1)
+  const last    = new Date(calYear.value, calMonth.value, 0)
+  const startDow = first.getDay()
+  const days    = []
+
+  for (let i = 0; i < startDow; i++) {
+    const d = new Date(calYear.value, calMonth.value - 1, -startDow + i + 1)
+    days.push({ date: formatDate(d), day: d.getDate(), current: false, events: [] })
+  }
+  for (let d = 1; d <= last.getDate(); d++) {
+    const date = formatDate(new Date(calYear.value, calMonth.value - 1, d))
+    days.push({ date, day: d, current: true, events: events.value.filter(e => e.scheduled_date === date) })
+  }
+  const remainder = 42 - days.length
+  for (let i = 1; i <= remainder; i++) {
+    const d = new Date(calYear.value, calMonth.value, i)
+    days.push({ date: formatDate(d), day: i, current: false, events: [] })
+  }
+  return days
+})
+
+function formatDate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const todayStr = formatDate(new Date())
+
+async function navigateMonth(delta) {
+  let m = calMonth.value + delta
+  let y = calYear.value
+  if (m < 1)  { m = 12; y-- }
+  if (m > 12) { m = 1;  y++ }
+  calMonth.value = m
+  calYear.value  = y
+  loading.value  = true
+  try {
+    const { data } = await axios.get(route('cid.dashboard.events'), { params: { month: m, year: y } })
+    events.value = data
+  } finally {
+    loading.value = false
+  }
+}
+
+function assessmentsOnDay(sectionId, date) {
+  return events.value.filter(
+    e => e.type === 'assessment' && e.section_id === sectionId && e.scheduled_date === date
+  ).length
+}
+
+// ── Create / edit modal ──────────────────────────────────────────────────────
+
+const showModal       = ref(false)
+const editingSchedule = ref(null)
+const selectedDate    = ref('')
+const form            = ref(emptyForm())
+const formErrors      = ref({})
+const saving          = ref(false)
+const assessmentCount = ref(0)
+const countLoading    = ref(false)
+
+function emptyForm() {
+  return {
+    title: '', type: 'assessment', scheduled_date: '',
+    section_id: '', subject_id: '', start_time: '', end_time: '', description: '',
+  }
+}
+
+function openCreate(date = '') {
+  editingSchedule.value = null
+  formErrors.value      = {}
+  form.value            = emptyForm()
+  form.value.scheduled_date = date
+  selectedDate.value    = date
+  assessmentCount.value = 0
+  showModal.value       = true
+}
+
+function openEdit(event) {
+  editingSchedule.value = event
+  formErrors.value      = {}
+  form.value = {
+    title:          event.title,
+    type:           event.type,
+    scheduled_date: event.scheduled_date,
+    section_id:     event.section_id ?? '',
+    subject_id:     event.subject_id ?? '',
+    start_time:     event.start_time ?? '',
+    end_time:       event.end_time ?? '',
+    description:    event.description ?? '',
+  }
+  selectedDate.value = event.scheduled_date
+  fetchAssessmentCount()
+  showModal.value = true
+}
+
+function closeModal() {
+  showModal.value = false
+  editingSchedule.value = null
+}
+
+watch([() => form.value.type, () => form.value.section_id, () => form.value.scheduled_date], () => {
+  if (form.value.type === 'assessment' && form.value.section_id && form.value.scheduled_date) {
+    fetchAssessmentCount()
+  } else {
+    assessmentCount.value = 0
+  }
+})
+
+async function fetchAssessmentCount() {
+  if (!form.value.section_id || !form.value.scheduled_date) return
+  countLoading.value = true
+  try {
+    const { data } = await axios.get(route('cid.dashboard.assessment-count'), {
+      params: {
+        section_id:     form.value.section_id,
+        scheduled_date: form.value.scheduled_date,
+        exclude_id:     editingSchedule.value?.id ?? null,
+      },
+    })
+    assessmentCount.value = data.count
+  } catch {
+    assessmentCount.value = 0
+  } finally {
+    countLoading.value = false
+  }
+}
+
+async function saveSchedule() {
+  formErrors.value = {}
+  saving.value = true
+  try {
+    const payload = {
+      ...form.value,
+      section_id: form.value.section_id || null,
+      subject_id: form.value.subject_id || null,
+    }
+    if (editingSchedule.value) {
+      const { data } = await axios.put(route('cid.dashboard.update', editingSchedule.value.id), payload)
+      const idx = events.value.findIndex(e => e.id === data.schedule.id)
+      if (idx !== -1) events.value.splice(idx, 1, data.schedule)
+    } else {
+      const { data } = await axios.post(route('cid.dashboard.store'), payload)
+      if (data.schedule.scheduled_date.startsWith(`${calYear.value}-${String(calMonth.value).padStart(2,'0')}`)) {
+        events.value.push(data.schedule)
+      }
+    }
+    closeModal()
+  } catch (err) {
+    if (err.response?.status === 422) {
+      if (err.response.data.errors) {
+        formErrors.value = err.response.data.errors
+      } else {
+        formErrors.value._general = err.response.data.message
+      }
+    }
+  } finally {
+    saving.value = false
+  }
+}
+
+// ── Delete ───────────────────────────────────────────────────────────────────
+
+async function deleteSchedule(event) {
+  if (!confirm(`Delete "${event.title}"?`)) return
+  await axios.delete(route('cid.dashboard.destroy', event.id))
+  events.value = events.value.filter(e => e.id !== event.id)
+}
+
+// ── Day detail panel ─────────────────────────────────────────────────────────
+
+const selectedDayEvents = ref(null)
+const selectedDayDate   = ref('')
+
+function selectDay(day) {
+  if (!day.current) return
+  selectedDayDate.value   = day.date
+  selectedDayEvents.value = day.events
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+
+const barChartData = computed(() => ({
+  labels:   props.charts.assessmentLoad.map(r => r.section),
+  datasets: [{
+    label:           'Assessments',
+    data:            props.charts.assessmentLoad.map(r => r.count),
+    backgroundColor: '#6366f1',
+    borderRadius:    4,
+  }],
+}))
+
+const barChartOptions = {
+  indexAxis: 'y',
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+}
+
+const lineChartData = computed(() => ({
+  labels:   props.charts.teacherAttendance.map(r => r.label),
+  datasets: [{
+    label:           'Teachers Present',
+    data:            props.charts.teacherAttendance.map(r => r.present),
+    borderColor:     '#10b981',
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    fill:            true,
+    tension:         0.4,
+  }],
+}))
+
+const lineChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+}
+
+const donutChartData = computed(() => ({
+  labels:   props.charts.classRecordStatus.map(r => r.label),
+  datasets: [{
+    data:            props.charts.classRecordStatus.map(r => r.count),
+    backgroundColor: ['#10b981', '#f59e0b'],
+    borderWidth:     0,
+  }],
+}))
+
+const donutChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '65%',
+  plugins: { legend: { position: 'bottom' } },
+}
+</script>
+
+<template>
+  <Head title="CID Dashboard" />
+  <AdminLayout title="CID Dashboard">
+
+    <!-- Header -->
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-semibold text-slate-800">CID Dashboard</h1>
+        <p class="text-sm text-slate-500 mt-0.5">{{ schoolYear?.name ?? 'No active school year' }}</p>
+      </div>
+      <button
+        @click="openCreate(todayStr)"
+        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+      >
+        <PlusIcon class="w-4 h-4" />
+        New Activity
+      </button>
+    </div>
+
+    <!-- ── Row 1: Summary Cards ─────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Assessments Today</span>
+          <CalendarDaysIcon class="w-5 h-5 text-red-400" />
+        </div>
+        <p class="text-3xl font-bold text-slate-800">{{ cards.assessments_today }}</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Sections at Max</span>
+          <ExclamationTriangleIcon class="w-5 h-5 text-amber-400" />
+        </div>
+        <p class="text-3xl font-bold text-slate-800">{{ cards.sections_at_max }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">3 assessments today</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Teachers Present</span>
+          <UserGroupIcon class="w-5 h-5 text-green-400" />
+        </div>
+        <p class="text-3xl font-bold text-slate-800">{{ cards.teachers_present_today }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">today via tap-in</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Class Records</span>
+          <ClipboardDocumentCheckIcon class="w-5 h-5 text-indigo-400" />
+        </div>
+        <p class="text-3xl font-bold text-slate-800">{{ cards.class_records_pending }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">pending review</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">This Week</span>
+          <DocumentTextIcon class="w-5 h-5 text-blue-400" />
+        </div>
+        <p class="text-3xl font-bold text-slate-800">{{ cards.activities_this_week }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">activities scheduled</p>
+      </div>
+
+    </div>
+
+    <!-- ── Row 2: Calendar + Today Panel ────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+      <!-- Calendar (2/3) -->
+      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4">
+        <!-- Month nav -->
+        <div class="flex items-center justify-between mb-4">
+          <button @click="navigateMonth(-1)" class="p-1.5 rounded hover:bg-slate-100">
+            <ChevronLeftIcon class="w-5 h-5 text-slate-500" />
+          </button>
+          <span class="text-sm font-semibold text-slate-700">
+            {{ MONTH_NAMES[calMonth - 1] }} {{ calYear }}
+          </span>
+          <button @click="navigateMonth(1)" class="p-1.5 rounded hover:bg-slate-100">
+            <ChevronRightIcon class="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <!-- Day headers -->
+        <div class="grid grid-cols-7 mb-1">
+          <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d"
+            class="text-center text-xs font-semibold text-slate-400 py-1">
+            {{ d }}
+          </div>
+        </div>
+
+        <!-- Day cells -->
+        <div v-if="loading" class="flex items-center justify-center h-64 text-slate-400 text-sm">
+          Loading…
+        </div>
+        <div v-else class="grid grid-cols-7 gap-px bg-slate-100 rounded-lg overflow-hidden">
+          <div
+            v-for="day in calendarDays" :key="day.date"
+            :class="[
+              'bg-white min-h-[80px] p-1.5 text-xs cursor-pointer hover:bg-indigo-50 transition-colors',
+              !day.current ? 'opacity-30' : '',
+              day.date === todayStr ? 'ring-2 ring-inset ring-indigo-400' : '',
+              selectedDayDate === day.date ? 'bg-indigo-50' : '',
+            ]"
+            @click="selectDay(day)"
+          >
+            <div class="flex items-center justify-between mb-1">
+              <span :class="['font-medium', day.date === todayStr ? 'text-indigo-600' : 'text-slate-700']">
+                {{ day.day }}
+              </span>
+              <span
+                v-if="day.current && day.events.filter(e => e.type === 'assessment').length >= 3"
+                title="Max assessments reached"
+                class="text-amber-500 font-bold text-[10px]"
+              >3/3</span>
+            </div>
+            <div class="space-y-0.5 overflow-hidden">
+              <div
+                v-for="ev in day.events.slice(0, 3)" :key="ev.id"
+                :class="['rounded px-1 py-0.5 truncate leading-tight', TYPE_COLORS[ev.type].bg, TYPE_COLORS[ev.type].text]"
+              >
+                {{ ev.title }}
+              </div>
+              <div v-if="day.events.length > 3" class="text-slate-400 pl-1">
+                +{{ day.events.length - 3 }} more
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex flex-wrap gap-3 mt-3">
+          <div v-for="(colors, type) in TYPE_COLORS" :key="type" class="flex items-center gap-1">
+            <span :class="['w-2 h-2 rounded-full inline-block', colors.dot]"></span>
+            <span class="text-xs text-slate-500 capitalize">{{ type }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Today / Selected Day Panel (1/3) -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-slate-700">
+            {{ selectedDayDate && selectedDayDate !== todayStr ? selectedDayDate : 'Today' }}
+          </h3>
+          <button
+            @click="openCreate(selectedDayDate || todayStr)"
+            class="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1"
+          >
+            <PlusIcon class="w-3.5 h-3.5" /> Add
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto space-y-2 max-h-[360px] pr-1">
+          <template v-if="(selectedDayEvents ?? todayEvents).length === 0">
+            <div class="flex flex-col items-center justify-center h-32 text-slate-300">
+              <CalendarDaysIcon class="w-10 h-10 mb-2" />
+              <span class="text-xs">No activities</span>
+            </div>
+          </template>
+
+          <div
+            v-for="ev in (selectedDayEvents ?? todayEvents)"
+            :key="ev.id"
+            :class="['rounded-lg p-2.5 border', TYPE_COLORS[ev.type].bg]"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <span :class="['inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded mb-1', TYPE_COLORS[ev.type].bg, TYPE_COLORS[ev.type].text]">
+                  {{ ev.type }}
+                </span>
+                <p class="text-sm font-medium text-slate-800 leading-tight">{{ ev.title }}</p>
+                <p v-if="ev.section_name" class="text-xs text-slate-500 mt-0.5">{{ ev.section_name }}</p>
+                <p v-if="ev.subject_name" class="text-xs text-slate-400">{{ ev.subject_name }}</p>
+                <p v-if="ev.start_time" class="text-xs text-slate-400 mt-0.5">
+                  {{ ev.start_time }}{{ ev.end_time ? ' – ' + ev.end_time : '' }}
+                </p>
+                <p v-if="ev.description" class="text-xs text-slate-500 mt-1 line-clamp-2">{{ ev.description }}</p>
+              </div>
+              <div class="flex gap-1 shrink-0">
+                <button @click="openEdit(ev)" class="p-1 rounded hover:bg-white/60">
+                  <PencilIcon class="w-3.5 h-3.5 text-slate-500" />
+                </button>
+                <button @click="deleteSchedule(ev)" class="p-1 rounded hover:bg-white/60">
+                  <TrashIcon class="w-3.5 h-3.5 text-red-400" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Row 3: Charts ─────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+      <!-- Assessment Load by Section -->
+      <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          Assessment Load by Section (This Month)
+        </h3>
+        <div class="h-48">
+          <Bar v-if="charts.assessmentLoad.length" :data="barChartData" :options="barChartOptions" />
+          <div v-else class="flex items-center justify-center h-full text-slate-300 text-xs">No data</div>
+        </div>
+      </div>
+
+      <!-- Teacher Attendance This Week -->
+      <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          Teacher Attendance Rate (This Week)
+        </h3>
+        <div class="h-48">
+          <Line :data="lineChartData" :options="lineChartOptions" />
+        </div>
+      </div>
+
+      <!-- Class Record Status -->
+      <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          Class Record Status (Current SY)
+        </h3>
+        <div class="h-48 flex items-center justify-center">
+          <Doughnut
+            v-if="charts.classRecordStatus.some(r => r.count > 0)"
+            :data="donutChartData"
+            :options="donutChartOptions"
+          />
+          <div v-else class="text-slate-300 text-xs">No class records</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Create / Edit Modal ───────────────────────────────────────────── -->
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+        <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100">
+          <h2 class="text-base font-semibold text-slate-800">
+            {{ editingSchedule ? 'Edit Activity' : 'New Activity' }}
+          </h2>
+          <button @click="closeModal" class="p-1.5 rounded hover:bg-slate-100">
+            <XMarkIcon class="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <div class="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+
+          <!-- General error -->
+          <div v-if="formErrors._general" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
+            {{ formErrors._general }}
+          </div>
+
+          <!-- Title -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Title <span class="text-red-500">*</span></label>
+            <input v-model="form.title" type="text" placeholder="e.g. Quarter 1 Exam"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            <p v-if="formErrors.title" class="text-red-500 text-xs mt-1">{{ formErrors.title[0] }}</p>
+          </div>
+
+          <!-- Type -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Type <span class="text-red-500">*</span></label>
+            <select v-model="form.type"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+              <option value="assessment">Assessment</option>
+              <option value="meeting">Meeting</option>
+              <option value="event">Event</option>
+              <option value="training">Training</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <!-- Date -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Date <span class="text-red-500">*</span></label>
+            <input v-model="form.scheduled_date" type="date"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            <p v-if="formErrors.scheduled_date" class="text-red-500 text-xs mt-1">{{ formErrors.scheduled_date[0] }}</p>
+          </div>
+
+          <!-- Section -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Section</label>
+            <select v-model="form.section_id"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+              <option value="">— All sections / Not section-specific —</option>
+              <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.label }}</option>
+            </select>
+
+            <!-- Assessment counter -->
+            <div v-if="form.type === 'assessment' && form.section_id && form.scheduled_date"
+              :class="[
+                'mt-1.5 text-xs px-2 py-1 rounded',
+                assessmentCount >= 3 ? 'bg-red-50 text-red-600 font-semibold' : 'bg-slate-50 text-slate-500'
+              ]"
+            >
+              <span v-if="countLoading">Checking…</span>
+              <span v-else>
+                {{ assessmentCount }}/3 assessments already on {{ form.scheduled_date }} for this section
+                <span v-if="assessmentCount >= 3"> — limit reached</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Subject -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Subject</label>
+            <select v-model="form.subject_id"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+              <option value="">— Not subject-specific —</option>
+              <option v-for="s in subjects" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
+
+          <!-- Time -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
+              <input v-model="form.start_time" type="time"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">End Time</label>
+              <input v-model="form.end_time" type="time"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            <textarea v-model="form.description" rows="3" placeholder="Optional notes…"
+              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full resize-none" />
+          </div>
+
+        </div>
+
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
+          <button @click="closeModal"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
+            Cancel
+          </button>
+          <button
+            @click="saveSchedule"
+            :disabled="saving || (form.type === 'assessment' && form.section_id && assessmentCount >= 3)"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ saving ? 'Saving…' : (editingSchedule ? 'Update' : 'Create') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </AdminLayout>
+</template>
