@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { ArrowLeftIcon, CheckIcon, XMarkIcon, ClockIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
 const props = defineProps({
@@ -99,11 +99,16 @@ const canCanvaser = computed(() => o.value.status === 'at_canvaser')
     <Head :title="`ORS — ${ors.ors_number || ors.id}`" />
     <AdminLayout :title="`ORS — ${ors.ors_number || '#' + ors.id}`">
 
-        <div class="mb-5">
+        <div class="mb-5 flex items-center justify-between">
             <a :href="route('ors.index')"
                 class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 transition-colors">
                 <ArrowLeftIcon class="w-4 h-4" />
                 Back to ORS
+            </a>
+            <a :href="route('ors.print', ors.id)" target="_blank"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+                <PrinterIcon class="w-4 h-4" />
+                Print / Save PDF
             </a>
         </div>
 

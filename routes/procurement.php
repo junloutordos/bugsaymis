@@ -74,6 +74,11 @@ Route::middleware(['web', 'auth', 'pshs.email'])
             ->name('procurements.reject')
             ->middleware('permission:procurement.pr.dc_sign|procurement.pr.number|procurement.pr.ocd_sign|procurement.pr.bo_initial');
 
+        Route::get('/procurements/{procurement}/print',
+            [PurchaseRequestController::class, 'print'])
+            ->name('procurements.print')
+            ->middleware('permission:procurement.pr.view|procurement.pr.create');
+
         // ── ORS ───────────────────────────────────────────────────────────────
         Route::middleware('permission:procurement.ors.view|procurement.ors.create')
             ->group(function () {
@@ -120,6 +125,11 @@ Route::middleware(['web', 'auth', 'pshs.email'])
         Route::post('/ors/{ors}/canvaser-receive',
             [OblRequestController::class, 'canvaserReceive'])
             ->name('ors.canvaser-receive');
+
+        Route::get('/ors/{ors}/print',
+            [OblRequestController::class, 'print'])
+            ->name('ors.print')
+            ->middleware('permission:procurement.ors.view|procurement.ors.create');
 
         // ── Disbursement Vouchers (DV) ────────────────────────────────────────
         Route::middleware('permission:procurement.dv.view|procurement.dv.create')
@@ -170,4 +180,9 @@ Route::middleware(['web', 'auth', 'pshs.email'])
             [DisbursementVoucherController::class, 'ocdPaymentSign'])
             ->name('dv.ocd-payment-sign')
             ->middleware('permission:procurement.dv.ocd_sign');
+
+        Route::get('/dv/{dv}/print',
+            [DisbursementVoucherController::class, 'print'])
+            ->name('dv.print')
+            ->middleware('permission:procurement.dv.view|procurement.dv.create');
     });
