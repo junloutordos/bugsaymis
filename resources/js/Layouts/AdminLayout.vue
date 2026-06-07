@@ -1319,6 +1319,21 @@ const menuItems = [
   },
 
   {
+    label: "CID Dashboard",
+    icon: ChartBarIcon,
+    permissions: ["cid.dashboard"],
+    children: [
+      {
+        label: "Dashboard",
+        routeName: "cid.dashboard.index",
+        href: route("cid.dashboard.index"),
+        icon: ChartBarIcon,
+        permissions: ["cid.dashboard"],
+      },
+    ],
+  },
+
+  {
     label: "Teacher Attendance",
     icon: ClockIcon,
     roles: ["Administrator", "CID Chief", "AUH"],

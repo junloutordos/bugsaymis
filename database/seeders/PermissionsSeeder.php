@@ -296,6 +296,9 @@ class PermissionsSeeder extends Seeder
             ['module' => 'OrgStructure', 'name' => 'org.export',            'description' => 'Export the organizational chart (PDF, PNG, Excel)'],
             ['module' => 'OrgStructure', 'name' => 'org.reports',           'description' => 'Generate organizational structure reports'],
 
+            // ── CID Dashboard ─────────────────────────────────────────────
+            ['module' => 'CID', 'name' => 'cid.dashboard', 'description' => 'Access the CID Dashboard: assessment calendar, activity scheduling, and CID analytics (CID Chief, AUH, Administrator)'],
+
             // ── Supply & Property ─────────────────────────────────────────────
             ['module' => 'Supply', 'name' => 'supply.view',    'description' => 'View supply items, stock levels, and ledger cards'],
             ['module' => 'Supply', 'name' => 'supply.receive', 'description' => 'Create IARs and accept/post deliveries to stock'],

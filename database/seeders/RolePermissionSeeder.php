@@ -377,6 +377,10 @@ class RolePermissionSeeder extends Seeder
         // AUH scoping is handled at runtime by checking academic_units.head_user_id
         $assign('CID Chief', ['class-attendance.view', 'class-attendance.manage']);
 
+        // ── CID Dashboard ─────────────────────────────────────────────────────
+        $assign('CID Chief', ['cid.dashboard']);
+        $assign('AUH',       ['cid.dashboard']);
+
         // ── PPMP ──────────────────────────────────────────────────────────────
         $assign('Faculty', ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
         $assign('Staff',   ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
