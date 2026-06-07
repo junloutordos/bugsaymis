@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\Classroom;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,6 +43,8 @@ class ClassroomController extends Controller
             'floor'          => $c->floor,
             'is_available'   => $c->is_available,
             'remarks'        => $c->remarks,
+            'nfc_uuid'       => $c->nfc_uuid,
+            'nfc_url'        => $c->nfc_uuid ? url('/class-tap/' . $c->nfc_uuid) : null,
         ]);
 
         return Inertia::render('FacultyLoading/Classrooms/Index', [
@@ -88,6 +91,15 @@ class ClassroomController extends Controller
         $classroom->update($data);
 
         return back()->with('success', 'Classroom updated.');
+    }
+
+    public function regenerateNfc(Classroom $classroom): RedirectResponse
+    {
+        $this->authorize('faculty_loading.classrooms');
+
+        $classroom->update(['nfc_uuid' => Str::uuid()->toString()]);
+
+        return back()->with('success', "NFC tag for \"{$classroom->name}\" regenerated. Reprogram the physical tag with the new URL.");
     }
 
     public function destroy(Classroom $classroom): RedirectResponse

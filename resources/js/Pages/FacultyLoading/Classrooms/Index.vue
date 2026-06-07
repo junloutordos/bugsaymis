@@ -95,6 +95,35 @@
             <span v-if="c.building">{{ c.building }}<template v-if="c.floor">, Floor {{ c.floor }}</template></span>
           </div>
           <p v-if="c.remarks" class="text-xs text-slate-400 italic">{{ c.remarks }}</p>
+
+          <!-- NFC section -->
+          <div class="border-t border-slate-100 pt-2 mt-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="inline-flex items-center gap-1 text-xs font-medium"
+                  :class="c.nfc_uuid ? 'text-emerald-600' : 'text-slate-400'">
+                  <SignalIcon class="h-3.5 w-3.5" />
+                  {{ c.nfc_uuid ? 'NFC Ready' : 'No NFC' }}
+                </span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button v-if="c.nfc_url" @click="copyNfcUrl(c)"
+                  :title="copied === c.id ? 'Copied!' : 'Copy NFC URL'"
+                  class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors"
+                  :class="copied === c.id ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+                  <ClipboardDocumentIcon class="h-3 w-3" />
+                  {{ copied === c.id ? 'Copied!' : 'Copy URL' }}
+                </button>
+                <button @click="regenerate(c)"
+                  title="Generate new NFC UUID (reprogram physical tag after)"
+                  class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-slate-600 rounded-md transition-colors">
+                  <ArrowPathIcon class="h-3 w-3" />
+                  Regenerate
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -172,6 +201,7 @@ import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   BuildingOfficeIcon, CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon, UsersIcon,
+  SignalIcon, ClipboardDocumentIcon, ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -226,5 +256,17 @@ function save() {
 function deleteClassroom(c) {
   if (! confirm(`Delete classroom "${c.name}"?`)) return
   useForm({}).delete(route('faculty-loading.classrooms.destroy', c.id))
+}
+
+const copied = ref(null)
+function copyNfcUrl(c) {
+  navigator.clipboard.writeText(c.nfc_url)
+  copied.value = c.id
+  setTimeout(() => { copied.value = null }, 2000)
+}
+
+function regenerate(c) {
+  if (! confirm(`Regenerate NFC UUID for "${c.name}"?\n\nThe old NFC tag URL will stop working. You must reprogram the physical tag with the new URL.`)) return
+  useForm({}).post(route('faculty-loading.classrooms.regenerate-nfc', c.id))
 }
 </script>
