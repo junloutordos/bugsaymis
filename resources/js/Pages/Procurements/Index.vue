@@ -4,7 +4,7 @@ import { Head, useForm, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
     PlusIcon, TrashIcon, ListBulletIcon, XMarkIcon,
-    EyeIcon, PaperAirplaneIcon, CheckIcon,
+    EyeIcon, PaperAirplaneIcon, CheckIcon, DocumentArrowUpIcon,
 } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
@@ -13,6 +13,7 @@ const props = defineProps({
     pendingAction: Array,
     units: Array,
     divisions: Array,
+    availablePpmps: { type: Array, default: () => [] },
     canViewAll: Boolean,
     currentUser: Object,
 })
@@ -86,7 +87,23 @@ const form = useForm({
     is_supplemental: false,
     ppmp_checked: true,
     division_id: props.currentUser?.division_id ?? null,
+    ppmp_id: null,
+    market_study_base64: null,
+    market_study_name: null,
 })
+
+const marketStudyLabel = ref('')
+const onMarketStudyChange = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    marketStudyLabel.value = file.name
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+        form.market_study_base64 = ev.target.result
+        form.market_study_name = file.name
+    }
+    reader.readAsDataURL(file)
+}
 
 const openCreate = () => {
     editId.value = null
@@ -94,6 +111,10 @@ const openCreate = () => {
     form.pr_date = today
     form.ppmp_checked = true
     form.division_id = props.currentUser?.division_id ?? null
+    form.ppmp_id = null
+    form.market_study_base64 = null
+    form.market_study_name = null
+    marketStudyLabel.value = ''
     showModal.value = true
 }
 
@@ -104,6 +125,7 @@ const openEdit = (p) => {
     form.is_supplemental = p.is_supplemental ?? false
     form.ppmp_checked = p.ppmp_checked ?? true
     form.division_id = p.division?.id ?? props.currentUser?.division_id ?? null
+    form.ppmp_id = p.ppmp_id ?? null
     showModal.value = true
 }
 
@@ -330,6 +352,27 @@ const removeItem = async (item, idx) => {
                             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
                             placeholder="Brief description of what is being purchased…"></textarea>
                         <p v-if="form.errors.purpose" class="text-red-600 text-xs mt-1">{{ form.errors.purpose }}</p>
+                    </div>
+                    <!-- Link to PPMP -->
+                    <div v-if="availablePpmps.length">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Link to PPMP (optional)</label>
+                        <select v-model="form.ppmp_id"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option :value="null">— No PPMP link —</option>
+                            <option v-for="p in availablePpmps" :key="p.id" :value="p.id">{{ p.label }}</option>
+                        </select>
+                        <p class="mt-1 text-xs text-slate-500">Linking to a PPMP tracks budget utilization.</p>
+                    </div>
+                    <!-- Market Study / Pre-canvass -->
+                    <div v-if="!editId">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Market Study / Pre-canvass (optional)</label>
+                        <label class="flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-slate-300 px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" class="sr-only" @change="onMarketStudyChange" />
+                            <DocumentArrowUpIcon class="w-4 h-4 text-slate-400 shrink-0" />
+                            <span class="text-sm text-slate-500 truncate">
+                                {{ marketStudyLabel || 'Click to attach file (PDF/image, max 15 MB)' }}
+                            </span>
+                        </label>
                     </div>
                     <div class="flex items-center gap-6">
                         <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">

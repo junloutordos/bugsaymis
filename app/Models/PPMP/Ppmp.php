@@ -24,18 +24,26 @@ class Ppmp extends Model
         'approved_at',
         'approved_by',
         'consolidated_at',
+        'is_supplemental',
+        'parent_ppmp_id',
+        'bac_reviewed_at',
+        'bac_reviewed_by',
+        'bac_remarks',
     ];
 
     protected $casts = [
         'submitted_at'    => 'datetime',
         'approved_at'     => 'datetime',
         'consolidated_at' => 'datetime',
+        'bac_reviewed_at' => 'datetime',
         'fiscal_year'     => 'integer',
+        'is_supplemental' => 'boolean',
     ];
 
     // ─── Status constants ─────────────────────────────────────────────────────
 
     public const STATUS_DRAFT        = 'draft';
+    public const STATUS_PENDING_BAC  = 'pending_bac';
     public const STATUS_SUBMITTED    = 'submitted';
     public const STATUS_RETURNED     = 'returned';
     public const STATUS_APPROVED     = 'approved';
@@ -43,6 +51,7 @@ class Ppmp extends Model
 
     public const STATUSES = [
         self::STATUS_DRAFT,
+        self::STATUS_PENDING_BAC,
         self::STATUS_SUBMITTED,
         self::STATUS_RETURNED,
         self::STATUS_APPROVED,
@@ -76,6 +85,21 @@ class Ppmp extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function bacReviewer()
+    {
+        return $this->belongsTo(User::class, 'bac_reviewed_by');
+    }
+
+    public function parentPpmp()
+    {
+        return $this->belongsTo(Ppmp::class, 'parent_ppmp_id');
+    }
+
+    public function supplementals()
+    {
+        return $this->hasMany(Ppmp::class, 'parent_ppmp_id');
     }
 
     public function statusHistory()
@@ -113,9 +137,16 @@ class Ppmp extends Model
             && $this->items()->exists();
     }
 
+    public function canBacReview(): bool
+    {
+        return $this->status === self::STATUS_PENDING_BAC;
+    }
+
     public function canApprove(): bool
     {
-        return $this->status === self::STATUS_SUBMITTED;
+        // Approver can act on both legacy 'submitted' and BAC-endorsed 'submitted'
+        // also allow directly approving 'pending_bac' (BAC step skipped by approver)
+        return in_array($this->status, [self::STATUS_SUBMITTED, self::STATUS_PENDING_BAC]);
     }
 
     // ─── Workflow actions ─────────────────────────────────────────────────────
@@ -123,11 +154,32 @@ class Ppmp extends Model
     public function submit(User $user): void
     {
         $from = $this->status;
-        $this->status = self::STATUS_SUBMITTED;
+        $this->status = self::STATUS_PENDING_BAC;
         $this->submitted_at = now();
         $this->save();
 
+        $this->logStatusChange($from, self::STATUS_PENDING_BAC, $user);
+    }
+
+    public function endorse(User $user): void
+    {
+        $from = $this->status;
+        $this->status = self::STATUS_SUBMITTED;
+        $this->bac_reviewed_at = now();
+        $this->bac_reviewed_by = $user->id;
+        $this->save();
+
         $this->logStatusChange($from, self::STATUS_SUBMITTED, $user);
+    }
+
+    public function bacReturn(User $user, string $remarks): void
+    {
+        $from = $this->status;
+        $this->status = self::STATUS_RETURNED;
+        $this->bac_remarks = $remarks;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);
     }
 
     public function approve(User $user): void
@@ -163,11 +215,21 @@ class Ppmp extends Model
 
     // ─── PPMP Number generation ───────────────────────────────────────────────
 
-    public static function generateNumber(int $fiscalYear, Division $division): string
+    public static function generateNumber(int $fiscalYear, Division $division, bool $isSupplemental = false, ?string $parentNumber = null): string
     {
         $acronym = $division->acronym ?? 'UNIT';
+
+        if ($isSupplemental && $parentNumber) {
+            $suppCount = static::where('fiscal_year', $fiscalYear)
+                ->where('division_id', $division->id)
+                ->where('is_supplemental', true)
+                ->count();
+            return "{$parentNumber}-S" . ($suppCount + 1);
+        }
+
         $count = static::where('fiscal_year', $fiscalYear)
             ->where('division_id', $division->id)
+            ->where('is_supplemental', false)
             ->count();
         $seq = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
 

@@ -49,6 +49,9 @@
                 <th style="width:55px">Unit Cost</th>
                 <th style="width:65px">Total Cost (ABC)</th>
                 <th style="width:75px">Mode of Procurement</th>
+                <th style="width:35px">Fund</th>
+                <th style="width:30px">Proc. Q</th>
+                <th style="width:30px">Del. Q</th>
                 <th style="width:60px">Remarks</th>
             </tr>
         </thead>
@@ -66,7 +69,7 @@
                         <tr class="subtotal-row">
                             <td colspan="16" style="text-align:right">Subtotal — {{ \App\Models\PPMP\PpmpItem::CATEGORY_LABELS[$currentCategory] ?? $currentCategory }}</td>
                             <td class="amt" colspan="2">{{ number_format($categorySubtotal, 2) }}</td>
-                            <td colspan="2"></td>
+                            <td colspan="5"></td>
                         </tr>
                     @endif
                     @php
@@ -74,7 +77,7 @@
                         $categorySubtotal = 0;
                     @endphp
                     <tr>
-                        <td colspan="20" class="cat-header">{{ \App\Models\PPMP\PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category }}</td>
+                        <td colspan="23" class="cat-header">{{ \App\Models\PPMP\PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category }}</td>
                     </tr>
                 @endif
 
@@ -91,6 +94,9 @@
                     <td class="amt">{{ number_format($item->unit_cost, 2) }}</td>
                     <td class="amt">{{ number_format($item->total_cost, 2) }}</td>
                     <td style="font-size:6pt">{{ \App\Models\PPMP\PpmpItem::PROCUREMENT_METHODS[$item->procurement_method] ?? $item->procurement_method }}</td>
+                    <td style="font-size:6pt;text-transform:uppercase">{{ $item->fund_source ?? 'MOOE' }}</td>
+                    <td style="font-size:6pt">{{ $item->procurement_quarter ? 'Q'.$item->procurement_quarter : '—' }}</td>
+                    <td style="font-size:6pt">{{ $item->delivery_quarter ? 'Q'.$item->delivery_quarter : '—' }}</td>
                     <td style="font-size:6pt">{{ $item->is_ps_dbm ? 'PS-DBM' : '' }} {{ $item->remarks }}</td>
                 </tr>
             @endforeach
@@ -106,7 +112,7 @@
             <tr class="grand-total">
                 <td colspan="16" style="text-align:right">GRAND TOTAL</td>
                 <td class="amt" colspan="2">{{ number_format($grandTotal, 2) }}</td>
-                <td colspan="2"></td>
+                <td colspan="5"></td>
             </tr>
         </tbody>
     </table>

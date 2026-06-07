@@ -34,13 +34,19 @@ class PPMPItemController extends Controller
             'oct'                => 'nullable|integer|min:0',
             'nov'                => 'nullable|integer|min:0',
             'dec'                => 'nullable|integer|min:0',
-            'procurement_method' => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
-            'is_ps_dbm'          => 'boolean',
-            'remarks'            => 'nullable|string|max:1000',
+            'procurement_method'  => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
+            'is_ps_dbm'           => 'boolean',
+            'remarks'             => 'nullable|string|max:1000',
+            'fund_source'         => 'nullable|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
+            'procurement_quarter' => 'nullable|integer|min:1|max:4',
+            'delivery_quarter'    => 'nullable|integer|min:1|max:4',
+            'price_source'        => 'nullable|string|max:100',
+            'price_validity_date' => 'nullable|date',
         ]);
 
-        $data['ppmp_id'] = $ppmp->id;
-        $data['sort_order'] = $ppmp->items()->where('category', $data['category'])->count();
+        $data['ppmp_id']     = $ppmp->id;
+        $data['fund_source'] = $data['fund_source'] ?? 'mooe';
+        $data['sort_order']  = $ppmp->items()->where('category', $data['category'])->count();
 
         // Default month fields to 0 if not provided
         foreach (PpmpItem::MONTHS as $m) {
@@ -79,9 +85,14 @@ class PPMPItemController extends Controller
             'oct'                => 'nullable|integer|min:0',
             'nov'                => 'nullable|integer|min:0',
             'dec'                => 'nullable|integer|min:0',
-            'procurement_method' => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
-            'is_ps_dbm'          => 'boolean',
-            'remarks'            => 'nullable|string|max:1000',
+            'procurement_method'  => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
+            'is_ps_dbm'           => 'boolean',
+            'remarks'             => 'nullable|string|max:1000',
+            'fund_source'         => 'nullable|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
+            'procurement_quarter' => 'nullable|integer|min:1|max:4',
+            'delivery_quarter'    => 'nullable|integer|min:1|max:4',
+            'price_source'        => 'nullable|string|max:100',
+            'price_validity_date' => 'nullable|date',
         ]);
 
         // Default month fields to 0 if not provided

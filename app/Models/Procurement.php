@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\PPMP\Ppmp;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Procurement extends Model
 {
@@ -13,7 +14,8 @@ class Procurement extends Model
     protected $fillable = [
         'pr_no', 'pr_date', 'purpose', 'fund_source', 'priority', 'remarks',
         'requested_by', 'status', 'division_id',
-        'is_supplemental', 'ppmp_checked',
+        'is_supplemental', 'ppmp_checked', 'ppmp_id',
+        'market_study_s3_key', 'market_study_filename',
         'supplemental_status', 'supplemental_budget_officer_id', 'supplemental_budget_officer_at',
         'division_chief_id', 'division_chief_remarks', 'division_chief_at',
         'procurement_officer_id', 'procurement_officer_at', 'assigned_pr_number',
@@ -46,6 +48,11 @@ class Procurement extends Model
         'ocd_approve_date'             => 'date',
         'ocd_decline_date'             => 'date',
     ];
+
+    public function ppmp(): BelongsTo
+    {
+        return $this->belongsTo(Ppmp::class, 'ppmp_id');
+    }
 
     public function items(): HasMany
     {
@@ -90,6 +97,11 @@ class Procurement extends Model
     public function obligationRequests(): HasMany
     {
         return $this->hasMany(\App\Models\Procurement\OblRequest::class, 'procurement_id');
+    }
+
+    public function rfqs(): HasMany
+    {
+        return $this->hasMany(\App\Models\Procurement\Rfq::class, 'procurement_id');
     }
 
     public function isLegacy(): bool
