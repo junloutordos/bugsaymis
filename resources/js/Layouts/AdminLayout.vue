@@ -1137,9 +1137,9 @@ const menuItems = [
     ],
   },
   {
-    label: "Supply Chain",
+    label: "Supply & Property",
     icon: ArchiveBoxIcon,
-    permissions: ["supply.view", "supply.receive", "supply.issue", "supply.manage"],
+    permissions: ["supply.view", "supply.receive", "supply.issue", "supply.manage", "property.view", "property.manage", "property.transfer", "property.reports", "property.dispose", "work-orders.view", "work-orders.manage"],
     children: [
       {
         label: "Item Catalog",
@@ -1169,13 +1169,6 @@ const menuItems = [
         icon: ArchiveBoxIcon,
         permissions: ["supply.view", "supply.manage"],
       },
-    ],
-  },
-  {
-    label: "Property & Equipment",
-    icon: WrenchScrewdriverIcon,
-    permissions: ["property.view", "property.manage", "property.transfer", "property.reports", "property.dispose", "work-orders.view", "work-orders.manage"],
-    children: [
       {
         label: "Property Items",
         routeName: "property.items.index",
