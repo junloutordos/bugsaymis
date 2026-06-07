@@ -425,14 +425,16 @@ class ChatController extends Controller
     {
         $userId = Auth::id();
 
-        $count = Conversation::forUser($userId)
-            ->withCount(['messages as unread_count' => function ($q) use ($userId) {
-                $q->where('sender_id', '!=', $userId)
-                  ->whereNull('deleted_at')
-                  ->whereNull('read_at');
-            }])
-            ->get()
-            ->sum('unread_count');
+        $count = DB::table('messages')
+            ->join('conversation_user as cu', 'messages.conversation_id', '=', 'cu.conversation_id')
+            ->where('cu.user_id', $userId)
+            ->where('messages.sender_id', '!=', $userId)
+            ->whereNull('messages.deleted_at')
+            ->where(function ($q) {
+                $q->whereNull('cu.last_read_at')
+                  ->orWhereColumn('messages.created_at', '>', 'cu.last_read_at');
+            })
+            ->count();
 
         return response()->json(['unread_count' => (int) $count]);
     }
