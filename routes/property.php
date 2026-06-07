@@ -20,6 +20,9 @@ Route::middleware(['auth', 'permission:property.view'])->prefix('property')->nam
         Route::put('/items/{item}', [PropertyItemController::class, 'update'])->name('items.update');
         Route::post('/categories', [PropertyItemController::class, 'storeCategory'])->name('categories.store');
         Route::put('/categories/{category}', [PropertyItemController::class, 'updateCategory'])->name('categories.update');
+        Route::get('/items/import/template', [PropertyItemController::class, 'downloadTemplate'])->name('items.import.template');
+        Route::post('/items/import/preview', [PropertyItemController::class, 'previewImport'])->name('items.import.preview');
+        Route::post('/items/import', [PropertyItemController::class, 'importCsv'])->name('items.import');
     });
 
     // ICS
