@@ -112,6 +112,180 @@ class PropertyItemController extends Controller
         return back()->with('success', 'Property item updated.');
     }
 
+    public function downloadTemplate()
+    {
+        $this->authorize('property.manage');
+
+        $headers = ['property_number', 'description', 'category_name', 'unit', 'quantity', 'unit_cost', 'acquisition_date', 'acquisition_mode', 'brand', 'model', 'serial_number', 'location', 'accountable_officer', 'status'];
+        $example1 = ['', 'Desktop Computer', 'IT Equipment and Software', 'unit', '1', '45000.00', '2023-01-15', 'purchase', 'Dell', 'OptiPlex 7090', 'SN-123456', 'Computer Lab 1', 'Juan dela Cruz', 'serviceable'];
+        $example2 = ['PROP-2022-001', 'Office Chair', 'Furniture and Fixtures', 'unit', '1', '3500.00', '2022-06-01', 'purchase', '', '', '', 'Principal Office', 'Maria Santos', 'serviceable'];
+
+        $lines = [implode(',', $headers), implode(',', $example1), implode(',', $example2)];
+
+        return response(implode("\n", $lines), 200, [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="property_items_template.csv"',
+        ]);
+    }
+
+    public function previewImport(Request $request)
+    {
+        $this->authorize('property.manage');
+
+        $request->validate(['csv_base64' => 'required|string']);
+
+        $csv = base64_decode($request->csv_base64);
+        $rows = array_filter(array_map('str_getcsv', explode("\n", trim($csv))));
+        $rows = array_values($rows);
+
+        if (count($rows) < 2) {
+            return response()->json(['error' => 'CSV must have a header row and at least one data row.'], 422);
+        }
+
+        $headers = array_map('trim', $rows[0]);
+        $required = ['description', 'category_name', 'unit', 'quantity', 'unit_cost', 'acquisition_date'];
+        foreach ($required as $col) {
+            if (! in_array($col, $headers)) {
+                return response()->json(['error' => "Missing required column: {$col}"], 422);
+            }
+        }
+
+        $categoryMap = PropertyCategory::pluck('id', 'name')->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
+        $officerMap  = User::where('status', '<>', 'inactive')->pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
+        $existingNumbers = PropertyItem::pluck('id', 'property_number')->toArray();
+
+        $preview = [];
+        foreach (array_slice($rows, 1) as $i => $cols) {
+            $row = [];
+            foreach ($headers as $j => $h) {
+                $row[$h] = trim($cols[$j] ?? '');
+            }
+
+            $errors = [];
+            if (empty($row['description'])) $errors[] = 'description is required';
+            if (empty($row['unit'])) $errors[] = 'unit is required';
+            if (! is_numeric($row['quantity'] ?? '')) $errors[] = 'quantity must be a number';
+            if (! is_numeric($row['unit_cost'] ?? '')) $errors[] = 'unit_cost must be a number';
+            if (empty($row['acquisition_date'])) $errors[] = 'acquisition_date is required';
+
+            $categoryId = $categoryMap[strtolower($row['category_name'] ?? '')] ?? null;
+            if (! $categoryId) $errors[] = "category_name '{$row['category_name']}' not found";
+
+            $officerName = $row['accountable_officer'] ?? '';
+            $officerId   = $officerMap[strtolower($officerName)] ?? null;
+            $officerMatched = empty($officerName) || (bool) $officerId;
+
+            $propNum = $row['property_number'] ?? '';
+            $action  = ($propNum && isset($existingNumbers[$propNum])) ? 'update' : 'create';
+
+            $preview[] = [
+                'row'              => $i + 2,
+                'property_number'  => $propNum ?: '(auto)',
+                'description'      => $row['description'],
+                'category_name'    => $row['category_name'],
+                'category_matched' => (bool) $categoryId,
+                'unit'             => $row['unit'],
+                'quantity'         => $row['quantity'],
+                'unit_cost'        => $row['unit_cost'],
+                'acquisition_date' => $row['acquisition_date'],
+                'acquisition_mode' => $row['acquisition_mode'] ?? 'purchase',
+                'brand'            => $row['brand'] ?? '',
+                'model'            => $row['model'] ?? '',
+                'serial_number'    => $row['serial_number'] ?? '',
+                'location'         => $row['location'] ?? '',
+                'accountable_officer' => $officerName,
+                'officer_matched'  => $officerMatched,
+                'status'           => in_array($row['status'] ?? '', ['serviceable','unserviceable']) ? $row['status'] : 'serviceable',
+                'action'           => $action,
+                'errors'           => $errors,
+            ];
+        }
+
+        return response()->json(['preview' => $preview]);
+    }
+
+    public function importCsv(Request $request)
+    {
+        $this->authorize('property.manage');
+
+        $request->validate(['csv_base64' => 'required|string']);
+
+        $csv = base64_decode($request->csv_base64);
+        $rows = array_filter(array_map('str_getcsv', explode("\n", trim($csv))));
+        $rows = array_values($rows);
+        $headers = array_map('trim', $rows[0]);
+
+        $categoryMap = PropertyCategory::pluck('id', 'name')->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
+        $officerMap  = User::where('status', '<>', 'inactive')->pluck('id', 'name')
+            ->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])->toArray();
+        $userId = $request->user()->id;
+
+        $imported = 0;
+        $skipped  = 0;
+        $errors   = [];
+
+        DB::transaction(function () use ($rows, $headers, $categoryMap, $officerMap, $userId, &$imported, &$skipped, &$errors) {
+            foreach (array_slice($rows, 1) as $i => $cols) {
+                $row = [];
+                foreach ($headers as $j => $h) {
+                    $row[$h] = trim($cols[$j] ?? '');
+                }
+
+                $rowNum = $i + 2;
+                $categoryId = $categoryMap[strtolower($row['category_name'] ?? '')] ?? null;
+
+                if (empty($row['description']) || empty($row['unit']) || ! $categoryId
+                    || ! is_numeric($row['quantity'] ?? '')
+                    || ! is_numeric($row['unit_cost'] ?? '')
+                    || empty($row['acquisition_date'])) {
+                    $errors[] = "Row {$rowNum} skipped — missing required fields or unmatched category.";
+                    $skipped++;
+                    continue;
+                }
+
+                $officerName = $row['accountable_officer'] ?? '';
+                $officerId   = $officerName ? ($officerMap[strtolower($officerName)] ?? null) : null;
+
+                $propNum = $row['property_number'] ?? '';
+                $mode    = in_array($row['acquisition_mode'] ?? '', ['purchase','donation','transfer','fabricated']) ? $row['acquisition_mode'] : 'purchase';
+                $status  = in_array($row['status'] ?? '', ['serviceable','unserviceable']) ? $row['status'] : 'serviceable';
+
+                $data = [
+                    'description'        => $row['description'],
+                    'category_id'        => $categoryId,
+                    'unit'               => $row['unit'],
+                    'quantity'           => (float) $row['quantity'],
+                    'unit_cost'          => (float) $row['unit_cost'],
+                    'acquisition_date'   => $row['acquisition_date'],
+                    'acquisition_mode'   => $mode,
+                    'brand'              => $row['brand'] ?? null ?: null,
+                    'model'              => $row['model'] ?? null ?: null,
+                    'serial_number'      => $row['serial_number'] ?? null ?: null,
+                    'location'           => $row['location'] ?? null ?: null,
+                    'current_officer_id' => $officerId,
+                    'status'             => $status,
+                    'created_by'         => $userId,
+                ];
+
+                if ($propNum) {
+                    PropertyItem::updateOrCreate(['property_number' => $propNum], $data);
+                } else {
+                    $data['property_number'] = PropertyItem::generateNumber('PROP');
+                    PropertyItem::create($data);
+                }
+
+                $imported++;
+            }
+        });
+
+        return response()->json([
+            'imported' => $imported,
+            'skipped'  => $skipped,
+            'errors'   => $errors,
+        ]);
+    }
+
     public function storeCategory(Request $request)
     {
         $this->authorize('property.manage');

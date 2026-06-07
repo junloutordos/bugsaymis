@@ -19,6 +19,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/supply/items/{item}/toggle-active',     [ItemController::class, 'toggleActive'])->name('supply.items.toggle-active');
         Route::post('/supply/categories',                     [ItemController::class, 'storeCategory'])->name('supply.categories.store');
         Route::put('/supply/categories/{category}',           [ItemController::class, 'updateCategory'])->name('supply.categories.update');
+        Route::get('/supply/items/import/template',           [ItemController::class, 'downloadTemplate'])->name('supply.items.import.template');
+        Route::post('/supply/items/import/preview',           [ItemController::class, 'previewImport'])->name('supply.items.import.preview');
+        Route::post('/supply/items/import',                   [ItemController::class, 'importCsv'])->name('supply.items.import');
     });
 
     // ── Inspection & Acceptance Reports (IAR) ────────────────────────────────

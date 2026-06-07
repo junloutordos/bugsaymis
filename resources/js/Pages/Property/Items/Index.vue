@@ -2,7 +2,8 @@
 import { ref, computed } from 'vue'
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PlusIcon, MagnifyingGlassIcon, PencilIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, MagnifyingGlassIcon, PencilIcon, ArrowUpTrayIcon, ArrowDownTrayIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import axios from 'axios'
 
 const props = defineProps({ items: Array, categories: Array, officers: Array, summary: Object })
 const { props: pageProps } = usePage()
@@ -52,6 +53,50 @@ function submitCategory() {
 }
 
 const statusColors = { serviceable:'bg-emerald-100 text-emerald-700', unserviceable:'bg-amber-100 text-amber-700', disposed:'bg-red-100 text-red-700', transferred:'bg-blue-100 text-blue-700', lost:'bg-slate-100 text-slate-600' }
+
+// CSV Import
+const showImportModal = ref(false)
+const importStep = ref('upload')
+const importLoading = ref(false)
+const importPreview = ref([])
+const importResult = ref(null)
+const importError = ref('')
+let pendingCsvBase64 = ''
+
+function openImport() { showImportModal.value=true; importStep.value='upload'; importPreview.value=[]; importResult.value=null; importError.value='' }
+
+async function onFileChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  importError.value = ''; importLoading.value = true
+  const reader = new FileReader()
+  reader.onload = async ev => {
+    pendingCsvBase64 = btoa(ev.target.result)
+    try {
+      const { data } = await axios.post(route('property.items.import.preview'), { csv_base64: pendingCsvBase64 })
+      importPreview.value = data.preview
+      importStep.value = 'preview'
+    } catch (err) {
+      importError.value = err.response?.data?.error ?? 'Failed to parse CSV.'
+    } finally { importLoading.value = false }
+  }
+  reader.readAsText(file)
+}
+
+async function confirmImport() {
+  importLoading.value = true
+  try {
+    const { data } = await axios.post(route('property.items.import'), { csv_base64: pendingCsvBase64 })
+    importResult.value = data; importStep.value = 'done'
+  } catch (err) {
+    importError.value = err.response?.data?.message ?? 'Import failed.'
+  } finally { importLoading.value = false }
+}
+
+function finishImport() { showImportModal.value=false; window.location.reload() }
+
+const importHasErrors = computed(() => importPreview.value.some(r => r.errors.length > 0))
+const importValidRows = computed(() => importPreview.value.filter(r => r.errors.length === 0).length)
 </script>
 <template>
   <Head title="Property Items" />
@@ -81,6 +126,8 @@ const statusColors = { serviceable:'bg-emerald-100 text-emerald-700', unservicea
       </select>
       <div v-if="canManage" class="flex gap-2 ml-auto">
         <button @click="showCatModal=true" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"><PlusIcon class="h-4 w-4"/>Category</button>
+        <a :href="route('property.items.import.template')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"><ArrowDownTrayIcon class="h-4 w-4"/>Template</a>
+        <button @click="openImport" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"><ArrowUpTrayIcon class="h-4 w-4"/>Import CSV</button>
         <button @click="openCreate" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"><PlusIcon class="h-4 w-4"/>Add Item</button>
       </div>
     </div>
@@ -140,6 +187,86 @@ const statusColors = { serviceable:'bg-emerald-100 text-emerald-700', unservicea
           </div>
           <div class="flex justify-end gap-3 pt-2"><button type="button" @click="showItemModal=false" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button><button type="submit" :disabled="form.processing" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-60">{{ editId?'Update':'Create' }}</button></div>
         </form>
+      </div>
+    </div>
+
+    <!-- Import CSV Modal -->
+    <div v-if="showImportModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-auto">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl my-4">
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+          <h3 class="text-base font-semibold text-slate-800">Import Property Items from CSV</h3>
+          <button @click="showImportModal=false" class="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+        </div>
+        <div class="p-6">
+
+          <!-- Step: Upload -->
+          <div v-if="importStep==='upload'">
+            <p class="text-sm text-slate-600 mb-4">Upload a CSV file to bulk-import property items. <a :href="route('property.items.import.template')" class="text-indigo-600 hover:underline font-medium">Download the template</a> to see the required format.</p>
+            <div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-8 text-center">
+              <ArrowUpTrayIcon class="h-8 w-8 text-slate-400 mx-auto mb-2"/>
+              <p class="text-sm text-slate-500 mb-3">Select your filled-in CSV file</p>
+              <input type="file" accept=".csv,text/csv" @change="onFileChange" class="block mx-auto text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+            </div>
+            <p v-if="importError" class="text-sm text-red-600 mt-3">{{ importError }}</p>
+            <p v-if="importLoading" class="text-sm text-slate-500 mt-3 text-center">Parsing CSV…</p>
+          </div>
+
+          <!-- Step: Preview -->
+          <div v-if="importStep==='preview'">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm text-slate-700"><strong>{{ importValidRows }}</strong> valid rows ready to import<span v-if="importHasErrors">, <strong class="text-amber-600">{{ importPreview.length - importValidRows }}</strong> with errors (will be skipped)</span>.</p>
+              <button @click="importStep='upload'" class="text-xs text-slate-500 hover:text-slate-700 underline">Re-upload</button>
+            </div>
+            <div class="overflow-auto max-h-72 border border-slate-200 rounded-lg">
+              <table class="min-w-full text-xs divide-y divide-slate-100">
+                <thead class="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th class="px-3 py-2 text-left font-semibold text-slate-500">Row</th>
+                    <th class="px-3 py-2 text-left font-semibold text-slate-500">Prop. No.</th>
+                    <th class="px-3 py-2 text-left font-semibold text-slate-500">Description</th>
+                    <th class="px-3 py-2 text-left font-semibold text-slate-500">Category</th>
+                    <th class="px-3 py-2 text-right font-semibold text-slate-500">Cost</th>
+                    <th class="px-3 py-2 text-left font-semibold text-slate-500">Officer</th>
+                    <th class="px-3 py-2 text-center font-semibold text-slate-500">Action</th>
+                    <th class="px-3 py-2 text-left font-semibold text-slate-500">Issues</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                  <tr v-for="r in importPreview" :key="r.row" :class="r.errors.length ? 'bg-red-50' : 'hover:bg-slate-50'">
+                    <td class="px-3 py-2 text-slate-400">{{ r.row }}</td>
+                    <td class="px-3 py-2 font-mono text-slate-600">{{ r.property_number }}</td>
+                    <td class="px-3 py-2 text-slate-800">{{ r.description }}</td>
+                    <td class="px-3 py-2" :class="r.category_matched ? 'text-slate-600' : 'text-red-600 font-medium'">{{ r.category_name }}</td>
+                    <td class="px-3 py-2 text-right">₱{{ Number(r.unit_cost).toLocaleString('en-PH',{minimumFractionDigits:2}) }}</td>
+                    <td class="px-3 py-2" :class="r.officer_matched ? 'text-slate-600' : 'text-amber-600'">{{ r.accountable_officer || '—' }}</td>
+                    <td class="px-3 py-2 text-center"><span :class="r.action==='update' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'" class="px-2 py-0.5 rounded-full font-medium capitalize">{{ r.action }}</span></td>
+                    <td class="px-3 py-2 text-red-600">{{ r.errors.join('; ') }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-amber-600 mt-2" v-if="importPreview.some(r=>!r.officer_matched && r.accountable_officer)">⚠ Unmatched officer names will be imported without an assigned officer.</p>
+            <p v-if="importError" class="text-sm text-red-600 mt-3">{{ importError }}</p>
+            <div class="flex justify-end gap-3 mt-4">
+              <button @click="showImportModal=false" class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button @click="confirmImport" :disabled="importLoading || importValidRows===0" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-60">
+                {{ importLoading ? 'Importing…' : `Import ${importValidRows} Row${importValidRows===1?'':'s'}` }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Step: Done -->
+          <div v-if="importStep==='done'" class="text-center py-6">
+            <CheckCircleIcon class="h-12 w-12 text-emerald-500 mx-auto mb-3"/>
+            <p class="text-lg font-semibold text-slate-800">Import Complete</p>
+            <p class="text-sm text-slate-500 mt-1"><strong>{{ importResult.imported }}</strong> items imported<span v-if="importResult.skipped">, <strong>{{ importResult.skipped }}</strong> skipped</span>.</p>
+            <ul v-if="importResult.errors?.length" class="mt-3 text-xs text-amber-700 text-left bg-amber-50 rounded-lg p-3 space-y-1 max-h-32 overflow-auto">
+              <li v-for="e in importResult.errors" :key="e">{{ e }}</li>
+            </ul>
+            <button @click="finishImport" class="mt-5 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg text-sm font-medium">Done</button>
+          </div>
+
+        </div>
       </div>
     </div>
 
