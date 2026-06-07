@@ -296,6 +296,21 @@ class PermissionsSeeder extends Seeder
             ['module' => 'OrgStructure', 'name' => 'org.export',            'description' => 'Export the organizational chart (PDF, PNG, Excel)'],
             ['module' => 'OrgStructure', 'name' => 'org.reports',           'description' => 'Generate organizational structure reports'],
 
+            // ── Supply & Property ─────────────────────────────────────────────
+            ['module' => 'Supply', 'name' => 'supply.view',    'description' => 'View supply items, stock levels, and ledger cards'],
+            ['module' => 'Supply', 'name' => 'supply.receive', 'description' => 'Create IARs and accept/post deliveries to stock'],
+            ['module' => 'Supply', 'name' => 'supply.issue',   'description' => 'Approve and issue supplies via RIS'],
+            ['module' => 'Supply', 'name' => 'supply.manage',  'description' => 'Full supply management: catalog, adjustments, categories'],
+
+            // ── Property ──────────────────────────────────────────────────────
+            ['module' => 'Property', 'name' => 'property.view',     'description' => 'View property items, ICS, PAR, and transfers'],
+            ['module' => 'Property', 'name' => 'property.manage',   'description' => 'Full property management: items, ICS, PAR, categories'],
+            ['module' => 'Property', 'name' => 'property.transfer', 'description' => 'Create and complete property accountability transfers'],
+            ['module' => 'Property', 'name' => 'property.reports',  'description' => 'Generate RPCI, RPCPPE, and depreciation reports'],
+            ['module' => 'Property', 'name' => 'property.dispose',  'description' => 'Create BSRs and process property disposal records'],
+            ['module' => 'Property', 'name' => 'work-orders.view',  'description' => 'View work orders for property repair and maintenance'],
+            ['module' => 'Property', 'name' => 'work-orders.manage','description' => 'Create and update work orders'],
+
         ];
 
         foreach ($permissions as $data) {
