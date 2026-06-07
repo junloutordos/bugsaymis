@@ -1995,5 +1995,7 @@ require __DIR__.'/faculty-loading.php';
 require __DIR__.'/ams.php';
 require __DIR__.'/ppmp.php';
 require __DIR__.'/procurement.php';
+require __DIR__.'/supply.php';
+require __DIR__.'/property.php';
 require __DIR__.'/registrar.php';
 require __DIR__.'/auth.php';

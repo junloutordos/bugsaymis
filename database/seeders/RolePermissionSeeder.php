@@ -500,6 +500,26 @@ class RolePermissionSeeder extends Seeder
             'procurement.rfq.evaluate', 'procurement.rfq.award',
         ]);
 
+        // ── Supply & Property ─────────────────────────────────────────────────
+        $supplyView = ['supply.view'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
+                  'Budget Officer', 'Bookkeeper', 'Accountant',
+                  'Procurement Officer', 'FAD Chief'] as $r) {
+            $assign($r, $supplyView);
+        }
+        $assign('Procurement Officer', ['supply.receive', 'supply.issue']);
+        $assign('FAD Chief', ['supply.receive', 'supply.issue', 'supply.manage']);
+
+        // ── Property ─────────────────────────────────────────────────────────
+        $propertyView = ['property.view', 'work-orders.view'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
+                  'Budget Officer', 'Bookkeeper', 'Accountant',
+                  'Procurement Officer', 'FAD Chief'] as $r) {
+            $assign($r, $propertyView);
+        }
+        $assign('Procurement Officer', ['property.transfer', 'property.reports', 'work-orders.manage']);
+        $assign('FAD Chief', ['property.manage', 'property.transfer', 'property.reports', 'property.dispose', 'work-orders.manage']);
+
         $this->command->info('Role permissions assigned successfully.');
     }
 }
