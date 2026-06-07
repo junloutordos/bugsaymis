@@ -373,6 +373,10 @@ class RolePermissionSeeder extends Seeder
         $assign('Faculty',   ['class-records.view', 'class-records.manage']);
         $assign('Staff',     ['class-records.view']);
 
+        // ── Teacher Class Attendance (NFC Tap-In) ─────────────────────────────
+        // AUH scoping is handled at runtime by checking academic_units.head_user_id
+        $assign('CID Chief', ['class-attendance.view', 'class-attendance.manage']);
+
         // ── PPMP ──────────────────────────────────────────────────────────────
         $assign('Faculty', ['ppmp.create', 'ppmp.submit', 'ppmp.export']);
         $assign('Staff',   ['ppmp.create', 'ppmp.submit', 'ppmp.export']);

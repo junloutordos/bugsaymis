@@ -21,6 +21,7 @@ class Classroom extends Model
         'room_id',
         'is_available',
         'remarks',
+        'nfc_uuid',
     ];
 
     protected $casts = [
@@ -38,6 +39,11 @@ class Classroom extends Model
     public function classSchedules(): HasMany
     {
         return $this->hasMany(ClassSchedule::class);
+    }
+
+    public function tapLogs(): HasMany
+    {
+        return $this->hasMany(TeacherTapLog::class);
     }
 
     public function scopeAvailable($query)

@@ -1972,6 +1972,18 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
     });
 });
 
+// ── Teacher Class Attendance (NFC Tap-In) ────────────────────────────────────
+Route::middleware(['auth'])->group(function () {
+    // NFC tap endpoint — NFC tag encodes /class-tap/{uuid}, auto-logs on load
+    Route::get('/class-tap/{uuid}', [\App\Http\Controllers\TeacherAttendanceController::class, 'tap'])
+        ->name('class-tap')
+        ->where('uuid', '[0-9a-f\-]{36}');
+
+    // Monitoring dashboard (AUH / CID Chief / Admin)
+    Route::get('/teacher-attendance',        [\App\Http\Controllers\TeacherAttendanceController::class, 'index'])->name('teacher-attendance.index');
+    Route::get('/teacher-attendance/export', [\App\Http\Controllers\TeacherAttendanceController::class, 'export'])->name('teacher-attendance.export');
+});
+
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
