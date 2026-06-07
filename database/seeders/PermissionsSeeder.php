@@ -144,6 +144,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'ORS',        'name' => 'procurement.ors.account',      'description' => 'Accountant: review ORS data'],
             ['module' => 'ORS',        'name' => 'procurement.ors.ocd_sign',     'description' => 'OCD: sign ORS and PO'],
 
+            // ── Procurement — Purchase Order (PO) ────────────────────────────
+            ['module' => 'PO',         'name' => 'procurement.po.view',    'description' => 'View Purchase Orders'],
+            ['module' => 'PO',         'name' => 'procurement.po.create',  'description' => 'Create and manage own Purchase Orders'],
+            ['module' => 'PO',         'name' => 'procurement.po.review',  'description' => 'Procurement Officer: review and approve POs'],
+            ['module' => 'PO',         'name' => 'procurement.po.sign',    'description' => 'Campus Director: sign and issue POs'],
+
             // ── Procurement — Disbursement Voucher (DV) ───────────────────────
             ['module' => 'DV',         'name' => 'procurement.dv.view',          'description' => 'View Disbursement Vouchers'],
             ['module' => 'DV',         'name' => 'procurement.dv.create',        'description' => 'Create and prepare Disbursement Vouchers'],

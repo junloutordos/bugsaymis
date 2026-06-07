@@ -82,6 +82,11 @@ class Procurement extends Model
         return $this->belongsTo(User::class, 'rejected_by');
     }
 
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(\App\Models\Procurement\PurchaseOrder::class, 'procurement_id');
+    }
+
     public function obligationRequests(): HasMany
     {
         return $this->hasMany(\App\Models\Procurement\OblRequest::class, 'procurement_id');

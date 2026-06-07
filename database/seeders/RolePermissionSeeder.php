@@ -472,6 +472,16 @@ class RolePermissionSeeder extends Seeder
             'procurement.dv.account', 'procurement.dv.ocd_sign', 'procurement.dv.cashier',
         ]);
 
+        // ── Purchase Orders (PO) ─────────────────────────────────────────────
+        $poBasic = ['procurement.po.view', 'procurement.po.create'];
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD',
+                  'Budget Officer', 'Bookkeeper', 'Accountant', 'Procurement Officer', 'FAD Chief'] as $r) {
+            $assign($r, $poBasic);
+        }
+        $assign('Procurement Officer', ['procurement.po.review']);
+        $assign('OCD',                 ['procurement.po.sign']);
+        $assign('FAD Chief',           ['procurement.po.review', 'procurement.po.sign']);
+
         $this->command->info('Role permissions assigned successfully.');
     }
 }
