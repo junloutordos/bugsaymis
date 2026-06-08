@@ -54,10 +54,18 @@ class HeadAdvisoryService
 
         // ── Create new head's AUH assignment ──────────────────────────────────
         if ($newHeadId) {
-            $designation = Designation::where('code', 'AUH-' . $unit->code)->first();
-            if (! $designation) {
-                return; // No matching AUH designation seeded — skip silently
-            }
+            $designation = Designation::firstOrCreate(
+                ['code' => 'AUH-' . $unit->code],
+                [
+                    'designation_category_id' => $this->auhCategoryId(),
+                    'name'                    => 'Academic Unit Head - ' . $unit->name,
+                    'load_units'              => 6,
+                    'requires_unit'           => false,
+                    'max_holders'             => 1,
+                    'sort_order'              => 0,
+                    'is_active'               => true,
+                ]
+            );
 
             $facultyLoad = $this->findOrCreateFacultyLoad($newHeadId);
             if (! $facultyLoad) {
@@ -208,6 +216,71 @@ class HeadAdvisoryService
                 $this->loads->syncLoad($facultyLoad);
             }
         }
+    }
+
+    // ── Designation lifecycle ────────────────────────────────────────────────
+
+    /**
+     * Ensure an AUH-{unit.code} designation exists for this unit.
+     * Called on unit create. Safe to call multiple times (idempotent).
+     */
+    public function ensureUnitDesignation(AcademicUnit $unit): Designation
+    {
+        $code = 'AUH-' . $unit->code;
+
+        return Designation::firstOrCreate(
+            ['code' => $code],
+            [
+                'designation_category_id' => $this->auhCategoryId(),
+                'name'                    => 'Academic Unit Head - ' . $unit->name,
+                'load_units'              => 6,
+                'requires_unit'           => false,
+                'max_holders'             => 1,
+                'sort_order'              => 0,
+                'is_active'               => true,
+            ]
+        );
+    }
+
+    /**
+     * Sync the AUH designation when a unit's code or name changes.
+     * Renames the designation code and name to stay in sync.
+     */
+    public function syncUnitDesignation(AcademicUnit $unit, string $oldCode, string $oldName): void
+    {
+        $designation = Designation::where('code', 'AUH-' . $oldCode)->first();
+        if (! $designation) {
+            $this->ensureUnitDesignation($unit);
+            return;
+        }
+
+        $updates = [];
+        if ($unit->code !== $oldCode) {
+            $updates['code'] = 'AUH-' . $unit->code;
+        }
+        if ($unit->name !== $oldName) {
+            $updates['name'] = 'Academic Unit Head - ' . $unit->name;
+        }
+
+        if ($updates) {
+            $designation->update($updates);
+        }
+    }
+
+    /**
+     * Get or create the AUH designation category id.
+     */
+    private function auhCategoryId(): int
+    {
+        return DesignationCategory::firstOrCreate(
+            ['code' => 'AUH'],
+            [
+                'name'        => 'Academic Unit Head',
+                'description' => 'Academic Unit Head designation for each subject department',
+                'sort_order'  => 1,
+                'is_active'   => true,
+            ]
+        )->id;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

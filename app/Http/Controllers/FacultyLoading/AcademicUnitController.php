@@ -58,6 +58,8 @@ class AcademicUnitController extends Controller
 
         $unit = AcademicUnit::create($data);
 
+        $advisory->ensureUnitDesignation($unit);
+
         if ($unit->head_user_id) {
             $advisory->syncUnitHead($unit, null);
         }
@@ -80,8 +82,12 @@ class AcademicUnitController extends Controller
 
         $oldHeadId = $academicUnit->head_user_id ? (int) $academicUnit->head_user_id : null;
         $newHeadId = $data['head_user_id'] ? (int) $data['head_user_id'] : null;
+        $oldCode   = $academicUnit->code;
+        $oldName   = $academicUnit->name;
 
         $academicUnit->update($data);
+
+        $advisory->syncUnitDesignation($academicUnit->fresh(), $oldCode, $oldName);
 
         if ($oldHeadId !== $newHeadId) {
             $advisory->syncUnitHead($academicUnit->fresh(), $oldHeadId);
