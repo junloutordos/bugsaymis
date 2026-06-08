@@ -5,8 +5,9 @@ namespace App\Http\Controllers\PPMP;
 use App\Http\Controllers\Controller;
 use App\Models\PPMP\PpmpCatalogue;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
-use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx as XlsxReader;
 
 class PPMPCatalogueController extends Controller
 {
@@ -51,6 +52,8 @@ class PPMPCatalogueController extends Controller
      */
     public function upload(Request $request)
     {
+        ini_set('memory_limit', '512M');
+
         $request->validate([
             'fiscal_year' => 'required|integer|min:2020|max:2099',
             'file_base64' => 'required|string',
@@ -72,10 +75,13 @@ class PPMPCatalogueController extends Controller
         file_put_contents($tmpFile, $decoded);
 
         try {
-            $spreadsheet = IOFactory::load($tmpFile);
-            $ws          = $spreadsheet->getActiveSheet();
+            $reader = new XlsxReader();
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($tmpFile);
+            $ws          = $this->findDataSheet($spreadsheet);
         } catch (\Throwable $e) {
             @unlink($tmpFile);
+            Log::error('PPMP catalogue upload: failed to load spreadsheet', ['error' => $e->getMessage()]);
             return back()->with('error', 'Could not read file: ' . $e->getMessage());
         } finally {
             @unlink($tmpFile);
@@ -86,18 +92,33 @@ class PPMPCatalogueController extends Controller
         try {
             $results = $this->parseAppCse($ws, $fiscalYear, $user->id);
         } catch (\Throwable $e) {
+            Log::error('PPMP catalogue upload: parsing failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return back()->with('error', 'Upload failed during parsing: ' . $e->getMessage());
         }
 
         $msg = "APP-CSE uploaded for FY {$fiscalYear}: "
-             . "{$results['part1_count']} Part I items, "
-             . "{$results['part2_count']} Part II items saved.";
+             . "{$results['part1Count']} Part I items, "
+             . "{$results['part2Count']} Part II items saved.";
 
         if ($results['skipped']) {
             $msg .= " {$results['skipped']} row(s) skipped.";
         }
 
         return back()->with('success', $msg)->with('upload_errors', $results['errors']);
+    }
+
+    /**
+     * Find the data sheet — prefer one whose name contains "APP" and "CSE",
+     * fall back to the first sheet so any sheet order works.
+     */
+    private function findDataSheet($spreadsheet)
+    {
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            if (preg_match('/APP.{0,3}CSE/i', $sheet->getTitle())) {
+                return $sheet;
+            }
+        }
+        return $spreadsheet->getSheet(0);
     }
 
     /**
@@ -123,11 +144,7 @@ class PPMPCatalogueController extends Controller
 
             $vals = [];
             foreach ($cells as $cell) {
-                try {
-                    $vals[] = $cell->getCalculatedValue();
-                } catch (\Throwable) {
-                    $vals[] = $cell->getValue();
-                }
+                $vals[] = $cell->getValue();
             }
 
             // Pad to at least 27 columns
