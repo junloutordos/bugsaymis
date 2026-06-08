@@ -53,6 +53,11 @@ Route::middleware(['web', 'auth', 'pshs.email'])
             ->name('settings.update')
             ->middleware('permission:ppmp.consolidate');
 
+        // ── Division Consolidation ────────────────────────────────────────────
+        Route::post('/division-consolidate', [PPMPController::class, 'divisionConsolidate'])
+            ->name('division_consolidate')
+            ->middleware('permission:ppmp.division_review');
+
         // ── APP Consolidation ─────────────────────────────────────────────────
         Route::middleware('permission:ppmp.consolidate')->group(function () {
             Route::get('/app', [PPMPAppController::class, 'index'])->name('app.index');

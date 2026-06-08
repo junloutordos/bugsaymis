@@ -84,10 +84,18 @@ class PPMPController extends Controller
                 ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym'])
                 : [],
             'deadline'           => $deadline,
-            'canCreate'          => $user->hasPermission('ppmp.create'),
-            'canReview'          => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
-            'canDivisionReview'  => $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin(),
-            'canManageCatalogue' => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
+            'canCreate'              => $user->hasPermission('ppmp.create'),
+            'canReview'              => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
+            'canDivisionReview'      => $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin(),
+            'canManageCatalogue'     => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
+            'hasApprovableUnitPpmps' => ($user->hasPermission('ppmp.division_review') || $user->isSuperAdmin())
+                && $user->division_id
+                && Ppmp::forDivision($user->division_id)
+                    ->forYear($fiscalYear)
+                    ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
+                    ->where('status', Ppmp::STATUS_DIVISION_APPROVED)
+                    ->whereNull('division_ppmp_id')
+                    ->exists(),
         ]);
     }
 
@@ -228,6 +236,8 @@ class PPMPController extends Controller
             'bacReviewer:id,name',
             'divisionReviewer:id,name',
             'parentPpmp:id,ppmp_number,title',
+            'divisionPpmp:id,ppmp_number,title,status',
+            'unitPpmps:id,ppmp_number,title,status,office_id,prepared_by',
             'statusHistory.actor:id,name',
         ]);
 
@@ -244,6 +254,10 @@ class PPMPController extends Controller
             ->where('procurements.ppmp_id', $ppmp->id)
             ->selectRaw('COUNT(DISTINCT procurements.id) as pr_count, COALESCE(SUM(procurement_items.quantity * procurement_items.unit_cost), 0) as pr_total')
             ->first();
+
+        $unitPpmps = $ppmp->ppmp_type === Ppmp::PPMP_TYPE_DIVISION
+            ? $ppmp->unitPpmps()->with('office:id,name')->get(['id', 'ppmp_number', 'title', 'status', 'office_id'])
+            : collect();
 
         return Inertia::render('PPMP/Show', [
             'ppmp'           => $ppmp,
@@ -264,6 +278,7 @@ class PPMPController extends Controller
                 'pr_count' => (int) $utilization->pr_count,
                 'pr_total' => (float) $utilization->pr_total,
             ],
+            'unitPpmps' => $unitPpmps,
         ]);
     }
 
@@ -379,6 +394,74 @@ class PPMPController extends Controller
 
         $ppmp->divisionEndorse($user);
         return back()->with('success', 'PPMP endorsed and forwarded to BAC/Procurement.');
+    }
+
+    /**
+     * Division Chief consolidates all division_approved unit PPMPs into one Division PPMP.
+     */
+    public function divisionConsolidate(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin(),
+            403
+        );
+        abort_unless($user->division_id, 422, 'You must be assigned to a division.');
+
+        $data = $request->validate([
+            'fiscal_year' => 'required|integer|min:2020',
+            'title'       => 'required|string|max:255',
+        ]);
+
+        $division = $user->division;
+        abort_unless($division, 422, 'Division not found.');
+
+        // Source: unit PPMPs that are division_approved and not yet linked to a division PPMP
+        $unitPpmps = Ppmp::forDivision($user->division_id)
+            ->forYear($data['fiscal_year'])
+            ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
+            ->where('status', Ppmp::STATUS_DIVISION_APPROVED)
+            ->whereNull('division_ppmp_id')
+            ->with('items')
+            ->get();
+
+        abort_if($unitPpmps->isEmpty(), 422, 'No approved unit PPMPs to consolidate.');
+
+        $divisionPpmp = DB::transaction(function () use ($user, $data, $division, $unitPpmps) {
+            $ppmp = Ppmp::create([
+                'ppmp_number'  => Ppmp::generateDivisionNumber($data['fiscal_year'], $division),
+                'title'        => $data['title'],
+                'fiscal_year'  => $data['fiscal_year'],
+                'division_id'  => $user->division_id,
+                'office_id'    => null,
+                'prepared_by'  => $user->id,
+                'status'       => Ppmp::STATUS_DRAFT,
+                'ppmp_type'    => Ppmp::PPMP_TYPE_DIVISION,
+                'is_supplemental' => false,
+            ]);
+
+            PpmpStatusHistory::create([
+                'ppmp_id'     => $ppmp->id,
+                'from_status' => null,
+                'to_status'   => Ppmp::STATUS_DRAFT,
+                'acted_by'    => $user->id,
+            ]);
+
+            foreach ($unitPpmps as $unit) {
+                foreach ($unit->items as $item) {
+                    $newItem = $item->replicate(['id', 'ppmp_id', 'created_at', 'updated_at']);
+                    $newItem->ppmp_id = $ppmp->id;
+                    $newItem->save();
+                }
+
+                $unit->division_ppmp_id = $ppmp->id;
+                $unit->save();
+            }
+
+            return $ppmp;
+        });
+
+        return redirect()->route('ppmp.show', $divisionPpmp)->with('success', 'Division PPMP created with ' . $unitPpmps->count() . ' unit PPMP(s) consolidated.');
     }
 
     /**

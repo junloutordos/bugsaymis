@@ -66,11 +66,16 @@ class PpmpPolicy extends GenericPolicy
 
     public function submit(User $user, Ppmp $ppmp): bool
     {
-        if (!$user->hasPermission('ppmp.submit')) {
+        if (!$ppmp->canSubmit()) {
             return false;
         }
 
-        if (!$ppmp->canSubmit()) {
+        if ($ppmp->ppmp_type === Ppmp::PPMP_TYPE_DIVISION) {
+            return $user->hasPermission('ppmp.division_review')
+                && $user->division_id === $ppmp->division_id;
+        }
+
+        if (!$user->hasPermission('ppmp.submit')) {
             return false;
         }
 
