@@ -36,11 +36,14 @@ const submit = () => {
                 <h2 class="text-lg font-semibold text-slate-800 mb-4">New Project Procurement Management Plan</h2>
 
                 <form @submit.prevent="submit" class="space-y-5">
-                    <!-- Division (read-only) -->
+                    <!-- Office / Unit (read-only) -->
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">End-User / Unit</label>
-                        <input type="text" :value="userDivision?.division_name || 'Not assigned'" disabled
+                        <input type="text"
+                               :value="userOffice?.name || userDivision?.division_name || 'Not assigned'"
+                               disabled
                                class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600" />
+                        <p v-if="userOffice" class="mt-1 text-xs text-slate-500">Division: {{ userDivision?.division_name }}</p>
                     </div>
 
                     <!-- Fiscal Year -->

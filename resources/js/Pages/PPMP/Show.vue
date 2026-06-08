@@ -390,7 +390,7 @@ const returnPpmp = () => {
 const showDivisionReturnModal = ref(false)
 const divisionRemarks         = ref('')
 const divisionEndorse = () => {
-    if (!confirm('Endorse this PPMP to BAC/Procurement?')) return
+    if (!confirm('Approve this unit PPMP? It will be marked as Division Approved and can then be consolidated into the Division PPMP.')) return
     router.post(route('ppmp.division_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
 }
 const divisionReturn = () => {
@@ -455,7 +455,9 @@ const utilizationRate = computed(() => {
                               class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">Division PPMP</span>
                         <span v-if="ppmp.is_supplemental" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Supplemental</span>
                     </div>
-                    <p class="text-sm text-slate-500">{{ ppmp.division?.division_name }} · FY {{ ppmp.fiscal_year }}</p>
+                    <p class="text-sm text-slate-500">
+                        <template v-if="ppmp.office">{{ ppmp.office.name }} · </template>{{ ppmp.division?.division_name }} · FY {{ ppmp.fiscal_year }}
+                    </p>
                     <p class="text-sm text-slate-500">Prepared by: {{ ppmp.preparer?.name }}</p>
                     <p v-if="ppmp.parent_ppmp" class="text-sm text-slate-500">Parent PPMP: {{ ppmp.parent_ppmp.ppmp_number }}</p>
                     <p v-if="ppmp.division_ppmp" class="text-sm text-teal-700 mt-1">
@@ -484,8 +486,8 @@ const utilizationRate = computed(() => {
                         {{ ppmp.ppmp_type === 'division' ? 'Submit to BAC' : 'Submit to Division' }}
                     </button>
                     <button v-if="canDivisionReview" @click="divisionEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-700 text-white">
-                        <CheckCircleIcon class="w-4 h-4" /> Endorse to BAC
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Approve Unit PPMP
                     </button>
                     <button v-if="canDivisionReview" @click="showDivisionReturnModal = true"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
