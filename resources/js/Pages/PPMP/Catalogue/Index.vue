@@ -8,7 +8,8 @@ const props = defineProps({
     items:          Array,
     fiscalYear:     Number,
     availableYears: Array,
-    itemCount:      Number,
+    part1Count:     Number,
+    part2Count:     Number,
 })
 
 const page  = usePage()
@@ -77,9 +78,10 @@ const filtered = computed(() => {
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
             <h3 class="text-sm font-semibold text-slate-700 mb-3">Upload PS-DBM Price List</h3>
             <p class="text-xs text-slate-500 mb-3">
-                Upload the DBM Procurement Service published price list (Excel .xlsx / .xls / .csv).
-                Expected columns: <strong>A</strong> Stock Number · <strong>B</strong> Description · <strong>C</strong> Unit · <strong>D</strong> Unit Cost · <strong>E</strong> Price Validity Date (optional).
-                Row 1 is treated as a header and skipped. Existing items for the selected fiscal year are updated in-place.
+                Upload the official <strong>APP-CSE Excel template</strong> from PS-DBM (the "APP-CSE YYYY FORM" sheet).
+                Column layout: <strong>A</strong> Seq# · <strong>B</strong> UNSPSC/Stock Number · <strong>C</strong> Description · <strong>D</strong> Unit · <strong>Z</strong> Unit Price.
+                Data rows start at row 32. Category group headers, Part II boundary, and summary rows are detected automatically.
+                Existing items for the selected fiscal year are deactivated and replaced on each upload.
             </p>
             <div class="flex flex-wrap items-end gap-3">
                 <div>
@@ -105,7 +107,8 @@ const filtered = computed(() => {
             <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
                 <div class="flex items-center gap-3">
                     <h3 class="text-sm font-semibold text-slate-700">FY {{ fiscalYear }} Catalogue</h3>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">{{ itemCount }} items</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">Part I: {{ part1Count }}</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Part II: {{ part2Count }}</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <select v-model="selectedYear" @change="changeYear"

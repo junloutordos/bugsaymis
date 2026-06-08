@@ -81,8 +81,13 @@ class PPMPCatalogueController extends Controller
             @unlink($tmpFile);
         }
 
-        $user    = $request->user();
-        $results = $this->parseAppCse($ws, $fiscalYear, $user->id);
+        $user = $request->user();
+
+        try {
+            $results = $this->parseAppCse($ws, $fiscalYear, $user->id);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Upload failed during parsing: ' . $e->getMessage());
+        }
 
         $msg = "APP-CSE uploaded for FY {$fiscalYear}: "
              . "{$results['part1_count']} Part I items, "
@@ -118,7 +123,11 @@ class PPMPCatalogueController extends Controller
 
             $vals = [];
             foreach ($cells as $cell) {
-                $vals[] = $cell->getCalculatedValue();
+                try {
+                    $vals[] = $cell->getCalculatedValue();
+                } catch (\Throwable) {
+                    $vals[] = $cell->getValue();
+                }
             }
 
             // Pad to at least 27 columns

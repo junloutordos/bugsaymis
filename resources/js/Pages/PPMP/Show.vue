@@ -36,8 +36,12 @@ const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFracti
 
 // ── Part I / Part II split ────────────────────────────────────────────────
 // catalogue_part is injected by the controller (ppmp_catalogue.part)
-const part1Items = computed(() => props.items.filter(i => i.catalogue_part === 1))
-const part2Items = computed(() => props.items.filter(i => i.catalogue_part !== 1)) // includes manual (null) + Part II catalogue (2)
+// Legacy items pre-catalogue have catalogue_part=null but are Part I if procurement_method=agency_to_agency
+const part1Items = computed(() => props.items.filter(i =>
+    i.catalogue_part === 1 ||
+    (i.catalogue_part !== 2 && i.procurement_method === 'agency_to_agency')
+))
+const part2Items = computed(() => props.items.filter(i => !part1Items.value.some(p => p.id === i.id)))
 
 // Group Part II items by category (preserving order: goods → infrastructure → consulting)
 const CATEGORY_ORDER = ['goods', 'infrastructure', 'consulting_services']
