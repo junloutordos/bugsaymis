@@ -1,66 +1,163 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Head, useForm, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PlusIcon, PencilSquareIcon, TrashIcon, CheckCircleIcon, ArrowUturnLeftIcon, DocumentArrowDownIcon, ShieldCheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import {
+    PlusIcon, PencilSquareIcon, TrashIcon, CheckCircleIcon,
+    ArrowUturnLeftIcon, DocumentArrowDownIcon, ShieldCheckIcon,
+    XMarkIcon, MagnifyingGlassIcon, BuildingStorefrontIcon,
+} from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
 const props = defineProps({
-    ppmp: Object,
-    items: Array,
-    summary: Array,
-    grandTotal: Number,
-    categories: Object,
-    methods: Object,
+    ppmp:        Object,
+    items:       Array,
+    summary:     Array,
+    grandTotal:  Number,
+    categories:  Object,
+    methods:     Object,
     fundSources: Object,
-    quarters: Array,
-    canEdit: Boolean,
-    canSubmit: Boolean,
+    quarters:    Array,
+    canEdit:     Boolean,
+    canSubmit:   Boolean,
     canBacReview: Boolean,
-    canApprove: Boolean,
-    canExport: Boolean,
+    canApprove:  Boolean,
+    canExport:   Boolean,
     utilization: Object,
 })
 
-const page = usePage()
+const page  = usePage()
 const flash = computed(() => page.props.flash)
 
-const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+const months      = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
 const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-// ── Status colors ─────────────────────────────────────────────────────────
+// ── Part I / Part II split ────────────────────────────────────────────────
+const part1Items = computed(() => props.items.filter(i => i.catalogue_id))
+const part2Items = computed(() => props.items.filter(i => !i.catalogue_id))
+
+// Group Part II items by category (preserving order: goods → infrastructure → consulting)
+const CATEGORY_ORDER = ['goods', 'infrastructure', 'consulting_services']
+const part2ByCategory = computed(() => {
+    return CATEGORY_ORDER
+        .map(cat => ({ cat, label: props.categories[cat] ?? cat, items: part2Items.value.filter(i => i.category === cat) }))
+        .filter(g => g.items.length > 0)
+})
+
+const part1Total = computed(() => part1Items.value.reduce((s, i) => s + Number(i.total_cost), 0))
+const part2Total = computed(() => part2Items.value.reduce((s, i) => s + Number(i.total_cost), 0))
+
+// Fund-source breakdown across all items
+const fundSourceTotals = computed(() => {
+    const map = {}
+    props.items.forEach(i => {
+        const fs = (i.fund_source ?? 'mooe').toLowerCase()
+        map[fs] = (map[fs] ?? 0) + Number(i.total_cost)
+    })
+    return map
+})
+
+// ── Status helpers ────────────────────────────────────────────────────────
 const statusColors = {
-    draft: 'bg-slate-100 text-slate-700',
-    pending_bac: 'bg-purple-100 text-purple-700',
-    submitted: 'bg-blue-100 text-blue-700',
-    returned: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
+    draft:        'bg-slate-100 text-slate-700',
+    pending_bac:  'bg-purple-100 text-purple-700',
+    submitted:    'bg-blue-100 text-blue-700',
+    returned:     'bg-amber-100 text-amber-700',
+    approved:     'bg-green-100 text-green-700',
     consolidated: 'bg-indigo-100 text-indigo-700',
 }
 
-// ── Add Item Form ─────────────────────────────────────────────────────────
+// ── Part I Catalogue Picker Modal ─────────────────────────────────────────
+const showCatModal     = ref(false)
+const catSearch        = ref('')
+const catResults       = ref([])
+const catSearching     = ref(false)
+const catSelectedItems = ref([])   // { catalogue_id, stock_number, description, unit, unit_cost }
+
+const searchCatalogue = async () => {
+    catSearching.value = true
+    try {
+        const { data } = await axios.get(route('ppmp.catalogue.search'), {
+            params: { fiscal_year: props.ppmp.fiscal_year, q: catSearch.value },
+        })
+        catResults.value = data
+    } catch {
+        catResults.value = []
+    }
+    catSearching.value = false
+}
+
+watch(catSearch, (val) => {
+    if (val.length >= 2 || val === '') searchCatalogue()
+})
+
+const openCatModal = () => {
+    catSearch.value = ''
+    catResults.value = []
+    catSelectedItems.value = []
+    searchCatalogue()
+    showCatModal.value = true
+}
+
+const isSelectedInCat = (item) => catSelectedItems.value.some(s => s.catalogue_id === item.id)
+const toggleCatItem   = (item) => {
+    if (isSelectedInCat(item)) {
+        catSelectedItems.value = catSelectedItems.value.filter(s => s.catalogue_id !== item.id)
+    } else {
+        catSelectedItems.value.push({
+            catalogue_id: item.id,
+            stock_number: item.stock_number,
+            description:  item.description,
+            unit:         item.unit,
+            unit_cost:    item.unit_cost,
+            // schedule fields filled in after modal confirm
+            fund_source:         'mooe',
+            procurement_quarter: null,
+            delivery_quarter:    null,
+            remarks:             '',
+            ...Object.fromEntries(months.map(m => [m, 0])),
+        })
+    }
+}
+
+// After selecting from catalogue, show schedule entry for each selected item
+const showScheduleEntry = ref(false)
+const proceedToSchedule = () => {
+    if (!catSelectedItems.value.length) return
+    showScheduleEntry.value = true
+}
+
+const part1Submitting = ref(false)
+const savePart1Items = async () => {
+    part1Submitting.value = true
+    for (const sel of catSelectedItems.value) {
+        await new Promise((resolve) => {
+            router.post(route('ppmp.items.store', props.ppmp.id), sel, {
+                preserveScroll: true,
+                onFinish: resolve,
+            })
+        })
+    }
+    part1Submitting.value = false
+    showCatModal.value    = false
+    showScheduleEntry.value = false
+}
+
+// ── Part II Add/Edit Forms ────────────────────────────────────────────────
 const showAddForm = ref(false)
-const itemForm = useForm({
-    code: '',
-    description: '',
-    unit: '',
-    category: 'goods',
-    unit_cost: '',
+const itemForm    = useForm({
+    code: '', description: '', unit: '', category: 'goods', unit_cost: '',
     jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
     jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0,
     procurement_method: 'competitive_bidding',
-    is_ps_dbm: false,
-    remarks: '',
-    fund_source: 'mooe',
-    procurement_quarter: null,
-    delivery_quarter: null,
-    price_source: '',
-    price_validity_date: '',
+    remarks: '', fund_source: 'mooe',
+    procurement_quarter: null, delivery_quarter: null,
+    price_source: '', price_validity_date: '',
 })
 
-const itemTotalQty = computed(() => months.reduce((s, m) => s + (Number(itemForm[m]) || 0), 0))
+const itemTotalQty  = computed(() => months.reduce((s, m) => s + (Number(itemForm[m]) || 0), 0))
 const itemTotalCost = computed(() => itemTotalQty.value * (Number(itemForm.unit_cost) || 0))
 
 const resetItemForm = () => {
@@ -69,9 +166,7 @@ const resetItemForm = () => {
     itemForm.procurement_method = 'competitive_bidding'
     itemForm.fund_source = 'mooe'
     itemForm.procurement_quarter = null
-    itemForm.delivery_quarter = null
-    itemForm.price_source = ''
-    itemForm.price_validity_date = ''
+    itemForm.delivery_quarter    = null
     showAddForm.value = false
 }
 
@@ -82,45 +177,38 @@ const saveItem = () => {
     })
 }
 
-// ── Edit Item Modal ───────────────────────────────────────────────────────
+// ── Edit Modal (handles both Part I and Part II) ──────────────────────────
 const showEditModal = ref(false)
-const editForm = useForm({
-    code: '',
-    description: '',
-    unit: '',
-    category: 'goods',
-    unit_cost: '',
+const editingItem   = ref(null)
+const editForm      = useForm({
+    // Part I-only fields
+    fund_source: 'mooe', procurement_quarter: null, delivery_quarter: null, remarks: '',
     jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
     jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0,
-    procurement_method: 'competitive_bidding',
-    is_ps_dbm: false,
-    remarks: '',
-    fund_source: 'mooe',
-    procurement_quarter: null,
-    delivery_quarter: null,
-    price_source: '',
-    price_validity_date: '',
+    // Part II extra fields
+    code: '', description: '', unit: '', category: 'goods', unit_cost: '',
+    procurement_method: 'competitive_bidding', price_source: '', price_validity_date: '',
 })
-const editingItem = ref(null)
 
 const editTotalQty = computed(() => months.reduce((s, m) => s + (Number(editForm[m]) || 0), 0))
 
 const startEdit = (item) => {
     editingItem.value = item
-    editForm.code = item.code || ''
-    editForm.description = item.description
-    editForm.unit = item.unit
-    editForm.category = item.category
-    editForm.unit_cost = item.unit_cost
-    months.forEach(m => editForm[m] = item[m])
-    editForm.procurement_method = item.procurement_method
-    editForm.is_ps_dbm = item.is_ps_dbm
-    editForm.remarks = item.remarks || ''
-    editForm.fund_source = item.fund_source || 'mooe'
-    editForm.procurement_quarter = item.procurement_quarter || null
-    editForm.delivery_quarter = item.delivery_quarter || null
-    editForm.price_source = item.price_source || ''
-    editForm.price_validity_date = item.price_validity_date || ''
+    Object.assign(editForm, {
+        fund_source:         item.fund_source || 'mooe',
+        procurement_quarter: item.procurement_quarter || null,
+        delivery_quarter:    item.delivery_quarter    || null,
+        remarks:             item.remarks || '',
+        code:                item.code || '',
+        description:         item.description,
+        unit:                item.unit,
+        category:            item.category,
+        unit_cost:           item.unit_cost,
+        procurement_method:  item.procurement_method,
+        price_source:        item.price_source || '',
+        price_validity_date: item.price_validity_date || '',
+    })
+    months.forEach(m => editForm[m] = item[m] ?? 0)
     showEditModal.value = true
 }
 
@@ -138,38 +226,49 @@ const deleteItem = (item) => {
     router.delete(route('ppmp.items.destroy', [props.ppmp.id, item.id]), { preserveScroll: true })
 }
 
+// ── Quick-fill distribute helper ──────────────────────────────────────────
+const makeDistributor = (form) => {
+    const total = ref(0)
+    const mode  = ref('monthly')
+    const run = () => {
+        const qty = Number(total.value) || 0
+        if (qty <= 0) return
+        const map = { monthly: months, quarterly: ['jan','apr','jul','oct'], semi: ['jan','jul'] }
+        const sel = map[mode.value]
+        months.forEach(m => form[m] = 0)
+        const per = Math.floor(qty / sel.length)
+        const rem = qty % sel.length
+        sel.forEach((m, i) => { form[m] = per + (i === sel.length - 1 ? rem : 0) })
+    }
+    return { total, mode, run }
+}
+const addDist  = makeDistributor(itemForm)
+const editDist = makeDistributor(editForm)
+
 // ── Validation ────────────────────────────────────────────────────────────
 const validationResult = ref(null)
-const validating = ref(false)
+const validating       = ref(false)
 
 const runValidation = async () => {
     validating.value = true
     try {
         const { data } = await axios.post(route('ppmp.validate', props.ppmp.id))
         validationResult.value = data
-    } catch (e) {
+    } catch {
         validationResult.value = null
     }
     validating.value = false
 }
 
-const itemHasError = (id) => validationResult.value?.errors?.some(e => e.item_id === id)
+const itemHasError   = (id) => validationResult.value?.errors?.some(e => e.item_id === id)
 const itemHasWarning = (id) => validationResult.value?.warnings?.some(w => w.item_id === id)
 
 // ── Workflow ──────────────────────────────────────────────────────────────
-const submitPpmp = () => {
-    if (!confirm('Submit this PPMP for BAC review?')) return
-    router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true })
-}
+const submitPpmp  = () => { if (!confirm('Submit this PPMP for BAC review?')) return; router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true }) }
+const approvePpmp = () => { if (!confirm('Approve this PPMP?'))              return; router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true }) }
 
-const approvePpmp = () => {
-    if (!confirm('Approve this PPMP?')) return
-    router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true })
-}
-
-const returnRemarks = ref('')
+const returnRemarks   = ref('')
 const showReturnModal = ref(false)
-
 const returnPpmp = () => {
     if (!returnRemarks.value.trim()) return
     router.post(route('ppmp.return', props.ppmp.id), { remarks: returnRemarks.value }, {
@@ -178,16 +277,10 @@ const returnPpmp = () => {
     })
 }
 
-// ── BAC Review ────────────────────────────────────────────────────────────
 const showBacReturnModal = ref(false)
-const bacRemarks = ref('')
-
-const bacEndorse = () => {
-    if (!confirm('Endorse this PPMP to the approving authority?')) return
-    router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
-}
-
-const bacReturn = () => {
+const bacRemarks         = ref('')
+const bacEndorse = () => { if (!confirm('Endorse this PPMP to the approving authority?')) return; router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true }) }
+const bacReturn  = () => {
     if (!bacRemarks.value.trim()) return
     router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'return', remarks: bacRemarks.value }, {
         preserveScroll: true,
@@ -200,48 +293,15 @@ const utilizationRate = computed(() => {
     if (!props.utilization || !props.grandTotal) return 0
     return props.grandTotal > 0 ? Math.min(100, (props.utilization.pr_total / props.grandTotal) * 100) : 0
 })
-
-// ── Distribute evenly helper ──────────────────────────────────────────────
-const distTotal = ref(0)
-const distMode = ref('monthly')
-const editDistTotal = ref(0)
-const editDistMode = ref('monthly')
-
-const distributeEvenly = () => {
-    const total = Number(distTotal.value) || 0
-    if (total <= 0) return
-    let selected = []
-    if (distMode.value === 'monthly') selected = [...months]
-    else if (distMode.value === 'quarterly') selected = ['jan','apr','jul','oct']
-    else if (distMode.value === 'semi') selected = ['jan','jul']
-
-    months.forEach(m => itemForm[m] = 0)
-    const per = Math.floor(total / selected.length)
-    const rem = total % selected.length
-    selected.forEach((m, i) => { itemForm[m] = per + (i === selected.length - 1 ? rem : 0) })
-}
-
-const distributeEvenlyEdit = () => {
-    const total = Number(editDistTotal.value) || 0
-    if (total <= 0) return
-    let selected = []
-    if (editDistMode.value === 'monthly') selected = [...months]
-    else if (editDistMode.value === 'quarterly') selected = ['jan','apr','jul','oct']
-    else if (editDistMode.value === 'semi') selected = ['jan','jul']
-
-    months.forEach(m => editForm[m] = 0)
-    const per = Math.floor(total / selected.length)
-    const rem = total % selected.length
-    selected.forEach((m, i) => { editForm[m] = per + (i === selected.length - 1 ? rem : 0) })
-}
 </script>
 
 <template>
     <Head :title="ppmp.ppmp_number" />
     <AdminLayout :title="ppmp.ppmp_number">
-        <!-- Flash messages -->
+
+        <!-- Flash -->
         <div v-if="flash.success" class="mb-4 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">{{ flash.success }}</div>
-        <div v-if="flash.error" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">{{ flash.error }}</div>
+        <div v-if="flash.error"   class="mb-4 rounded-lg bg-red-50   border border-red-200   px-4 py-3 text-sm text-red-800">{{ flash.error }}</div>
 
         <!-- Validation results -->
         <div v-if="validationResult?.errors?.length" class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
@@ -261,7 +321,7 @@ const distributeEvenlyEdit = () => {
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div class="space-y-1">
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <h2 class="text-lg font-semibold text-slate-800">{{ ppmp.title }}</h2>
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
                               :class="statusColors[ppmp.status] ?? 'bg-slate-100 text-slate-700'">
@@ -311,7 +371,7 @@ const distributeEvenlyEdit = () => {
                 </div>
             </div>
 
-            <!-- Summary cards -->
+            <!-- Category summary cards -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                 <div v-for="s in summary" :key="s.category" class="bg-slate-50 rounded-lg p-3">
                     <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ s.label }}</p>
@@ -325,38 +385,132 @@ const distributeEvenlyEdit = () => {
                 </div>
             </div>
 
-            <!-- Utilization panel -->
-            <div v-if="utilization" class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="bg-emerald-50 rounded-lg p-3">
-                    <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Linked PRs</p>
-                    <p class="text-lg font-bold text-emerald-800">{{ utilization.pr_count }}</p>
-                    <p class="text-xs text-emerald-600">Purchase Requests referencing this PPMP</p>
+            <!-- Fund-source breakdown -->
+            <div v-if="Object.keys(fundSourceTotals).length" class="mt-3 flex flex-wrap gap-2">
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide self-center">By Fund Source:</span>
+                <span v-for="(amt, fs) in fundSourceTotals" :key="fs"
+                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                    {{ fs.toUpperCase() }}: ₱{{ formatPeso(amt) }}
+                </span>
+            </div>
+
+            <!-- Part I / Part II summary bar -->
+            <div class="mt-3 grid grid-cols-2 gap-3">
+                <div class="bg-blue-50 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide">Part I — PS-DBM (Agency-to-Agency)</p>
+                        <p class="text-base font-bold text-blue-800">₱{{ formatPeso(part1Total) }}</p>
+                        <p class="text-xs text-blue-500">{{ part1Items.length }} item(s)</p>
+                    </div>
                 </div>
-                <div class="bg-emerald-50 rounded-lg p-3">
-                    <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wide">PR Total</p>
-                    <p class="text-lg font-bold text-emerald-800">₱{{ formatPeso(utilization.pr_total) }}</p>
-                    <p class="text-xs text-emerald-600">Total value of linked PRs</p>
+                <div class="bg-emerald-50 rounded-lg p-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Part II — Other Procurement</p>
+                        <p class="text-base font-bold text-emerald-800">₱{{ formatPeso(part2Total) }}</p>
+                        <p class="text-xs text-emerald-500">{{ part2Items.length }} item(s)</p>
+                    </div>
                 </div>
-                <div class="bg-emerald-50 rounded-lg p-3">
-                    <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Budget Utilization</p>
-                    <p class="text-lg font-bold text-emerald-800">{{ utilizationRate.toFixed(1) }}%</p>
-                    <div class="mt-1 w-full bg-emerald-200 rounded-full h-1.5">
-                        <div class="bg-emerald-500 h-1.5 rounded-full transition-all" :style="{ width: utilizationRate + '%' }"></div>
+            </div>
+
+            <!-- Utilization -->
+            <div v-if="utilization" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Linked PRs</p>
+                    <p class="text-lg font-bold text-slate-800">{{ utilization.pr_count }}</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">PR Total</p>
+                    <p class="text-lg font-bold text-slate-800">₱{{ formatPeso(utilization.pr_total) }}</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Budget Utilization</p>
+                    <p class="text-lg font-bold text-slate-800">{{ utilizationRate.toFixed(1) }}%</p>
+                    <div class="mt-1 w-full bg-slate-200 rounded-full h-1.5">
+                        <div class="bg-indigo-500 h-1.5 rounded-full transition-all" :style="{ width: utilizationRate + '%' }"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Items table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                <h3 class="text-sm font-semibold text-slate-700">Procurement Items</h3>
+        <!-- ══ PART I TABLE ════════════════════════════════════════════════════ -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-blue-50">
+                <div>
+                    <h3 class="text-sm font-semibold text-blue-800">Part I — Items from PS-DBM (Agency-to-Agency)</h3>
+                    <p class="text-xs text-blue-600 mt-0.5">Common-Use Supplies and Equipment procured through Procurement Service – DBM at published catalogue prices.</p>
+                </div>
+                <button v-if="canEdit" @click="openCatModal"
+                        class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                    <BuildingStorefrontIcon class="w-4 h-4" /> Add from Catalogue
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-[1400px] w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-28">Stock No.</th>
+                            <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
+                            <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-14">Unit</th>
+                            <th v-for="ml in monthLabels" :key="ml" class="px-1 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-10">{{ ml }}</th>
+                            <th class="px-2 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-14">Total</th>
+                            <th class="px-2 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-24">Unit Cost</th>
+                            <th class="px-2 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Total Cost</th>
+                            <th class="px-2 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-16">Fund</th>
+                            <th class="px-2 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-14">Proc. Q</th>
+                            <th v-if="canEdit" class="px-2 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-16">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr v-for="item in part1Items" :key="item.id"
+                            :class="{
+                                'border-l-4 border-red-400':   itemHasError(item.id),
+                                'border-l-4 border-amber-400': !itemHasError(item.id) && itemHasWarning(item.id),
+                            }">
+                            <td class="px-2 py-1.5 font-mono text-xs text-slate-600">{{ item.code }}</td>
+                            <td class="px-2 py-1.5 text-slate-700">{{ item.description }}</td>
+                            <td class="px-2 py-1.5 text-slate-600">{{ item.unit }}</td>
+                            <td v-for="m in months" :key="m" class="px-1 py-1.5 text-center text-xs text-slate-600">{{ item[m] > 0 ? item[m] : '—' }}</td>
+                            <td class="px-2 py-1.5 text-center font-medium text-slate-700">{{ item.total_quantity }}</td>
+                            <td class="px-2 py-1.5 text-right text-xs text-slate-700">₱{{ formatPeso(item.unit_cost) }}</td>
+                            <td class="px-2 py-1.5 text-right font-medium text-xs text-slate-800">₱{{ formatPeso(item.total_cost) }}</td>
+                            <td class="px-2 py-1.5 text-center text-xs">
+                                <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 uppercase">{{ item.fund_source ?? 'mooe' }}</span>
+                            </td>
+                            <td class="px-2 py-1.5 text-center text-xs text-slate-600">{{ item.procurement_quarter ? 'Q' + item.procurement_quarter : '—' }}</td>
+                            <td v-if="canEdit" class="px-2 py-1.5 text-center">
+                                <div class="flex items-center justify-center gap-1">
+                                    <button @click="startEdit(item)" class="text-slate-400 hover:text-indigo-600"><PencilSquareIcon class="w-4 h-4" /></button>
+                                    <button @click="deleteItem(item)" class="text-slate-400 hover:text-red-600"><TrashIcon class="w-4 h-4" /></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="!part1Items.length">
+                            <td :colspan="canEdit ? 20 : 19" class="px-4 py-6 text-center text-slate-400 text-sm">
+                                No PS-DBM items yet. Click "Add from Catalogue" to add Part I items.
+                            </td>
+                        </tr>
+                        <tr v-if="part1Items.length" class="bg-blue-50">
+                            <td colspan="13" class="px-2 py-1.5 text-right text-xs font-semibold text-blue-700">Part I Subtotal</td>
+                            <td class="px-2 py-1.5 text-right text-xs font-semibold text-blue-800" colspan="2">₱{{ formatPeso(part1Total) }}</td>
+                            <td :colspan="canEdit ? 5 : 4"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ══ PART II TABLE ═══════════════════════════════════════════════════ -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-emerald-50">
+                <div>
+                    <h3 class="text-sm font-semibold text-emerald-800">Part II — Other Procurement Items</h3>
+                    <p class="text-xs text-emerald-600 mt-0.5">Items not available from PS-DBM. Procured via Competitive Bidding, Shopping, SVP, etc.</p>
+                </div>
                 <button v-if="canEdit && !showAddForm" @click="showAddForm = true"
-                        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                        class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
                     <PlusIcon class="w-4 h-4" /> Add Item
                 </button>
             </div>
-
             <div class="overflow-x-auto">
                 <table class="min-w-[1600px] w-full text-sm">
                     <thead class="bg-slate-50">
@@ -364,7 +518,7 @@ const distributeEvenlyEdit = () => {
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-16">Code</th>
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
                             <th class="px-2 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-14">Unit</th>
-                            <th v-for="(ml, mi) in monthLabels" :key="mi" class="px-1 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-10">{{ ml }}</th>
+                            <th v-for="ml in monthLabels" :key="ml" class="px-1 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-10">{{ ml }}</th>
                             <th class="px-2 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-14">Total</th>
                             <th class="px-2 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-20">Unit Cost</th>
                             <th class="px-2 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-24">Total Cost</th>
@@ -375,35 +529,30 @@ const distributeEvenlyEdit = () => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <template v-for="(item, idx) in items" :key="item.id">
+                        <template v-for="group in part2ByCategory" :key="group.cat">
                             <!-- Category header -->
-                            <tr v-if="idx === 0 || item.category !== items[idx - 1].category">
+                            <tr>
                                 <td :colspan="canEdit ? 22 : 21" class="px-2 py-2 bg-slate-100 font-semibold text-xs text-slate-700 uppercase tracking-wide">
-                                    {{ categories[item.category] || item.category }}
+                                    {{ group.label }}
                                 </td>
                             </tr>
-
-                            <!-- Item row -->
-                            <tr :class="{
-                                'border-l-4 border-red-400': itemHasError(item.id),
-                                'border-l-4 border-amber-400': !itemHasError(item.id) && itemHasWarning(item.id),
-                            }">
-                                <td class="px-2 py-1.5 text-slate-600 text-xs">{{ item.code }}</td>
+                            <tr v-for="item in group.items" :key="item.id"
+                                :class="{
+                                    'border-l-4 border-red-400':   itemHasError(item.id),
+                                    'border-l-4 border-amber-400': !itemHasError(item.id) && itemHasWarning(item.id),
+                                }">
+                                <td class="px-2 py-1.5 text-xs text-slate-600">{{ item.code }}</td>
                                 <td class="px-2 py-1.5 text-slate-700">{{ item.description }}</td>
                                 <td class="px-2 py-1.5 text-slate-600">{{ item.unit }}</td>
-                                <td v-for="m in months" :key="m" class="px-1 py-1.5 text-center text-slate-600 text-xs">
-                                    {{ item[m] > 0 ? item[m] : '—' }}
-                                </td>
+                                <td v-for="m in months" :key="m" class="px-1 py-1.5 text-center text-xs text-slate-600">{{ item[m] > 0 ? item[m] : '—' }}</td>
                                 <td class="px-2 py-1.5 text-center font-medium text-slate-700">{{ item.total_quantity }}</td>
-                                <td class="px-2 py-1.5 text-right text-slate-700 text-xs">{{ formatPeso(item.unit_cost) }}</td>
-                                <td class="px-2 py-1.5 text-right font-medium text-slate-800 text-xs">{{ formatPeso(item.total_cost) }}</td>
-                                <td class="px-2 py-1.5 text-slate-600 text-xs">{{ methods[item.procurement_method] || item.procurement_method }}</td>
+                                <td class="px-2 py-1.5 text-right text-xs text-slate-700">₱{{ formatPeso(item.unit_cost) }}</td>
+                                <td class="px-2 py-1.5 text-right font-medium text-xs text-slate-800">₱{{ formatPeso(item.total_cost) }}</td>
+                                <td class="px-2 py-1.5 text-xs text-slate-600">{{ methods[item.procurement_method] || item.procurement_method }}</td>
                                 <td class="px-2 py-1.5 text-center text-xs">
                                     <span v-if="item.fund_source" class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 uppercase">{{ item.fund_source }}</span>
                                 </td>
-                                <td class="px-2 py-1.5 text-center text-xs text-slate-600">
-                                    {{ item.procurement_quarter ? 'Q' + item.procurement_quarter : '—' }}
-                                </td>
+                                <td class="px-2 py-1.5 text-center text-xs text-slate-600">{{ item.procurement_quarter ? 'Q' + item.procurement_quarter : '—' }}</td>
                                 <td v-if="canEdit" class="px-2 py-1.5 text-center">
                                     <div class="flex items-center justify-center gap-1">
                                         <button @click="startEdit(item)" class="text-slate-400 hover:text-indigo-600"><PencilSquareIcon class="w-4 h-4" /></button>
@@ -412,20 +561,24 @@ const distributeEvenlyEdit = () => {
                                 </td>
                             </tr>
                         </template>
-
-                        <tr v-if="!items.length">
-                            <td :colspan="canEdit ? 22 : 21" class="px-4 py-8 text-center text-slate-400">
-                                No items yet. Click "Add Item" to start building your PPMP.
+                        <tr v-if="!part2Items.length">
+                            <td :colspan="canEdit ? 22 : 21" class="px-4 py-6 text-center text-slate-400 text-sm">
+                                No Part II items yet. Click "Add Item" to add items procured through other modes.
                             </td>
+                        </tr>
+                        <tr v-if="part2Items.length" class="bg-emerald-50">
+                            <td colspan="14" class="px-2 py-1.5 text-right text-xs font-semibold text-emerald-700">Part II Subtotal</td>
+                            <td class="px-2 py-1.5 text-right text-xs font-semibold text-emerald-800" colspan="2">₱{{ formatPeso(part2Total) }}</td>
+                            <td :colspan="canEdit ? 6 : 5"></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Add Item Form (slide-down) -->
-        <div v-if="showAddForm && canEdit" class="mt-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Add Procurement Item</h3>
+        <!-- Part II Add Form -->
+        <div v-if="showAddForm && canEdit" class="mt-2 mb-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">Add Part II Item</h3>
             <form @submit.prevent="saveItem" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
@@ -459,62 +612,50 @@ const distributeEvenlyEdit = () => {
                             <option v-for="(label, key) in methods" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </div>
-                    <div class="flex items-end">
-                        <label class="flex items-center gap-2 text-sm text-slate-700">
-                            <input v-model="itemForm.is_ps_dbm" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                            Available from PS-DBM
-                        </label>
-                    </div>
-                </div>
-
-                <!-- COA/DBM compliance fields -->
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Fund Source</label>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Fund Source *</label>
                         <select v-model="itemForm.fund_source" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option v-for="(label, key) in fundSources" :key="key" :value="key">{{ label }}</option>
                         </select>
                     </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Procurement Quarter</label>
                         <select v-model="itemForm.procurement_quarter" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option :value="null">— Any —</option>
-                            <option v-for="q in quarters" :key="q.value" :value="q.value">{{ q.label }}</option>
+                            <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Delivery Quarter</label>
                         <select v-model="itemForm.delivery_quarter" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option :value="null">— Any —</option>
-                            <option v-for="q in quarters" :key="q.value" :value="q.value">{{ q.label }}</option>
+                            <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Price Source</label>
+                        <input v-model="itemForm.price_source" placeholder="PhilGEPS, Canvass, etc." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Price Validity Date</label>
                         <input v-model="itemForm.price_validity_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                     </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Price Source</label>
-                    <input v-model="itemForm.price_source" placeholder="e.g., PhilGEPS, Canvass, PS-DBM catalogue" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                </div>
-
-                <!-- Distribute helper -->
+                <!-- Quick-fill -->
                 <div class="flex items-end gap-2 bg-slate-50 rounded-lg p-3">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Quick fill: Total Qty</label>
-                        <input v-model.number="distTotal" type="number" min="0" class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <input v-model.number="addDist.total.value" type="number" min="0" class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                     </div>
-                    <div>
-                        <select v-model="distMode" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="monthly">Monthly (12)</option>
-                            <option value="quarterly">Quarterly (4)</option>
-                            <option value="semi">Semi-Annual (2)</option>
-                        </select>
-                    </div>
-                    <button type="button" @click="distributeEvenly" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700">Distribute</button>
+                    <select v-model="addDist.mode.value" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="monthly">Monthly (12)</option>
+                        <option value="quarterly">Quarterly (4)</option>
+                        <option value="semi">Semi-Annual (2)</option>
+                    </select>
+                    <button type="button" @click="addDist.run()" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700">Distribute</button>
                 </div>
-
                 <!-- Monthly quantities -->
                 <div>
                     <label class="block text-xs font-medium text-slate-600 mb-1">Monthly Quantities</label>
@@ -530,13 +671,10 @@ const distributeEvenlyEdit = () => {
                         <span class="text-slate-600">Total Cost: <strong>₱{{ formatPeso(itemTotalCost) }}</strong></span>
                     </div>
                 </div>
-
-                <!-- Remarks -->
                 <div>
                     <label class="block text-xs font-medium text-slate-600 mb-1">Remarks / Justification</label>
                     <textarea v-model="itemForm.remarks" rows="2" placeholder="Required for Direct Contracting, Emergency, etc." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 </div>
-
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="resetItemForm" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
                     <button type="submit" :disabled="itemForm.processing" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Save Item</button>
@@ -545,7 +683,7 @@ const distributeEvenlyEdit = () => {
         </div>
 
         <!-- Status History -->
-        <div v-if="ppmp.status_history?.length" class="mt-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div v-if="ppmp.status_history?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <h3 class="text-sm font-semibold text-slate-700 mb-3">Status History</h3>
             <div class="space-y-2">
                 <div v-for="h in ppmp.status_history" :key="h.id" class="flex items-start gap-3 text-sm">
@@ -562,55 +700,190 @@ const distributeEvenlyEdit = () => {
             </div>
         </div>
 
-        <!-- Edit Item Modal -->
+        <!-- ══ PART I CATALOGUE PICKER MODAL ══════════════════════════════════ -->
+        <div v-if="showCatModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-800">Add from PS-DBM Catalogue — Part I</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">FY {{ ppmp.fiscal_year }} · Agency-to-Agency · Prices from PS-DBM price list</p>
+                    </div>
+                    <button @click="showCatModal = false; showScheduleEntry = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
+                </div>
+
+                <!-- Step 1: Select items -->
+                <div v-if="!showScheduleEntry" class="flex flex-col flex-1 overflow-hidden">
+                    <div class="px-5 py-3 border-b border-slate-100">
+                        <div class="relative">
+                            <MagnifyingGlassIcon class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input v-model="catSearch" placeholder="Search by stock number or description…"
+                                   class="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        </div>
+                        <p v-if="catSelectedItems.length" class="text-xs text-indigo-600 mt-2 font-medium">{{ catSelectedItems.length }} item(s) selected</p>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <div v-if="catSearching" class="px-5 py-8 text-center text-sm text-slate-400">Searching…</div>
+                        <table v-else class="w-full text-sm">
+                            <thead class="bg-slate-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 w-10"></th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-32">Stock No.</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-16">Unit</th>
+                                    <th class="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase w-28">Unit Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="item in catResults" :key="item.id"
+                                    @click="toggleCatItem(item)"
+                                    class="cursor-pointer hover:bg-indigo-50 transition-colors"
+                                    :class="{ 'bg-indigo-50': isSelectedInCat(item) }">
+                                    <td class="px-3 py-2 text-center">
+                                        <input type="checkbox" :checked="isSelectedInCat(item)"
+                                               class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" readonly />
+                                    </td>
+                                    <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ item.stock_number }}</td>
+                                    <td class="px-3 py-2 text-slate-700">{{ item.description }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ item.unit }}</td>
+                                    <td class="px-3 py-2 text-right text-slate-700">₱{{ formatPeso(item.unit_cost) }}</td>
+                                </tr>
+                                <tr v-if="!catResults.length">
+                                    <td colspan="5" class="px-5 py-8 text-center text-slate-400">
+                                        {{ catSearch ? 'No items match your search.' : 'No catalogue loaded for this fiscal year. Ask the budget officer to upload the PS-DBM price list.' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+                        <button @click="showCatModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                        <button @click="proceedToSchedule" :disabled="!catSelectedItems.length"
+                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                            Next: Set Schedule ({{ catSelectedItems.length }})
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Set monthly schedule per selected item -->
+                <div v-if="showScheduleEntry" class="flex flex-col flex-1 overflow-hidden">
+                    <div class="px-5 py-3 border-b border-slate-100">
+                        <p class="text-sm text-slate-600">Set the monthly quantities and fund source for each selected item. Unit cost is from the PS-DBM catalogue and cannot be changed.</p>
+                    </div>
+                    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                        <div v-for="sel in catSelectedItems" :key="sel.catalogue_id" class="border border-slate-200 rounded-lg p-4">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <p class="font-medium text-slate-800 text-sm">{{ sel.description }}</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">{{ sel.stock_number }} · {{ sel.unit }} · <strong>₱{{ formatPeso(sel.unit_cost) }}</strong> (PS-DBM published price)</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-6 sm:grid-cols-12 gap-1.5 mb-3">
+                                <div v-for="(ml, mi) in monthLabels" :key="mi" class="text-center">
+                                    <span class="block text-xs text-slate-400 mb-0.5">{{ ml }}</span>
+                                    <input v-model.number="sel[months[mi]]" type="number" min="0"
+                                           class="w-full rounded border border-slate-200 bg-white px-1 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Fund Source *</label>
+                                    <select v-model="sel.fund_source" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option v-for="(label, key) in fundSources" :key="key" :value="key">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Proc. Quarter</label>
+                                    <select v-model="sel.procurement_quarter" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option :value="null">— Any —</option>
+                                        <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Del. Quarter</label>
+                                    <select v-model="sel.delivery_quarter" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        <option :value="null">— Any —</option>
+                                        <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Remarks</label>
+                                    <input v-model="sel.remarks" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+                        <button @click="showScheduleEntry = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Back</button>
+                        <button @click="savePart1Items" :disabled="part1Submitting"
+                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">
+                            {{ part1Submitting ? 'Saving…' : 'Add to PPMP' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Item Modal (Part I: schedule only; Part II: full edit) -->
         <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
                 <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                    <h3 class="text-base font-semibold text-slate-800">Edit Item</h3>
-                    <button @click="cancelEdit" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"><XMarkIcon class="w-5 h-5" /></button>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-800">{{ editingItem?.catalogue_id ? 'Edit PS-DBM Item Schedule' : 'Edit Item' }}</h3>
+                        <p v-if="editingItem?.catalogue_id" class="text-xs text-slate-500 mt-0.5">Description and unit cost are from the PS-DBM catalogue and cannot be changed.</p>
+                    </div>
+                    <button @click="cancelEdit" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
                 </div>
                 <div class="p-5 space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Code</label>
-                            <input v-model="editForm.code" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                        <div class="sm:col-span-2">
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Description *</label>
-                            <input v-model="editForm.description" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Unit *</label>
-                            <input v-model="editForm.unit" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                        </div>
+                    <!-- Part I: show locked fields as read-only info -->
+                    <div v-if="editingItem?.catalogue_id" class="bg-blue-50 rounded-lg p-3 text-sm">
+                        <span class="font-medium text-blue-800">{{ editingItem.description }}</span>
+                        <span class="text-blue-600 ml-2">{{ editingItem.code }} · {{ editingItem.unit }} · ₱{{ formatPeso(editingItem.unit_cost) }}</span>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Category *</label>
-                            <select v-model="editForm.category" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
-                            </select>
+
+                    <!-- Part II: full fields -->
+                    <template v-if="!editingItem?.catalogue_id">
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Code</label>
+                                <input v-model="editForm.code" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Description *</label>
+                                <input v-model="editForm.description" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Unit *</label>
+                                <input v-model="editForm.unit" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Unit Cost (₱) *</label>
-                            <input v-model="editForm.unit_cost" type="number" step="0.01" min="0.01" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Category *</label>
+                                <select v-model="editForm.category" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option v-for="(label, key) in categories" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Unit Cost (₱) *</label>
+                                <input v-model="editForm.unit_cost" type="number" step="0.01" min="0.01" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Mode of Procurement *</label>
+                                <select v-model="editForm.procurement_method" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option v-for="(label, key) in methods" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Price Source</label>
+                                <input v-model="editForm.price_source" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
                         </div>
+                    </template>
+
+                    <!-- Shared: fund source + quarters -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Mode of Procurement *</label>
-                            <select v-model="editForm.procurement_method" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option v-for="(label, key) in methods" :key="key" :value="key">{{ label }}</option>
-                            </select>
-                        </div>
-                        <div class="flex items-end">
-                            <label class="flex items-center gap-2 text-sm text-slate-700">
-                                <input v-model="editForm.is_ps_dbm" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                                PS-DBM
-                            </label>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Fund Source</label>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Fund Source *</label>
                             <select v-model="editForm.fund_source" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                 <option v-for="(label, key) in fundSources" :key="key" :value="key">{{ label }}</option>
                             </select>
@@ -619,40 +892,34 @@ const distributeEvenlyEdit = () => {
                             <label class="block text-xs font-medium text-slate-600 mb-1">Procurement Quarter</label>
                             <select v-model="editForm.procurement_quarter" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                 <option :value="null">— Any —</option>
-                                <option v-for="q in quarters" :key="q.value" :value="q.value">{{ q.label }}</option>
+                                <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-slate-600 mb-1">Delivery Quarter</label>
                             <select v-model="editForm.delivery_quarter" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                 <option :value="null">— Any —</option>
-                                <option v-for="q in quarters" :key="q.value" :value="q.value">{{ q.label }}</option>
+                                <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
                             </select>
                         </div>
-                        <div>
+                        <div v-if="!editingItem?.catalogue_id">
                             <label class="block text-xs font-medium text-slate-600 mb-1">Price Validity Date</label>
                             <input v-model="editForm.price_validity_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">Price Source</label>
-                        <input v-model="editForm.price_source" placeholder="e.g., PhilGEPS, Canvass, PS-DBM catalogue" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    </div>
 
-                    <!-- Distribute helper -->
+                    <!-- Quick-fill distribute -->
                     <div class="flex items-end gap-2 bg-slate-50 rounded-lg p-3">
                         <div>
                             <label class="block text-xs font-medium text-slate-600 mb-1">Quick fill: Total Qty</label>
-                            <input v-model.number="editDistTotal" type="number" min="0" class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            <input v-model.number="editDist.total.value" type="number" min="0" class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                         </div>
-                        <div>
-                            <select v-model="editDistMode" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                <option value="monthly">Monthly (12)</option>
-                                <option value="quarterly">Quarterly (4)</option>
-                                <option value="semi">Semi-Annual (2)</option>
-                            </select>
-                        </div>
-                        <button type="button" @click="distributeEvenlyEdit" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700">Distribute</button>
+                        <select v-model="editDist.mode.value" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="monthly">Monthly (12)</option>
+                            <option value="quarterly">Quarterly (4)</option>
+                            <option value="semi">Semi-Annual (2)</option>
+                        </select>
+                        <button type="button" @click="editDist.run()" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-200 hover:bg-slate-300 text-slate-700">Distribute</button>
                     </div>
 
                     <!-- Monthly quantities -->
@@ -675,16 +942,16 @@ const distributeEvenlyEdit = () => {
                 </div>
                 <div class="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
                     <button @click="cancelEdit" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
-                    <button @click="saveEdit" :disabled="editForm.processing" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Update Item</button>
+                    <button @click="saveEdit" :disabled="editForm.processing" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">Update</button>
                 </div>
             </div>
         </div>
 
-        <!-- Return Modal (OCD/Approver) -->
+        <!-- Return Modal -->
         <div v-if="showReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                 <h3 class="text-lg font-semibold text-slate-800 mb-3">Return PPMP for Revision</h3>
-                <textarea v-model="returnRemarks" rows="4" placeholder="Explain what needs to be corrected..."
+                <textarea v-model="returnRemarks" rows="4" placeholder="Explain what needs to be corrected…"
                           class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
                 <div class="flex justify-end gap-2">
                     <button @click="showReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
@@ -697,8 +964,8 @@ const distributeEvenlyEdit = () => {
         <div v-if="showBacReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
                 <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to End-User Unit</h3>
-                <p class="text-sm text-slate-500 mb-3">State what compliance issues need to be resolved before endorsement.</p>
-                <textarea v-model="bacRemarks" rows="4" placeholder="Compliance issues, missing justifications, threshold concerns..."
+                <p class="text-sm text-slate-500 mb-3">State what compliance issues need to be resolved.</p>
+                <textarea v-model="bacRemarks" rows="4" placeholder="Compliance issues, missing justifications…"
                           class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
                 <div class="flex justify-end gap-2">
                     <button @click="showBacReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
@@ -706,5 +973,6 @@ const distributeEvenlyEdit = () => {
                 </div>
             </div>
         </div>
+
     </AdminLayout>
 </template>

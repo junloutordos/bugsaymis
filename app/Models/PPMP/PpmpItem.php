@@ -44,7 +44,7 @@ class PpmpItem extends Model
     public const QUARTERS = [1 => 'Q1', 2 => 'Q2', 3 => 'Q3', 4 => 'Q4'];
 
     protected $fillable = [
-        'ppmp_id', 'code', 'description', 'unit', 'category', 'unit_cost',
+        'ppmp_id', 'catalogue_id', 'code', 'description', 'unit', 'category', 'unit_cost',
         'jan', 'feb', 'mar', 'apr', 'may', 'jun',
         'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
         'procurement_method', 'is_ps_dbm', 'remarks', 'sort_order',
@@ -60,15 +60,22 @@ class PpmpItem extends Model
         'procurement_quarter' => 'integer',
         'delivery_quarter'    => 'integer',
         'price_validity_date' => 'date',
+        'catalogue_id'        => 'integer',
     ];
 
-    // ─── Auto-compute totals on save ──────────────────────────────────────────
+    // ─── Auto-compute totals and enforce Part I rules on save ─────────────────
 
     protected static function booted(): void
     {
         static::saving(function (PpmpItem $item) {
             $item->total_quantity = collect(self::MONTHS)->sum(fn ($m) => (int) $item->$m);
             $item->total_cost = $item->total_quantity * $item->unit_cost;
+
+            // Part I items (from catalogue) are always Agency-to-Agency
+            if ($item->catalogue_id) {
+                $item->is_ps_dbm = true;
+                $item->procurement_method = 'agency_to_agency';
+            }
         });
     }
 
@@ -77,6 +84,11 @@ class PpmpItem extends Model
     public function ppmp()
     {
         return $this->belongsTo(Ppmp::class, 'ppmp_id');
+    }
+
+    public function catalogue()
+    {
+        return $this->belongsTo(PpmpCatalogue::class, 'catalogue_id');
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
