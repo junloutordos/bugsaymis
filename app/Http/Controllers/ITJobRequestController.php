@@ -127,26 +127,26 @@ public function index(Request $request)
     }
 
     /**
-     * Auto-assign to the MIS member with the fewest active (non-terminal) requests.
-     * Falls back to null if no MIS users exist.
+     * Auto-assign MIS personnel based on category.
+     * "Technical Assistance on Events" → Alexis Dave San Miguel (id=5).
+     * All other categories → load-balance between Junlou (id=1) and Michael (id=2).
      */
-    private function autoAssignMIS(): ?int
+    private function autoAssignMIS(string $category): ?int
     {
-        $misIds = User::havingRole('MIS')->pluck('id');
-        if ($misIds->isEmpty()) {
-            return null;
+        if ($category === 'Technical Assistance on Events') {
+            return 5;
         }
 
         $terminalStatuses = ['Request Completed', 'Rejected by Division Chief', 'Rejected by OCD'];
+        $poolIds = collect([1, 2]);
 
-        $activeCounts = ITJobRequest::whereIn('assignedto', $misIds)
+        $activeCounts = ITJobRequest::whereIn('assignedto', $poolIds)
             ->whereNotIn('status', $terminalStatuses)
             ->groupBy('assignedto')
             ->selectRaw('assignedto, COUNT(*) as cnt')
             ->pluck('cnt', 'assignedto');
 
-        // Sort by active count ASC, break ties by user ID ASC for determinism
-        return $misIds->sortBy(fn ($id) => [$activeCounts->get($id, 0), $id])->first();
+        return $poolIds->sortBy(fn ($id) => [$activeCounts->get($id, 0), $id])->first();
     }
 
     /* =====================================================
@@ -183,8 +183,8 @@ public function index(Request $request)
             return back()->withErrors(['category' => $e->getMessage()]);
         }
 
-        // Auto-assign MIS personnel (load-balanced by active request count)
-        $validated['assignedto'] = $this->autoAssignMIS();
+        // Auto-assign MIS personnel (category-routed)
+        $validated['assignedto'] = $this->autoAssignMIS($validated['category']);
 
         // Duplicate guard: same user submitted identical title+category within the last 30 seconds
         $isDuplicate = ITJobRequest::where('user_id', $request->user()->id)
