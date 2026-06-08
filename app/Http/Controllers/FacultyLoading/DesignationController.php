@@ -206,6 +206,10 @@ class DesignationController extends Controller
     {
         $this->authorize('faculty_loading.manage');
 
+        if (str_starts_with($designation->code, 'AUH-')) {
+            return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
+        }
+
         $data = $request->validate([
             'user_id'          => 'required|exists:users,id',
             'academic_term_id' => 'required|exists:academic_terms,id',
@@ -256,6 +260,11 @@ class DesignationController extends Controller
     {
         $this->authorize('faculty_loading.manage');
 
+        $assignment->load('designation');
+        if ($assignment->designation && str_starts_with($assignment->designation->code, 'AUH-')) {
+            return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
+        }
+
         $result = $this->service->revoke($assignment);
 
         if (! $result['ok']) {
@@ -279,6 +288,10 @@ class DesignationController extends Controller
 
         $designation = Designation::findOrFail($data['designation_id']);
 
+        if (str_starts_with($designation->code, 'AUH-')) {
+            return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
+        }
+
         $result = $this->service->assign(
             $facultyLoad,
             $designation,
@@ -297,6 +310,11 @@ class DesignationController extends Controller
     public function revoke(LoadAssignment $assignment): RedirectResponse
     {
         $this->authorize('faculty_loading.load_assignments');
+
+        $assignment->load('designation');
+        if ($assignment->designation && str_starts_with($assignment->designation->code, 'AUH-')) {
+            return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
+        }
 
         $result = $this->service->revoke($assignment);
 

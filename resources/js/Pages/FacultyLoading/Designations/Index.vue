@@ -97,12 +97,13 @@
                   <span v-for="h in d.holders" :key="h.assignment_id"
                     class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                     {{ h.user_name }}
-                    <button @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
+                    <button v-if="!isAuhDesignation(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
                       <XMarkIcon class="h-3 w-3" />
                     </button>
                   </span>
                 </div>
                 <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
+                <p v-if="isAuhDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Academic Units</p>
               </td>
 
               <!-- Status -->
@@ -116,8 +117,15 @@
               <!-- Actions -->
               <td class="px-5 py-3 text-right">
                 <div class="flex items-center justify-end gap-1">
+                  <!-- AUH-* designations: link to Academic Units instead -->
+                  <a v-if="isAuhDesignation(d)"
+                    :href="route('faculty-loading.academic-units.index')"
+                    class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
+                    title="Manage in Academic Units">
+                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                  </a>
                   <!-- Assign button — disabled if at capacity -->
-                  <button @click="openAssignModal(d)"
+                  <button v-else @click="openAssignModal(d)"
                     :disabled="d.max_holders !== null && d.holders.length >= d.max_holders"
                     class="p-1.5 rounded transition-colors"
                     :class="d.max_holders !== null && d.holders.length >= d.max_holders
@@ -261,7 +269,7 @@
             <span v-for="h in selectedDesig.holders" :key="h.assignment_id"
               class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
               {{ h.user_name }}
-              <button @click="revokeHolder(h); assignModal = false"
+              <button v-if="!isAuhDesignation(selectedDesig)" @click="revokeHolder(h); assignModal = false"
                 class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
                 <XMarkIcon class="h-3 w-3" />
               </button>
@@ -327,7 +335,7 @@ import { ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
-  CheckCircleIcon, ExclamationCircleIcon, PencilIcon, PlusIcon,
+  ArrowTopRightOnSquareIcon, CheckCircleIcon, ExclamationCircleIcon, PencilIcon, PlusIcon,
   TagIcon, TrashIcon, UserPlusIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -338,6 +346,12 @@ const props = defineProps({
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
 })
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isAuhDesignation(d) {
+  return d.code.startsWith('AUH-')
+}
 
 // ── Term filter ───────────────────────────────────────────────────────────────
 
