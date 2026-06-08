@@ -6,8 +6,8 @@ import { PlusIcon, MagnifyingGlassIcon, PencilIcon, ArrowUpTrayIcon, ArrowDownTr
 import axios from 'axios'
 
 const props = defineProps({ items: Array, categories: Array, officers: Array, summary: Object })
-const { props: pageProps } = usePage()
-const canManage = computed(() => pageProps.value.auth?.user?.permissions?.includes('property.manage'))
+const page = usePage()
+const canManage = computed(() => page.props.auth?.user?.permissions?.includes('property.manage'))
 
 const search = ref('')
 const filterStatus = ref('')
