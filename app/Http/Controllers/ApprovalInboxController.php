@@ -376,9 +376,12 @@ class ApprovalInboxController extends Controller
                     return app(\App\Http\Controllers\HumanResource\GatePassController::class)
                         ->approveByOCDInApp($request, $record->id);
                 }
+                // Division Chief approval: run update() for side effects (signing, notifications, DTR)
+                // but don't return its JSON response — redirect back instead.
                 $request->merge(['status' => 'Division Approved']);
-                return app(\App\Http\Controllers\HumanResource\GatePassController::class)
+                app(\App\Http\Controllers\HumanResource\GatePassController::class)
                     ->update($request, $record->id);
+                return back()->with('success', 'Gate pass approved.');
 
             case 'leave_applications':
                 $stage  = $this->resolveLeaveStage($user, $record);
@@ -467,8 +470,9 @@ class ApprovalInboxController extends Controller
                     'status'         => 'Division Declined',
                     'decline_reason' => $request->input('reason'),
                 ]);
-                return app(\App\Http\Controllers\HumanResource\GatePassController::class)
+                app(\App\Http\Controllers\HumanResource\GatePassController::class)
                     ->update($request, $record->id);
+                return back()->with('success', 'Gate pass declined.');
 
             case 'leave_applications':
                 $stage = $this->resolveLeaveStage($user, $record);
