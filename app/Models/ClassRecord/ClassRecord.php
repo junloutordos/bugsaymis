@@ -4,7 +4,7 @@ namespace App\Models\ClassRecord;
 
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
-use App\Models\Subject;
+use App\Models\FacultyLoading\Subject;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
