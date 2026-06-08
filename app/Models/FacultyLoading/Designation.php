@@ -16,6 +16,7 @@ class Designation extends Model
         'name',
         'description',
         'load_units',
+        'assignment_type',
         'requires_unit',
         'max_holders',
         'sort_order',
@@ -23,11 +24,12 @@ class Designation extends Model
     ];
 
     protected $casts = [
-        'load_units'     => 'decimal:2',
-        'requires_unit'  => 'boolean',
-        'max_holders'    => 'integer',
-        'sort_order'     => 'integer',
-        'is_active'      => 'boolean',
+        'load_units'      => 'decimal:2',
+        'assignment_type' => 'string',
+        'requires_unit'   => 'boolean',
+        'max_holders'     => 'integer',
+        'sort_order'      => 'integer',
+        'is_active'       => 'boolean',
     ];
 
     // ── Relationships ─────────────────────────────────────────────────────────

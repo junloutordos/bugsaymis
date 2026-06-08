@@ -21,14 +21,16 @@ class LoadAssignment extends Model
         'subject_id',
         'section_id',
         'load_units',
+        'is_overridden',
         'description',
         'designation_id',
         'created_by',
     ];
 
     protected $casts = [
-        'load_units' => 'decimal:2',
-        'section_id' => 'integer',
+        'load_units'   => 'decimal:2',
+        'is_overridden'=> 'boolean',
+        'section_id'   => 'integer',
     ];
 
     // ── Relationships ────────────────────────────────────────────────────────
