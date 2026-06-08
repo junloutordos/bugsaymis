@@ -33,7 +33,9 @@ class PPMPController extends Controller
         $fiscalYear = $request->input('fiscal_year', (int) date('Y'));
         $status = $request->input('status');
 
-        $query = Ppmp::with(['division:id,division_name,acronym', 'preparer:id,name'])
+        $isDivisionReviewer = $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin();
+
+        $query = Ppmp::with(['division:id,division_name,acronym', 'office:id,name', 'preparer:id,name'])
             ->forYear($fiscalYear)
             ->latest();
 
@@ -44,21 +46,32 @@ class PPMPController extends Controller
                 $query->forDivision($request->input('division_id'));
             }
         } else {
-            // Division chief and regular unit members are scoped to their own division
             if (!$user->division_id) {
                 return Inertia::render('PPMP/Index', [
-                    'ppmps'              => collect(),
-                    'filters'            => ['fiscal_year' => $fiscalYear, 'status' => $status, 'division_id' => null],
-                    'fiscalYears'        => collect([(int) date('Y')]),
-                    'divisions'          => [],
-                    'deadline'           => null,
-                    'canCreate'          => false,
-                    'canReview'          => false,
-                    'canDivisionReview'  => false,
-                    'canManageCatalogue' => false,
+                    'ppmps'                  => collect(),
+                    'filters'                => ['fiscal_year' => $fiscalYear, 'status' => $status, 'division_id' => null],
+                    'fiscalYears'            => collect([(int) date('Y')]),
+                    'divisions'              => [],
+                    'deadline'               => null,
+                    'canCreate'              => false,
+                    'canReview'              => false,
+                    'canDivisionReview'      => false,
+                    'canManageCatalogue'     => false,
+                    'hasApprovableUnitPpmps' => false,
+                    'approvableUnitPpmps'    => [],
+                    'pendingDivisionPpmps'   => [],
                 ]);
             }
-            $query->forDivision($user->division_id);
+
+            // Division Chiefs always see the full division so they can review all unit PPMPs.
+            // Regular users are scoped to their own office when assigned to one.
+            if ($isDivisionReviewer) {
+                $query->forDivision($user->division_id);
+            } elseif ($user->office_id) {
+                $query->where('office_id', $user->office_id);
+            } else {
+                $query->forDivision($user->division_id);
+            }
         }
 
         if ($status) {
@@ -84,18 +97,29 @@ class PPMPController extends Controller
                 ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym'])
                 : [],
             'deadline'           => $deadline,
-            'canCreate'              => $user->hasPermission('ppmp.create'),
-            'canReview'              => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
-            'canDivisionReview'      => $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin(),
-            'canManageCatalogue'     => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
-            'hasApprovableUnitPpmps' => ($user->hasPermission('ppmp.division_review') || $user->isSuperAdmin())
-                && $user->division_id
-                && Ppmp::forDivision($user->division_id)
+            'canCreate'          => $user->hasPermission('ppmp.create'),
+            'canReview'          => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
+            'canDivisionReview'  => $isDivisionReviewer,
+            'canManageCatalogue' => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
+            'approvableUnitPpmps'  => $isDivisionReviewer && $user->division_id
+                ? Ppmp::forDivision($user->division_id)
                     ->forYear($fiscalYear)
                     ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
                     ->where('status', Ppmp::STATUS_DIVISION_APPROVED)
                     ->whereNull('division_ppmp_id')
-                    ->exists(),
+                    ->with('office:id,name')
+                    ->get(['id', 'ppmp_number', 'title', 'office_id'])
+                    ->map(fn ($p) => ['id' => $p->id, 'ppmp_number' => $p->ppmp_number, 'title' => $p->title, 'office_name' => $p->office?->name, 'grand_total' => $p->grandTotal()])
+                : [],
+            'pendingDivisionPpmps' => $isDivisionReviewer && $user->division_id
+                ? Ppmp::forDivision($user->division_id)
+                    ->forYear($fiscalYear)
+                    ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
+                    ->where('status', Ppmp::STATUS_PENDING_DIVISION)
+                    ->with('office:id,name')
+                    ->get(['id', 'ppmp_number', 'title', 'office_id'])
+                    ->map(fn ($p) => ['id' => $p->id, 'ppmp_number' => $p->ppmp_number, 'title' => $p->title, 'office_name' => $p->office?->name])
+                : [],
         ]);
     }
 
@@ -112,15 +136,20 @@ class PPMPController extends Controller
             return back()->with('error', 'You must be assigned to a division to create a PPMP.');
         }
 
+        // Scope to the user's own office when assigned; otherwise the full division
+        $unitScope = $user->office_id
+            ? Ppmp::where('office_id', $user->office_id)
+            : Ppmp::forDivision($user->division_id);
+
         // Previous PPMPs for duplication
-        $previousPpmps = Ppmp::forDivision($user->division_id)
+        $previousPpmps = (clone $unitScope)
             ->where('fiscal_year', '<', (int) date('Y') + 1)
             ->with('division:id,division_name,acronym')
             ->latest('fiscal_year')
             ->get(['id', 'ppmp_number', 'title', 'fiscal_year', 'division_id']);
 
         // Approved PPMPs that can be supplemented (same year)
-        $supplementablePpmps = Ppmp::forDivision($user->division_id)
+        $supplementablePpmps = (clone $unitScope)
             ->whereIn('status', [Ppmp::STATUS_APPROVED, Ppmp::STATUS_CONSOLIDATED])
             ->where('is_supplemental', false)
             ->latest('fiscal_year')
