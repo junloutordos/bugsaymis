@@ -4,6 +4,7 @@ namespace App\Http\Controllers\PPMP;
 
 use App\Http\Controllers\Controller;
 use App\Models\Division;
+use App\Models\Office;
 use App\Models\PPMP\Ppmp;
 use App\Models\PPMP\PpmpItem;
 use App\Models\PPMP\PpmpSetting;
@@ -156,8 +157,8 @@ class PPMPController extends Controller
             ->get(['id', 'ppmp_number', 'title', 'fiscal_year']);
 
         return Inertia::render('PPMP/Create', [
-            'userDivision'        => $user->division,
-            'userOffice'          => $user->office,
+            'userDivision'        => Division::find($user->division_id),
+            'userOffice'          => Office::find($user->office_id),
             'fiscalYears'         => range((int) date('Y'), (int) date('Y') + 2),
             'previousPpmps'       => $previousPpmps,
             'supplementablePpmps' => $supplementablePpmps,
@@ -200,7 +201,7 @@ class PPMPController extends Controller
             }
         }
 
-        $division = $user->division;
+        $division = Division::find($user->division_id);
         if (!$division) {
             return back()->with('error', 'You must be assigned to a division to create a PPMP.');
         }
@@ -442,7 +443,7 @@ class PPMPController extends Controller
             'title'       => 'required|string|max:255',
         ]);
 
-        $division = $user->division;
+        $division = Division::find($user->division_id);
         abort_unless($division, 422, 'Division not found.');
 
         // Source: unit PPMPs that are division_approved and not yet linked to a division PPMP
