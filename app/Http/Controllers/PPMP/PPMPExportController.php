@@ -22,7 +22,7 @@ class PPMPExportController extends Controller
     {
         $this->authorize('export', $ppmp);
 
-        $ppmp->load(['division', 'preparer', 'approver']);
+        $ppmp->load(['division', 'preparer', 'approver', 'parentPpmp:id,ppmp_number']);
         $items = $ppmp->items()->get();
         $summary = $this->costService->computePPMPSummary($ppmp->id);
         $grandTotal = $ppmp->grandTotal();

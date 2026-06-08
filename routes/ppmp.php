@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\PPMP\PPMPAppController;
+use App\Http\Controllers\PPMP\PPMPCatalogueController;
 use App\Http\Controllers\PPMP\PPMPController;
 use App\Http\Controllers\PPMP\PPMPDashboardController;
 use App\Http\Controllers\PPMP\PPMPExportController;
@@ -30,6 +31,14 @@ Route::middleware(['web', 'auth', 'pshs.email'])
     ->prefix('ppmp')
     ->name('ppmp.')
     ->group(function () {
+
+        // ── Part I Catalogue (admin/budget officer) ───────────────────────────
+        Route::middleware('permission:ppmp.consolidate')->group(function () {
+            Route::get('/catalogue', [PPMPCatalogueController::class, 'index'])->name('catalogue.index');
+            Route::post('/catalogue/upload', [PPMPCatalogueController::class, 'upload'])->name('catalogue.upload');
+        });
+        // Catalogue search is available to all PPMP users (for the Part I picker modal)
+        Route::get('/catalogue/search', [PPMPCatalogueController::class, 'search'])->name('catalogue.search');
 
         // ── Dashboard (view_all only) ─────────────────────────────────────────
         Route::get('/dashboard', [PPMPDashboardController::class, 'index'])

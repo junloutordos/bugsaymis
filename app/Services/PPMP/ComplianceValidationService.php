@@ -19,22 +19,19 @@ class ComplianceValidationService
      */
     public function validatePPMP(Ppmp $ppmp, Collection $items): array
     {
-        $errors = [];
+        $errors   = [];
         $warnings = [];
 
-        // PPMP-level validations
         array_push($errors, ...$this->validatePPMPLevel($ppmp, $items));
 
-        // Item-level validations
         foreach ($items as $item) {
-            array_push($errors, ...$this->validateItem($item));
+            array_push($errors,   ...$this->validateItem($item));
 
             $thresholdResult = $this->validateThresholds($item);
-            array_push($errors, ...$thresholdResult['errors']);
+            array_push($errors,   ...$thresholdResult['errors']);
             array_push($warnings, ...$thresholdResult['warnings']);
         }
 
-        // Cross-item validations
         array_push($errors, ...$this->validateDuplicates($items));
 
         return [
@@ -98,8 +95,18 @@ class ComplianceValidationService
             $errors[] = $this->itemError($item, 'procurement_method', 'required', 'Mode of procurement is required.');
         }
 
+        // Part I integrity: catalogue items must use agency_to_agency
+        if ($item->catalogue_id && $item->procurement_method !== 'agency_to_agency') {
+            $errors[] = $this->itemError($item, 'procurement_method', 'part1_method', 'PS-DBM (Part I) items must use Agency-to-Agency procurement.');
+        }
+
+        // Fund source is mandatory — blocks submission (COA requirement)
+        if (empty($item->fund_source) || !array_key_exists($item->fund_source, PpmpItem::FUND_SOURCES)) {
+            $errors[] = $this->itemError($item, 'fund_source', 'fund_source_required', "Fund source is required for '{$item->description}' (MOOE/CO/PS/Trust Fund/SEF).");
+        }
+
         // Consistency check (should always pass due to model saving event)
-        $expectedQty = collect(PpmpItem::MONTHS)->sum(fn ($m) => (int) $item->$m);
+        $expectedQty  = collect(PpmpItem::MONTHS)->sum(fn ($m) => (int) $item->$m);
         $expectedCost = $expectedQty * $item->unit_cost;
         if (abs($item->total_cost - $expectedCost) > 0.01) {
             $errors[] = $this->itemError($item, 'total_cost', 'consistency', 'Computed total cost does not match.');
@@ -110,19 +117,33 @@ class ComplianceValidationService
 
     private function validateThresholds(PpmpItem $item): array
     {
-        $errors = [];
+        $errors   = [];
         $warnings = [];
 
         if ($item->procurement_method === 'shopping') {
             $threshold = $this->thresholds->getThreshold('shopping', $item->category);
             if ($threshold !== null && $item->total_cost > $threshold) {
                 $formatted = number_format($threshold, 0);
-                $label = PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category;
+                $label     = PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category;
                 $warnings[] = $this->itemWarning(
                     $item,
                     'procurement_method',
                     'shopping_threshold',
                     "Shopping threshold exceeded for {$label} (₱{$formatted}). Consider Competitive Bidding."
+                );
+            }
+        }
+
+        if ($item->procurement_method === 'svp') {
+            $threshold = $this->thresholds->getThreshold('svp', $item->category);
+            if ($threshold !== null && $item->total_cost > $threshold) {
+                $formatted = number_format($threshold, 0);
+                $label     = PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category;
+                $warnings[] = $this->itemWarning(
+                    $item,
+                    'procurement_method',
+                    'svp_threshold',
+                    "SVP threshold exceeded for {$label} (₱{$formatted}). Consider Competitive Bidding."
                 );
             }
         }
@@ -143,22 +164,14 @@ class ComplianceValidationService
             );
         }
 
-        if ($item->procurement_method === 'svp') {
-            $threshold = $this->thresholds->getThreshold('shopping', $item->category);
-            if ($threshold !== null && $item->total_cost > $threshold) {
-                $formatted = number_format($threshold, 0);
-                $label = PpmpItem::CATEGORY_LABELS[$item->category] ?? $item->category;
-                $warnings[] = $this->itemWarning(
-                    $item,
-                    'procurement_method',
-                    'svp_threshold',
-                    "SVP threshold exceeded for {$label} (₱{$formatted}). Consider Competitive Bidding."
-                );
-            }
-        }
-
-        if (empty($item->fund_source)) {
-            $warnings[] = $this->itemWarning($item, 'fund_source', 'fund_source_missing', 'Fund source not specified (MOOE/CO/PS). Required for COA audit.');
+        // Warn if agency_to_agency is used without a catalogue link (possible legacy/manual entry)
+        if ($item->procurement_method === 'agency_to_agency' && !$item->catalogue_id) {
+            $warnings[] = $this->itemWarning(
+                $item,
+                'procurement_method',
+                'a2a_without_catalogue',
+                "Agency-to-Agency item '{$item->description}' is not linked to the PS-DBM catalogue. Verify it is a CUSE item."
+            );
         }
 
         return ['errors' => $errors, 'warnings' => $warnings];
@@ -167,7 +180,7 @@ class ComplianceValidationService
     private function validateDuplicates(Collection $items): array
     {
         $errors = [];
-        $seen = [];
+        $seen   = [];
 
         foreach ($items as $item) {
             $key = strtolower(trim($item->description)) . '|' . strtolower(trim($item->unit)) . '|' . $item->category;
