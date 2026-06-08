@@ -1920,6 +1920,12 @@ Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     Route::get('/class-records/{classRecord}/quarters/{q}/scores',  [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'index'])->name('class-records.scores.index');
     Route::post('/class-records/{classRecord}/quarters/{q}/scores', [\App\Http\Controllers\ClassRecord\ClassRecordScoreController::class, 'upsert'])->name('class-records.scores.upsert');
 
+    // Attendance
+    Route::get('/class-records/{classRecord}/quarters/{q}/attendance',              [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'index'])->name('class-records.attendance.index');
+    Route::post('/class-records/{classRecord}/quarters/{q}/attendance/dates',       [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'storeDates'])->name('class-records.attendance.store-dates');
+    Route::delete('/class-records/{classRecord}/quarters/{q}/attendance/dates/{attendanceDate}', [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'destroyDate'])->name('class-records.attendance.destroy-date');
+    Route::post('/class-records/{classRecord}/quarters/{q}/attendance/records',     [\App\Http\Controllers\ClassRecord\ClassRecordAttendanceController::class, 'upsert'])->name('class-records.attendance.upsert');
+
     // Final grades
     Route::get('/class-records/{classRecord}/final-grades', [\App\Http\Controllers\ClassRecord\ClassRecordFinalGradeController::class, 'index'])->name('class-records.final-grades');
 
