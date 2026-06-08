@@ -320,21 +320,28 @@ class PPMPAppController extends Controller
      */
     private function buildConsolidated(int $fiscalYear): array
     {
-        $monthCols = implode(', ', array_map(fn ($m) => "COALESCE(SUM(pi.{$m}), 0) as {$m}", ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']));
+        // `dec` is a MySQL reserved word — must be backtick-quoted in raw SQL
+        $monthCols = implode(', ', array_map(
+            fn ($m) => "COALESCE(SUM(`pi`.`{$m}`), 0) as `{$m}`",
+            ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+        ));
+
+        // Pre-fetch PPMP IDs to avoid string-binding loss inside JoinClause closures
+        $ppmpIds = DB::table('ppmp')
+            ->where('fiscal_year', $fiscalYear)
+            ->whereIn('status', [Ppmp::STATUS_APPROVED, Ppmp::STATUS_CONSOLIDATED])
+            ->pluck('id')
+            ->toArray();
 
         $rows = DB::table('ppmp_catalogue as c')
-            ->leftJoin('ppmp_items as pi', function ($join) use ($fiscalYear) {
+            ->leftJoin('ppmp_items as pi', function ($join) use ($ppmpIds) {
                 $join->on('pi.catalogue_id', '=', 'c.id')
-                    ->whereIn('pi.ppmp_id', function ($sub) use ($fiscalYear) {
-                        $sub->select('id')
-                            ->from('ppmp')
-                            ->where('fiscal_year', $fiscalYear)
-                            ->whereIn('status', [Ppmp::STATUS_APPROVED, Ppmp::STATUS_CONSOLIDATED]);
-                    });
+                    ->when(count($ppmpIds) > 0, fn ($j) => $j->whereIn('pi.ppmp_id', $ppmpIds))
+                    ->when(count($ppmpIds) === 0, fn ($j) => $j->whereRaw('1 = 0'));
             })
             ->where('c.fiscal_year', $fiscalYear)
             ->where('c.is_active', true)
-            ->selectRaw("c.id, c.stock_number, c.description, c.unit, c.unit_cost, c.part, c.category_group, c.row_position, {$monthCols}, COALESCE(SUM(pi.total_quantity), 0) as total_quantity, AVG(CASE WHEN pi.office_unit_cost > 0 THEN pi.office_unit_cost END) as avg_office_unit_cost")
+            ->selectRaw("c.id, c.stock_number, c.description, c.unit, c.unit_cost, c.part, c.category_group, c.row_position, {$monthCols}, COALESCE(SUM(`pi`.`total_quantity`), 0) as total_quantity, AVG(CASE WHEN `pi`.`office_unit_cost` > 0 THEN `pi`.`office_unit_cost` END) as avg_office_unit_cost")
             ->groupBy('c.id','c.stock_number','c.description','c.unit','c.unit_cost','c.part','c.category_group','c.row_position')
             ->orderBy('c.part')
             ->orderBy('c.row_position')

@@ -29,28 +29,34 @@ class Ppmp extends Model
         'bac_reviewed_at',
         'bac_reviewed_by',
         'bac_remarks',
+        'division_reviewed_at',
+        'division_reviewed_by',
+        'division_remarks',
     ];
 
     protected $casts = [
-        'submitted_at'    => 'datetime',
-        'approved_at'     => 'datetime',
-        'consolidated_at' => 'datetime',
-        'bac_reviewed_at' => 'datetime',
-        'fiscal_year'     => 'integer',
-        'is_supplemental' => 'boolean',
+        'submitted_at'        => 'datetime',
+        'approved_at'         => 'datetime',
+        'consolidated_at'     => 'datetime',
+        'bac_reviewed_at'     => 'datetime',
+        'division_reviewed_at'=> 'datetime',
+        'fiscal_year'         => 'integer',
+        'is_supplemental'     => 'boolean',
     ];
 
     // ─── Status constants ─────────────────────────────────────────────────────
 
-    public const STATUS_DRAFT        = 'draft';
-    public const STATUS_PENDING_BAC  = 'pending_bac';
-    public const STATUS_SUBMITTED    = 'submitted';
-    public const STATUS_RETURNED     = 'returned';
-    public const STATUS_APPROVED     = 'approved';
-    public const STATUS_CONSOLIDATED = 'consolidated';
+    public const STATUS_DRAFT             = 'draft';
+    public const STATUS_PENDING_DIVISION  = 'pending_division';
+    public const STATUS_PENDING_BAC       = 'pending_bac';
+    public const STATUS_SUBMITTED         = 'submitted';
+    public const STATUS_RETURNED          = 'returned';
+    public const STATUS_APPROVED          = 'approved';
+    public const STATUS_CONSOLIDATED      = 'consolidated';
 
     public const STATUSES = [
         self::STATUS_DRAFT,
+        self::STATUS_PENDING_DIVISION,
         self::STATUS_PENDING_BAC,
         self::STATUS_SUBMITTED,
         self::STATUS_RETURNED,
@@ -90,6 +96,11 @@ class Ppmp extends Model
     public function bacReviewer()
     {
         return $this->belongsTo(User::class, 'bac_reviewed_by');
+    }
+
+    public function divisionReviewer()
+    {
+        return $this->belongsTo(User::class, 'division_reviewed_by');
     }
 
     public function parentPpmp()
@@ -137,6 +148,11 @@ class Ppmp extends Model
             && $this->items()->exists();
     }
 
+    public function canDivisionReview(): bool
+    {
+        return $this->status === self::STATUS_PENDING_DIVISION;
+    }
+
     public function canBacReview(): bool
     {
         return $this->status === self::STATUS_PENDING_BAC;
@@ -144,8 +160,6 @@ class Ppmp extends Model
 
     public function canApprove(): bool
     {
-        // Approver can act on both legacy 'submitted' and BAC-endorsed 'submitted'
-        // also allow directly approving 'pending_bac' (BAC step skipped by approver)
         return in_array($this->status, [self::STATUS_SUBMITTED, self::STATUS_PENDING_BAC]);
     }
 
@@ -154,11 +168,34 @@ class Ppmp extends Model
     public function submit(User $user): void
     {
         $from = $this->status;
-        $this->status = self::STATUS_PENDING_BAC;
+        $this->status = self::STATUS_PENDING_DIVISION;
         $this->submitted_at = now();
         $this->save();
 
+        $this->logStatusChange($from, self::STATUS_PENDING_DIVISION, $user);
+    }
+
+    public function divisionEndorse(User $user): void
+    {
+        $from = $this->status;
+        $this->status = self::STATUS_PENDING_BAC;
+        $this->division_reviewed_at = now();
+        $this->division_reviewed_by = $user->id;
+        $this->save();
+
         $this->logStatusChange($from, self::STATUS_PENDING_BAC, $user);
+    }
+
+    public function divisionReturn(User $user, string $remarks): void
+    {
+        $from = $this->status;
+        $this->status = self::STATUS_RETURNED;
+        $this->division_reviewed_at = now();
+        $this->division_reviewed_by = $user->id;
+        $this->division_remarks = $remarks;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);
     }
 
     public function endorse(User $user): void

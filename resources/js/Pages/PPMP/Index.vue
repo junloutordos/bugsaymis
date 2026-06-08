@@ -6,13 +6,14 @@ import AppBadge from '@/Components/AppBadge.vue'
 import { PlusIcon, FunnelIcon, DocumentArrowDownIcon, BuildingStorefrontIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-    ppmps: Array,
-    filters: Object,
-    fiscalYears: Array,
-    divisions: Array,
-    deadline: String,
+    ppmps:              Array,
+    filters:            Object,
+    fiscalYears:        Array,
+    divisions:          Array,
+    deadline:           String,
     canCreate:          Boolean,
     canReview:          Boolean,
+    canDivisionReview:  Boolean,
     canManageCatalogue: Boolean,
 })
 
@@ -53,12 +54,24 @@ watch([fiscalYear, statusFilter, divisionFilter], () => {
 })
 
 const statusColors = {
-    draft: 'bg-slate-100 text-slate-700',
-    submitted: 'bg-blue-100 text-blue-700',
-    returned: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
-    consolidated: 'bg-indigo-100 text-indigo-700',
+    draft:            'bg-slate-100 text-slate-700',
+    pending_division: 'bg-orange-100 text-orange-700',
+    pending_bac:      'bg-purple-100 text-purple-700',
+    submitted:        'bg-blue-100 text-blue-700',
+    returned:         'bg-amber-100 text-amber-700',
+    approved:         'bg-green-100 text-green-700',
+    consolidated:     'bg-indigo-100 text-indigo-700',
 }
+
+const statusLabel = (s) => ({
+    draft:            'Draft',
+    pending_division: 'Pending Division',
+    pending_bac:      'Pending BAC',
+    submitted:        'Submitted',
+    returned:         'Returned',
+    approved:         'Approved',
+    consolidated:     'Consolidated',
+}[s] ?? s)
 
 const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -91,6 +104,8 @@ const deadlinePassed = computed(() => {
                 <select v-model="statusFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
+                    <option value="pending_division">Pending Division</option>
+                    <option value="pending_bac">Pending BAC</option>
                     <option value="submitted">Submitted</option>
                     <option value="returned">Returned</option>
                     <option value="approved">Approved</option>
@@ -139,9 +154,9 @@ const deadlinePassed = computed(() => {
                             <td class="px-4 py-3 text-center text-slate-600">{{ p.item_count }}</td>
                             <td class="px-4 py-3 text-right text-slate-700 font-medium">₱{{ formatPeso(p.grand_total) }}</td>
                             <td class="px-4 py-3 text-center">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                                       :class="statusColors[p.status] || 'bg-slate-100 text-slate-700'">
-                                    {{ p.status }}
+                                    {{ statusLabel(p.status) }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-slate-600">{{ p.preparer?.name }}</td>

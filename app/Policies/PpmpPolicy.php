@@ -77,6 +77,19 @@ class PpmpPolicy extends GenericPolicy
         return $user->division_id === $ppmp->division_id;
     }
 
+    public function divisionReview(User $user, Ppmp $ppmp): bool
+    {
+        if (!$user->hasPermission('ppmp.division_review')) {
+            return false;
+        }
+
+        if (!$ppmp->canDivisionReview()) {
+            return false;
+        }
+
+        return $user->division_id === $ppmp->division_id;
+    }
+
     public function approve(User $user, Ppmp $ppmp): bool
     {
         if (!$user->hasPermission('ppmp.approve')) {

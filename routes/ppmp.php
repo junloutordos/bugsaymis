@@ -80,6 +80,9 @@ Route::middleware(['web', 'auth', 'pshs.email'])
         // ── Workflow ──────────────────────────────────────────────────────────
         Route::post('/{ppmp}/validate', [PPMPController::class, 'validatePpmp'])->name('validate');
         Route::post('/{ppmp}/submit', [PPMPController::class, 'submit'])->name('submit');
+        Route::post('/{ppmp}/division-review', [PPMPController::class, 'divisionReview'])
+            ->name('division_review')
+            ->middleware('permission:ppmp.division_review');
         Route::post('/{ppmp}/bac-review', [PPMPController::class, 'bacReview'])
             ->name('bac_review')
             ->middleware('permission:ppmp.bac_review');
