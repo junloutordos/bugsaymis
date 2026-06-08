@@ -23,9 +23,6 @@ class PPMPController extends Controller
     ) {
     }
 
-    /**
-     * List PPMPs — own division or all (based on permission).
-     */
     public function index(Request $request)
     {
         $this->authorize('viewAny', Ppmp::class);
@@ -34,38 +31,30 @@ class PPMPController extends Controller
         $fiscalYear = $request->input('fiscal_year', (int) date('Y'));
         $status = $request->input('status');
 
-        $isDivisionReviewer = $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin();
+        $isDivisionReviewer  = $user->hasPermission('ppmp.division_review') || $user->isSuperAdmin();
+        $isPropertyOfficer   = $user->hasPermission('ppmp.property_officer_review') && !$user->isSuperAdmin();
+        $isBudgetOfficer     = $user->hasPermission('ppmp.budget_officer_review') && !$user->isSuperAdmin();
+        $isOcd               = $user->hasPermission('ppmp.approve') && !$user->isSuperAdmin();
 
         $query = Ppmp::with(['division:id,division_name,acronym', 'office:id,name', 'preparer:id,name'])
             ->forYear($fiscalYear)
             ->latest();
 
-        // Scope visibility by role
-        if ($user->hasPermission('ppmp.view_all')) {
-            // Budget officer / admin sees everything; optional division filter
+        if ($user->hasPermission('ppmp.view_all') || $user->isSuperAdmin()) {
             if ($request->filled('division_id')) {
                 $query->forDivision($request->input('division_id'));
             }
+        } elseif ($isPropertyOfficer) {
+            // Property Officer sees all Division PPMPs and Property PPMPs
+            $query->whereIn('ppmp_type', [Ppmp::PPMP_TYPE_DIVISION, Ppmp::PPMP_TYPE_PROPERTY]);
+        } elseif ($isBudgetOfficer || $isOcd) {
+            // Budget Officer and OCD see all Property PPMPs
+            $query->where('ppmp_type', Ppmp::PPMP_TYPE_PROPERTY);
         } else {
             if (!$user->division_id) {
-                return Inertia::render('PPMP/Index', [
-                    'ppmps'                  => collect(),
-                    'filters'                => ['fiscal_year' => $fiscalYear, 'status' => $status, 'division_id' => null],
-                    'fiscalYears'            => collect([(int) date('Y')]),
-                    'divisions'              => [],
-                    'deadline'               => null,
-                    'canCreate'              => false,
-                    'canReview'              => false,
-                    'canDivisionReview'      => false,
-                    'canManageCatalogue'     => false,
-                    'hasApprovableUnitPpmps' => false,
-                    'approvableUnitPpmps'    => [],
-                    'pendingDivisionPpmps'   => [],
-                ]);
+                return Inertia::render('PPMP/Index', $this->emptyIndexProps($fiscalYear, $status));
             }
 
-            // Division Chiefs always see the full division so they can review all unit PPMPs.
-            // Regular users are scoped to their own office when assigned to one.
             if ($isDivisionReviewer) {
                 $query->forDivision($user->division_id);
             } elseif ($user->office_id) {
@@ -86,47 +75,96 @@ class PPMPController extends Controller
 
         $deadline = PpmpSetting::getValue("submission_deadline_{$fiscalYear}");
 
+        // Approvable unit PPMPs (for Division Chief consolidation banner)
+        $approvableUnitPpmps = $isDivisionReviewer && $user->division_id
+            ? Ppmp::forDivision($user->division_id)
+                ->forYear($fiscalYear)
+                ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
+                ->where('status', Ppmp::STATUS_DIVISION_APPROVED)
+                ->whereNull('division_ppmp_id')
+                ->with('office:id,name')
+                ->get(['id', 'ppmp_number', 'title', 'office_id'])
+                ->map(fn ($p) => [
+                    'id'          => $p->id,
+                    'ppmp_number' => $p->ppmp_number,
+                    'title'       => $p->title,
+                    'office_name' => $p->office?->name,
+                    'grand_total' => $p->grandTotal(),
+                ])
+            : [];
+
+        // Pending division review (for Division Chief banner)
+        $pendingDivisionPpmps = $isDivisionReviewer && $user->division_id
+            ? Ppmp::forDivision($user->division_id)
+                ->forYear($fiscalYear)
+                ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
+                ->where('status', Ppmp::STATUS_PENDING_DIVISION)
+                ->with('office:id,name')
+                ->get(['id', 'ppmp_number', 'title', 'office_id'])
+                ->map(fn ($p) => [
+                    'id'          => $p->id,
+                    'ppmp_number' => $p->ppmp_number,
+                    'title'       => $p->title,
+                    'office_name' => $p->office?->name,
+                ])
+            : [];
+
+        // Approvable division PPMPs (for Property Officer consolidation banner)
+        $approvableDivisionPpmps = $isPropertyOfficer
+            ? Ppmp::forYear($fiscalYear)
+                ->where('ppmp_type', Ppmp::PPMP_TYPE_DIVISION)
+                ->where('status', Ppmp::STATUS_PROPERTY_OFFICER_APPROVED)
+                ->whereNull('property_ppmp_id')
+                ->with('division:id,division_name,acronym')
+                ->get(['id', 'ppmp_number', 'title', 'division_id'])
+                ->map(fn ($p) => [
+                    'id'            => $p->id,
+                    'ppmp_number'   => $p->ppmp_number,
+                    'title'         => $p->title,
+                    'division_name' => $p->division?->division_name,
+                    'grand_total'   => $p->grandTotal(),
+                ])
+            : [];
+
+        // Pending property officer review (for Property Officer banner)
+        $pendingPropertyOfficerPpmps = $isPropertyOfficer
+            ? Ppmp::forYear($fiscalYear)
+                ->where('ppmp_type', Ppmp::PPMP_TYPE_DIVISION)
+                ->where('status', Ppmp::STATUS_PENDING_PROPERTY_OFFICER)
+                ->with('division:id,division_name')
+                ->get(['id', 'ppmp_number', 'title', 'division_id'])
+                ->map(fn ($p) => [
+                    'id'            => $p->id,
+                    'ppmp_number'   => $p->ppmp_number,
+                    'title'         => $p->title,
+                    'division_name' => $p->division?->division_name,
+                ])
+            : [];
+
         return Inertia::render('PPMP/Index', [
-            'ppmps'       => $ppmps,
-            'filters'     => [
+            'ppmps'                      => $ppmps,
+            'filters'                    => [
                 'fiscal_year' => $fiscalYear,
                 'status'      => $status,
                 'division_id' => $request->input('division_id'),
             ],
-            'fiscalYears' => Ppmp::distinct()->pluck('fiscal_year')->push((int) date('Y'))->unique()->sort()->values(),
-            'divisions'   => $user->hasPermission('ppmp.view_all')
+            'fiscalYears'                => Ppmp::distinct()->pluck('fiscal_year')->push((int) date('Y'))->unique()->sort()->values(),
+            'divisions'                  => ($user->hasPermission('ppmp.view_all') || $user->isSuperAdmin())
                 ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym'])
                 : [],
-            'deadline'           => $deadline,
-            'canCreate'          => $user->hasPermission('ppmp.create'),
-            'canReview'          => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
-            'canDivisionReview'  => $isDivisionReviewer,
-            'canManageCatalogue' => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
-            'approvableUnitPpmps'  => $isDivisionReviewer && $user->division_id
-                ? Ppmp::forDivision($user->division_id)
-                    ->forYear($fiscalYear)
-                    ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
-                    ->where('status', Ppmp::STATUS_DIVISION_APPROVED)
-                    ->whereNull('division_ppmp_id')
-                    ->with('office:id,name')
-                    ->get(['id', 'ppmp_number', 'title', 'office_id'])
-                    ->map(fn ($p) => ['id' => $p->id, 'ppmp_number' => $p->ppmp_number, 'title' => $p->title, 'office_name' => $p->office?->name, 'grand_total' => $p->grandTotal()])
-                : [],
-            'pendingDivisionPpmps' => $isDivisionReviewer && $user->division_id
-                ? Ppmp::forDivision($user->division_id)
-                    ->forYear($fiscalYear)
-                    ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
-                    ->where('status', Ppmp::STATUS_PENDING_DIVISION)
-                    ->with('office:id,name')
-                    ->get(['id', 'ppmp_number', 'title', 'office_id'])
-                    ->map(fn ($p) => ['id' => $p->id, 'ppmp_number' => $p->ppmp_number, 'title' => $p->title, 'office_name' => $p->office?->name])
-                : [],
+            'deadline'                   => $deadline,
+            'canCreate'                  => $user->hasPermission('ppmp.create'),
+            'canReview'                  => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
+            'canDivisionReview'          => $isDivisionReviewer,
+            'canPropertyOfficerReview'   => $isPropertyOfficer,
+            'canManageCatalogue'         => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
+            'approvableUnitPpmps'        => $approvableUnitPpmps,
+            'pendingDivisionPpmps'       => $pendingDivisionPpmps,
+            'approvableDivisionPpmps'    => $approvableDivisionPpmps,
+            'pendingPropertyOfficerPpmps'=> $pendingPropertyOfficerPpmps,
         ]);
     }
 
-    /**
-     * Show PPMP creation form.
-     */
     public function create(Request $request)
     {
         $this->authorize('create', Ppmp::class);
@@ -137,19 +175,16 @@ class PPMPController extends Controller
             return back()->with('error', 'You must be assigned to a division to create a PPMP.');
         }
 
-        // Scope to the user's own office when assigned; otherwise the full division
         $unitScope = $user->office_id
             ? Ppmp::where('office_id', $user->office_id)
             : Ppmp::forDivision($user->division_id);
 
-        // Previous PPMPs for duplication
         $previousPpmps = (clone $unitScope)
             ->where('fiscal_year', '<', (int) date('Y') + 1)
             ->with('division:id,division_name,acronym')
             ->latest('fiscal_year')
             ->get(['id', 'ppmp_number', 'title', 'fiscal_year', 'division_id']);
 
-        // Approved PPMPs that can be supplemented (same year)
         $supplementablePpmps = (clone $unitScope)
             ->whereIn('status', [Ppmp::STATUS_APPROVED, Ppmp::STATUS_CONSOLIDATED])
             ->where('is_supplemental', false)
@@ -165,9 +200,6 @@ class PPMPController extends Controller
         ]);
     }
 
-    /**
-     * Store a new PPMP.
-     */
     public function store(Request $request)
     {
         $this->authorize('create', Ppmp::class);
@@ -175,17 +207,16 @@ class PPMPController extends Controller
         $user = $request->user();
 
         $data = $request->validate([
-            'fiscal_year'      => 'required|integer|min:2020',
-            'title'            => 'required|string|max:255',
-            'source_ppmp_id'   => 'nullable|integer|exists:ppmp,id',
-            'is_supplemental'  => 'boolean',
-            'parent_ppmp_id'   => 'nullable|integer|exists:ppmp,id',
+            'fiscal_year'     => 'required|integer|min:2020',
+            'title'           => 'required|string|max:255',
+            'source_ppmp_id'  => 'nullable|integer|exists:ppmp,id',
+            'is_supplemental' => 'boolean',
+            'parent_ppmp_id'  => 'nullable|integer|exists:ppmp,id',
         ]);
 
-        $isSupplemental = ! empty($data['is_supplemental']);
+        $isSupplemental = !empty($data['is_supplemental']);
 
-        // For regular PPMPs, check for existing active one (scoped to office so each office gets its own)
-        if (! $isSupplemental) {
+        if (!$isSupplemental) {
             $scope = $user->office_id
                 ? Ppmp::where('office_id', $user->office_id)
                 : Ppmp::forDivision($user->division_id);
@@ -207,24 +238,23 @@ class PPMPController extends Controller
         }
 
         $parentNumber = null;
-        if ($isSupplemental && ! empty($data['parent_ppmp_id'])) {
+        if ($isSupplemental && !empty($data['parent_ppmp_id'])) {
             $parent = Ppmp::find($data['parent_ppmp_id']);
             $parentNumber = $parent?->ppmp_number;
         }
 
         $ppmp = Ppmp::create([
-            'ppmp_number'    => Ppmp::generateNumber($data['fiscal_year'], $division, $isSupplemental, $parentNumber),
-            'title'          => $data['title'],
-            'fiscal_year'    => $data['fiscal_year'],
-            'division_id'    => $user->division_id,
-            'office_id'      => $user->office_id,
-            'prepared_by'    => $user->id,
-            'status'         => Ppmp::STATUS_DRAFT,
-            'is_supplemental'=> $isSupplemental,
-            'parent_ppmp_id' => $isSupplemental ? ($data['parent_ppmp_id'] ?? null) : null,
+            'ppmp_number'     => Ppmp::generateNumber($data['fiscal_year'], $division, $isSupplemental, $parentNumber),
+            'title'           => $data['title'],
+            'fiscal_year'     => $data['fiscal_year'],
+            'division_id'     => $user->division_id,
+            'office_id'       => $user->office_id,
+            'prepared_by'     => $user->id,
+            'status'          => Ppmp::STATUS_DRAFT,
+            'is_supplemental' => $isSupplemental,
+            'parent_ppmp_id'  => $isSupplemental ? ($data['parent_ppmp_id'] ?? null) : null,
         ]);
 
-        // Log initial status
         PpmpStatusHistory::create([
             'ppmp_id'     => $ppmp->id,
             'from_status' => null,
@@ -232,7 +262,6 @@ class PPMPController extends Controller
             'acted_by'    => $user->id,
         ]);
 
-        // Duplicate items from source PPMP if requested
         if (!empty($data['source_ppmp_id'])) {
             $source = Ppmp::find($data['source_ppmp_id']);
             if ($source && $source->division_id === $user->division_id) {
@@ -240,7 +269,6 @@ class PPMPController extends Controller
                     $newItem = $item->replicate(['id', 'ppmp_id', 'created_at', 'updated_at']);
                     $newItem->ppmp_id = $ppmp->id;
                     $newItem->unit_cost = 0;
-                    // total_quantity and total_cost are recomputed by the saving event
                     $newItem->save();
                 }
             }
@@ -249,9 +277,6 @@ class PPMPController extends Controller
         return redirect()->route('ppmp.show', $ppmp)->with('success', 'PPMP created.');
     }
 
-    /**
-     * Show PPMP detail with items.
-     */
     public function show(Ppmp $ppmp)
     {
         $this->authorize('view', $ppmp);
@@ -267,58 +292,68 @@ class PPMPController extends Controller
             'divisionReviewer:id,name',
             'propertyOfficerReviewer:id,name',
             'budgetOfficerReviewer:id,name',
+            'ocdReviewer:id,name',
+            'dbmSubmitter:id,name',
             'parentPpmp:id,ppmp_number,title',
             'divisionPpmp:id,ppmp_number,title,status',
+            'propertyPpmp:id,ppmp_number,title,status',
             'unitPpmps:id,ppmp_number,title,status,office_id,prepared_by',
             'statusHistory.actor:id,name',
         ]);
+
+        // Load division PPMPs for property type
+        $divisionPpmps = $ppmp->ppmp_type === Ppmp::PPMP_TYPE_PROPERTY
+            ? $ppmp->divisionPpmps()->with('division:id,division_name,acronym')->get(['id', 'ppmp_number', 'title', 'status', 'division_id'])
+            : collect();
+
+        // Load unit PPMPs for division type
+        $unitPpmps = $ppmp->ppmp_type === Ppmp::PPMP_TYPE_DIVISION
+            ? $ppmp->unitPpmps()->with('office:id,name')->get(['id', 'ppmp_number', 'title', 'status', 'office_id'])
+            : collect();
 
         $items = $ppmp->items()->with('catalogue:id,part')->get()->map(function ($item) {
             $arr = $item->toArray();
             $arr['catalogue_part'] = $item->catalogue?->part;
             return $arr;
         })->values();
+
         $summary = $this->costService->computePPMPSummary($ppmp->id);
 
-        // PR utilization: PRs linked to this PPMP
         $utilization = DB::table('procurement_items')
             ->join('procurements', 'procurement_items.procurement_id', '=', 'procurements.id')
             ->where('procurements.ppmp_id', $ppmp->id)
             ->selectRaw('COUNT(DISTINCT procurements.id) as pr_count, COALESCE(SUM(procurement_items.quantity * procurement_items.unit_cost), 0) as pr_total')
             ->first();
 
-        $unitPpmps = $ppmp->ppmp_type === Ppmp::PPMP_TYPE_DIVISION
-            ? $ppmp->unitPpmps()->with('office:id,name')->get(['id', 'ppmp_number', 'title', 'status', 'office_id'])
-            : collect();
-
         return Inertia::render('PPMP/Show', [
-            'ppmp'           => $ppmp,
-            'items'          => $items,
-            'summary'        => $summary,
-            'grandTotal'     => $ppmp->grandTotal(),
-            'categories'     => PpmpItem::CATEGORY_LABELS,
-            'methods'        => PpmpItem::PROCUREMENT_METHODS,
-            'fundSources'    => PpmpItem::FUND_SOURCES,
-            'quarters'       => PpmpItem::QUARTERS,
+            'ppmp'                      => $ppmp,
+            'items'                     => $items,
+            'summary'                   => $summary,
+            'grandTotal'                => $ppmp->grandTotal(),
+            'categories'                => PpmpItem::CATEGORY_LABELS,
+            'methods'                   => PpmpItem::PROCUREMENT_METHODS,
+            'fundSources'               => PpmpItem::FUND_SOURCES,
+            'quarters'                  => PpmpItem::QUARTERS,
             'canEdit'                   => $user->can('update', $ppmp),
             'canSubmit'                 => $user->can('submit', $ppmp),
             'canDivisionReview'         => $user->can('divisionReview', $ppmp),
             'canBacReview'              => ($user->hasPermission('ppmp.bac_review') || $user->isSuperAdmin()) && $ppmp->canBacReview(),
             'canPropertyOfficerReview'  => $user->can('propertyOfficerReview', $ppmp),
             'canBudgetOfficerReview'    => $user->can('budgetOfficerReview', $ppmp),
+            'canOcdApprove'             => $user->can('ocdApprove', $ppmp),
+            'canOcdReturn'              => $user->can('ocdReturn', $ppmp),
+            'canSubmitToDbm'            => $user->can('submitToDbm', $ppmp),
             'canApprove'                => $user->can('approve', $ppmp),
             'canExport'                 => $user->can('export', $ppmp),
-            'utilization'    => [
+            'utilization'               => [
                 'pr_count' => (int) $utilization->pr_count,
                 'pr_total' => (float) $utilization->pr_total,
             ],
-            'unitPpmps' => $unitPpmps,
+            'unitPpmps'     => $unitPpmps,
+            'divisionPpmps' => $divisionPpmps,
         ]);
     }
 
-    /**
-     * Update PPMP header.
-     */
     public function update(Request $request, Ppmp $ppmp)
     {
         $this->authorize('update', $ppmp);
@@ -332,9 +367,6 @@ class PPMPController extends Controller
         return back()->with('success', 'PPMP updated.');
     }
 
-    /**
-     * Delete a draft PPMP.
-     */
     public function destroy(Ppmp $ppmp)
     {
         $this->authorize('delete', $ppmp);
@@ -344,9 +376,6 @@ class PPMPController extends Controller
         return redirect()->route('ppmp.index')->with('success', 'PPMP deleted.');
     }
 
-    /**
-     * Run compliance validation (on-demand, returns JSON).
-     */
     public function validatePpmp(Ppmp $ppmp)
     {
         $this->authorize('update', $ppmp);
@@ -357,9 +386,6 @@ class PPMPController extends Controller
         return response()->json($result);
     }
 
-    /**
-     * Submit PPMP for review.
-     */
     public function submit(Ppmp $ppmp)
     {
         $this->authorize('submit', $ppmp);
@@ -375,12 +401,15 @@ class PPMPController extends Controller
 
         $ppmp->submit(auth()->user());
 
-        return back()->with('success', 'PPMP submitted for review.');
+        $messages = [
+            Ppmp::PPMP_TYPE_UNIT     => 'PPMP submitted to Division Chief for review.',
+            Ppmp::PPMP_TYPE_DIVISION => 'Division PPMP submitted to Property Officer for review.',
+            Ppmp::PPMP_TYPE_PROPERTY => 'Property PPMP submitted to Budget Officer for evaluation.',
+        ];
+
+        return back()->with('success', $messages[$ppmp->ppmp_type] ?? 'PPMP submitted.');
     }
 
-    /**
-     * Approve a submitted PPMP.
-     */
     public function approve(Ppmp $ppmp)
     {
         $this->authorize('approve', $ppmp);
@@ -390,9 +419,6 @@ class PPMPController extends Controller
         return back()->with('success', 'PPMP approved.');
     }
 
-    /**
-     * Return a submitted PPMP for revision.
-     */
     public function returnPpmp(Request $request, Ppmp $ppmp)
     {
         $this->authorize('returnForRevision', $ppmp);
@@ -407,7 +433,7 @@ class PPMPController extends Controller
     }
 
     /**
-     * Division Chief endorsement or return.
+     * Division Chief endorsement or return of unit PPMP.
      */
     public function divisionReview(Request $request, Ppmp $ppmp)
     {
@@ -427,7 +453,7 @@ class PPMPController extends Controller
         }
 
         $ppmp->divisionEndorse($user);
-        return back()->with('success', 'PPMP endorsed and forwarded to BAC/Procurement.');
+        return back()->with('success', 'Unit PPMP approved and marked for consolidation.');
     }
 
     /**
@@ -450,7 +476,6 @@ class PPMPController extends Controller
         $division = Division::find($user->division_id);
         abort_unless($division, 422, 'Division not found.');
 
-        // Source: unit PPMPs that are division_approved and not yet linked to a division PPMP
         $unitPpmps = Ppmp::forDivision($user->division_id)
             ->forYear($data['fiscal_year'])
             ->where('ppmp_type', Ppmp::PPMP_TYPE_UNIT)
@@ -463,14 +488,14 @@ class PPMPController extends Controller
 
         $divisionPpmp = DB::transaction(function () use ($user, $data, $division, $unitPpmps) {
             $ppmp = Ppmp::create([
-                'ppmp_number'  => Ppmp::generateDivisionNumber($data['fiscal_year'], $division),
-                'title'        => $data['title'],
-                'fiscal_year'  => $data['fiscal_year'],
-                'division_id'  => $user->division_id,
-                'office_id'    => null,
-                'prepared_by'  => $user->id,
-                'status'       => Ppmp::STATUS_DRAFT,
-                'ppmp_type'    => Ppmp::PPMP_TYPE_DIVISION,
+                'ppmp_number'     => Ppmp::generateDivisionNumber($data['fiscal_year'], $division),
+                'title'           => $data['title'],
+                'fiscal_year'     => $data['fiscal_year'],
+                'division_id'     => $user->division_id,
+                'office_id'       => null,
+                'prepared_by'     => $user->id,
+                'status'          => Ppmp::STATUS_DRAFT,
+                'ppmp_type'       => Ppmp::PPMP_TYPE_DIVISION,
                 'is_supplemental' => false,
             ]);
 
@@ -495,11 +520,12 @@ class PPMPController extends Controller
             return $ppmp;
         });
 
-        return redirect()->route('ppmp.show', $divisionPpmp)->with('success', 'Division PPMP created with ' . $unitPpmps->count() . ' unit PPMP(s) consolidated.');
+        return redirect()->route('ppmp.show', $divisionPpmp)
+            ->with('success', 'Division PPMP created with ' . $unitPpmps->count() . ' unit PPMP(s) consolidated.');
     }
 
     /**
-     * Property Officer endorsement or return.
+     * Property Officer endorsement or return of division PPMP.
      */
     public function propertyOfficerReview(Request $request, Ppmp $ppmp)
     {
@@ -515,15 +541,78 @@ class PPMPController extends Controller
         if ($data['action'] === 'return') {
             abort_unless(filled($data['remarks']), 422, 'Remarks are required when returning a PPMP.');
             $ppmp->propertyOfficerReturn($user, $data['remarks']);
-            return back()->with('success', 'PPMP returned to the Division Chief for revision.');
+            return back()->with('success', 'Division PPMP returned to the Division Chief for revision.');
         }
 
         $ppmp->propertyOfficerEndorse($user);
-        return back()->with('success', 'PPMP endorsed and forwarded to Budget Officer.');
+        return back()->with('success', 'Division PPMP approved and marked for Property PPMP consolidation.');
     }
 
     /**
-     * Budget Officer endorsement or return.
+     * Property Officer consolidates all property_officer_approved division PPMPs into one Property PPMP.
+     */
+    public function propertyConsolidate(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user->hasPermission('ppmp.property_officer_review') || $user->isSuperAdmin(),
+            403
+        );
+
+        $data = $request->validate([
+            'fiscal_year' => 'required|integer|min:2020',
+            'title'       => 'required|string|max:255',
+        ]);
+
+        $divisionPpmps = Ppmp::forYear($data['fiscal_year'])
+            ->where('ppmp_type', Ppmp::PPMP_TYPE_DIVISION)
+            ->where('status', Ppmp::STATUS_PROPERTY_OFFICER_APPROVED)
+            ->whereNull('property_ppmp_id')
+            ->with('items')
+            ->get();
+
+        abort_if($divisionPpmps->isEmpty(), 422, 'No approved division PPMPs to consolidate.');
+
+        $propertyPpmp = DB::transaction(function () use ($user, $data, $divisionPpmps) {
+            $ppmp = Ppmp::create([
+                'ppmp_number'     => Ppmp::generatePropertyNumber($data['fiscal_year']),
+                'title'           => $data['title'],
+                'fiscal_year'     => $data['fiscal_year'],
+                'division_id'     => null,
+                'office_id'       => null,
+                'prepared_by'     => $user->id,
+                'status'          => Ppmp::STATUS_DRAFT,
+                'ppmp_type'       => Ppmp::PPMP_TYPE_PROPERTY,
+                'is_supplemental' => false,
+            ]);
+
+            PpmpStatusHistory::create([
+                'ppmp_id'     => $ppmp->id,
+                'from_status' => null,
+                'to_status'   => Ppmp::STATUS_DRAFT,
+                'acted_by'    => $user->id,
+            ]);
+
+            foreach ($divisionPpmps as $division) {
+                foreach ($division->items as $item) {
+                    $newItem = $item->replicate(['id', 'ppmp_id', 'created_at', 'updated_at']);
+                    $newItem->ppmp_id = $ppmp->id;
+                    $newItem->save();
+                }
+
+                $division->property_ppmp_id = $ppmp->id;
+                $division->save();
+            }
+
+            return $ppmp;
+        });
+
+        return redirect()->route('ppmp.show', $propertyPpmp)
+            ->with('success', 'Property PPMP created with ' . $divisionPpmps->count() . ' division PPMP(s) consolidated.');
+    }
+
+    /**
+     * Budget Officer endorsement or return of property PPMP.
      */
     public function budgetOfficerReview(Request $request, Ppmp $ppmp)
     {
@@ -539,15 +628,55 @@ class PPMPController extends Controller
         if ($data['action'] === 'return') {
             abort_unless(filled($data['remarks']), 422, 'Remarks are required when returning a PPMP.');
             $ppmp->budgetOfficerReturn($user, $data['remarks']);
-            return back()->with('success', 'PPMP returned to the Division Chief for revision.');
+            return back()->with('success', 'Property PPMP returned to Property Officer for revision.');
         }
 
         $ppmp->budgetOfficerEndorse($user);
-        return back()->with('success', 'PPMP endorsed and forwarded to Head of Agency for approval.');
+        return back()->with('success', 'Property PPMP submitted to OCD for final approval.');
     }
 
     /**
-     * BAC / Procurement Officer endorsement or return.
+     * OCD final approval of property PPMP.
+     */
+    public function ocdApprove(Ppmp $ppmp)
+    {
+        $this->authorize('ocdApprove', $ppmp);
+
+        $ppmp->ocdApprove(auth()->user());
+
+        return back()->with('success', 'PPMP/APP-CSE approved. Budget Officer may now submit to DBM.');
+    }
+
+    /**
+     * OCD returns property PPMP for revision.
+     */
+    public function ocdReturn(Request $request, Ppmp $ppmp)
+    {
+        $this->authorize('ocdReturn', $ppmp);
+
+        $data = $request->validate([
+            'remarks' => 'required|string|max:1000',
+        ]);
+
+        $ppmp->ocdReturn(auth()->user(), $data['remarks']);
+
+        return back()->with('success', 'PPMP returned to Budget Officer for revision.');
+    }
+
+    /**
+     * Budget Officer submits approved property PPMP to DBM.
+     */
+    public function submitToDbm(Ppmp $ppmp)
+    {
+        $this->authorize('submitToDbm', $ppmp);
+
+        $ppmp->submitToDbm(auth()->user());
+
+        return back()->with('success', 'PPMP/APP-CSE submitted to DBM.');
+    }
+
+    /**
+     * BAC / Procurement Officer endorsement or return (legacy).
      */
     public function bacReview(Request $request, Ppmp $ppmp)
     {
@@ -568,5 +697,25 @@ class PPMPController extends Controller
 
         $ppmp->endorse($user);
         return back()->with('success', 'PPMP endorsed and forwarded to approver.');
+    }
+
+    private function emptyIndexProps(int $fiscalYear, ?string $status): array
+    {
+        return [
+            'ppmps'                       => collect(),
+            'filters'                     => ['fiscal_year' => $fiscalYear, 'status' => $status, 'division_id' => null],
+            'fiscalYears'                 => collect([(int) date('Y')]),
+            'divisions'                   => [],
+            'deadline'                    => null,
+            'canCreate'                   => false,
+            'canReview'                   => false,
+            'canDivisionReview'           => false,
+            'canPropertyOfficerReview'    => false,
+            'canManageCatalogue'          => false,
+            'approvableUnitPpmps'         => [],
+            'pendingDivisionPpmps'        => [],
+            'approvableDivisionPpmps'     => [],
+            'pendingPropertyOfficerPpmps' => [],
+        ];
     }
 }

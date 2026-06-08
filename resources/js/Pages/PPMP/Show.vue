@@ -24,10 +24,14 @@ const props = defineProps({
     canBacReview:             Boolean,
     canPropertyOfficerReview: Boolean,
     canBudgetOfficerReview:   Boolean,
+    canOcdApprove:            Boolean,
+    canOcdReturn:             Boolean,
+    canSubmitToDbm:           Boolean,
     canApprove:               Boolean,
     canExport:                Boolean,
     utilization:              Object,
     unitPpmps:                Array,
+    divisionPpmps:            Array,
 })
 
 const page  = usePage()
@@ -77,12 +81,15 @@ const statusColors = {
     pending_division:             'bg-orange-100 text-orange-700',
     division_approved:            'bg-teal-100 text-teal-700',
     pending_property_officer:     'bg-yellow-100 text-yellow-800',
+    property_officer_approved:    'bg-teal-100 text-teal-700',
     pending_budget_officer:       'bg-sky-100 text-sky-700',
+    pending_ocd:                  'bg-violet-100 text-violet-700',
     pending_head:                 'bg-rose-100 text-rose-700',
     pending_bac:                  'bg-purple-100 text-purple-700',
     submitted:                    'bg-blue-100 text-blue-700',
     returned:                     'bg-amber-100 text-amber-700',
     approved:                     'bg-green-100 text-green-700',
+    submitted_to_dbm:             'bg-emerald-100 text-emerald-800',
     consolidated:                 'bg-indigo-100 text-indigo-700',
 }
 
@@ -91,12 +98,15 @@ const statusLabel = (s) => ({
     pending_division:             'Pending Division Review',
     division_approved:            'Division Approved',
     pending_property_officer:     'Pending Property Officer',
+    property_officer_approved:    'Property Officer Approved',
     pending_budget_officer:       'Pending Budget Officer',
+    pending_ocd:                  'Pending OCD Approval',
     pending_head:                 'Pending Head of Agency',
     pending_bac:                  'Pending BAC Review',
     submitted:                    'Submitted',
     returned:                     'Returned',
-    approved:                     'Approved',
+    approved:                     'OCD Approved',
+    submitted_to_dbm:             'Submitted to DBM',
     consolidated:                 'Consolidated',
 }[s] ?? s)
 
@@ -375,11 +385,13 @@ const itemHasError   = (id) => validationResult.value?.errors?.some(e => e.item_
 const itemHasWarning = (id) => validationResult.value?.warnings?.some(w => w.item_id === id)
 
 // ── Workflow ──────────────────────────────────────────────────────────────
-const submitPpmp  = () => {
-    const msg = props.ppmp.ppmp_type === 'division'
-        ? 'Submit this Division PPMP to the Property Officer for review?'
-        : 'Submit this PPMP to your Division Chief for review?'
-    if (!confirm(msg)) return
+const submitPpmp = () => {
+    const msgs = {
+        unit:     'Submit this PPMP to your Division Chief for review?',
+        division: 'Submit this Division PPMP to the Property Officer for review?',
+        property: 'Submit this Property PPMP to the Budget Officer for evaluation?',
+    }
+    if (!confirm(msgs[props.ppmp.ppmp_type] ?? 'Submit this PPMP?')) return
     router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true })
 }
 const approvePpmp = () => { if (!confirm('Approve this PPMP?')) return; router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true }) }
@@ -450,6 +462,28 @@ const budgetOfficerReturn = () => {
     })
 }
 
+// OCD approval / return
+const ocdApprove = () => {
+    if (!confirm('Approve this PPMP/APP-CSE? Budget Officer will be able to submit to DBM after this.')) return
+    router.post(route('ppmp.ocd_approve', props.ppmp.id), {}, { preserveScroll: true })
+}
+
+const showOcdReturnModal = ref(false)
+const ocdReturnRemarks   = ref('')
+const ocdReturn = () => {
+    if (!ocdReturnRemarks.value.trim()) return
+    router.post(route('ppmp.ocd_return', props.ppmp.id), { remarks: ocdReturnRemarks.value }, {
+        preserveScroll: true,
+        onSuccess: () => { showOcdReturnModal.value = false; ocdReturnRemarks.value = '' },
+    })
+}
+
+// Budget Officer submits to DBM
+const submitToDbm = () => {
+    if (!confirm('Submit this approved PPMP/APP-CSE to DBM? This is the final step.')) return
+    router.post(route('ppmp.submit_to_dbm', props.ppmp.id), {}, { preserveScroll: true })
+}
+
 // ── Utilization ───────────────────────────────────────────────────────────
 const utilizationRate = computed(() => {
     if (!props.utilization || !props.grandTotal) return 0
@@ -491,6 +525,8 @@ const utilizationRate = computed(() => {
                         </span>
                         <span v-if="ppmp.ppmp_type === 'division'"
                               class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">Division PPMP</span>
+                        <span v-if="ppmp.ppmp_type === 'property'"
+                              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">Property PPMP</span>
                         <span v-if="ppmp.is_supplemental" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Supplemental</span>
                     </div>
                     <p class="text-sm text-slate-500">
@@ -504,6 +540,12 @@ const utilizationRate = computed(() => {
                            class="underline hover:no-underline">{{ ppmp.division_ppmp.ppmp_number }}</a>
                         ({{ statusLabel(ppmp.division_ppmp.status) }})
                     </p>
+                    <p v-if="ppmp.property_ppmp" class="text-sm text-violet-700 mt-1">
+                        Property PPMP:
+                        <a :href="route('ppmp.show', ppmp.property_ppmp.id)"
+                           class="underline hover:no-underline">{{ ppmp.property_ppmp.ppmp_number }}</a>
+                        ({{ statusLabel(ppmp.property_ppmp.status) }})
+                    </p>
                     <p v-if="ppmp.remarks && ppmp.status === 'returned'" class="text-sm text-amber-700 mt-2">
                         <strong>Return remarks:</strong> {{ ppmp.remarks }}
                     </p>
@@ -516,6 +558,9 @@ const utilizationRate = computed(() => {
                     <p v-if="ppmp.budget_officer_remarks" class="text-sm text-sky-700 mt-1">
                         <strong>Budget Officer remarks:</strong> {{ ppmp.budget_officer_remarks }}
                     </p>
+                    <p v-if="ppmp.ocd_remarks" class="text-sm text-violet-700 mt-1">
+                        <strong>OCD remarks:</strong> {{ ppmp.ocd_remarks }}
+                    </p>
                     <p v-if="ppmp.bac_remarks" class="text-sm text-purple-700 mt-1">
                         <strong>BAC remarks:</strong> {{ ppmp.bac_remarks }}
                     </p>
@@ -525,18 +570,69 @@ const utilizationRate = computed(() => {
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
                         <ShieldCheckIcon class="w-4 h-4" /> Validate
                     </button>
-                    <button v-if="canSubmit" @click="submitPpmp"
+
+                    <!-- Stage 1/2/3: Submit (unit/division/property) — only in draft or returned -->
+                    <button v-if="canSubmit && ['draft','returned'].includes(ppmp.status)" @click="submitPpmp"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white">
-                        {{ ppmp.ppmp_type === 'division' ? 'Submit to Property Officer' : 'Submit to Division' }}
+                        {{ { unit: 'Submit to Division Chief', division: 'Submit to Property Officer', property: 'Submit to Budget Officer' }[ppmp.ppmp_type] ?? 'Submit' }}
                     </button>
-                    <button v-if="canDivisionReview" @click="divisionEndorse"
+
+                    <!-- Stage 2: Division Chief reviews unit PPMP -->
+                    <button v-if="canDivisionReview && ppmp.ppmp_type === 'unit' && ppmp.status === 'pending_division'"
+                            @click="divisionEndorse"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white">
                         <CheckCircleIcon class="w-4 h-4" /> Approve Unit PPMP
                     </button>
-                    <button v-if="canDivisionReview" @click="showDivisionReturnModal = true"
+                    <button v-if="canDivisionReview && ppmp.ppmp_type === 'unit' && ppmp.status === 'pending_division'"
+                            @click="showDivisionReturnModal = true"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Unit
                     </button>
+
+                    <!-- Stage 3: Property Officer reviews division PPMP -->
+                    <button v-if="canPropertyOfficerReview && ppmp.ppmp_type === 'division' && ppmp.status === 'pending_property_officer'"
+                            @click="propertyOfficerEndorse"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-yellow-500 hover:bg-yellow-600 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Approve Division PPMP
+                    </button>
+                    <button v-if="canPropertyOfficerReview && ppmp.ppmp_type === 'division' && ppmp.status === 'pending_property_officer'"
+                            @click="showPropertyReturnModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Division
+                    </button>
+
+                    <!-- Stage 4: Budget Officer reviews property PPMP → submits to OCD -->
+                    <button v-if="canBudgetOfficerReview && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_budget_officer'"
+                            @click="budgetOfficerEndorse"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Submit to OCD
+                    </button>
+                    <button v-if="canBudgetOfficerReview && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_budget_officer'"
+                            @click="showBudgetReturnModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Property Officer
+                    </button>
+
+                    <!-- Stage 5: OCD final approval / return -->
+                    <button v-if="canOcdApprove && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_ocd'"
+                            @click="ocdApprove"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Approve PPMP/APP-CSE
+                    </button>
+                    <button v-if="canOcdReturn && ppmp.ppmp_type === 'property' && ppmp.status === 'pending_ocd'"
+                            @click="showOcdReturnModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Budget Officer
+                    </button>
+
+                    <!-- Stage 6: Budget Officer submits to DBM -->
+                    <button v-if="canSubmitToDbm && ppmp.ppmp_type === 'property' && ppmp.status === 'approved'"
+                            @click="submitToDbm"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Submit to DBM
+                    </button>
+
+                    <!-- Legacy BAC flow -->
                     <button v-if="canBacReview" @click="bacEndorse"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white">
                         <CheckCircleIcon class="w-4 h-4" /> Endorse
@@ -544,22 +640,6 @@ const utilizationRate = computed(() => {
                     <button v-if="canBacReview" @click="showBacReturnModal = true"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Unit
-                    </button>
-                    <button v-if="canPropertyOfficerReview" @click="propertyOfficerEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-yellow-500 hover:bg-yellow-600 text-white">
-                        <CheckCircleIcon class="w-4 h-4" /> Endorse to Budget Officer
-                    </button>
-                    <button v-if="canPropertyOfficerReview" @click="showPropertyReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
-                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Division
-                    </button>
-                    <button v-if="canBudgetOfficerReview" @click="budgetOfficerEndorse"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white">
-                        <CheckCircleIcon class="w-4 h-4" /> Endorse to Head of Agency
-                    </button>
-                    <button v-if="canBudgetOfficerReview" @click="showBudgetReturnModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
-                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Division
                     </button>
                     <button v-if="canApprove" @click="approvePpmp"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white">
@@ -569,6 +649,7 @@ const utilizationRate = computed(() => {
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return
                     </button>
+
                     <a v-if="canExport" :href="route('ppmp.export.pdf', ppmp.id)"
                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
                         <DocumentArrowDownIcon class="w-4 h-4" /> PDF
@@ -641,6 +722,142 @@ const utilizationRate = computed(() => {
             </div>
         </div>
 
+        <!-- ══ WORKFLOW TRACKING TIMELINE ══════════════════════════════════════ -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
+            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Approval Workflow</h3>
+            <div class="flex flex-col gap-0">
+
+                <!-- Stage 1: Unit Submission (all types) -->
+                <div class="flex gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+                             :class="ppmp.submitted_at ? 'bg-teal-500 border-teal-500 text-white' : 'bg-white border-slate-300 text-slate-400'">
+                            1
+                        </div>
+                        <div class="w-0.5 flex-1 my-1"
+                             :class="ppmp.submitted_at ? 'bg-teal-300' : 'bg-slate-200'"></div>
+                    </div>
+                    <div class="pb-4 flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-700">Unit Submission</p>
+                        <p v-if="ppmp.submitted_at" class="text-xs text-slate-500 mt-0.5">
+                            {{ ppmp.preparer?.name }} ·
+                            {{ new Date(ppmp.submitted_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) }}
+                        </p>
+                        <p v-else class="text-xs text-slate-400 mt-0.5">Not yet submitted</p>
+                    </div>
+                </div>
+
+                <!-- Stage 2: Division Chief Review (all types) -->
+                <div class="flex gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+                             :class="ppmp.division_reviewed_at ? 'bg-teal-500 border-teal-500 text-white' : (ppmp.status === 'pending_division' ? 'bg-orange-100 border-orange-400 text-orange-600' : 'bg-white border-slate-300 text-slate-400')">
+                            2
+                        </div>
+                        <div class="w-0.5 flex-1 my-1"
+                             :class="ppmp.division_reviewed_at ? 'bg-teal-300' : 'bg-slate-200'"></div>
+                    </div>
+                    <div class="pb-4 flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-700">Division Chief Review</p>
+                        <p v-if="ppmp.division_reviewed_at" class="text-xs text-slate-500 mt-0.5">
+                            {{ ppmp.division_reviewer?.name }} ·
+                            {{ new Date(ppmp.division_reviewed_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) }}
+                        </p>
+                        <p v-else-if="ppmp.status === 'pending_division'" class="text-xs text-orange-600 mt-0.5 font-medium">Awaiting review</p>
+                        <p v-else class="text-xs text-slate-400 mt-0.5">Pending</p>
+                        <p v-if="ppmp.ppmp_type === 'unit' && ['division_approved'].includes(ppmp.status)" class="text-xs text-teal-600 mt-0.5">
+                            Approved → will be consolidated into Division PPMP
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Stage 3: Property Officer Review (division and property types) -->
+                <div v-if="['division','property'].includes(ppmp.ppmp_type)" class="flex gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+                             :class="ppmp.property_officer_reviewed_at ? 'bg-teal-500 border-teal-500 text-white' : (ppmp.status === 'pending_property_officer' ? 'bg-yellow-100 border-yellow-400 text-yellow-700' : 'bg-white border-slate-300 text-slate-400')">
+                            3
+                        </div>
+                        <div class="w-0.5 flex-1 my-1"
+                             :class="ppmp.property_officer_reviewed_at ? 'bg-teal-300' : 'bg-slate-200'"></div>
+                    </div>
+                    <div class="pb-4 flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-700">Property Officer Review</p>
+                        <p v-if="ppmp.property_officer_reviewed_at" class="text-xs text-slate-500 mt-0.5">
+                            {{ ppmp.property_officer_reviewer?.name }} ·
+                            {{ new Date(ppmp.property_officer_reviewed_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) }}
+                        </p>
+                        <p v-else-if="ppmp.status === 'pending_property_officer'" class="text-xs text-yellow-700 mt-0.5 font-medium">Awaiting review</p>
+                        <p v-else class="text-xs text-slate-400 mt-0.5">Pending</p>
+                        <p v-if="ppmp.ppmp_type === 'division' && ppmp.status === 'property_officer_approved'" class="text-xs text-teal-600 mt-0.5">
+                            Approved → will be consolidated into Property PPMP
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Stage 4: Budget Officer (property type only) -->
+                <div v-if="ppmp.ppmp_type === 'property'" class="flex gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+                             :class="ppmp.budget_officer_reviewed_at ? 'bg-teal-500 border-teal-500 text-white' : (ppmp.status === 'pending_budget_officer' ? 'bg-sky-100 border-sky-400 text-sky-700' : 'bg-white border-slate-300 text-slate-400')">
+                            4
+                        </div>
+                        <div class="w-0.5 flex-1 my-1"
+                             :class="ppmp.budget_officer_reviewed_at ? 'bg-teal-300' : 'bg-slate-200'"></div>
+                    </div>
+                    <div class="pb-4 flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-700">Budget Officer Evaluation</p>
+                        <p v-if="ppmp.budget_officer_reviewed_at" class="text-xs text-slate-500 mt-0.5">
+                            {{ ppmp.budget_officer_reviewer?.name }} ·
+                            {{ new Date(ppmp.budget_officer_reviewed_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) }}
+                        </p>
+                        <p v-else-if="ppmp.status === 'pending_budget_officer'" class="text-xs text-sky-700 mt-0.5 font-medium">Awaiting evaluation</p>
+                        <p v-else class="text-xs text-slate-400 mt-0.5">Pending</p>
+                    </div>
+                </div>
+
+                <!-- Stage 5: OCD Approval (property type only) -->
+                <div v-if="ppmp.ppmp_type === 'property'" class="flex gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+                             :class="ppmp.ocd_reviewed_at ? 'bg-teal-500 border-teal-500 text-white' : (ppmp.status === 'pending_ocd' ? 'bg-violet-100 border-violet-400 text-violet-700' : 'bg-white border-slate-300 text-slate-400')">
+                            5
+                        </div>
+                        <div class="w-0.5 flex-1 my-1"
+                             :class="ppmp.ocd_reviewed_at ? 'bg-teal-300' : 'bg-slate-200'"></div>
+                    </div>
+                    <div class="pb-4 flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-700">OCD Final Approval</p>
+                        <p v-if="ppmp.ocd_reviewed_at" class="text-xs text-slate-500 mt-0.5">
+                            {{ ppmp.ocd_reviewer?.name }} ·
+                            {{ new Date(ppmp.ocd_reviewed_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) }}
+                        </p>
+                        <p v-else-if="ppmp.status === 'pending_ocd'" class="text-xs text-violet-700 mt-0.5 font-medium">Awaiting OCD approval</p>
+                        <p v-else class="text-xs text-slate-400 mt-0.5">Pending</p>
+                    </div>
+                </div>
+
+                <!-- Stage 6: DBM Submission (property type only) -->
+                <div v-if="ppmp.ppmp_type === 'property'" class="flex gap-4">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
+                             :class="ppmp.submitted_to_dbm_at ? 'bg-emerald-600 border-emerald-600 text-white' : (ppmp.status === 'approved' ? 'bg-emerald-50 border-emerald-400 text-emerald-600' : 'bg-white border-slate-300 text-slate-400')">
+                            6
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-700">DBM Submission</p>
+                        <p v-if="ppmp.submitted_to_dbm_at" class="text-xs text-slate-500 mt-0.5">
+                            {{ ppmp.dbm_submitter?.name }} ·
+                            {{ new Date(ppmp.submitted_to_dbm_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric' }) }}
+                        </p>
+                        <p v-else-if="ppmp.status === 'approved'" class="text-xs text-emerald-600 mt-0.5 font-medium">Ready for DBM submission</p>
+                        <p v-else class="text-xs text-slate-400 mt-0.5">Pending</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ══ SOURCE UNIT PPMPs (Division PPMP only) ═══════════════════════════ -->
         <div v-if="ppmp.ppmp_type === 'division' && unitPpmps?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
             <div class="px-4 py-3 border-b border-slate-100 bg-teal-50">
@@ -664,6 +881,38 @@ const utilizationRate = computed(() => {
                             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
                                   :class="statusColors[u.status] ?? 'bg-slate-100 text-slate-700'">
                                 {{ statusLabel(u.status) }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ══ SOURCE DIVISION PPMPs (Property PPMP only) ══════════════════════ -->
+        <div v-if="ppmp.ppmp_type === 'property' && divisionPpmps?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+            <div class="px-4 py-3 border-b border-slate-100 bg-violet-50">
+                <h3 class="text-sm font-semibold text-violet-800">Consolidated Division PPMPs</h3>
+                <p class="text-xs text-violet-600 mt-0.5">Division PPMPs whose items were merged into this Property PPMP.</p>
+            </div>
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">PPMP No.</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Title</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Division</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr v-for="d in divisionPpmps" :key="d.id" class="hover:bg-slate-50/60 cursor-pointer"
+                        @click="router.visit(route('ppmp.show', d.id))">
+                        <td class="px-4 py-2 font-medium text-indigo-600">{{ d.ppmp_number }}</td>
+                        <td class="px-4 py-2 text-slate-700">{{ d.title }}</td>
+                        <td class="px-4 py-2 text-slate-600">{{ d.division?.division_name }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  :class="statusColors[d.status] ?? 'bg-slate-100 text-slate-700'">
+                                {{ statusLabel(d.status) }}
                             </span>
                         </td>
                     </tr>
@@ -1424,13 +1673,27 @@ const utilizationRate = computed(() => {
         <!-- Budget Officer Return Modal -->
         <div v-if="showBudgetReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
             <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Division Chief</h3>
-                <p class="text-sm text-slate-500 mb-3">State the budget-related concerns for this PPMP.</p>
+                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Property Officer</h3>
+                <p class="text-sm text-slate-500 mb-3">State the budget-related concerns for this Property PPMP.</p>
                 <textarea v-model="budgetRemarks" rows="4" placeholder="Budget availability, fund source issues…"
                           class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
                 <div class="flex justify-end gap-2">
                     <button @click="showBudgetReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
                     <button @click="budgetOfficerReturn" :disabled="!budgetRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- OCD Return Modal -->
+        <div v-if="showOcdReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Budget Officer</h3>
+                <p class="text-sm text-slate-500 mb-3">State the OCD's concerns or conditions for this PPMP/APP-CSE.</p>
+                <textarea v-model="ocdReturnRemarks" rows="4" placeholder="Policy concerns, budget alignment issues…"
+                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button @click="showOcdReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                    <button @click="ocdReturn" :disabled="!ocdReturnRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
                 </div>
             </div>
         </div>
