@@ -79,8 +79,9 @@ class PPMPController extends Controller
                 ? Division::where('status', 'active')->orderBy('division_name')->get(['id', 'division_name', 'acronym'])
                 : [],
             'deadline'    => $deadline,
-            'canCreate'   => $user->hasPermission('ppmp.create'),
-            'canReview'   => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
+            'canCreate'          => $user->hasPermission('ppmp.create'),
+            'canReview'          => $user->hasPermission('ppmp.review') || $user->hasPermission('ppmp.approve'),
+            'canManageCatalogue' => $user->hasPermission('ppmp.consolidate') || $user->isSuperAdmin(),
         ]);
     }
 
