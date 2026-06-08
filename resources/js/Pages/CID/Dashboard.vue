@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { Head, usePage, router } from '@inertiajs/vue3'
+import { ref, computed, watch } from 'vue'
+import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
 import {
@@ -9,22 +9,22 @@ import {
   ExclamationTriangleIcon,
   UserGroupIcon,
   DocumentTextIcon,
-  CheckCircleIcon,
   XMarkIcon,
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   PencilIcon,
   TrashIcon,
+  EyeIcon,
 } from '@heroicons/vue/24/outline'
 import { Bar, Line, Doughnut } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, BarElement, LineElement,
-  PointElement, ArcElement, Tooltip, Legend, Title,
+  PointElement, ArcElement, Tooltip, Legend,
 } from 'chart.js'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Tooltip, Legend, Title)
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Tooltip, Legend)
 
 const props = defineProps({
   schoolYear:     Object,
@@ -50,19 +50,35 @@ const MONTH_NAMES = [
   'July','August','September','October','November','December',
 ]
 
-const TYPE_COLORS = {
-  assessment: { bg: 'bg-red-100',    text: 'text-red-700',    dot: 'bg-red-500'   },
-  meeting:    { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-blue-500'  },
-  event:      { bg: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-green-500' },
-  training:   { bg: 'bg-amber-100',  text: 'text-amber-700',  dot: 'bg-amber-500' },
-  other:      { bg: 'bg-slate-100',  text: 'text-slate-700',  dot: 'bg-slate-400' },
+// CID-created activities (meeting/event/training/other)
+const CID_TYPE_COLORS = {
+  meeting:  { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-blue-500'  },
+  event:    { bg: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-green-500' },
+  training: { bg: 'bg-amber-100',  text: 'text-amber-700',  dot: 'bg-amber-500' },
+  other:    { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400' },
 }
 
+function eventStyle(ev) {
+  if (ev.source === 'class_record') {
+    return { bg: 'bg-red-50 border border-red-300', text: 'text-red-700', dot: 'bg-red-400' }
+  }
+  return CID_TYPE_COLORS[ev.type] ?? CID_TYPE_COLORS.other
+}
+
+function formatDate(d) {
+  const y   = d.getFullYear()
+  const m   = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const todayStr = formatDate(new Date())
+
 const calendarDays = computed(() => {
-  const first   = new Date(calYear.value, calMonth.value - 1, 1)
-  const last    = new Date(calYear.value, calMonth.value, 0)
+  const first    = new Date(calYear.value, calMonth.value - 1, 1)
+  const last     = new Date(calYear.value, calMonth.value, 0)
   const startDow = first.getDay()
-  const days    = []
+  const days     = []
 
   for (let i = 0; i < startDow; i++) {
     const d = new Date(calYear.value, calMonth.value - 1, -startDow + i + 1)
@@ -80,14 +96,15 @@ const calendarDays = computed(() => {
   return days
 })
 
-function formatDate(d) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+function dayHasMaxedSection(dayEvents) {
+  const bySec = {}
+  dayEvents.forEach(e => {
+    if (e.source === 'class_record' && e.section_id) {
+      bySec[e.section_id] = (bySec[e.section_id] || 0) + 1
+    }
+  })
+  return Object.values(bySec).some(c => c >= 3)
 }
-
-const todayStr = formatDate(new Date())
 
 async function navigateMonth(delta) {
   let m = calMonth.value + delta
@@ -105,13 +122,7 @@ async function navigateMonth(delta) {
   }
 }
 
-function assessmentsOnDay(sectionId, date) {
-  return events.value.filter(
-    e => e.type === 'assessment' && e.section_id === sectionId && e.scheduled_date === date
-  ).length
-}
-
-// ── Create / edit modal ──────────────────────────────────────────────────────
+// ── Create / edit modal (CID activities only — no assessment type) ────────────
 
 const showModal       = ref(false)
 const editingSchedule = ref(null)
@@ -119,12 +130,10 @@ const selectedDate    = ref('')
 const form            = ref(emptyForm())
 const formErrors      = ref({})
 const saving          = ref(false)
-const assessmentCount = ref(0)
-const countLoading    = ref(false)
 
 function emptyForm() {
   return {
-    title: '', type: 'assessment', scheduled_date: '',
+    title: '', type: 'meeting', scheduled_date: '',
     section_id: '', subject_id: '', start_time: '', end_time: '', description: '',
   }
 }
@@ -135,7 +144,6 @@ function openCreate(date = '') {
   form.value            = emptyForm()
   form.value.scheduled_date = date
   selectedDate.value    = date
-  assessmentCount.value = 0
   showModal.value       = true
 }
 
@@ -153,45 +161,17 @@ function openEdit(event) {
     description:    event.description ?? '',
   }
   selectedDate.value = event.scheduled_date
-  fetchAssessmentCount()
-  showModal.value = true
+  showModal.value    = true
 }
 
 function closeModal() {
-  showModal.value = false
+  showModal.value       = false
   editingSchedule.value = null
-}
-
-watch([() => form.value.type, () => form.value.section_id, () => form.value.scheduled_date], () => {
-  if (form.value.type === 'assessment' && form.value.section_id && form.value.scheduled_date) {
-    fetchAssessmentCount()
-  } else {
-    assessmentCount.value = 0
-  }
-})
-
-async function fetchAssessmentCount() {
-  if (!form.value.section_id || !form.value.scheduled_date) return
-  countLoading.value = true
-  try {
-    const { data } = await axios.get(route('cid.dashboard.assessment-count'), {
-      params: {
-        section_id:     form.value.section_id,
-        scheduled_date: form.value.scheduled_date,
-        exclude_id:     editingSchedule.value?.id ?? null,
-      },
-    })
-    assessmentCount.value = data.count
-  } catch {
-    assessmentCount.value = 0
-  } finally {
-    countLoading.value = false
-  }
 }
 
 async function saveSchedule() {
   formErrors.value = {}
-  saving.value = true
+  saving.value     = true
   try {
     const payload = {
       ...form.value,
@@ -204,18 +184,15 @@ async function saveSchedule() {
       if (idx !== -1) events.value.splice(idx, 1, data.schedule)
     } else {
       const { data } = await axios.post(route('cid.dashboard.store'), payload)
-      if (data.schedule.scheduled_date.startsWith(`${calYear.value}-${String(calMonth.value).padStart(2,'0')}`)) {
+      const prefix = `${calYear.value}-${String(calMonth.value).padStart(2, '0')}`
+      if (data.schedule.scheduled_date.startsWith(prefix)) {
         events.value.push(data.schedule)
       }
     }
     closeModal()
   } catch (err) {
     if (err.response?.status === 422) {
-      if (err.response.data.errors) {
-        formErrors.value = err.response.data.errors
-      } else {
-        formErrors.value._general = err.response.data.message
-      }
+      formErrors.value = err.response.data.errors ?? { _general: err.response.data.message }
     }
   } finally {
     saving.value = false
@@ -248,7 +225,7 @@ const barChartData = computed(() => ({
   datasets: [{
     label:           'Assessments',
     data:            props.charts.assessmentLoad.map(r => r.count),
-    backgroundColor: '#6366f1',
+    backgroundColor: '#ef4444',
     borderRadius:    4,
   }],
 }))
@@ -325,6 +302,7 @@ const donutChartOptions = {
           <CalendarDaysIcon class="w-5 h-5 text-red-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.assessments_today }}</p>
+        <p class="text-xs text-slate-400 mt-0.5">from class records</p>
       </div>
 
       <div class="bg-white rounded-xl border border-slate-200 p-4">
@@ -360,7 +338,7 @@ const donutChartOptions = {
           <DocumentTextIcon class="w-5 h-5 text-blue-400" />
         </div>
         <p class="text-3xl font-bold text-slate-800">{{ cards.activities_this_week }}</p>
-        <p class="text-xs text-slate-400 mt-0.5">activities scheduled</p>
+        <p class="text-xs text-slate-400 mt-0.5">CID activities</p>
       </div>
 
     </div>
@@ -411,15 +389,15 @@ const donutChartOptions = {
                 {{ day.day }}
               </span>
               <span
-                v-if="day.current && day.events.filter(e => e.type === 'assessment').length >= 3"
-                title="Max assessments reached"
+                v-if="day.current && dayHasMaxedSection(day.events)"
+                title="A section has reached 3 assessments today"
                 class="text-amber-500 font-bold text-[10px]"
               >3/3</span>
             </div>
             <div class="space-y-0.5 overflow-hidden">
               <div
                 v-for="ev in day.events.slice(0, 3)" :key="ev.id"
-                :class="['rounded px-1 py-0.5 truncate leading-tight', TYPE_COLORS[ev.type].bg, TYPE_COLORS[ev.type].text]"
+                :class="['rounded px-1 py-0.5 truncate leading-tight text-[11px]', eventStyle(ev).bg, eventStyle(ev).text]"
               >
                 {{ ev.title }}
               </div>
@@ -432,9 +410,13 @@ const donutChartOptions = {
 
         <!-- Legend -->
         <div class="flex flex-wrap gap-3 mt-3">
-          <div v-for="(colors, type) in TYPE_COLORS" :key="type" class="flex items-center gap-1">
+          <div class="flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full inline-block bg-red-400 border border-red-300"></span>
+            <span class="text-xs text-slate-500">Assessment (Class Record)</span>
+          </div>
+          <div v-for="(colors, type) in CID_TYPE_COLORS" :key="type" class="flex items-center gap-1">
             <span :class="['w-2 h-2 rounded-full inline-block', colors.dot]"></span>
-            <span class="text-xs text-slate-500 capitalize">{{ type }}</span>
+            <span class="text-xs text-slate-500 capitalize">{{ type }} (CID)</span>
           </div>
         </div>
       </div>
@@ -464,22 +446,27 @@ const donutChartOptions = {
           <div
             v-for="ev in (selectedDayEvents ?? todayEvents)"
             :key="ev.id"
-            :class="['rounded-lg p-2.5 border', TYPE_COLORS[ev.type].bg]"
+            :class="['rounded-lg p-2.5 border', eventStyle(ev).bg]"
           >
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
-                <span :class="['inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded mb-1', TYPE_COLORS[ev.type].bg, TYPE_COLORS[ev.type].text]">
-                  {{ ev.type }}
-                </span>
+                <div class="flex items-center gap-1.5 mb-1">
+                  <span :class="['inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded', eventStyle(ev).bg, eventStyle(ev).text]">
+                    {{ ev.source === 'class_record' ? 'Assessment' : ev.type }}
+                  </span>
+                  <EyeIcon v-if="ev.source === 'class_record'" class="w-3 h-3 text-slate-400" title="Read-only — set by teacher" />
+                </div>
                 <p class="text-sm font-medium text-slate-800 leading-tight">{{ ev.title }}</p>
                 <p v-if="ev.section_name" class="text-xs text-slate-500 mt-0.5">{{ ev.section_name }}</p>
-                <p v-if="ev.subject_name" class="text-xs text-slate-400">{{ ev.subject_name }}</p>
+                <p v-if="ev.subject_name && ev.source === 'class_record'" class="text-xs text-slate-400">{{ ev.subject_name }}</p>
                 <p v-if="ev.start_time" class="text-xs text-slate-400 mt-0.5">
                   {{ ev.start_time }}{{ ev.end_time ? ' – ' + ev.end_time : '' }}
                 </p>
                 <p v-if="ev.description" class="text-xs text-slate-500 mt-1 line-clamp-2">{{ ev.description }}</p>
+                <p v-if="ev.created_by" class="text-xs text-slate-400 mt-0.5 italic">{{ ev.source === 'class_record' ? 'Teacher: ' : 'By: ' }}{{ ev.created_by }}</p>
               </div>
-              <div class="flex gap-1 shrink-0">
+              <!-- Only CID-created events can be edited/deleted -->
+              <div v-if="ev.source === 'cid'" class="flex gap-1 shrink-0">
                 <button @click="openEdit(ev)" class="p-1 rounded hover:bg-white/60">
                   <PencilIcon class="w-3.5 h-3.5 text-slate-500" />
                 </button>
@@ -496,18 +483,17 @@ const donutChartOptions = {
     <!-- ── Row 3: Charts ─────────────────────────────────────────────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-      <!-- Assessment Load by Section -->
       <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
         <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
           Assessment Load by Section (This Month)
         </h3>
+        <p class="text-[11px] text-slate-400 mb-2">From class records</p>
         <div class="h-48">
           <Bar v-if="charts.assessmentLoad.length" :data="barChartData" :options="barChartOptions" />
-          <div v-else class="flex items-center justify-center h-full text-slate-300 text-xs">No data</div>
+          <div v-else class="flex items-center justify-center h-full text-slate-300 text-xs">No assessments scheduled</div>
         </div>
       </div>
 
-      <!-- Teacher Attendance This Week -->
       <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
         <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
           Teacher Attendance Rate (This Week)
@@ -517,7 +503,6 @@ const donutChartOptions = {
         </div>
       </div>
 
-      <!-- Class Record Status -->
       <div class="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
         <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
           Class Record Status (Current SY)
@@ -534,7 +519,7 @@ const donutChartOptions = {
 
     </div>
 
-    <!-- ── Create / Edit Modal ───────────────────────────────────────────── -->
+    <!-- ── Create / Edit Modal (CID activities only) ─────────────────────── -->
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
         <div class="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100">
@@ -548,25 +533,21 @@ const donutChartOptions = {
 
         <div class="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
 
-          <!-- General error -->
           <div v-if="formErrors._general" class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
             {{ formErrors._general }}
           </div>
 
-          <!-- Title -->
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Title <span class="text-red-500">*</span></label>
-            <input v-model="form.title" type="text" placeholder="e.g. Quarter 1 Exam"
+            <input v-model="form.title" type="text" placeholder="e.g. Department Meeting"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
             <p v-if="formErrors.title" class="text-red-500 text-xs mt-1">{{ formErrors.title[0] }}</p>
           </div>
 
-          <!-- Type -->
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Type <span class="text-red-500">*</span></label>
             <select v-model="form.type"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
-              <option value="assessment">Assessment</option>
               <option value="meeting">Meeting</option>
               <option value="event">Event</option>
               <option value="training">Training</option>
@@ -574,7 +555,6 @@ const donutChartOptions = {
             </select>
           </div>
 
-          <!-- Date -->
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Date <span class="text-red-500">*</span></label>
             <input v-model="form.scheduled_date" type="date"
@@ -582,7 +562,6 @@ const donutChartOptions = {
             <p v-if="formErrors.scheduled_date" class="text-red-500 text-xs mt-1">{{ formErrors.scheduled_date[0] }}</p>
           </div>
 
-          <!-- Section -->
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Section</label>
             <select v-model="form.section_id"
@@ -590,23 +569,8 @@ const donutChartOptions = {
               <option value="">— All sections / Not section-specific —</option>
               <option v-for="s in sections" :key="s.id" :value="s.id">{{ s.label }}</option>
             </select>
-
-            <!-- Assessment counter -->
-            <div v-if="form.type === 'assessment' && form.section_id && form.scheduled_date"
-              :class="[
-                'mt-1.5 text-xs px-2 py-1 rounded',
-                assessmentCount >= 3 ? 'bg-red-50 text-red-600 font-semibold' : 'bg-slate-50 text-slate-500'
-              ]"
-            >
-              <span v-if="countLoading">Checking…</span>
-              <span v-else>
-                {{ assessmentCount }}/3 assessments already on {{ form.scheduled_date }} for this section
-                <span v-if="assessmentCount >= 3"> — limit reached</span>
-              </span>
-            </div>
           </div>
 
-          <!-- Subject -->
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Subject</label>
             <select v-model="form.subject_id"
@@ -616,7 +580,6 @@ const donutChartOptions = {
             </select>
           </div>
 
-          <!-- Time -->
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
@@ -630,7 +593,6 @@ const donutChartOptions = {
             </div>
           </div>
 
-          <!-- Description -->
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
             <textarea v-model="form.description" rows="3" placeholder="Optional notes…"
@@ -644,11 +606,8 @@ const donutChartOptions = {
             class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
             Cancel
           </button>
-          <button
-            @click="saveSchedule"
-            :disabled="saving || (form.type === 'assessment' && form.section_id && assessmentCount >= 3)"
-            class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <button @click="saveSchedule" :disabled="saving"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
             {{ saving ? 'Saving…' : (editingSchedule ? 'Update' : 'Create') }}
           </button>
         </div>
