@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppBadge from '@/Components/AppBadge.vue'
-import { PlusIcon, FunnelIcon, DocumentArrowDownIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, FunnelIcon, DocumentArrowDownIcon, BuildingStorefrontIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
     ppmps: Array,
@@ -11,8 +11,9 @@ const props = defineProps({
     fiscalYears: Array,
     divisions: Array,
     deadline: String,
-    canCreate: Boolean,
-    canReview: Boolean,
+    canCreate:          Boolean,
+    canReview:          Boolean,
+    canManageCatalogue: Boolean,
 })
 
 const page = usePage()
@@ -102,10 +103,16 @@ const deadlinePassed = computed(() => {
                 <input v-model="search" type="text" placeholder="Search..."
                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48" />
             </div>
-            <a v-if="canCreate" :href="route('ppmp.create')"
-               class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                <PlusIcon class="w-4 h-4" /> Create PPMP
-            </a>
+            <div class="flex items-center gap-2">
+                <a v-if="canManageCatalogue" :href="route('ppmp.catalogue.index')"
+                   class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">
+                    <BuildingStorefrontIcon class="w-4 h-4" /> PS-DBM Catalogue
+                </a>
+                <a v-if="canCreate" :href="route('ppmp.create')"
+                   class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <PlusIcon class="w-4 h-4" /> Create PPMP
+                </a>
+            </div>
         </div>
 
         <!-- Table -->

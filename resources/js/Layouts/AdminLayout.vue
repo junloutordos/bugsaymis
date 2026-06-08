@@ -1100,6 +1100,27 @@ const menuItems = [
         permissions: ["ppmp.create", "ppmp.view_all"],
       },
       {
+        label: "PPMP Dashboard",
+        routeName: "ppmp.dashboard",
+        href: "/ppmp/dashboard",
+        icon: DocumentTextIcon,
+        permissions: ["ppmp.view_all"],
+      },
+      {
+        label: "PS-DBM Catalogue",
+        routeName: "ppmp.catalogue.index",
+        href: "/ppmp/catalogue",
+        icon: DocumentTextIcon,
+        permissions: ["ppmp.consolidate"],
+      },
+      {
+        label: "Annual Procurement Plan",
+        routeName: "ppmp.app.index",
+        href: "/ppmp/app",
+        icon: DocumentTextIcon,
+        permissions: ["ppmp.consolidate"],
+      },
+      {
         label: "Purchase Requests",
         routeName: "procurements.index",
         href: route("procurements.index"),
