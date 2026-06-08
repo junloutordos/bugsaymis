@@ -1320,17 +1320,10 @@ const menuItems = [
 
   {
     label: "CID Dashboard",
+    routeName: "cid.dashboard.index",
+    href: route("cid.dashboard.index"),
     icon: ChartBarIcon,
     permissions: ["cid.dashboard"],
-    children: [
-      {
-        label: "Dashboard",
-        routeName: "cid.dashboard.index",
-        href: route("cid.dashboard.index"),
-        icon: ChartBarIcon,
-        permissions: ["cid.dashboard"],
-      },
-    ],
   },
 
   {
