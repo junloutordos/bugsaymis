@@ -10,20 +10,21 @@ import {
 import axios from 'axios'
 
 const props = defineProps({
-    ppmp:        Object,
-    items:       Array,
-    summary:     Array,
-    grandTotal:  Number,
-    categories:  Object,
-    methods:     Object,
-    fundSources: Object,
-    quarters:    Array,
-    canEdit:     Boolean,
-    canSubmit:   Boolean,
-    canBacReview: Boolean,
-    canApprove:  Boolean,
-    canExport:   Boolean,
-    utilization: Object,
+    ppmp:               Object,
+    items:              Array,
+    summary:            Array,
+    grandTotal:         Number,
+    categories:         Object,
+    methods:            Object,
+    fundSources:        Object,
+    quarters:           Array,
+    canEdit:            Boolean,
+    canSubmit:          Boolean,
+    canDivisionReview:  Boolean,
+    canBacReview:       Boolean,
+    canApprove:         Boolean,
+    canExport:          Boolean,
+    utilization:        Object,
 })
 
 const page  = usePage()
@@ -69,12 +70,13 @@ const fundSourceTotals = computed(() => {
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const statusColors = {
-    draft:        'bg-slate-100 text-slate-700',
-    pending_bac:  'bg-purple-100 text-purple-700',
-    submitted:    'bg-blue-100 text-blue-700',
-    returned:     'bg-amber-100 text-amber-700',
-    approved:     'bg-green-100 text-green-700',
-    consolidated: 'bg-indigo-100 text-indigo-700',
+    draft:             'bg-slate-100 text-slate-700',
+    pending_division:  'bg-orange-100 text-orange-700',
+    pending_bac:       'bg-purple-100 text-purple-700',
+    submitted:         'bg-blue-100 text-blue-700',
+    returned:          'bg-amber-100 text-amber-700',
+    approved:          'bg-green-100 text-green-700',
+    consolidated:      'bg-indigo-100 text-indigo-700',
 }
 
 // ── Part I Catalogue Picker Modal ─────────────────────────────────────────
@@ -352,8 +354,8 @@ const itemHasError   = (id) => validationResult.value?.errors?.some(e => e.item_
 const itemHasWarning = (id) => validationResult.value?.warnings?.some(w => w.item_id === id)
 
 // ── Workflow ──────────────────────────────────────────────────────────────
-const submitPpmp  = () => { if (!confirm('Submit this PPMP for BAC review?')) return; router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true }) }
-const approvePpmp = () => { if (!confirm('Approve this PPMP?'))              return; router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true }) }
+const submitPpmp  = () => { if (!confirm('Submit this PPMP to your Division Chief for review?')) return; router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true }) }
+const approvePpmp = () => { if (!confirm('Approve this PPMP?')) return; router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true }) }
 
 const returnRemarks   = ref('')
 const showReturnModal = ref(false)
@@ -362,6 +364,21 @@ const returnPpmp = () => {
     router.post(route('ppmp.return', props.ppmp.id), { remarks: returnRemarks.value }, {
         preserveScroll: true,
         onSuccess: () => { showReturnModal.value = false; returnRemarks.value = '' },
+    })
+}
+
+// Division review
+const showDivisionReturnModal = ref(false)
+const divisionRemarks         = ref('')
+const divisionEndorse = () => {
+    if (!confirm('Endorse this PPMP to BAC/Procurement?')) return
+    router.post(route('ppmp.division_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
+}
+const divisionReturn = () => {
+    if (!divisionRemarks.value.trim()) return
+    router.post(route('ppmp.division_review', props.ppmp.id), { action: 'return', remarks: divisionRemarks.value }, {
+        preserveScroll: true,
+        onSuccess: () => { showDivisionReturnModal.value = false; divisionRemarks.value = '' },
     })
 }
 
@@ -423,6 +440,9 @@ const utilizationRate = computed(() => {
                     <p v-if="ppmp.remarks && ppmp.status === 'returned'" class="text-sm text-amber-700 mt-2">
                         <strong>Return remarks:</strong> {{ ppmp.remarks }}
                     </p>
+                    <p v-if="ppmp.division_remarks" class="text-sm text-orange-700 mt-1">
+                        <strong>Division remarks:</strong> {{ ppmp.division_remarks }}
+                    </p>
                     <p v-if="ppmp.bac_remarks" class="text-sm text-purple-700 mt-1">
                         <strong>BAC remarks:</strong> {{ ppmp.bac_remarks }}
                     </p>
@@ -434,7 +454,15 @@ const utilizationRate = computed(() => {
                     </button>
                     <button v-if="canSubmit" @click="submitPpmp"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white">
-                        Submit for BAC Review
+                        Submit to Division
+                    </button>
+                    <button v-if="canDivisionReview" @click="divisionEndorse"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-700 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Endorse to BAC
+                    </button>
+                    <button v-if="canDivisionReview" @click="showDivisionReturnModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Unit
                     </button>
                     <button v-if="canBacReview" @click="bacEndorse"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white">
@@ -1228,6 +1256,20 @@ const utilizationRate = computed(() => {
                 <div class="flex justify-end gap-2">
                     <button @click="showReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
                     <button @click="returnPpmp" :disabled="!returnRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Division Return Modal -->
+        <div v-if="showDivisionReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Unit for Revision</h3>
+                <p class="text-sm text-slate-500 mb-3">Explain what the unit needs to correct before the PPMP can be endorsed.</p>
+                <textarea v-model="divisionRemarks" rows="4" placeholder="Describe what needs to be revised or corrected…"
+                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button @click="showDivisionReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                    <button @click="divisionReturn" :disabled="!divisionRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
                 </div>
             </div>
         </div>
