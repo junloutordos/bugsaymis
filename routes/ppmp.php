@@ -57,6 +57,7 @@ Route::middleware(['web', 'auth', 'pshs.email'])
         Route::middleware('permission:ppmp.consolidate')->group(function () {
             Route::get('/app', [PPMPAppController::class, 'index'])->name('app.index');
             Route::post('/app/consolidate', [PPMPAppController::class, 'consolidate'])->name('app.consolidate');
+            Route::get('/app/export/excel', [PPMPAppController::class, 'excel'])->name('app.export.excel');
         });
 
         // ── PPMP CRUD ─────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ Route::middleware(['web', 'auth', 'pshs.email'])
 
         // ── Export ────────────────────────────────────────────────────────────
         Route::middleware('permission:ppmp.export')->group(function () {
-            Route::get('/{ppmp}/export/pdf', [PPMPExportController::class, 'pdf'])->name('export.pdf');
+            Route::get('/{ppmp}/export/pdf',   [PPMPExportController::class, 'pdf'])->name('export.pdf');
+            Route::get('/{ppmp}/export/excel', [PPMPExportController::class, 'excel'])->name('export.excel');
         });
     });

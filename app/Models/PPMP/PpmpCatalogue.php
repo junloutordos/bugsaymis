@@ -11,6 +11,10 @@ class PpmpCatalogue extends Model
 
     protected $fillable = [
         'fiscal_year',
+        'part',
+        'category_group',
+        'row_position',
+        'is_price_fixed',
         'stock_number',
         'description',
         'unit',
@@ -22,11 +26,14 @@ class PpmpCatalogue extends Model
     ];
 
     protected $casts = [
-        'unit_cost'            => 'decimal:2',
-        'price_validity_date'  => 'date',
-        'is_active'            => 'boolean',
-        'fiscal_year'          => 'integer',
-        'uploaded_at'          => 'datetime',
+        'unit_cost'           => 'decimal:2',
+        'price_validity_date' => 'date',
+        'is_active'           => 'boolean',
+        'is_price_fixed'      => 'boolean',
+        'fiscal_year'         => 'integer',
+        'part'                => 'integer',
+        'row_position'        => 'integer',
+        'uploaded_at'         => 'datetime',
     ];
 
     public function uploader()
@@ -42,5 +49,15 @@ class PpmpCatalogue extends Model
     public function scopeForYear($query, int $year)
     {
         return $query->where('fiscal_year', $year)->where('is_active', true);
+    }
+
+    public function scopePart($query, int $part)
+    {
+        return $query->where('part', $part);
+    }
+
+    public function effectiveUnitCost(): float
+    {
+        return (float) $this->unit_cost;
     }
 }

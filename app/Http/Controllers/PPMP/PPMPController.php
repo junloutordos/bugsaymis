@@ -220,7 +220,11 @@ class PPMPController extends Controller
             'statusHistory.actor:id,name',
         ]);
 
-        $items = $ppmp->items()->get();
+        $items = $ppmp->items()->with('catalogue:id,part')->get()->map(function ($item) {
+            $arr = $item->toArray();
+            $arr['catalogue_part'] = $item->catalogue?->part;
+            return $arr;
+        })->values();
         $summary = $this->costService->computePPMPSummary($ppmp->id);
 
         // PR utilization: PRs linked to this PPMP

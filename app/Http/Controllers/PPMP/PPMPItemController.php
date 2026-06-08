@@ -11,9 +11,10 @@ use Illuminate\Http\Request;
 class PPMPItemController extends Controller
 {
     /**
-     * Add a line item — two paths:
-     *   Part I  (catalogue_id present): pull description/unit/cost from catalogue, lock method to agency_to_agency
-     *   Part II (catalogue_id absent):  full manual entry
+     * Add a line item — three paths:
+     *   Part I catalogue  (catalogue.part === 1): pull all fields from catalogue, lock to agency_to_agency
+     *   Part II catalogue (catalogue.part === 2): pull description/unit from catalogue, require office_unit_cost
+     *   Manual            (no catalogue_id):      full free-form entry
      */
     public function store(Request $request, Ppmp $ppmp)
     {
@@ -22,49 +23,44 @@ class PPMPItemController extends Controller
         $catalogueId = $request->input('catalogue_id');
 
         if ($catalogueId) {
-            return $this->storePartI($request, $ppmp, (int) $catalogueId);
+            $catalogue = PpmpCatalogue::findOrFail((int) $catalogueId);
+            if ($catalogue->part === 1) {
+                return $this->storePartICatalogue($request, $ppmp, $catalogue);
+            }
+            return $this->storePartIICatalogue($request, $ppmp, $catalogue);
         }
 
-        return $this->storePartII($request, $ppmp);
+        return $this->storeManual($request, $ppmp);
     }
 
-    private function storePartI(Request $request, Ppmp $ppmp, int $catalogueId): \Illuminate\Http\RedirectResponse
+    private function monthValidation(): array
     {
-        $data = $request->validate([
+        return collect(PpmpItem::MONTHS)->mapWithKeys(fn ($m) => [$m => 'nullable|integer|min:0'])->all();
+    }
+
+    private function storePartICatalogue(Request $request, Ppmp $ppmp, PpmpCatalogue $catalogue): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validate(array_merge([
             'catalogue_id'        => 'required|integer|exists:ppmp_catalogue,id',
             'fund_source'         => 'required|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
             'procurement_quarter' => 'nullable|integer|min:1|max:4',
             'delivery_quarter'    => 'nullable|integer|min:1|max:4',
             'remarks'             => 'nullable|string|max:1000',
-            'jan'                 => 'nullable|integer|min:0',
-            'feb'                 => 'nullable|integer|min:0',
-            'mar'                 => 'nullable|integer|min:0',
-            'apr'                 => 'nullable|integer|min:0',
-            'may'                 => 'nullable|integer|min:0',
-            'jun'                 => 'nullable|integer|min:0',
-            'jul'                 => 'nullable|integer|min:0',
-            'aug'                 => 'nullable|integer|min:0',
-            'sep'                 => 'nullable|integer|min:0',
-            'oct'                 => 'nullable|integer|min:0',
-            'nov'                 => 'nullable|integer|min:0',
-            'dec'                 => 'nullable|integer|min:0',
-        ]);
+        ], $this->monthValidation()));
 
-        $catalogue = PpmpCatalogue::findOrFail($catalogueId);
-
-        // description, unit, unit_cost and method come from catalogue — not user input
         $record = array_merge($data, [
-            'ppmp_id'            => $ppmp->id,
-            'code'               => $catalogue->stock_number,
-            'description'        => $catalogue->description,
-            'unit'               => $catalogue->unit,
-            'unit_cost'          => $catalogue->unit_cost,
-            'category'           => 'goods', // PS-DBM CUSE items are always Goods
-            'procurement_method' => 'agency_to_agency',
-            'is_ps_dbm'          => true,
-            'price_source'       => 'PS-DBM Catalogue',
-            'price_validity_date'=> $catalogue->price_validity_date,
-            'sort_order'         => $ppmp->items()->where('catalogue_id', '!=', null)->count(),
+            'ppmp_id'             => $ppmp->id,
+            'catalogue_id'        => $catalogue->id,
+            'code'                => $catalogue->stock_number,
+            'description'         => $catalogue->description,
+            'unit'                => $catalogue->unit,
+            'unit_cost'           => $catalogue->unit_cost,
+            'category'            => 'goods',
+            'procurement_method'  => 'agency_to_agency',
+            'is_ps_dbm'           => true,
+            'price_source'        => 'PS-DBM Catalogue',
+            'price_validity_date' => $catalogue->price_validity_date,
+            'sort_order'          => $ppmp->items()->whereNotNull('catalogue_id')->count(),
         ]);
 
         foreach (PpmpItem::MONTHS as $m) {
@@ -76,26 +72,49 @@ class PPMPItemController extends Controller
         return back()->with('success', 'PS-DBM item added (Part I).');
     }
 
-    private function storePartII(Request $request, Ppmp $ppmp): \Illuminate\Http\RedirectResponse
+    private function storePartIICatalogue(Request $request, Ppmp $ppmp, PpmpCatalogue $catalogue): \Illuminate\Http\RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
+            'catalogue_id'        => 'required|integer|exists:ppmp_catalogue,id',
+            'office_unit_cost'    => 'required|numeric|min:0.01',
+            'fund_source'         => 'required|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
+            'procurement_method'  => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
+            'procurement_quarter' => 'nullable|integer|min:1|max:4',
+            'delivery_quarter'    => 'nullable|integer|min:1|max:4',
+            'remarks'             => 'nullable|string|max:1000',
+            'price_source'        => 'nullable|string|max:100',
+            'price_validity_date' => 'nullable|date',
+        ], $this->monthValidation()));
+
+        $record = array_merge($data, [
+            'ppmp_id'     => $ppmp->id,
+            'catalogue_id'=> $catalogue->id,
+            'code'        => $catalogue->stock_number,
+            'description' => $catalogue->description,
+            'unit'        => $catalogue->unit,
+            'unit_cost'   => $catalogue->unit_cost, // reference only; effective cost = office_unit_cost
+            'category'    => 'goods',
+            'is_ps_dbm'   => true,
+            'sort_order'  => $ppmp->items()->whereNull('catalogue_id')->count(),
+        ]);
+
+        foreach (PpmpItem::MONTHS as $m) {
+            $record[$m] = $record[$m] ?? 0;
+        }
+
+        PpmpItem::create($record);
+
+        return back()->with('success', 'Part II catalogue item added.');
+    }
+
+    private function storeManual(Request $request, Ppmp $ppmp): \Illuminate\Http\RedirectResponse
+    {
+        $data = $request->validate(array_merge([
             'code'                => 'nullable|string|max:50',
             'description'         => 'required|string|max:500',
             'unit'                => 'required|string|max:50',
             'category'            => 'required|in:' . implode(',', PpmpItem::CATEGORIES),
             'unit_cost'           => 'required|numeric|min:0.01',
-            'jan'                 => 'nullable|integer|min:0',
-            'feb'                 => 'nullable|integer|min:0',
-            'mar'                 => 'nullable|integer|min:0',
-            'apr'                 => 'nullable|integer|min:0',
-            'may'                 => 'nullable|integer|min:0',
-            'jun'                 => 'nullable|integer|min:0',
-            'jul'                 => 'nullable|integer|min:0',
-            'aug'                 => 'nullable|integer|min:0',
-            'sep'                 => 'nullable|integer|min:0',
-            'oct'                 => 'nullable|integer|min:0',
-            'nov'                 => 'nullable|integer|min:0',
-            'dec'                 => 'nullable|integer|min:0',
             'procurement_method'  => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
             'remarks'             => 'nullable|string|max:1000',
             'fund_source'         => 'required|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
@@ -103,12 +122,12 @@ class PPMPItemController extends Controller
             'delivery_quarter'    => 'nullable|integer|min:1|max:4',
             'price_source'        => 'nullable|string|max:100',
             'price_validity_date' => 'nullable|date',
-        ]);
+        ], $this->monthValidation()));
 
-        $data['ppmp_id']    = $ppmp->id;
-        $data['is_ps_dbm']  = false;
+        $data['ppmp_id']      = $ppmp->id;
+        $data['is_ps_dbm']    = false;
         $data['catalogue_id'] = null;
-        $data['sort_order'] = $ppmp->items()->where('category', $data['category'])->whereNull('catalogue_id')->count();
+        $data['sort_order']   = $ppmp->items()->whereNull('catalogue_id')->count();
 
         foreach (PpmpItem::MONTHS as $m) {
             $data[$m] = $data[$m] ?? 0;
@@ -121,7 +140,9 @@ class PPMPItemController extends Controller
 
     /**
      * Update a line item.
-     * Part I items: only monthly quantities, fund source, quarters, and remarks are editable.
+     *   Part I catalogue items:  only schedule / fund / quarter / remarks editable
+     *   Part II catalogue items: office_unit_cost + schedule + procurement fields (description/unit locked)
+     *   Manual items:            full edit
      */
     public function update(Request $request, Ppmp $ppmp, PpmpItem $item)
     {
@@ -129,54 +150,52 @@ class PPMPItemController extends Controller
         abort_if($item->ppmp_id !== $ppmp->id, 404);
 
         if ($item->catalogue_id) {
-            // Part I — only schedule/fund fields editable
-            $data = $request->validate([
+            $cat = $item->catalogue ?? PpmpCatalogue::find($item->catalogue_id);
+
+            if (!$cat || $cat->part === 1) {
+                // Part I: schedule-only
+                $data = $request->validate(array_merge([
+                    'fund_source'         => 'required|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
+                    'procurement_quarter' => 'nullable|integer|min:1|max:4',
+                    'delivery_quarter'    => 'nullable|integer|min:1|max:4',
+                    'remarks'             => 'nullable|string|max:1000',
+                ], $this->monthValidation()));
+
+                foreach (PpmpItem::MONTHS as $m) {
+                    $data[$m] = $data[$m] ?? 0;
+                }
+
+                $item->update($data);
+                return back()->with('success', 'PS-DBM item schedule updated.');
+            }
+
+            // Part II catalogue: allow price + scheduling fields
+            $data = $request->validate(array_merge([
+                'office_unit_cost'    => 'required|numeric|min:0.01',
                 'fund_source'         => 'required|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
+                'procurement_method'  => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
                 'procurement_quarter' => 'nullable|integer|min:1|max:4',
                 'delivery_quarter'    => 'nullable|integer|min:1|max:4',
                 'remarks'             => 'nullable|string|max:1000',
-                'jan'                 => 'nullable|integer|min:0',
-                'feb'                 => 'nullable|integer|min:0',
-                'mar'                 => 'nullable|integer|min:0',
-                'apr'                 => 'nullable|integer|min:0',
-                'may'                 => 'nullable|integer|min:0',
-                'jun'                 => 'nullable|integer|min:0',
-                'jul'                 => 'nullable|integer|min:0',
-                'aug'                 => 'nullable|integer|min:0',
-                'sep'                 => 'nullable|integer|min:0',
-                'oct'                 => 'nullable|integer|min:0',
-                'nov'                 => 'nullable|integer|min:0',
-                'dec'                 => 'nullable|integer|min:0',
-            ]);
+                'price_source'        => 'nullable|string|max:100',
+                'price_validity_date' => 'nullable|date',
+            ], $this->monthValidation()));
 
             foreach (PpmpItem::MONTHS as $m) {
                 $data[$m] = $data[$m] ?? 0;
             }
 
             $item->update($data);
-
-            return back()->with('success', 'PS-DBM item schedule updated.');
+            return back()->with('success', 'Part II catalogue item updated.');
         }
 
-        // Part II — full update
-        $data = $request->validate([
+        // Manual: full edit
+        $data = $request->validate(array_merge([
             'code'                => 'nullable|string|max:50',
             'description'         => 'required|string|max:500',
             'unit'                => 'required|string|max:50',
             'category'            => 'required|in:' . implode(',', PpmpItem::CATEGORIES),
             'unit_cost'           => 'required|numeric|min:0.01',
-            'jan'                 => 'nullable|integer|min:0',
-            'feb'                 => 'nullable|integer|min:0',
-            'mar'                 => 'nullable|integer|min:0',
-            'apr'                 => 'nullable|integer|min:0',
-            'may'                 => 'nullable|integer|min:0',
-            'jun'                 => 'nullable|integer|min:0',
-            'jul'                 => 'nullable|integer|min:0',
-            'aug'                 => 'nullable|integer|min:0',
-            'sep'                 => 'nullable|integer|min:0',
-            'oct'                 => 'nullable|integer|min:0',
-            'nov'                 => 'nullable|integer|min:0',
-            'dec'                 => 'nullable|integer|min:0',
             'procurement_method'  => 'required|in:' . implode(',', array_keys(PpmpItem::PROCUREMENT_METHODS)),
             'remarks'             => 'nullable|string|max:1000',
             'fund_source'         => 'required|in:' . implode(',', array_keys(PpmpItem::FUND_SOURCES)),
@@ -184,14 +203,13 @@ class PPMPItemController extends Controller
             'delivery_quarter'    => 'nullable|integer|min:1|max:4',
             'price_source'        => 'nullable|string|max:100',
             'price_validity_date' => 'nullable|date',
-        ]);
+        ], $this->monthValidation()));
 
         foreach (PpmpItem::MONTHS as $m) {
             $data[$m] = $data[$m] ?? 0;
         }
 
         $item->update($data);
-
         return back()->with('success', 'Item updated.');
     }
 
