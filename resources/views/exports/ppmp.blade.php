@@ -219,29 +219,29 @@
         </tbody>
     </table>
 
-    {{-- ── Certification / Signature Block ── --}}
+    {{-- ── Certification / Signature Block (APP-CSE prescribed format) ── --}}
     <div class="sig-section">
         <table class="sig-table">
             <tr>
                 <td>
                     Prepared by:<br>
                     <span class="sig-line"></span>
-                    <strong>{{ $ppmp->preparer?->name }}</strong><br>
-                    {{ $ppmp->preparer?->position ?? 'End-User Representative' }}<br>
+                    <strong>{{ strtoupper($ppmp->preparer?->name ?? '') }}</strong><br>
+                    {{ $ppmp->preparer?->position ?? 'Property / Supply Officer' }}<br>
                     Date: _______________
                 </td>
                 <td>
-                    Reviewed and Endorsed by:<br>
+                    Reviewed/Certified by:<br>
                     <span class="sig-line"></span>
                     ___________________________<br>
-                    BAC Chairperson / Secretariat<br>
+                    BAC Chairperson / Accountant / Budget Officer<br>
                     Date: {{ $ppmp->bac_reviewed_at?->format('M d, Y') ?? '_______________' }}
                 </td>
                 <td>
                     Approved by:<br>
                     <span class="sig-line"></span>
-                    {{ $ppmp->approver?->name ?? '___________________________' }}<br>
-                    Head of Procuring Entity (HoPE)<br>
+                    {{ strtoupper($ppmp->approver?->name ?? '') ?: '___________________________' }}<br>
+                    Head of Office / Agency<br>
                     Date: {{ $ppmp->approved_at?->format('M d, Y') ?? '_______________' }}
                 </td>
             </tr>

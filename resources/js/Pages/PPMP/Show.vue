@@ -35,8 +35,9 @@ const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 // ── Part I / Part II split ────────────────────────────────────────────────
-const part1Items = computed(() => props.items.filter(i => i.catalogue_id))
-const part2Items = computed(() => props.items.filter(i => !i.catalogue_id))
+// catalogue_part is injected by the controller (ppmp_catalogue.part)
+const part1Items = computed(() => props.items.filter(i => i.catalogue_part === 1))
+const part2Items = computed(() => props.items.filter(i => i.catalogue_part !== 1)) // includes manual (null) + Part II catalogue (2)
 
 // Group Part II items by category (preserving order: goods → infrastructure → consulting)
 const CATEGORY_ORDER = ['goods', 'infrastructure', 'consulting_services']
@@ -48,6 +49,9 @@ const part2ByCategory = computed(() => {
 
 const part1Total = computed(() => part1Items.value.reduce((s, i) => s + Number(i.total_cost), 0))
 const part2Total = computed(() => part2Items.value.reduce((s, i) => s + Number(i.total_cost), 0))
+
+// Effective unit cost: Part II catalogue items use office_unit_cost; others use unit_cost
+const effectiveUnitCost = (item) => Number(item.office_unit_cost) > 0 ? Number(item.office_unit_cost) : Number(item.unit_cost)
 
 // Fund-source breakdown across all items
 const fundSourceTotals = computed(() => {
@@ -80,7 +84,7 @@ const searchCatalogue = async () => {
     catSearching.value = true
     try {
         const { data } = await axios.get(route('ppmp.catalogue.search'), {
-            params: { fiscal_year: props.ppmp.fiscal_year, q: catSearch.value },
+            params: { fiscal_year: props.ppmp.fiscal_year, q: catSearch.value, part: 1 },
         })
         catResults.value = data
     } catch {
@@ -145,6 +149,83 @@ const savePart1Items = async () => {
     showScheduleEntry.value = false
 }
 
+// ── Part II Catalogue Picker Modal ────────────────────────────────────────
+const showCat2Modal      = ref(false)
+const cat2Search         = ref('')
+const cat2Results        = ref([])
+const cat2Searching      = ref(false)
+const cat2SelectedItems  = ref([])   // { catalogue_id, stock_number, description, unit, office_unit_cost, ... }
+
+const searchCatalogue2 = async () => {
+    cat2Searching.value = true
+    try {
+        const { data } = await axios.get(route('ppmp.catalogue.search'), {
+            params: { fiscal_year: props.ppmp.fiscal_year, q: cat2Search.value, part: 2 },
+        })
+        cat2Results.value = data
+    } catch {
+        cat2Results.value = []
+    }
+    cat2Searching.value = false
+}
+
+watch(cat2Search, (val) => {
+    if (val.length >= 2 || val === '') searchCatalogue2()
+})
+
+const openCat2Modal = () => {
+    cat2Search.value = ''
+    cat2Results.value = []
+    cat2SelectedItems.value = []
+    searchCatalogue2()
+    showCat2Modal.value = true
+}
+
+const isSelectedInCat2  = (item) => cat2SelectedItems.value.some(s => s.catalogue_id === item.id)
+const toggleCat2Item    = (item) => {
+    if (isSelectedInCat2(item)) {
+        cat2SelectedItems.value = cat2SelectedItems.value.filter(s => s.catalogue_id !== item.id)
+    } else {
+        cat2SelectedItems.value.push({
+            catalogue_id:        item.id,
+            stock_number:        item.stock_number,
+            description:         item.description,
+            unit:                item.unit,
+            office_unit_cost:    '',
+            procurement_method:  'competitive_bidding',
+            fund_source:         'mooe',
+            price_source:        '',
+            price_validity_date: '',
+            procurement_quarter: null,
+            delivery_quarter:    null,
+            remarks:             '',
+            ...Object.fromEntries(months.map(m => [m, 0])),
+        })
+    }
+}
+
+const showSchedule2Entry  = ref(false)
+const proceedToSchedule2  = () => {
+    if (!cat2SelectedItems.value.length) return
+    showSchedule2Entry.value = true
+}
+
+const part2CatSubmitting = ref(false)
+const savePart2CatItems = async () => {
+    part2CatSubmitting.value = true
+    for (const sel of cat2SelectedItems.value) {
+        await new Promise((resolve) => {
+            router.post(route('ppmp.items.store', props.ppmp.id), sel, {
+                preserveScroll: true,
+                onFinish: resolve,
+            })
+        })
+    }
+    part2CatSubmitting.value = false
+    showCat2Modal.value      = false
+    showSchedule2Entry.value = false
+}
+
 // ── Part II Add/Edit Forms ────────────────────────────────────────────────
 const showAddForm = ref(false)
 const itemForm    = useForm({
@@ -185,7 +266,9 @@ const editForm      = useForm({
     fund_source: 'mooe', procurement_quarter: null, delivery_quarter: null, remarks: '',
     jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
     jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0,
-    // Part II extra fields
+    // Part II catalogue extra field
+    office_unit_cost: '',
+    // Manual Part II extra fields
     code: '', description: '', unit: '', category: 'goods', unit_cost: '',
     procurement_method: 'competitive_bidding', price_source: '', price_validity_date: '',
 })
@@ -199,6 +282,7 @@ const startEdit = (item) => {
         procurement_quarter: item.procurement_quarter || null,
         delivery_quarter:    item.delivery_quarter    || null,
         remarks:             item.remarks || '',
+        office_unit_cost:    item.office_unit_cost || '',
         code:                item.code || '',
         description:         item.description,
         unit:                item.unit,
@@ -368,6 +452,10 @@ const utilizationRate = computed(() => {
                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700">
                         <DocumentArrowDownIcon class="w-4 h-4" /> PDF
                     </a>
+                    <a v-if="canExport" :href="route('ppmp.export.excel', ppmp.id)"
+                       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-100 hover:bg-emerald-200 text-emerald-800">
+                        <DocumentArrowDownIcon class="w-4 h-4" /> APP-CSE Excel
+                    </a>
                 </div>
             </div>
 
@@ -506,10 +594,16 @@ const utilizationRate = computed(() => {
                     <h3 class="text-sm font-semibold text-emerald-800">Part II — Other Procurement Items</h3>
                     <p class="text-xs text-emerald-600 mt-0.5">Items not available from PS-DBM. Procured via Competitive Bidding, Shopping, SVP, etc.</p>
                 </div>
-                <button v-if="canEdit && !showAddForm" @click="showAddForm = true"
-                        class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
-                    <PlusIcon class="w-4 h-4" /> Add Item
-                </button>
+                <div v-if="canEdit" class="flex items-center gap-2">
+                    <button @click="openCat2Modal"
+                            class="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                        <BuildingStorefrontIcon class="w-4 h-4" /> Add from List (Part II)
+                    </button>
+                    <button v-if="!showAddForm" @click="showAddForm = true"
+                            class="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                        <PlusIcon class="w-4 h-4" /> Add Custom Item
+                    </button>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-[1600px] w-full text-sm">
@@ -546,7 +640,10 @@ const utilizationRate = computed(() => {
                                 <td class="px-2 py-1.5 text-slate-600">{{ item.unit }}</td>
                                 <td v-for="m in months" :key="m" class="px-1 py-1.5 text-center text-xs text-slate-600">{{ item[m] > 0 ? item[m] : '—' }}</td>
                                 <td class="px-2 py-1.5 text-center font-medium text-slate-700">{{ item.total_quantity }}</td>
-                                <td class="px-2 py-1.5 text-right text-xs text-slate-700">₱{{ formatPeso(item.unit_cost) }}</td>
+                                <td class="px-2 py-1.5 text-right text-xs text-slate-700">
+                                    ₱{{ formatPeso(effectiveUnitCost(item)) }}
+                                    <span v-if="item.catalogue_part === 2" class="block text-[9px] text-emerald-600 font-medium">office price</span>
+                                </td>
                                 <td class="px-2 py-1.5 text-right font-medium text-xs text-slate-800">₱{{ formatPeso(item.total_cost) }}</td>
                                 <td class="px-2 py-1.5 text-xs text-slate-600">{{ methods[item.procurement_method] || item.procurement_method }}</td>
                                 <td class="px-2 py-1.5 text-center text-xs">
@@ -823,24 +920,191 @@ const utilizationRate = computed(() => {
             </div>
         </div>
 
-        <!-- Edit Item Modal (Part I: schedule only; Part II: full edit) -->
+        <!-- ══ PART II CATALOGUE PICKER MODAL ════════════════════════════════ -->
+        <div v-if="showCat2Modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-800">Add from PS-DBM List — Part II</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">FY {{ ppmp.fiscal_year }} · Items not available at PS-DBM · Enter your canvassed price per item</p>
+                    </div>
+                    <button @click="showCat2Modal = false; showSchedule2Entry = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
+                </div>
+
+                <!-- Step 1: Select items -->
+                <div v-if="!showSchedule2Entry" class="flex flex-col flex-1 overflow-hidden">
+                    <div class="px-5 py-3 border-b border-slate-100">
+                        <div class="relative">
+                            <MagnifyingGlassIcon class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input v-model="cat2Search" placeholder="Search Part II items by stock number or description…"
+                                   class="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        </div>
+                        <p v-if="cat2SelectedItems.length" class="text-xs text-emerald-600 mt-2 font-medium">{{ cat2SelectedItems.length }} item(s) selected</p>
+                    </div>
+                    <div class="flex-1 overflow-y-auto">
+                        <div v-if="cat2Searching" class="px-5 py-8 text-center text-sm text-slate-400">Searching…</div>
+                        <table v-else class="w-full text-sm">
+                            <thead class="bg-slate-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 w-10"></th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-32">Stock No.</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-16">Unit</th>
+                                    <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase w-28">Category</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="item in cat2Results" :key="item.id"
+                                    @click="toggleCat2Item(item)"
+                                    class="cursor-pointer hover:bg-emerald-50 transition-colors"
+                                    :class="{ 'bg-emerald-50': isSelectedInCat2(item) }">
+                                    <td class="px-3 py-2 text-center">
+                                        <input type="checkbox" :checked="isSelectedInCat2(item)"
+                                               class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" readonly />
+                                    </td>
+                                    <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ item.stock_number }}</td>
+                                    <td class="px-3 py-2 text-slate-700">{{ item.description }}</td>
+                                    <td class="px-3 py-2 text-slate-600">{{ item.unit }}</td>
+                                    <td class="px-3 py-2 text-xs text-slate-500">{{ item.category_group }}</td>
+                                </tr>
+                                <tr v-if="!cat2Results.length">
+                                    <td colspan="5" class="px-5 py-8 text-center text-slate-400">
+                                        {{ cat2Search ? 'No items match your search.' : 'No Part II catalogue loaded for this fiscal year.' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+                        <button @click="showCat2Modal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                        <button @click="proceedToSchedule2" :disabled="!cat2SelectedItems.length"
+                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
+                            Next: Set Price & Schedule ({{ cat2SelectedItems.length }})
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Set price + monthly schedule per selected item -->
+                <div v-if="showSchedule2Entry" class="flex flex-col flex-1 overflow-hidden">
+                    <div class="px-5 py-3 border-b border-slate-100">
+                        <p class="text-sm text-slate-600">Enter your canvassed price and monthly quantities for each item. These are Part II items — price is not fixed by PS-DBM.</p>
+                    </div>
+                    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                        <div v-for="sel in cat2SelectedItems" :key="sel.catalogue_id" class="border border-slate-200 rounded-lg p-4">
+                            <div class="mb-3">
+                                <p class="font-medium text-slate-800 text-sm">{{ sel.description }}</p>
+                                <p class="text-xs text-slate-500 mt-0.5">{{ sel.stock_number }} · {{ sel.unit }}</p>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Office Unit Cost (₱) *</label>
+                                    <input v-model.number="sel.office_unit_cost" type="number" step="0.01" min="0.01"
+                                           class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Mode of Procurement *</label>
+                                    <select v-model="sel.procurement_method" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option v-for="(label, key) in methods" :key="key" :value="key">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Fund Source *</label>
+                                    <select v-model="sel.fund_source" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option v-for="(label, key) in fundSources" :key="key" :value="key">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Price Source</label>
+                                    <input v-model="sel.price_source" placeholder="PhilGEPS, Canvass…"
+                                           class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-6 sm:grid-cols-12 gap-1.5 mb-2">
+                                <div v-for="(ml, mi) in monthLabels" :key="mi" class="text-center">
+                                    <span class="block text-xs text-slate-400 mb-0.5">{{ ml }}</span>
+                                    <input v-model.number="sel[months[mi]]" type="number" min="0"
+                                           class="w-full rounded border border-slate-200 bg-white px-1 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Proc. Quarter</label>
+                                    <select v-model="sel.procurement_quarter" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option :value="null">— Any —</option>
+                                        <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Del. Quarter</label>
+                                    <select v-model="sel.delivery_quarter" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option :value="null">— Any —</option>
+                                        <option v-for="(label, value) in quarters" :key="value" :value="Number(value)">{{ label }}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-500 mb-0.5">Remarks</label>
+                                    <input v-model="sel.remarks" class="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+                        <button @click="showSchedule2Entry = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Back</button>
+                        <button @click="savePart2CatItems" :disabled="part2CatSubmitting"
+                                class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50">
+                            {{ part2CatSubmitting ? 'Saving…' : 'Add to PPMP' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Item Modal (Part I: schedule only; Part II catalogue: price+schedule; Manual: full edit) -->
         <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
                 <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                     <div>
-                        <h3 class="text-base font-semibold text-slate-800">{{ editingItem?.catalogue_id ? 'Edit PS-DBM Item Schedule' : 'Edit Item' }}</h3>
-                        <p v-if="editingItem?.catalogue_id" class="text-xs text-slate-500 mt-0.5">Description and unit cost are from the PS-DBM catalogue and cannot be changed.</p>
+                        <h3 class="text-base font-semibold text-slate-800">
+                            {{ editingItem?.catalogue_part === 1 ? 'Edit PS-DBM Item Schedule' : editingItem?.catalogue_part === 2 ? 'Edit Part II Catalogue Item' : 'Edit Item' }}
+                        </h3>
+                        <p v-if="editingItem?.catalogue_id" class="text-xs text-slate-500 mt-0.5">Description and unit are from the catalogue and cannot be changed.</p>
                     </div>
                     <button @click="cancelEdit" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><XMarkIcon class="w-5 h-5" /></button>
                 </div>
                 <div class="p-5 space-y-4">
-                    <!-- Part I: show locked fields as read-only info -->
-                    <div v-if="editingItem?.catalogue_id" class="bg-blue-50 rounded-lg p-3 text-sm">
+                    <!-- Part I: locked info banner -->
+                    <div v-if="editingItem?.catalogue_part === 1" class="bg-blue-50 rounded-lg p-3 text-sm">
                         <span class="font-medium text-blue-800">{{ editingItem.description }}</span>
-                        <span class="text-blue-600 ml-2">{{ editingItem.code }} · {{ editingItem.unit }} · ₱{{ formatPeso(editingItem.unit_cost) }}</span>
+                        <span class="text-blue-600 ml-2">{{ editingItem.code }} · {{ editingItem.unit }} · ₱{{ formatPeso(editingItem.unit_cost) }} (PS-DBM price, fixed)</span>
                     </div>
 
-                    <!-- Part II: full fields -->
+                    <!-- Part II catalogue: locked description + editable price + procurement method -->
+                    <template v-if="editingItem?.catalogue_part === 2">
+                        <div class="bg-emerald-50 rounded-lg p-3 text-sm">
+                            <span class="font-medium text-emerald-800">{{ editingItem.description }}</span>
+                            <span class="text-emerald-600 ml-2">{{ editingItem.code }} · {{ editingItem.unit }}</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Office Unit Cost (₱) *</label>
+                                <input v-model="editForm.office_unit_cost" type="number" step="0.01" min="0.01"
+                                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Mode of Procurement *</label>
+                                <select v-model="editForm.procurement_method" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option v-for="(label, key) in methods" :key="key" :value="key">{{ label }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Price Source</label>
+                                <input v-model="editForm.price_source" placeholder="PhilGEPS, Canvass, etc."
+                                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Manual Part II: full fields -->
                     <template v-if="!editingItem?.catalogue_id">
                         <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
@@ -903,6 +1167,10 @@ const utilizationRate = computed(() => {
                             </select>
                         </div>
                         <div v-if="!editingItem?.catalogue_id">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Price Validity Date</label>
+                            <input v-model="editForm.price_validity_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        </div>
+                        <div v-if="editingItem?.catalogue_part === 2">
                             <label class="block text-xs font-medium text-slate-600 mb-1">Price Validity Date</label>
                             <input v-model="editForm.price_validity_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                         </div>

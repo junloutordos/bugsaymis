@@ -19,26 +19,35 @@ class PPMPCatalogueController extends Controller
 
         $items = PpmpCatalogue::with('uploader:id,name')
             ->where('fiscal_year', $fiscalYear)
-            ->orderBy('stock_number')
+            ->orderBy('part')
+            ->orderBy('row_position')
             ->get();
 
         $availableYears = PpmpCatalogue::distinct()->pluck('fiscal_year')
             ->push((int) date('Y'))
             ->unique()->sort()->values();
 
+        $part1Count = $items->where('part', 1)->count();
+        $part2Count = $items->where('part', 2)->count();
+
         return Inertia::render('PPMP/Catalogue/Index', [
             'items'          => $items,
             'fiscalYear'     => $fiscalYear,
             'availableYears' => $availableYears,
-            'itemCount'      => $items->count(),
+            'part1Count'     => $part1Count,
+            'part2Count'     => $part2Count,
         ]);
     }
 
     /**
-     * Parse and upsert a base64-encoded Excel/CSV catalogue upload.
+     * Parse and upsert the official APP-CSE Excel template from PS-DBM.
      *
-     * Expected columns (row 1 = header, skipped):
-     *   A: Stock Number  B: Description  C: Unit  D: Unit Cost  E: Price Validity Date (optional)
+     * Expected format (single sheet "APP-CSE YYYY FORM"):
+     *   Row structure from row ~32 onward:
+     *     Category group header row: col A = text (non-numeric), col B = empty
+     *     Item row: col A = seq# (numeric), col B = UNSPSC code, col C = description,
+     *               col D = unit, col Z (index 25) = unit price (Part I only)
+     *   Part boundary: a row where col A starts with "PART II"
      */
     public function upload(Request $request)
     {
@@ -50,7 +59,6 @@ class PPMPCatalogueController extends Controller
         $fiscalYear = (int) $request->input('fiscal_year');
         $base64     = $request->input('file_base64');
 
-        // Strip data URI prefix if present
         if (str_contains($base64, ',')) {
             $base64 = explode(',', $base64, 2)[1];
         }
@@ -60,13 +68,12 @@ class PPMPCatalogueController extends Controller
             return back()->with('error', 'Invalid file encoding. Please re-select the file.');
         }
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'ppmp_cat_') . '.xlsx';
+        $tmpFile = tempnam(sys_get_temp_dir(), 'appcse_') . '.xlsx';
         file_put_contents($tmpFile, $decoded);
 
         try {
             $spreadsheet = IOFactory::load($tmpFile);
-            $sheet       = $spreadsheet->getActiveSheet();
-            $rows        = $sheet->toArray(null, true, true, false);
+            $ws          = $spreadsheet->getActiveSheet();
         } catch (\Throwable $e) {
             @unlink($tmpFile);
             return back()->with('error', 'Could not read file: ' . $e->getMessage());
@@ -74,87 +81,155 @@ class PPMPCatalogueController extends Controller
             @unlink($tmpFile);
         }
 
-        $user     = $request->user();
-        $inserted = 0;
-        $skipped  = 0;
-        $errors   = [];
+        $user    = $request->user();
+        $results = $this->parseAppCse($ws, $fiscalYear, $user->id);
 
-        foreach ($rows as $rowIndex => $row) {
-            // Skip header row
-            if ($rowIndex === 0) {
-                continue;
-            }
+        $msg = "APP-CSE uploaded for FY {$fiscalYear}: "
+             . "{$results['part1_count']} Part I items, "
+             . "{$results['part2_count']} Part II items saved.";
 
-            [$stockNumber, $description, $unit, $unitCost, $validityDate] = array_pad($row, 5, null);
-
-            $stockNumber = trim((string) $stockNumber);
-            $description = trim((string) $description);
-            $unit        = trim((string) $unit);
-
-            if ($stockNumber === '' || $description === '' || $unit === '') {
-                $skipped++;
-                continue;
-            }
-
-            $costValue = is_numeric($unitCost) ? (float) $unitCost : 0;
-            if ($costValue <= 0) {
-                $errors[] = "Row " . ($rowIndex + 1) . ": '{$stockNumber}' has invalid unit cost — skipped.";
-                $skipped++;
-                continue;
-            }
-
-            $validityDateParsed = null;
-            if ($validityDate) {
-                try {
-                    $validityDateParsed = \Carbon\Carbon::parse($validityDate)->toDateString();
-                } catch (\Throwable) {
-                    // non-fatal, leave null
-                }
-            }
-
-            PpmpCatalogue::updateOrCreate(
-                ['fiscal_year' => $fiscalYear, 'stock_number' => $stockNumber],
-                [
-                    'description'         => $description,
-                    'unit'                => $unit,
-                    'unit_cost'           => $costValue,
-                    'price_validity_date' => $validityDateParsed,
-                    'is_active'           => true,
-                    'uploaded_by'         => $user->id,
-                    'uploaded_at'         => now(),
-                ]
-            );
-
-            $inserted++;
+        if ($results['skipped']) {
+            $msg .= " {$results['skipped']} row(s) skipped.";
         }
 
-        $message = "Catalogue uploaded: {$inserted} item(s) saved for FY {$fiscalYear}.";
-        if ($skipped) {
-            $message .= " {$skipped} row(s) skipped.";
-        }
-
-        return back()->with('success', $message)->with('upload_errors', $errors);
+        return back()->with('success', $msg)->with('upload_errors', $results['errors']);
     }
 
     /**
-     * Search catalogue items — JSON, used by the Part I picker modal.
+     * Parse the APP-CSE worksheet and upsert into ppmp_catalogue.
+     */
+    private function parseAppCse($ws, int $fiscalYear, int $uploadedBy): array
+    {
+        $part          = 1;
+        $categoryGroup = null;
+        $rowPosition   = 0;
+        $part1Count    = 0;
+        $part2Count    = 0;
+        $skipped       = 0;
+        $errors        = [];
+
+        // Deactivate all existing items for this year before re-import
+        PpmpCatalogue::where('fiscal_year', $fiscalYear)->update(['is_active' => false]);
+
+        foreach ($ws->getRowIterator() as $row) {
+            $rowIndex = $row->getRowIndex();
+            $cells    = $row->getCellIterator();
+            $cells->setIterateOnlyExistingCells(false);
+
+            $vals = [];
+            foreach ($cells as $cell) {
+                $vals[] = $cell->getCalculatedValue();
+            }
+
+            // Pad to at least 27 columns
+            while (count($vals) < 27) {
+                $vals[] = null;
+            }
+
+            $colA = trim((string) ($vals[0] ?? ''));
+            $colB = trim((string) ($vals[1] ?? ''));
+            $colC = trim((string) ($vals[2] ?? ''));
+            $colD = trim((string) ($vals[3] ?? ''));
+            $colZ = $vals[25] ?? null; // Unit price
+
+            // Detect Part II boundary
+            if (str_starts_with(strtoupper($colA), 'PART II')) {
+                $part = 2;
+                $categoryGroup = null;
+                continue;
+            }
+
+            // Skip header / instruction rows before data starts
+            if ($rowIndex < 32) {
+                continue;
+            }
+
+            // Skip summary rows (A, B, C, D, E labels)
+            if (preg_match('/^[A-E]\.\s/i', $colA)) {
+                continue;
+            }
+
+            // Category group header: col A is non-empty text, col B is empty, not a number
+            if ($colA !== '' && $colB === '' && !is_numeric($colA)) {
+                $categoryGroup = $colA;
+                continue;
+            }
+
+            // Item row: col A is a sequential number
+            if (!is_numeric($colA) || $colA === '' || $colB === '' || $colC === '') {
+                continue;
+            }
+
+            $stockNumber = $colB;
+            $description = $colC;
+            $unit        = $colD !== '' ? $colD : 'piece';
+            $unitCost    = is_numeric($colZ) ? (float) $colZ : 0.0;
+            $isPriceFixed = ($part === 1);
+            $rowPosition++;
+
+            if (empty($stockNumber) || empty($description)) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                PpmpCatalogue::updateOrCreate(
+                    ['fiscal_year' => $fiscalYear, 'stock_number' => $stockNumber],
+                    [
+                        'part'                => $part,
+                        'category_group'      => $categoryGroup,
+                        'row_position'        => $rowPosition,
+                        'is_price_fixed'      => $isPriceFixed,
+                        'description'         => $description,
+                        'unit'                => $unit,
+                        'unit_cost'           => $unitCost,
+                        'price_validity_date' => null,
+                        'is_active'           => true,
+                        'uploaded_by'         => $uploadedBy,
+                        'uploaded_at'         => now(),
+                    ]
+                );
+
+                if ($part === 1) {
+                    $part1Count++;
+                } else {
+                    $part2Count++;
+                }
+            } catch (\Throwable $e) {
+                $errors[] = "Row {$rowIndex} ({$stockNumber}): " . $e->getMessage();
+                $skipped++;
+            }
+        }
+
+        return compact('part1Count', 'part2Count', 'skipped', 'errors');
+    }
+
+    /**
+     * Search catalogue items — JSON endpoint used by picker modals.
+     * part=1 → Part I (PS-DBM items, price fixed)
+     * part=2 → Part II (non-PS-DBM pre-defined, price to be filled)
+     * part=0 → all parts
      */
     public function search(Request $request)
     {
         $fiscalYear = (int) $request->input('fiscal_year', (int) date('Y'));
         $query      = trim((string) $request->input('q', ''));
+        $part       = $request->input('part'); // null = all
 
         $items = PpmpCatalogue::forYear($fiscalYear)
+            ->when($part !== null, fn ($q) => $q->part((int) $part))
             ->when($query !== '', function ($q) use ($query) {
                 $like = '%' . $query . '%';
                 $q->where(function ($sub) use ($like) {
                     $sub->where('stock_number', 'like', $like)
-                        ->orWhere('description', 'like', $like);
+                        ->orWhere('description', 'like', $like)
+                        ->orWhere('category_group', 'like', $like);
                 });
             })
-            ->orderBy('stock_number')
-            ->limit(100)
-            ->get(['id', 'stock_number', 'description', 'unit', 'unit_cost', 'price_validity_date']);
+            ->orderBy('part')
+            ->orderBy('row_position')
+            ->limit(150)
+            ->get(['id', 'part', 'category_group', 'stock_number', 'description', 'unit', 'unit_cost', 'is_price_fixed', 'price_validity_date']);
 
         return response()->json($items);
     }

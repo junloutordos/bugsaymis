@@ -45,6 +45,7 @@ class PpmpItem extends Model
 
     protected $fillable = [
         'ppmp_id', 'catalogue_id', 'code', 'description', 'unit', 'category', 'unit_cost',
+        'office_unit_cost',
         'jan', 'feb', 'mar', 'apr', 'may', 'jun',
         'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
         'procurement_method', 'is_ps_dbm', 'remarks', 'sort_order',
@@ -54,6 +55,7 @@ class PpmpItem extends Model
 
     protected $casts = [
         'unit_cost'           => 'decimal:2',
+        'office_unit_cost'    => 'decimal:2',
         'total_cost'          => 'decimal:2',
         'total_quantity'      => 'integer',
         'is_ps_dbm'           => 'boolean',
@@ -69,14 +71,33 @@ class PpmpItem extends Model
     {
         static::saving(function (PpmpItem $item) {
             $item->total_quantity = collect(self::MONTHS)->sum(fn ($m) => (int) $item->$m);
-            $item->total_cost = $item->total_quantity * $item->unit_cost;
 
-            // Part I items (from catalogue) are always Agency-to-Agency
+            // Effective cost: Part II catalogue items use office_unit_cost if provided,
+            // otherwise fall back to catalogue/unit_cost
+            $effectiveCost = ($item->office_unit_cost !== null && $item->office_unit_cost > 0)
+                ? (float) $item->office_unit_cost
+                : (float) $item->unit_cost;
+
+            $item->total_cost = $item->total_quantity * $effectiveCost;
+
+            // Part I catalogue items are always Agency-to-Agency, Part II may vary
             if ($item->catalogue_id) {
                 $item->is_ps_dbm = true;
-                $item->procurement_method = 'agency_to_agency';
+                $cat = $item->catalogue ?? \App\Models\PPMP\PpmpCatalogue::find($item->catalogue_id);
+                if ($cat && $cat->part === 1) {
+                    $item->procurement_method = 'agency_to_agency';
+                }
             }
         });
+    }
+
+    // The price actually used for totals (office price for Part II, catalogue price for Part I)
+    public function effectiveUnitCost(): float
+    {
+        if ($this->office_unit_cost !== null && $this->office_unit_cost > 0) {
+            return (float) $this->office_unit_cost;
+        }
+        return (float) $this->unit_cost;
     }
 
     // ─── Relationships ────────────────────────────────────────────────────────
