@@ -265,6 +265,8 @@ class PPMPController extends Controller
             'approver:id,name,position',
             'bacReviewer:id,name',
             'divisionReviewer:id,name',
+            'propertyOfficerReviewer:id,name',
+            'budgetOfficerReviewer:id,name',
             'parentPpmp:id,ppmp_number,title',
             'divisionPpmp:id,ppmp_number,title,status',
             'unitPpmps:id,ppmp_number,title,status,office_id,prepared_by',
@@ -298,12 +300,14 @@ class PPMPController extends Controller
             'methods'        => PpmpItem::PROCUREMENT_METHODS,
             'fundSources'    => PpmpItem::FUND_SOURCES,
             'quarters'       => PpmpItem::QUARTERS,
-            'canEdit'           => $user->can('update', $ppmp),
-            'canSubmit'         => $user->can('submit', $ppmp),
-            'canDivisionReview' => $user->can('divisionReview', $ppmp),
-            'canBacReview'      => ($user->hasPermission('ppmp.bac_review') || $user->isSuperAdmin()) && $ppmp->canBacReview(),
-            'canApprove'        => $user->can('approve', $ppmp),
-            'canExport'         => $user->can('export', $ppmp),
+            'canEdit'                   => $user->can('update', $ppmp),
+            'canSubmit'                 => $user->can('submit', $ppmp),
+            'canDivisionReview'         => $user->can('divisionReview', $ppmp),
+            'canBacReview'              => ($user->hasPermission('ppmp.bac_review') || $user->isSuperAdmin()) && $ppmp->canBacReview(),
+            'canPropertyOfficerReview'  => $user->can('propertyOfficerReview', $ppmp),
+            'canBudgetOfficerReview'    => $user->can('budgetOfficerReview', $ppmp),
+            'canApprove'                => $user->can('approve', $ppmp),
+            'canExport'                 => $user->can('export', $ppmp),
             'utilization'    => [
                 'pr_count' => (int) $utilization->pr_count,
                 'pr_total' => (float) $utilization->pr_total,
@@ -492,6 +496,54 @@ class PPMPController extends Controller
         });
 
         return redirect()->route('ppmp.show', $divisionPpmp)->with('success', 'Division PPMP created with ' . $unitPpmps->count() . ' unit PPMP(s) consolidated.');
+    }
+
+    /**
+     * Property Officer endorsement or return.
+     */
+    public function propertyOfficerReview(Request $request, Ppmp $ppmp)
+    {
+        $this->authorize('propertyOfficerReview', $ppmp);
+
+        $data = $request->validate([
+            'action'  => 'required|in:endorse,return',
+            'remarks' => 'nullable|string|max:1000',
+        ]);
+
+        $user = $request->user();
+
+        if ($data['action'] === 'return') {
+            abort_unless(filled($data['remarks']), 422, 'Remarks are required when returning a PPMP.');
+            $ppmp->propertyOfficerReturn($user, $data['remarks']);
+            return back()->with('success', 'PPMP returned to the Division Chief for revision.');
+        }
+
+        $ppmp->propertyOfficerEndorse($user);
+        return back()->with('success', 'PPMP endorsed and forwarded to Budget Officer.');
+    }
+
+    /**
+     * Budget Officer endorsement or return.
+     */
+    public function budgetOfficerReview(Request $request, Ppmp $ppmp)
+    {
+        $this->authorize('budgetOfficerReview', $ppmp);
+
+        $data = $request->validate([
+            'action'  => 'required|in:endorse,return',
+            'remarks' => 'nullable|string|max:1000',
+        ]);
+
+        $user = $request->user();
+
+        if ($data['action'] === 'return') {
+            abort_unless(filled($data['remarks']), 422, 'Remarks are required when returning a PPMP.');
+            $ppmp->budgetOfficerReturn($user, $data['remarks']);
+            return back()->with('success', 'PPMP returned to the Division Chief for revision.');
+        }
+
+        $ppmp->budgetOfficerEndorse($user);
+        return back()->with('success', 'PPMP endorsed and forwarded to Head of Agency for approval.');
     }
 
     /**
