@@ -108,6 +108,8 @@
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Teaching</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Research</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Admin</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Co-curr</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Committee</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Overload</th>
@@ -126,6 +128,8 @@
               <td class="px-4 py-3 text-center text-slate-700">{{ load.teaching_units }}</td>
               <td class="px-4 py-3 text-center text-slate-700">{{ load.research_units }}</td>
               <td class="px-4 py-3 text-center text-slate-700">{{ load.admin_units }}</td>
+              <td class="px-4 py-3 text-center text-slate-700">{{ load.cocurricular_units }}</td>
+              <td class="px-4 py-3 text-center text-slate-700">{{ load.committee_units }}</td>
               <td class="px-4 py-3 text-center font-semibold text-slate-800">
                 <div class="flex flex-col items-center gap-1">
                   <span>{{ load.total_units }}</span>

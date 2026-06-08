@@ -11,6 +11,7 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
 use App\Services\FacultyLoading\DesignationService;
 use App\Services\FacultyLoading\LoadComputationService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -50,15 +51,16 @@ class DesignationController extends Controller
                 'sort_order'   => $cat->sort_order,
                 'is_active'    => $cat->is_active,
                 'designations' => $cat->designations->map(fn ($d) => [
-                    'id'            => $d->id,
-                    'code'          => $d->code,
-                    'name'          => $d->name,
-                    'description'   => $d->description,
-                    'load_units'    => (float) $d->load_units,
-                    'requires_unit' => $d->requires_unit,
-                    'max_holders'   => $d->max_holders,
-                    'sort_order'    => $d->sort_order,
-                    'is_active'     => $d->is_active,
+                    'id'              => $d->id,
+                    'code'            => $d->code,
+                    'name'            => $d->name,
+                    'description'     => $d->description,
+                    'load_units'      => (float) $d->load_units,
+                    'assignment_type' => $d->assignment_type ?? 'admin',
+                    'requires_unit'   => $d->requires_unit,
+                    'max_holders'     => $d->max_holders,
+                    'sort_order'      => $d->sort_order,
+                    'is_active'       => $d->is_active,
                     // Current holders — from any module (AUH, adviser, supervisory, etc.)
                     'holders'       => ($holdersByDesig->get($d->id) ?? collect())
                         ->map(fn ($a) => [
@@ -151,6 +153,7 @@ class DesignationController extends Controller
             'name'                    => 'required|string|max:150',
             'description'             => 'nullable|string',
             'load_units'              => 'required|numeric|min:0',
+            'assignment_type'         => 'required|in:teaching,research,admin,cocurricular,committee',
             'requires_unit'           => 'boolean',
             'max_holders'             => 'nullable|integer|min:1',
             'sort_order'              => 'nullable|integer|min:0',
@@ -162,7 +165,7 @@ class DesignationController extends Controller
         return back()->with('success', 'Designation created.');
     }
 
-    public function update(Request $request, Designation $designation): RedirectResponse
+    public function update(Request $request, Designation $designation, LoadComputationService $loads): RedirectResponse
     {
         $this->authorize('faculty_loading.setup');
 
@@ -172,13 +175,29 @@ class DesignationController extends Controller
             'name'                    => 'required|string|max:150',
             'description'             => 'nullable|string',
             'load_units'              => 'required|numeric|min:0',
+            'assignment_type'         => 'required|in:teaching,research,admin,cocurricular,committee',
             'requires_unit'           => 'boolean',
             'max_holders'             => 'nullable|integer|min:1',
             'sort_order'              => 'nullable|integer|min:0',
             'is_active'               => 'boolean',
         ]);
 
+        $oldUnits = (float) $designation->load_units;
         $designation->update($data);
+
+        // Propagate load_units change to non-overridden assignments
+        if ((float) $data['load_units'] !== $oldUnits) {
+            $affectedLoadIds = LoadAssignment::where('designation_id', $designation->id)
+                ->where('is_overridden', false)
+                ->pluck('faculty_load_id')
+                ->unique();
+
+            LoadAssignment::where('designation_id', $designation->id)
+                ->where('is_overridden', false)
+                ->update(['load_units' => (float) $data['load_units']]);
+
+            FacultyLoad::whereIn('id', $affectedLoadIds)->each(fn ($fl) => $loads->syncLoad($fl));
+        }
 
         return back()->with('success', 'Designation updated.');
     }

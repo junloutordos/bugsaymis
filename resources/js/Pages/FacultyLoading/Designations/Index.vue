@@ -88,7 +88,10 @@
                 <div class="font-medium text-slate-800">{{ d.name }}</div>
                 <div v-if="d.requires_unit" class="text-[10px] text-amber-600 font-medium mt-0.5">Unit-scoped</div>
               </td>
-              <td class="px-5 py-3 text-center text-slate-700 font-semibold">{{ d.load_units }}</td>
+              <td class="px-5 py-3 text-center">
+                <span class="font-semibold text-slate-700 block">{{ d.load_units }}</span>
+                <span :class="assignmentTypeBadge(d.assignment_type)" class="text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5 inline-block">{{ d.assignment_type }}</span>
+              </td>
               <td class="px-5 py-3 text-center text-slate-500">{{ d.max_holders ?? '∞' }}</td>
 
               <!-- Current Holders -->
@@ -209,6 +212,18 @@
               <input v-model="desigForm.load_units" type="number" min="0" step="0.5"
                 class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
             </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Load Type <span class="text-red-500">*</span></label>
+            <select v-model="desigForm.assignment_type"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="admin">Admin</option>
+              <option value="teaching">Teaching</option>
+              <option value="research">Research</option>
+              <option value="cocurricular">Co-curricular</option>
+              <option value="committee">Committee</option>
+            </select>
+            <p class="text-[11px] text-slate-400 mt-1">Determines which column this load counts toward in faculty totals.</p>
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
@@ -353,6 +368,16 @@ function isAuhDesignation(d) {
   return d.code.startsWith('AUH-')
 }
 
+function assignmentTypeBadge(type) {
+  return {
+    admin:        'bg-slate-100 text-slate-600',
+    teaching:     'bg-blue-50 text-blue-700',
+    research:     'bg-violet-50 text-violet-700',
+    cocurricular: 'bg-teal-50 text-teal-700',
+    committee:    'bg-orange-50 text-orange-700',
+  }[type] ?? 'bg-slate-100 text-slate-500'
+}
+
 // ── Term filter ───────────────────────────────────────────────────────────────
 
 const selectedTermId = ref(props.filters.term_id ? Number(props.filters.term_id) : (props.currentTerm?.id ?? null))
@@ -388,13 +413,13 @@ function deleteCat(cat) {
 // ── Designation CRUD ──────────────────────────────────────────────────────────
 
 const desigModal = ref(false)
-const desigForm  = useForm({ id: null, designation_category_id: null, code: '', name: '', description: '', load_units: 0, requires_unit: false, max_holders: null, sort_order: 0, is_active: true })
+const desigForm  = useForm({ id: null, designation_category_id: null, code: '', name: '', description: '', load_units: 0, assignment_type: 'admin', requires_unit: false, max_holders: null, sort_order: 0, is_active: true })
 
 function openDesigForm(d = null, cat = null) {
   if (d) {
-    Object.assign(desigForm, { id: d.id, designation_category_id: d.designation_category_id ?? cat?.id, code: d.code, name: d.name, description: d.description ?? '', load_units: d.load_units, requires_unit: d.requires_unit, max_holders: d.max_holders, sort_order: d.sort_order, is_active: d.is_active })
+    Object.assign(desigForm, { id: d.id, designation_category_id: d.designation_category_id ?? cat?.id, code: d.code, name: d.name, description: d.description ?? '', load_units: d.load_units, assignment_type: d.assignment_type ?? 'admin', requires_unit: d.requires_unit, max_holders: d.max_holders, sort_order: d.sort_order, is_active: d.is_active })
   } else {
-    desigForm.reset(); desigForm.id = null; desigForm.is_active = true; desigForm.load_units = 0
+    desigForm.reset(); desigForm.id = null; desigForm.is_active = true; desigForm.load_units = 0; desigForm.assignment_type = 'admin'
     desigForm.designation_category_id = cat?.id ?? null
   }
   desigModal.value = true

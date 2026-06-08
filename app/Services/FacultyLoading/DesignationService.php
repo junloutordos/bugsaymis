@@ -96,6 +96,7 @@ class DesignationService
             'academic_term_id' => $facultyLoad->academic_term_id,
             'assignment_type'  => $assignmentType,
             'load_units'       => $overrideUnits ?? (float) $designation->load_units,
+            'is_overridden'    => ! is_null($overrideUnits),
             'description'      => $designation->name,
             'designation_id'   => $designation->id,
             'created_by'       => $createdBy,
@@ -166,18 +167,12 @@ class DesignationService
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
-     * Map the designation category code to a load_assignment assignment_type.
-     * Falls back to 'admin' for unrecognised categories.
+     * Read the assignment_type directly from the designation row.
+     * Falls back to 'admin' for unrecognised/null values.
      */
     private function resolveAssignmentType(Designation $designation): string
     {
-        $categoryCode = strtolower($designation->category->code ?? '');
-
-        return match (true) {
-            str_contains($categoryCode, 'committee') => 'committee',
-            str_contains($categoryCode, 'research')  => 'research',
-            default                                   => 'admin',
-        };
+        return $designation->assignment_type ?? 'admin';
     }
 
     private function fail(string $message): array
