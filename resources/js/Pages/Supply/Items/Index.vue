@@ -14,9 +14,9 @@ const props = defineProps({
   categories: Array,
 })
 
-const { props: pageProps } = usePage()
+const page = usePage()
 const perms = computed(() => ({
-  canManage: pageProps.value.auth?.user?.permissions?.includes('supply.manage'),
+  canManage: page.props.auth?.user?.permissions?.includes('supply.manage'),
 }))
 
 const search = ref('')
