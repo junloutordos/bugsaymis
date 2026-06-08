@@ -6,17 +6,20 @@ import AppBadge from '@/Components/AppBadge.vue'
 import { PlusIcon, BuildingStorefrontIcon, Square2StackIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-    ppmps:                 Array,
-    filters:               Object,
-    fiscalYears:           Array,
-    divisions:             Array,
-    deadline:              String,
-    canCreate:             Boolean,
-    canReview:             Boolean,
-    canDivisionReview:     Boolean,
-    canManageCatalogue:    Boolean,
-    approvableUnitPpmps:   Array,
-    pendingDivisionPpmps:  Array,
+    ppmps:                       Array,
+    filters:                     Object,
+    fiscalYears:                 Array,
+    divisions:                   Array,
+    deadline:                    String,
+    canCreate:                   Boolean,
+    canReview:                   Boolean,
+    canDivisionReview:           Boolean,
+    canPropertyOfficerReview:    Boolean,
+    canManageCatalogue:          Boolean,
+    approvableUnitPpmps:         Array,
+    pendingDivisionPpmps:        Array,
+    approvableDivisionPpmps:     Array,
+    pendingPropertyOfficerPpmps: Array,
 })
 
 const page = usePage()
@@ -71,35 +74,57 @@ function submitDivisionConsolidate() {
     })
 }
 
+// ── Property Consolidate Modal ────────────────────────────────────────────
+const showPropertyConsolidateModal = ref(false)
+const propertyConsolidateForm = ref({ fiscal_year: new Date().getFullYear(), title: '' })
+
+function openPropertyConsolidateModal() {
+    propertyConsolidateForm.value.fiscal_year = fiscalYear.value
+    propertyConsolidateForm.value.title = ''
+    showPropertyConsolidateModal.value = true
+}
+
+function submitPropertyConsolidate() {
+    router.post(route('ppmp.property_consolidate'), propertyConsolidateForm.value, {
+        onSuccess: () => { showPropertyConsolidateModal.value = false },
+    })
+}
+
 const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const statusColors = {
-    draft:                    'bg-slate-100 text-slate-700',
-    pending_division:         'bg-orange-100 text-orange-700',
-    division_approved:        'bg-teal-100 text-teal-700',
-    pending_property_officer: 'bg-yellow-100 text-yellow-800',
-    pending_budget_officer:   'bg-sky-100 text-sky-700',
-    pending_head:             'bg-rose-100 text-rose-700',
-    pending_bac:              'bg-purple-100 text-purple-700',
-    submitted:                'bg-blue-100 text-blue-700',
-    returned:                 'bg-amber-100 text-amber-700',
-    approved:                 'bg-green-100 text-green-700',
-    consolidated:             'bg-indigo-100 text-indigo-700',
+    draft:                      'bg-slate-100 text-slate-700',
+    pending_division:           'bg-orange-100 text-orange-700',
+    division_approved:          'bg-teal-100 text-teal-700',
+    pending_property_officer:   'bg-yellow-100 text-yellow-800',
+    property_officer_approved:  'bg-teal-100 text-teal-700',
+    pending_budget_officer:     'bg-sky-100 text-sky-700',
+    pending_ocd:                'bg-violet-100 text-violet-700',
+    pending_head:               'bg-rose-100 text-rose-700',
+    pending_bac:                'bg-purple-100 text-purple-700',
+    submitted:                  'bg-blue-100 text-blue-700',
+    returned:                   'bg-amber-100 text-amber-700',
+    approved:                   'bg-green-100 text-green-700',
+    submitted_to_dbm:           'bg-emerald-100 text-emerald-800',
+    consolidated:               'bg-indigo-100 text-indigo-700',
 }
 
 const statusLabel = (s) => ({
-    draft:                    'Draft',
-    pending_division:         'Pending Division',
-    division_approved:        'Division Approved',
-    pending_property_officer: 'Pending Property Officer',
-    pending_budget_officer:   'Pending Budget Officer',
-    pending_head:             'Pending Head of Agency',
-    pending_bac:              'Pending BAC',
-    submitted:                'Submitted',
-    returned:                 'Returned',
-    approved:                 'Approved',
-    consolidated:             'Consolidated',
+    draft:                      'Draft',
+    pending_division:           'Pending Division',
+    division_approved:          'Division Approved',
+    pending_property_officer:   'Pending Property Officer',
+    property_officer_approved:  'PO Approved',
+    pending_budget_officer:     'Pending Budget Officer',
+    pending_ocd:                'Pending OCD',
+    pending_head:               'Pending Head of Agency',
+    pending_bac:                'Pending BAC',
+    submitted:                  'Submitted',
+    returned:                   'Returned',
+    approved:                   'OCD Approved',
+    submitted_to_dbm:           'Submitted to DBM',
+    consolidated:               'Consolidated',
 }[s] ?? s)
 
 const deadlinePassed = computed(() => {
@@ -121,6 +146,28 @@ const deadlinePassed = computed(() => {
             <template v-else>
                 📅 Submission deadline for FY {{ fiscalYear }}: {{ new Date(deadline).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) }}
             </template>
+        </div>
+
+        <!-- Property Officer review queue banner -->
+        <div v-if="canPropertyOfficerReview && pendingPropertyOfficerPpmps?.length"
+             class="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+            <div class="flex items-start gap-3">
+                <ExclamationCircleIcon class="w-5 h-5 text-yellow-500 mt-0.5 shrink-0" />
+                <div>
+                    <p class="text-sm font-semibold text-yellow-800">
+                        {{ pendingPropertyOfficerPpmps.length }} division PPMP{{ pendingPropertyOfficerPpmps.length > 1 ? 's' : '' }} awaiting your review
+                    </p>
+                    <ul class="mt-1 space-y-0.5">
+                        <li v-for="p in pendingPropertyOfficerPpmps" :key="p.id">
+                            <a :href="route('ppmp.show', p.id)"
+                               class="text-sm text-yellow-700 hover:text-yellow-900 underline">
+                                {{ p.ppmp_number }} — {{ p.title }}
+                                <span v-if="p.division_name" class="font-normal">({{ p.division_name }})</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
 
         <!-- DC review queue banner (B2) -->
@@ -162,7 +209,11 @@ const deadlinePassed = computed(() => {
                     <option value="pending_bac">Pending BAC</option>
                     <option value="submitted">Submitted</option>
                     <option value="returned">Returned</option>
-                    <option value="approved">Approved</option>
+                    <option value="property_officer_approved">PO Approved</option>
+                    <option value="pending_budget_officer">Pending Budget Officer</option>
+                    <option value="pending_ocd">Pending OCD</option>
+                    <option value="approved">OCD Approved</option>
+                    <option value="submitted_to_dbm">Submitted to DBM</option>
                     <option value="consolidated">Consolidated</option>
                 </select>
                 <select v-if="divisions.length" v-model="divisionFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -177,11 +228,17 @@ const deadlinePassed = computed(() => {
                    class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">
                     <BuildingStorefrontIcon class="w-4 h-4" /> PS-DBM Catalogue
                 </a>
-                <button v-if="canDivisionReview && approvableUnitPpmps.length"
+                <button v-if="canDivisionReview && approvableUnitPpmps?.length"
                         @click="openConsolidateModal"
                         class="inline-flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                     <Square2StackIcon class="w-4 h-4" /> Create Division PPMP
                     <span class="ml-0.5 bg-teal-500 text-white text-xs rounded-full px-1.5 py-0.5">{{ approvableUnitPpmps.length }}</span>
+                </button>
+                <button v-if="canPropertyOfficerReview && approvableDivisionPpmps?.length"
+                        @click="openPropertyConsolidateModal"
+                        class="inline-flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <Square2StackIcon class="w-4 h-4" /> Create Property PPMP
+                    <span class="ml-0.5 bg-yellow-400 text-white text-xs rounded-full px-1.5 py-0.5">{{ approvableDivisionPpmps.length }}</span>
                 </button>
                 <a v-if="canCreate" :href="route('ppmp.create')"
                    class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -208,12 +265,14 @@ const deadlinePassed = computed(() => {
                     <tbody class="divide-y divide-slate-100">
                         <tr v-for="p in displayed" :key="p.id"
                             class="cursor-pointer"
-                            :class="canDivisionReview && p.status === 'pending_division' ? 'bg-orange-50/60 hover:bg-orange-50' : 'hover:bg-slate-50/60'"
+                            :class="(canDivisionReview && p.status === 'pending_division') ? 'bg-orange-50/60 hover:bg-orange-50' : (canPropertyOfficerReview && p.status === 'pending_property_officer') ? 'bg-yellow-50/60 hover:bg-yellow-50' : 'hover:bg-slate-50/60'"
                             @click="router.visit(route('ppmp.show', p.id))">
                             <td class="px-4 py-3 font-medium text-indigo-600">
                                 {{ p.ppmp_number }}
                                 <span v-if="p.ppmp_type === 'division'"
                                       class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">DIV</span>
+                                <span v-if="p.ppmp_type === 'property'"
+                                      class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">PROP</span>
                             </td>
                             <td class="px-4 py-3 text-slate-700">{{ p.title }}</td>
                             <td class="px-4 py-3 text-slate-600">
@@ -307,6 +366,68 @@ const deadlinePassed = computed(() => {
                                 :disabled="!divisionConsolidateForm.title"
                                 class="px-4 py-2 rounded-lg text-sm bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50">
                             Consolidate {{ approvableUnitPpmps.length }} Unit PPMP{{ approvableUnitPpmps.length > 1 ? 's' : '' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Property Consolidate Modal -->
+        <div v-if="showPropertyConsolidateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
+                <div class="px-6 pt-5 pb-4 border-b border-slate-100">
+                    <h3 class="text-base font-semibold text-slate-800">Create Property PPMP</h3>
+                    <p class="text-sm text-slate-500 mt-0.5">The following approved division PPMPs will be merged into one Property PPMP.</p>
+                </div>
+
+                <!-- Division PPMPs preview table -->
+                <div class="px-6 py-3 max-h-52 overflow-y-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-xs font-semibold text-slate-500 uppercase">
+                                <th class="pb-1 text-left">PPMP No.</th>
+                                <th class="pb-1 text-left">Division</th>
+                                <th class="pb-1 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="p in approvableDivisionPpmps" :key="p.id">
+                                <td class="py-1.5 font-medium text-indigo-600">{{ p.ppmp_number }}</td>
+                                <td class="py-1.5 text-slate-700">{{ p.division_name || p.title }}</td>
+                                <td class="py-1.5 text-right text-slate-700">₱{{ formatPeso(p.grand_total) }}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="border-t border-slate-200">
+                                <td colspan="2" class="pt-2 text-xs font-semibold text-slate-500 uppercase">Combined Total</td>
+                                <td class="pt-2 text-right font-bold text-slate-800">
+                                    ₱{{ formatPeso(approvableDivisionPpmps.reduce((s, p) => s + p.grand_total, 0)) }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="px-6 pb-5 pt-3 space-y-3 border-t border-slate-100">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Fiscal Year</label>
+                        <select v-model="propertyConsolidateForm.fiscal_year"
+                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full">
+                            <option v-for="y in fiscalYears" :key="y" :value="y">FY {{ y }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Property PPMP Title</label>
+                        <input v-model="propertyConsolidateForm.title" type="text"
+                               placeholder="e.g. PSHS-CRC Property PPMP/APP-CSE FY 2026"
+                               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full" />
+                    </div>
+                    <div class="flex justify-end gap-2 pt-1">
+                        <button @click="showPropertyConsolidateModal = false"
+                                class="px-4 py-2 rounded-lg text-sm bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
+                        <button @click="submitPropertyConsolidate"
+                                :disabled="!propertyConsolidateForm.title"
+                                class="px-4 py-2 rounded-lg text-sm bg-yellow-500 hover:bg-yellow-600 text-white disabled:opacity-50">
+                            Consolidate {{ approvableDivisionPpmps.length }} Division PPMP{{ approvableDivisionPpmps.length > 1 ? 's' : '' }}
                         </button>
                     </div>
                 </div>

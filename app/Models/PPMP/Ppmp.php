@@ -38,50 +38,60 @@ class Ppmp extends Model
         'budget_officer_reviewed_at',
         'budget_officer_reviewed_by',
         'budget_officer_remarks',
+        'ocd_reviewed_at',
+        'ocd_reviewed_by',
+        'ocd_remarks',
+        'submitted_to_dbm_at',
+        'submitted_to_dbm_by',
         'ppmp_type',
         'division_ppmp_id',
+        'property_ppmp_id',
     ];
 
     protected $casts = [
-        'submitted_at'        => 'datetime',
-        'approved_at'         => 'datetime',
-        'consolidated_at'     => 'datetime',
-        'bac_reviewed_at'     => 'datetime',
-        'division_reviewed_at'              => 'datetime',
-        'property_officer_reviewed_at'      => 'datetime',
-        'budget_officer_reviewed_at'        => 'datetime',
-        'fiscal_year'         => 'integer',
-        'is_supplemental'     => 'boolean',
+        'submitted_at'                  => 'datetime',
+        'approved_at'                   => 'datetime',
+        'consolidated_at'               => 'datetime',
+        'bac_reviewed_at'               => 'datetime',
+        'division_reviewed_at'          => 'datetime',
+        'property_officer_reviewed_at'  => 'datetime',
+        'budget_officer_reviewed_at'    => 'datetime',
+        'ocd_reviewed_at'               => 'datetime',
+        'submitted_to_dbm_at'           => 'datetime',
+        'fiscal_year'                   => 'integer',
+        'is_supplemental'               => 'boolean',
     ];
 
     // ─── Status constants ─────────────────────────────────────────────────────
 
-    public const STATUS_DRAFT                        = 'draft';
-    public const STATUS_PENDING_DIVISION             = 'pending_division';
-    public const STATUS_DIVISION_APPROVED            = 'division_approved';
-    public const STATUS_PENDING_PROPERTY_OFFICER     = 'pending_property_officer';
-    public const STATUS_PENDING_BUDGET_OFFICER       = 'pending_budget_officer';
-    public const STATUS_PENDING_HEAD                 = 'pending_head';
-    // Legacy — kept for existing records
-    public const STATUS_PENDING_BAC                  = 'pending_bac';
-    public const STATUS_SUBMITTED                    = 'submitted';
-    public const STATUS_RETURNED                     = 'returned';
-    public const STATUS_APPROVED                     = 'approved';
-    public const STATUS_CONSOLIDATED                 = 'consolidated';
+    // Unit PPMP flow: draft → pending_division → division_approved
+    public const STATUS_DRAFT                       = 'draft';
+    public const STATUS_PENDING_DIVISION            = 'pending_division';
+    public const STATUS_DIVISION_APPROVED           = 'division_approved';
 
+    // Division PPMP flow: draft → pending_property_officer → property_officer_approved
+    public const STATUS_PENDING_PROPERTY_OFFICER    = 'pending_property_officer';
+    public const STATUS_PROPERTY_OFFICER_APPROVED   = 'property_officer_approved';
+
+    // Property PPMP flow: draft → pending_budget_officer → pending_ocd → approved → submitted_to_dbm
+    public const STATUS_PENDING_BUDGET_OFFICER      = 'pending_budget_officer';
+    public const STATUS_PENDING_OCD                 = 'pending_ocd';
+    public const STATUS_APPROVED                    = 'approved';
+    public const STATUS_SUBMITTED_TO_DBM            = 'submitted_to_dbm';
+
+    // Cross-flow
+    public const STATUS_RETURNED                    = 'returned';
+    public const STATUS_CONSOLIDATED                = 'consolidated';
+
+    // Legacy — kept for existing records
+    public const STATUS_PENDING_HEAD                = 'pending_head';
+    public const STATUS_PENDING_BAC                 = 'pending_bac';
+    public const STATUS_SUBMITTED                   = 'submitted';
+
+    // PPMP types
     public const PPMP_TYPE_UNIT     = 'unit';
     public const PPMP_TYPE_DIVISION = 'division';
-
-    public const STATUSES = [
-        self::STATUS_DRAFT,
-        self::STATUS_PENDING_DIVISION,
-        self::STATUS_DIVISION_APPROVED,
-        self::STATUS_PENDING_BAC,
-        self::STATUS_SUBMITTED,
-        self::STATUS_RETURNED,
-        self::STATUS_APPROVED,
-        self::STATUS_CONSOLIDATED,
-    ];
+    public const PPMP_TYPE_PROPERTY = 'property';
 
     // ─── Relationships ────────────────────────────────────────────────────────
 
@@ -132,6 +142,16 @@ class Ppmp extends Model
         return $this->belongsTo(User::class, 'budget_officer_reviewed_by');
     }
 
+    public function ocdReviewer()
+    {
+        return $this->belongsTo(User::class, 'ocd_reviewed_by');
+    }
+
+    public function dbmSubmitter()
+    {
+        return $this->belongsTo(User::class, 'submitted_to_dbm_by');
+    }
+
     public function parentPpmp()
     {
         return $this->belongsTo(Ppmp::class, 'parent_ppmp_id');
@@ -142,6 +162,7 @@ class Ppmp extends Model
         return $this->hasMany(Ppmp::class, 'parent_ppmp_id');
     }
 
+    // Unit → Division PPMP
     public function divisionPpmp()
     {
         return $this->belongsTo(Ppmp::class, 'division_ppmp_id');
@@ -150,6 +171,17 @@ class Ppmp extends Model
     public function unitPpmps()
     {
         return $this->hasMany(Ppmp::class, 'division_ppmp_id');
+    }
+
+    // Division → Property PPMP
+    public function propertyPpmp()
+    {
+        return $this->belongsTo(Ppmp::class, 'property_ppmp_id');
+    }
+
+    public function divisionPpmps()
+    {
+        return $this->hasMany(Ppmp::class, 'property_ppmp_id');
     }
 
     public function statusHistory()
@@ -187,7 +219,8 @@ class Ppmp extends Model
             return false;
         }
 
-        if ($this->ppmp_type === self::PPMP_TYPE_DIVISION) {
+        // Division and Property PPMPs can submit even without items (consolidated)
+        if (in_array($this->ppmp_type, [self::PPMP_TYPE_DIVISION, self::PPMP_TYPE_PROPERTY])) {
             return true;
         }
 
@@ -196,7 +229,8 @@ class Ppmp extends Model
 
     public function canDivisionReview(): bool
     {
-        return $this->status === self::STATUS_PENDING_DIVISION;
+        return $this->status === self::STATUS_PENDING_DIVISION
+            && $this->ppmp_type === self::PPMP_TYPE_UNIT;
     }
 
     public function canBacReview(): bool
@@ -206,17 +240,31 @@ class Ppmp extends Model
 
     public function canPropertyOfficerReview(): bool
     {
-        return $this->status === self::STATUS_PENDING_PROPERTY_OFFICER;
+        return $this->status === self::STATUS_PENDING_PROPERTY_OFFICER
+            && $this->ppmp_type === self::PPMP_TYPE_DIVISION;
     }
 
     public function canBudgetOfficerReview(): bool
     {
-        return $this->status === self::STATUS_PENDING_BUDGET_OFFICER;
+        return $this->status === self::STATUS_PENDING_BUDGET_OFFICER
+            && $this->ppmp_type === self::PPMP_TYPE_PROPERTY;
+    }
+
+    public function canOcdApprove(): bool
+    {
+        return $this->status === self::STATUS_PENDING_OCD
+            && $this->ppmp_type === self::PPMP_TYPE_PROPERTY;
+    }
+
+    public function canSubmitToDbm(): bool
+    {
+        return $this->status === self::STATUS_APPROVED
+            && $this->ppmp_type === self::PPMP_TYPE_PROPERTY;
     }
 
     public function canApprove(): bool
     {
-        // New flow: pending_head; legacy: submitted / pending_bac
+        // Legacy flow
         return in_array($this->status, [
             self::STATUS_PENDING_HEAD,
             self::STATUS_SUBMITTED,
@@ -230,11 +278,11 @@ class Ppmp extends Model
     {
         $from = $this->status;
 
-        if ($this->ppmp_type === self::PPMP_TYPE_DIVISION) {
-            $to = self::STATUS_PENDING_PROPERTY_OFFICER;
-        } else {
-            $to = self::STATUS_PENDING_DIVISION;
-        }
+        $to = match ($this->ppmp_type) {
+            self::PPMP_TYPE_DIVISION => self::STATUS_PENDING_PROPERTY_OFFICER,
+            self::PPMP_TYPE_PROPERTY => self::STATUS_PENDING_BUDGET_OFFICER,
+            default                  => self::STATUS_PENDING_DIVISION,
+        };
 
         $this->status = $to;
         $this->submitted_at = now();
@@ -269,12 +317,12 @@ class Ppmp extends Model
     public function propertyOfficerEndorse(User $user): void
     {
         $from = $this->status;
-        $this->status                         = self::STATUS_PENDING_BUDGET_OFFICER;
-        $this->property_officer_reviewed_at   = now();
-        $this->property_officer_reviewed_by   = $user->id;
+        $this->status                       = self::STATUS_PROPERTY_OFFICER_APPROVED;
+        $this->property_officer_reviewed_at = now();
+        $this->property_officer_reviewed_by = $user->id;
         $this->save();
 
-        $this->logStatusChange($from, self::STATUS_PENDING_BUDGET_OFFICER, $user);
+        $this->logStatusChange($from, self::STATUS_PROPERTY_OFFICER_APPROVED, $user);
     }
 
     public function propertyOfficerReturn(User $user, string $remarks): void
@@ -292,12 +340,12 @@ class Ppmp extends Model
     public function budgetOfficerEndorse(User $user): void
     {
         $from = $this->status;
-        $this->status                       = self::STATUS_PENDING_HEAD;
-        $this->budget_officer_reviewed_at   = now();
-        $this->budget_officer_reviewed_by   = $user->id;
+        $this->status                     = self::STATUS_PENDING_OCD;
+        $this->budget_officer_reviewed_at = now();
+        $this->budget_officer_reviewed_by = $user->id;
         $this->save();
 
-        $this->logStatusChange($from, self::STATUS_PENDING_HEAD, $user);
+        $this->logStatusChange($from, self::STATUS_PENDING_OCD, $user);
     }
 
     public function budgetOfficerReturn(User $user, string $remarks): void
@@ -312,6 +360,43 @@ class Ppmp extends Model
         $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);
     }
 
+    public function ocdApprove(User $user): void
+    {
+        $from = $this->status;
+        $this->status         = self::STATUS_APPROVED;
+        $this->approved_at    = now();
+        $this->approved_by    = $user->id;
+        $this->ocd_reviewed_at = now();
+        $this->ocd_reviewed_by = $user->id;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_APPROVED, $user);
+    }
+
+    public function ocdReturn(User $user, string $remarks): void
+    {
+        $from = $this->status;
+        $this->status          = self::STATUS_RETURNED;
+        $this->ocd_reviewed_at = now();
+        $this->ocd_reviewed_by = $user->id;
+        $this->ocd_remarks     = $remarks;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);
+    }
+
+    public function submitToDbm(User $user): void
+    {
+        $from = $this->status;
+        $this->status              = self::STATUS_SUBMITTED_TO_DBM;
+        $this->submitted_to_dbm_at = now();
+        $this->submitted_to_dbm_by = $user->id;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_SUBMITTED_TO_DBM, $user);
+    }
+
+    // Legacy methods
     public function endorse(User $user): void
     {
         $from = $this->status;
@@ -397,6 +482,16 @@ class Ppmp extends Model
         $seq = str_pad($count + 1, 2, '0', STR_PAD_LEFT);
 
         return "PPMP-{$fiscalYear}-{$acronym}-DIV-{$seq}";
+    }
+
+    public static function generatePropertyNumber(int $fiscalYear): string
+    {
+        $count = static::where('fiscal_year', $fiscalYear)
+            ->where('ppmp_type', self::PPMP_TYPE_PROPERTY)
+            ->count();
+        $seq = str_pad($count + 1, 2, '0', STR_PAD_LEFT);
+
+        return "PPMP-{$fiscalYear}-PROP-{$seq}";
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
