@@ -16,6 +16,7 @@ import {
   DocumentDuplicateIcon,
 } from '@heroicons/vue/24/outline'
 import ScoreGrid from './components/ScoreGrid.vue'
+import AttendanceGrid from './components/AttendanceGrid.vue'
 import { adjectivalColor } from '@/Utils/ClassRecord/gradeUtils.js'
 
 const props = defineProps({
@@ -40,7 +41,7 @@ function statusBadge(status) {
 
 // ── Quarter tabs ──────────────────────────────────────────────────────────────
 const activeQuarter = ref(1)
-const activeSubTab  = ref('setup')  // 'setup' | 'scores'
+const activeSubTab  = ref('setup')  // 'setup' | 'scores' | 'attendance'
 
 const currentQuarterData = computed(() =>
   props.classRecord.quarters?.find(q => q.quarter === activeQuarter.value) ?? null
@@ -410,7 +411,7 @@ async function checkRecord() {
         <!-- Sub-tab bar -->
         <div class="flex gap-1 px-4 pt-1 border-b border-slate-50">
           <button
-            v-for="tab in ['setup', 'scores']" :key="tab"
+            v-for="tab in ['setup', 'scores', 'attendance']" :key="tab"
             @click="activeSubTab = tab"
             :class="[
               'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors',
@@ -418,7 +419,7 @@ async function checkRecord() {
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50',
             ]">
-            {{ tab === 'setup' ? '⚙ Setup' : '📊 Scores & Grades' }}
+            {{ tab === 'setup' ? '⚙ Setup' : tab === 'scores' ? '📊 Scores & Grades' : '📋 Attendance' }}
           </button>
         </div>
 
@@ -568,6 +569,16 @@ async function checkRecord() {
             :subject-type="classRecord.subject?.subject_type ?? null"
             :section-id="classRecord.section_id ?? null"
             @reload="router.reload({ only: ['classRecord'] })"
+          />
+        </div>
+
+        <!-- ── Attendance sub-tab ────────────────────────────────────────── -->
+        <div v-if="activeSubTab === 'attendance'" class="p-5">
+          <AttendanceGrid
+            :class-record-id="classRecord.id"
+            :quarter-number="activeQuarter"
+            :quarter-data="currentQuarterData"
+            :is-locked="isLocked || isReadOnly"
           />
         </div>
         </template>
