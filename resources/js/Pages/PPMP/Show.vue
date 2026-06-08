@@ -25,6 +25,7 @@ const props = defineProps({
     canApprove:         Boolean,
     canExport:          Boolean,
     utilization:        Object,
+    unitPpmps:          Array,
 })
 
 const page  = usePage()
@@ -72,12 +73,24 @@ const fundSourceTotals = computed(() => {
 const statusColors = {
     draft:             'bg-slate-100 text-slate-700',
     pending_division:  'bg-orange-100 text-orange-700',
+    division_approved: 'bg-teal-100 text-teal-700',
     pending_bac:       'bg-purple-100 text-purple-700',
     submitted:         'bg-blue-100 text-blue-700',
     returned:          'bg-amber-100 text-amber-700',
     approved:          'bg-green-100 text-green-700',
     consolidated:      'bg-indigo-100 text-indigo-700',
 }
+
+const statusLabel = (s) => ({
+    draft:             'Draft',
+    pending_division:  'Pending Division Review',
+    division_approved: 'Division Approved',
+    pending_bac:       'Pending BAC Review',
+    submitted:         'Submitted',
+    returned:          'Returned',
+    approved:          'Approved',
+    consolidated:      'Consolidated',
+}[s] ?? s)
 
 // ── Part I Catalogue Picker Modal ─────────────────────────────────────────
 const showCatModal     = ref(false)
@@ -354,7 +367,13 @@ const itemHasError   = (id) => validationResult.value?.errors?.some(e => e.item_
 const itemHasWarning = (id) => validationResult.value?.warnings?.some(w => w.item_id === id)
 
 // ── Workflow ──────────────────────────────────────────────────────────────
-const submitPpmp  = () => { if (!confirm('Submit this PPMP to your Division Chief for review?')) return; router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true }) }
+const submitPpmp  = () => {
+    const msg = props.ppmp.ppmp_type === 'division'
+        ? 'Submit this Division PPMP to BAC/Procurement for review?'
+        : 'Submit this PPMP to your Division Chief for review?'
+    if (!confirm(msg)) return
+    router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true })
+}
 const approvePpmp = () => { if (!confirm('Approve this PPMP?')) return; router.post(route('ppmp.approve', props.ppmp.id), {}, { preserveScroll: true }) }
 
 const returnRemarks   = ref('')
@@ -428,15 +447,23 @@ const utilizationRate = computed(() => {
                 <div class="space-y-1">
                     <div class="flex items-center gap-3 flex-wrap">
                         <h2 class="text-lg font-semibold text-slate-800">{{ ppmp.title }}</h2>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                               :class="statusColors[ppmp.status] ?? 'bg-slate-100 text-slate-700'">
-                            {{ ppmp.status?.replace('_', ' ') }}
+                            {{ statusLabel(ppmp.status) }}
                         </span>
+                        <span v-if="ppmp.ppmp_type === 'division'"
+                              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">Division PPMP</span>
                         <span v-if="ppmp.is_supplemental" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">Supplemental</span>
                     </div>
                     <p class="text-sm text-slate-500">{{ ppmp.division?.division_name }} · FY {{ ppmp.fiscal_year }}</p>
                     <p class="text-sm text-slate-500">Prepared by: {{ ppmp.preparer?.name }}</p>
                     <p v-if="ppmp.parent_ppmp" class="text-sm text-slate-500">Parent PPMP: {{ ppmp.parent_ppmp.ppmp_number }}</p>
+                    <p v-if="ppmp.division_ppmp" class="text-sm text-teal-700 mt-1">
+                        Division PPMP:
+                        <a :href="route('ppmp.show', ppmp.division_ppmp.id)"
+                           class="underline hover:no-underline">{{ ppmp.division_ppmp.ppmp_number }}</a>
+                        ({{ statusLabel(ppmp.division_ppmp.status) }})
+                    </p>
                     <p v-if="ppmp.remarks && ppmp.status === 'returned'" class="text-sm text-amber-700 mt-2">
                         <strong>Return remarks:</strong> {{ ppmp.remarks }}
                     </p>
@@ -454,7 +481,7 @@ const utilizationRate = computed(() => {
                     </button>
                     <button v-if="canSubmit" @click="submitPpmp"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white">
-                        Submit to Division
+                        {{ ppmp.ppmp_type === 'division' ? 'Submit to BAC' : 'Submit to Division' }}
                     </button>
                     <button v-if="canDivisionReview" @click="divisionEndorse"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-orange-600 hover:bg-orange-700 text-white">
@@ -550,6 +577,36 @@ const utilizationRate = computed(() => {
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- ══ SOURCE UNIT PPMPs (Division PPMP only) ═══════════════════════════ -->
+        <div v-if="ppmp.ppmp_type === 'division' && unitPpmps?.length" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-4">
+            <div class="px-4 py-3 border-b border-slate-100 bg-teal-50">
+                <h3 class="text-sm font-semibold text-teal-800">Consolidated Unit PPMPs</h3>
+                <p class="text-xs text-teal-600 mt-0.5">Unit PPMPs whose items were merged into this Division PPMP.</p>
+            </div>
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">PPMP No.</th>
+                        <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Title</th>
+                        <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr v-for="u in unitPpmps" :key="u.id" class="hover:bg-slate-50/60 cursor-pointer"
+                        @click="router.visit(route('ppmp.show', u.id))">
+                        <td class="px-4 py-2 font-medium text-indigo-600">{{ u.ppmp_number }}</td>
+                        <td class="px-4 py-2 text-slate-700">{{ u.title }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  :class="statusColors[u.status] ?? 'bg-slate-100 text-slate-700'">
+                                {{ statusLabel(u.status) }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <!-- ══ PART I TABLE ════════════════════════════════════════════════════ -->

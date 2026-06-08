@@ -32,6 +32,8 @@ class Ppmp extends Model
         'division_reviewed_at',
         'division_reviewed_by',
         'division_remarks',
+        'ppmp_type',
+        'division_ppmp_id',
     ];
 
     protected $casts = [
@@ -48,15 +50,20 @@ class Ppmp extends Model
 
     public const STATUS_DRAFT             = 'draft';
     public const STATUS_PENDING_DIVISION  = 'pending_division';
+    public const STATUS_DIVISION_APPROVED = 'division_approved';
     public const STATUS_PENDING_BAC       = 'pending_bac';
     public const STATUS_SUBMITTED         = 'submitted';
     public const STATUS_RETURNED          = 'returned';
     public const STATUS_APPROVED          = 'approved';
     public const STATUS_CONSOLIDATED      = 'consolidated';
 
+    public const PPMP_TYPE_UNIT     = 'unit';
+    public const PPMP_TYPE_DIVISION = 'division';
+
     public const STATUSES = [
         self::STATUS_DRAFT,
         self::STATUS_PENDING_DIVISION,
+        self::STATUS_DIVISION_APPROVED,
         self::STATUS_PENDING_BAC,
         self::STATUS_SUBMITTED,
         self::STATUS_RETURNED,
@@ -113,6 +120,16 @@ class Ppmp extends Model
         return $this->hasMany(Ppmp::class, 'parent_ppmp_id');
     }
 
+    public function divisionPpmp()
+    {
+        return $this->belongsTo(Ppmp::class, 'division_ppmp_id');
+    }
+
+    public function unitPpmps()
+    {
+        return $this->hasMany(Ppmp::class, 'division_ppmp_id');
+    }
+
     public function statusHistory()
     {
         return $this->hasMany(PpmpStatusHistory::class, 'ppmp_id')->orderBy('created_at');
@@ -144,8 +161,15 @@ class Ppmp extends Model
 
     public function canSubmit(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_RETURNED])
-            && $this->items()->exists();
+        if (!in_array($this->status, [self::STATUS_DRAFT, self::STATUS_RETURNED])) {
+            return false;
+        }
+
+        if ($this->ppmp_type === self::PPMP_TYPE_DIVISION) {
+            return true;
+        }
+
+        return $this->items()->exists();
     }
 
     public function canDivisionReview(): bool
@@ -168,22 +192,29 @@ class Ppmp extends Model
     public function submit(User $user): void
     {
         $from = $this->status;
-        $this->status = self::STATUS_PENDING_DIVISION;
+
+        if ($this->ppmp_type === self::PPMP_TYPE_DIVISION) {
+            $to = self::STATUS_PENDING_BAC;
+        } else {
+            $to = self::STATUS_PENDING_DIVISION;
+        }
+
+        $this->status = $to;
         $this->submitted_at = now();
         $this->save();
 
-        $this->logStatusChange($from, self::STATUS_PENDING_DIVISION, $user);
+        $this->logStatusChange($from, $to, $user);
     }
 
     public function divisionEndorse(User $user): void
     {
         $from = $this->status;
-        $this->status = self::STATUS_PENDING_BAC;
+        $this->status = self::STATUS_DIVISION_APPROVED;
         $this->division_reviewed_at = now();
         $this->division_reviewed_by = $user->id;
         $this->save();
 
-        $this->logStatusChange($from, self::STATUS_PENDING_BAC, $user);
+        $this->logStatusChange($from, self::STATUS_DIVISION_APPROVED, $user);
     }
 
     public function divisionReturn(User $user, string $remarks): void
@@ -271,6 +302,18 @@ class Ppmp extends Model
         $seq = str_pad($count + 1, 3, '0', STR_PAD_LEFT);
 
         return "PPMP-{$fiscalYear}-{$acronym}-{$seq}";
+    }
+
+    public static function generateDivisionNumber(int $fiscalYear, Division $division): string
+    {
+        $acronym = $division->acronym ?? 'DIV';
+        $count = static::where('fiscal_year', $fiscalYear)
+            ->where('division_id', $division->id)
+            ->where('ppmp_type', self::PPMP_TYPE_DIVISION)
+            ->count();
+        $seq = str_pad($count + 1, 2, '0', STR_PAD_LEFT);
+
+        return "PPMP-{$fiscalYear}-{$acronym}-DIV-{$seq}";
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
