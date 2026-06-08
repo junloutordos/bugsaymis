@@ -63,6 +63,44 @@ class ClassRecordAssessmentController extends Controller
             'assessments.*.sort_order'             => 'sometimes|integer|min:0',
         ]);
 
+        // Max-3-assessments-per-section-per-day check
+        if ($classRecord->section_id) {
+            $byDate = collect($validated['assessments'])
+                ->filter(fn ($item) => ! empty($item['activity_date']))
+                ->groupBy('activity_date');
+
+            foreach ($byDate as $date => $items) {
+                // Find IDs of assessments being replaced (already exist in DB for this quarter)
+                $replacedIds = ClassRecordAssessment::where('class_record_quarter_id', $quarter->id)
+                    ->where(function ($q) use ($items) {
+                        foreach ($items as $item) {
+                            $q->orWhere(function ($q2) use ($item) {
+                                $q2->where('grading_category_id', $item['grading_category_id'])
+                                   ->where('assessment_number',   $item['assessment_number']);
+                            });
+                        }
+                    })
+                    ->pluck('id');
+
+                $existingCount = ClassRecordAssessment::join('class_record_quarters as crq', 'class_record_assessments.class_record_quarter_id', '=', 'crq.id')
+                    ->join('class_records as cr', 'crq.class_record_id', '=', 'cr.id')
+                    ->where('cr.section_id',      $classRecord->section_id)
+                    ->where('cr.school_year_id',  $classRecord->school_year_id)
+                    ->where('class_record_assessments.activity_date', $date)
+                    ->whereNotIn('class_record_assessments.id', $replacedIds)
+                    ->count();
+
+                $adding = $items->count();
+
+                if ($existingCount + $adding > 3) {
+                    $formatted = \Carbon\Carbon::parse($date)->format('M d, Y');
+                    return response()->json([
+                        'message' => "Section already has {$existingCount} assessment(s) on {$formatted}. Cannot add {$adding} more — max 3 per section per day.",
+                    ], 422);
+                }
+            }
+        }
+
         $upserted = [];
         foreach ($validated['assessments'] as $i => $item) {
             $assessment = ClassRecordAssessment::updateOrCreate(
