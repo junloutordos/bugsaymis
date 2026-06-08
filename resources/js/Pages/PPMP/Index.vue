@@ -75,25 +75,31 @@ const formatPeso = (v) => Number(v || 0).toLocaleString('en-PH', { minimumFracti
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const statusColors = {
-    draft:             'bg-slate-100 text-slate-700',
-    pending_division:  'bg-orange-100 text-orange-700',
-    division_approved: 'bg-teal-100 text-teal-700',
-    pending_bac:       'bg-purple-100 text-purple-700',
-    submitted:         'bg-blue-100 text-blue-700',
-    returned:          'bg-amber-100 text-amber-700',
-    approved:          'bg-green-100 text-green-700',
-    consolidated:      'bg-indigo-100 text-indigo-700',
+    draft:                    'bg-slate-100 text-slate-700',
+    pending_division:         'bg-orange-100 text-orange-700',
+    division_approved:        'bg-teal-100 text-teal-700',
+    pending_property_officer: 'bg-yellow-100 text-yellow-800',
+    pending_budget_officer:   'bg-sky-100 text-sky-700',
+    pending_head:             'bg-rose-100 text-rose-700',
+    pending_bac:              'bg-purple-100 text-purple-700',
+    submitted:                'bg-blue-100 text-blue-700',
+    returned:                 'bg-amber-100 text-amber-700',
+    approved:                 'bg-green-100 text-green-700',
+    consolidated:             'bg-indigo-100 text-indigo-700',
 }
 
 const statusLabel = (s) => ({
-    draft:             'Draft',
-    pending_division:  'Pending Division',
-    division_approved: 'Division Approved',
-    pending_bac:       'Pending BAC',
-    submitted:         'Submitted',
-    returned:          'Returned',
-    approved:          'Approved',
-    consolidated:      'Consolidated',
+    draft:                    'Draft',
+    pending_division:         'Pending Division',
+    division_approved:        'Division Approved',
+    pending_property_officer: 'Pending Property Officer',
+    pending_budget_officer:   'Pending Budget Officer',
+    pending_head:             'Pending Head of Agency',
+    pending_bac:              'Pending BAC',
+    submitted:                'Submitted',
+    returned:                 'Returned',
+    approved:                 'Approved',
+    consolidated:             'Consolidated',
 }[s] ?? s)
 
 const deadlinePassed = computed(() => {
@@ -150,6 +156,9 @@ const deadlinePassed = computed(() => {
                     <option value="draft">Draft</option>
                     <option value="pending_division">Pending Division</option>
                     <option value="division_approved">Division Approved</option>
+                    <option value="pending_property_officer">Pending Property Officer</option>
+                    <option value="pending_budget_officer">Pending Budget Officer</option>
+                    <option value="pending_head">Pending Head of Agency</option>
                     <option value="pending_bac">Pending BAC</option>
                     <option value="submitted">Submitted</option>
                     <option value="returned">Returned</option>

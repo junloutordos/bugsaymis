@@ -32,6 +32,12 @@ class Ppmp extends Model
         'division_reviewed_at',
         'division_reviewed_by',
         'division_remarks',
+        'property_officer_reviewed_at',
+        'property_officer_reviewed_by',
+        'property_officer_remarks',
+        'budget_officer_reviewed_at',
+        'budget_officer_reviewed_by',
+        'budget_officer_remarks',
         'ppmp_type',
         'division_ppmp_id',
     ];
@@ -41,21 +47,27 @@ class Ppmp extends Model
         'approved_at'         => 'datetime',
         'consolidated_at'     => 'datetime',
         'bac_reviewed_at'     => 'datetime',
-        'division_reviewed_at'=> 'datetime',
+        'division_reviewed_at'              => 'datetime',
+        'property_officer_reviewed_at'      => 'datetime',
+        'budget_officer_reviewed_at'        => 'datetime',
         'fiscal_year'         => 'integer',
         'is_supplemental'     => 'boolean',
     ];
 
     // ─── Status constants ─────────────────────────────────────────────────────
 
-    public const STATUS_DRAFT             = 'draft';
-    public const STATUS_PENDING_DIVISION  = 'pending_division';
-    public const STATUS_DIVISION_APPROVED = 'division_approved';
-    public const STATUS_PENDING_BAC       = 'pending_bac';
-    public const STATUS_SUBMITTED         = 'submitted';
-    public const STATUS_RETURNED          = 'returned';
-    public const STATUS_APPROVED          = 'approved';
-    public const STATUS_CONSOLIDATED      = 'consolidated';
+    public const STATUS_DRAFT                        = 'draft';
+    public const STATUS_PENDING_DIVISION             = 'pending_division';
+    public const STATUS_DIVISION_APPROVED            = 'division_approved';
+    public const STATUS_PENDING_PROPERTY_OFFICER     = 'pending_property_officer';
+    public const STATUS_PENDING_BUDGET_OFFICER       = 'pending_budget_officer';
+    public const STATUS_PENDING_HEAD                 = 'pending_head';
+    // Legacy — kept for existing records
+    public const STATUS_PENDING_BAC                  = 'pending_bac';
+    public const STATUS_SUBMITTED                    = 'submitted';
+    public const STATUS_RETURNED                     = 'returned';
+    public const STATUS_APPROVED                     = 'approved';
+    public const STATUS_CONSOLIDATED                 = 'consolidated';
 
     public const PPMP_TYPE_UNIT     = 'unit';
     public const PPMP_TYPE_DIVISION = 'division';
@@ -108,6 +120,16 @@ class Ppmp extends Model
     public function divisionReviewer()
     {
         return $this->belongsTo(User::class, 'division_reviewed_by');
+    }
+
+    public function propertyOfficerReviewer()
+    {
+        return $this->belongsTo(User::class, 'property_officer_reviewed_by');
+    }
+
+    public function budgetOfficerReviewer()
+    {
+        return $this->belongsTo(User::class, 'budget_officer_reviewed_by');
     }
 
     public function parentPpmp()
@@ -182,9 +204,24 @@ class Ppmp extends Model
         return $this->status === self::STATUS_PENDING_BAC;
     }
 
+    public function canPropertyOfficerReview(): bool
+    {
+        return $this->status === self::STATUS_PENDING_PROPERTY_OFFICER;
+    }
+
+    public function canBudgetOfficerReview(): bool
+    {
+        return $this->status === self::STATUS_PENDING_BUDGET_OFFICER;
+    }
+
     public function canApprove(): bool
     {
-        return in_array($this->status, [self::STATUS_SUBMITTED, self::STATUS_PENDING_BAC]);
+        // New flow: pending_head; legacy: submitted / pending_bac
+        return in_array($this->status, [
+            self::STATUS_PENDING_HEAD,
+            self::STATUS_SUBMITTED,
+            self::STATUS_PENDING_BAC,
+        ]);
     }
 
     // ─── Workflow actions ─────────────────────────────────────────────────────
@@ -194,7 +231,7 @@ class Ppmp extends Model
         $from = $this->status;
 
         if ($this->ppmp_type === self::PPMP_TYPE_DIVISION) {
-            $to = self::STATUS_PENDING_BAC;
+            $to = self::STATUS_PENDING_PROPERTY_OFFICER;
         } else {
             $to = self::STATUS_PENDING_DIVISION;
         }
@@ -224,6 +261,52 @@ class Ppmp extends Model
         $this->division_reviewed_at = now();
         $this->division_reviewed_by = $user->id;
         $this->division_remarks = $remarks;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);
+    }
+
+    public function propertyOfficerEndorse(User $user): void
+    {
+        $from = $this->status;
+        $this->status                         = self::STATUS_PENDING_BUDGET_OFFICER;
+        $this->property_officer_reviewed_at   = now();
+        $this->property_officer_reviewed_by   = $user->id;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_PENDING_BUDGET_OFFICER, $user);
+    }
+
+    public function propertyOfficerReturn(User $user, string $remarks): void
+    {
+        $from = $this->status;
+        $this->status                       = self::STATUS_RETURNED;
+        $this->property_officer_reviewed_at = now();
+        $this->property_officer_reviewed_by = $user->id;
+        $this->property_officer_remarks     = $remarks;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);
+    }
+
+    public function budgetOfficerEndorse(User $user): void
+    {
+        $from = $this->status;
+        $this->status                       = self::STATUS_PENDING_HEAD;
+        $this->budget_officer_reviewed_at   = now();
+        $this->budget_officer_reviewed_by   = $user->id;
+        $this->save();
+
+        $this->logStatusChange($from, self::STATUS_PENDING_HEAD, $user);
+    }
+
+    public function budgetOfficerReturn(User $user, string $remarks): void
+    {
+        $from = $this->status;
+        $this->status                     = self::STATUS_RETURNED;
+        $this->budget_officer_reviewed_at = now();
+        $this->budget_officer_reviewed_by = $user->id;
+        $this->budget_officer_remarks     = $remarks;
         $this->save();
 
         $this->logStatusChange($from, self::STATUS_RETURNED, $user, $remarks);

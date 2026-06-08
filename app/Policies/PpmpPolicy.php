@@ -95,6 +95,20 @@ class PpmpPolicy extends GenericPolicy
         return $user->division_id === $ppmp->division_id;
     }
 
+    public function propertyOfficerReview(User $user, Ppmp $ppmp): bool
+    {
+        return $user->hasPermission('ppmp.property_officer_review')
+            && $ppmp->ppmp_type === Ppmp::PPMP_TYPE_DIVISION
+            && $ppmp->canPropertyOfficerReview();
+    }
+
+    public function budgetOfficerReview(User $user, Ppmp $ppmp): bool
+    {
+        return $user->hasPermission('ppmp.budget_officer_review')
+            && $ppmp->ppmp_type === Ppmp::PPMP_TYPE_DIVISION
+            && $ppmp->canBudgetOfficerReview();
+    }
+
     public function approve(User $user, Ppmp $ppmp): bool
     {
         if (!$user->hasPermission('ppmp.approve')) {

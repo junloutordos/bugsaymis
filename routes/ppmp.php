@@ -88,6 +88,12 @@ Route::middleware(['web', 'auth', 'pshs.email'])
         Route::post('/{ppmp}/division-review', [PPMPController::class, 'divisionReview'])
             ->name('division_review')
             ->middleware('permission:ppmp.division_review');
+        Route::post('/{ppmp}/property-officer-review', [PPMPController::class, 'propertyOfficerReview'])
+            ->name('property_officer_review')
+            ->middleware('permission:ppmp.property_officer_review');
+        Route::post('/{ppmp}/budget-officer-review', [PPMPController::class, 'budgetOfficerReview'])
+            ->name('budget_officer_review')
+            ->middleware('permission:ppmp.budget_officer_review');
         Route::post('/{ppmp}/bac-review', [PPMPController::class, 'bacReview'])
             ->name('bac_review')
             ->middleware('permission:ppmp.bac_review');

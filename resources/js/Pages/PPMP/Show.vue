@@ -18,14 +18,16 @@ const props = defineProps({
     methods:            Object,
     fundSources:        Object,
     quarters:           Array,
-    canEdit:            Boolean,
-    canSubmit:          Boolean,
-    canDivisionReview:  Boolean,
-    canBacReview:       Boolean,
-    canApprove:         Boolean,
-    canExport:          Boolean,
-    utilization:        Object,
-    unitPpmps:          Array,
+    canEdit:                  Boolean,
+    canSubmit:                Boolean,
+    canDivisionReview:        Boolean,
+    canBacReview:             Boolean,
+    canPropertyOfficerReview: Boolean,
+    canBudgetOfficerReview:   Boolean,
+    canApprove:               Boolean,
+    canExport:                Boolean,
+    utilization:              Object,
+    unitPpmps:                Array,
 })
 
 const page  = usePage()
@@ -71,25 +73,31 @@ const fundSourceTotals = computed(() => {
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const statusColors = {
-    draft:             'bg-slate-100 text-slate-700',
-    pending_division:  'bg-orange-100 text-orange-700',
-    division_approved: 'bg-teal-100 text-teal-700',
-    pending_bac:       'bg-purple-100 text-purple-700',
-    submitted:         'bg-blue-100 text-blue-700',
-    returned:          'bg-amber-100 text-amber-700',
-    approved:          'bg-green-100 text-green-700',
-    consolidated:      'bg-indigo-100 text-indigo-700',
+    draft:                        'bg-slate-100 text-slate-700',
+    pending_division:             'bg-orange-100 text-orange-700',
+    division_approved:            'bg-teal-100 text-teal-700',
+    pending_property_officer:     'bg-yellow-100 text-yellow-800',
+    pending_budget_officer:       'bg-sky-100 text-sky-700',
+    pending_head:                 'bg-rose-100 text-rose-700',
+    pending_bac:                  'bg-purple-100 text-purple-700',
+    submitted:                    'bg-blue-100 text-blue-700',
+    returned:                     'bg-amber-100 text-amber-700',
+    approved:                     'bg-green-100 text-green-700',
+    consolidated:                 'bg-indigo-100 text-indigo-700',
 }
 
 const statusLabel = (s) => ({
-    draft:             'Draft',
-    pending_division:  'Pending Division Review',
-    division_approved: 'Division Approved',
-    pending_bac:       'Pending BAC Review',
-    submitted:         'Submitted',
-    returned:          'Returned',
-    approved:          'Approved',
-    consolidated:      'Consolidated',
+    draft:                        'Draft',
+    pending_division:             'Pending Division Review',
+    division_approved:            'Division Approved',
+    pending_property_officer:     'Pending Property Officer',
+    pending_budget_officer:       'Pending Budget Officer',
+    pending_head:                 'Pending Head of Agency',
+    pending_bac:                  'Pending BAC Review',
+    submitted:                    'Submitted',
+    returned:                     'Returned',
+    approved:                     'Approved',
+    consolidated:                 'Consolidated',
 }[s] ?? s)
 
 // ── Part I Catalogue Picker Modal ─────────────────────────────────────────
@@ -369,7 +377,7 @@ const itemHasWarning = (id) => validationResult.value?.warnings?.some(w => w.ite
 // ── Workflow ──────────────────────────────────────────────────────────────
 const submitPpmp  = () => {
     const msg = props.ppmp.ppmp_type === 'division'
-        ? 'Submit this Division PPMP to BAC/Procurement for review?'
+        ? 'Submit this Division PPMP to the Property Officer for review?'
         : 'Submit this PPMP to your Division Chief for review?'
     if (!confirm(msg)) return
     router.post(route('ppmp.submit', props.ppmp.id), {}, { preserveScroll: true })
@@ -409,6 +417,36 @@ const bacReturn  = () => {
     router.post(route('ppmp.bac_review', props.ppmp.id), { action: 'return', remarks: bacRemarks.value }, {
         preserveScroll: true,
         onSuccess: () => { showBacReturnModal.value = false; bacRemarks.value = '' },
+    })
+}
+
+// Property Officer review
+const showPropertyReturnModal = ref(false)
+const propertyRemarks         = ref('')
+const propertyOfficerEndorse = () => {
+    if (!confirm('Endorse this PPMP and forward to Budget Officer?')) return
+    router.post(route('ppmp.property_officer_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
+}
+const propertyOfficerReturn = () => {
+    if (!propertyRemarks.value.trim()) return
+    router.post(route('ppmp.property_officer_review', props.ppmp.id), { action: 'return', remarks: propertyRemarks.value }, {
+        preserveScroll: true,
+        onSuccess: () => { showPropertyReturnModal.value = false; propertyRemarks.value = '' },
+    })
+}
+
+// Budget Officer review
+const showBudgetReturnModal = ref(false)
+const budgetRemarks         = ref('')
+const budgetOfficerEndorse = () => {
+    if (!confirm('Endorse this PPMP and forward to Head of Agency for approval?')) return
+    router.post(route('ppmp.budget_officer_review', props.ppmp.id), { action: 'endorse' }, { preserveScroll: true })
+}
+const budgetOfficerReturn = () => {
+    if (!budgetRemarks.value.trim()) return
+    router.post(route('ppmp.budget_officer_review', props.ppmp.id), { action: 'return', remarks: budgetRemarks.value }, {
+        preserveScroll: true,
+        onSuccess: () => { showBudgetReturnModal.value = false; budgetRemarks.value = '' },
     })
 }
 
@@ -472,6 +510,12 @@ const utilizationRate = computed(() => {
                     <p v-if="ppmp.division_remarks" class="text-sm text-orange-700 mt-1">
                         <strong>Division remarks:</strong> {{ ppmp.division_remarks }}
                     </p>
+                    <p v-if="ppmp.property_officer_remarks" class="text-sm text-yellow-800 mt-1">
+                        <strong>Property Officer remarks:</strong> {{ ppmp.property_officer_remarks }}
+                    </p>
+                    <p v-if="ppmp.budget_officer_remarks" class="text-sm text-sky-700 mt-1">
+                        <strong>Budget Officer remarks:</strong> {{ ppmp.budget_officer_remarks }}
+                    </p>
                     <p v-if="ppmp.bac_remarks" class="text-sm text-purple-700 mt-1">
                         <strong>BAC remarks:</strong> {{ ppmp.bac_remarks }}
                     </p>
@@ -483,7 +527,7 @@ const utilizationRate = computed(() => {
                     </button>
                     <button v-if="canSubmit" @click="submitPpmp"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white">
-                        {{ ppmp.ppmp_type === 'division' ? 'Submit to BAC' : 'Submit to Division' }}
+                        {{ ppmp.ppmp_type === 'division' ? 'Submit to Property Officer' : 'Submit to Division' }}
                     </button>
                     <button v-if="canDivisionReview" @click="divisionEndorse"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-teal-600 hover:bg-teal-700 text-white">
@@ -500,6 +544,22 @@ const utilizationRate = computed(() => {
                     <button v-if="canBacReview" @click="showBacReturnModal = true"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
                         <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Unit
+                    </button>
+                    <button v-if="canPropertyOfficerReview" @click="propertyOfficerEndorse"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-yellow-500 hover:bg-yellow-600 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Endorse to Budget Officer
+                    </button>
+                    <button v-if="canPropertyOfficerReview" @click="showPropertyReturnModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Division
+                    </button>
+                    <button v-if="canBudgetOfficerReview" @click="budgetOfficerEndorse"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white">
+                        <CheckCircleIcon class="w-4 h-4" /> Endorse to Head of Agency
+                    </button>
+                    <button v-if="canBudgetOfficerReview" @click="showBudgetReturnModal = true"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white">
+                        <ArrowUturnLeftIcon class="w-4 h-4" /> Return to Division
                     </button>
                     <button v-if="canApprove" @click="approvePpmp"
                             class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white">
@@ -1343,6 +1403,34 @@ const utilizationRate = computed(() => {
                 <div class="flex justify-end gap-2">
                     <button @click="showBacReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
                     <button @click="bacReturn" :disabled="!bacRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Property Officer Return Modal -->
+        <div v-if="showPropertyReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Division Chief</h3>
+                <p class="text-sm text-slate-500 mb-3">State the reason for returning this PPMP.</p>
+                <textarea v-model="propertyRemarks" rows="4" placeholder="Property concerns, missing documents…"
+                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button @click="showPropertyReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                    <button @click="propertyOfficerReturn" :disabled="!propertyRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Officer Return Modal -->
+        <div v-if="showBudgetReturnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+                <h3 class="text-lg font-semibold text-slate-800 mb-3">Return to Division Chief</h3>
+                <p class="text-sm text-slate-500 mb-3">State the budget-related concerns for this PPMP.</p>
+                <textarea v-model="budgetRemarks" rows="4" placeholder="Budget availability, fund source issues…"
+                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button @click="showBudgetReturnModal = false" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                    <button @click="budgetOfficerReturn" :disabled="!budgetRemarks.trim()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50">Return</button>
                 </div>
             </div>
         </div>
