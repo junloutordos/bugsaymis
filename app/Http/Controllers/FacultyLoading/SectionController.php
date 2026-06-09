@@ -175,6 +175,9 @@ class SectionController extends Controller
             'school_year_id' => $data['syid'],
         ]));
 
+        // Auto-create the HRA-/HAC- designation for this section (grades 7–12)
+        $advisory->ensureSectionDesignation($section);
+
         if ($section->adviser) {
             $advisory->syncSectionAdviser($section, null);
         }
@@ -219,8 +222,13 @@ class SectionController extends Controller
 
         $oldAdviserId = $section->adviser ? (int) $section->adviser : null;
         $newAdviserId = isset($data['adviser']) && $data['adviser'] ? (int) $data['adviser'] : null;
+        $oldName      = $section->sectionname;
+        $oldCode      = $section->section_code ?? '';
 
         $section->update($data);
+
+        // Sync the HRA-/HAC- designation name/code if section details changed
+        $advisory->syncSectionDesignation($section->fresh(), $oldName, $oldCode);
 
         if ($oldAdviserId !== $newAdviserId) {
             $advisory->syncSectionAdviser($section->fresh(), $oldAdviserId);

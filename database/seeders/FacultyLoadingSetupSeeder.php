@@ -186,37 +186,10 @@ class FacultyLoadingSetupSeeder extends Seeder
             ['SCO-SHS', 'Student Conduct Officer (SHS)', 5, false, 2],
         ]);
 
-        // ── HR Advisory (homeroom — Grades 7–10, 3 units) ────────────────────
-
-        $this->desigs($hra, [
-            ['HRA-G7A',  'HR Adviser — G7 Section 1',  3, false,  1],
-            ['HRA-G7B',  'HR Adviser — G7 Section 2',  3, false,  2],
-            ['HRA-G7C',  'HR Adviser — G7 Section 3',  3, false,  3],
-            ['HRA-G7D',  'HR Adviser — G7 Section 4',  3, false,  4],
-            ['HRA-G8A',  'HR Adviser — G8 Section 1',  3, false,  5],
-            ['HRA-G8B',  'HR Adviser — G8 Section 2',  3, false,  6],
-            ['HRA-G8C',  'HR Adviser — G8 Section 3',  3, false,  7],
-            ['HRA-G8D',  'HR Adviser — G8 Section 4',  3, false,  8],
-            ['HRA-G9A',  'HR Adviser — G9 Section 1',  3, false,  9],
-            ['HRA-G9B',  'HR Adviser — G9 Section 2',  3, false, 10],
-            ['HRA-G9C',  'HR Adviser — G9 Section 3',  3, false, 11],
-            ['HRA-G9D',  'HR Adviser — G9 Section 4',  3, false, 12],
-            ['HRA-G10A', 'HR Adviser — G10 Section 1', 3, false, 13],
-            ['HRA-G10B', 'HR Adviser — G10 Section 2', 3, false, 14],
-            ['HRA-G10C', 'HR Adviser — G10 Section 3', 3, false, 15],
-            ['HRA-G10D', 'HR Adviser — G10 Section 4', 3, false, 16],
-        ]);
-
-        // ── HR/Academic Advisory (homeroom — Grades 11–12, 3 units) ──────────
-
-        $this->desigs($hac, [
-            ['HAC-G11A',  'HR/Academic Adviser — G11 Section 1', 3, false, 1],
-            ['HAC-G11B',  'HR/Academic Adviser — G11 Section 2', 3, false, 2],
-            ['HAC-G11C',  'HR/Academic Adviser — G11 Section 3', 3, false, 3],
-            ['HAC-G12A',  'HR/Academic Adviser — G12 Section 1', 3, false, 4],
-            ['HAC-G12B',  'HR/Academic Adviser — G12 Section 2', 3, false, 5],
-            ['HAC-G12C',  'HR/Academic Adviser — G12 Section 3', 3, false, 6],
-        ]);
+        // ── HR Advisory / HR Academic Advisory ───────────────────────────────
+        // Designations are auto-created per section via SectionController::store()
+        // and faculty-loading:sync-section-designations. Not seeded here.
+        unset($hra, $hac); // categories seeded above; individual designations come from sections
 
         // ── Research Advisory (1–2 units per group) ───────────────────────────
 
