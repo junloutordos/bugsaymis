@@ -115,7 +115,9 @@
                   </td>
                   <td class="px-5 py-3 text-center">
                     <span class="font-semibold text-slate-700 block">
-                      <template v-if="isManagedExternally(d) && d.load_units === 0">Variable</template>
+                      <template v-if="isManagedExternally(d) && d.load_units === 0">
+                        {{ d.holders.reduce((s, h) => s + h.load_units, 0) }}
+                      </template>
                       <template v-else>{{ d.load_units }}</template>
                     </span>
                     <span :class="assignmentTypeBadge(d.assignment_type)" class="text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5 inline-block">{{ d.assignment_type }}</span>
