@@ -70,6 +70,7 @@ class DesignationController extends Controller
                             'assignment_id' => $a->id,
                             'user_id'       => $a->user_id,
                             'user_name'     => $a->faculty?->name ?? '—',
+                            'load_units'    => (float) $a->load_units,
                         ])
                         ->values()
                         ->all(),
