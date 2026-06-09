@@ -250,7 +250,7 @@
                   </div>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
-                  <button v-if="!r.is_locked && isAdmin" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
+                  <button v-if="!r.is_locked && (isAdmin || canManageDtr)" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
                     <PencilSquareIcon class="h-4 w-4" />
                   </button>
                   <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
@@ -353,6 +353,9 @@ const props = defineProps({
 const page = usePage()
 const isAdmin = computed(() =>
   page.props.auth?.user?.roleNames?.includes('Administrator') ?? false
+)
+const canManageDtr = computed(() =>
+  page.props.auth?.user?.permissions?.includes('hr.dtr.manage') ?? false
 )
 
 const currentMonth = ref(props.month)
