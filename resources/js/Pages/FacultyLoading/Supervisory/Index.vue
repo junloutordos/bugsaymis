@@ -18,6 +18,17 @@
         </button>
       </div>
 
+      <!-- School Year picker -->
+      <div class="flex items-center gap-2">
+        <label class="text-xs font-medium text-slate-500 uppercase tracking-wide">School Year</label>
+        <select v-model="selectedSy" @change="switchYear"
+          class="text-sm border border-indigo-300 bg-indigo-50 text-indigo-700 font-medium rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+            {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+          </option>
+        </select>
+      </div>
+
       <!-- Flash -->
       <div v-if="$page.props.flash?.success"
         class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
@@ -154,11 +165,19 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  positions:  { type: Array,  default: () => [] },
-  users:      { type: Array,  default: () => [] },
-  schoolYear: { type: Object, default: null },
-  term:       { type: Object, default: null },
+  positions:           { type: Array,  default: () => [] },
+  users:               { type: Array,  default: () => [] },
+  schoolYear:          { type: Object, default: null },
+  term:                { type: Object, default: null },
+  schoolYears:         { type: Array,  default: () => [] },
+  currentSchoolYearId: { type: Number, default: null },
 })
+
+const selectedSy = ref(props.currentSchoolYearId)
+
+function switchYear() {
+  router.get(route('faculty-loading.supervisory.index'), { school_year_id: selectedSy.value }, { preserveState: false })
+}
 
 const hasImportSuggestions = computed(() => props.positions.some(p => p.suggestion && !p.assigned))
 

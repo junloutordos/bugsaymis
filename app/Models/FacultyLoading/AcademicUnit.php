@@ -12,6 +12,7 @@ class AcademicUnit extends Model
     protected $table = 'academic_units';
 
     protected $fillable = [
+        'school_year_id',
         'code',
         'name',
         'unit_type',
@@ -21,11 +22,17 @@ class AcademicUnit extends Model
     ];
 
     protected $casts = [
-        'sort_order' => 'integer',
-        'is_active'  => 'boolean',
+        'school_year_id' => 'integer',
+        'sort_order'     => 'integer',
+        'is_active'      => 'boolean',
     ];
 
     // ── Relationships ─────────────────────────────────────────────────────────
+
+    public function schoolYear(): BelongsTo
+    {
+        return $this->belongsTo(SchoolYear::class);
+    }
 
     public function head(): BelongsTo
     {

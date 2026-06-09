@@ -206,10 +206,11 @@ Route::middleware(['web', 'auth', 'verified'])
         // Subjects
         Route::middleware('permission:faculty_loading.subjects')
             ->prefix('subjects')->name('subjects.')->group(function () {
-                Route::get('/',             [SubjectController::class, 'index'])->name('index');
-                Route::post('/',            [SubjectController::class, 'store'])->name('store');
-                Route::put('/{subject}',    [SubjectController::class, 'update'])->name('update');
-                Route::delete('/{subject}', [SubjectController::class, 'destroy'])->name('destroy');
+                Route::get('/',                    [SubjectController::class, 'index'])->name('index');
+                Route::post('/',                   [SubjectController::class, 'store'])->name('store');
+                Route::post('/copy-from-year',     [SubjectController::class, 'copyFromYear'])->name('copy-from-year');
+                Route::put('/{subject}',           [SubjectController::class, 'update'])->name('update');
+                Route::delete('/{subject}',        [SubjectController::class, 'destroy'])->name('destroy');
             });
 
         // Classrooms
@@ -217,6 +218,7 @@ Route::middleware(['web', 'auth', 'verified'])
             ->prefix('classrooms')->name('classrooms.')->group(function () {
                 Route::get('/',                            [ClassroomController::class, 'index'])->name('index');
                 Route::post('/',                           [ClassroomController::class, 'store'])->name('store');
+                Route::post('/copy-from-year',             [ClassroomController::class, 'copyFromYear'])->name('copy-from-year');
                 Route::put('/{classroom}',                 [ClassroomController::class, 'update'])->name('update');
                 Route::delete('/{classroom}',              [ClassroomController::class, 'destroy'])->name('destroy');
                 Route::post('/{classroom}/regenerate-nfc', [ClassroomController::class, 'regenerateNfc'])->name('regenerate-nfc');
@@ -231,6 +233,7 @@ Route::middleware(['web', 'auth', 'verified'])
             ->prefix('academic-units')->name('academic-units.')->group(function () {
                 Route::get('/',                      [AcademicUnitController::class, 'index'])->name('index');
                 Route::post('/',                     [AcademicUnitController::class, 'store'])->name('store');
+                Route::post('/copy-from-year',       [AcademicUnitController::class, 'copyFromYear'])->name('copy-from-year');
                 Route::put('/{academicUnit}',         [AcademicUnitController::class, 'update'])->name('update');
                 Route::delete('/{academicUnit}',      [AcademicUnitController::class, 'destroy'])->name('destroy');
             });

@@ -4,6 +4,7 @@ namespace App\Models\FacultyLoading;
 
 use App\Models\Room;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\FacultyLoading\SchoolYear;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -12,6 +13,7 @@ class Classroom extends Model
     protected $table = 'classrooms';
 
     protected $fillable = [
+        'school_year_id',
         'name',
         'code',
         'classroom_type',
@@ -25,10 +27,16 @@ class Classroom extends Model
     ];
 
     protected $casts = [
-        'capacity'     => 'integer',
-        'floor'        => 'integer',
-        'is_available' => 'boolean',
+        'school_year_id' => 'integer',
+        'capacity'       => 'integer',
+        'floor'          => 'integer',
+        'is_available'   => 'boolean',
     ];
+
+    public function schoolYear(): BelongsTo
+    {
+        return $this->belongsTo(SchoolYear::class);
+    }
 
     /** Optional link to the existing rooms/facilities table */
     public function room(): BelongsTo
