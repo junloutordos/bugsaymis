@@ -73,7 +73,7 @@ const PLANTILLA_NAMES = ['Plantilla Teaching', 'Plantilla Non-Teaching']
 
 // Competency definitions — name + suggested proficiency level
 const COMPETENCY_DEFS = [
-  { name: 'Integrity',                                                  suggested: 'advanced' },
+  { name: 'Exemplifying Integrity',                                     suggested: 'advanced' },
   { name: 'Delivering Service Excellence',                              suggested: 'advanced' },
   { name: 'Solving Problems and Decision Making',                       suggested: 'advanced' },
   { name: 'Championing and Applying Innovation',                        suggested: 'advanced' },
