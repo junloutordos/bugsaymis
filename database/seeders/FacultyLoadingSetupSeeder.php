@@ -189,16 +189,10 @@ class FacultyLoadingSetupSeeder extends Seeder
         // and faculty-loading:sync-section-designations. Not seeded here.
         unset($hra, $hac); // categories seeded above; individual designations come from sections
 
-        // ── Research Advisory (1–2 units per group) ───────────────────────────
-
-        $this->desigs($res, [
-            ['RES-G7',  'Research Adviser — Grade 7',  2, false, 1],
-            ['RES-G8',  'Research Adviser — Grade 8',  2, false, 2],
-            ['RES-G9',  'Research Adviser — Grade 9',  2, false, 3],
-            ['RES-G10', 'Research Adviser — Grade 10', 2, false, 4],
-            ['RES-G11', 'Research Adviser — Grade 11', 1, false, 5],
-            ['RES-G12', 'Research Adviser — Grade 12 (Thesis)', 1, false, 6],
-        ]);
+        // ── Research Advisory ─────────────────────────────────────────────────
+        // RES-G* designations are auto-created on demand by ResearchAdvisoryController
+        // when the first advisory group for a grade level is saved. Not seeded here.
+        unset($res);
 
         // ── SCALE Advisory (per SHS section, 3 units) ────────────────────────
 
