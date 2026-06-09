@@ -236,6 +236,10 @@ class DesignationController extends Controller
             return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
         }
 
+        if (str_starts_with($designation->code, 'RES-')) {
+            return back()->withErrors(['error' => 'Research designations are managed through the Research Advisories module.']);
+        }
+
         $data = $request->validate([
             'user_id'          => 'required|exists:users,id',
             'academic_term_id' => 'required|exists:academic_terms,id',
@@ -285,6 +289,10 @@ class DesignationController extends Controller
             return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
         }
 
+        if ($assignment->designation && str_starts_with($assignment->designation->code, 'RES-')) {
+            return back()->withErrors(['error' => 'Research designations are managed through the Research Advisories module.']);
+        }
+
         $result = $this->service->revoke($assignment);
 
         if (! $result['ok']) {
@@ -316,6 +324,10 @@ class DesignationController extends Controller
             return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
         }
 
+        if (str_starts_with($designation->code, 'RES-')) {
+            return back()->withErrors(['error' => 'Research designations are managed through the Research Advisories module.']);
+        }
+
         $result = $this->service->assign(
             $facultyLoad,
             $designation,
@@ -342,6 +354,10 @@ class DesignationController extends Controller
 
         if ($assignment->designation && $assignment->designation->section_id !== null) {
             return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
+        }
+
+        if ($assignment->designation && str_starts_with($assignment->designation->code, 'RES-')) {
+            return back()->withErrors(['error' => 'Research designations are managed through the Research Advisories module.']);
         }
 
         $result = $this->service->revoke($assignment);
