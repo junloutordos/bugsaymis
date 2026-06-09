@@ -5,6 +5,7 @@ namespace App\Models\FacultyLoading;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ResearchAdvisory extends Model
 {
@@ -14,8 +15,6 @@ class ResearchAdvisory extends Model
         'user_id',
         'school_year_id',
         'academic_term_id',
-        'student_id',
-        'student_name',
         'research_title',
         'grade_level',
         'advisory_role',
@@ -29,7 +28,6 @@ class ResearchAdvisory extends Model
     protected $casts = [
         'grade_level' => 'integer',
         'load_units'  => 'decimal:2',
-        'student_id'  => 'integer',
     ];
 
     public function faculty(): BelongsTo
@@ -50,6 +48,11 @@ class ResearchAdvisory extends Model
     public function loadAssignment(): BelongsTo
     {
         return $this->belongsTo(LoadAssignment::class);
+    }
+
+    public function members(): HasMany
+    {
+        return $this->hasMany(ResearchAdvisoryMember::class);
     }
 
     public function scopeActive($query)

@@ -116,6 +116,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 // Research Advisories
                 Route::prefix('research-advisories')->name('research-advisories.')->group(function () {
                     Route::get('/',                         [ResearchAdvisoryController::class, 'index'])->name('index');
+                    Route::get('/students',                 [ResearchAdvisoryController::class, 'studentsForGrade'])->name('students');
                     Route::post('/',                        [ResearchAdvisoryController::class, 'store'])->name('store');
                     Route::put('/{researchAdvisory}',       [ResearchAdvisoryController::class, 'update'])->name('update');
                     Route::delete('/{researchAdvisory}',    [ResearchAdvisoryController::class, 'destroy'])->name('destroy');
