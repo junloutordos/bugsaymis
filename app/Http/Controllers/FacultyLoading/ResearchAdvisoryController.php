@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\Designation;
+use App\Models\FacultyLoading\DesignationCategory;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\ResearchAdvisory;
@@ -295,10 +296,21 @@ class ResearchAdvisoryController extends Controller
      */
     private function recomputeGradeAssignment(int $userId, int $termId, int $gradeLevel, FacultyLoad $load): ?LoadAssignment
     {
-        $designation = Designation::where('code', "RES-G{$gradeLevel}")->first();
-        if (! $designation) {
-            return null;
-        }
+        $designation = Designation::firstOrCreate(
+            ['code' => "RES-G{$gradeLevel}"],
+            [
+                'designation_category_id' => DesignationCategory::firstOrCreate(
+                    ['code' => 'RESEARCH'],
+                    ['name' => 'Research Advisory', 'description' => 'Research group and thesis advisory roles', 'sort_order' => 8, 'is_active' => true]
+                )->id,
+                'name'            => "Research Advisory — Grade {$gradeLevel}",
+                'assignment_type' => 'research',
+                'load_units'      => 0,
+                'requires_unit'   => false,
+                'is_active'       => true,
+                'sort_order'      => $gradeLevel,
+            ]
+        );
 
         $total = (float) ResearchAdvisory::where('user_id', $userId)
             ->where('academic_term_id', $termId)
