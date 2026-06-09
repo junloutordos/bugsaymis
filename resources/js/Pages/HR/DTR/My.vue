@@ -63,7 +63,7 @@
             Advance Entry — {{ toDateStr(advanceRecord.work_date) }}
           </p>
           <p class="text-xs text-sky-600 mt-0.5">
-            This row is your cut-off date advance entry. Fill in your expected time using the edit icon on the highlighted row before your payroll cut-off.
+            This row is your cut-off date advance entry. Fill in your expected time directly in the highlighted row before your payroll cut-off.
           </p>
         </div>
       </div>
@@ -254,22 +254,30 @@
               <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
-                <!-- AM In -->
-                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_in_am')">
-                  {{ tableCellText(r, 'time_in_am') }}
-                </td>
-                <!-- AM Out -->
-                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_out_am')">
-                  {{ tableCellText(r, 'time_out_am') }}
-                </td>
-                <!-- PM In -->
-                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_in_pm')">
-                  {{ tableCellText(r, 'time_in_pm') }}
-                </td>
-                <!-- PM Out -->
-                <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_out_pm')">
-                  {{ tableCellText(r, 'time_out_pm') }}
-                </td>
+                <template v-if="r.is_advance">
+                  <td v-for="pf in ['penned_time_in_am','penned_time_out_am','penned_time_in_pm','penned_time_out_pm']" :key="pf" class="px-2 py-1.5">
+                    <input v-model="advancePennedForm[pf]" type="time"
+                      class="w-[90px] border border-amber-200 rounded px-1.5 py-0.5 text-xs font-mono text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white" />
+                  </td>
+                </template>
+                <template v-else>
+                  <!-- AM In -->
+                  <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_in_am')">
+                    {{ tableCellText(r, 'time_in_am') }}
+                  </td>
+                  <!-- AM Out -->
+                  <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_out_am')">
+                    {{ tableCellText(r, 'time_out_am') }}
+                  </td>
+                  <!-- PM In -->
+                  <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_in_pm')">
+                    {{ tableCellText(r, 'time_in_pm') }}
+                  </td>
+                  <!-- PM Out -->
+                  <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap" :class="tableCellClass(r, 'time_out_pm')">
+                    {{ tableCellText(r, 'time_out_pm') }}
+                  </td>
+                </template>
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_in) || '–' }}</td>
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">{{ fmtTime(r.scheduled_time_out) || '–' }}</td>
                 <td class="px-4 py-2.5 text-right text-slate-700 text-xs tabular-nums">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</td>
@@ -323,17 +331,25 @@
                   </div>
                 </td>
                 <td class="px-4 py-2.5">
-                  <!-- Penned-submitted lock (employee submitted) -->
-                  <LockClosedIcon v-if="r.penned_submitted_at" class="h-4 w-4 text-amber-400" title="Penned entries submitted — contact HR to unlock" />
-                  <!-- HR lock -->
-                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" title="Record locked by HR" />
-                  <!-- Edit button -->
-                  <button v-else-if="hasMissingSlots(r) || r.is_travel"
-                    @click="openEdit(r)"
-                    class="text-slate-300 hover:text-indigo-600 transition-colors"
-                    title="Submit penned entry">
-                    <PencilSquareIcon class="h-4 w-4" />
-                  </button>
+                  <template v-if="r.is_advance">
+                    <button @click="saveAdvancePenned(r)" :disabled="advancePennedForm.processing"
+                      class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded font-medium disabled:opacity-50 whitespace-nowrap">
+                      {{ advancePennedForm.processing ? '…' : 'Save' }}
+                    </button>
+                  </template>
+                  <template v-else>
+                    <!-- Penned-submitted lock (employee submitted) -->
+                    <LockClosedIcon v-if="r.penned_submitted_at" class="h-4 w-4 text-amber-400" title="Penned entries submitted — contact HR to unlock" />
+                    <!-- HR lock -->
+                    <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" title="Record locked by HR" />
+                    <!-- Edit button -->
+                    <button v-else-if="hasMissingSlots(r) || r.is_travel"
+                      @click="openEdit(r)"
+                      class="text-slate-300 hover:text-indigo-600 transition-colors"
+                      title="Submit penned entry">
+                      <PencilSquareIcon class="h-4 w-4" />
+                    </button>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -729,5 +745,27 @@ function submitEdit() {
   editForm.patch(route('hr.my-dtr.penned', editModal.record.id), {
     onSuccess: () => { editModal.open = false },
   })
+}
+
+// ── Inline advance penned entry ─────────────────────────────────────────────
+
+const advancePennedForm = useForm({
+  penned_time_in_am:  fmtTime(props.records.find(r => r.is_advance)?.penned_time_in_am)  || '',
+  penned_time_out_am: fmtTime(props.records.find(r => r.is_advance)?.penned_time_out_am) || '',
+  penned_time_in_pm:  fmtTime(props.records.find(r => r.is_advance)?.penned_time_in_pm)  || '',
+  penned_time_out_pm: fmtTime(props.records.find(r => r.is_advance)?.penned_time_out_pm) || '',
+  penned_remarks:     props.records.find(r => r.is_advance)?.penned_remarks || '',
+})
+
+function saveAdvancePenned(record) {
+  advancePennedForm
+    .transform(data => ({
+      penned_time_in_am:  data.penned_time_in_am  ? data.penned_time_in_am  + ':00' : null,
+      penned_time_out_am: data.penned_time_out_am ? data.penned_time_out_am + ':00' : null,
+      penned_time_in_pm:  data.penned_time_in_pm  ? data.penned_time_in_pm  + ':00' : null,
+      penned_time_out_pm: data.penned_time_out_pm ? data.penned_time_out_pm + ':00' : null,
+      penned_remarks:     data.penned_remarks || null,
+    }))
+    .patch(route('hr.my-dtr.penned', record.id), { preserveScroll: true })
 }
 </script>
