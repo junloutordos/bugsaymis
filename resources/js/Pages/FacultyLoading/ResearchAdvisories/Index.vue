@@ -1,330 +1,457 @@
-<template>
-  <Head title="Research Advisories" />
-  <AdminLayout title="Research Advisories">
-    <div class="space-y-5">
-
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Research Advisories</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Assign student research advisory loads (max {{ MAX_RESEARCH }} units per term)</p>
-        </div>
-        <button @click="openForm()"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <PlusIcon class="h-4 w-4" /> Add Advisory
-        </button>
-      </div>
-
-      <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
-        <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
-      </div>
-      <div v-if="Object.keys($page.props.errors ?? {}).length" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm space-y-1">
-        <p v-for="(msg, key) in $page.props.errors" :key="key">{{ msg }}</p>
-      </div>
-
-      <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
-        <select v-model="filters.term_id" @change="applyFilters"
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-          <option v-for="t in terms" :key="t.id" :value="t.id">
-            {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
-          </option>
-        </select>
-        <select v-model="filters.faculty_id" @change="applyFilters"
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-          <option :value="null">All Faculty</option>
-          <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
-        </select>
-      </div>
-
-      <!-- Empty -->
-      <div v-if="advisories.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <BeakerIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No research advisories for this term</p>
-      </div>
-
-      <!-- Table -->
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Faculty</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Research Title</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Units</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="r in advisories" :key="r.id" class="hover:bg-slate-50/50">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ r.faculty?.name ?? '—' }}</td>
-              <td class="px-4 py-3 text-slate-700">{{ r.student_name }}</td>
-              <td class="px-4 py-3 text-slate-600 max-w-xs truncate">{{ r.research_title }}</td>
-              <td class="px-4 py-3 text-center text-slate-600">{{ r.grade_level }}</td>
-              <td class="px-4 py-3 text-center">
-                <span :class="roleBadge(r.advisory_role)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                  {{ roleLabel(r.advisory_role) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <span v-if="r.research_type" :class="typeBadge(r.research_type)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                  {{ typeLabel(r.research_type) }}
-                </span>
-                <span v-else class="text-xs text-slate-400">—</span>
-              </td>
-              <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ r.load_units }}</td>
-              <td class="px-4 py-3 text-center">
-                <span :class="statusBadge(r.status)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                  {{ r.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <button @click="openForm(r)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                    <PencilIcon class="h-4 w-4" />
-                  </button>
-                  <button @click="remove(r)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                    <TrashIcon class="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-
-    <!-- Modal -->
-    <div v-if="modal" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 my-8">
-        <h2 class="text-lg font-semibold text-slate-800">{{ form.id ? 'Edit' : 'Add' }} Research Advisory</h2>
-
-        <div class="grid grid-cols-2 gap-3">
-          <!-- Faculty + term (create only) -->
-          <template v-if="!form.id">
-            <div class="col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Faculty *</label>
-              <select v-model="form.user_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option :value="null">Select faculty...</option>
-                <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
-              </select>
-            </div>
-            <div class="col-span-2">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
-              <select v-model="form.academic_term_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option :value="null">Select term...</option>
-                <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
-              </select>
-            </div>
-          </template>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Student Name *</label>
-            <input v-model="form.student_name" type="text"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Research Title *</label>
-            <input v-model="form.research_title" type="text"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level *</label>
-            <select v-model.number="form.grade_level" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option v-for="g in [7,8,9,10,11,12]" :key="g" :value="g">Grade {{ g }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Advisory Role *</label>
-            <select v-model="form.advisory_role" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="lead">Lead Adviser</option>
-              <option value="co_adviser">Co-Adviser</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Research Type</label>
-            <select v-model="form.research_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option :value="null">— None —</option>
-              <option v-for="t in researchTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Load Units *</label>
-            <input v-model.number="form.load_units" type="number" step="0.5" min="0.5" max="5"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-            <p class="text-[11px] text-slate-400 mt-0.5">Default: lead = 1, co-adviser = 0.5</p>
-          </div>
-
-          <div v-if="form.id" class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-            <select v-model="form.status" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option value="active">Active</option>
-              <option value="dropped">Dropped</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
-
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-            <textarea v-model="form.remarks" rows="2"
-              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-1">
-          <button @click="modal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-          <button @click="save" :disabled="form.processing"
-            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
-            {{ form.id ? 'Update' : 'Save' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-  </AdminLayout>
-</template>
-
 <script setup>
-import { reactive, ref, watch } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { ref, computed, watch } from 'vue'
+import { Head, usePage, useForm } from '@inertiajs/vue3'
+import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { BeakerIcon, CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
-
-const MAX_RESEARCH = 5
+import {
+    PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon,
+    UserGroupIcon, ExclamationTriangleIcon, XMarkIcon,
+    ChevronDownIcon, ChevronUpIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  advisories:  { type: Array,  default: () => [] },
-  terms:       { type: Array,  default: () => [] },
-  faculty:     { type: Array,  default: () => [] },
-  currentTerm: { type: Object, default: null },
-  filters:     { type: Object, default: () => ({}) },
+    advisories:  Array,
+    terms:       Array,
+    faculty:     Array,
+    currentTerm: Object,
+    filters:     Object,
 })
 
-const researchTypes = [
-  { value: 'thesis',           label: 'Thesis' },
-  { value: 'investigatory',    label: 'Investigatory Project' },
-  { value: 'science_research', label: 'Science Research' },
-  { value: 'feasibility',      label: 'Feasibility Study' },
-]
+const page  = usePage()
+const flash = computed(() => page.props.flash ?? {})
 
-const filters = reactive({
-  term_id:    props.filters.term_id    ?? props.currentTerm?.id ?? null,
-  faculty_id: props.filters.faculty_id ?? null,
-})
+// ── Filters ───────────────────────────────────────────────────────────────────
+const termId    = ref(props.filters.term_id    ?? props.currentTerm?.id ?? '')
+const facultyId = ref(props.filters.faculty_id ?? '')
+const search    = ref('')
 
 function applyFilters() {
-  router.get(route('faculty-loading.research-advisories.index'), filters, { preserveState: true })
+    const params = {}
+    if (termId.value)    params.term_id    = termId.value
+    if (facultyId.value) params.faculty_id = facultyId.value
+    window.location.href = route('faculty-loading.research-advisories.index') + '?' + new URLSearchParams(params).toString()
 }
+watch([termId, facultyId], applyFilters)
 
-const modal = ref(false)
+// ── Pagination ────────────────────────────────────────────────────────────────
+const PER_PAGE    = 15
+const currentPage = ref(1)
+const filtered    = computed(() => {
+    const q = search.value.toLowerCase()
+    return props.advisories.filter(a =>
+        !q ||
+        a.research_title.toLowerCase().includes(q) ||
+        (a.faculty?.name ?? '').toLowerCase().includes(q) ||
+        String(a.grade_level).includes(q)
+    )
+})
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PER_PAGE)))
+const displayed  = computed(() => {
+    const start = (currentPage.value - 1) * PER_PAGE
+    return filtered.value.slice(start, start + PER_PAGE)
+})
+watch(search, () => { currentPage.value = 1 })
+
+// ── Expanded members row ──────────────────────────────────────────────────────
+const expandedId = ref(null)
+function toggleExpand(id) { expandedId.value = expandedId.value === id ? null : id }
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+const showModal  = ref(false)
+const editTarget = ref(null)
+
 const form = useForm({
-  id: null,
-  user_id: null,
-  academic_term_id: null,
-  student_name: '',
-  research_title: '',
-  grade_level: 7,
-  advisory_role: 'lead',
-  research_type: null,
-  load_units: 1.0,
-  status: 'active',
-  remarks: '',
+    user_id: '', academic_term_id: '', research_title: '',
+    grade_level: '', advisory_role: 'lead', research_type: '',
+    load_units: 1.0, status: 'active', remarks: '', members: [],
 })
 
-// Auto-suggest load_units when role changes (only when creating, not editing)
-watch(() => form.advisory_role, (role) => {
-  if (!form.id) {
-    form.load_units = role === 'co_adviser' ? 0.5 : 1.0
-  }
-})
-
-function openForm(r = null) {
-  if (r) {
-    Object.assign(form, {
-      id: r.id,
-      user_id: null, academic_term_id: null,
-      student_name: r.student_name,
-      research_title: r.research_title,
-      grade_level: r.grade_level,
-      advisory_role: r.advisory_role ?? 'lead',
-      research_type: r.research_type ?? null,
-      load_units: r.load_units,
-      status: r.status,
-      remarks: r.remarks ?? '',
-    })
-  } else {
+function openCreate() {
+    editTarget.value = null
     form.reset()
-    form.id              = null
-    form.advisory_role   = 'lead'
-    form.research_type   = null
-    form.grade_level     = 7
-    form.load_units      = 1.0
-    form.status          = 'active'
-    form.academic_term_id = filters.term_id ?? null
-  }
-  modal.value = true
+    form.user_id          = ''
+    form.academic_term_id = termId.value || props.currentTerm?.id || ''
+    form.advisory_role    = 'lead'
+    form.load_units       = 1.0
+    form.status           = 'active'
+    form.members          = []
+    availableStudents.value = []
+    studentSearch.value     = ''
+    showModal.value = true
 }
 
-function save() {
-  if (form.id) {
-    form.put(route('faculty-loading.research-advisories.update', form.id), {
-      onSuccess: () => { modal.value = false },
-    })
-  } else {
-    form.post(route('faculty-loading.research-advisories.store'), {
-      onSuccess: () => { modal.value = false },
-    })
-  }
+function openEdit(advisory) {
+    editTarget.value      = advisory
+    form.research_title   = advisory.research_title
+    form.grade_level      = advisory.grade_level
+    form.advisory_role    = advisory.advisory_role
+    form.research_type    = advisory.research_type ?? ''
+    form.load_units       = advisory.load_units
+    form.status           = advisory.status
+    form.remarks          = advisory.remarks ?? ''
+    form.members          = advisory.members.map(m => ({ student_id: m.student_id, student_name: m.student_name }))
+    availableStudents.value = []
+    studentSearch.value     = ''
+    if (advisory.grade_level && advisory.term?.id) {
+        loadStudents(advisory.grade_level, advisory.term.id, advisory.id)
+    }
+    showModal.value = true
 }
 
-function remove(r) {
-  if (!confirm(`Remove advisory for "${r.student_name}"?`)) return
-  useForm({}).delete(route('faculty-loading.research-advisories.destroy', r.id))
+function closeModal() { showModal.value = false }
+
+// Auto-set default units on role change (create mode only)
+watch(() => form.advisory_role, role => {
+    if (!editTarget.value) form.load_units = role === 'lead' ? 1.0 : 0.5
+})
+
+// Auto-load students when grade level changes
+watch(() => form.grade_level, gl => {
+    const tid = editTarget.value?.term?.id ?? form.academic_term_id
+    if (gl && tid) loadStudents(gl, tid, editTarget.value?.id)
+    else availableStudents.value = []
+})
+
+function submit() {
+    if (editTarget.value) {
+        form.put(route('faculty-loading.research-advisories.update', editTarget.value.id), {
+            preserveScroll: true, onSuccess: closeModal,
+        })
+    } else {
+        form.post(route('faculty-loading.research-advisories.store'), {
+            preserveScroll: true, onSuccess: closeModal,
+        })
+    }
 }
 
-function roleBadge(role) {
-  return {
-    lead:       'bg-indigo-50 text-indigo-700',
-    co_adviser: 'bg-slate-100 text-slate-600',
-  }[role] ?? 'bg-slate-50 text-slate-600'
+// ── Delete ────────────────────────────────────────────────────────────────────
+const deleteForm = useForm({})
+function remove(advisory) {
+    if (!confirm(`Remove advisory group "${advisory.research_title}"?`)) return
+    deleteForm.delete(route('faculty-loading.research-advisories.destroy', advisory.id), { preserveScroll: true })
 }
 
-function roleLabel(role) {
-  return { lead: 'Lead', co_adviser: 'Co-Adviser' }[role] ?? role
+// ── Student picker ────────────────────────────────────────────────────────────
+const availableStudents = ref([])
+const studentSearch     = ref('')
+const loadingStudents   = ref(false)
+
+async function loadStudents(gradeLevel, termIdVal, advisoryId = null) {
+    if (!gradeLevel || !termIdVal) return
+    loadingStudents.value   = true
+    availableStudents.value = []
+    try {
+        const params = { grade_level: gradeLevel, term_id: termIdVal }
+        if (advisoryId) params.advisory_id = advisoryId
+        const { data } = await axios.get(route('faculty-loading.research-advisories.students'), { params })
+        availableStudents.value = data
+    } catch {
+        availableStudents.value = []
+    } finally {
+        loadingStudents.value = false
+    }
 }
 
-function typeBadge(type) {
-  return {
-    thesis:           'bg-violet-50 text-violet-700',
-    investigatory:    'bg-blue-50 text-blue-700',
-    science_research: 'bg-teal-50 text-teal-700',
-    feasibility:      'bg-amber-50 text-amber-700',
-  }[type] ?? 'bg-slate-50 text-slate-600'
+const filteredStudents = computed(() => {
+    const q = studentSearch.value.toLowerCase()
+    return availableStudents.value.filter(s => !q || s.student_name.toLowerCase().includes(q))
+})
+
+function isSelected(studentId) {
+    return form.members.some(m => m.student_id === studentId)
 }
 
-function typeLabel(type) {
-  return researchTypes.find(t => t.value === type)?.label ?? type
+function toggleStudent(student) {
+    if (isSelected(student.id)) {
+        form.members = form.members.filter(m => m.student_id !== student.id)
+    } else {
+        form.members.push({ student_id: student.id, student_name: student.student_name })
+    }
 }
 
-function statusBadge(status) {
-  return {
-    active:    'bg-emerald-50 text-emerald-700',
-    dropped:   'bg-red-50 text-red-700',
-    completed: 'bg-blue-50 text-blue-700',
-  }[status] ?? 'bg-slate-50 text-slate-600'
+function removeMember(index) { form.members.splice(index, 1) }
+
+// ── Display helpers ───────────────────────────────────────────────────────────
+const roleLabel = { lead: 'Lead', co_adviser: 'Co-Adviser' }
+const roleBadge = { lead: 'bg-indigo-100 text-indigo-700', co_adviser: 'bg-purple-100 text-purple-700' }
+const typeLabel = { thesis: 'Thesis', investigatory: 'Investigatory', science_research: 'Science Research', feasibility: 'Feasibility' }
+const statusBadge = {
+    active: 'bg-green-100 text-green-700', completed: 'bg-blue-100 text-blue-700', dropped: 'bg-red-100 text-red-700',
 }
 </script>
+
+<template>
+    <Head title="Research Advisories" />
+    <AdminLayout title="Research Advisories">
+
+        <div v-if="flash.success" class="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">{{ flash.success }}</div>
+        <div v-if="flash.error"   class="mb-4 rounded-lg bg-red-50   px-4 py-3 text-sm text-red-700">{{ flash.error }}</div>
+
+        <!-- Header -->
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-xl font-semibold text-slate-800">Research Advisories</h1>
+                <p class="text-sm text-slate-500">Manage research advisory groups per faculty per term.</p>
+            </div>
+            <button @click="openCreate" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+                <PlusIcon class="h-4 w-4" /> New Advisory Group
+            </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="mb-4 flex flex-wrap gap-3">
+            <select v-model="termId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">All Terms</option>
+                <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+            <select v-model="facultyId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">All Faculty</option>
+                <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+            </select>
+            <div class="relative">
+                <MagnifyingGlassIcon class="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                <input v-model="search" placeholder="Search title / faculty…"
+                    class="rounded-lg border border-slate-200 bg-white pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64" />
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        <th class="px-4 py-3 text-left">Faculty</th>
+                        <th class="px-4 py-3 text-left">Research Title</th>
+                        <th class="px-4 py-3 text-center">Grade</th>
+                        <th class="px-4 py-3 text-center">Role</th>
+                        <th class="px-4 py-3 text-center">Type</th>
+                        <th class="px-4 py-3 text-center">Units</th>
+                        <th class="px-4 py-3 text-center">Members</th>
+                        <th class="px-4 py-3 text-center">Status</th>
+                        <th class="px-4 py-3 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template v-if="displayed.length === 0">
+                        <tr><td colspan="9" class="px-4 py-8 text-center text-slate-400">No research advisory groups found.</td></tr>
+                    </template>
+                    <template v-for="a in displayed" :key="a.id">
+                        <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-3 font-medium text-slate-800">{{ a.faculty?.name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-slate-700 max-w-xs truncate" :title="a.research_title">{{ a.research_title }}</td>
+                            <td class="px-4 py-3 text-center text-slate-600">Grade {{ a.grade_level }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium" :class="roleBadge[a.advisory_role]">
+                                    {{ roleLabel[a.advisory_role] ?? a.advisory_role }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-center text-xs text-slate-600">{{ typeLabel[a.research_type] ?? '—' }}</td>
+                            <td class="px-4 py-3 text-center font-medium text-slate-800">{{ a.load_units }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button @click="toggleExpand(a.id)"
+                                    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200">
+                                    <UserGroupIcon class="h-3.5 w-3.5" />
+                                    {{ a.members.length }}
+                                    <ChevronDownIcon v-if="expandedId !== a.id" class="h-3 w-3" />
+                                    <ChevronUpIcon   v-else                      class="h-3 w-3" />
+                                </button>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize" :class="statusBadge[a.status]">
+                                    {{ a.status }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button @click="openEdit(a)" class="text-indigo-600 hover:text-indigo-800" title="Edit"><PencilIcon class="h-4 w-4" /></button>
+                                    <button @click="remove(a)"   class="text-red-500 hover:text-red-700" title="Delete"><TrashIcon class="h-4 w-4" /></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Expanded members -->
+                        <tr v-if="expandedId === a.id" class="bg-slate-50 border-b border-slate-100">
+                            <td colspan="9" class="px-6 py-3">
+                                <p v-if="a.members.length === 0" class="text-xs text-slate-400 italic">No members recorded.</p>
+                                <div v-else class="flex flex-wrap gap-2">
+                                    <span v-for="m in a.members" :key="m.id"
+                                        class="inline-block rounded-full bg-white border border-slate-200 px-3 py-0.5 text-xs text-slate-700 shadow-sm">
+                                        {{ m.student_name }}
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between text-sm text-slate-600">
+            <span>Page {{ currentPage }} of {{ totalPages }}</span>
+            <div class="flex gap-2">
+                <button @click="currentPage--" :disabled="currentPage === 1"          class="rounded px-3 py-1 border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Prev</button>
+                <button @click="currentPage++" :disabled="currentPage === totalPages" class="rounded px-3 py-1 border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Next</button>
+            </div>
+        </div>
+
+        <!-- Create / Edit Modal -->
+        <Teleport to="body">
+            <div v-if="showModal" class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-12">
+                <div class="w-full max-w-2xl rounded-xl bg-white shadow-xl mb-8">
+                    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                        <h2 class="text-base font-semibold text-slate-800">
+                            {{ editTarget ? 'Edit Advisory Group' : 'New Advisory Group' }}
+                        </h2>
+                        <button @click="closeModal" class="text-slate-400 hover:text-slate-600"><XMarkIcon class="h-5 w-5" /></button>
+                    </div>
+
+                    <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
+
+                        <!-- Faculty + Term (create only) -->
+                        <template v-if="!editTarget">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Faculty <span class="text-red-500">*</span></label>
+                                    <select v-model="form.user_id" required class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                                        <option value="">Select faculty…</option>
+                                        <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+                                    </select>
+                                    <p v-if="form.errors.user_id" class="mt-1 text-xs text-red-500">{{ form.errors.user_id }}</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">Term <span class="text-red-500">*</span></label>
+                                    <select v-model="form.academic_term_id" required class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                                        <option value="">Select term…</option>
+                                        <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
+                                    </select>
+                                    <p v-if="form.errors.academic_term_id" class="mt-1 text-xs text-red-500">{{ form.errors.academic_term_id }}</p>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Research Title -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Research Title <span class="text-red-500">*</span></label>
+                            <input v-model="form.research_title" type="text" required maxlength="500"
+                                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+                            <p v-if="form.errors.research_title" class="mt-1 text-xs text-red-500">{{ form.errors.research_title }}</p>
+                        </div>
+
+                        <!-- Grade / Role / Type / Units -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level <span class="text-red-500">*</span></label>
+                                <select v-model="form.grade_level" required class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                                    <option value="">Select grade…</option>
+                                    <option v-for="g in [7,8,9,10,11,12]" :key="g" :value="g">Grade {{ g }}</option>
+                                </select>
+                                <p v-if="form.errors.grade_level" class="mt-1 text-xs text-red-500">{{ form.errors.grade_level }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Advisory Role <span class="text-red-500">*</span></label>
+                                <select v-model="form.advisory_role" required class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                                    <option value="lead">Lead Adviser</option>
+                                    <option value="co_adviser">Co-Adviser</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Research Type</label>
+                                <select v-model="form.research_type" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                                    <option value="">— None —</option>
+                                    <option value="thesis">Thesis</option>
+                                    <option value="investigatory">Investigatory</option>
+                                    <option value="science_research">Science Research</option>
+                                    <option value="feasibility">Feasibility</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Load Units <span class="text-red-500">*</span></label>
+                                <input v-model.number="form.load_units" type="number" step="0.5" min="0.5" max="5" required
+                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+                                <p v-if="form.errors.load_units" class="mt-1 text-xs text-red-500">{{ form.errors.load_units }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Status + Remarks -->
+                        <div class="grid gap-4" :class="editTarget ? 'grid-cols-2' : 'grid-cols-1'">
+                            <div v-if="editTarget">
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+                                <select v-model="form.status" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                                    <option value="active">Active</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="dropped">Dropped</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+                                <input v-model="form.remarks" type="text" maxlength="500"
+                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
+                            </div>
+                        </div>
+
+                        <!-- Member Picker -->
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Group Members</p>
+
+                            <!-- Selected chips -->
+                            <div v-if="form.members.length > 0" class="mb-3 flex flex-wrap gap-2">
+                                <span v-for="(m, i) in form.members" :key="i"
+                                    class="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-3 py-0.5 text-xs text-indigo-700">
+                                    {{ m.student_name }}
+                                    <button type="button" @click="removeMember(i)" class="hover:text-red-500"><XMarkIcon class="h-3 w-3" /></button>
+                                </span>
+                            </div>
+                            <p v-else class="mb-2 text-xs text-slate-400 italic">No members selected yet.</p>
+
+                            <!-- Student list -->
+                            <template v-if="form.grade_level && (form.academic_term_id || editTarget)">
+                                <div class="rounded-lg border border-slate-200 bg-slate-50">
+                                    <div class="p-2 border-b border-slate-200">
+                                        <div class="relative">
+                                            <MagnifyingGlassIcon class="absolute left-2 top-2 h-4 w-4 text-slate-400" />
+                                            <input v-model="studentSearch" placeholder="Search students…"
+                                                class="w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                        </div>
+                                    </div>
+                                    <div v-if="loadingStudents" class="px-3 py-4 text-center text-xs text-slate-400">Loading students…</div>
+                                    <div v-else-if="filteredStudents.length === 0" class="px-3 py-4 text-center text-xs text-slate-400">
+                                        {{ availableStudents.length === 0 ? 'No enrolled students found for this grade level.' : 'No students match your search.' }}
+                                    </div>
+                                    <ul v-else class="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                                        <li v-for="s in filteredStudents" :key="s.id"
+                                            class="flex items-center justify-between px-3 py-2 cursor-pointer transition-colors hover:bg-white"
+                                            :class="isSelected(s.id) ? 'bg-indigo-50' : ''"
+                                            @click="toggleStudent(s)">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                <input type="checkbox" :checked="isSelected(s.id)" class="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600" readonly />
+                                                <span class="text-xs text-slate-700 truncate">{{ s.student_name }}</span>
+                                            </div>
+                                            <span v-if="s.already_assigned && !isSelected(s.id)"
+                                                class="ml-2 shrink-0 inline-flex items-center gap-1 text-xs text-amber-600"
+                                                :title="`Already in: ${s.assigned_group} (${s.assigned_faculty})`">
+                                                <ExclamationTriangleIcon class="h-3.5 w-3.5 text-amber-500" />
+                                                <span class="hidden sm:inline">Assigned</span>
+                                            </span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </template>
+                            <p v-else class="text-xs text-slate-400 italic">
+                                Select a grade level{{ !editTarget ? ' and term' : '' }} to load students.
+                            </p>
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-2">
+                            <button type="button" @click="closeModal" class="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50">Cancel</button>
+                            <button type="submit" :disabled="form.processing"
+                                class="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-60">
+                                {{ editTarget ? 'Save Changes' : 'Create Group' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </Teleport>
+
+    </AdminLayout>
+</template>
