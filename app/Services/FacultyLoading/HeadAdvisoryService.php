@@ -58,7 +58,7 @@ class HeadAdvisoryService
                 [
                     'designation_category_id' => $this->auhCategoryId(),
                     'name'                    => 'Academic Unit Head - ' . $unit->name,
-                    'load_units'              => 6,
+                    'load_units'              => 3,
                     'requires_unit'           => false,
                     'max_holders'             => 1,
                     'sort_order'              => 0,
@@ -228,7 +228,7 @@ class HeadAdvisoryService
             [
                 'designation_category_id' => $this->auhCategoryId(),
                 'name'                    => 'Academic Unit Head - ' . $unit->name,
-                'load_units'              => 6,
+                'load_units'              => 3,
                 'requires_unit'           => false,
                 'max_holders'             => 1,
                 'sort_order'              => 0,
@@ -475,7 +475,7 @@ class HeadAdvisoryService
                 'cocurricular_units' => 0,
                 'committee_units'    => 0,
                 'total_units'        => 0,
-                'full_load_threshold'=> 18.0,
+                'full_load_threshold' => LoadComputationService::FULL_LOAD_THRESHOLD,
                 'load_status'        => 'underload',
                 'is_locked'          => false,
                 'overload_approved'  => false,

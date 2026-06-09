@@ -11,7 +11,6 @@ use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\User;
 use App\Services\FacultyLoading\DesignationService;
 use App\Services\FacultyLoading\LoadComputationService;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +19,10 @@ use Inertia\Response;
 
 class DesignationController extends Controller
 {
-    public function __construct(private readonly DesignationService $service) {}
+    public function __construct(
+        private readonly DesignationService     $service,
+        private readonly LoadComputationService $loads,
+    ) {}
 
     // ── Reference data (categories + designations) ────────────────────────────
 
@@ -166,7 +168,7 @@ class DesignationController extends Controller
         return back()->with('success', 'Designation created.');
     }
 
-    public function update(Request $request, Designation $designation, LoadComputationService $loads): RedirectResponse
+    public function update(Request $request, Designation $designation): RedirectResponse
     {
         $this->authorize('faculty_loading.setup');
 
@@ -197,7 +199,7 @@ class DesignationController extends Controller
                 ->where('is_overridden', false)
                 ->update(['load_units' => (float) $data['load_units']]);
 
-            FacultyLoad::whereIn('id', $affectedLoadIds)->each(fn ($fl) => $loads->syncLoad($fl));
+            FacultyLoad::whereIn('id', $affectedLoadIds)->each(fn ($fl) => $this->loads->syncLoad($fl));
         }
 
         return back()->with('success', 'Designation updated.');
@@ -242,20 +244,10 @@ class DesignationController extends Controller
 
         $term = AcademicTerm::with('schoolYear')->findOrFail($data['academic_term_id']);
 
-        $load = FacultyLoad::firstOrCreate(
-            ['user_id' => $data['user_id'], 'academic_term_id' => $data['academic_term_id']],
-            [
-                'school_year_id'      => $term->school_year_id,
-                'teaching_units'      => 0,
-                'research_units'      => 0,
-                'admin_units'         => 0,
-                'cocurricular_units'  => 0,
-                'committee_units'     => 0,
-                'total_units'         => 0,
-                'full_load_threshold' => LoadComputationService::FULL_LOAD_THRESHOLD,
-                'load_status'         => 'underload',
-                'overload_approved'   => false,
-            ]
+        $load = $this->loads->findOrCreateFacultyLoad(
+            $data['user_id'],
+            $term->school_year_id,
+            $data['academic_term_id']
         );
 
         if ($load->is_locked) {

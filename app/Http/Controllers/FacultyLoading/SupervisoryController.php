@@ -40,7 +40,8 @@ class SupervisoryController extends Controller
                 ->get()
             : collect();
 
-        // Current assignment per designation (for the active term)
+        // Current assignment per designation, scoped by school year rather than term —
+        // supervisory positions (SUPV) are year-level roles, not per-semester.
         $assignedMap = [];
         if ($term) {
             $assignments = LoadAssignment::with('faculty:id,name')

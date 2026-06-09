@@ -5,7 +5,6 @@ namespace App\Models\FacultyLoading;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\FacultyLoading\Section;
 
 class Designation extends Model
 {

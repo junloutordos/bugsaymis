@@ -97,11 +97,9 @@ class FacultyLoadingSetupSeeder extends Seeder
 
     private function seedDesignations(): void
     {
-        // Clear designations then categories (FK: designations.designation_category_id)
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
-        DB::table('designations')->truncate();
-        DB::table('designation_categories')->truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        // Delete static designations only — HRA-/HAC- section designations (section_id IS NOT NULL)
+        // are auto-created from sections and must not be wiped on seeder re-runs.
+        DB::table('designations')->whereNull('section_id')->delete();
 
         // ── Categories ────────────────────────────────────────────────────────
 
@@ -121,15 +119,15 @@ class FacultyLoadingSetupSeeder extends Seeder
         // ── Academic Unit Head (1 per department, 6 units) ────────────────────
 
         $this->desigs($auh, [
-            ['AUH-CS',     'Academic Unit Head - Computer Science',  6, true,  1],
-            ['AUH-PISES',  'Academic Unit Head - PISES',             6, true,  2],
-            ['AUH-ENG',    'Academic Unit Head - English',           6, true,  3],
-            ['AUH-FIL',    'Academic Unit Head - Filipino',          6, true,  4],
-            ['AUH-MATH',   'Academic Unit Head - Mathematics',       6, true,  5],
-            ['AUH-BIOCHEM','Academic Unit Head - BioChem',           6, true,  6],
-            ['AUH-SOCSCI', 'Academic Unit Head - Social Science',    6, true,  7],
-            ['AUH-PEHM',   'Academic Unit Head - PEHM-VE',          6, true,  8],
-            ['AUH-ENGRES', 'Academic Unit Head - Engres',            6, true,  9],
+            ['AUH-CS',     'Academic Unit Head - Computer Science',  3, true,  1],
+            ['AUH-PISES',  'Academic Unit Head - PISES',             3, true,  2],
+            ['AUH-ENG',    'Academic Unit Head - English',           3, true,  3],
+            ['AUH-FIL',    'Academic Unit Head - Filipino',          3, true,  4],
+            ['AUH-MATH',   'Academic Unit Head - Mathematics',       3, true,  5],
+            ['AUH-BIOCHEM','Academic Unit Head - BioChem',           3, true,  6],
+            ['AUH-SOCSCI', 'Academic Unit Head - Social Science',    3, true,  7],
+            ['AUH-PEHM',   'Academic Unit Head - PEHM-VE',          3, true,  8],
+            ['AUH-ENGRES', 'Academic Unit Head - Engres',            3, true,  9],
         ]);
 
         // ── Student Organization advisers ─────────────────────────────────────
@@ -311,13 +309,15 @@ class FacultyLoadingSetupSeeder extends Seeder
 
     private function cat(string $code, string $name, string $desc, int $sort): DesignationCategory
     {
-        return DesignationCategory::create([
-            'code'        => $code,
-            'name'        => $name,
-            'description' => $desc,
-            'sort_order'  => $sort,
-            'is_active'   => true,
-        ]);
+        return DesignationCategory::updateOrCreate(
+            ['code' => $code],
+            [
+                'name'        => $name,
+                'description' => $desc,
+                'sort_order'  => $sort,
+                'is_active'   => true,
+            ]
+        );
     }
 
     /**
@@ -327,16 +327,18 @@ class FacultyLoadingSetupSeeder extends Seeder
     private function desigs(DesignationCategory $cat, array $rows): void
     {
         foreach ($rows as [$code, $name, $load, $requiresUnit, $sort]) {
-            Designation::create([
-                'designation_category_id' => $cat->id,
-                'code'         => $code,
-                'name'         => $name,
-                'load_units'   => $load,
-                'requires_unit'=> $requiresUnit,
-                'max_holders'  => null,
-                'sort_order'   => $sort,
-                'is_active'    => true,
-            ]);
+            Designation::updateOrCreate(
+                ['code' => $code],
+                [
+                    'designation_category_id' => $cat->id,
+                    'name'         => $name,
+                    'load_units'   => $load,
+                    'requires_unit'=> $requiresUnit,
+                    'max_holders'  => null,
+                    'sort_order'   => $sort,
+                    'is_active'    => true,
+                ]
+            );
         }
     }
 }

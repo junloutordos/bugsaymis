@@ -275,6 +275,31 @@ class LoadComputationService
         ];
     }
 
+    // ── Faculty Load Bootstrap ───────────────────────────────────────────────
+
+    /**
+     * Find or auto-create the FacultyLoad record for a given faculty + term.
+     * Call this from assignment controllers before creating a LoadAssignment row.
+     */
+    public function findOrCreateFacultyLoad(int $userId, int $schoolYearId, int $termId): FacultyLoad
+    {
+        return FacultyLoad::firstOrCreate(
+            ['user_id' => $userId, 'academic_term_id' => $termId],
+            [
+                'school_year_id'      => $schoolYearId,
+                'teaching_units'      => 0,
+                'research_units'      => 0,
+                'admin_units'         => 0,
+                'cocurricular_units'  => 0,
+                'committee_units'     => 0,
+                'total_units'         => 0,
+                'full_load_threshold' => self::FULL_LOAD_THRESHOLD,
+                'load_status'         => 'underload',
+                'overload_approved'   => false,
+            ]
+        );
+    }
+
     // ── Committee Compliance ─────────────────────────────────────────────────
 
     /**
