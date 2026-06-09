@@ -221,7 +221,7 @@ class CommitteeAssignmentController extends Controller
             }
         }
 
-        $load       = $this->findOrCreateLoad($data['user_id'], $data['school_year_id'], $data['academic_term_id']);
+        $load       = $this->loads->findOrCreateFacultyLoad($data['user_id'], $data['school_year_id'], $data['academic_term_id']);
         $assignment = LoadAssignment::create([
             'faculty_load_id'  => $load->id,
             'user_id'          => $data['user_id'],
@@ -421,25 +421,6 @@ class CommitteeAssignmentController extends Controller
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
-
-    private function findOrCreateLoad(int $userId, int $schoolYearId, int $termId): FacultyLoad
-    {
-        return FacultyLoad::firstOrCreate(
-            ['user_id' => $userId, 'academic_term_id' => $termId],
-            [
-                'school_year_id'      => $schoolYearId,
-                'teaching_units'      => 0,
-                'research_units'      => 0,
-                'admin_units'         => 0,
-                'cocurricular_units'  => 0,
-                'committee_units'     => 0,
-                'total_units'         => 0,
-                'full_load_threshold' => LoadComputationService::FULL_LOAD_THRESHOLD,
-                'load_status'         => 'underload',
-                'overload_approved'   => false,
-            ]
-        );
-    }
 
     private function mapAssignment(FacultyCommitteeAssignment $a): array
     {
