@@ -42,6 +42,12 @@
               <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': recomputing }" />
               {{ recomputing ? 'Recomputing…' : 'Recompute' }}
             </button>
+            <button v-if="canAdvanceGenerate" @click="submitAdvanceGenerate" :disabled="advanceGenerating"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+              title="Generate advance cut-off entry for this COS employee">
+              <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
+              {{ advanceGenerating ? 'Generating…' : 'Advance Entry' }}
+            </button>
             <a :href="route('hr.dtr.checklist', employee.id) + '?month=' + currentMonth" target="_blank"
                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium">
               <ClipboardDocumentListIcon class="h-4 w-4" />Checklist
@@ -340,7 +346,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, ArrowPathIcon,
-  ClipboardDocumentListIcon,
+  ClipboardDocumentListIcon, BoltIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -357,6 +363,43 @@ const isAdmin = computed(() =>
 const canManageDtr = computed(() =>
   page.props.auth?.user?.permissions?.includes('hr.dtr.manage') ?? false
 )
+
+const isCos = computed(() =>
+  ['COS Teaching', 'COS Non Teaching'].includes(props.employee?.emp_category)
+)
+
+const isCurrentMonth = computed(() => {
+  const n = new Date()
+  const curr = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`
+  return currentMonth.value === curr
+})
+
+const tomorrowStr = computed(() => {
+  const t = new Date()
+  t.setDate(t.getDate() + 1)
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+})
+
+const hasAdvanceRecord = computed(() => props.records.some(r => r.is_advance))
+
+const canAdvanceGenerate = computed(() =>
+  isCos.value && isCurrentMonth.value && !hasAdvanceRecord.value && (isAdmin.value || canManageDtr.value)
+)
+
+const advanceGenerating = ref(false)
+
+function submitAdvanceGenerate() {
+  const [y, m] = currentMonth.value.split('-')
+  advanceGenerating.value = true
+  router.post(route('hr.dtr.generate'), {
+    user_id:   props.employee.id,
+    category:  'single',
+    date_from: `${y}-${m}-01`,
+    date_to:   tomorrowStr.value,
+  }, {
+    onFinish: () => { advanceGenerating.value = false },
+  })
+}
 
 const currentMonth = ref(props.month)
 
