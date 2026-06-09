@@ -7,6 +7,7 @@ use App\Models\HR\DtrRecord;
 use App\Models\HR\EmployeeSchedule;
 use App\Models\HR\Holiday;
 use App\Models\HR\LeaveApplication;
+use App\Models\User;
 use App\Models\WFHAttendance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -56,12 +57,18 @@ class DTRService
             ->where('date_to', '>=', $dateFrom)
             ->get();
 
+        // COS employees may generate one advance day ahead for cut-off processing
+        $user      = User::find($userId);
+        $isCos     = in_array($user?->emp_category ?? '', ['COS Teaching', 'COS Non Teaching']);
+        $tomorrow  = now()->addDay()->startOfDay();
+
         // Iterate each calendar date in the range
         for ($date = $from->copy(); $date->lte($to); $date->addDay()) {
-            $dateStr = $date->toDateString();
+            $dateStr   = $date->toDateString();
+            $isAdvance = $date->isFuture() && $isCos && $date->lte($tomorrow);
 
-            // Skip future dates
-            if ($date->isFuture()) {
+            // Skip future dates; COS employees may generate one advance day (cut-off)
+            if ($date->isFuture() && ! $isAdvance) {
                 continue;
             }
 
@@ -161,6 +168,7 @@ class DTRService
                     'attendance_status'    => $attendanceStatus,
                     'leave_application_id' => $leave?->id,
                     'wfh_attendance_id'    => ($wfh && $logsForDay->isEmpty()) ? $wfh->id : null,
+                    'is_advance'           => $isAdvance,
                     'processed_by'         => Auth::id(),
                     'processed_at'         => now(),
                 ]

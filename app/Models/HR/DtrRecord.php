@@ -46,6 +46,7 @@ class DtrRecord extends Model
         'wfh_attendance_id',
         'is_travel',
         'travel_remarks',
+        'is_advance',
     ];
 
     protected $casts = [
@@ -57,6 +58,7 @@ class DtrRecord extends Model
         'is_posted'      => 'boolean',
         'is_locked'      => 'boolean',
         'is_travel'      => 'boolean',
+        'is_advance'     => 'boolean',
         'processed_at'        => 'datetime',
         'penned_at'           => 'datetime',
         'penned_submitted_at' => 'datetime',

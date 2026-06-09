@@ -54,6 +54,20 @@
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
       </div>
 
+      <!-- COS Advance Entry Banner -->
+      <div v-if="isCos && advanceRecord"
+           class="bg-sky-50 border border-sky-200 rounded-xl p-4 flex items-start gap-3">
+        <InformationCircleIcon class="h-5 w-5 text-sky-500 shrink-0 mt-0.5" />
+        <div>
+          <p class="text-sm font-semibold text-sky-800">
+            Advance Entry — {{ toDateStr(advanceRecord.work_date) }}
+          </p>
+          <p class="text-xs text-sky-600 mt-0.5">
+            This row is your cut-off date advance entry. Fill in your expected time using the edit icon on the highlighted row before your payroll cut-off.
+          </p>
+        </div>
+      </div>
+
       <!-- Submit Penned Entries Banner -->
       <div v-if="hasPenned && !allSubmitted"
            class="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-center justify-between gap-4">
@@ -237,7 +251,7 @@
               <tr v-if="!records.length">
                 <td colspan="14" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
               </tr>
-              <tr v-for="r in records" :key="r.id" class="hover:bg-slate-50/60">
+              <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <!-- AM In -->
@@ -302,6 +316,10 @@
                     <span v-if="r.is_travel"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-600 whitespace-nowrap"
                           :title="r.penned_remarks || 'On official travel'">T</span>
+                    <!-- Advance entry badge -->
+                    <span v-if="r.is_advance"
+                          class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 whitespace-nowrap"
+                          title="Advance entry — cut-off date, pending biometric confirmation">Advance</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5">
@@ -329,9 +347,14 @@
     <Teleport to="body">
       <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-          <h3 class="text-base font-semibold text-slate-800 mb-0.5">Submit Penned Entry</h3>
+          <h3 class="text-base font-semibold text-slate-800 mb-0.5">
+            {{ editModal.record?.is_advance ? 'Submit Advance Entry' : 'Submit Penned Entry' }}
+          </h3>
           <p class="text-sm text-slate-400 mb-1">{{ toDateStr(editModal.record?.work_date) }} — {{ getDayName(editModal.record?.work_date) }}</p>
-          <p class="text-[11px] text-slate-400 mb-4">
+          <p v-if="editModal.record?.is_advance" class="text-[11px] text-amber-600 mb-4 font-medium">
+            This is an advance cut-off entry. Enter your <span class="font-semibold">expected</span> time for this date. It will be replaced by biometric data once the actual day passes.
+          </p>
+          <p v-else class="text-[11px] text-slate-400 mb-4">
             Biometric punches are read-only. Fill in the <span class="text-red-500 font-medium">empty slots</span> with your actual time.
             This will be reviewed by HR.
           </p>
@@ -396,6 +419,7 @@ import axios from 'axios'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, CheckCircleIcon, ExclamationCircleIcon,
+  InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -410,6 +434,12 @@ const props = defineProps({
 })
 
 const currentMonth = ref(props.month)
+
+const isCos = computed(() =>
+  ['COS Teaching', 'COS Non Teaching'].includes(props.employee?.emp_category)
+)
+
+const advanceRecord = computed(() => props.records.find(r => r.is_advance) ?? null)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -587,6 +617,7 @@ function cellBg(cell) {
     if (!cell.isWorkDay) return 'bg-slate-50 border-slate-100'
     return 'bg-red-50/30 border-red-100'
   }
+  if (cell.record.is_advance) return 'bg-amber-50 border-amber-300'
   const s = cell.record.attendance_status
   if (s === 'present')    return 'bg-emerald-50/70 border-emerald-100'
   if (s === 'absent')     return 'bg-red-50 border-red-200'

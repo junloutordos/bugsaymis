@@ -35,7 +35,7 @@
             </thead>
             <tbody>
               <tr v-for="date in allDates" :key="date">
-                <td class="col-day">{{ dayLabel(date) }}</td>
+                <td class="col-day">{{ dayLabel(date) }}{{ emp.records[date]?.is_advance ? '*' : '' }}</td>
 
                 <!-- Spanning cell for weekends/holidays -->
                 <template v-if="spanLabel(emp.records[date], date)">
@@ -70,6 +70,9 @@
           <!-- ── Legend ──────────────────────────────── -->
           <div class="legend">
             Legend: [T]-Travel &nbsp; [L]-Leave &nbsp; [A]-Absent &nbsp; [OB]-Official Business
+            <template v-if="Object.values(emp.records).some(r => r?.is_advance)">
+              &nbsp; * Advance entry — pending biometric confirmation
+            </template>
           </div>
 
           <!-- ── Certification ───────────────────────── -->
