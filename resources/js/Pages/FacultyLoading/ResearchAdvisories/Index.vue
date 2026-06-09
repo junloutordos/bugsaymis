@@ -53,6 +53,7 @@
               <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
               <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Research Title</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Role</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Units</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
@@ -66,10 +67,17 @@
               <td class="px-4 py-3 text-slate-600 max-w-xs truncate">{{ r.research_title }}</td>
               <td class="px-4 py-3 text-center text-slate-600">{{ r.grade_level }}</td>
               <td class="px-4 py-3 text-center">
-                <span :class="typeBadge(r.advisory_type)"
+                <span :class="roleBadge(r.advisory_role)"
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                  {{ typeLabel(r.advisory_type) }}
+                  {{ roleLabel(r.advisory_role) }}
                 </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span v-if="r.research_type" :class="typeBadge(r.research_type)"
+                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
+                  {{ typeLabel(r.research_type) }}
+                </span>
+                <span v-else class="text-xs text-slate-400">—</span>
               </td>
               <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ r.load_units }}</td>
               <td class="px-4 py-3 text-center">
@@ -110,18 +118,11 @@
                 <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
               </select>
             </div>
-            <div>
+            <div class="col-span-2">
               <label class="block text-xs font-medium text-slate-600 mb-1">Academic Term *</label>
               <select v-model="form.academic_term_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 <option :value="null">Select term...</option>
                 <option v-for="t in terms" :key="t.id" :value="t.id">{{ t.label }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">School Year *</label>
-              <select v-model="form.school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                <option :value="null">Select SY...</option>
-                <option v-for="t in terms" :key="'sy-' + t.id" :value="t.id">{{ t.label }}</option>
               </select>
             </div>
           </template>
@@ -146,9 +147,18 @@
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Advisory Type *</label>
-            <select v-model="form.advisory_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-              <option v-for="t in advisoryTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Advisory Role *</label>
+            <select v-model="form.advisory_role" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option value="lead">Lead Adviser</option>
+              <option value="co_adviser">Co-Adviser</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Research Type</label>
+            <select v-model="form.research_type" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">— None —</option>
+              <option v-for="t in researchTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
             </select>
           </div>
 
@@ -156,13 +166,14 @@
             <label class="block text-xs font-medium text-slate-600 mb-1">Load Units *</label>
             <input v-model.number="form.load_units" type="number" step="0.5" min="0.5" max="5"
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            <p class="text-[11px] text-slate-400 mt-0.5">Default: lead = 1, co-adviser = 0.5</p>
           </div>
 
-          <div v-if="form.id">
+          <div v-if="form.id" class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
             <select v-model="form.status" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="dropped">Dropped</option>
               <option value="completed">Completed</option>
             </select>
           </div>
@@ -188,7 +199,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { BeakerIcon, CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
@@ -203,7 +214,7 @@ const props = defineProps({
   filters:     { type: Object, default: () => ({}) },
 })
 
-const advisoryTypes = [
+const researchTypes = [
   { value: 'thesis',           label: 'Thesis' },
   { value: 'investigatory',    label: 'Investigatory Project' },
   { value: 'science_research', label: 'Science Research' },
@@ -223,37 +234,46 @@ const modal = ref(false)
 const form = useForm({
   id: null,
   user_id: null,
-  school_year_id: null,
   academic_term_id: null,
   student_name: '',
   research_title: '',
   grade_level: 7,
-  advisory_type: 'science_research',
-  load_units: 0.5,
+  advisory_role: 'lead',
+  research_type: null,
+  load_units: 1.0,
   status: 'active',
   remarks: '',
+})
+
+// Auto-suggest load_units when role changes (only when creating, not editing)
+watch(() => form.advisory_role, (role) => {
+  if (!form.id) {
+    form.load_units = role === 'co_adviser' ? 0.5 : 1.0
+  }
 })
 
 function openForm(r = null) {
   if (r) {
     Object.assign(form, {
       id: r.id,
-      user_id: null, school_year_id: null, academic_term_id: null,
+      user_id: null, academic_term_id: null,
       student_name: r.student_name,
       research_title: r.research_title,
       grade_level: r.grade_level,
-      advisory_type: r.advisory_type,
+      advisory_role: r.advisory_role ?? 'lead',
+      research_type: r.research_type ?? null,
       load_units: r.load_units,
       status: r.status,
       remarks: r.remarks ?? '',
     })
   } else {
     form.reset()
-    form.id = null
-    form.advisory_type = 'science_research'
-    form.grade_level = 7
-    form.load_units = 0.5
-    form.status = 'active'
+    form.id              = null
+    form.advisory_role   = 'lead'
+    form.research_type   = null
+    form.grade_level     = 7
+    form.load_units      = 1.0
+    form.status          = 'active'
     form.academic_term_id = filters.term_id ?? null
   }
   modal.value = true
@@ -276,23 +296,34 @@ function remove(r) {
   useForm({}).delete(route('faculty-loading.research-advisories.destroy', r.id))
 }
 
+function roleBadge(role) {
+  return {
+    lead:       'bg-indigo-50 text-indigo-700',
+    co_adviser: 'bg-slate-100 text-slate-600',
+  }[role] ?? 'bg-slate-50 text-slate-600'
+}
+
+function roleLabel(role) {
+  return { lead: 'Lead', co_adviser: 'Co-Adviser' }[role] ?? role
+}
+
 function typeBadge(type) {
   return {
     thesis:           'bg-violet-50 text-violet-700',
     investigatory:    'bg-blue-50 text-blue-700',
-    science_research: 'bg-indigo-50 text-indigo-700',
-    feasibility:      'bg-teal-50 text-teal-700',
+    science_research: 'bg-teal-50 text-teal-700',
+    feasibility:      'bg-amber-50 text-amber-700',
   }[type] ?? 'bg-slate-50 text-slate-600'
 }
 
 function typeLabel(type) {
-  return advisoryTypes.find(t => t.value === type)?.label ?? type
+  return researchTypes.find(t => t.value === type)?.label ?? type
 }
 
 function statusBadge(status) {
   return {
     active:    'bg-emerald-50 text-emerald-700',
-    inactive:  'bg-slate-100 text-slate-500',
+    dropped:   'bg-red-50 text-red-700',
     completed: 'bg-blue-50 text-blue-700',
   }[status] ?? 'bg-slate-50 text-slate-600'
 }

@@ -58,16 +58,20 @@ class ResearchAdvisoryController extends Controller
 
         $data = $request->validate([
             'user_id'          => 'required|exists:users,id',
-            'school_year_id'   => 'required|exists:school_years,id',
             'academic_term_id' => 'required|exists:academic_terms,id',
             'student_name'     => 'required|string|max:200',
             'student_id'       => 'nullable|integer',
             'research_title'   => 'required|string|max:500',
             'grade_level'      => 'required|integer|min:7|max:12',
-            'advisory_type'    => ['required', Rule::in(['thesis', 'investigatory', 'science_research', 'feasibility'])],
+            'advisory_role'    => ['required', Rule::in(['lead', 'co_adviser'])],
+            'research_type'    => ['nullable', Rule::in(['thesis', 'investigatory', 'science_research', 'feasibility'])],
             'load_units'       => 'required|numeric|min:0.5|max:5',
             'remarks'          => 'nullable|string|max:500',
         ]);
+
+        // Derive school_year_id from the selected term
+        $term         = AcademicTerm::findOrFail($data['academic_term_id']);
+        $schoolYearId = $term->school_year_id;
 
         $existingLoad = FacultyLoad::where('user_id', $data['user_id'])
             ->where('academic_term_id', $data['academic_term_id'])
@@ -76,11 +80,16 @@ class ResearchAdvisoryController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
-        // Check the 5-unit research cap for this faculty + term
+        // Cap check — covers both per-student advisory rows AND any designation-sourced research units
         $currentResearchUnits = ResearchAdvisory::where('user_id', $data['user_id'])
-            ->where('academic_term_id', $data['academic_term_id'])
-            ->where('status', 'active')
-            ->sum('load_units');
+                ->where('academic_term_id', $data['academic_term_id'])
+                ->where('status', 'active')
+                ->sum('load_units')
+            + LoadAssignment::where('user_id', $data['user_id'])
+                ->where('academic_term_id', $data['academic_term_id'])
+                ->where('assignment_type', 'research')
+                ->whereNotNull('designation_id')
+                ->sum('load_units');
 
         if (($currentResearchUnits + $data['load_units']) > LoadComputationService::MAX_RESEARCH_UNITS) {
             $remaining = max(0, LoadComputationService::MAX_RESEARCH_UNITS - $currentResearchUnits);
@@ -91,20 +100,21 @@ class ResearchAdvisoryController extends Controller
             ]);
         }
 
-        // Ensure FacultyLoad exists; create a linked LoadAssignment
-        $load       = $this->loads->findOrCreateFacultyLoad($data['user_id'], $data['school_year_id'], $data['academic_term_id']);
+        $typeLabel  = $data['research_type'] ? " ({$data['research_type']})" : '';
+        $load       = $this->loads->findOrCreateFacultyLoad($data['user_id'], $schoolYearId, $data['academic_term_id']);
         $assignment = LoadAssignment::create([
             'faculty_load_id'  => $load->id,
             'user_id'          => $data['user_id'],
-            'school_year_id'   => $data['school_year_id'],
+            'school_year_id'   => $schoolYearId,
             'academic_term_id' => $data['academic_term_id'],
             'assignment_type'  => 'research',
             'load_units'       => $data['load_units'],
-            'description'      => "Research advisory: {$data['student_name']}",
+            'description'      => "Research advisory: {$data['student_name']}{$typeLabel}",
             'created_by'       => Auth::id(),
         ]);
 
         ResearchAdvisory::create(array_merge($data, [
+            'school_year_id'     => $schoolYearId,
             'load_assignment_id' => $assignment->id,
             'status'             => 'active',
         ]));
@@ -132,18 +142,24 @@ class ResearchAdvisoryController extends Controller
             'student_id'     => 'nullable|integer',
             'research_title' => 'required|string|max:500',
             'grade_level'    => 'required|integer|min:7|max:12',
-            'advisory_type'  => ['required', Rule::in(['thesis', 'investigatory', 'science_research', 'feasibility'])],
+            'advisory_role'  => ['required', Rule::in(['lead', 'co_adviser'])],
+            'research_type'  => ['nullable', Rule::in(['thesis', 'investigatory', 'science_research', 'feasibility'])],
             'load_units'     => 'required|numeric|min:0.5|max:5',
-            'status'         => ['nullable', Rule::in(['active', 'inactive', 'completed'])],
+            'status'         => ['nullable', Rule::in(['active', 'completed', 'dropped'])],
             'remarks'        => 'nullable|string|max:500',
         ]);
 
-        // Re-check cap excluding this record
+        // Re-check cap excluding this record (both advisory rows and designation-sourced units)
         $currentResearchUnits = ResearchAdvisory::where('user_id', $researchAdvisory->user_id)
-            ->where('academic_term_id', $researchAdvisory->academic_term_id)
-            ->where('status', 'active')
-            ->where('id', '!=', $researchAdvisory->id)
-            ->sum('load_units');
+                ->where('academic_term_id', $researchAdvisory->academic_term_id)
+                ->where('status', 'active')
+                ->where('id', '!=', $researchAdvisory->id)
+                ->sum('load_units')
+            + LoadAssignment::where('user_id', $researchAdvisory->user_id)
+                ->where('academic_term_id', $researchAdvisory->academic_term_id)
+                ->where('assignment_type', 'research')
+                ->whereNotNull('designation_id')
+                ->sum('load_units');
 
         if (($currentResearchUnits + $data['load_units']) > LoadComputationService::MAX_RESEARCH_UNITS) {
             $remaining = max(0, LoadComputationService::MAX_RESEARCH_UNITS - $currentResearchUnits);
@@ -158,8 +174,12 @@ class ResearchAdvisoryController extends Controller
 
         // Sync the linked LoadAssignment if present
         if ($researchAdvisory->load_assignment_id) {
+            $typeLabel = $data['research_type'] ? " ({$data['research_type']})" : '';
             LoadAssignment::where('id', $researchAdvisory->load_assignment_id)
-                ->update(['load_units' => $data['load_units']]);
+                ->update([
+                    'load_units'  => $data['load_units'],
+                    'description' => "Research advisory: {$data['student_name']}{$typeLabel}",
+                ]);
         }
 
         if ($researchAdvisory->academicTerm && $load) {
@@ -205,17 +225,18 @@ class ResearchAdvisoryController extends Controller
     private function mapAdvisory(ResearchAdvisory $r): array
     {
         return [
-            'id'             => $r->id,
-            'student_name'   => $r->student_name,
-            'student_id'     => $r->student_id,
-            'research_title' => $r->research_title,
-            'grade_level'    => $r->grade_level,
-            'advisory_type'  => $r->advisory_type,
-            'load_units'     => (float) $r->load_units,
-            'status'         => $r->status,
-            'remarks'        => $r->remarks,
-            'faculty'        => $r->faculty ? ['id' => $r->faculty->id, 'name' => $r->faculty->name] : null,
-            'term'           => $r->academicTerm ? ['id' => $r->academicTerm->id, 'label' => $r->academicTerm->full_label] : null,
+            'id'            => $r->id,
+            'student_name'  => $r->student_name,
+            'student_id'    => $r->student_id,
+            'research_title'=> $r->research_title,
+            'grade_level'   => $r->grade_level,
+            'advisory_role' => $r->advisory_role,
+            'research_type' => $r->research_type,
+            'load_units'    => (float) $r->load_units,
+            'status'        => $r->status,
+            'remarks'       => $r->remarks,
+            'faculty'       => $r->faculty ? ['id' => $r->faculty->id, 'name' => $r->faculty->name] : null,
+            'term'          => $r->academicTerm ? ['id' => $r->academicTerm->id, 'label' => $r->academicTerm->full_label] : null,
         ];
     }
 }

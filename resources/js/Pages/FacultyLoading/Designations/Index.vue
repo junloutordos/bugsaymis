@@ -108,6 +108,7 @@
                 <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
                 <p v-if="isAuhDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Academic Units</p>
                 <p v-else-if="isSectionDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Sections</p>
+                <p v-else-if="isResearchDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Research Advisories</p>
               </td>
 
               <!-- Status -->
@@ -133,6 +134,13 @@
                     :href="route('faculty-loading.sections.index')"
                     class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
                     title="Manage in Sections">
+                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                  </a>
+                  <!-- Research designations: link to Research Advisories instead -->
+                  <a v-else-if="isResearchDesignation(d)"
+                    :href="route('faculty-loading.research-advisories.index')"
+                    class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
+                    title="Manage in Research Advisories">
                     <ArrowTopRightOnSquareIcon class="h-4 w-4" />
                   </a>
                   <!-- Assign button — disabled if at capacity -->
@@ -380,8 +388,12 @@ function isSectionDesignation(d) {
   return !!d.section_id
 }
 
+function isResearchDesignation(d) {
+  return d.code.startsWith('RES-')
+}
+
 function isManagedExternally(d) {
-  return isAuhDesignation(d) || isSectionDesignation(d)
+  return isAuhDesignation(d) || isSectionDesignation(d) || isResearchDesignation(d)
 }
 
 function assignmentTypeBadge(type) {
