@@ -153,12 +153,13 @@ class DtrRecordController extends Controller
         $wfhByDate      = $this->loadWfhByDate($user->id, $y, $m);
         $gatepassByDate = $this->loadGatepassByDate($user->badge_id, $y, $m);
 
-        // Determine whether the employee can submit penned entries this month
-        $hasPenned    = $records->contains(fn ($r) =>
+        // Advance records are not included in the Submit & Lock flow
+        $nonAdvance   = $records->filter(fn ($r) => ! $r->is_advance);
+        $hasPenned    = $nonAdvance->contains(fn ($r) =>
             $r->penned_time_in_am || $r->penned_time_out_am ||
             $r->penned_time_in_pm || $r->penned_time_out_pm || $r->penned_remarks
         );
-        $allSubmitted = $records->isNotEmpty() && $records->every(fn ($r) => $r->penned_submitted_at !== null);
+        $allSubmitted = $nonAdvance->isNotEmpty() && $nonAdvance->every(fn ($r) => $r->penned_submitted_at !== null);
 
         return Inertia::render('HR/DTR/My', [
             'employee'       => $user->load('employeeProfile'),
@@ -270,6 +271,12 @@ class DtrRecordController extends Controller
             return back()->with('error', 'Penned entries have already been submitted for this record. Contact HR to unlock.');
         }
 
+        // Block penned entries for dates more than one day ahead (only advance records within
+        // the COS cut-off window of today+1 are permitted; generate() sets is_advance for those)
+        if (Carbon::parse($record->work_date)->gt(now()->addDay()->endOfDay())) {
+            return back()->with('error', 'Penned entries for future dates beyond tomorrow are not allowed.');
+        }
+
         $validated = $request->validate([
             'penned_time_in_am'  => 'nullable|date_format:H:i',
             'penned_time_out_am' => 'nullable|date_format:H:i',
@@ -317,10 +324,12 @@ class DtrRecordController extends Controller
         $month = $request->input('month', now()->format('Y-m'));
         [$y, $m] = explode('-', $month);
 
+        // Advance records are excluded — they remain editable until the actual date arrives
         $updated = DtrRecord::where('user_id', $user->id)
             ->whereYear('work_date', $y)
             ->whereMonth('work_date', $m)
             ->where('is_locked', false)
+            ->where('is_advance', false)
             ->whereNull('penned_submitted_at')
             ->update([
                 'penned_submitted_at' => now(),
@@ -658,6 +667,11 @@ class DtrRecordController extends Controller
 
         if ($record->is_locked) {
             return back()->with('error', 'This DTR record is locked.');
+        }
+
+        // Block entries for dates more than one day ahead
+        if (Carbon::parse($record->work_date)->gt(now()->addDay()->endOfDay())) {
+            return back()->with('error', 'Penned entries for future dates beyond tomorrow are not allowed.');
         }
 
         $validated = $request->validate([

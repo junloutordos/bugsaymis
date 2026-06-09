@@ -206,7 +206,7 @@
               <tr v-if="!records.length">
                 <td colspan="14" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
               </tr>
-              <tr v-for="r in records" :key="r.id" class="hover:bg-slate-50/60">
+              <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
@@ -244,6 +244,9 @@
                     <span v-if="r.wfh_attendance_id"
                       class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
                       title="Times sourced from WFH attendance log">WFH</span>
+                    <span v-if="r.is_advance"
+                      class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 whitespace-nowrap"
+                      title="Advance entry — cut-off date, pending biometric confirmation">Advance</span>
                   </div>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
@@ -480,6 +483,7 @@ function cellBg(cell) {
     if (!cell.isWorkDay) return 'bg-slate-50 border-slate-100'
     return 'bg-red-50/30 border-red-100'
   }
+  if (cell.record.is_advance) return 'bg-amber-50 border-amber-300'
   const s = cell.record.attendance_status
   if (s === 'present')    return 'bg-emerald-50/70 border-emerald-100'
   if (s === 'absent')     return 'bg-red-50 border-red-200'

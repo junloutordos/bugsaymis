@@ -34,7 +34,7 @@
           </thead>
           <tbody>
             <tr v-for="day in daysInMonth" :key="day">
-              <td class="col-day">{{ String(day).padStart(2,'0') }}</td>
+              <td class="col-day">{{ String(day).padStart(2,'0') }}{{ records[ds(day)]?.is_advance ? '*' : '' }}</td>
 
               <!-- Spanning cell for weekends / holidays -->
               <template v-if="spanLabel(records[ds(day)], day)">
@@ -69,6 +69,9 @@
         <!-- ── Legend ───────────────────────────────── -->
         <div class="legend">
           Legend: [T]-Travel &nbsp; [L]-Leave &nbsp; [A]-Absent &nbsp; [OB]-Official Business
+          <template v-if="Object.values(records).some(r => r?.is_advance)">
+            &nbsp; * Advance entry — pending biometric confirmation
+          </template>
         </div>
 
         <!-- ── Certification ────────────────────────── -->
