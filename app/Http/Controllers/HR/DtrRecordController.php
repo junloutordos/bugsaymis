@@ -312,6 +312,41 @@ class DtrRecordController extends Controller
     }
 
     /**
+     * COS employee self-generates their advance DTR entry for tomorrow (payroll cut-off).
+     * Requires the user to be COS Teaching or COS Non Teaching and no advance record to exist yet.
+     */
+    public function myGenerateAdvance(Request $request, DTRService $dtrService)
+    {
+        $this->authorize('dtr.view_own');
+
+        $user = Auth::user();
+
+        if (! in_array($user->emp_category ?? '', ['COS Teaching', 'COS Non Teaching'])) {
+            return back()->with('error', 'Advance entry generation is only available for COS employees.');
+        }
+
+        $tomorrow = now()->addDay()->startOfDay();
+        $month    = now()->format('Y-m');
+        [$y, $m]  = explode('-', $month);
+
+        $alreadyExists = DtrRecord::where('user_id', $user->id)
+            ->where('work_date', $tomorrow->toDateString())
+            ->where('is_advance', true)
+            ->exists();
+
+        if ($alreadyExists) {
+            return back()->with('error', 'An advance entry for tomorrow already exists.');
+        }
+
+        $dateFrom = Carbon::create($y, $m, 1)->toDateString();
+        $dateTo   = $tomorrow->toDateString();
+
+        $dtrService->generate($user->id, $dateFrom, $dateTo);
+
+        return back()->with('success', 'Advance entry generated. Fill in your expected time below.');
+    }
+
+    /**
      * Employee submits all penned entries for the month.
      * Marks every record in the month as penned_submitted, blocking further
      * employee edits. HR / Administrator can reset via unlockPenned().

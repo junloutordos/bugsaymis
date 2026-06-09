@@ -36,6 +36,12 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
+            <button v-if="isCos && isCurrentMonth && !advanceRecord" @click="submitMyAdvanceGenerate" :disabled="advanceGenerating"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+              title="Generate your advance cut-off entry for tomorrow">
+              <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
+              {{ advanceGenerating ? 'Generating…' : 'Generate Advance Entry' }}
+            </button>
             <a :href="route('hr.my-dtr.checklist') + '?month=' + currentMonth" target="_blank"
                class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
               <PrinterIcon class="h-4 w-4" />Print Checklist
@@ -435,7 +441,7 @@ import axios from 'axios'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, CheckCircleIcon, ExclamationCircleIcon,
-  InformationCircleIcon,
+  InformationCircleIcon, BoltIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -456,6 +462,21 @@ const isCos = computed(() =>
 )
 
 const advanceRecord = computed(() => props.records.find(r => r.is_advance) ?? null)
+
+const isCurrentMonth = computed(() => {
+  const n = new Date()
+  const curr = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`
+  return currentMonth.value === curr
+})
+
+const advanceGenerating = ref(false)
+
+function submitMyAdvanceGenerate() {
+  advanceGenerating.value = true
+  router.post(route('hr.my-dtr.generate-advance'), {}, {
+    onFinish: () => { advanceGenerating.value = false },
+  })
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -1600,6 +1600,8 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
         ->name('my-dtr.penned');
     Route::post('/my-dtr/submit-penned', [\App\Http\Controllers\HR\DtrRecordController::class, 'submitPenned'])
         ->name('my-dtr.submit-penned');
+    Route::post('/my-dtr/generate-advance', [\App\Http\Controllers\HR\DtrRecordController::class, 'myGenerateAdvance'])
+        ->name('my-dtr.generate-advance');
 
     // ── DTR Records ───────────────────────────────────────────────────────────
     Route::get('/dtr', [\App\Http\Controllers\HR\DtrRecordController::class, 'index'])
