@@ -368,7 +368,7 @@ class DtrRecordController extends Controller
 
         $data = $request->validate([
             'user_id'   => 'nullable|exists:users,id',
-            'category'  => 'nullable|in:all,plantilla,non_plantilla',
+            'category'  => 'nullable|in:all,plantilla,non_plantilla,single',
             'date_from' => 'required|date',
             'date_to'   => 'required|date|after_or_equal:date_from',
         ]);
