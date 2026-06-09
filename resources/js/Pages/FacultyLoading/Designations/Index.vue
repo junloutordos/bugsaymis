@@ -99,7 +99,7 @@
                 <div v-if="d.holders.length" class="flex flex-wrap gap-1.5">
                   <span v-for="h in d.holders" :key="h.assignment_id"
                     class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
-                    {{ h.user_name }}
+                    {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
                     <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
                       <XMarkIcon class="h-3 w-3" />
                     </button>
@@ -299,7 +299,7 @@
           <div class="flex flex-wrap gap-1.5">
             <span v-for="h in selectedDesig.holders" :key="h.assignment_id"
               class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
-              {{ h.user_name }}
+              {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
               <button v-if="!isManagedExternally(selectedDesig)" @click="revokeHolder(h); assignModal = false"
                 class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
                 <XMarkIcon class="h-3 w-3" />
