@@ -4,6 +4,7 @@ namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicTerm;
+use App\Models\FacultyLoading\Designation;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\ResearchAdvisory;
@@ -80,16 +81,11 @@ class ResearchAdvisoryController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
-        // Cap check — covers both per-student advisory rows AND any designation-sourced research units
+        // Cap check — per-student advisory rows only; designation-sourced units are now RA-owned
         $currentResearchUnits = ResearchAdvisory::where('user_id', $data['user_id'])
-                ->where('academic_term_id', $data['academic_term_id'])
-                ->where('status', 'active')
-                ->sum('load_units')
-            + LoadAssignment::where('user_id', $data['user_id'])
-                ->where('academic_term_id', $data['academic_term_id'])
-                ->where('assignment_type', 'research')
-                ->whereNotNull('designation_id')
-                ->sum('load_units');
+            ->where('academic_term_id', $data['academic_term_id'])
+            ->where('status', 'active')
+            ->sum('load_units');
 
         if (($currentResearchUnits + $data['load_units']) > LoadComputationService::MAX_RESEARCH_UNITS) {
             $remaining = max(0, LoadComputationService::MAX_RESEARCH_UNITS - $currentResearchUnits);
@@ -100,24 +96,19 @@ class ResearchAdvisoryController extends Controller
             ]);
         }
 
-        $typeLabel  = $data['research_type'] ? " ({$data['research_type']})" : '';
-        $load       = $this->loads->findOrCreateFacultyLoad($data['user_id'], $schoolYearId, $data['academic_term_id']);
-        $assignment = LoadAssignment::create([
-            'faculty_load_id'  => $load->id,
-            'user_id'          => $data['user_id'],
-            'school_year_id'   => $schoolYearId,
-            'academic_term_id' => $data['academic_term_id'],
-            'assignment_type'  => 'research',
-            'load_units'       => $data['load_units'],
-            'description'      => "Research advisory: {$data['student_name']}{$typeLabel}",
-            'created_by'       => Auth::id(),
-        ]);
+        $load = $this->loads->findOrCreateFacultyLoad($data['user_id'], $schoolYearId, $data['academic_term_id']);
 
-        ResearchAdvisory::create(array_merge($data, [
+        // Create advisory first so recomputeGradeAssignment can sum it from the DB
+        $advisory = ResearchAdvisory::create(array_merge($data, [
             'school_year_id'     => $schoolYearId,
-            'load_assignment_id' => $assignment->id,
+            'load_assignment_id' => null,
             'status'             => 'active',
         ]));
+
+        $gradeLa = $this->recomputeGradeAssignment($data['user_id'], $data['academic_term_id'], $data['grade_level'], $load);
+        if ($gradeLa) {
+            $advisory->update(['load_assignment_id' => $gradeLa->id]);
+        }
 
         $this->loads->syncLoad($load);
 
@@ -149,17 +140,12 @@ class ResearchAdvisoryController extends Controller
             'remarks'        => 'nullable|string|max:500',
         ]);
 
-        // Re-check cap excluding this record (both advisory rows and designation-sourced units)
+        // Cap check excluding this record
         $currentResearchUnits = ResearchAdvisory::where('user_id', $researchAdvisory->user_id)
-                ->where('academic_term_id', $researchAdvisory->academic_term_id)
-                ->where('status', 'active')
-                ->where('id', '!=', $researchAdvisory->id)
-                ->sum('load_units')
-            + LoadAssignment::where('user_id', $researchAdvisory->user_id)
-                ->where('academic_term_id', $researchAdvisory->academic_term_id)
-                ->where('assignment_type', 'research')
-                ->whereNotNull('designation_id')
-                ->sum('load_units');
+            ->where('academic_term_id', $researchAdvisory->academic_term_id)
+            ->where('status', 'active')
+            ->where('id', '!=', $researchAdvisory->id)
+            ->sum('load_units');
 
         if (($currentResearchUnits + $data['load_units']) > LoadComputationService::MAX_RESEARCH_UNITS) {
             $remaining = max(0, LoadComputationService::MAX_RESEARCH_UNITS - $currentResearchUnits);
@@ -170,19 +156,19 @@ class ResearchAdvisoryController extends Controller
             ]);
         }
 
+        $oldGradeLevel = $researchAdvisory->grade_level;
         $researchAdvisory->update($data);
 
-        // Sync the linked LoadAssignment if present
-        if ($researchAdvisory->load_assignment_id) {
-            $typeLabel = $data['research_type'] ? " ({$data['research_type']})" : '';
-            LoadAssignment::where('id', $researchAdvisory->load_assignment_id)
-                ->update([
-                    'load_units'  => $data['load_units'],
-                    'description' => "Research advisory: {$data['student_name']}{$typeLabel}",
-                ]);
+        // Recompute grade-level LoadAssignment(s); handle grade_level changes
+        if ($oldGradeLevel !== (int) $data['grade_level']) {
+            $this->recomputeGradeAssignment($researchAdvisory->user_id, $researchAdvisory->academic_term_id, $oldGradeLevel, $load);
+        }
+        $newLa = $this->recomputeGradeAssignment($researchAdvisory->user_id, $researchAdvisory->academic_term_id, (int) $data['grade_level'], $load);
+        if ($newLa && $researchAdvisory->load_assignment_id !== $newLa->id) {
+            $researchAdvisory->update(['load_assignment_id' => $newLa->id]);
         }
 
-        if ($researchAdvisory->academicTerm && $load) {
+        if ($load) {
             $this->loads->syncLoad($load);
         }
 
@@ -202,18 +188,15 @@ class ResearchAdvisoryController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
-        $userId  = $researchAdvisory->user_id;
-        $termId  = $researchAdvisory->academic_term_id;
-        $laId    = $researchAdvisory->load_assignment_id;
+        $userId     = $researchAdvisory->user_id;
+        $termId     = $researchAdvisory->academic_term_id;
+        $gradeLevel = $researchAdvisory->grade_level;
 
         $researchAdvisory->delete();
 
-        if ($laId) {
-            LoadAssignment::destroy($laId);
-        }
-
-        $load = FacultyLoad::where('user_id', $userId)->where('academic_term_id', $termId)->first();
         if ($load) {
+            // Recompute (or delete) the shared grade-level LoadAssignment
+            $this->recomputeGradeAssignment($userId, $termId, $gradeLevel, $load);
             $this->loads->syncLoad($load);
         }
 
@@ -221,6 +204,53 @@ class ResearchAdvisoryController extends Controller
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Find or create the shared grade-level LoadAssignment (RES-GX) for a faculty member,
+     * recomputing its units from the sum of all active advisories for that grade.
+     * Deletes the LoadAssignment if no active advisories remain.
+     */
+    private function recomputeGradeAssignment(int $userId, int $termId, int $gradeLevel, FacultyLoad $load): ?LoadAssignment
+    {
+        $designation = Designation::where('code', "RES-G{$gradeLevel}")->first();
+        if (! $designation) {
+            return null;
+        }
+
+        $total = (float) ResearchAdvisory::where('user_id', $userId)
+            ->where('academic_term_id', $termId)
+            ->where('grade_level', $gradeLevel)
+            ->where('status', 'active')
+            ->sum('load_units');
+
+        $la = LoadAssignment::where('faculty_load_id', $load->id)
+            ->where('designation_id', $designation->id)
+            ->first();
+
+        if ($total <= 0) {
+            $la?->delete();
+            return null;
+        }
+
+        if ($la) {
+            $la->update(['load_units' => $total]);
+        } else {
+            $la = LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $userId,
+                'school_year_id'   => $load->school_year_id,
+                'academic_term_id' => $termId,
+                'designation_id'   => $designation->id,
+                'assignment_type'  => 'research',
+                'load_units'       => $total,
+                'description'      => "Grade {$gradeLevel} Research Advisory",
+                'is_overridden'    => true,
+                'created_by'       => Auth::id(),
+            ]);
+        }
+
+        return $la;
+    }
 
     private function mapAdvisory(ResearchAdvisory $r): array
     {
