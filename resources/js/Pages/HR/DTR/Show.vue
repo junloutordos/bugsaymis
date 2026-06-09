@@ -215,11 +215,19 @@
               <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
-                <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
-                    class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
-                    :class="r.wfh_attendance_id && r[f] ? 'text-rose-600 font-medium' : (r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-amber-700 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200'))))">
-                  {{ timeCell(r, f) }}
-                </td>
+                <template v-if="r.is_advance && (isAdmin || canManageDtr)">
+                  <td v-for="pf in ['penned_time_in_am','penned_time_out_am','penned_time_in_pm','penned_time_out_pm']" :key="pf" class="px-2 py-1.5">
+                    <input v-model="advancePennedForm[pf]" type="time"
+                      class="w-[90px] border border-amber-200 rounded px-1.5 py-0.5 text-xs font-mono text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white" />
+                  </td>
+                </template>
+                <template v-else>
+                  <td v-for="f in ['time_in_am','time_out_am','time_in_pm','time_out_pm']" :key="f"
+                      class="px-4 py-2.5 font-mono text-xs whitespace-nowrap"
+                      :class="r.wfh_attendance_id && r[f] ? 'text-rose-600 font-medium' : (r[f] ? 'text-slate-700' : (r['penned_'+f] ? 'text-amber-700 font-semibold' : (r.attendance_status === 'on_leave' ? 'text-amber-600 font-bold' : (r.attendance_status === 'on_official_business' ? 'text-blue-500 font-bold' : 'text-slate-200'))))">
+                    {{ timeCell(r, f) }}
+                  </td>
+                </template>
                 <!-- Scheduled times (indigo, derived from employee schedule) -->
                 <td class="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-indigo-400">
                   {{ fmtTime(r.scheduled_time_in) || '–' }}
@@ -256,10 +264,18 @@
                   </div>
                 </td>
                 <td class="px-4 py-2.5 print:hidden">
-                  <button v-if="!r.is_locked && (isAdmin || canManageDtr)" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
-                    <PencilSquareIcon class="h-4 w-4" />
-                  </button>
-                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
+                  <template v-if="r.is_advance && (isAdmin || canManageDtr)">
+                    <button @click="saveAdvancePenned(r)" :disabled="advancePennedForm.processing"
+                      class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded font-medium disabled:opacity-50 whitespace-nowrap">
+                      {{ advancePennedForm.processing ? '…' : 'Save' }}
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button v-if="!r.is_locked && (isAdmin || canManageDtr)" @click="openEdit(r)" class="text-slate-300 hover:text-indigo-600 transition-colors">
+                      <PencilSquareIcon class="h-4 w-4" />
+                    </button>
+                    <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -643,6 +659,28 @@ function submitEdit() {
       onSuccess: () => { editModal.open = false },
     })
   }
+}
+
+// ── Inline advance penned entry ─────────────────────────────────────────────
+
+const advancePennedForm = useForm({
+  penned_time_in_am:  fmtTime(props.records.find(r => r.is_advance)?.penned_time_in_am)  || '',
+  penned_time_out_am: fmtTime(props.records.find(r => r.is_advance)?.penned_time_out_am) || '',
+  penned_time_in_pm:  fmtTime(props.records.find(r => r.is_advance)?.penned_time_in_pm)  || '',
+  penned_time_out_pm: fmtTime(props.records.find(r => r.is_advance)?.penned_time_out_pm) || '',
+  penned_remarks:     props.records.find(r => r.is_advance)?.penned_remarks || '',
+})
+
+function saveAdvancePenned(record) {
+  advancePennedForm
+    .transform(data => ({
+      penned_time_in_am:  data.penned_time_in_am  ? data.penned_time_in_am  + ':00' : null,
+      penned_time_out_am: data.penned_time_out_am ? data.penned_time_out_am + ':00' : null,
+      penned_time_in_pm:  data.penned_time_in_pm  ? data.penned_time_in_pm  + ':00' : null,
+      penned_time_out_pm: data.penned_time_out_pm ? data.penned_time_out_pm + ':00' : null,
+      penned_remarks:     data.penned_remarks || null,
+    }))
+    .patch(route('hr.dtr.penned', record.id), { preserveScroll: true })
 }
 </script>
 
