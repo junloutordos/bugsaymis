@@ -409,7 +409,6 @@ function submitAdvanceGenerate() {
   advanceGenerating.value = true
   router.post(route('hr.dtr.generate'), {
     user_id:   props.employee.id,
-    category:  'single',
     date_from: `${y}-${m}-01`,
     date_to:   tomorrowStr.value,
   }, {
