@@ -17,12 +17,11 @@ use App\Models\FacultyLoading\Section;
  *   2. A Section Adviser is assigned / changed / removed
  *
  * Designation mapping:
- *   Unit Head     → AUH-{DEPT_CODE}       (e.g. AUH-CS)    → admin, 6 units
- *   Adviser G7–10 → HRA-G{grade}{A–D}                      → admin, 3 units
- *   Adviser G11–12→ HAC-G{grade}{A–C}                      → admin, 3 units
+ *   Unit Head     → AUH-{DEPT_CODE}              (e.g. AUH-CS)         → admin, 3 units
+ *   Adviser G7–10 → HRA-{section_code}           (e.g. HRA-G7-NEWTON)  → admin, 3 units
+ *   Adviser G11–12→ HAC-{section_code}           (e.g. HAC-G11-MARS)   → admin, 3 units
  *
- * Section letter is determined by the section's insertion order (id ASC)
- * within its grade level and school year, making it stable and reproducible.
+ * Section designations are auto-created from the Sections table — not hardcoded in seeders.
  */
 class HeadAdvisoryService
 {
@@ -118,14 +117,10 @@ class HeadAdvisoryService
 
         // ── Create new adviser's homeroom assignment ───────────────────────────
         if ($newAdviserId) {
-            $code = $this->getAdviserDesignationCode($section);
-            if (! $code) {
-                return; // Cannot determine designation slot — skip silently
-            }
-
-            $designation = Designation::where('code', $code)->first();
+            // Ensure the section's designation exists (auto-creates if needed)
+            $designation = $this->ensureSectionDesignation($section);
             if (! $designation) {
-                return; // Designation not seeded — skip silently
+                return; // Not a G7-12 section — skip
             }
 
             $facultyLoad = $this->findOrCreateFacultyLoad($newAdviserId);
@@ -268,8 +263,99 @@ class HeadAdvisoryService
     }
 
     /**
-     * Get or create the AUH designation category id.
+     * Ensure an HRA-{section_code} or HAC-{section_code} designation exists
+     * for the given section. Only applies to grades 7–12.
+     *
+     * Called on section create (and as a safety fallback in syncSectionAdviser).
+     * Safe to call multiple times (idempotent via code uniqueness).
+     *
+     * @return Designation|null  Null if section is not grade 7–12.
      */
+    public function ensureSectionDesignation(Section $section): ?Designation
+    {
+        $grade = (int) $section->levelid;
+        if ($grade < 7 || $grade > 12) {
+            return null;
+        }
+
+        $isJhs = $grade <= 10;
+        $prefix = $isJhs ? 'HRA' : 'HAC';
+
+        // Derive a stable code from section_code; fall back to grade+name
+        $sc   = $section->section_code ?? ('G' . $grade . '-' . strtoupper(str_replace(' ', '_', $section->sectionname)));
+        $code = $prefix . '-' . $sc;
+
+        $name = $isJhs
+            ? "HR Adviser — G{$grade} {$section->sectionname}"
+            : "HR/Academic Adviser — G{$grade} {$section->sectionname}";
+
+        $categoryId = $isJhs ? $this->hraCategoryId() : $this->hacCategoryId();
+
+        return Designation::firstOrCreate(
+            ['code' => $code],
+            [
+                'designation_category_id' => $categoryId,
+                'section_id'              => $section->id,
+                'name'                    => $name,
+                'load_units'              => 3,
+                'assignment_type'         => 'admin',
+                'requires_unit'           => false,
+                'max_holders'             => 1,
+                'sort_order'              => 0,
+                'is_active'               => true,
+            ]
+        );
+    }
+
+    /**
+     * Sync the section designation when a section's name or section_code changes.
+     * Called on section update. Updates the designation code and/or name.
+     *
+     * @param Section $section   The section with its new values already saved.
+     * @param string  $oldName   sectionname before the update.
+     * @param string  $oldCode   section_code before the update (empty string if null).
+     */
+    public function syncSectionDesignation(Section $section, string $oldName, string $oldCode): void
+    {
+        $grade  = (int) $section->levelid;
+        if ($grade < 7 || $grade > 12) {
+            return;
+        }
+
+        $isJhs  = $grade <= 10;
+        $prefix = $isJhs ? 'HRA' : 'HAC';
+
+        $oldSc   = $oldCode ?: ('G' . $grade . '-' . strtoupper(str_replace(' ', '_', $oldName)));
+        $oldDesigCode = $prefix . '-' . $oldSc;
+
+        $designation = Designation::where('code', $oldDesigCode)->first();
+        if (! $designation) {
+            // Designation didn't exist yet — create it with the new values
+            $this->ensureSectionDesignation($section);
+            return;
+        }
+
+        $newSc       = $section->section_code ?? ('G' . $grade . '-' . strtoupper(str_replace(' ', '_', $section->sectionname)));
+        $newDesigCode = $prefix . '-' . $newSc;
+        $newName      = $isJhs
+            ? "HR Adviser — G{$grade} {$section->sectionname}"
+            : "HR/Academic Adviser — G{$grade} {$section->sectionname}";
+
+        $updates = [];
+        if ($newDesigCode !== $oldDesigCode) {
+            $updates['code'] = $newDesigCode;
+        }
+        if ($section->sectionname !== $oldName) {
+            $updates['name'] = $newName;
+        }
+
+        if ($updates) {
+            $designation->update($updates);
+        }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
     private function auhCategoryId(): int
     {
         return DesignationCategory::firstOrCreate(
@@ -283,7 +369,31 @@ class HeadAdvisoryService
         )->id;
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    private function hraCategoryId(): int
+    {
+        return DesignationCategory::firstOrCreate(
+            ['code' => 'HR_ADV'],
+            [
+                'name'        => 'HR Advisory',
+                'description' => 'Homeroom advisory for Grades 7–10',
+                'sort_order'  => 6,
+                'is_active'   => true,
+            ]
+        )->id;
+    }
+
+    private function hacCategoryId(): int
+    {
+        return DesignationCategory::firstOrCreate(
+            ['code' => 'HR_ACAD'],
+            [
+                'name'        => 'HR/Academic Advisory',
+                'description' => 'Homeroom/Academic advisory for Grades 11–12',
+                'sort_order'  => 7,
+                'is_active'   => true,
+            ]
+        )->id;
+    }
 
     /**
      * Delete the AUH load assignment for the given unit code and user.
@@ -327,38 +437,6 @@ class HeadAdvisoryService
                 $this->loads->syncLoad($facultyLoad);
             }
         }
-    }
-
-    /**
-     * Determine the designation code for a section's homeroom adviser.
-     *
-     * Sections are ordered by id (insertion order) within their grade + school year.
-     * Position 0 → A, 1 → B, 2 → C, 3 → D
-     *
-     * G7–G10  → HRA-G{grade}{letter}
-     * G11–G12 → HAC-G{grade}{letter}
-     */
-    private function getAdviserDesignationCode(Section $section): ?string
-    {
-        if (! $section->school_year_id) {
-            return null;
-        }
-
-        $sectionIds = Section::where('school_year_id', $section->school_year_id)
-            ->where('levelid', $section->levelid)
-            ->orderBy('id')
-            ->pluck('id')
-            ->toArray();
-
-        $position = array_search($section->id, $sectionIds, true);
-        if ($position === false) {
-            return null;
-        }
-
-        $letter = chr(ord('A') + $position);
-        $prefix = $section->levelid <= 10 ? 'HRA' : 'HAC';
-
-        return "{$prefix}-G{$section->levelid}{$letter}";
     }
 
     /**

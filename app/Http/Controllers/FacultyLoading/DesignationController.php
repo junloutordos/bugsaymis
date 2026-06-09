@@ -61,6 +61,7 @@ class DesignationController extends Controller
                     'max_holders'     => $d->max_holders,
                     'sort_order'      => $d->sort_order,
                     'is_active'       => $d->is_active,
+                    'section_id'      => $d->section_id,
                     // Current holders — from any module (AUH, adviser, supervisory, etc.)
                     'holders'       => ($holdersByDesig->get($d->id) ?? collect())
                         ->map(fn ($a) => [
@@ -229,6 +230,10 @@ class DesignationController extends Controller
             return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
         }
 
+        if ($designation->section_id !== null) {
+            return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
+        }
+
         $data = $request->validate([
             'user_id'          => 'required|exists:users,id',
             'academic_term_id' => 'required|exists:academic_terms,id',
@@ -284,6 +289,10 @@ class DesignationController extends Controller
             return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
         }
 
+        if ($assignment->designation && $assignment->designation->section_id !== null) {
+            return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
+        }
+
         $result = $this->service->revoke($assignment);
 
         if (! $result['ok']) {
@@ -311,6 +320,10 @@ class DesignationController extends Controller
             return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
         }
 
+        if ($designation->section_id !== null) {
+            return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
+        }
+
         $result = $this->service->assign(
             $facultyLoad,
             $designation,
@@ -333,6 +346,10 @@ class DesignationController extends Controller
         $assignment->load('designation');
         if ($assignment->designation && str_starts_with($assignment->designation->code, 'AUH-')) {
             return back()->withErrors(['error' => 'Unit head designations are managed through the Academic Units module.']);
+        }
+
+        if ($assignment->designation && $assignment->designation->section_id !== null) {
+            return back()->withErrors(['error' => 'Section adviser designations are managed through the Sections module.']);
         }
 
         $result = $this->service->revoke($assignment);

@@ -5,6 +5,7 @@ namespace App\Models\FacultyLoading;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\FacultyLoading\Section;
 
 class Designation extends Model
 {
@@ -12,6 +13,7 @@ class Designation extends Model
 
     protected $fillable = [
         'designation_category_id',
+        'section_id',
         'code',
         'name',
         'description',
@@ -24,6 +26,7 @@ class Designation extends Model
     ];
 
     protected $casts = [
+        'section_id'      => 'integer',
         'load_units'      => 'decimal:2',
         'assignment_type' => 'string',
         'requires_unit'   => 'boolean',
@@ -37,6 +40,11 @@ class Designation extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(DesignationCategory::class, 'designation_category_id');
+    }
+
+    public function section(): BelongsTo
+    {
+        return $this->belongsTo(Section::class);
     }
 
     public function loadAssignments(): HasMany

@@ -100,13 +100,14 @@
                   <span v-for="h in d.holders" :key="h.assignment_id"
                     class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
                     {{ h.user_name }}
-                    <button v-if="!isAuhDesignation(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
+                    <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
                       <XMarkIcon class="h-3 w-3" />
                     </button>
                   </span>
                 </div>
                 <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
                 <p v-if="isAuhDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Academic Units</p>
+                <p v-else-if="isSectionDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Sections</p>
               </td>
 
               <!-- Status -->
@@ -125,6 +126,13 @@
                     :href="route('faculty-loading.academic-units.index')"
                     class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
                     title="Manage in Academic Units">
+                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                  </a>
+                  <!-- Section designations: link to Sections instead -->
+                  <a v-else-if="isSectionDesignation(d)"
+                    :href="route('faculty-loading.sections.index')"
+                    class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
+                    title="Manage in Sections">
                     <ArrowTopRightOnSquareIcon class="h-4 w-4" />
                   </a>
                   <!-- Assign button — disabled if at capacity -->
@@ -284,7 +292,7 @@
             <span v-for="h in selectedDesig.holders" :key="h.assignment_id"
               class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
               {{ h.user_name }}
-              <button v-if="!isAuhDesignation(selectedDesig)" @click="revokeHolder(h); assignModal = false"
+              <button v-if="!isManagedExternally(selectedDesig)" @click="revokeHolder(h); assignModal = false"
                 class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
                 <XMarkIcon class="h-3 w-3" />
               </button>
@@ -366,6 +374,14 @@ const props = defineProps({
 
 function isAuhDesignation(d) {
   return d.code.startsWith('AUH-')
+}
+
+function isSectionDesignation(d) {
+  return !!d.section_id
+}
+
+function isManagedExternally(d) {
+  return isAuhDesignation(d) || isSectionDesignation(d)
 }
 
 function assignmentTypeBadge(type) {
