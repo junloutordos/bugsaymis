@@ -20,11 +20,14 @@ class SupervisoryController extends Controller
 {
     // ── Index ─────────────────────────────────────────────────────────────────
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('faculty_loading.manage');
 
-        $sy   = SchoolYear::where('is_current', true)->first();
+        $currentSy    = SchoolYear::where('is_current', true)->first();
+        $schoolYearId = (int) $request->input('school_year_id', $currentSy?->id);
+
+        $sy   = SchoolYear::find($schoolYearId);
         $term = $sy
             ? (AcademicTerm::where('school_year_id', $sy->id)->where('is_current', true)->first()
                ?? AcademicTerm::where('school_year_id', $sy->id)->orderBy('start_date')->first())
@@ -86,11 +89,15 @@ class SupervisoryController extends Controller
 
         $users = User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name']);
 
+        $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
+
         return Inertia::render('FacultyLoading/Supervisory/Index', [
-            'positions'  => $positions,
-            'users'      => $users,
-            'schoolYear' => $sy ? ['id' => $sy->id, 'name' => $sy->name] : null,
-            'term'       => $term ? ['id' => $term->id, 'name' => $term->name] : null,
+            'positions'           => $positions,
+            'users'               => $users,
+            'schoolYear'          => $sy ? ['id' => $sy->id, 'name' => $sy->name] : null,
+            'term'                => $term ? ['id' => $term->id, 'name' => $term->name] : null,
+            'schoolYears'         => $schoolYears,
+            'currentSchoolYearId' => $schoolYearId,
         ]);
     }
 

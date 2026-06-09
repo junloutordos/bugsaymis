@@ -4,6 +4,7 @@ namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicUnit;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\User;
 use App\Services\FacultyLoading\HeadAdvisoryService;
 use Illuminate\Http\RedirectResponse;
@@ -13,11 +14,15 @@ use Inertia\Response;
 
 class AcademicUnitController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('faculty_loading.setup');
 
+        $currentSy    = SchoolYear::where('is_current', true)->first();
+        $schoolYearId = (int) $request->input('school_year_id', $currentSy?->id);
+
         $units = AcademicUnit::with('head')
+            ->where('school_year_id', $schoolYearId)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
@@ -37,9 +42,13 @@ class AcademicUnitController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $schoolYears = SchoolYear::orderByDesc('name')->get(['id', 'name', 'is_current']);
+
         return Inertia::render('FacultyLoading/AcademicUnits/Index', [
-            'units'         => $units,
-            'facultyOptions' => $facultyOptions,
+            'units'               => $units,
+            'facultyOptions'      => $facultyOptions,
+            'schoolYears'         => $schoolYears,
+            'currentSchoolYearId' => $schoolYearId,
         ]);
     }
 
@@ -47,13 +56,18 @@ class AcademicUnitController extends Controller
     {
         $this->authorize('faculty_loading.setup');
 
+        $schoolYearId = (int) $request->input('school_year_id',
+            SchoolYear::where('is_current', true)->value('id')
+        );
+
         $data = $request->validate([
-            'code'         => 'required|string|max:20|unique:academic_units,code',
-            'name'         => 'required|string|max:100',
-            'unit_type'    => 'required|in:junior_high,senior_high,sst,admin,department',
-            'head_user_id' => 'nullable|exists:users,id',
-            'sort_order'   => 'nullable|integer|min:0',
-            'is_active'    => 'boolean',
+            'school_year_id' => 'required|exists:school_years,id',
+            'code'           => "required|string|max:20|unique:academic_units,code,NULL,id,school_year_id,{$schoolYearId}",
+            'name'           => 'required|string|max:100',
+            'unit_type'      => 'required|in:junior_high,senior_high,sst,admin,department',
+            'head_user_id'   => 'nullable|exists:users,id',
+            'sort_order'     => 'nullable|integer|min:0',
+            'is_active'      => 'boolean',
         ]);
 
         $unit = AcademicUnit::create($data);
@@ -71,8 +85,10 @@ class AcademicUnitController extends Controller
     {
         $this->authorize('faculty_loading.setup');
 
+        $schoolYearId = $academicUnit->school_year_id;
+
         $data = $request->validate([
-            'code'         => "required|string|max:20|unique:academic_units,code,{$academicUnit->id}",
+            'code'         => "required|string|max:20|unique:academic_units,code,{$academicUnit->id},id,school_year_id,{$schoolYearId}",
             'name'         => 'required|string|max:100',
             'unit_type'    => 'required|in:junior_high,senior_high,sst,admin,department',
             'head_user_id' => 'nullable|exists:users,id',
@@ -81,7 +97,7 @@ class AcademicUnitController extends Controller
         ]);
 
         $oldHeadId = $academicUnit->head_user_id ? (int) $academicUnit->head_user_id : null;
-        $newHeadId = $data['head_user_id'] ? (int) $data['head_user_id'] : null;
+        $newHeadId = isset($data['head_user_id']) ? (int) $data['head_user_id'] : null;
         $oldCode   = $academicUnit->code;
         $oldName   = $academicUnit->name;
 
@@ -107,5 +123,56 @@ class AcademicUnitController extends Controller
         $academicUnit->delete();
 
         return back()->with('success', 'Academic unit deleted.');
+    }
+
+    /**
+     * Copy all academic units from a source school year into a target school year.
+     * AUH designations (global) are ensured via firstOrCreate — no duplicates.
+     * Skips unit codes that already exist in the target year.
+     */
+    public function copyFromYear(Request $request, HeadAdvisoryService $advisory): RedirectResponse
+    {
+        $this->authorize('faculty_loading.setup');
+
+        $data = $request->validate([
+            'source_school_year_id' => 'required|exists:school_years,id',
+            'target_school_year_id' => 'required|exists:school_years,id|different:source_school_year_id',
+        ]);
+
+        $sourceId = $data['source_school_year_id'];
+        $targetId = $data['target_school_year_id'];
+
+        $existing = AcademicUnit::where('school_year_id', $targetId)->pluck('code')->flip();
+
+        $sources = AcademicUnit::where('school_year_id', $sourceId)->orderBy('sort_order')->get();
+
+        $copied = 0;
+        foreach ($sources as $u) {
+            if ($existing->has($u->code)) {
+                continue;
+            }
+            $newUnit = AcademicUnit::create([
+                'school_year_id' => $targetId,
+                'code'           => $u->code,
+                'name'           => $u->name,
+                'unit_type'      => $u->unit_type,
+                'head_user_id'   => $u->head_user_id,
+                'sort_order'     => $u->sort_order,
+                'is_active'      => $u->is_active,
+            ]);
+
+            // Ensure AUH-* designation exists (idempotent — no-op if already present)
+            $advisory->ensureUnitDesignation($newUnit);
+
+            $copied++;
+        }
+
+        $skipped = $sources->count() - $copied;
+        $msg = "{$copied} academic unit(s) copied.";
+        if ($skipped > 0) {
+            $msg .= " {$skipped} skipped (codes already exist in target year).";
+        }
+
+        return back()->with('success', $msg);
     }
 }

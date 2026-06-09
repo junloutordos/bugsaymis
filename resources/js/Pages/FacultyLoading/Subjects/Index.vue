@@ -9,10 +9,16 @@
           <h1 class="text-xl font-semibold text-slate-800">Subject Catalog</h1>
           <p class="text-sm text-slate-500 mt-0.5">Manage subjects and their load unit assignments</p>
         </div>
-        <button @click="openForm()"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <PlusIcon class="h-4 w-4" /> New Subject
-        </button>
+        <div class="flex items-center gap-2">
+          <button @click="copyModal = true"
+            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg font-medium transition-colors shadow-sm shrink-0">
+            <DocumentDuplicateIcon class="h-4 w-4" /> Copy from Year
+          </button>
+          <button @click="openForm()"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
+            <PlusIcon class="h-4 w-4" /> New Subject
+          </button>
+        </div>
       </div>
 
       <!-- Flash -->
@@ -23,7 +29,14 @@
 
       <!-- Filters -->
       <div class="flex flex-wrap gap-2">
-        <input v-model="filters.search" @input.debounce="applyFilters" type="search" placeholder="Search code or name..."
+        <!-- School year picker -->
+        <select v-model="filters.school_year_id" @change="applyFilters"
+          class="text-sm border border-indigo-300 bg-indigo-50 text-indigo-700 font-medium rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+            {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+          </option>
+        </select>
+        <input v-model="filters.search" @input="applyFilters" type="search" placeholder="Search code or name..."
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-56 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
         <select v-model="filters.grade_level" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -50,7 +63,8 @@
       <!-- Empty -->
       <div v-if="subjects.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
         <BookOpenIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No subjects found</p>
+        <p class="text-sm font-medium text-slate-500">No subjects found for this school year</p>
+        <p class="text-xs text-slate-400 mt-1">Use "Copy from Year" to import subjects from a previous year.</p>
       </div>
 
       <!-- Table -->
@@ -203,6 +217,40 @@
       </div>
     </div>
 
+    <!-- Copy from Year Modal -->
+    <div v-if="copyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <h2 class="text-lg font-semibold text-slate-800">Copy Subjects from Another Year</h2>
+        <p class="text-sm text-slate-500">Copies all subjects from the source year into the target year. Subjects with duplicate codes are skipped.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Source Year (copy from)</label>
+            <select v-model="copyForm.source_school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+                {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Target Year (copy into)</label>
+            <select v-model="copyForm.target_school_year_id" class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+                {{ sy.name }}{{ sy.is_current ? ' (current)' : '' }}
+              </option>
+            </select>
+          </div>
+          <p v-if="copyForm.errors.target_school_year_id" class="text-xs text-red-500">{{ copyForm.errors.target_school_year_id }}</p>
+        </div>
+        <div class="flex justify-end gap-3 pt-1">
+          <button @click="copyModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
+          <button @click="doCopy" :disabled="copyForm.processing"
+            class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50">
+            Copy Subjects
+          </button>
+        </div>
+      </div>
+    </div>
+
   </AdminLayout>
 </template>
 
@@ -210,20 +258,23 @@
 import { reactive, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { BookOpenIcon, CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { BookOpenIcon, CheckCircleIcon, DocumentDuplicateIcon, PencilIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  subjects:      { type: Array,  default: () => [] },
-  terms:         { type: Array,  default: () => [] },
-  currentTermId: { type: Number, default: null },
-  filters:       { type: Object, default: () => ({}) },
+  subjects:            { type: Array,  default: () => [] },
+  terms:               { type: Array,  default: () => [] },
+  currentTermId:       { type: Number, default: null },
+  schoolYears:         { type: Array,  default: () => [] },
+  currentSchoolYearId: { type: Number, default: null },
+  filters:             { type: Object, default: () => ({}) },
 })
 
 const filters = reactive({
-  search:       props.filters.search       ?? '',
-  grade_level:  props.filters.grade_level  ?? 'all',
-  subject_type: props.filters.subject_type ?? 'all',
-  term_id:      props.filters.term_id      ?? props.currentTermId,
+  search:          props.filters.search          ?? '',
+  grade_level:     props.filters.grade_level     ?? 'all',
+  subject_type:    props.filters.subject_type    ?? 'all',
+  term_id:         props.filters.term_id         ?? props.currentTermId,
+  school_year_id:  props.filters.school_year_id  ?? props.currentSchoolYearId,
 })
 
 function applyFilters() {
@@ -242,7 +293,8 @@ function typeBadge(type) {
 
 const modal = ref(false)
 const form  = useForm({
-  id: null, code: '', name: '', description: '', specialization_tags: '',
+  id: null, school_year_id: props.currentSchoolYearId,
+  code: '', name: '', description: '', specialization_tags: '',
   credit_units: 3, load_units: 3,
   lecture_hours: 3, lab_hours: 0, subject_type: 'lecture', grade_level: 7,
   semester: null, sessions_per_week: 5, minutes_per_session: 60, is_active: true,
@@ -250,16 +302,20 @@ const form  = useForm({
 
 function openForm(s = null) {
   if (s) {
-    Object.assign(form, { id: s.id, code: s.code, name: s.name, description: s.description ?? '',
+    Object.assign(form, { id: s.id, school_year_id: props.currentSchoolYearId,
+      code: s.code, name: s.name, description: s.description ?? '',
       specialization_tags: s.specialization_tags ?? '',
       credit_units: s.credit_units, load_units: s.load_units, lecture_hours: s.lecture_hours,
       lab_hours: s.lab_hours ?? 0, subject_type: s.subject_type, grade_level: s.grade_level,
       semester: s.semester, sessions_per_week: s.sessions_per_week,
       minutes_per_session: s.minutes_per_session, is_active: s.is_active })
   } else {
-    form.reset(); form.id = null; form.grade_level = 7; form.subject_type = 'lecture'
-    form.credit_units = 3; form.load_units = 3; form.lecture_hours = 3; form.sessions_per_week = 5
-    form.minutes_per_session = 60; form.is_active = true
+    form.reset()
+    form.id = null
+    form.school_year_id = props.currentSchoolYearId
+    form.grade_level = 7; form.subject_type = 'lecture'
+    form.credit_units = 3; form.load_units = 3; form.lecture_hours = 3
+    form.sessions_per_week = 5; form.minutes_per_session = 60; form.is_active = true
   }
   modal.value = true
 }
@@ -275,5 +331,17 @@ function save() {
 function deleteSubject(s) {
   if (! confirm(`Delete subject "${s.name}"?`)) return
   useForm({}).delete(route('faculty-loading.subjects.destroy', s.id))
+}
+
+const copyModal = ref(false)
+const copyForm  = useForm({
+  source_school_year_id: props.currentSchoolYearId,
+  target_school_year_id: props.currentSchoolYearId,
+})
+
+function doCopy() {
+  copyForm.post(route('faculty-loading.subjects.copy-from-year'), {
+    onSuccess: () => { copyModal.value = false }
+  })
 }
 </script>

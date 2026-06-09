@@ -11,6 +11,7 @@ class Subject extends Model
     protected $table = 'subjects';
 
     protected $fillable = [
+        'school_year_id',
         'code',
         'name',
         'description',
@@ -29,6 +30,7 @@ class Subject extends Model
     ];
 
     protected $casts = [
+        'school_year_id'      => 'integer',
         'credit_units'        => 'integer',
         'lecture_hours'       => 'decimal:1',
         'lab_hours'           => 'decimal:1',
@@ -38,6 +40,11 @@ class Subject extends Model
         'minutes_per_session' => 'integer',
         'is_active'           => 'boolean',
     ];
+
+    public function schoolYear(): BelongsTo
+    {
+        return $this->belongsTo(SchoolYear::class);
+    }
 
     public function academicUnit(): BelongsTo
     {

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FacultyLoading\AcademicUnit;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\TeacherTapLog;
 use App\Models\User;
 use Carbon\Carbon;
@@ -33,7 +34,10 @@ class TeacherAttendanceService
      */
     public function tap(string $nfcUuid, User $teacher): array
     {
-        $classroom = Classroom::where('nfc_uuid', $nfcUuid)->first();
+        $currentSyId = SchoolYear::where('is_current', true)->value('id');
+        $classroom   = Classroom::where('nfc_uuid', $nfcUuid)
+            ->where('school_year_id', $currentSyId)
+            ->first();
 
         if (! $classroom) {
             return ['status' => 'room_not_found', 'tap' => null, 'schedule' => null, 'classroom' => null];
