@@ -348,9 +348,14 @@
                   <label class="block text-xs font-medium text-slate-600 mb-1">Date To</label>
                   <input v-model="genForm.date_to" type="date"
                          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <button type="button" @click="genForm.date_to = tomorrowStr"
+                    class="mt-1.5 text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded px-2 py-0.5 font-medium transition-colors whitespace-nowrap">
+                    → Use tomorrow (cut-off)
+                  </button>
                 </div>
               </div>
               <p class="text-xs text-slate-400">Date range can span across months (e.g. Dec 25 – Jan 10).</p>
+              <p class="text-xs text-amber-600">For COS payroll cut-off, set Date To to tomorrow to generate an advance entry.</p>
             </template>
           </div>
 
@@ -540,6 +545,12 @@ function openGenerateModal () {
 }
 
 syncGenDates()
+
+const tomorrowStr = computed(() => {
+  const t = new Date()
+  t.setDate(t.getDate() + 1)
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`
+})
 
 function submitGenerate () {
   genForm.category = genCategory.value
