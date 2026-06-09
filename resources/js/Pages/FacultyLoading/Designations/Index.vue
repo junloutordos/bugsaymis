@@ -21,7 +21,7 @@
             class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg font-medium transition-colors">
             <TagIcon class="h-4 w-4" /> New Category
           </button>
-          <button @click="openDesigForm()"
+          <button @click="openDesigForm(null, activeCategory)"
             class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm">
             <PlusIcon class="h-4 w-4" /> New Designation
           </button>
@@ -36,137 +36,162 @@
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.errors.error }}
       </div>
 
-      <!-- Categories + designations -->
+      <!-- Empty state -->
       <div v-if="categories.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-14 text-center text-sm text-slate-400">
         No categories yet. Add one to get started.
       </div>
 
-      <div v-for="cat in categories" :key="cat.id" class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <!-- Category header -->
-        <div class="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
-          <div class="flex items-center gap-3">
-            <span class="font-mono text-xs text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded">{{ cat.code }}</span>
-            <span class="font-semibold text-slate-800 text-sm">{{ cat.name }}</span>
-            <span :class="cat.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
-              class="text-xs px-2 py-0.5 rounded-full font-medium">
-              {{ cat.is_active ? 'Active' : 'Inactive' }}
+      <!-- Tabbed layout -->
+      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+
+        <!-- Tab bar -->
+        <div class="flex overflow-x-auto border-b border-slate-100 scrollbar-hide">
+          <button
+            v-for="cat in categories"
+            :key="cat.id"
+            @click="activeTabId = cat.id"
+            class="flex-shrink-0 flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+            :class="activeTabId === cat.id
+              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/40'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'">
+            {{ cat.name }}
+            <span class="text-xs px-1.5 py-0.5 rounded-full font-medium"
+              :class="activeTabId === cat.id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'">
+              {{ cat.designations.length }}
             </span>
-          </div>
-          <div class="flex items-center gap-1">
-            <button @click="openDesigForm(null, cat)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1">
-              <PlusIcon class="h-3.5 w-3.5" /> Add
-            </button>
-            <button @click="openCatForm(cat)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-              <PencilIcon class="h-4 w-4" />
-            </button>
-            <button @click="deleteCat(cat)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-              <TrashIcon class="h-4 w-4" />
-            </button>
-          </div>
+          </button>
         </div>
 
-        <!-- Designations table -->
-        <table class="w-full text-sm">
-          <thead class="border-b border-slate-50">
-            <tr class="text-xs text-slate-400 font-medium uppercase tracking-wide">
-              <th class="px-5 py-2 text-left">Code</th>
-              <th class="px-5 py-2 text-left">Name</th>
-              <th class="px-5 py-2 text-center">Units</th>
-              <th class="px-5 py-2 text-center">Max</th>
-              <th class="px-5 py-2 text-left">Current Holders</th>
-              <th class="px-5 py-2 text-center">Status</th>
-              <th class="px-5 py-2"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-if="cat.designations.length === 0">
-              <td colspan="7" class="px-5 py-4 text-xs text-slate-400 italic">No designations in this category yet.</td>
-            </tr>
-            <tr v-for="d in cat.designations" :key="d.id" class="hover:bg-slate-50/50">
-              <td class="px-5 py-3 font-mono text-xs text-slate-600">{{ d.code }}</td>
-              <td class="px-5 py-3">
-                <div class="font-medium text-slate-800">{{ d.name }}</div>
-                <div v-if="d.requires_unit" class="text-[10px] text-amber-600 font-medium mt-0.5">Unit-scoped</div>
-              </td>
-              <td class="px-5 py-3 text-center">
-                <span class="font-semibold text-slate-700 block">
-                  <template v-if="isManagedExternally(d) && d.load_units === 0">Variable</template>
-                  <template v-else>{{ d.load_units }}</template>
-                </span>
-                <span :class="assignmentTypeBadge(d.assignment_type)" class="text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5 inline-block">{{ d.assignment_type }}</span>
-              </td>
-              <td class="px-5 py-3 text-center text-slate-500">{{ d.max_holders ?? '∞' }}</td>
+        <!-- Active tab panel -->
+        <template v-for="cat in categories" :key="cat.id">
+          <div v-show="activeTabId === cat.id">
 
-              <!-- Current Holders -->
-              <td class="px-5 py-3">
-                <div v-if="d.holders.length" class="flex flex-wrap gap-1.5">
-                  <span v-for="h in d.holders" :key="h.assignment_id"
-                    class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
-                    {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
-                    <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
-                      <XMarkIcon class="h-3 w-3" />
-                    </button>
-                  </span>
-                </div>
-                <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
-                <p v-if="isAuhDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Academic Units</p>
-                <p v-else-if="isSectionDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Sections</p>
-                <p v-else-if="isResearchDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Research Advisories</p>
-              </td>
-
-              <!-- Status -->
-              <td class="px-5 py-3 text-center">
-                <span :class="d.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'"
+            <!-- Panel toolbar -->
+            <div class="flex items-center justify-between px-5 py-2.5 bg-slate-50/60 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <span class="font-mono text-xs text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded">{{ cat.code }}</span>
+                <span v-if="cat.description" class="text-xs text-slate-400">{{ cat.description }}</span>
+                <span :class="cat.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
                   class="text-xs px-2 py-0.5 rounded-full font-medium">
-                  {{ d.is_active ? 'Active' : 'Inactive' }}
+                  {{ cat.is_active ? 'Active' : 'Inactive' }}
                 </span>
-              </td>
+              </div>
+              <div class="flex items-center gap-1">
+                <button @click="openDesigForm(null, cat)"
+                  class="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 px-2 py-1 rounded hover:bg-indigo-50">
+                  <PlusIcon class="h-3.5 w-3.5" /> Add Designation
+                </button>
+                <button @click="openCatForm(cat)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded" title="Edit category">
+                  <PencilIcon class="h-4 w-4" />
+                </button>
+                <button @click="deleteCat(cat)" class="p-1.5 text-slate-400 hover:text-red-600 rounded" title="Delete category">
+                  <TrashIcon class="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-              <!-- Actions -->
-              <td class="px-5 py-3 text-right">
-                <div class="flex items-center justify-end gap-1">
-                  <!-- AUH-* designations: link to Academic Units instead -->
-                  <a v-if="isAuhDesignation(d)"
-                    :href="route('faculty-loading.academic-units.index')"
-                    class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
-                    title="Manage in Academic Units">
-                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
-                  </a>
-                  <!-- Section designations: link to Sections instead -->
-                  <a v-else-if="isSectionDesignation(d)"
-                    :href="route('faculty-loading.sections.index')"
-                    class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
-                    title="Manage in Sections">
-                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
-                  </a>
-                  <!-- Research designations: link to Research Advisories instead -->
-                  <a v-else-if="isResearchDesignation(d)"
-                    :href="route('faculty-loading.research-advisories.index')"
-                    class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
-                    title="Manage in Research Advisories">
-                    <ArrowTopRightOnSquareIcon class="h-4 w-4" />
-                  </a>
-                  <!-- Assign button — disabled if at capacity -->
-                  <button v-else @click="openAssignModal(d)"
-                    :disabled="d.max_holders !== null && d.holders.length >= d.max_holders"
-                    class="p-1.5 rounded transition-colors"
-                    :class="d.max_holders !== null && d.holders.length >= d.max_holders
-                      ? 'text-slate-200 cursor-not-allowed'
-                      : 'text-slate-400 hover:text-emerald-600'"
-                    :title="d.max_holders !== null && d.holders.length >= d.max_holders ? 'At capacity' : 'Assign faculty'">
-                    <UserPlusIcon class="h-4 w-4" />
-                  </button>
-                  <button @click="openDesigForm(d, cat)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
-                    <PencilIcon class="h-4 w-4" />
-                  </button>
-                  <button @click="deleteDesig(d)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
-                    <TrashIcon class="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            <!-- Designations table -->
+            <table class="w-full text-sm">
+              <thead class="border-b border-slate-50">
+                <tr class="text-xs text-slate-400 font-medium uppercase tracking-wide">
+                  <th class="px-5 py-2 text-left">Code</th>
+                  <th class="px-5 py-2 text-left">Name</th>
+                  <th class="px-5 py-2 text-center">Units</th>
+                  <th class="px-5 py-2 text-center">Max</th>
+                  <th class="px-5 py-2 text-left">Current Holders</th>
+                  <th class="px-5 py-2 text-center">Status</th>
+                  <th class="px-5 py-2"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                <tr v-if="cat.designations.length === 0">
+                  <td colspan="7" class="px-5 py-6 text-xs text-slate-400 italic text-center">No designations in this category yet.</td>
+                </tr>
+                <tr v-for="d in cat.designations" :key="d.id" class="hover:bg-slate-50/50">
+                  <td class="px-5 py-3 font-mono text-xs text-slate-600">{{ d.code }}</td>
+                  <td class="px-5 py-3">
+                    <div class="font-medium text-slate-800">{{ d.name }}</div>
+                    <div v-if="d.requires_unit" class="text-[10px] text-amber-600 font-medium mt-0.5">Unit-scoped</div>
+                  </td>
+                  <td class="px-5 py-3 text-center">
+                    <span class="font-semibold text-slate-700 block">
+                      <template v-if="isManagedExternally(d) && d.load_units === 0">Variable</template>
+                      <template v-else>{{ d.load_units }}</template>
+                    </span>
+                    <span :class="assignmentTypeBadge(d.assignment_type)" class="text-[10px] px-1.5 py-0.5 rounded-full font-medium mt-0.5 inline-block">{{ d.assignment_type }}</span>
+                  </td>
+                  <td class="px-5 py-3 text-center text-slate-500">{{ d.max_holders ?? '∞' }}</td>
+
+                  <!-- Current Holders -->
+                  <td class="px-5 py-3">
+                    <div v-if="d.holders.length" class="flex flex-wrap gap-1.5">
+                      <span v-for="h in d.holders" :key="h.assignment_id"
+                        class="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {{ h.user_name }}<span class="text-indigo-400 font-normal">&nbsp;({{ h.load_units }}u)</span>
+                        <button v-if="!isManagedExternally(d)" @click="revokeHolder(h)" class="hover:text-red-600 transition-colors ml-0.5 rounded-full p-0.5 hover:bg-red-50" title="Remove">
+                          <XMarkIcon class="h-3 w-3" />
+                        </button>
+                      </span>
+                    </div>
+                    <span v-else class="text-xs text-slate-400 italic">Unassigned</span>
+                    <p v-if="isAuhDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Academic Units</p>
+                    <p v-else-if="isSectionDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Sections</p>
+                    <p v-else-if="isResearchDesignation(d)" class="text-[10px] text-amber-600 mt-1">Managed via Research Advisories</p>
+                  </td>
+
+                  <!-- Status -->
+                  <td class="px-5 py-3 text-center">
+                    <span :class="d.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'"
+                      class="text-xs px-2 py-0.5 rounded-full font-medium">
+                      {{ d.is_active ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
+
+                  <!-- Actions -->
+                  <td class="px-5 py-3 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                      <a v-if="isAuhDesignation(d)"
+                        :href="route('faculty-loading.academic-units.index')"
+                        class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
+                        title="Manage in Academic Units">
+                        <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                      </a>
+                      <a v-else-if="isSectionDesignation(d)"
+                        :href="route('faculty-loading.sections.index')"
+                        class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
+                        title="Manage in Sections">
+                        <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                      </a>
+                      <a v-else-if="isResearchDesignation(d)"
+                        :href="route('faculty-loading.research-advisories.index')"
+                        class="p-1.5 rounded text-slate-400 hover:text-amber-600 transition-colors"
+                        title="Manage in Research Advisories">
+                        <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+                      </a>
+                      <button v-else @click="openAssignModal(d)"
+                        :disabled="d.max_holders !== null && d.holders.length >= d.max_holders"
+                        class="p-1.5 rounded transition-colors"
+                        :class="d.max_holders !== null && d.holders.length >= d.max_holders
+                          ? 'text-slate-200 cursor-not-allowed'
+                          : 'text-slate-400 hover:text-emerald-600'"
+                        :title="d.max_holders !== null && d.holders.length >= d.max_holders ? 'At capacity' : 'Assign faculty'">
+                        <UserPlusIcon class="h-4 w-4" />
+                      </button>
+                      <button @click="openDesigForm(d, cat)" class="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
+                        <PencilIcon class="h-4 w-4" />
+                      </button>
+                      <button @click="deleteDesig(d)" class="p-1.5 text-slate-400 hover:text-red-600 rounded">
+                        <TrashIcon class="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+          </div>
+        </template>
+
       </div>
 
     </div>
@@ -365,7 +390,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
@@ -380,6 +405,11 @@ const props = defineProps({
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
 })
+
+// ── Active tab ────────────────────────────────────────────────────────────────
+
+const activeTabId = ref(props.categories[0]?.id ?? null)
+const activeCategory = computed(() => props.categories.find(c => c.id === activeTabId.value) ?? null)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
