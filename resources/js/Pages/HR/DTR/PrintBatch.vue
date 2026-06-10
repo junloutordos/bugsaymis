@@ -96,8 +96,8 @@
           <div class="sig-row supervisor-row" style="margin-top:6px;">
             <div class="sig-box">
               <div class="sig-line"></div>
-              <div v-if="supervisor" class="sig-name sup-name">{{ supervisor.name }}</div>
-              <div v-if="supervisor" class="sig-label sup-label">{{ supervisor.position }}</div>
+              <div v-if="emp.supervisor" class="sig-name sup-name">{{ emp.supervisor.name }}</div>
+              <div v-if="emp.supervisor" class="sig-label sup-label">{{ emp.supervisor.position }}</div>
             </div>
           </div>
 
@@ -124,7 +124,6 @@ const props = defineProps({
   employees:  Array,
   date_from:  String,
   date_to:    String,
-  supervisor: Object,
   holidays:   Object,   // keyed by YYYY-MM-DD → { name, type }
 })
 
