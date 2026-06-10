@@ -175,7 +175,7 @@
                 <th></th>
                 <th>Vacation<br>Leave</th>
                 <th>Sick<br>Leave</th>
-                <th>Compensatory<br>Overtime<br>Credit(hr)</th>
+                <th>Compensatory<br>Time Off<br>Credit (days)</th>
                 <th>Service<br>Credit</th>
                 <th>Wellness<br>Leave</th>
               </tr>
@@ -185,7 +185,7 @@
                 <td class="cr-lbl">Total Earned</td>
                 <td>{{ credits['VL']?.earned ?? '' }}</td>
                 <td>{{ credits['SL']?.earned ?? '' }}</td>
-                <td>{{ credits['COC']?.earned ?? 0 }}</td>
+                <td>{{ credits['CTO']?.earned ?? 0 }}</td>
                 <td>{{ credits['SC']?.earned ?? 0 }}</td>
                 <td>{{ credits['WL']?.earned ?? '' }}</td>
               </tr>
@@ -193,7 +193,7 @@
                 <td class="cr-lbl">Less this Application</td>
                 <td>{{ isChecked('VL') ? application.days_applied : 0 }}</td>
                 <td>{{ isChecked('SL') ? application.days_applied : 0 }}</td>
-                <td>0</td>
+                <td>{{ isChecked('CTO') ? application.days_applied : 0 }}</td>
                 <td></td>
                 <td>{{ isChecked('WL') ? application.days_applied : 0 }}</td>
               </tr>
@@ -201,7 +201,7 @@
                 <td class="cr-lbl">Balance</td>
                 <td>{{ credits['VL']?.balance ?? '' }}</td>
                 <td>{{ credits['SL']?.balance ?? '' }}</td>
-                <td></td>
+                <td>{{ credits['CTO']?.balance ?? '' }}</td>
                 <td></td>
                 <td></td>
               </tr>
@@ -355,7 +355,7 @@ const inclusiveDates = computed(() => {
   const to   = props.application.date_to
   if (!from) return ''
   const fmtShort = d => {
-    const dt = new Date(d + 'T00:00:00')
+    const dt = new Date(String(d).slice(0, 10) + 'T00:00:00')
     return dt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
   }
   return from === to ? fmtShort(from) : `${fmtShort(from)} to ${fmtShort(to)}`
