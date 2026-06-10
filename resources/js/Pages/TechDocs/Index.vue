@@ -212,7 +212,7 @@ const modules = [
     controller: 'PDSController',
     models: ['User'],
     permissions: ['hr.employees.view'],
-    description: 'Personal Data Sheet (CSC Form 212 Revised 2017). Includes Work Experience Sheet (WES) tab. Employee self-service with HR review.',
+    description: 'Personal Data Sheet (CSC Form 212 Revised 2025). Includes Work Experience Sheet (WES) tab. Employee self-service with HR review.',
     workflow: 'Employee fills → saves → HR verifies',
     rules: [],
   },
