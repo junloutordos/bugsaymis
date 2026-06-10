@@ -184,7 +184,7 @@ class LeaveApplicationController extends Controller
             approver:    $approver,
         );
 
-        if ($data['action'] === 'approve') {
+        if (in_array($data['action'], ['certified', 'forwarded', 'approved'], true)) {
             $this->performSign($request, LeaveApplication::class, $leaveApplication->id,
                 $data['stage'],
                 "Leave Application #{$leaveApplication->id}",
@@ -390,6 +390,19 @@ class LeaveApplicationController extends Controller
                 'earned'  => round((float) $c->earned + (float) $c->carried_over, 3),
                 'used'    => round((float) $c->used, 3),
                 'balance' => round((float) $balance, 3),
+            ];
+        }
+
+        // Teaching staff: CTO is tracked via approved Service Credit records (in days)
+        if ($u && $this->credits->isTeaching($u)) {
+            $serviceDays = ServiceCreditRecord::active()
+                ->where('user_id', $application->user_id)
+                ->sum('days_equivalent');
+
+            $creditsMap['CTO'] = [
+                'earned'  => round((float) $serviceDays, 3),
+                'used'    => 0,
+                'balance' => round((float) $serviceDays, 3),
             ];
         }
 
