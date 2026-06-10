@@ -489,30 +489,46 @@ class DtrRecordController extends Controller
             return [
                 'user'                => $user,
                 'records'             => $records,
+                'supervisor'          => $this->resolveSupervisor($user),
                 'total_tardy_hours'   => (int) floor($totalTardy / 60),
                 'total_tardy_minutes' => (int) ($totalTardy % 60),
             ];
         })->values();
 
-        // Resolve supervisor: OCD head
-        $supervisor = null;
-        $officeDivision = \Illuminate\Support\Facades\DB::table('divisions')
-            ->where('division_name', 'Office of the Campus Director')
-            ->first();
-        if ($officeDivision?->division_chief_id) {
-            $d = User::find($officeDivision->division_chief_id);
-            if ($d) {
-                $supervisor = ['name' => $d->name, 'position' => $d->position ?? 'OIC - Campus Director'];
-            }
-        }
-
         return Inertia::render('HR/DTR/PrintBatch', [
             'employees'  => $employees,
             'date_from'  => $dateFrom,
             'date_to'    => $dateTo,
-            'supervisor' => $supervisor,
             'holidays'   => $holidays->map(fn ($h) => ['name' => $h->name, 'type' => $h->type]),
         ]);
+    }
+
+    /**
+     * Resolve the DTR "Verified" signatory for a user: their division chief,
+     * falling back to the Office of the Campus Director head if the user has
+     * no division or no chief assigned.
+     */
+    private function resolveSupervisor(User $user): ?array
+    {
+        if ($user->division_id) {
+            $division = DB::table('divisions')->where('id', $user->division_id)->first();
+            if ($division?->division_chief_id) {
+                $chief = User::find($division->division_chief_id);
+                if ($chief) {
+                    return ['name' => $chief->name, 'position' => $chief->position ?? 'Division Chief'];
+                }
+            }
+        }
+
+        $ocdDiv = DB::table('divisions')->where('division_name', 'Office of the Campus Director')->first();
+        if ($ocdDiv?->division_chief_id) {
+            $d = User::find($ocdDiv->division_chief_id);
+            if ($d) {
+                return ['name' => $d->name, 'position' => $d->position ?? 'OIC - Campus Director'];
+            }
+        }
+
+        return null;
     }
 
     public function printCsc(Request $request, User $user)
@@ -544,21 +560,7 @@ class DtrRecordController extends Controller
         }
 
         // Supervisor: division chief, fallback to OCD head
-        $supervisor = null;
-        if ($user->division_id) {
-            $division = \Illuminate\Support\Facades\DB::table('divisions')->where('id', $user->division_id)->first();
-            if ($division?->division_chief_id) {
-                $chief = User::find($division->division_chief_id);
-                if ($chief) $supervisor = ['name' => $chief->name, 'position' => $chief->position ?? 'Division Chief'];
-            }
-        }
-        if (!$supervisor) {
-            $ocdDiv = \Illuminate\Support\Facades\DB::table('divisions')->where('division_name', 'Office of the Campus Director')->first();
-            if ($ocdDiv?->division_chief_id) {
-                $d = User::find($ocdDiv->division_chief_id);
-                if ($d) $supervisor = ['name' => $d->name, 'position' => $d->position ?? 'OIC - Campus Director'];
-            }
-        }
+        $supervisor = $this->resolveSupervisor($user);
 
         $totalLate  = $records->sum('late_minutes');
         $totalUt    = $records->sum('undertime_minutes');

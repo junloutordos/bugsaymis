@@ -18,7 +18,7 @@ class ApplicationRequirementsSeeder extends Seeder
             ],
             [
                 'name'             => 'Personal Data Sheet (PDS)',
-                'description'      => 'CSC Form 212 (Revised 2017 or latest edition), duly accomplished and signed',
+                'description'      => 'CSC Form 212 (Revised 2025 or latest edition), duly accomplished and signed',
                 'accepted_formats' => 'PDF, DOC, DOCX',
                 'sort_order'       => 2,
             ],
