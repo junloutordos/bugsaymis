@@ -227,7 +227,11 @@ class GatePassController extends Controller
             : null;
         $isOCDDivision = $submitterDivision &&
             strtolower(trim($submitterDivision->division_name)) === strtolower('Office of the Campus Director');
-        $bypassDivisionChief = $submitter && ($submitter->hasRole('DivisionChief') || $isOCDDivision);
+        $bypassDivisionChief = $submitter && (
+            $submitter->hasRole('DivisionChief')
+            || $isOCDDivision
+            || \App\Models\Division::where('division_chief_id', $submitter->id)->exists()
+        );
 
         // Status is always computed server-side — never trust client-supplied status.
         $insert['status'] = $bypassDivisionChief ? 'Division Approved' : 'Pending';
