@@ -519,8 +519,7 @@ const menuItems = [
   {
     label: "Administration",
     icon: DocumentTextIcon,
-    roles: ["Administrator", "OCD"],
-    permissions: ["issuances.manage"],
+    permissions: ["issuances.manage", "km.view"],
     children: [
       {
         label: "Issuances",
@@ -528,6 +527,13 @@ const menuItems = [
         href: route("issuances.index"),
         icon: DocumentTextIcon,
         permissions: ["issuances.manage"],
+      },
+      {
+        label: "OED Issuances",
+        routeName: "km.index",
+        href: route("km.index"),
+        icon: BookOpenIcon,
+        permissions: ["km.view"],
       },
     ],
   },

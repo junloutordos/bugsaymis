@@ -427,6 +427,22 @@ class RolePermissionSeeder extends Seeder
             $assign($roleName, ['issuances.view']);
         }
 
+        // ── Knowledge Management (OED Issuances) ──────────────────────────────
+        // OCD + Records can upload/manage; Administrator bypasses via isSuperAdmin()
+        $assign('OCD',     ['km.view', 'km.manage']);
+        $assign('Records', ['km.view', 'km.manage']);
+
+        // Campus-wide view access for all other employee roles
+        $kmViewRoles = [
+            'DivisionChief', 'Faculty', 'Staff', 'CID Chief', 'FAD Chief',
+            'GSU Head', 'HR', 'HRMPSB', 'MIS', 'Registrar', 'Librarian', 'Nurse',
+            'Guidance', 'InformationOfficer', 'Recruitment Officer', 'Payroll Officer',
+            'Cashier', 'PMT', 'Dorm Manager',
+        ];
+        foreach ($kmViewRoles as $roleName) {
+            $assign($roleName, ['km.view']);
+        }
+
         // ── Purchase Requests (PR) ────────────────────────────────────────────
         $prBasic = ['procurement.view', 'procurement.create', 'procurement.pr.view', 'procurement.pr.create'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD', 'HR', 'MIS',
