@@ -49,17 +49,15 @@ const personalForm = ref({
   year_graduated: '', is_internal: false, remarks: '',
 })
 
-// Document files (keyed by document type)
-const docFiles = ref({
-  application_letter: null,
-  pds:                null,
-  work_experience:    null,
-  transcript:         null,
-  eligibility:        null,
-  ipcr:               null,
-})
+// Single consolidated application documents file
+const consolidatedFile = ref(null)
 
-const docRequired = { application_letter: true, pds: true, work_experience: true, transcript: true, eligibility: true, ipcr: false }
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload  = () => resolve(reader.result)
+  reader.onerror = reject
+  reader.readAsDataURL(file)
+})
 
 const openApply = (vacancy) => {
   selected.value = vacancy
@@ -69,7 +67,7 @@ const openApply = (vacancy) => {
     personalForm.value[k] = typeof personalForm.value[k] === 'boolean' ? false : ''
   })
   personalForm.value.civil_status = 'single'
-  Object.keys(docFiles.value).forEach(k => docFiles.value[k] = null)
+  consolidatedFile.value = null
   showApply.value = true
 }
 
@@ -77,26 +75,25 @@ const submitApply = async () => {
   submitting.value = true
   submitErrors.value = {}
 
-  const data = new FormData()
-  Object.entries(personalForm.value).forEach(([k, v]) => data.append(k, v ?? ''))
-  Object.entries(docFiles.value).forEach(([type, file]) => {
-    if (file) data.append(`doc_${type}`, file)
-  })
-  data.append('_method', 'POST')
-
   try {
-    await axios.post(route('recruitment.public.vacancies.apply', selected.value.id), data, {
-      headers: { 'Content-Type': 'multipart/form-data', 'X-Inertia': 'false' },
+    const payload = { ...personalForm.value }
+
+    payload.documents_base64   = await fileToBase64(consolidatedFile.value)
+    payload.documents_filename = consolidatedFile.value.name
+    payload.documents_mime     = consolidatedFile.value.type
+
+    await axios.post(route('recruitment.public.vacancies.apply', selected.value.id), payload, {
+      headers: { 'X-Inertia': 'false' },
     })
     submitSuccess.value = true
-    submitting.value = false
   } catch (err) {
-    submitting.value = false
     if (err.response?.status === 422) {
       submitErrors.value = err.response.data.errors ?? {}
     } else {
       submitErrors.value = { _general: ['An unexpected error occurred. Please try again.'] }
     }
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -386,33 +383,38 @@ const fileLabel = (file) => file ? file.name : 'Choose file…'
           <!-- Required documents -->
           <fieldset class="border border-blue-200 rounded-xl p-4 bg-blue-50">
             <legend class="text-xs font-semibold text-blue-700 uppercase tracking-wide px-1">
-              📎 Required Documents <span class="text-blue-500 font-normal normal-case">(PDF/DOC, max 10MB each)</span>
+              📎 Required Documents
+              <span class="text-blue-400 font-normal normal-case">(PDF/DOC/DOCX, max 10MB)</span>
             </legend>
-            <p class="text-xs text-blue-600 mt-2 mb-3">Files will be securely uploaded to Google Drive. Consolidate all files in a single PDF per document type as much as possible.</p>
-            <div class="space-y-3">
-              <div v-for="(label, key) in required_documents" :key="key">
-                <label class="block text-xs font-medium text-gray-700 mb-1">
-                  {{ label }}
-                  <span v-if="docRequired[key]" class="text-red-500">*</span>
-                  <span v-else class="text-gray-400">(optional)</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="file"
-                         :required="docRequired[key]"
-                         :accept="key === 'eligibility' ? '.pdf,.doc,.docx,.jpg,.jpeg,.png' : '.pdf,.doc,.docx'"
-                         class="hidden"
-                         @change="(e) => docFiles[key] = e.target.files[0]" />
-                  <span class="flex-1 px-3 py-1.5 rounded-lg border text-sm truncate"
-                        :class="docFiles[key] ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-white text-gray-400'">
-                    {{ docFiles[key] ? docFiles[key].name : 'Choose file…' }}
-                  </span>
-                  <span class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
-                    Browse
-                  </span>
-                </label>
-                <p v-if="submitErrors[`doc_${key}`]" class="text-red-500 text-xs mt-1">{{ submitErrors[`doc_${key}`][0] }}</p>
-              </div>
-            </div>
+            <p class="text-xs text-blue-600 mt-2 mb-3">Combine the documents below into ONE single file, in this order, then upload it. The file will be securely uploaded to Google Drive.</p>
+            <ul class="space-y-1 mb-3">
+              <li v-for="(label, key) in required_documents" :key="key"
+                  class="flex items-start gap-2 text-xs text-gray-700">
+                <span class="mt-0.5 flex-shrink-0"
+                      :class="key !== 'ipcr' ? 'text-red-500' : 'text-gray-400'">
+                  {{ key !== 'ipcr' ? '●' : '○' }}
+                </span>
+                <span>{{ label }}</span>
+              </li>
+            </ul>
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Consolidated Application Documents <span class="text-red-500">*</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="file"
+                     required
+                     accept=".pdf,.doc,.docx"
+                     class="hidden"
+                     @change="(e) => consolidatedFile = e.target.files[0]" />
+              <span class="flex-1 px-3 py-1.5 rounded-lg border text-sm truncate"
+                    :class="consolidatedFile ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-white text-gray-400'">
+                {{ consolidatedFile ? consolidatedFile.name : 'Choose file…' }}
+              </span>
+              <span class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                Browse
+              </span>
+            </label>
+            <p v-if="submitErrors['documents_base64']" class="text-red-500 text-xs mt-1">{{ submitErrors['documents_base64'][0] }}</p>
           </fieldset>
 
           <div class="flex justify-end gap-3 pt-2">
