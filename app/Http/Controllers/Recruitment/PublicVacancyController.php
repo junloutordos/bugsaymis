@@ -102,31 +102,12 @@ class PublicVacancyController extends Controller
             'year_graduated'      => 'nullable|integer|min:1950|max:' . now()->year,
             'is_internal'         => 'boolean',
             'remarks'             => 'nullable|string|max:1000',
-            // Required documents — sent as base64 data URIs (Cloudflare blocks multipart uploads)
-            'doc_application_letter_base64'   => 'required|string',
-            'doc_application_letter_filename' => 'required|string|max:255',
-            'doc_application_letter_mime'     => 'nullable|string|max:100',
-            'doc_pds_base64'                  => 'required|string',
-            'doc_pds_filename'                => 'required|string|max:255',
-            'doc_pds_mime'                     => 'nullable|string|max:100',
-            'doc_work_experience_base64'      => 'required|string',
-            'doc_work_experience_filename'    => 'required|string|max:255',
-            'doc_work_experience_mime'         => 'nullable|string|max:100',
-            'doc_transcript_base64'           => 'required|string',
-            'doc_transcript_filename'         => 'required|string|max:255',
-            'doc_transcript_mime'              => 'nullable|string|max:100',
-            'doc_eligibility_base64'          => 'required|string',
-            'doc_eligibility_filename'        => 'required|string|max:255',
-            'doc_eligibility_mime'             => 'nullable|string|max:100',
-            'doc_ipcr_base64'                  => 'nullable|string',
-            'doc_ipcr_filename'                => 'nullable|string|max:255',
-            'doc_ipcr_mime'                     => 'nullable|string|max:100',
+            // Consolidated application documents — sent as a base64 data URI (Cloudflare blocks multipart uploads)
+            'documents_base64'    => 'required|string',
+            'documents_filename'  => 'required|string|max:255',
+            'documents_mime'      => 'nullable|string|max:100',
         ], [
-            'doc_application_letter_base64.required' => 'Application Letter is required.',
-            'doc_pds_base64.required'                 => 'Personal Data Sheet is required.',
-            'doc_work_experience_base64.required'     => 'Work Experience Sheet is required.',
-            'doc_transcript_base64.required'          => 'Transcript of Records is required.',
-            'doc_eligibility_base64.required'         => 'Copy of Eligibility is required.',
+            'documents_base64.required' => 'Please attach your consolidated application documents.',
         ]);
 
         $position = $vacancy->jobItem->position_title ?? 'Position';
@@ -136,56 +117,40 @@ class PublicVacancyController extends Controller
         // Upload files to Google Drive in a subfolder named: "LASTNAME, FIRSTNAME - Position"
         $driveFolder = "{$lastName}, {$firstName} - {$position}";
 
-        $uploadedDocs = [];
-        $docKeys = [
-            'application_letter' => ['field' => 'doc_application_letter', 'exts' => ['pdf', 'doc', 'docx']],
-            'pds'                => ['field' => 'doc_pds', 'exts' => ['pdf', 'doc', 'docx']],
-            'work_experience'    => ['field' => 'doc_work_experience', 'exts' => ['pdf', 'doc', 'docx']],
-            'transcript'         => ['field' => 'doc_transcript', 'exts' => ['pdf', 'doc', 'docx']],
-            'eligibility'        => ['field' => 'doc_eligibility', 'exts' => ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']],
-            'ipcr'               => ['field' => 'doc_ipcr', 'exts' => ['pdf', 'doc', 'docx']],
-        ];
+        // Validate, decode, and upload the consolidated documents file
+        $allowedExts = ['pdf', 'doc', 'docx'];
+        $filename    = $validated['documents_filename'];
+        $mime        = $validated['documents_mime'] ?? 'application/octet-stream';
+        $ext         = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
-        foreach ($docKeys as $docType => $config) {
-            $base64 = $validated["{$config['field']}_base64"] ?? null;
-            if (! $base64) {
-                continue;
-            }
-
-            $label    = self::REQUIRED_DOCUMENTS[$docType] ?? $docType;
-            $filename = $validated["{$config['field']}_filename"];
-            $mime     = $validated["{$config['field']}_mime"] ?? 'application/octet-stream';
-            $ext      = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-            if (! in_array($ext, $config['exts'], true)) {
-                return back()->withErrors(["{$config['field']}_base64" => "{$label} must be one of: " . implode(', ', $config['exts']) . '.']);
-            }
-
-            $raw = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $base64));
-
-            if (strlen($raw) > 10 * 1024 * 1024) {
-                return back()->withErrors(["{$config['field']}_base64" => "{$label} exceeds the 10MB limit."]);
-            }
-
-            $fileName = "[{$driveFolder}] {$label}.{$ext}";
-
-            try {
-                $result = $this->drive->uploadRaw($raw, $fileName, $mime);
-                $uploadedDocs[$docType] = [
-                    'drive_file_id' => $result['file_id'],
-                    'drive_url'     => $result['link'],
-                    'original_name' => $filename,
-                    'file_size'     => strlen($raw),
-                    'mime_type'     => $mime,
-                ];
-            } catch (\Throwable $e) {
-                Log::error("Drive upload failed for {$docType}: " . $e->getMessage());
-                return back()->withErrors(["doc_{$docType}" => "Failed to upload {$label}. Please try again."]);
-            }
+        if (! in_array($ext, $allowedExts, true)) {
+            return back()->withErrors(['documents_base64' => 'File must be one of: ' . implode(', ', $allowedExts) . '.']);
         }
 
-        // Create applicant + application + document records in one transaction
-        $application = DB::transaction(function () use ($validated, $vacancy, $uploadedDocs) {
+        $raw = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $validated['documents_base64']));
+
+        if (strlen($raw) > 10 * 1024 * 1024) {
+            return back()->withErrors(['documents_base64' => 'File exceeds the 10MB limit.']);
+        }
+
+        $fileName = "[{$driveFolder}] Application Documents.{$ext}";
+
+        try {
+            $result = $this->drive->uploadRaw($raw, $fileName, $mime);
+            $uploadedDoc = [
+                'drive_file_id' => $result['file_id'],
+                'drive_url'     => $result['link'],
+                'original_name' => $filename,
+                'file_size'     => strlen($raw),
+                'mime_type'     => $mime,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Drive upload failed for application_documents: ' . $e->getMessage());
+            return back()->withErrors(['documents_base64' => 'Failed to upload your documents. Please try again.']);
+        }
+
+        // Create applicant + application + document record in one transaction
+        $application = DB::transaction(function () use ($validated, $vacancy, $uploadedDoc) {
             $applicant = Applicant::updateOrCreate(
                 ['email' => $validated['email']],
                 array_merge(
@@ -199,13 +164,11 @@ class PublicVacancyController extends Controller
                 )
             );
 
-            // Store Drive doc records
-            foreach ($uploadedDocs as $docType => $meta) {
-                ApplicantDocument::updateOrCreate(
-                    ['applicant_id' => $applicant->id, 'document_type' => $docType],
-                    array_merge($meta, ['file_path' => $meta['drive_url'], 'status' => 'pending'])
-                );
-            }
+            // Store the consolidated documents record
+            ApplicantDocument::updateOrCreate(
+                ['applicant_id' => $applicant->id, 'document_type' => 'application_documents'],
+                array_merge($uploadedDoc, ['file_path' => $uploadedDoc['drive_url'], 'status' => 'pending'])
+            );
 
             return $this->workflow->apply($applicant, $vacancy, [
                 'is_internal' => $validated['is_internal'] ?? false,

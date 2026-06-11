@@ -50,9 +50,7 @@ const personalForm = ref({
   year_graduated: '', is_internal: false, remarks: '',
 })
 
-const docFiles = ref({})
-
-const docRequired = { application_letter: true, pds: true, work_experience: true, transcript: true, eligibility: true, ipcr: false }
+const consolidatedFile = ref(null)
 
 const openApply = () => {
   submitSuccess.value = false
@@ -62,8 +60,8 @@ const openApply = () => {
     personalForm.value[k] = typeof personalForm.value[k] === 'boolean' ? false : ''
   })
   personalForm.value.civil_status = 'single'
-  // Reset doc files
-  docFiles.value = {}
+  // Reset document file
+  consolidatedFile.value = null
   showModal.value = true
 }
 
@@ -82,12 +80,9 @@ const submitApply = async () => {
   try {
     const payload = { ...personalForm.value }
 
-    for (const [type, file] of Object.entries(docFiles.value)) {
-      if (!file) continue
-      payload[`doc_${type}_base64`]   = await fileToBase64(file)
-      payload[`doc_${type}_filename`] = file.name
-      payload[`doc_${type}_mime`]     = file.type
-    }
+    payload.documents_base64   = await fileToBase64(consolidatedFile.value)
+    payload.documents_filename = consolidatedFile.value.name
+    payload.documents_mime     = consolidatedFile.value.type
 
     await axios.post(route('recruitment.public.vacancies.apply', props.vacancy.id), payload, {
       headers: { 'X-Inertia': 'false' },
@@ -235,7 +230,7 @@ const submitApply = async () => {
             </span>
           </li>
         </ul>
-        <p class="mt-3 text-xs text-gray-400 italic">Consolidate all requirements in a single PDF per document type. Maximum 10MB per file.</p>
+        <p class="mt-3 text-xs text-gray-400 italic">Consolidate all of the above into ONE single PDF/DOC/DOCX file, in the order listed, and upload it during application. Maximum 10MB.</p>
       </div>
 
       <!-- ── Selection Criteria ─────────────────────────────────────────── -->
@@ -410,33 +405,40 @@ const submitApply = async () => {
           <fieldset class="border border-blue-200 rounded-xl p-4 bg-blue-50">
             <legend class="text-xs font-semibold text-blue-700 uppercase tracking-wide px-1">
               📎 Required Documents
-              <span class="text-blue-400 font-normal normal-case">(PDF/DOC, max 10MB each)</span>
+              <span class="text-blue-400 font-normal normal-case">(PDF/DOC/DOCX, max 10MB)</span>
             </legend>
-            <p class="text-xs text-blue-600 mt-2 mb-3">Files will be securely uploaded to Google Drive. Consolidate all files in a single PDF per document type.</p>
-            <div class="space-y-3">
-              <div v-for="(label, key) in required_documents" :key="key">
-                <label class="block text-xs font-medium text-gray-700 mb-1">
-                  {{ label }}
-                  <span v-if="docRequired[key]" class="text-red-500">*</span>
-                  <span v-else class="text-gray-400">(optional)</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="file"
-                         :required="docRequired[key]"
-                         :accept="key === 'eligibility' ? '.pdf,.doc,.docx,.jpg,.jpeg,.png' : '.pdf,.doc,.docx'"
-                         class="hidden"
-                         @change="(e) => docFiles[key] = e.target.files[0]" />
-                  <span class="flex-1 px-3 py-1.5 rounded-lg border text-sm truncate"
-                        :class="docFiles[key] ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-white text-gray-400'">
-                    {{ docFiles[key] ? docFiles[key].name : 'Choose file…' }}
-                  </span>
-                  <span class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
-                    Browse
-                  </span>
-                </label>
-                <p v-if="submitErrors[`doc_${key}`]" class="text-red-500 text-xs mt-1">{{ submitErrors[`doc_${key}`][0] }}</p>
-              </div>
-            </div>
+            <p class="text-xs text-blue-600 mt-2 mb-3">Combine the documents below into ONE single file, in this order, then upload it. The file will be securely uploaded to Google Drive.</p>
+            <ul class="space-y-1 mb-3">
+              <li v-for="req in docList" :key="req.id"
+                  class="flex items-start gap-2 text-xs text-gray-700">
+                <span class="mt-0.5 flex-shrink-0"
+                      :class="req.pivot?.is_mandatory ? 'text-red-500' : 'text-gray-400'">
+                  {{ req.pivot?.is_mandatory ? '●' : '○' }}
+                </span>
+                <span>
+                  {{ req.name }}
+                  <span v-if="!req.pivot?.is_mandatory" class="text-gray-400 ml-1">(optional)</span>
+                </span>
+              </li>
+            </ul>
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Consolidated Application Documents <span class="text-red-500">*</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="file"
+                     required
+                     accept=".pdf,.doc,.docx"
+                     class="hidden"
+                     @change="(e) => consolidatedFile = e.target.files[0]" />
+              <span class="flex-1 px-3 py-1.5 rounded-lg border text-sm truncate"
+                    :class="consolidatedFile ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 bg-white text-gray-400'">
+                {{ consolidatedFile ? consolidatedFile.name : 'Choose file…' }}
+              </span>
+              <span class="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                Browse
+              </span>
+            </label>
+            <p v-if="submitErrors['documents_base64']" class="text-red-500 text-xs mt-1">{{ submitErrors['documents_base64'][0] }}</p>
           </fieldset>
 
           <div class="flex justify-end gap-3 pt-1">
