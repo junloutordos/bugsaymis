@@ -5,6 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import axios from 'axios'
+import { ArrowTopRightOnSquareIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   applicant: { type: Object, required: true },
@@ -203,6 +204,10 @@ const docTypes = [
               <div v-if="doc.remarks" class="text-xs text-slate-500 mt-0.5">{{ doc.remarks }}</div>
             </div>
             <div class="flex items-center gap-2">
+              <a v-if="doc.drive_url" :href="doc.drive_url" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                View <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" />
+              </a>
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium" :class="docStatusColors[doc.status]">
                 {{ doc.status }}
               </span>
