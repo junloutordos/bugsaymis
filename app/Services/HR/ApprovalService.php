@@ -52,12 +52,22 @@ class ApprovalService
 
                 case 'hr_officer':
                     abort_unless(in_array($action, ['certified', 'rejected']), 422);
+
+                    $newStatus = 'rejected';
+                    if ($action === 'certified') {
+                        // Division Chiefs have no DC above them — skip straight to
+                        // the Campus Director / OCD stage.
+                        $newStatus = $application->user?->hasRole('DivisionChief')
+                            ? 'forwarded'
+                            : 'hr_verified';
+                    }
+
                     $application->update([
                         'hr_officer_id'      => $approver->id,
                         'hr_officer_action'  => $action,
                         'hr_officer_at'      => now(),
                         'hr_officer_remarks' => $remarks,
-                        'status'             => $action === 'certified' ? 'hr_verified' : 'rejected',
+                        'status'             => $newStatus,
                     ]);
                     $this->snapshots->recordApproval(
                         approvable: $application,

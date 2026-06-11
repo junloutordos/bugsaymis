@@ -412,9 +412,13 @@ class LeaveApplicationController extends Controller
         $liveCertifying = $application->hr_officer_id ? $application->hrOfficer : null;
 
         // Fallback: live authorized officer (Division Chief of the applicant's division)
-        $liveAuthorized = $application->user?->division?->divisionchief;
-        if (! $liveAuthorized && $application->division_chief_id) {
-            $liveAuthorized = $application->divisionChief;
+        // Division Chiefs have no DC above them — leave this signatory blank.
+        $liveAuthorized = null;
+        if (! $application->user?->hasRole('DivisionChief')) {
+            $liveAuthorized = $application->user?->division?->divisionchief;
+            if (! $liveAuthorized && $application->division_chief_id) {
+                $liveAuthorized = $application->divisionChief;
+            }
         }
 
         // Fallback: live authorized official (OCD / Campus Director)

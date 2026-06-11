@@ -165,7 +165,7 @@ class ApprovalInboxService
             $laQuery = LeaveApplication::with(['user:id,name', 'leaveType:id,name,code', 'hrOfficer:id,name'])
                 ->where('status', 'hr_verified');
             if (! $isAdmin) {
-                $laQuery->where('division_chief_id', $user->id);
+                $laQuery->whereHas('user', fn($q) => $q->whereIn('division_id', $divisionIds));
             }
             $laItems = $laQuery->latest()->get()
                 ->map(fn($r) => $this->normaliseLeaveApplication($r))
