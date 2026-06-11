@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
+import { ArrowTopRightOnSquareIcon } from '@heroicons/vue/24/outline'
 import PlacementApprovalForm from './PlacementApprovalForm.vue'
 
 const props = defineProps({
@@ -329,14 +330,20 @@ const type = computed(() => props.application.recruitment_type ?? {})
             <div v-for="doc in application.applicant.documents" :key="doc.id"
                  class="flex items-center justify-between text-sm py-1.5 border-b border-slate-100">
               <span class="text-slate-700">{{ doc.document_type }}</span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    :class="{
-                      'bg-emerald-50 text-emerald-700': doc.status === 'verified',
-                      'bg-amber-50 text-amber-700':    doc.status === 'pending',
-                      'bg-red-50 text-red-600':        doc.status === 'rejected',
-                    }">
-                {{ doc.status }}
-              </span>
+              <div class="flex items-center gap-2">
+                <a v-if="doc.drive_url" :href="doc.drive_url" target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium">
+                  View <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" />
+                </a>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                      :class="{
+                        'bg-emerald-50 text-emerald-700': doc.status === 'verified',
+                        'bg-amber-50 text-amber-700':    doc.status === 'pending',
+                        'bg-red-50 text-red-600':        doc.status === 'rejected',
+                      }">
+                  {{ doc.status }}
+                </span>
+              </div>
             </div>
           </div>
           <div v-else class="text-slate-400 text-sm">No documents on file.</div>
