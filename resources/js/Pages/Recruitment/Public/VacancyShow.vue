@@ -67,19 +67,30 @@ const openApply = () => {
   showModal.value = true
 }
 
+// Files are sent as base64 data URIs in JSON — Cloudflare WAF blocks multipart/form-data
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload  = () => resolve(reader.result)
+  reader.onerror = reject
+  reader.readAsDataURL(file)
+})
+
 const submitApply = async () => {
   submitting.value = true
   submitErrors.value = {}
 
-  const data = new FormData()
-  Object.entries(personalForm.value).forEach(([k, v]) => data.append(k, v ?? ''))
-  Object.entries(docFiles.value).forEach(([type, file]) => {
-    if (file) data.append(`doc_${type}`, file)
-  })
-
   try {
-    await axios.post(route('recruitment.public.vacancies.apply', props.vacancy.id), data, {
-      headers: { 'Content-Type': 'multipart/form-data', 'X-Inertia': 'false' },
+    const payload = { ...personalForm.value }
+
+    for (const [type, file] of Object.entries(docFiles.value)) {
+      if (!file) continue
+      payload[`doc_${type}_base64`]   = await fileToBase64(file)
+      payload[`doc_${type}_filename`] = file.name
+      payload[`doc_${type}_mime`]     = file.type
+    }
+
+    await axios.post(route('recruitment.public.vacancies.apply', props.vacancy.id), payload, {
+      headers: { 'X-Inertia': 'false' },
     })
     submitSuccess.value = true
   } catch (err) {
