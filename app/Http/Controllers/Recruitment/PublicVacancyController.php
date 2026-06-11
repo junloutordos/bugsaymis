@@ -83,7 +83,11 @@ class PublicVacancyController extends Controller
 
     public function apply(Request $request, JobVacancy $vacancy)
     {
-        abort_if($vacancy->status !== 'open', 422, 'This vacancy is no longer accepting applications.');
+        if ($vacancy->status !== 'open') {
+            return response()->json([
+                'errors' => ['_general' => ['This vacancy is no longer accepting applications.']],
+            ], 422);
+        }
 
         $validated = $request->validate([
             'first_name'          => 'required|string|max:100',
@@ -110,6 +114,15 @@ class PublicVacancyController extends Controller
             'documents_base64.required' => 'Please attach your consolidated application documents.',
         ]);
 
+        // Prevent duplicate applications to the same vacancy
+        $existingApplicant = Applicant::where('email', $validated['email'])->first();
+        if ($existingApplicant && Application::where('applicant_id', $existingApplicant->id)
+                ->where('job_vacancy_id', $vacancy->id)->exists()) {
+            return response()->json([
+                'errors' => ['_general' => ['You have already applied for this position. Use the application tracker to check your status.']],
+            ], 422);
+        }
+
         $position = $vacancy->jobItem->position_title ?? 'Position';
         $lastName  = strtoupper($validated['last_name']);
         $firstName = strtoupper($validated['first_name']);
@@ -124,13 +137,17 @@ class PublicVacancyController extends Controller
         $ext         = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
         if (! in_array($ext, $allowedExts, true)) {
-            return back()->withErrors(['documents_base64' => 'File must be one of: ' . implode(', ', $allowedExts) . '.']);
+            return response()->json([
+                'errors' => ['documents_base64' => ['File must be one of: ' . implode(', ', $allowedExts) . '.']],
+            ], 422);
         }
 
         $raw = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $validated['documents_base64']));
 
         if (strlen($raw) > 10 * 1024 * 1024) {
-            return back()->withErrors(['documents_base64' => 'File exceeds the 10MB limit.']);
+            return response()->json([
+                'errors' => ['documents_base64' => ['File exceeds the 10MB limit.']],
+            ], 422);
         }
 
         $fileName = "[{$driveFolder}] Application Documents.{$ext}";
@@ -146,35 +163,41 @@ class PublicVacancyController extends Controller
             ];
         } catch (\Throwable $e) {
             Log::error('Drive upload failed for application_documents: ' . $e->getMessage());
-            return back()->withErrors(['documents_base64' => 'Failed to upload your documents. Please try again.']);
+            return response()->json([
+                'errors' => ['documents_base64' => ['Failed to upload your documents. Please try again.']],
+            ], 422);
         }
 
         // Create applicant + application + document record in one transaction
-        $application = DB::transaction(function () use ($validated, $vacancy, $uploadedDoc) {
-            $applicant = Applicant::updateOrCreate(
-                ['email' => $validated['email']],
-                array_merge(
-                    array_intersect_key($validated, array_flip([
-                        'first_name','middle_name','last_name','suffix',
-                        'birthdate','email','contact_number','address',
-                        'civil_status','eligibility','prc_license_no',
-                        'school','course','year_graduated',
-                    ])),
-                    ['status' => 'active', 'source' => 'online']
-                )
-            );
+        try {
+            $application = DB::transaction(function () use ($validated, $vacancy, $uploadedDoc) {
+                $applicant = Applicant::updateOrCreate(
+                    ['email' => $validated['email']],
+                    array_merge(
+                        array_intersect_key($validated, array_flip([
+                            'first_name','middle_name','last_name','suffix',
+                            'birthdate','email','contact_number','address',
+                            'civil_status','eligibility','prc_license_no',
+                            'school','course','year_graduated',
+                        ])),
+                        ['status' => 'active', 'source' => 'online']
+                    )
+                );
 
-            // Store the consolidated documents record
-            ApplicantDocument::updateOrCreate(
-                ['applicant_id' => $applicant->id, 'document_type' => 'application_documents'],
-                array_merge($uploadedDoc, ['file_path' => $uploadedDoc['drive_url'], 'status' => 'pending'])
-            );
+                // Store the consolidated documents record
+                ApplicantDocument::updateOrCreate(
+                    ['applicant_id' => $applicant->id, 'document_type' => 'application_documents'],
+                    array_merge($uploadedDoc, ['file_path' => $uploadedDoc['drive_url'], 'status' => 'pending'])
+                );
 
-            return $this->workflow->apply($applicant, $vacancy, [
-                'is_internal' => $validated['is_internal'] ?? false,
-                'remarks'     => $validated['remarks'] ?? null,
-            ]);
-        });
+                return $this->workflow->apply($applicant, $vacancy, [
+                    'is_internal' => $validated['is_internal'] ?? false,
+                    'remarks'     => $validated['remarks'] ?? null,
+                ]);
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['errors' => ['_general' => [$e->getMessage()]]], 422);
+        }
 
         return back()->with('success',
             "Application submitted successfully! Your reference number is #{$application->id}. " .
