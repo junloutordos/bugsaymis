@@ -267,6 +267,10 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Issuances', 'name' => 'issuances.view',   'description' => 'View issuances addressed to the user or their office'],
             ['module' => 'Issuances', 'name' => 'issuances.manage', 'description' => 'Create, sign, release, and manage official issuances (OCD)'],
 
+            // ── Knowledge Management (OED Issuances) ─────────────────────────
+            ['module' => 'Knowledge Management', 'name' => 'km.view',   'description' => 'View and download OED issuances knowledge base'],
+            ['module' => 'Knowledge Management', 'name' => 'km.manage', 'description' => 'Upload, edit, and manage OED issuances in the knowledge base'],
+
             // ── PPMP ──────────────────────────────────────────────────────────
             ['module' => 'PPMP', 'name' => 'ppmp.create',      'description' => 'Create and edit own unit PPMP'],
             ['module' => 'PPMP', 'name' => 'ppmp.submit',      'description' => 'Submit PPMP for review'],

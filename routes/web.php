@@ -326,6 +326,24 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/{issuance}/scan',        [\App\Http\Controllers\IssuanceController::class, 'viewScan'])->name('scan');
     });
 
+    // ── Knowledge Management — OED Issuances ─────────────────────────────────
+    Route::prefix('knowledge-management')->name('km.')->middleware('permission:km.view')->group(function () {
+        Route::get('/', [\App\Http\Controllers\KnowledgeManagementController::class, 'index'])->name('index');
+
+        Route::middleware('permission:km.manage')->group(function () {
+            Route::get('/create',             [\App\Http\Controllers\KnowledgeManagementController::class, 'create'])->name('create');
+            Route::post('/',                  [\App\Http\Controllers\KnowledgeManagementController::class, 'store'])->name('store');
+            Route::get('/{oedIssuance}/edit', [\App\Http\Controllers\KnowledgeManagementController::class, 'edit'])->name('edit');
+            Route::put('/{oedIssuance}',      [\App\Http\Controllers\KnowledgeManagementController::class, 'update'])->name('update');
+            Route::delete('/{oedIssuance}',   [\App\Http\Controllers\KnowledgeManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::get('/{oedIssuance}',              [\App\Http\Controllers\KnowledgeManagementController::class, 'show'])->name('show');
+        Route::post('/{oedIssuance}/acknowledge', [\App\Http\Controllers\KnowledgeManagementController::class, 'acknowledge'])->name('acknowledge');
+        Route::get('/{oedIssuance}/file',         [\App\Http\Controllers\KnowledgeManagementController::class, 'viewFile'])->name('file');
+        Route::get('/{oedIssuance}/download',     [\App\Http\Controllers\KnowledgeManagementController::class, 'download'])->name('download');
+    });
+
 
     // ── Data Privacy Policy ───────────────────────────────────────────────────
     Route::get('/privacy', fn () => inertia('Privacy/Index'))->name('privacy.index');
