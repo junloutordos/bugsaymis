@@ -102,19 +102,31 @@ class PublicVacancyController extends Controller
             'year_graduated'      => 'nullable|integer|min:1950|max:' . now()->year,
             'is_internal'         => 'boolean',
             'remarks'             => 'nullable|string|max:1000',
-            // Required documents (IPCR is optional)
-            'doc_application_letter' => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'doc_pds'                => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'doc_work_experience'    => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'doc_transcript'         => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'doc_eligibility'        => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'doc_ipcr'               => 'nullable|file|mimes:pdf,doc,docx|max:10240',
+            // Required documents — sent as base64 data URIs (Cloudflare blocks multipart uploads)
+            'doc_application_letter_base64'   => 'required|string',
+            'doc_application_letter_filename' => 'required|string|max:255',
+            'doc_application_letter_mime'     => 'nullable|string|max:100',
+            'doc_pds_base64'                  => 'required|string',
+            'doc_pds_filename'                => 'required|string|max:255',
+            'doc_pds_mime'                     => 'nullable|string|max:100',
+            'doc_work_experience_base64'      => 'required|string',
+            'doc_work_experience_filename'    => 'required|string|max:255',
+            'doc_work_experience_mime'         => 'nullable|string|max:100',
+            'doc_transcript_base64'           => 'required|string',
+            'doc_transcript_filename'         => 'required|string|max:255',
+            'doc_transcript_mime'              => 'nullable|string|max:100',
+            'doc_eligibility_base64'          => 'required|string',
+            'doc_eligibility_filename'        => 'required|string|max:255',
+            'doc_eligibility_mime'             => 'nullable|string|max:100',
+            'doc_ipcr_base64'                  => 'nullable|string',
+            'doc_ipcr_filename'                => 'nullable|string|max:255',
+            'doc_ipcr_mime'                     => 'nullable|string|max:100',
         ], [
-            'doc_application_letter.required' => 'Application Letter is required.',
-            'doc_pds.required'                => 'Personal Data Sheet is required.',
-            'doc_work_experience.required'    => 'Work Experience Sheet is required.',
-            'doc_transcript.required'         => 'Transcript of Records is required.',
-            'doc_eligibility.required'        => 'Copy of Eligibility is required.',
+            'doc_application_letter_base64.required' => 'Application Letter is required.',
+            'doc_pds_base64.required'                 => 'Personal Data Sheet is required.',
+            'doc_work_experience_base64.required'     => 'Work Experience Sheet is required.',
+            'doc_transcript_base64.required'          => 'Transcript of Records is required.',
+            'doc_eligibility_base64.required'         => 'Copy of Eligibility is required.',
         ]);
 
         $position = $vacancy->jobItem->position_title ?? 'Position';
@@ -126,31 +138,45 @@ class PublicVacancyController extends Controller
 
         $uploadedDocs = [];
         $docKeys = [
-            'application_letter' => 'doc_application_letter',
-            'pds'                => 'doc_pds',
-            'work_experience'    => 'doc_work_experience',
-            'transcript'         => 'doc_transcript',
-            'eligibility'        => 'doc_eligibility',
-            'ipcr'               => 'doc_ipcr',
+            'application_letter' => ['field' => 'doc_application_letter', 'exts' => ['pdf', 'doc', 'docx']],
+            'pds'                => ['field' => 'doc_pds', 'exts' => ['pdf', 'doc', 'docx']],
+            'work_experience'    => ['field' => 'doc_work_experience', 'exts' => ['pdf', 'doc', 'docx']],
+            'transcript'         => ['field' => 'doc_transcript', 'exts' => ['pdf', 'doc', 'docx']],
+            'eligibility'        => ['field' => 'doc_eligibility', 'exts' => ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png']],
+            'ipcr'               => ['field' => 'doc_ipcr', 'exts' => ['pdf', 'doc', 'docx']],
         ];
 
-        foreach ($docKeys as $docType => $fieldKey) {
-            if (! $request->hasFile($fieldKey)) {
+        foreach ($docKeys as $docType => $config) {
+            $base64 = $validated["{$config['field']}_base64"] ?? null;
+            if (! $base64) {
                 continue;
             }
 
-            $file     = $request->file($fieldKey);
             $label    = self::REQUIRED_DOCUMENTS[$docType] ?? $docType;
-            $fileName = "[{$driveFolder}] {$label}.{$file->getClientOriginalExtension()}";
+            $filename = $validated["{$config['field']}_filename"];
+            $mime     = $validated["{$config['field']}_mime"] ?? 'application/octet-stream';
+            $ext      = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+            if (! in_array($ext, $config['exts'], true)) {
+                return back()->withErrors(["{$config['field']}_base64" => "{$label} must be one of: " . implode(', ', $config['exts']) . '.']);
+            }
+
+            $raw = base64_decode(preg_replace('/^data:[^;]+;base64,/', '', $base64));
+
+            if (strlen($raw) > 10 * 1024 * 1024) {
+                return back()->withErrors(["{$config['field']}_base64" => "{$label} exceeds the 10MB limit."]);
+            }
+
+            $fileName = "[{$driveFolder}] {$label}.{$ext}";
 
             try {
-                $result = $this->drive->upload($file, $fileName);
+                $result = $this->drive->uploadRaw($raw, $fileName, $mime);
                 $uploadedDocs[$docType] = [
                     'drive_file_id' => $result['file_id'],
                     'drive_url'     => $result['link'],
-                    'original_name' => $file->getClientOriginalName(),
-                    'file_size'     => $file->getSize(),
-                    'mime_type'     => $file->getMimeType(),
+                    'original_name' => $filename,
+                    'file_size'     => strlen($raw),
+                    'mime_type'     => $mime,
                 ];
             } catch (\Throwable $e) {
                 Log::error("Drive upload failed for {$docType}: " . $e->getMessage());
