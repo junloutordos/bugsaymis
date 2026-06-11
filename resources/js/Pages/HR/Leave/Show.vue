@@ -217,6 +217,17 @@
         </div>
       </Teleport>
 
+      <!-- Digital Signature PIN -->
+      <DigitalSignaturePin
+        :show="showPinModal"
+        :hasPin="hasPin"
+        :signatureUri="signatureUri"
+        :loading="pinModalLoading"
+        confirmLabel="Sign & Submit"
+        @confirm="handlePinConfirm"
+        @cancel="handlePinCancel"
+      />
+
     </div>
   </AdminLayout>
 </template>
@@ -225,9 +236,12 @@
 import { ref, computed, watch } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
-  application: Object,
+  application:  Object,
+  hasPin:       Boolean,
+  signatureUri: String,
 })
 
 const page = usePage()
@@ -260,7 +274,14 @@ const approveForm = useForm({
   stage:   defaultStage(),
   action:  defaultAction(defaultStage()),
   remarks: '',
+  pin:     null,
 })
+
+// Digital signature PIN
+const showPinModal   = ref(false)
+const pinModalLoading = ref(false)
+
+const SIGNING_ACTIONS = ['certified', 'forwarded', 'approved']
 
 const actionOptions = computed(() => {
   if (approveForm.stage === 'hr_officer') {
@@ -286,9 +307,33 @@ watch(() => approveForm.stage, (stage) => {
 })
 
 function submitApprove() {
+  if (SIGNING_ACTIONS.includes(approveForm.action)) {
+    approveModal.value = false
+    showPinModal.value = true
+    return
+  }
+  approveForm.pin = null
+  postApprove()
+}
+
+function postApprove() {
   approveForm.post(route('hr.leave.approve', props.application.id), {
-    onSuccess: () => { approveModal.value = false },
+    onSuccess: () => {
+      approveModal.value = false
+      showPinModal.value = false
+    },
+    onFinish: () => { pinModalLoading.value = false },
   })
+}
+
+function handlePinConfirm(pin) {
+  approveForm.pin = pin
+  pinModalLoading.value = true
+  postApprove()
+}
+
+function handlePinCancel() {
+  showPinModal.value = false
 }
 
 function cancelApp() {

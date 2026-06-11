@@ -137,6 +137,8 @@ class LeaveApplicationController extends Controller
     {
         $this->authorize('hr.leave.view');
 
+        $authUser = Auth::user();
+
         return Inertia::render('HR/Leave/Show', [
             'application' => $leaveApplication->load([
                 'user', 'leaveType',
@@ -144,6 +146,8 @@ class LeaveApplicationController extends Controller
                 'divisionChief',   // Stage 2
                 'approvedBy',      // Stage 3
             ]),
+            'hasPin'       => ! empty($authUser->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($authUser),
         ]);
     }
 
