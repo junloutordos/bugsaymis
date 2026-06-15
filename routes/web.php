@@ -1972,6 +1972,10 @@ Route::get('/verify/issuance/{token}', [\App\Http\Controllers\DocumentVerificati
     ->name('issuances.verify')
     ->where('token', '[0-9a-f\-]{36}');
 
+Route::get('/verify/issuance/{token}/document', [\App\Http\Controllers\DocumentVerificationController::class, 'issuanceDocument'])
+    ->name('issuances.verify.document')
+    ->where('token', '[0-9a-f\-]{36}');
+
 // ── Student Portal ────────────────────────────────────────────────────────────
 // Public (no session required): login page + Google OAuth + logout
 Route::prefix('student-portal')->name('student-portal.')->group(function () {
