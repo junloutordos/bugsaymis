@@ -4,13 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentEnrollment;
+use App\Models\User;
+use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Picqer\Barcode\BarcodeGeneratorSVG;
 
 class StudentController extends Controller
 {
+    public function __construct(
+        private DigitalSignatureService $sigService,
+    ) {}
+
     public function index(Request $request)
     {
         $perPage = 10;
@@ -202,9 +208,17 @@ class StudentController extends Controller
         $middle   = $student->middlename ? " {$student->middlename}" : '';
         $fullName = trim("{$student->lastname}, {$student->firstname}{$middle}");
 
-        $qrSvg = $student->pisaysystemID
-            ? (string) QrCode::format('svg')->size(150)->margin(0)->generate($student->pisaysystemID)
+        $barcodeSvg = $student->pisaysystemID
+            ? (new BarcodeGeneratorSVG())->getBarcode($student->pisaysystemID, BarcodeGeneratorSVG::TYPE_CODE_128, 2, 40)
             : null;
+
+        $ocd = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
+
+        $address = implode(', ', array_filter([
+            $student->houseno,
+            $student->municipal,
+            $student->province,
+        ], fn ($v) => filled($v)));
 
         return Inertia::render('Students/IdCard', [
             'student' => [
@@ -219,7 +233,17 @@ class StudentController extends Controller
                 'section'     => $enrollment->section?->sectionname,
             ] : null,
             'school_year' => $currentSY?->name,
-            'qr_svg'      => $qrSvg,
+            'barcode_svg' => $barcodeSvg,
+            'ocd' => $ocd ? [
+                'name'          => $ocd->name,
+                'position'      => $ocd->position,
+                'signature_uri' => $this->sigService->getSignatureDataUri($ocd),
+            ] : null,
+            'emergency' => [
+                'guardian_name' => $student->contactperson ?: null,
+                'contact_no'    => $student->contactno1 ?: null,
+                'address'       => $address ?: null,
+            ],
         ]);
     }
 }
