@@ -362,6 +362,23 @@ class FacilityRequestController extends Controller
         $facilityRequest->status = 'Pending FAD Approval';
         $facilityRequest->save();
 
+        // Record digital signature for the Division Chief (email one-click approval — no auth/PIN UI)
+        $chiefUser = User::find($chief);
+        if ($chiefUser) {
+            try {
+                $this->sigService->sign(
+                    signer:        $chiefUser,
+                    signableType:  FacilityRequest::class,
+                    signableId:    $facilityRequest->id,
+                    documentTitle: "Facility Request #{$facilityRequest->id}",
+                    contentToHash: FacilityRequest::class . $facilityRequest->id . 'dc_approval',
+                    metadata:      ['stage' => 'dc_approval'],
+                );
+            } catch (\Throwable $e) {
+                logger()->error('Digital sign failed (DC email approval)', ['error' => $e->getMessage(), 'facility_request_id' => $facilityRequest->id]);
+            }
+        }
+
         // Notify FAD Chief users with signed approve/decline links
         try {
             $fadUsers = \App\Models\User::select('id','email','position')
@@ -652,10 +669,27 @@ class FacilityRequestController extends Controller
         $facilityRequest->status = 'Approved';
         $facilityRequest->save();
 
+        // Record digital signature for the FAD Chief (email one-click approval — no auth/PIN UI)
+        $chiefUser = $chief ? User::find($chief) : null;
+        if ($chiefUser) {
+            try {
+                $this->sigService->sign(
+                    signer:        $chiefUser,
+                    signableType:  FacilityRequest::class,
+                    signableId:    $facilityRequest->id,
+                    documentTitle: "Facility Request #{$facilityRequest->id}",
+                    contentToHash: FacilityRequest::class . $facilityRequest->id . 'fad_approval',
+                    metadata:      ['stage' => 'fad_approval'],
+                );
+            } catch (\Throwable $e) {
+                logger()->error('Digital sign failed (FAD email approval)', ['error' => $e->getMessage(), 'facility_request_id' => $facilityRequest->id]);
+            }
+        }
+
         // Notify requester — fully approved
         try {
             $requesterEmail = $facilityRequest->requester?->email ?? null;
-            $approverName = $chief ? (\App\Models\User::find($chief)?->name ?? 'FAD Chief') : 'FAD Chief';
+            $approverName = $chiefUser?->name ?? 'FAD Chief';
 
             if ($requesterEmail) {
                 \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
