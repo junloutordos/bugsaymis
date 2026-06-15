@@ -111,10 +111,12 @@ function printCard() {
             <p>This ID must be surrendered upon graduation.</p>
             <p>Lost ID cards will be replaced only upon presentation of an affidavit of loss to the Office of the Registrar.</p>
           </div>
+
+          <div class="id-sy-label">Valid for School Year</div>
         </div>
 
         <div class="id-back-footer">
-          <div class="id-back-footer-label">Valid for School Year</div>
+          <div v-if="barcode_svg" class="id-back-barcode" v-html="barcode_svg"></div>
         </div>
       </div>
     </div>
@@ -195,10 +197,10 @@ html, body { background: #f1f5f9; }
   color: #fff;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 1.5mm;
   padding: 1.5mm 2mm;
-  text-align: center;
+  text-align: left;
 }
 .id-logo { width: 7mm; height: 7mm; object-fit: contain; flex-shrink: 0; }
 .id-band-text { line-height: 1.25; }
@@ -226,18 +228,18 @@ html, body { background: #f1f5f9; }
   border-bottom: 1.5px solid #1447c0;
 }
 .id-back-footer {
-  text-align: center;
-  color: #1447c0;
   border-top: 1.5px solid #1447c0;
-  padding: 1.5mm 0;
+  padding: 1.5mm 3mm;
   height: 11mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.id-back-footer-label {
-  font-size: 4.5px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  text-transform: uppercase;
+.id-back-barcode {
+  width: 100%;
+  height: 100%;
 }
+.id-back-barcode svg { width: 100%; height: 100%; }
 
 /* ── Card body ─────────────────────────────────────────────────── */
 .id-card-inner {
@@ -366,18 +368,19 @@ html, body { background: #f1f5f9; }
 }
 
 .id-notice {
-  font-size: 4.5px;
+  font-size: 5px;
   color: #475569;
   line-height: 1.6;
-  text-align: left;
+  text-align: justify;
   width: 100%;
 }
 .id-notice-title {
-  font-size: 5px;
+  font-size: 5.5px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
   letter-spacing: .5px;
+  text-align: center;
   margin-bottom: 1mm;
 }
 .id-notice p {
@@ -385,6 +388,19 @@ html, body { background: #f1f5f9; }
 }
 .id-notice p:last-child {
   margin-bottom: 0;
+}
+
+.id-sy-label {
+  margin-top: 3mm;
+  width: 100%;
+  text-align: center;
+  font-size: 4.5px;
+  font-weight: 700;
+  color: #1447c0;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1.5mm;
 }
 
 /* ── Print ─────────────────────────────────────────────────────── */
