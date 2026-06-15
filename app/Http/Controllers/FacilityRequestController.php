@@ -882,8 +882,9 @@ class FacilityRequestController extends Controller
         $sigs = $this->loadSigsForPrint(FacilityRequest::class, $facilityRequest->id);
 
         return view('facility_requests.print_ticket', [
-            'request' => $facilityRequest,
-            'sigs'    => $sigs,
+            'request'    => $facilityRequest,
+            'sigs'       => $sigs,
+            'sigService' => $this->sigService,
         ]);
     }
 

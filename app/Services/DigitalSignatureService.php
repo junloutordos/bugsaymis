@@ -70,8 +70,16 @@ class DigitalSignatureService
      */
     public function getSignatureDataUri(User $user): ?string
     {
-        $path = $user->electronic_signature ?? null;
+        return $this->getImageDataUriFromPath($user->electronic_signature ?? null);
+    }
 
+    /**
+     * Resolve any stored signature path (user electronic_signature or
+     * division signature_path) to a base64 data URI. Tries S3 first
+     * (current uploads), then disk('public') for legacy uploads.
+     */
+    public function getImageDataUriFromPath(?string $path): ?string
+    {
         if (empty($path) || $path === '0') {
             return null;
         }
