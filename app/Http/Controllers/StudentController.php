@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Registrar\StudentEnrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class StudentController extends Controller
 {
@@ -179,5 +182,44 @@ class StudentController extends Controller
     {
         DB::table('students')->where('id', $id)->delete();
         return redirect()->route('students.index')->with('success', 'Student deleted.');
+    }
+
+    /**
+     * CR-80 student ID card preview / print page (front + back).
+     */
+    public function idCard($id)
+    {
+        $student = DB::table('students')->where('id', $id)->first();
+        abort_if(! $student, 404);
+
+        $currentSY = SchoolYear::where('is_current', true)->first();
+
+        $enrollment = StudentEnrollment::where('student_id', $id)
+            ->when($currentSY, fn ($q) => $q->where('school_year_id', $currentSY->id))
+            ->with('section')
+            ->first();
+
+        $middle   = $student->middlename ? " {$student->middlename}" : '';
+        $fullName = trim("{$student->lastname}, {$student->firstname}{$middle}");
+
+        $qrSvg = $student->pisaysystemID
+            ? (string) QrCode::format('svg')->size(150)->margin(0)->generate($student->pisaysystemID)
+            : null;
+
+        return Inertia::render('Students/IdCard', [
+            'student' => [
+                'id'        => $student->id,
+                'full_name' => $fullName,
+                'lrn'       => $student->lrn,
+                'barcode'   => $student->pisaysystemID ?: null,
+                'img'       => $student->img,
+            ],
+            'enrollment' => $enrollment ? [
+                'grade_level' => $enrollment->grade_level,
+                'section'     => $enrollment->section?->sectionname,
+            ] : null,
+            'school_year' => $currentSY?->name,
+            'qr_svg'      => $qrSvg,
+        ]);
     }
 }

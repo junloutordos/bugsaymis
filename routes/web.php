@@ -1081,6 +1081,7 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
 Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controllers\LibraryAttendanceController::class, 'report'])->name('library.statistics.report');
     // Students CRUD (Registrar / public admin may use)
     Route::get('/students', [\App\Http\Controllers\StudentController::class, 'index'])->name('students.index');
+    Route::get('/students/{id}/id-card', [\App\Http\Controllers\StudentController::class, 'idCard'])->name('students.id-card');
     Route::get('/students/create', [\App\Http\Controllers\StudentController::class, 'create'])->name('students.create');
     Route::post('/students', [\App\Http\Controllers\StudentController::class, 'store'])->name('students.store');
     Route::get('/students/{id}/edit', [\App\Http\Controllers\StudentController::class, 'edit'])->name('students.edit');
@@ -1970,6 +1971,10 @@ Route::get('/verify/itjr/{itjrNo}', [\App\Http\Controllers\DocumentVerificationC
 
 Route::get('/verify/issuance/{token}', [\App\Http\Controllers\DocumentVerificationController::class, 'showIssuance'])
     ->name('issuances.verify')
+    ->where('token', '[0-9a-f\-]{36}');
+
+Route::get('/verify/issuance/{token}/document', [\App\Http\Controllers\DocumentVerificationController::class, 'issuanceDocument'])
+    ->name('issuances.verify.document')
     ->where('token', '[0-9a-f\-]{36}');
 
 // ── Student Portal ────────────────────────────────────────────────────────────

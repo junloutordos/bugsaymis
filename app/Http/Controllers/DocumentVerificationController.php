@@ -7,6 +7,7 @@ use App\Models\Issuance;
 use App\Models\ITJobRequest;
 use App\Services\DigitalSignatureService;
 use App\Services\IssuanceService;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class DocumentVerificationController extends Controller
@@ -106,21 +107,79 @@ class DocumentVerificationController extends Controller
         $issuance = Issuance::where('qr_token', $token)->with(['creator:id,name,position', 'signature.signer:id,name,position,electronic_signature'])->first();
 
         if (! $issuance || $issuance->status !== 'released') {
-            return view('issuances.verify', ['valid' => false, 'issuance' => null, 'tampered' => false, 'sigUri' => null]);
+            return view('issuances.verify', [
+                'valid' => false, 'issuance' => null, 'tampered' => false,
+                'reason' => null, 'sig' => null, 'sigUri' => null, 'documentUrl' => null,
+            ]);
         }
 
-        // Tamper detection: recompute hash and compare
-        $computedHash = app(IssuanceService::class)->computeHash($issuance);
-        $tampered     = $issuance->content_hash && $computedHash !== $issuance->content_hash;
-        $sig          = $issuance->signature;
-        $sigUri       = $sig?->signer ? $this->svc->getSignatureDataUri($sig->signer) : null;
+        $sig    = $issuance->signature;
+        $sigUri = $sig?->signer ? $this->svc->getSignatureDataUri($sig->signer) : null;
+
+        if ($sig) {
+            // Cryptographic check: recompute the content hash from the LIVE row and
+            // compare it against the signed, immutable document_hash on the
+            // digital_signatures record (frozen at release time). Forging a match
+            // requires the KMS/HMAC signing key — not just write access to `issuances`.
+            $liveHash        = $this->issuanceSvc->computeHash($issuance);
+            $expectedDocHash = hash('sha256', $liveHash);
+            $contentMatches  = hash_equals($expectedDocHash, $sig->document_hash);
+            $signatureValid  = $this->svc->verify($sig->verification_token) !== null;
+
+            if (! $signatureValid) {
+                $tampered = true;
+                $reason   = 'signature';
+            } elseif (! $contentMatches) {
+                $tampered = true;
+                $reason   = 'content';
+            } else {
+                $tampered = false;
+                $reason   = null;
+            }
+        } elseif ($issuance->content_hash) {
+            // Legacy fallback for issuances released before signing was wired up:
+            // self-referential hash check only.
+            $computedHash = $this->issuanceSvc->computeHash($issuance);
+            $tampered     = $computedHash !== $issuance->content_hash;
+            $reason       = $tampered ? 'legacy' : 'legacy_ok';
+        } else {
+            $tampered = false;
+            $reason   = 'no_signature';
+        }
 
         return view('issuances.verify', [
-            'valid'    => true,
-            'tampered' => $tampered,
-            'issuance' => $issuance,
-            'sig'      => $sig,
-            'sigUri'   => $sigUri,
+            'valid'       => true,
+            'tampered'    => $tampered,
+            'reason'      => $reason,
+            'issuance'    => $issuance,
+            'sig'         => $sig,
+            'sigUri'      => $sigUri,
+            'documentUrl' => route('issuances.verify.document', $token),
+        ]);
+    }
+
+    /**
+     * Public PDF proxy for the system's canonical copy of a released issuance —
+     * lets the person scanning the QR visually compare it against the printed
+     * document in their hand. No authentication required.
+     */
+    public function issuanceDocument(string $token)
+    {
+        $issuance = Issuance::where('qr_token', $token)->first();
+
+        abort_if(! $issuance || $issuance->status !== 'released', 404);
+
+        $pdfPath = 'issuances/' . $issuance->control_number . '.pdf';
+        if (! Storage::disk('s3')->exists($pdfPath)) {
+            $pdfPath = $this->issuanceSvc->generatePdf($issuance);
+        }
+
+        $content = Storage::disk('s3')->get($pdfPath);
+
+        return response($content, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $issuance->control_number . '.pdf"',
+            'Cache-Control'       => 'private, max-age=300',
         ]);
     }
 }

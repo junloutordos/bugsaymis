@@ -16,6 +16,11 @@
   .status.valid   { background:#f0fdf4; border:1px solid #86efac; }
   .status.invalid { background:#fff1f2; border:1px solid #fca5a5; }
   .status.tampered { background:#fff7ed; border:1px solid #fed7aa; }
+  .status.warning { background:#eff6ff; border:1px solid #bfdbfe; }
+  .doc-section { margin-bottom:16px; }
+  .doc-section iframe { width:100%; height:360px; border:1px solid #e2e8f0; border-radius:8px; display:block; }
+  .doc-btn { display:block; text-align:center; margin-top:8px; background:#1447c0; color:#fff; padding:10px; border-radius:8px; font-size:13px; font-weight:600; text-decoration:none; }
+  .doc-hint { font-size:11px; color:#64748b; margin-bottom:6px; }
   .status-icon { font-size:28px; }
   .status-title { font-size:15px; font-weight:700; }
   .status-sub   { font-size:12px; margin-top:2px; color:#64748b; }
@@ -49,6 +54,24 @@
       </div>
     </div>
 
+    @elseif($tampered && $reason === 'signature')
+    <div class="status tampered">
+      <div class="status-icon">⛔</div>
+      <div>
+        <div class="status-title" style="color:#dc2626;">Signature Invalid</div>
+        <div class="status-sub">The digital signature record for this document failed verification. This document cannot be trusted.</div>
+      </div>
+    </div>
+
+    @elseif($tampered && $reason === 'content')
+    <div class="status tampered">
+      <div class="status-icon">⚠️</div>
+      <div>
+        <div class="status-title" style="color:#ea580c;">Document Tampered — Content Changed</div>
+        <div class="status-sub">This document's content no longer matches the version that was digitally signed. Do not trust this document.</div>
+      </div>
+    </div>
+
     @elseif($tampered)
     <div class="status tampered">
       <div class="status-icon">⚠️</div>
@@ -58,17 +81,40 @@
       </div>
     </div>
 
+    @elseif($reason === 'no_signature')
+    <div class="status warning">
+      <div class="status-icon">ℹ️</div>
+      <div>
+        <div class="status-title" style="color:#1d4ed8;">Valid Record — Not Digitally Signed</div>
+        <div class="status-sub">This issuance was found in the system, but has no digital signature on file. Its integrity cannot be cryptographically verified.</div>
+      </div>
+    </div>
+
     @else
     <div class="status valid">
       <div class="status-icon">✅</div>
       <div>
         <div class="status-title" style="color:#16a34a;">Authentic & Unmodified</div>
-        <div class="status-sub">This issuance has been verified as authentic. Content hash matches the signed original.</div>
+        <div class="status-sub">
+          @if($reason === 'legacy_ok')
+            This issuance has been verified as authentic via content hash (legacy check — no digital signature on file).
+          @elseif($sig?->signature_type === 'kms')
+            Cryptographically verified — digitally signed with AWS KMS (RSA-2048).
+          @else
+            Cryptographically verified — content hash matches the signed original.
+          @endif
+        </div>
       </div>
     </div>
     @endif
 
     @if($valid)
+    <div class="doc-section">
+      <div class="doc-hint">System Copy — compare this with the printed document in your hand. If the text, names, dates, or amounts differ, the printed copy may have been altered.</div>
+      <iframe src="{{ $documentUrl }}" title="Original document"></iframe>
+      <a href="{{ $documentUrl }}" target="_blank" class="doc-btn">View / Download Original Document</a>
+    </div>
+
     <div class="meta">
       <div class="meta-row">
         <div class="meta-label">Control No.</div>
@@ -109,7 +155,12 @@
     </div>
     @endif
 
-    @if($issuance->content_hash)
+    @if($sig?->document_hash)
+    <div style="font-size:11px; color:#64748b; margin-bottom:4px;">
+      Signed Document Hash (SHA-256{{ $sig->signature_type === 'kms' ? ', AWS KMS RSA-2048' : ', HMAC-SHA256' }}):
+    </div>
+    <div class="hash-box">{{ $sig->document_hash }}</div>
+    @elseif($issuance->content_hash)
     <div style="font-size:11px; color:#64748b; margin-bottom:4px;">SHA-256 Content Hash:</div>
     <div class="hash-box">{{ $issuance->content_hash }}</div>
     @endif
