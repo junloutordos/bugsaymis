@@ -48,14 +48,14 @@ function printCard() {
         <div class="id-band">
           <img src="/images/pshslogo.png" class="id-logo" alt="" onerror="this.style.display='none'" />
           <div class="id-band-text">
+            <div class="id-republic">Republic of the Philippines</div>
+            <div class="id-dost">Department of Science and Technology</div>
             <div class="id-school">Philippine Science High School</div>
-            <div class="id-campus">Caraga Region Campus</div>
+            <div class="id-campus">Caraga Region Campus in Butuan City</div>
           </div>
         </div>
 
         <div class="id-card-inner">
-          <div class="id-doc-label">Student Identification Card</div>
-
           <div class="id-photo">
             <img v-if="photoUrl" :src="photoUrl" alt="Photo" />
             <div v-else class="id-photo-empty">No Photo</div>
@@ -79,15 +79,13 @@ function printCard() {
           </div>
         </div>
 
-        <div class="id-footer-band">STUDENT</div>
+        <div class="id-footer-band">SCHOLAR</div>
       </div>
 
       <!-- Back -->
       <div class="id-card">
-        <div class="id-band id-band-thin">
-          <div class="id-band-text">
-            <div class="id-band-title">In Case of Emergency, Notify</div>
-          </div>
+        <div class="id-back-band">
+          <div class="id-band-title">In Case of Emergency, Notify</div>
         </div>
 
         <div class="id-card-inner">
@@ -107,16 +105,16 @@ function printCard() {
           <div class="id-divider"></div>
 
           <div class="id-notice">
-            <strong>IMPORTANT:</strong> This ID is the property of PSHS-CRC and must be
-            presented upon request by school authorities. It is non-transferable and
-            valid only for the school year indicated below. Loss must be reported
-            immediately to the OCD/Records Office. Tampering or alteration renders this
-            ID invalid.
+            <div class="id-notice-title">Important</div>
+            <p>This ID is valid for the period indicated on the validation sticker.</p>
+            <p>This ID is non-transferable and should be worn visibly at all times while inside the campus.</p>
+            <p>This ID must be surrendered upon graduation.</p>
+            <p>Lost ID cards will be replaced only upon presentation of an affidavit of loss to the Office of the Registrar.</p>
           </div>
         </div>
 
-        <div class="id-footer-band id-footer-band-thin">
-          Valid for School Year: {{ school_year || '—' }}
+        <div class="id-back-footer">
+          <div class="id-back-footer-label">Valid for School Year</div>
         </div>
       </div>
     </div>
@@ -191,7 +189,7 @@ html, body { background: #f1f5f9; }
   flex-direction: column;
 }
 
-/* ── Header / footer bands ────────────────────────────────────── */
+/* ── Front header / footer bands ──────────────────────────────── */
 .id-band {
   background: linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%);
   color: #fff;
@@ -199,14 +197,15 @@ html, body { background: #f1f5f9; }
   align-items: center;
   justify-content: center;
   gap: 1.5mm;
-  padding: 2mm 2mm;
+  padding: 1.5mm 2mm;
   text-align: center;
 }
-.id-band-thin { padding: 1.5mm 2mm; justify-content: center; }
 .id-logo { width: 7mm; height: 7mm; object-fit: contain; flex-shrink: 0; }
 .id-band-text { line-height: 1.25; }
-.id-school { font-size: 5.5px; font-weight: 700; }
-.id-campus { font-size: 4.5px; text-transform: uppercase; letter-spacing: .5px; opacity: .85; }
+.id-republic { font-size: 3.6px; font-weight: 400; }
+.id-dost { font-size: 3.6px; font-weight: 400; }
+.id-school { font-size: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-top: 0.5mm; }
+.id-campus { font-size: 3.8px; font-weight: 700; text-transform: uppercase; letter-spacing: .2px; }
 .id-band-title { font-size: 6px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 
 .id-footer-band {
@@ -218,11 +217,26 @@ html, body { background: #f1f5f9; }
   text-align: center;
   padding: 1.5mm 0;
 }
-.id-footer-band-thin {
+
+/* ── Back header / footer bands — no gradient ─────────────────── */
+.id-back-band {
+  text-align: center;
+  color: #1447c0;
+  padding: 1.5mm 2mm;
+  border-bottom: 1.5px solid #1447c0;
+}
+.id-back-footer {
+  text-align: center;
+  color: #1447c0;
+  border-top: 1.5px solid #1447c0;
+  padding: 1.5mm 0;
+  height: 11mm;
+}
+.id-back-footer-label {
   font-size: 4.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: .5px;
-  text-transform: none;
+  text-transform: uppercase;
 }
 
 /* ── Card body ─────────────────────────────────────────────────── */
@@ -237,17 +251,10 @@ html, body { background: #f1f5f9; }
 }
 
 /* ── Front face ────────────────────────────────────────────────── */
-.id-doc-label {
-  font-size: 4.5px;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 1mm 0 1.5mm;
-}
 .id-photo {
-  width: 20mm;
-  height: 24mm;
+  width: 18mm;
+  height: 22mm;
+  margin-top: 1mm;
   border: 1px solid #e2e8f0;
   border-radius: 1.5mm;
   overflow: hidden;
@@ -359,10 +366,25 @@ html, body { background: #f1f5f9; }
 }
 
 .id-notice {
-  font-size: 4.2px;
+  font-size: 4.5px;
   color: #475569;
   line-height: 1.6;
   text-align: left;
+  width: 100%;
+}
+.id-notice-title {
+  font-size: 5px;
+  font-weight: 700;
+  color: #1447c0;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 1mm;
+}
+.id-notice p {
+  margin-bottom: 1mm;
+}
+.id-notice p:last-child {
+  margin-bottom: 0;
 }
 
 /* ── Print ─────────────────────────────────────────────────────── */
