@@ -13,7 +13,9 @@ trait SignsDocuments
      *
      * - If the signer has a PIN, the request must supply a matching `pin` field.
      * - If no PIN is set, the signature is recorded automatically.
-     * - Failures are logged but never surface to the user.
+     * - Returns true if a DigitalSignature record was created, false otherwise
+     *   (missing/incorrect PIN, or signing failed) — callers that gate an
+     *   approval on the signature should check this before mutating state.
      *
      * Expects $this->sigService to be a DigitalSignatureService instance.
      */
@@ -25,13 +27,13 @@ trait SignsDocuments
         string  $documentTitle,
         string  $contentHash,
         array   $extraMeta = []
-    ): void {
+    ): bool {
         $signer = $request->user();
 
         if (! empty($signer->signature_pin)) {
             $pin = $request->input('pin');
             if (! $pin || ! $this->sigService->verifyPin($signer, $pin)) {
-                return;
+                return false;
             }
         }
 
@@ -44,6 +46,8 @@ trait SignsDocuments
                 contentToHash: $contentHash,
                 metadata:      array_merge(['stage' => $stage], $extraMeta),
             );
+
+            return true;
         } catch (\Throwable $e) {
             logger()->error('Digital sign failed', [
                 'signable_type' => $signableType,
@@ -51,6 +55,8 @@ trait SignsDocuments
                 'stage'         => $stage,
                 'error'         => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 

@@ -430,6 +430,14 @@ class FacilityRequestController extends Controller
             return back()->with('success', 'Already forwarded for FAD approval.');
         }
 
+        if (! $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
+            'dc_approval',
+            "Facility Request #{$facilityRequest->id}",
+            FacilityRequest::class . $facilityRequest->id . 'dc_approval'
+        )) {
+            return back()->with('error', 'Incorrect signature PIN. The request was not approved — please try again.');
+        }
+
         $facilityRequest->status = 'Pending FAD Approval';
         $facilityRequest->save();
 
@@ -459,12 +467,6 @@ class FacilityRequestController extends Controller
         } catch (\Throwable $e) {
             logger()->error('Failed to queue FAD notifications for facility request (in-app)', ['error' => $e->getMessage()]);
         }
-
-        $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
-            'dc_approval',
-            "Facility Request #{$facilityRequest->id}",
-            FacilityRequest::class . $facilityRequest->id . 'dc_approval'
-        );
 
         return back()->with('success', 'Facility request approved. FAD has been notified.');
     }
@@ -964,14 +966,16 @@ class FacilityRequestController extends Controller
         $request->validate(['action' => 'required|in:approve,reject']);
 
         if ($request->action === 'approve') {
-            $facilityRequest->update(['status' => 'Approved']);
-            if ($facilityRequest->requester) { NotificationService::notifyUser($facilityRequest->requester, 'Facility Request', "#{$facilityRequest->id}", 'Approved by FAD', route('facility-requests.index')); }
-
-            $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
+            if (! $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
                 'fad_approval',
                 "Facility Request #{$facilityRequest->id}",
                 FacilityRequest::class . $facilityRequest->id . 'fad_approval'
-            );
+            )) {
+                return back()->with('error', 'Incorrect signature PIN. The request was not approved — please try again.');
+            }
+
+            $facilityRequest->update(['status' => 'Approved']);
+            if ($facilityRequest->requester) { NotificationService::notifyUser($facilityRequest->requester, 'Facility Request', "#{$facilityRequest->id}", 'Approved by FAD', route('facility-requests.index')); }
 
             // Notify requester — FAD is the final approver
             try {
@@ -1028,13 +1032,15 @@ class FacilityRequestController extends Controller
         $request->validate(['action' => 'required|in:approve,reject']);
 
         if ($request->action === 'approve') {
-            $facilityRequest->update(['status' => 'OCD Approved']);
-
-            $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
+            if (! $this->performSign($request, FacilityRequest::class, $facilityRequest->id,
                 'ocd_approval',
                 "Facility Request #{$facilityRequest->id}",
                 FacilityRequest::class . $facilityRequest->id . 'ocd_approval'
-            );
+            )) {
+                return back()->with('error', 'Incorrect signature PIN. The request was not approved — please try again.');
+            }
+
+            $facilityRequest->update(['status' => 'OCD Approved']);
         } else {
             $request->validate(['reason' => 'nullable|string|max:1000']);
             $facilityRequest->update([

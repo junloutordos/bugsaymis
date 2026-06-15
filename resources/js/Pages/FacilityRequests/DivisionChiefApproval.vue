@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from "vue"
-import { Head, router } from "@inertiajs/vue3"
+import { Head, router, usePage } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { CheckCircleIcon, XCircleIcon, EyeIcon, XMarkIcon } from "@heroicons/vue/24/outline"
 import Swal from "sweetalert2"
@@ -76,7 +76,11 @@ function handleApproveConfirm(pin) {
   isSubmitting.value = true
   Swal.fire({ title: 'Approving…', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() })
   router.post(route('facility-requests.approve.inapp', pendingApproveId.value), { pin: pin || null }, {
-    onSuccess: () => Swal.fire('Approved!', 'Facility request approved. FAD has been notified.', 'success'),
+    onSuccess: () => {
+      const err = usePage().props.flash?.error
+      if (err) Swal.fire('Not approved', err, 'error')
+      else Swal.fire('Approved!', 'Facility request approved. FAD has been notified.', 'success')
+    },
     onFinish:  () => { isSubmitting.value = false },
   })
 }
