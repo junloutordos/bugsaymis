@@ -254,8 +254,8 @@ html, body { background: #f1f5f9; }
 
 /* ── Front face ────────────────────────────────────────────────── */
 .id-photo {
-  width: 18mm;
-  height: 22mm;
+  width: 20mm;
+  height: 20mm;
   margin-top: 1mm;
   border: 1px solid #e2e8f0;
   border-radius: 1.5mm;
