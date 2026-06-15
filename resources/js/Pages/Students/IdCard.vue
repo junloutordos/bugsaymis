@@ -8,19 +8,14 @@ const props = defineProps({
   student: Object,
   enrollment: Object,
   school_year: String,
-  qr_svg: String,
+  barcode_svg: String,
+  ocd: Object,
+  emergency: Object,
 })
 
 const photoUrl = computed(() => {
   if (!props.student.img) return null
   return storageUrl(`students_profile_picture/${encodeURIComponent(props.student.img)}`)
-})
-
-const gradeSection = computed(() => {
-  if (!props.enrollment) return null
-  const parts = [`Grade ${props.enrollment.grade_level}`]
-  if (props.enrollment.section) parts.push(props.enrollment.section)
-  return parts.join(' - ')
 })
 
 function printCard() {
@@ -68,17 +63,19 @@ function printCard() {
 
           <div class="id-name">{{ student.full_name }}</div>
 
-          <div v-if="gradeSection" class="id-pill">{{ gradeSection }}</div>
+          <div v-if="barcode_svg" class="id-barcode" v-html="barcode_svg"></div>
+          <div v-if="student.barcode" class="id-barcode-no">{{ student.barcode }}</div>
 
-          <div class="id-info">
-            <div v-if="student.lrn" class="id-info-row">
-              <span class="id-info-label">LRN</span>
-              <span class="id-info-value">{{ student.lrn }}</span>
-            </div>
-            <div v-if="school_year" class="id-info-row">
-              <span class="id-info-label">S.Y.</span>
-              <span class="id-info-value">{{ school_year }}</span>
-            </div>
+          <div class="id-lrn">
+            <div class="id-lrn-label">Learner Reference Number</div>
+            <div class="id-lrn-value">{{ student.lrn || '—' }}</div>
+          </div>
+
+          <div v-if="ocd" class="id-sig-block">
+            <img v-if="ocd.signature_uri" :src="ocd.signature_uri" class="id-sig-img" alt="" />
+            <div class="id-sig-rule"></div>
+            <div class="id-sig-name">{{ ocd.name }}</div>
+            <div class="id-sig-position">{{ ocd.position }}</div>
           </div>
         </div>
 
@@ -89,33 +86,37 @@ function printCard() {
       <div class="id-card">
         <div class="id-band id-band-thin">
           <div class="id-band-text">
-            <div class="id-id-no">ID No. {{ student.barcode ?? '—' }}</div>
+            <div class="id-band-title">In Case of Emergency, Notify</div>
           </div>
         </div>
 
         <div class="id-card-inner">
-          <div class="id-qr" v-if="qr_svg" v-html="qr_svg"></div>
-          <div v-else class="id-qr id-qr-empty">No QR</div>
-          <div class="id-qr-caption">Scan to verify enrollment</div>
+          <div class="id-emergency-field">
+            <div class="id-emergency-label">Name of Parent / Guardian</div>
+            <div class="id-emergency-value">{{ emergency.guardian_name || '—' }}</div>
+          </div>
+          <div class="id-emergency-field">
+            <div class="id-emergency-label">Contact Number</div>
+            <div class="id-emergency-value">{{ emergency.contact_no || '—' }}</div>
+          </div>
+          <div class="id-emergency-field">
+            <div class="id-emergency-label">Address</div>
+            <div class="id-emergency-value">{{ emergency.address || '—' }}</div>
+          </div>
 
           <div class="id-divider"></div>
 
-          <div class="id-return">
-            <strong>If found, please return to:</strong><br />
-            Philippine Science High School<br />
-            Caraga Region Campus<br />
-            Ampayon, Butuan City, 8600<br />
-            Tel: (085) 817-0987
-          </div>
-
-          <div class="id-sig-line">
-            <div class="id-sig-rule"></div>
-            <div class="id-sig-label">Cardholder's Signature</div>
+          <div class="id-notice">
+            <strong>IMPORTANT:</strong> This ID is the property of PSHS-CRC and must be
+            presented upon request by school authorities. It is non-transferable and
+            valid only for the school year indicated below. Loss must be reported
+            immediately to the OCD/Records Office. Tampering or alteration renders this
+            ID invalid.
           </div>
         </div>
 
         <div class="id-footer-band id-footer-band-thin">
-          Property of PSHS-CRC · Non-transferable
+          Valid for School Year: {{ school_year || '—' }}
         </div>
       </div>
     </div>
@@ -206,7 +207,7 @@ html, body { background: #f1f5f9; }
 .id-band-text { line-height: 1.25; }
 .id-school { font-size: 5.5px; font-weight: 700; }
 .id-campus { font-size: 4.5px; text-transform: uppercase; letter-spacing: .5px; opacity: .85; }
-.id-id-no { font-size: 6px; font-weight: 700; letter-spacing: .5px; }
+.id-band-title { font-size: 6px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 
 .id-footer-band {
   background: linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%);
@@ -245,8 +246,8 @@ html, body { background: #f1f5f9; }
   margin: 1mm 0 1.5mm;
 }
 .id-photo {
-  width: 26mm;
-  height: 30mm;
+  width: 20mm;
+  height: 24mm;
   border: 1px solid #e2e8f0;
   border-radius: 1.5mm;
   overflow: hidden;
@@ -265,74 +266,103 @@ html, body { background: #f1f5f9; }
   line-height: 1.3;
   margin-top: 2mm;
 }
-.id-pill {
+
+.id-barcode {
+  width: 100%;
+  height: 9mm;
   margin-top: 1.5mm;
-  background: #eff6ff;
-  color: #1447c0;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  font-size: 5.5px;
-  font-weight: 700;
-  padding: 0.8mm 3mm;
 }
-.id-info {
+.id-barcode svg { width: 100%; height: 100%; }
+.id-barcode-no {
+  font-size: 5px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 1px;
+  margin-top: 0.5mm;
+}
+
+.id-lrn {
+  margin-top: 1.5mm;
+  width: 100%;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1.5mm;
+}
+.id-lrn-label {
+  font-size: 4.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.id-lrn-value {
+  font-size: 7px;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 1px;
+  margin-top: 0.5mm;
+}
+
+.id-sig-block {
   margin-top: auto;
   width: 100%;
   padding-top: 2mm;
-}
-.id-info-row {
   display: flex;
-  justify-content: space-between;
-  border-top: 1px solid #f1f5f9;
-  padding: 1mm 0;
-  font-size: 5.5px;
+  flex-direction: column;
+  align-items: center;
 }
-.id-info-label { color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-.id-info-value { color: #1e293b; font-weight: 600; }
+.id-sig-img {
+  height: 7mm;
+  max-width: 80%;
+  object-fit: contain;
+  margin-bottom: 0.5mm;
+}
+.id-sig-rule {
+  width: 80%;
+  border-top: 1px solid #94a3b8;
+  margin-bottom: 0.8mm;
+}
+.id-sig-name {
+  font-size: 5.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.id-sig-position {
+  font-size: 4.5px;
+  color: #94a3b8;
+  letter-spacing: .5px;
+}
 
 /* ── Back face ─────────────────────────────────────────────────── */
-.id-qr {
-  width: 26mm;
-  height: 26mm;
+.id-emergency-field {
+  width: 100%;
   margin-top: 2mm;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.id-qr svg { width: 100%; height: 100%; }
-.id-qr-empty {
-  font-size: 6px;
+.id-emergency-field:first-child { margin-top: 1mm; }
+.id-emergency-label {
+  font-size: 4.5px;
+  font-weight: 700;
   color: #94a3b8;
-  border: 1px dashed #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: .5px;
 }
-.id-qr-caption {
-  font-size: 5px;
-  color: #64748b;
-  margin-top: 1mm;
+.id-emergency-value {
+  font-size: 6px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-top: 0.5mm;
 }
+
 .id-divider {
   width: 100%;
   border-top: 1px solid #f1f5f9;
   margin: 2mm 0;
 }
-.id-return {
-  font-size: 4.5px;
+
+.id-notice {
+  font-size: 4.2px;
   color: #475569;
   line-height: 1.6;
-}
-.id-sig-line {
-  margin-top: auto;
-  width: 100%;
-  padding-bottom: 1mm;
-}
-.id-sig-rule {
-  border-top: 1px solid #94a3b8;
-  margin: 0 4mm 0.8mm;
-}
-.id-sig-label {
-  font-size: 4.5px;
-  color: #94a3b8;
-  letter-spacing: .5px;
+  text-align: left;
 }
 
 /* ── Print ─────────────────────────────────────────────────────── */

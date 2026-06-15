@@ -22,10 +22,11 @@
         "maatwebsite/excel": "^3.1",
         "minishlink/web-push": "^9.0",
         "mpdf/mpdf": "^8.2",
-        "setasign/fpdi": "^2.6.7",
         "phpoffice/phpspreadsheet": "^1.30",
+        "picqer/php-barcode-generator": "^3.2",
         "predis/predis": "^3.4",
         "pusher/pusher-php-server": "^7.2",
+        "setasign/fpdi": "^2.6.7",
         "simplesoftwareio/simple-qrcode": "^4.2",
         "tecnickcom/tcpdf": "^6.7",
         "tightenco/ziggy": "^2.0"
