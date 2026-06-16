@@ -351,13 +351,31 @@ const salary = computed(() => {
 })
 
 const inclusiveDates = computed(() => {
-  const from = props.application.date_from
-  const to   = props.application.date_to
-  if (!from) return ''
   const fmtShort = d => {
     const dt = new Date(String(d).slice(0, 10) + 'T00:00:00')
     return dt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
   }
+
+  const rawDates = props.application.dates
+  if (Array.isArray(rawDates) && rawDates.length > 0) {
+    const sorted = [...rawDates].map(d => String(d).slice(0, 10)).sort()
+    if (sorted.length === 1) return fmtShort(sorted[0])
+
+    // Count weekdays between first and last date; if it matches stored count → consecutive range
+    const first = new Date(sorted[0] + 'T00:00:00')
+    const last  = new Date(sorted[sorted.length - 1] + 'T00:00:00')
+    let weekdayCount = 0
+    for (const d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0 && d.getDay() !== 6) weekdayCount++
+    }
+    if (weekdayCount === sorted.length) return `${fmtShort(sorted[0])} to ${fmtShort(sorted[sorted.length - 1])}`
+    return sorted.map(fmtShort).join(', ')
+  }
+
+  // Fallback for older records without a dates array
+  const from = props.application.date_from
+  const to   = props.application.date_to
+  if (!from) return ''
   return from === to ? fmtShort(from) : `${fmtShort(from)} to ${fmtShort(to)}`
 })
 
