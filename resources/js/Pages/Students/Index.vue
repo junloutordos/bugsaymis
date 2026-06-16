@@ -3,6 +3,7 @@ import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { EyeIcon } from "@heroicons/vue/24/outline"
+import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   students: Object,
@@ -112,8 +113,13 @@ const photoVersions = ref({})
 
 const profilePic = (student) => {
   if (!student?.img) return null
-  const v = photoVersions.value[student.id]
-  return route('students.photo', { id: student.id }) + (v ? `?v=${v}` : '')
+  const img = student.img
+  // New uploads are stored as S3 keys containing '/'; legacy filenames have no '/'
+  if (img.includes('/')) {
+    const v = photoVersions.value[student.id]
+    return route('students.photo', { id: student.id }) + (v ? `?v=${v}` : '')
+  }
+  return storageUrl(`students_profile_picture/${encodeURIComponent(img)}`)
 }
 
 // ── Photo crop modal ──────────────────────────────────────────────
