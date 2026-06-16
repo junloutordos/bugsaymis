@@ -666,21 +666,23 @@ function openForm(a = null, prefillFacultyId = null) {
 function save() {
   if (form.id) {
     form.put(route('faculty-loading.assignments.update', form.id), {
-      onSuccess: () => { modal.value = false },
+      onSuccess: () => { modal.value = false; router.reload({ only: ['assignments'] }) },
     })
   } else {
     // Always re-derive school_year_id from the selected term before submitting
     const t = props.terms.find(t => t.id === Number(form.academic_term_id))
     if (t) form.school_year_id = t.school_year_id
     form.post(route('faculty-loading.assignments.store'), {
-      onSuccess: () => { modal.value = false },
+      onSuccess: () => { modal.value = false; router.reload({ only: ['assignments'] }) },
     })
   }
 }
 
 function remove(a) {
   if (!confirm(`Remove "${a.display_label}" assignment?`)) return
-  useForm({}).delete(route('faculty-loading.assignments.destroy', a.id))
+  useForm({}).delete(route('faculty-loading.assignments.destroy', a.id), {
+    onSuccess: () => router.reload({ only: ['assignments'] }),
+  })
 }
 
 function statusBadge(status) {
