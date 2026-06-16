@@ -459,16 +459,17 @@ class GatePassController extends Controller
             abort(404);
         }
 
-        // resolve division chief (if any) for signature
+        // resolve division chief from the requester's division, not the viewer's
         $divisionChief = null;
-        if ($request->user() && $request->user()->division_id) {
-            $division = DB::table('divisions')->where('id', $request->user()->division_id)->first();
-            if ($division && !empty($division->division_chief_id)) {
-                $chief = DB::table('users')->where('id', $division->division_chief_id)->first();
+        $gpRequester = DB::table('users')->whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $row->badgeNumber])->first();
+        if ($gpRequester && $gpRequester->division_id) {
+            $gpDivision = DB::table('divisions')->where('id', $gpRequester->division_id)->first();
+            if ($gpDivision && !empty($gpDivision->division_chief_id)) {
+                $chief = DB::table('users')->where('id', $gpDivision->division_chief_id)->first();
                 if ($chief) {
                     $divisionChief = [
-                        'id' => $chief->id,
-                        'name' => $chief->name,
+                        'id'       => $chief->id,
+                        'name'     => $chief->name,
                         'position' => $chief->position ?? 'Division Chief',
                     ];
                 }
@@ -637,6 +638,23 @@ class GatePassController extends Controller
         }
 
         DB::table('gatepass')->where('id', $id)->update(['status' => 'OCD Approved', 'updated_at' => now()]);
+
+        $ocdUser = User::find($ocd);
+        if ($ocdUser) {
+            try {
+                $this->sigService->sign(
+                    signer:        $ocdUser,
+                    signableType:  'App\Models\GatePass',
+                    signableId:    (int) $id,
+                    documentTitle: "Gate Pass #{$id}",
+                    contentToHash: 'GatePass' . $id . 'ocd_approval',
+                    metadata:      ['stage' => 'ocd_approval'],
+                );
+            } catch (\Throwable $e) {
+                logger()->error('Failed to record OCD signature on gate pass', ['error' => $e->getMessage(), 'id' => $id]);
+            }
+        }
+
         $row = DB::table('gatepass')
             ->leftJoin('users', DB::raw("CAST(users.badge_id AS CHAR)"), '=', DB::raw("CAST(gatepass.badgeNumber AS CHAR)"))
             ->select('gatepass.*', 'users.name as name', 'users.position as position')
