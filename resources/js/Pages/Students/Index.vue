@@ -130,11 +130,14 @@ const cropImg = ref(null)
 const cropContainerRef = ref(null)
 const cropX = ref(0)
 const cropY = ref(0)
-const cropSize = ref(0)
+const cropW = ref(0)
+const cropH = ref(0)
 const displayedImgW = ref(0)
 const displayedImgH = ref(0)
 const isDragging = ref(false)
-const dragStart = ref({ x: 0, y: 0, cx: 0, cy: 0 })
+const isResizing = ref(false)
+const activeHandle = ref(null)
+const dragStart = ref({ x: 0, y: 0, cx: 0, cy: 0, cw: 0, ch: 0 })
 const photoUploading = ref(false)
 const photoError = ref(null)
 
@@ -160,20 +163,22 @@ const onImgLoad = () => {
     const rect = container.getBoundingClientRect()
     displayedImgW.value = rect.width
     displayedImgH.value = rect.height
-    const minDim = Math.min(rect.width, rect.height)
-    cropSize.value = Math.round(minDim * 0.85)
-    cropX.value = Math.round((rect.width - cropSize.value) / 2)
-    cropY.value = Math.round((rect.height - cropSize.value) / 2)
+    const size = Math.round(Math.min(rect.width, rect.height) * 0.85)
+    cropW.value = size
+    cropH.value = size
+    cropX.value = Math.round((rect.width - size) / 2)
+    cropY.value = Math.round((rect.height - size) / 2)
   })
 }
 
+// ── Move (drag entire box) ───────────────────────────────────────
 const onDrag = (e) => {
   if (!isDragging.value) return
   if (e.cancelable) e.preventDefault()
   const clientX = e.touches?.[0]?.clientX ?? e.clientX
   const clientY = e.touches?.[0]?.clientY ?? e.clientY
-  const maxX = displayedImgW.value - cropSize.value
-  const maxY = displayedImgH.value - cropSize.value
+  const maxX = displayedImgW.value - cropW.value
+  const maxY = displayedImgH.value - cropH.value
   cropX.value = Math.round(Math.min(maxX, Math.max(0, dragStart.value.cx + clientX - dragStart.value.x)))
   cropY.value = Math.round(Math.min(maxY, Math.max(0, dragStart.value.cy + clientY - dragStart.value.y)))
 }
@@ -191,15 +196,76 @@ const startDrag = (e) => {
   isDragging.value = true
   const clientX = e.touches?.[0]?.clientX ?? e.clientX
   const clientY = e.touches?.[0]?.clientY ?? e.clientY
-  dragStart.value = { x: clientX, y: clientY, cx: cropX.value, cy: cropY.value }
+  dragStart.value = { x: clientX, y: clientY, cx: cropX.value, cy: cropY.value, cw: cropW.value, ch: cropH.value }
   window.addEventListener('mousemove', onDrag)
   window.addEventListener('mouseup', endDrag)
   window.addEventListener('touchmove', onDrag, { passive: false })
   window.addEventListener('touchend', endDrag)
 }
 
+// ── Resize (drag a handle) ───────────────────────────────────────
+const MIN_CROP = 30
+
+const onResize = (e) => {
+  if (!isResizing.value) return
+  if (e.cancelable) e.preventDefault()
+  const clientX = e.touches?.[0]?.clientX ?? e.clientX
+  const clientY = e.touches?.[0]?.clientY ?? e.clientY
+  const dx = clientX - dragStart.value.x
+  const dy = clientY - dragStart.value.y
+  const { cx, cy, cw, ch } = dragStart.value
+  const handle = activeHandle.value
+
+  let newX = cx, newY = cy, newW = cw, newH = ch
+
+  if (handle.includes('w')) {
+    newW = Math.max(MIN_CROP, cw - dx)
+    newX = cx + (cw - newW)
+    if (newX < 0) { newW += newX; newX = 0 }
+  }
+  if (handle.includes('e')) {
+    newW = Math.max(MIN_CROP, Math.min(cw + dx, displayedImgW.value - cx))
+  }
+  if (handle.includes('n')) {
+    newH = Math.max(MIN_CROP, ch - dy)
+    newY = cy + (ch - newH)
+    if (newY < 0) { newH += newY; newY = 0 }
+  }
+  if (handle.includes('s')) {
+    newH = Math.max(MIN_CROP, Math.min(ch + dy, displayedImgH.value - cy))
+  }
+
+  cropX.value = Math.round(newX)
+  cropY.value = Math.round(newY)
+  cropW.value = Math.round(newW)
+  cropH.value = Math.round(newH)
+}
+
+const endResize = () => {
+  isResizing.value = false
+  activeHandle.value = null
+  window.removeEventListener('mousemove', onResize)
+  window.removeEventListener('mouseup', endResize)
+  window.removeEventListener('touchmove', onResize)
+  window.removeEventListener('touchend', endResize)
+}
+
+const startResize = (e, handle) => {
+  e.preventDefault()
+  e.stopPropagation()
+  isResizing.value = true
+  activeHandle.value = handle
+  const clientX = e.touches?.[0]?.clientX ?? e.clientX
+  const clientY = e.touches?.[0]?.clientY ?? e.clientY
+  dragStart.value = { x: clientX, y: clientY, cx: cropX.value, cy: cropY.value, cw: cropW.value, ch: cropH.value }
+  window.addEventListener('mousemove', onResize)
+  window.addEventListener('mouseup', endResize)
+  window.addEventListener('touchmove', onResize, { passive: false })
+  window.addEventListener('touchend', endResize)
+}
+
 const confirmCrop = async () => {
-  if (!cropImg.value || !photoPreviewSrc.value || !photoStudent.value || cropSize.value === 0) return
+  if (!cropImg.value || !photoPreviewSrc.value || !photoStudent.value || cropW.value === 0 || cropH.value === 0) return
   photoUploading.value = true
   photoError.value = null
   try {
@@ -207,10 +273,12 @@ const confirmCrop = async () => {
     const scaleX = img.naturalWidth / displayedImgW.value
     const scaleY = img.naturalHeight / displayedImgH.value
     const canvas = document.createElement('canvas')
-    canvas.width = 400
-    canvas.height = 400
+    const MAX_OUT = 800
+    const aspect = cropW.value / cropH.value
+    canvas.width  = cropW.value >= cropH.value ? Math.min(cropW.value, MAX_OUT) : Math.round(Math.min(cropH.value, MAX_OUT) * aspect)
+    canvas.height = cropW.value >= cropH.value ? Math.round(Math.min(cropW.value, MAX_OUT) / aspect) : Math.min(cropH.value, MAX_OUT)
     const ctx = canvas.getContext('2d')
-    ctx.drawImage(img, cropX.value * scaleX, cropY.value * scaleY, cropSize.value * scaleX, cropSize.value * scaleY, 0, 0, 400, 400)
+    ctx.drawImage(img, cropX.value * scaleX, cropY.value * scaleY, cropW.value * scaleX, cropH.value * scaleY, 0, 0, canvas.width, canvas.height)
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
 
     const { data } = await axios.post(route('students.photo.update', { id: photoStudent.value.id }), { photo_base64: dataUrl })
@@ -412,7 +480,7 @@ const confirmCrop = async () => {
               <span class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Choose Photo</span>
               <input type="file" accept="image/*" @change="onFileSelect" class="sr-only" />
             </label>
-            <p class="text-xs text-slate-500 text-center">JPG, PNG, or WebP. Will be cropped to a square.</p>
+            <p class="text-xs text-slate-500 text-center">JPG, PNG, or WebP.</p>
           </div>
 
           <!-- Crop UI -->
@@ -422,24 +490,38 @@ const confirmCrop = async () => {
                 <img ref="cropImg" :src="photoPreviewSrc" @load="onImgLoad" class="block" style="max-width: 100%; max-height: 280px; display: block;" alt="" />
                 <!-- Overlay regions outside crop box -->
                 <div class="absolute pointer-events-none bg-black/55" :style="{ top: '0px', left: '0px', right: '0px', height: cropY + 'px' }"></div>
-                <div class="absolute pointer-events-none bg-black/55" :style="{ top: (cropY + cropSize) + 'px', left: '0px', right: '0px', bottom: '0px' }"></div>
-                <div class="absolute pointer-events-none bg-black/55" :style="{ top: cropY + 'px', left: '0px', width: cropX + 'px', height: cropSize + 'px' }"></div>
-                <div class="absolute pointer-events-none bg-black/55" :style="{ top: cropY + 'px', left: (cropX + cropSize) + 'px', right: '0px', height: cropSize + 'px' }"></div>
-                <!-- Draggable crop box -->
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: (cropY + cropH) + 'px', left: '0px', right: '0px', bottom: '0px' }"></div>
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: cropY + 'px', left: '0px', width: cropX + 'px', height: cropH + 'px' }"></div>
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: cropY + 'px', left: (cropX + cropW) + 'px', right: '0px', height: cropH + 'px' }"></div>
+                <!-- Draggable + resizable crop box -->
                 <div
                   class="absolute border border-white/90 cursor-move"
-                  :style="{ top: cropY + 'px', left: cropX + 'px', width: cropSize + 'px', height: cropSize + 'px' }"
+                  :style="{ top: cropY + 'px', left: cropX + 'px', width: cropW + 'px', height: cropH + 'px' }"
                   @mousedown.prevent="startDrag"
                   @touchstart.prevent="startDrag"
                 >
-                  <div class="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white"></div>
-                  <div class="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-white"></div>
-                  <div class="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-white"></div>
-                  <div class="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white"></div>
+                  <!-- Corner resize handles -->
+                  <div class="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-white cursor-nw-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'nw')" @touchstart.stop.prevent="e => startResize(e, 'nw')"></div>
+                  <div class="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-white cursor-ne-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'ne')" @touchstart.stop.prevent="e => startResize(e, 'ne')"></div>
+                  <div class="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-white cursor-sw-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'sw')" @touchstart.stop.prevent="e => startResize(e, 'sw')"></div>
+                  <div class="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-white cursor-se-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'se')" @touchstart.stop.prevent="e => startResize(e, 'se')"></div>
+                  <!-- Edge resize handles -->
+                  <div class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-2.5 h-5 bg-white/70 rounded-sm cursor-w-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'w')" @touchstart.stop.prevent="e => startResize(e, 'w')"></div>
+                  <div class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-2.5 h-5 bg-white/70 rounded-sm cursor-e-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'e')" @touchstart.stop.prevent="e => startResize(e, 'e')"></div>
+                  <div class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-5 h-2.5 bg-white/70 rounded-sm cursor-n-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 'n')" @touchstart.stop.prevent="e => startResize(e, 'n')"></div>
+                  <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-5 h-2.5 bg-white/70 rounded-sm cursor-s-resize"
+                       @mousedown.stop.prevent="e => startResize(e, 's')" @touchstart.stop.prevent="e => startResize(e, 's')"></div>
                 </div>
               </div>
             </div>
-            <p class="text-xs text-slate-500 mt-2 text-center">Drag the square to position the crop area.</p>
+            <p class="text-xs text-slate-500 mt-2 text-center">Drag inside to move · drag handles to resize.</p>
             <div v-if="photoError" class="mt-2 text-xs text-red-600 text-center">{{ photoError }}</div>
           </div>
         </div>
@@ -449,7 +531,7 @@ const confirmCrop = async () => {
           <div v-else></div>
           <div class="flex gap-2">
             <button @click="showPhotoModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-            <button v-if="photoPreviewSrc" @click="confirmCrop" :disabled="photoUploading || cropSize === 0" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <button v-if="photoPreviewSrc" @click="confirmCrop" :disabled="photoUploading || cropW === 0 || cropH === 0" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
               {{ photoUploading ? 'Uploading…' : 'Upload Photo' }}
             </button>
           </div>
