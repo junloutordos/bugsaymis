@@ -783,8 +783,10 @@ class DtrRecordController extends Controller
             ->get()
             ->mapWithKeys(fn ($w) => [
                 Carbon::parse($w->date)->toDateString() => [
-                    'time_in'  => $w->time_in  ? Carbon::parse($w->time_in)->format('H:i:s')  : null,
-                    'time_out' => $w->time_out ? Carbon::parse($w->time_out)->format('H:i:s') : null,
+                    'time_in'   => $w->time_in   ? Carbon::parse($w->time_in)->format('H:i:s')   : null,
+                    'break_out' => $w->break_out  ? Carbon::parse($w->break_out)->format('H:i:s') : null,
+                    'break_in'  => $w->break_in   ? Carbon::parse($w->break_in)->format('H:i:s')  : null,
+                    'time_out'  => $w->time_out   ? Carbon::parse($w->time_out)->format('H:i:s')  : null,
                 ],
             ])
             ->toArray();

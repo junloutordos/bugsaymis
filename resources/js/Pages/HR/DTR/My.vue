@@ -213,6 +213,8 @@
             <template v-else-if="wfhByDate[cell.date]">
               <div class="font-mono text-[9px] text-red-500 leading-[1.4] space-y-px flex-1">
                 <div class="flex gap-1"><span class="text-slate-400">in</span><span>{{ fmtTime(wfhByDate[cell.date].time_in) }}</span></div>
+                <div v-if="wfhByDate[cell.date].break_out" class="flex gap-1"><span class="text-slate-400">out</span><span>{{ fmtTime(wfhByDate[cell.date].break_out) }}</span></div>
+                <div v-if="wfhByDate[cell.date].break_in" class="flex gap-1"><span class="text-slate-400">in</span><span>{{ fmtTime(wfhByDate[cell.date].break_in) }}</span></div>
                 <div class="flex gap-1"><span class="text-slate-400">out</span><span>{{ fmtTime(wfhByDate[cell.date].time_out) }}</span></div>
               </div>
               <div class="mt-1 text-center rounded text-[8px] font-bold py-0.5 px-1 uppercase tracking-wide bg-indigo-100 text-indigo-700">WFH</div>
@@ -522,10 +524,12 @@ function tableCellClass(r, field) {
   if (r[field]) return r.wfh_attendance_id ? 'text-rose-600 font-medium' : 'text-slate-700'
   if (r['penned_' + field]) return 'text-red-600 font-semibold'
   const dateStr = toDateStr(r.work_date)
-  // WFH fallback shows in AM-in and PM-out (record exists but biometric slot empty)
-  if ((field === 'time_in_am' || field === 'time_out_pm') && props.wfhByDate[dateStr]) {
-    return 'text-rose-500 font-semibold'
-  }
+  const wfh = props.wfhByDate[dateStr]
+  // WFH fallback covers all four slots when biometric slot is empty
+  if (field === 'time_in_am'  && wfh?.time_in)   return 'text-rose-500 font-semibold'
+  if (field === 'time_out_am' && wfh?.break_out)  return 'text-rose-500 font-semibold'
+  if (field === 'time_in_pm'  && wfh?.break_in)   return 'text-rose-500 font-semibold'
+  if (field === 'time_out_pm' && wfh?.time_out)   return 'text-rose-500 font-semibold'
   if (r.is_travel) return 'text-sky-600 font-bold'
   if (r.attendance_status === 'on_leave') return 'text-red-600 font-bold'
   if (r.attendance_status === 'on_official_business') return 'text-red-600 font-bold'
@@ -537,8 +541,10 @@ function tableCellText(r, field) {
   if (r[field] || r['penned_' + field]) return fmtTime(r[field] || r['penned_' + field])
   const dateStr = toDateStr(r.work_date)
   const wfh = props.wfhByDate[dateStr]
-  if (field === 'time_in_am'  && wfh?.time_in)  return fmtTime(wfh.time_in)
-  if (field === 'time_out_pm' && wfh?.time_out) return fmtTime(wfh.time_out)
+  if (field === 'time_in_am'  && wfh?.time_in)   return fmtTime(wfh.time_in)
+  if (field === 'time_out_am' && wfh?.break_out)  return fmtTime(wfh.break_out)
+  if (field === 'time_in_pm'  && wfh?.break_in)   return fmtTime(wfh.break_in)
+  if (field === 'time_out_pm' && wfh?.time_out)   return fmtTime(wfh.time_out)
   if (r.is_travel) return 'T'
   const gp = props.gatepassByDate[dateStr]
   if (gp) return gp.label
