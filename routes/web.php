@@ -282,6 +282,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pds', [PdsController::class, 'newpds'])
         ->name('pds.newpds');
 
+    Route::post('/pds/{pds}/passport-photo', [PDSController::class, 'updatePassportPhoto'])->name('pds.passport-photo');
+
     Route::post(
         '/pds/{pds}/trainings/upload-csv',
         [PDSTrainingController::class, 'uploadCsv']

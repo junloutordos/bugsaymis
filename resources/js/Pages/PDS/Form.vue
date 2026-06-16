@@ -14,6 +14,29 @@ import {
 import { ref, watch, computed } from 'vue'
 import Swal from 'sweetalert2'
 
+const passportPhotoUploading = ref(false)
+const passportPhotoError = ref(null)
+
+async function uploadPassportPhoto(file) {
+  if (!file || !props.pds) return
+  passportPhotoUploading.value = true
+  passportPhotoError.value = null
+  try {
+    const dataUri = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = e => resolve(e.target.result)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+    const { data } = await axios.post(route('pds.passport-photo', props.pds.id), { photo_base64: dataUri })
+    form.other_info.path_passport_photo = data.path
+  } catch {
+    passportPhotoError.value = 'Failed to upload photo. Please try again.'
+  } finally {
+    passportPhotoUploading.value = false
+  }
+}
+
 const props = defineProps({
   pds: { type: Object, default: null },
 })
@@ -1565,9 +1588,11 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
               <label class="block text-xs font-medium text-slate-500 mb-1">Date &amp; Place of Issuance</label>
               <input v-model="form.other_info.date_place_issuance" class="input w-full" :readonly="!editMode" />
             </div>
-            <div v-if="editMode">
+            <div v-if="editMode && props.pds">
               <label class="block text-xs font-medium text-slate-500 mb-1">Passport Photo</label>
-              <input type="file" @change="e => form.other_info.path_passport_photo = e.target.files[0]" class="input" />
+              <input type="file" accept="image/*" :disabled="passportPhotoUploading" @change="e => uploadPassportPhoto(e.target.files[0])" class="input" />
+              <p v-if="passportPhotoUploading" class="text-xs text-indigo-600 mt-1">Uploading…</p>
+              <p v-if="passportPhotoError" class="text-xs text-red-600 mt-1">{{ passportPhotoError }}</p>
             </div>
         </div>
 

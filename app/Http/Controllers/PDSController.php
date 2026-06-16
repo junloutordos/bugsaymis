@@ -212,6 +212,40 @@ class PDSController extends Controller
     }
 
     /* =====================================================
+     | PASSPORT PHOTO UPLOAD
+     ===================================================== */
+    public function updatePassportPhoto(Request $request, Pds $pds)
+    {
+        $this->authorizeAccess($pds);
+
+        $request->validate(['photo_base64' => 'required|string']);
+
+        $dataUri = $request->input('photo_base64');
+        if (! preg_match('/^data:(image\/[\w+\-]+);base64,(.+)$/s', $dataUri, $m)) {
+            return response()->json(['error' => 'Invalid image data'], 422);
+        }
+
+        $mime   = $m[1];
+        $ext    = str_contains($mime, 'png') ? 'png' : (str_contains($mime, 'webp') ? 'webp' : 'jpg');
+        $binary = base64_decode($m[2]);
+
+        $existing = $pds->otherInfo?->path_passport_photo;
+        if ($existing && str_starts_with($existing, 'pds/') && Storage::disk('s3')->exists($existing)) {
+            Storage::disk('s3')->delete($existing);
+        }
+
+        $s3Key = 'pds/passport_photos/' . $pds->user_id . '_' . $pds->id . '_' . time() . '.' . $ext;
+        Storage::disk('s3')->put($s3Key, $binary, ['ContentType' => $mime]);
+
+        $pds->otherInfo()->updateOrCreate(
+            ['pds_id' => $pds->id],
+            ['path_passport_photo' => $s3Key]
+        );
+
+        return response()->json(['path' => $s3Key]);
+    }
+
+    /* =====================================================
      | ACCESS CONTROL
      ===================================================== */
     private function authorizeAccess(Pds $pds): void
