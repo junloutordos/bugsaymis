@@ -561,11 +561,12 @@ class DTRService
             $lunchFound = true;
 
             // Check whether the very next middle punch is a post-lunch return.
-            // Accept any gap ≥ 1 min to accommodate employees with short breaks.
+            // No upper-time ceiling: once AM-out is confirmed the immediately
+            // following middle punch is PM-in regardless of how late it occurs.
             $nextIdx = $i + 1;
             if ($nextIdx <= $count - 2) {
                 $nextMin = $mins[$nextIdx];
-                if ($nextMin > $outMin && $nextMin <= $pmInCutoffMin) {
+                if ($nextMin > $outMin) {
                     $timeInPm = $times[$nextIdx];
                 }
             }
@@ -575,9 +576,13 @@ class DTRService
         // ── Phase 2: standalone PM return (no AM-out found) ──────────────────
         // Employee has a biometric gap at lunch departure but tapped back in.
         // E.g. [08:00, 13:30, 17:00] → time_in_pm = 13:30.
+        // No upper-time ceiling: the loop boundary ($i <= $count-2) already
+        // ensures the punch is not the final PM-out, and >= $breakMinutes
+        // excludes morning punches. Any remaining middle punch after the break
+        // midpoint is the best available PM-in candidate.
         if (! $lunchFound) {
             for ($i = 1; $i <= $count - 2; $i++) {
-                if ($mins[$i] >= $breakMinutes && $mins[$i] <= $pmInCutoffMin) {
+                if ($mins[$i] >= $breakMinutes) {
                     $timeInPm = $times[$i];
                     break;
                 }
