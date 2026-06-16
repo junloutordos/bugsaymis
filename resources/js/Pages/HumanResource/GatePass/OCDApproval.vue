@@ -178,6 +178,16 @@
       </div>
     </Teleport>
 
+    <DigitalSignaturePin
+      :show="showPinModal"
+      :hasPin="props.has_pin"
+      :signatureUri="props.signature_uri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Approve"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
+
   </AdminLayout>
 </template>
 
@@ -187,8 +197,14 @@ import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { EyeIcon } from '@heroicons/vue/24/outline'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
-const props = defineProps({ requests: Object, filters: Object })
+const props = defineProps({
+  requests:      Object,
+  filters:       Object,
+  has_pin:       { type: Boolean, default: false },
+  signature_uri: { type: String,  default: null },
+})
 
 const search      = ref(props.filters?.search ?? '')
 const isLoading   = ref(false)
@@ -226,10 +242,34 @@ const viewTarget = ref(null)
 function openView(req) { viewTarget.value = req; viewModal.value = true }
 
 // ── Approve ───────────────────────────────────────────────────────────────────
+const showPinModal     = ref(false)
+const pendingApproveId = ref(null)
+const pinLoading       = ref(false)
+
 function approveRequest(id) {
+  if (props.has_pin) {
+    pendingApproveId.value = id
+    showPinModal.value = true
+    return
+  }
+  submitApprove(id, null)
+}
+
+function handlePinConfirm(pin) {
+  showPinModal.value = false
+  submitApprove(pendingApproveId.value, pin)
+}
+
+function handlePinCancel() {
+  showPinModal.value = false
+  pendingApproveId.value = null
+}
+
+function submitApprove(id, pin) {
   isSubmitting.value = true
-  router.post(route('gatepass.ocd-action', id), { action: 'approve' }, {
-    onFinish: () => { isSubmitting.value = false },
+  pinLoading.value = true
+  router.post(route('gatepass.ocd-action', id), { action: 'approve', pin: pin ?? undefined }, {
+    onFinish: () => { isSubmitting.value = false; pinLoading.value = false },
   })
 }
 
