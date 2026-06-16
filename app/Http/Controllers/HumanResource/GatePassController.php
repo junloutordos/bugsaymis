@@ -748,9 +748,13 @@ class GatePassController extends Controller
 
         $requests = $query->latest('gatepass.created_at')->paginate($perPage)->withQueryString();
 
+        $user = $request->user();
+
         return Inertia::render('HumanResource/GatePass/OCDApproval', [
-            'requests' => $requests,
-            'filters'  => ['search' => $search],
+            'requests'      => $requests,
+            'filters'       => ['search' => $search],
+            'has_pin'       => ! empty($user?->signature_pin),
+            'signature_uri' => $user ? $this->sigService->getSignatureDataUri($user) : null,
         ]);
     }
 
