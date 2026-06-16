@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import { ArrowLeftIcon, PrinterIcon } from '@heroicons/vue/24/outline'
-import { storageUrl } from '@/Composables/useStorage.js'
+import { storageUrl } from '@/Composables/useStorage.js' // still used for bg.jpg
 
 const props = defineProps({
   student: Object,
@@ -15,7 +15,7 @@ const props = defineProps({
 
 const photoUrl = computed(() => {
   if (!props.student.img) return null
-  return storageUrl(`students_profile_picture/${encodeURIComponent(props.student.img)}`)
+  return route('students.photo', { id: props.student.id })
 })
 
 function printCard() {

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Picqer\Barcode\BarcodeGeneratorSVG;
 
@@ -101,6 +102,7 @@ class StudentController extends Controller
             'students' => $students,
             'columns' => $columns,
             'q' => $search,
+            'can_manage_students' => auth()->user()->hasPermission('manage-students') || auth()->user()->isSuperAdmin(),
         ]);
     }
 
@@ -222,7 +224,7 @@ class StudentController extends Controller
 
         return Inertia::render('Students/IdCard', [
             'student' => [
-                'id'        => $student->id,
+                'id'  => $student->id,
                 'full_name' => $fullName,
                 'lrn'       => $student->lrn,
                 'barcode'   => $student->pisaysystemID ?: null,
@@ -245,5 +247,53 @@ class StudentController extends Controller
                 'address'       => $address ?: null,
             ],
         ]);
+    }
+
+    public function proxyPhoto(int $id)
+    {
+        $img = DB::table('students')->where('id', $id)->value('img');
+        abort_if(! $img, 404);
+
+        if (str_contains($img, '/')) {
+            abort_if(! Storage::disk('s3')->exists($img), 404);
+            $content = Storage::disk('s3')->get($img);
+            $mime = Storage::disk('s3')->mimeType($img) ?: 'image/jpeg';
+            return response($content, 200, [
+                'Content-Type'  => $mime,
+                'Cache-Control' => 'private, max-age=3600',
+            ]);
+        }
+
+        $localPath = storage_path("app/public/students_profile_picture/{$img}");
+        abort_if(! file_exists($localPath), 404);
+        return response()->file($localPath, ['Cache-Control' => 'private, max-age=3600']);
+    }
+
+    public function updatePhoto(Request $request, int $id)
+    {
+        $this->authorize('manage-students');
+
+        $request->validate(['photo_base64' => 'required|string']);
+
+        $dataUri = $request->input('photo_base64');
+        if (! preg_match('/^data:(image\/[\w+\-]+);base64,(.+)$/s', $dataUri, $m)) {
+            return response()->json(['error' => 'Invalid image data'], 422);
+        }
+
+        $mime   = $m[1];
+        $ext    = str_contains($mime, 'png') ? 'png' : (str_contains($mime, 'webp') ? 'webp' : 'jpg');
+        $binary = base64_decode($m[2]);
+
+        $existing = DB::table('students')->where('id', $id)->value('img');
+        if ($existing && str_contains($existing, '/') && Storage::disk('s3')->exists($existing)) {
+            Storage::disk('s3')->delete($existing);
+        }
+
+        $s3Key = "students/profile_pictures/{$id}_" . time() . ".{$ext}";
+        Storage::disk('s3')->put($s3Key, $binary, ['ContentType' => $mime]);
+
+        DB::table('students')->where('id', $id)->update(['img' => $s3Key]);
+
+        return response()->json(['success' => true, 'img' => $s3Key]);
     }
 }

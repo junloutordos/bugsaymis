@@ -1,14 +1,14 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { EyeIcon } from "@heroicons/vue/24/outline"
-import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
   students: Object,
   columns: Array,
   editing: Number,
+  can_manage_students: Boolean,
 })
 
 const students = ref(props.students?.data ?? props.students ?? [])
@@ -107,12 +107,121 @@ const lastPage = computed(() => pager.value?.last_page ?? null)
 
 const goTo = (url) => { if (!url) return; window.location.href = url }
 
+// Photo versions keyed by student id — bumped after a successful upload to cache-bust the proxy URL
+const photoVersions = ref({})
+
 const profilePic = (student) => {
-  if (!student) return null
-  const fname = student.img ?? student.image ?? student.photo ?? null
-  if (!fname) return null
-  // public storage path (storage/app/public -> public/storage)
-  return storageUrl(`students_profile_picture/${encodeURIComponent(fname)}`)
+  if (!student?.img) return null
+  const v = photoVersions.value[student.id]
+  return route('students.photo', { id: student.id }) + (v ? `?v=${v}` : '')
+}
+
+// ── Photo crop modal ──────────────────────────────────────────────
+const showPhotoModal = ref(false)
+const photoStudent = ref(null)
+const photoPreviewSrc = ref(null)
+const cropImg = ref(null)
+const cropContainerRef = ref(null)
+const cropX = ref(0)
+const cropY = ref(0)
+const cropSize = ref(0)
+const displayedImgW = ref(0)
+const displayedImgH = ref(0)
+const isDragging = ref(false)
+const dragStart = ref({ x: 0, y: 0, cx: 0, cy: 0 })
+const photoUploading = ref(false)
+const photoError = ref(null)
+
+const openPhotoModal = (student) => {
+  photoStudent.value = student
+  photoPreviewSrc.value = null
+  photoError.value = null
+  showPhotoModal.value = true
+}
+
+const onFileSelect = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => { photoPreviewSrc.value = ev.target.result }
+  reader.readAsDataURL(file)
+}
+
+const onImgLoad = () => {
+  nextTick(() => {
+    const container = cropContainerRef.value
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    displayedImgW.value = rect.width
+    displayedImgH.value = rect.height
+    const minDim = Math.min(rect.width, rect.height)
+    cropSize.value = Math.round(minDim * 0.85)
+    cropX.value = Math.round((rect.width - cropSize.value) / 2)
+    cropY.value = Math.round((rect.height - cropSize.value) / 2)
+  })
+}
+
+const onDrag = (e) => {
+  if (!isDragging.value) return
+  if (e.cancelable) e.preventDefault()
+  const clientX = e.touches?.[0]?.clientX ?? e.clientX
+  const clientY = e.touches?.[0]?.clientY ?? e.clientY
+  const maxX = displayedImgW.value - cropSize.value
+  const maxY = displayedImgH.value - cropSize.value
+  cropX.value = Math.round(Math.min(maxX, Math.max(0, dragStart.value.cx + clientX - dragStart.value.x)))
+  cropY.value = Math.round(Math.min(maxY, Math.max(0, dragStart.value.cy + clientY - dragStart.value.y)))
+}
+
+const endDrag = () => {
+  isDragging.value = false
+  window.removeEventListener('mousemove', onDrag)
+  window.removeEventListener('mouseup', endDrag)
+  window.removeEventListener('touchmove', onDrag)
+  window.removeEventListener('touchend', endDrag)
+}
+
+const startDrag = (e) => {
+  e.preventDefault()
+  isDragging.value = true
+  const clientX = e.touches?.[0]?.clientX ?? e.clientX
+  const clientY = e.touches?.[0]?.clientY ?? e.clientY
+  dragStart.value = { x: clientX, y: clientY, cx: cropX.value, cy: cropY.value }
+  window.addEventListener('mousemove', onDrag)
+  window.addEventListener('mouseup', endDrag)
+  window.addEventListener('touchmove', onDrag, { passive: false })
+  window.addEventListener('touchend', endDrag)
+}
+
+const confirmCrop = async () => {
+  if (!cropImg.value || !photoPreviewSrc.value || !photoStudent.value || cropSize.value === 0) return
+  photoUploading.value = true
+  photoError.value = null
+  try {
+    const img = cropImg.value
+    const scaleX = img.naturalWidth / displayedImgW.value
+    const scaleY = img.naturalHeight / displayedImgH.value
+    const canvas = document.createElement('canvas')
+    canvas.width = 400
+    canvas.height = 400
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, cropX.value * scaleX, cropY.value * scaleY, cropSize.value * scaleX, cropSize.value * scaleY, 0, 0, 400, 400)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+
+    const { data } = await axios.post(route('students.photo.update', { id: photoStudent.value.id }), { photo_base64: dataUrl })
+
+    photoVersions.value[photoStudent.value.id] = Date.now()
+    if (viewStudent.value?.id === photoStudent.value.id) {
+      viewStudent.value = { ...viewStudent.value, img: data.img }
+    }
+    const idx = students.value.findIndex(s => s.id === photoStudent.value.id)
+    if (idx !== -1) students.value[idx] = { ...students.value[idx], img: data.img }
+
+    showPhotoModal.value = false
+  } catch {
+    photoError.value = 'Failed to upload photo. Please try again.'
+  } finally {
+    photoUploading.value = false
+  }
 }
 
 </script>
@@ -246,10 +355,13 @@ const profilePic = (student) => {
 
           <div class="px-6 py-5 max-h-[70vh] overflow-auto">
             <div class="mb-5 flex items-center gap-4">
-              <div v-if="profilePic(viewStudent)">
-                <img :src="profilePic(viewStudent)" alt="Profile" class="w-24 h-24 object-cover rounded-xl border border-slate-200" />
+              <div class="flex flex-col items-center gap-1.5">
+                <div v-if="profilePic(viewStudent)">
+                  <img :src="profilePic(viewStudent)" alt="Profile" class="w-24 h-24 object-cover rounded-xl border border-slate-200" />
+                </div>
+                <div v-else class="w-24 h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-xs text-slate-500">No photo</div>
+                <button v-if="props.can_manage_students" @click="openPhotoModal(viewStudent)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">Change Photo</button>
               </div>
-              <div v-else class="w-24 h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-xs text-slate-500">No photo</div>
               <div class="flex-1">
                 <div class="text-sm font-semibold text-slate-800">{{ viewStudent ? ((viewStudent.last_name ?? viewStudent.lastname ?? viewStudent.lname ?? '') + ', ' + (viewStudent.first_name ?? viewStudent.firstname ?? viewStudent.fname ?? '') + (viewStudent.middle_name ? ' ' + (viewStudent.middle_name ?? viewStudent.middlename ?? viewStudent.mname) : '')) : '—' }}</div>
                 <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ viewStudent ? (viewStudent.pisaysystemID ?? viewStudent.pisay_system_id ?? viewStudent.pisay_id ?? viewStudent.pisayid ?? '—') : '—' }}</div>
@@ -269,6 +381,71 @@ const profilePic = (student) => {
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
             <a v-if="viewStudent" :href="route('students.id-card', viewStudent.id)" target="_blank" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Print ID Card</a>
             <button @click="closeView" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Photo Crop Modal -->
+    <div v-if="showPhotoModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/60 z-[60]">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-slate-800">Update Photo</h3>
+          <button @click="showPhotoModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </button>
+        </div>
+
+        <div class="px-6 py-5">
+          <!-- File picker -->
+          <div v-if="!photoPreviewSrc" class="flex flex-col items-center gap-4 py-6">
+            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <label class="cursor-pointer">
+              <span class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Choose Photo</span>
+              <input type="file" accept="image/*" @change="onFileSelect" class="sr-only" />
+            </label>
+            <p class="text-xs text-slate-500 text-center">JPG, PNG, or WebP. Will be cropped to a square.</p>
+          </div>
+
+          <!-- Crop UI -->
+          <div v-else>
+            <div class="flex justify-center py-2 overflow-hidden rounded-lg bg-slate-900">
+              <div class="relative inline-block select-none" ref="cropContainerRef">
+                <img ref="cropImg" :src="photoPreviewSrc" @load="onImgLoad" class="block" style="max-width: 100%; max-height: 280px; display: block;" alt="" />
+                <!-- Overlay regions outside crop box -->
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: '0px', left: '0px', right: '0px', height: cropY + 'px' }"></div>
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: (cropY + cropSize) + 'px', left: '0px', right: '0px', bottom: '0px' }"></div>
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: cropY + 'px', left: '0px', width: cropX + 'px', height: cropSize + 'px' }"></div>
+                <div class="absolute pointer-events-none bg-black/55" :style="{ top: cropY + 'px', left: (cropX + cropSize) + 'px', right: '0px', height: cropSize + 'px' }"></div>
+                <!-- Draggable crop box -->
+                <div
+                  class="absolute border border-white/90 cursor-move"
+                  :style="{ top: cropY + 'px', left: cropX + 'px', width: cropSize + 'px', height: cropSize + 'px' }"
+                  @mousedown.prevent="startDrag"
+                  @touchstart.prevent="startDrag"
+                >
+                  <div class="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white"></div>
+                  <div class="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-white"></div>
+                  <div class="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-white"></div>
+                  <div class="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white"></div>
+                </div>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2 text-center">Drag the square to position the crop area.</p>
+            <div v-if="photoError" class="mt-2 text-xs text-red-600 text-center">{{ photoError }}</div>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-2">
+          <button v-if="photoPreviewSrc" @click="photoPreviewSrc = null" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Change Image</button>
+          <div v-else></div>
+          <div class="flex gap-2">
+            <button @click="showPhotoModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+            <button v-if="photoPreviewSrc" @click="confirmCrop" :disabled="photoUploading || cropSize === 0" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              {{ photoUploading ? 'Uploading…' : 'Upload Photo' }}
+            </button>
           </div>
         </div>
       </div>
