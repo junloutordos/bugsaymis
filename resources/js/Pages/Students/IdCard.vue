@@ -44,7 +44,9 @@ function printCard() {
 
     <div class="cards">
       <!-- Front -->
-      <div class="id-card">
+      <div class="id-card id-card-front">
+        <div class="id-bg" :style="{ backgroundImage: `url(${storageUrl('bg.jpg')})` }"></div>
+
         <div class="id-band">
           <img src="/images/pshslogo.png" class="id-logo" alt="" onerror="this.style.display='none'" />
           <div class="id-band-text">
@@ -190,6 +192,20 @@ html, body { background: #f1f5f9; }
   display: flex;
   flex-direction: column;
 }
+.id-card-front {
+  position: relative;
+  isolation: isolate;
+}
+.id-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.12;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 
 /* ── Front header / footer bands ──────────────────────────────── */
 .id-band {
@@ -202,13 +218,12 @@ html, body { background: #f1f5f9; }
   padding: 1.5mm 2mm;
   text-align: left;
 }
-.id-logo { width: 7mm; height: 7mm; object-fit: contain; flex-shrink: 0; }
+.id-logo { width: 9mm; height: 9mm; object-fit: contain; flex-shrink: 0; }
 .id-band-text { line-height: 1.25; }
-.id-republic { font-size: 3.6px; font-weight: 400; }
-.id-dost { font-size: 3.6px; font-weight: 400; }
-.id-school { font-size: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-top: 0.5mm; }
-.id-campus { font-size: 3.8px; font-weight: 700; text-transform: uppercase; letter-spacing: .2px; }
-.id-band-title { font-size: 6px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.id-republic { font-size: 4.5px; font-weight: 400; }
+.id-dost { font-size: 4.5px; font-weight: 400; }
+.id-school { font-size: 6.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.id-campus { font-size: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: .2px; }
 
 .id-footer-band {
   background: linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%);
@@ -227,6 +242,7 @@ html, body { background: #f1f5f9; }
   padding: 1.5mm 2mm;
   border-bottom: 1.5px solid #1447c0;
 }
+.id-band-title { font-size: 7px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .id-back-footer {
   border-top: 1.5px solid #1447c0;
   padding: 1.5mm 3mm;
@@ -235,10 +251,7 @@ html, body { background: #f1f5f9; }
   align-items: center;
   justify-content: center;
 }
-.id-back-barcode {
-  width: 100%;
-  height: 100%;
-}
+.id-back-barcode { width: 100%; height: 100%; }
 .id-back-barcode svg { width: 100%; height: 100%; }
 
 /* ── Card body ─────────────────────────────────────────────────── */
@@ -254,8 +267,8 @@ html, body { background: #f1f5f9; }
 
 /* ── Front face ────────────────────────────────────────────────── */
 .id-photo {
-  width: 20mm;
-  height: 20mm;
+  width: 30mm;
+  height: 30mm;
   margin-top: 1mm;
   border: 1px solid #e2e8f0;
   border-radius: 1.5mm;
@@ -273,14 +286,10 @@ html, body { background: #f1f5f9; }
   font-weight: 700;
   color: #1e293b;
   line-height: 1.3;
-  margin-top: 2mm;
-}
-
-.id-barcode {
-  width: 100%;
-  height: 9mm;
   margin-top: 1.5mm;
 }
+
+.id-barcode { width: 100%; height: 7mm; margin-top: 1mm; }
 .id-barcode svg { width: 100%; height: 100%; }
 .id-barcode-no {
   font-size: 5px;
@@ -291,10 +300,10 @@ html, body { background: #f1f5f9; }
 }
 
 .id-lrn {
-  margin-top: 1.5mm;
+  margin-top: 1mm;
   width: 100%;
   border-top: 1px solid #f1f5f9;
-  padding-top: 1.5mm;
+  padding-top: 1mm;
 }
 .id-lrn-label {
   font-size: 4.5px;
@@ -314,13 +323,13 @@ html, body { background: #f1f5f9; }
 .id-sig-block {
   margin-top: auto;
   width: 100%;
-  padding-top: 2mm;
+  padding-top: 1.5mm;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 .id-sig-img {
-  height: 7mm;
+  height: 5mm;
   max-width: 80%;
   object-fit: contain;
   margin-bottom: 0.5mm;
@@ -334,6 +343,7 @@ html, body { background: #f1f5f9; }
   font-size: 5.5px;
   font-weight: 700;
   color: #1e293b;
+  text-transform: uppercase;
 }
 .id-sig-position {
   font-size: 4.5px;
@@ -342,40 +352,33 @@ html, body { background: #f1f5f9; }
 }
 
 /* ── Back face ─────────────────────────────────────────────────── */
-.id-emergency-field {
-  width: 100%;
-  margin-top: 2mm;
-}
+.id-emergency-field { width: 100%; margin-top: 2mm; }
 .id-emergency-field:first-child { margin-top: 1mm; }
 .id-emergency-label {
-  font-size: 4.5px;
+  font-size: 5px;
   font-weight: 700;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .5px;
 }
 .id-emergency-value {
-  font-size: 6px;
+  font-size: 7.5px;
   font-weight: 600;
   color: #1e293b;
   margin-top: 0.5mm;
 }
 
-.id-divider {
-  width: 100%;
-  border-top: 1px solid #f1f5f9;
-  margin: 2mm 0;
-}
+.id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 2mm 0; }
 
 .id-notice {
-  font-size: 5px;
+  font-size: 6px;
   color: #475569;
   line-height: 1.6;
   text-align: justify;
   width: 100%;
 }
 .id-notice-title {
-  font-size: 5.5px;
+  font-size: 6.5px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
@@ -383,18 +386,14 @@ html, body { background: #f1f5f9; }
   text-align: center;
   margin-bottom: 1mm;
 }
-.id-notice p {
-  margin-bottom: 1mm;
-}
-.id-notice p:last-child {
-  margin-bottom: 0;
-}
+.id-notice p { margin-bottom: 1mm; }
+.id-notice p:last-child { margin-bottom: 0; }
 
 .id-sy-label {
   margin-top: 3mm;
   width: 100%;
   text-align: center;
-  font-size: 4.5px;
+  font-size: 5.5px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
