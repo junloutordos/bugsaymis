@@ -144,8 +144,12 @@ const isDragging = ref(false)
 const dragStart  = ref({ x: 0, y: 0, px: 0, py: 0 })
 
 const effectiveScale = computed(() => minScale.value * imgScale.value)
-const imgDispW = computed(() => cropImg.value ? Math.round(cropImg.value.naturalWidth  * effectiveScale.value) : 0)
-const imgDispH = computed(() => cropImg.value ? Math.round(cropImg.value.naturalHeight * effectiveScale.value) : 0)
+const imgDispW = computed(() => cropImg.value ? Math.round(cropImg.value.naturalWidth * effectiveScale.value) : 0)
+const imgDispH = computed(() => {
+  if (!cropImg.value || !imgDispW.value) return 0
+  const { naturalWidth, naturalHeight } = cropImg.value
+  return naturalWidth > 0 ? Math.round(imgDispW.value * naturalHeight / naturalWidth) : 0
+})
 const imgLeft  = computed(() => Math.round(containerW.value / 2 + panX.value - imgDispW.value / 2))
 const imgTop   = computed(() => Math.round(CONTAINER_H      / 2 + panY.value - imgDispH.value / 2))
 const frameLeft = computed(() => Math.round((containerW.value - FRAME) / 2))
@@ -456,7 +460,6 @@ const confirmCrop = async () => {
                 class="absolute pointer-events-none"
                 :style="{
                   width: imgDispW + 'px',
-                  height: imgDispH + 'px',
                   left: imgLeft + 'px',
                   top: imgTop + 'px',
                 }"
