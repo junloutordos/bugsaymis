@@ -1,7 +1,7 @@
 @extends('emails.layouts.base')
 
 @section('header-gradient', str_contains(strtolower($status ?? ''), 'approved') ? 'linear-gradient(90deg,#059669,#10b981)' : 'linear-gradient(90deg,#dc2626,#ef4444)')
-@section('header-title','Service Request — {{ $status }}')
+@section('header-title')Service Request — {{ $status }}@endsection
 @section('header-subtitle','PSHS-CRC MIS — GSU Service Requests')
 
 @section('content')
