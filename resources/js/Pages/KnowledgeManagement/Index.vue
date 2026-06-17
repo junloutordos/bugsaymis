@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Head, router, usePage } from '@inertiajs/vue3'
+import { Head, router, usePage, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import FlashMessage from '@/Components/FlashMessage.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 import EmptyState from '@/Components/EmptyState.vue'
 import {
-  PlusIcon, MagnifyingGlassIcon, LockClosedIcon,
+  PlusIcon, MagnifyingGlassIcon, LockClosedIcon, Cog6ToothIcon, XMarkIcon, PencilIcon, CheckIcon,
 } from '@heroicons/vue/24/outline'
 
 const page = usePage()
@@ -15,6 +15,7 @@ const flash = computed(() => page.props.flash ?? {})
 const props = defineProps({
   issuances:        Array,
   categories:       Array,
+  allCategories:    Array,
   canManage:        Boolean,
   totalActiveUsers: Number,
 })
@@ -83,6 +84,38 @@ function fmtSize(bytes) {
 function readDenominator(i) {
   return i.recipient_type === 'all' ? props.totalActiveUsers : i.recipients_count
 }
+
+// ── Category management modal ──────────────────────────────────────────────
+const showCatModal = ref(false)
+const editingCode  = ref(null)
+
+const addForm = useForm({ code: '', label: '', description: '' })
+const editForm = useForm({ label: '', description: '', is_active: true })
+
+function openCatModal() { showCatModal.value = true; editingCode.value = null; addForm.reset() }
+function closeCatModal() { showCatModal.value = false; editingCode.value = null }
+
+function startEdit(cat) {
+  editingCode.value = cat.code
+  editForm.label       = cat.label
+  editForm.description = cat.description ?? ''
+  editForm.is_active   = cat.is_active
+}
+function cancelEdit() { editingCode.value = null }
+
+function saveEdit(code) {
+  editForm.put(route('km.categories.update', code), {
+    preserveScroll: true,
+    onSuccess: () => { editingCode.value = null },
+  })
+}
+
+function submitAdd() {
+  addForm.post(route('km.categories.store'), {
+    preserveScroll: true,
+    onSuccess: () => { addForm.reset() },
+  })
+}
 </script>
 
 <template>
@@ -98,10 +131,16 @@ function readDenominator(i) {
           Searchable repository of memoranda, orders, and other issuances from the Office of the Executive Director
         </p>
       </div>
-      <a v-if="canManage" :href="route('km.create')"
-        class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
-        <PlusIcon class="h-4 w-4" /> Upload Document
-      </a>
+      <div v-if="canManage" class="flex items-center gap-2">
+        <button @click="openCatModal"
+          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg bg-white hover:bg-slate-50">
+          <Cog6ToothIcon class="h-4 w-4" /> Categories
+        </button>
+        <a :href="route('km.create')"
+          class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
+          <PlusIcon class="h-4 w-4" /> Upload Document
+        </a>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -180,6 +219,100 @@ function readDenominator(i) {
         :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
         @prev="currentPage--" @next="currentPage++" />
     </div>
+
+    <!-- Manage Categories Modal -->
+    <Teleport to="body">
+      <div v-if="showCatModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+            <h3 class="font-semibold text-slate-800">Manage Categories</h3>
+            <button @click="closeCatModal" class="text-slate-400 hover:text-slate-600">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="overflow-y-auto flex-1 px-5 py-4 space-y-1">
+            <div v-for="cat in allCategories" :key="cat.code"
+              class="rounded-lg border border-slate-200 px-3 py-2.5">
+
+              <!-- View row -->
+              <div v-if="editingCode !== cat.code" class="flex items-center gap-3">
+                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0"
+                  :class="categoryColors[cat.code] ?? categoryColors.OTHER">
+                  {{ cat.code }}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-slate-800 truncate">{{ cat.label }}</p>
+                  <p v-if="cat.description" class="text-xs text-slate-400 truncate">{{ cat.description }}</p>
+                </div>
+                <span v-if="!cat.is_active"
+                  class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 border border-slate-200 rounded px-1.5 py-0.5 shrink-0">
+                  Inactive
+                </span>
+                <button @click="startEdit(cat)" class="text-slate-400 hover:text-indigo-600 shrink-0">
+                  <PencilIcon class="h-4 w-4" />
+                </button>
+              </div>
+
+              <!-- Edit row -->
+              <div v-else class="space-y-2">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    :class="categoryColors[cat.code] ?? categoryColors.OTHER">
+                    {{ cat.code }}
+                  </span>
+                  <span class="text-xs text-slate-400">Code is permanent</span>
+                </div>
+                <input v-model="editForm.label" type="text" placeholder="Label"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input v-model="editForm.description" type="text" placeholder="Description (optional)"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" v-model="editForm.is_active" class="rounded" />
+                  Active (visible in dropdowns)
+                </label>
+                <p v-if="editForm.errors.label" class="text-xs text-red-500">{{ editForm.errors.label }}</p>
+                <div class="flex gap-2 pt-1">
+                  <button @click="saveEdit(cat.code)" :disabled="editForm.processing"
+                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
+                    <CheckIcon class="h-3.5 w-3.5" /> Save
+                  </button>
+                  <button @click="cancelEdit"
+                    class="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add new category -->
+          <div class="border-t border-slate-200 px-5 py-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add New Category</p>
+            <div class="flex gap-2 mb-2">
+              <input v-model="addForm.code" type="text" placeholder="Code (e.g. MC2)"
+                maxlength="10"
+                @input="addForm.code = addForm.code.toUpperCase()"
+                class="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
+              <input v-model="addForm.label" type="text" placeholder="Label"
+                class="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <input v-model="addForm.description" type="text" placeholder="Description (optional)"
+              class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2" />
+            <p v-if="addForm.errors.code"  class="text-xs text-red-500 mb-1">{{ addForm.errors.code }}</p>
+            <p v-if="addForm.errors.label" class="text-xs text-red-500 mb-1">{{ addForm.errors.label }}</p>
+            <button @click="submitAdd" :disabled="addForm.processing || !addForm.code || !addForm.label"
+              class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
+              <PlusIcon class="h-4 w-4" /> Add Category
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
 
   </AdminLayout>
 </template>
