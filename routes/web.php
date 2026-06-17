@@ -333,11 +333,13 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/', [\App\Http\Controllers\KnowledgeManagementController::class, 'index'])->name('index');
 
         Route::middleware('permission:km.manage')->group(function () {
-            Route::get('/create',             [\App\Http\Controllers\KnowledgeManagementController::class, 'create'])->name('create');
-            Route::post('/',                  [\App\Http\Controllers\KnowledgeManagementController::class, 'store'])->name('store');
-            Route::get('/{oedIssuance}/edit', [\App\Http\Controllers\KnowledgeManagementController::class, 'edit'])->name('edit');
-            Route::put('/{oedIssuance}',      [\App\Http\Controllers\KnowledgeManagementController::class, 'update'])->name('update');
-            Route::delete('/{oedIssuance}',   [\App\Http\Controllers\KnowledgeManagementController::class, 'destroy'])->name('destroy');
+            Route::get('/create',                           [\App\Http\Controllers\KnowledgeManagementController::class, 'create'])->name('create');
+            Route::post('/',                                [\App\Http\Controllers\KnowledgeManagementController::class, 'store'])->name('store');
+            Route::get('/{oedIssuance}/edit',               [\App\Http\Controllers\KnowledgeManagementController::class, 'edit'])->name('edit');
+            Route::put('/{oedIssuance}',                    [\App\Http\Controllers\KnowledgeManagementController::class, 'update'])->name('update');
+            Route::delete('/{oedIssuance}',                 [\App\Http\Controllers\KnowledgeManagementController::class, 'destroy'])->name('destroy');
+            Route::post('/categories',                      [\App\Http\Controllers\KnowledgeManagementController::class, 'storeCategory'])->name('categories.store');
+            Route::put('/categories/{code}',                [\App\Http\Controllers\KnowledgeManagementController::class, 'updateCategory'])->name('categories.update');
         });
 
         Route::get('/{oedIssuance}',              [\App\Http\Controllers\KnowledgeManagementController::class, 'show'])->name('show');

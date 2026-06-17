@@ -41,6 +41,9 @@ class KnowledgeManagementController extends Controller
         return Inertia::render('KnowledgeManagement/Index', [
             'issuances'        => $issuances,
             'categories'       => OedIssuanceCategory::where('is_active', true)->orderBy('label')->get(['code', 'label']),
+            'allCategories'    => $canManage
+                ? OedIssuanceCategory::orderBy('label')->get(['code', 'label', 'description', 'is_active'])
+                : [],
             'canManage'        => $canManage,
             'totalActiveUsers' => User::where('status', '<>', 'inactive')->count(),
         ]);
@@ -285,6 +288,43 @@ class KnowledgeManagementController extends Controller
             'Content-Type'        => $oedIssuance->file_mime ?: 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $oedIssuance->file_name . '"',
         ]);
+    }
+
+    // ── Category management ───────────────────────────────────────────────────
+
+    public function storeCategory(Request $request)
+    {
+        abort_unless($request->user()->hasPermission('km.manage'), 403);
+
+        $validated = $request->validate([
+            'code'        => ['required', 'string', 'max:10', 'unique:oed_issuance_categories,code'],
+            'label'       => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $validated['code']      = strtoupper($validated['code']);
+        $validated['is_active'] = true;
+
+        OedIssuanceCategory::create($validated);
+
+        return back()->with('success', 'Category "' . $validated['label'] . '" added.');
+    }
+
+    public function updateCategory(Request $request, string $code)
+    {
+        abort_unless($request->user()->hasPermission('km.manage'), 403);
+
+        $category = OedIssuanceCategory::findOrFail($code);
+
+        $validated = $request->validate([
+            'label'       => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'is_active'   => ['required', 'boolean'],
+        ]);
+
+        $category->update($validated);
+
+        return back()->with('success', 'Category updated.');
     }
 
     // ── Shared validation ─────────────────────────────────────────────────────
