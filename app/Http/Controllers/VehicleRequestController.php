@@ -602,11 +602,16 @@ class VehicleRequestController extends Controller
 
         $sigs = $this->loadSigsForPrint(VehicleRequest::class, $vehicleRequest->id);
 
+        $verifyUrl = route('document.verify.doc', ['type' => 'vehicle', 'id' => $vehicleRequest->id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return view('vehicle_requests.print_ticket', [
             'request'     => $vehicleRequest,
             'director'    => $director,
             'directorSig' => $directorSig,
             'sigs'        => $sigs,
+            'qrSvg'       => $qrSvg,
+            'verifyUrl'   => $verifyUrl,
         ]);
     }
 

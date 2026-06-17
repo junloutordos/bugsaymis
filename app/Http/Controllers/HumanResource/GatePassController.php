@@ -492,11 +492,16 @@ class GatePassController extends Controller
 
         $sigs = $this->loadSigsForPrint('App\Models\GatePass', (int) $id);
 
+        $verifyUrl = route('document.verify.doc', ['type' => 'gatepass', 'id' => (int) $id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return view('hr.print_gatepass', [
             'row'           => $row,
             'divisionChief' => $divisionChief,
             'director'      => $director,
             'sigs'          => $sigs,
+            'qrSvg'         => $qrSvg,
+            'verifyUrl'     => $verifyUrl,
         ]);
     }
 

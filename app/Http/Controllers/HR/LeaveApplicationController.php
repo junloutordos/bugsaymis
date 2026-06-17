@@ -458,6 +458,9 @@ class LeaveApplicationController extends Controller
 
         $sigs = $this->loadSigsForPrint(LeaveApplication::class, $leaveApplication->id);
 
+        $verifyUrl = route('document.verify.doc', ['type' => 'leave', 'id' => $leaveApplication->id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return Inertia::render('HR/Leave/PrintForm', [
             'application'        => $application,
             'credits'            => $creditsMap,
@@ -466,6 +469,8 @@ class LeaveApplicationController extends Controller
             'authorizedOfficial' => $authorizedOfficial,
             'monthlySalary'      => $monthlySalary,
             'sigs'               => $sigs,
+            'qrSvg'              => $qrSvg,
+            'verifyUrl'          => $verifyUrl,
         ]);
     }
 

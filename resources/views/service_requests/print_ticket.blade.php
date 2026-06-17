@@ -283,6 +283,19 @@
         PSHS-00-F-GSM-01-Ver02-Rev0-02/01/20
     </div>
 
+    {{-- ── QR Verify Section ──────────────────────────────── --}}
+    @if(!empty($qrSvg))
+    <div style="margin-top:16px; padding-top:10px; border-top:1px solid #ccc; display:flex; align-items:center; gap:12px;">
+      <img src="data:image/svg+xml;base64,{{ $qrSvg }}" style="width:72px; height:72px; flex-shrink:0;" alt="QR Code" />
+      <div style="font-size:9px; color:#555; line-height:1.5;">
+        <div style="font-weight:bold; font-size:10px; margin-bottom:2px;">Verify Digital Signatures</div>
+        <div>Scan the QR code or visit:</div>
+        <div style="font-size:8px; color:#888; word-break:break-all; max-width:200px;">{{ $verifyUrl }}</div>
+        <div style="margin-top:3px; color:#999; font-size:8px;">PSHS-CRC Management Information System</div>
+      </div>
+    </div>
+    @endif
+
 </div>
 </body>
 </html>
