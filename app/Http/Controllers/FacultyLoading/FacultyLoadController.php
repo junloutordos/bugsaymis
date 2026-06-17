@@ -11,6 +11,7 @@ use App\Services\FacultyLoading\LoadComputationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -127,7 +128,135 @@ class FacultyLoadController extends Controller
         return back()->with('success', "Load record unlocked for {$facultyLoad->faculty?->name}.");
     }
 
+    // ── Print: individual (admin/CID) ────────────────────────────────────────
+
+    public function print(FacultyLoad $facultyLoad): Response
+    {
+        $this->authorize('faculty_loading.view');
+
+        $facultyLoad->load(['faculty:id,name,position', 'academicTerm.schoolYear', 'assignments.subject.academicUnit.head']);
+
+        [$sectionMap, $cidChief, $director] = $this->printDependencies();
+
+        return Inertia::render('FacultyLoading/Print', [
+            'loads' => [$this->mapLoadForPrint($facultyLoad, $sectionMap, $cidChief, $director)],
+        ]);
+    }
+
+    // ── Print: own load (faculty) ─────────────────────────────────────────────
+
+    public function printMyLoad(Request $request): Response
+    {
+        $this->authorize('faculty_loading.view_own');
+
+        $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
+
+        $load = FacultyLoad::with(['faculty:id,name,position', 'academicTerm.schoolYear', 'assignments.subject.academicUnit.head'])
+            ->where('user_id', Auth::id())
+            ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
+            ->first();
+
+        abort_if(! $load, 404);
+
+        [$sectionMap, $cidChief, $director] = $this->printDependencies();
+
+        return Inertia::render('FacultyLoading/Print', [
+            'loads' => [$this->mapLoadForPrint($load, $sectionMap, $cidChief, $director)],
+        ]);
+    }
+
+    // ── Print: batch (all faculty for a term) ────────────────────────────────
+
+    public function printBatch(Request $request): Response
+    {
+        $this->authorize('faculty_loading.view');
+
+        $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
+
+        $loads = FacultyLoad::with(['faculty:id,name,position', 'academicTerm.schoolYear', 'assignments.subject.academicUnit.head'])
+            ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
+            ->orderBy(User::select('name')->whereColumn('users.id', 'faculty_loads.user_id'))
+            ->get();
+
+        [$sectionMap, $cidChief, $director] = $this->printDependencies();
+
+        return Inertia::render('FacultyLoading/Print', [
+            'loads' => $loads->map(fn ($l) => $this->mapLoadForPrint($l, $sectionMap, $cidChief, $director))->values(),
+        ]);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function printDependencies(): array
+    {
+        $sectionMap = DB::table('sections')->pluck('sectionname', 'id')->all();
+
+        $cidChief = User::whereHas('roles', fn ($q) => $q->where('name', 'CID Chief'))
+            ->first(['id', 'name', 'position']);
+
+        $director = User::where('position', 'like', '%Director%')
+            ->where('position', 'not like', '%Assistant%')
+            ->first(['id', 'name', 'position']);
+
+        return [$sectionMap, $cidChief, $director];
+    }
+
+    private function mapLoadForPrint(FacultyLoad $l, array $sectionMap, ?object $cidChief, ?object $director): array
+    {
+        $assignments = $l->assignments->map(function ($a) use ($sectionMap) {
+            if ($a->assignment_type === 'teaching' && $a->subject) {
+                $section = $a->section_id ? ($sectionMap[$a->section_id] ?? 'Sec ' . $a->section_id) : null;
+                $label   = $a->subject->name . ($section ? ' (' . $section . ')' : '');
+            } else {
+                $label = $a->description ?? ucfirst(str_replace('_', ' ', $a->assignment_type));
+            }
+
+            return [
+                'id'              => $a->id,
+                'assignment_type' => $a->assignment_type,
+                'display_label'   => $label,
+                'load_units'      => (float) $a->load_units,
+            ];
+        })->values();
+
+        // Resolve AUH from the first teaching assignment's subject → academic unit
+        $auh              = null;
+        $academicUnitName = null;
+        foreach ($l->assignments as $a) {
+            if ($a->assignment_type === 'teaching' && $a->subject?->academicUnit) {
+                $academicUnitName = $a->subject->academicUnit->name;
+                if ($a->subject->academicUnit->head) {
+                    $auh = [
+                        'name'     => $a->subject->academicUnit->head->name,
+                        'position' => $a->subject->academicUnit->head->position ?? 'Academic Unit Head',
+                    ];
+                }
+                break;
+            }
+        }
+
+        return [
+            'id'                 => $l->id,
+            'faculty'            => $l->faculty ? [
+                'name'     => $l->faculty->name,
+                'position' => $l->faculty->position ?? '',
+            ] : null,
+            'term'               => $l->academicTerm ? [
+                'label'       => $l->academicTerm->full_label,
+                'school_year' => $l->academicTerm->schoolYear?->name ?? '',
+                'start_date'  => $l->academicTerm->start_date?->format('F Y'),
+                'end_date'    => $l->academicTerm->end_date?->format('F Y'),
+            ] : null,
+            'academic_unit_name' => $academicUnitName,
+            'assignments'        => $assignments,
+            'total_units'        => (float) $l->total_units,
+            'signatories'        => [
+                'auh'      => $auh,
+                'cid_chief'=> $cidChief ? ['name' => $cidChief->name, 'position' => $cidChief->position ?? 'CID Chief'] : null,
+                'director' => $director  ? ['name' => $director->name,  'position' => $director->position  ?? 'Director III'] : null,
+            ],
+        ];
+    }
 
     private function mapLoad(FacultyLoad $l, bool $withAssignments = false): array
     {
