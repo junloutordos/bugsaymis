@@ -49,7 +49,8 @@ Route::middleware(['web', 'auth', 'verified'])
         // ══════════════════════════════════════════════════════════════════════
         Route::middleware('permission:faculty_loading.view_own')
             ->group(function () {
-                Route::get('/my-load', [FacultyLoadController::class, 'myLoad'])->name('my-load');
+                Route::get('/my-load',       [FacultyLoadController::class, 'myLoad'])->name('my-load');
+                Route::get('/my-load/print', [FacultyLoadController::class, 'printMyLoad'])->name('my-load.print');
             });
 
         // ══════════════════════════════════════════════════════════════════════
@@ -57,7 +58,9 @@ Route::middleware(['web', 'auth', 'verified'])
         // ══════════════════════════════════════════════════════════════════════
         Route::middleware('permission:faculty_loading.view')
             ->group(function () {
-                Route::get('/', [FacultyLoadController::class, 'index'])->name('index');
+                Route::get('/',                          [FacultyLoadController::class, 'index'])->name('index');
+                Route::get('/print-batch',               [FacultyLoadController::class, 'printBatch'])->name('print-batch');
+                Route::get('/{facultyLoad}/print',       [FacultyLoadController::class, 'print'])->name('print');
             });
 
         Route::middleware('permission:faculty_loading.manage')

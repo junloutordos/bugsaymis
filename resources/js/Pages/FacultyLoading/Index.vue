@@ -10,6 +10,10 @@
           <p class="text-sm text-slate-500 mt-0.5">Load summary per faculty for the selected term</p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <button @click="printBatch"
+            class="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors">
+            <PrinterIcon class="h-4 w-4" /> Print All
+          </button>
           <Link :href="route('faculty-loading.assignments.index')"
             class="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors">
             <ClipboardDocumentListIcon class="h-4 w-4" /> Assignments
@@ -114,6 +118,7 @@
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Overload</th>
               <th v-if="canApprove" class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Lock</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Print</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
@@ -176,6 +181,13 @@
                   <LockOpenIcon class="h-3.5 w-3.5" /> Lock
                 </button>
               </td>
+              <td class="px-4 py-3 text-center">
+                <button @click="printLoad(load)"
+                  class="text-slate-400 hover:text-indigo-600 transition-colors mx-auto flex"
+                  title="Print faculty load">
+                  <PrinterIcon class="h-4 w-4" />
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -215,7 +227,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   BanknotesIcon, BeakerIcon, CalendarIcon, ChartBarIcon, CheckCircleIcon,
   ClipboardDocumentListIcon, CpuChipIcon, LockClosedIcon, LockOpenIcon,
-  RectangleGroupIcon, ScaleIcon, UserGroupIcon,
+  PrinterIcon, RectangleGroupIcon, ScaleIcon, UserGroupIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -268,5 +280,13 @@ function submitApproval(approved) {
 function toggleLock(load, lock) {
   const routeName = lock ? 'faculty-loading.lock' : 'faculty-loading.unlock'
   router.post(route(routeName, load.id))
+}
+
+function printLoad(load) {
+  window.open(route('faculty-loading.print', load.id), '_blank')
+}
+
+function printBatch() {
+  window.open(route('faculty-loading.print-batch', { term_id: selectedTermId.value }), '_blank')
 }
 </script>

@@ -9,12 +9,19 @@
           <h1 class="text-xl font-semibold text-slate-800">My Faculty Load</h1>
           <p class="text-sm text-slate-500 mt-0.5">Your teaching load summary for the selected term</p>
         </div>
-        <select v-model="selectedTermId" @change="applyFilter"
-          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-          <option v-for="t in terms" :key="t.id" :value="t.id">
-            {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
-          </option>
-        </select>
+        <div class="flex items-center gap-2">
+          <select v-model="selectedTermId" @change="applyFilter"
+            class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option v-for="t in terms" :key="t.id" :value="t.id">
+              {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
+            </option>
+          </select>
+          <button v-if="load" @click="printLoad"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg font-medium transition-colors"
+            title="Print faculty load">
+            <PrinterIcon class="h-4 w-4" /> Print
+          </button>
+        </div>
       </div>
 
       <!-- No load record -->
@@ -130,7 +137,7 @@
 import { computed, ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { DocumentTextIcon } from '@heroicons/vue/24/outline'
+import { DocumentTextIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   load:        { type: Object, default: null },
@@ -143,6 +150,10 @@ const selectedTermId = ref(props.filters.term_id ?? props.currentTerm?.id)
 
 function applyFilter() {
   router.get(route('faculty-loading.my-load'), { term_id: selectedTermId.value }, { preserveState: true })
+}
+
+function printLoad() {
+  window.open(route('faculty-loading.my-load.print', { term_id: selectedTermId.value }), '_blank')
 }
 
 const statusLabel = computed(() => ({
