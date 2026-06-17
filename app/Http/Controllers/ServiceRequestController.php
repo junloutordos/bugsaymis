@@ -637,9 +637,15 @@ class ServiceRequestController extends Controller
         }
 
         $sigs = $this->loadSigsForPrint(ServiceRequest::class, $serviceRequest->id);
+
+        $verifyUrl = route('document.verify.doc', ['type' => 'service', 'id' => $serviceRequest->id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return view('service_requests.print_ticket', [
-            'request' => $serviceRequest,
-            'sigs'    => $sigs,
+            'request'   => $serviceRequest,
+            'sigs'      => $sigs,
+            'qrSvg'     => $qrSvg,
+            'verifyUrl' => $verifyUrl,
         ]);
     }
 

@@ -535,11 +535,16 @@ class MessengerialController extends Controller
 
         $sigs = $this->loadSigsForPrint(MessengerialRequest::class, $messengerialRequest->id);
 
+        $verifyUrl = route('document.verify.doc', ['type' => 'messengerial', 'id' => $messengerialRequest->id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return view('messengerial.print_ticket', [
             'request'            => $messengerialRequest,
             'divisionChiefName'  => $divisionChiefName,
             'requestorSignature' => $requestorSignature,
             'sigs'               => $sigs,
+            'qrSvg'              => $qrSvg,
+            'verifyUrl'          => $verifyUrl,
         ]);
     }
 

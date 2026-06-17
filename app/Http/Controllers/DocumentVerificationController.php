@@ -3,10 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\DigitalSignature;
+use App\Models\FacilityRequest;
+use App\Models\HR\LeaveApplication;
 use App\Models\Issuance;
 use App\Models\ITJobRequest;
+use App\Models\MessengerialRequest;
+use App\Models\ServiceRequest;
+use App\Models\VehicleRequest;
+use App\Models\WorkRequest;
 use App\Services\DigitalSignatureService;
 use App\Services\IssuanceService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -182,4 +189,73 @@ class DocumentVerificationController extends Controller
             'Cache-Control'       => 'private, max-age=300',
         ]);
     }
+
+    /**
+     * Generic document-level verification page for all non-ITJR modules.
+     * Public, no authentication required.
+     */
+    public function showDocument(string $type, int $id)
+    {
+        $config = self::DOC_CONFIGS[$type] ?? null;
+        abort_if(! $config, 404);
+
+        // Resolve document info (title + requester name)
+        $documentTitle  = $config['label'] . ' #' . $id;
+        $documentMeta   = null;
+
+        if ($type === 'gatepass') {
+            $row = DB::table('gatepass')->where('id', $id)->first();
+            abort_if(! $row, 404);
+            $documentMeta = $row->purpose ?? null;
+        } else {
+            $model = $config['class'];
+            $doc   = $model::find($id);
+            abort_if(! $doc, 404);
+            if ($config['title_field']) {
+                $documentMeta = $doc->{$config['title_field']} ?? null;
+            }
+        }
+
+        // Load all digital signatures for this document
+        $signatures = DigitalSignature::where('signable_type', $config['signable_type'])
+            ->where('signable_id', $id)
+            ->with('signer:id,name,position,badge_id,electronic_signature')
+            ->orderBy('signed_at')
+            ->get();
+
+        $entries = $signatures->map(function (DigitalSignature $sig) {
+            $valid  = $this->svc->verify($sig->verification_token) !== null;
+            $stage  = $sig->metadata['stage'] ?? 'unknown';
+            $sigUri = $sig->signer ? $this->svc->getSignatureDataUri($sig->signer) : null;
+
+            return [
+                'stage'              => ucwords(str_replace('_', ' ', $stage)),
+                'signer'             => $sig->signer?->name ?? '—',
+                'position'           => $sig->signer?->position ?? '—',
+                'badge_id'           => $sig->signer?->badge_id ?? null,
+                'signed_at'          => $sig->signed_at->format('F d, Y \a\t h:i A'),
+                'valid'              => $valid,
+                'signature_uri'      => $sigUri,
+                'verification_token' => $sig->verification_token,
+                'metadata'           => $sig->metadata ?? [],
+            ];
+        });
+
+        return view('documents.verify', [
+            'documentLabel' => $config['label'],
+            'documentTitle' => $documentTitle,
+            'documentMeta'  => $documentMeta,
+            'entries'       => $entries,
+        ]);
+    }
+
+    private const DOC_CONFIGS = [
+        'facility'     => ['class' => FacilityRequest::class,    'signable_type' => FacilityRequest::class,    'label' => 'Facility Request',     'title_field' => 'purpose'],
+        'vehicle'      => ['class' => VehicleRequest::class,     'signable_type' => VehicleRequest::class,     'label' => 'Vehicle Request',      'title_field' => 'purpose'],
+        'work-request' => ['class' => WorkRequest::class,        'signable_type' => WorkRequest::class,        'label' => 'Work Request',         'title_field' => 'description'],
+        'service'      => ['class' => ServiceRequest::class,     'signable_type' => ServiceRequest::class,     'label' => 'Service Request',      'title_field' => 'description'],
+        'gatepass'     => ['class' => null,                      'signable_type' => 'App\Models\GatePass',     'label' => 'Gate Pass',            'title_field' => null],
+        'leave'        => ['class' => LeaveApplication::class,   'signable_type' => LeaveApplication::class,   'label' => 'Leave Application',    'title_field' => null],
+        'messengerial' => ['class' => MessengerialRequest::class, 'signable_type' => MessengerialRequest::class,'label' => 'Messengerial Request', 'title_field' => 'purpose'],
+    ];
 }

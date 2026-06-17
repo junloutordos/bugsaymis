@@ -717,9 +717,15 @@ class WorkRequestController extends Controller
     {
         $workRequest->load(['division', 'office', 'assignedUser', 'requester', 'actedBy']);
         $sigs = $this->loadSigsForPrint(WorkRequest::class, $workRequest->id);
+
+        $verifyUrl = route('document.verify.doc', ['type' => 'work-request', 'id' => $workRequest->id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return view('work_requests.print_ticket', [
             'workRequest' => $workRequest,
             'sigs'        => $sigs,
+            'qrSvg'       => $qrSvg,
+            'verifyUrl'   => $verifyUrl,
         ]);
     }
 }

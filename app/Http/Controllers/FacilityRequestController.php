@@ -883,10 +883,15 @@ class FacilityRequestController extends Controller
         $facilityRequest->load(['requester']);
         $sigs = $this->loadSigsForPrint(FacilityRequest::class, $facilityRequest->id);
 
+        $verifyUrl = route('document.verify.doc', ['type' => 'facility', 'id' => $facilityRequest->id]);
+        $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
+
         return view('facility_requests.print_ticket', [
             'request'    => $facilityRequest,
             'sigs'       => $sigs,
             'sigService' => $this->sigService,
+            'qrSvg'      => $qrSvg,
+            'verifyUrl'  => $verifyUrl,
         ]);
     }
 
