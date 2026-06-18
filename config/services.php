@@ -60,6 +60,11 @@ return [
         'region'          => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
     ],
 
+    'rekognition' => [
+        'region'                  => env('AWS_DEFAULT_REGION', 'ap-southeast-1'),
+        'cognito_identity_pool_id' => env('COGNITO_IDENTITY_POOL_ID'),
+    ],
+
     'sms_gate' => [
         // Local mode:  http://<phone-lan-ip>:8080/message
         // Cloud mode:  https://api.sms-gate.app/3rdparty/v1/messages

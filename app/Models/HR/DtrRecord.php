@@ -45,6 +45,7 @@ class DtrRecord extends Model
         'is_travel',
         'travel_remarks',
         'is_advance',
+        'source',
     ];
 
     protected $casts = [

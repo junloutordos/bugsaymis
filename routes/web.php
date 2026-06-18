@@ -1098,6 +1098,67 @@ Route::middleware(['auth', 'permission:wfh.view'])->prefix('hr/wfh')->name('hr.w
 });
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Online Time Punches (Facial Recognition) Module ─────────────────────────
+Route::middleware(['auth', 'permission:hr.online-punch.record'])->prefix('hr/online-punch')->name('hr.online-punch.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'index'])
+        ->name('index');
+
+    Route::post('/liveness-session', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'createLivenessSession'])
+        ->name('liveness-session');
+    Route::post('/punch', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'punch'])
+        ->name('punch');
+
+    Route::get('/my-punches', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'myPunches'])
+        ->name('my-punches');
+
+    // Monitoring — users with hr.online-punch.monitor permission only
+    Route::get('/monitor', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'monitorPage'])
+        ->middleware('permission:hr.online-punch.monitor')
+        ->name('monitor.page');
+    Route::get('/monitor/data', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'monitor'])
+        ->middleware('permission:hr.online-punch.monitor')
+        ->name('monitor');
+
+    // Image proxy
+    Route::get('/photo/{fileId}', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'photo'])
+        ->name('photo')
+        ->where('fileId', '[a-zA-Z0-9_.=-]+');
+});
+
+// ─── Face Enrollment Module ───────────────────────────────────────────────────
+Route::middleware(['auth'])->prefix('hr/face-enrollment')->name('hr.face-enrollment.')->group(function () {
+    // Employee self-enrollment
+    Route::get('/self', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'selfEnrollPage'])
+        ->middleware('permission:hr.face-enrollment.self')
+        ->name('self');
+    Route::post('/self', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'store'])
+        ->middleware('permission:hr.face-enrollment.self')
+        ->name('store');
+    Route::get('/my-status', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'myStatus'])
+        ->middleware('permission:hr.face-enrollment.self')
+        ->name('my-status');
+
+    // HR review queue
+    Route::get('/', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'index'])
+        ->middleware('permission:hr.face-enrollment.manage')
+        ->name('index');
+    Route::get('/data', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'data'])
+        ->middleware('permission:hr.face-enrollment.manage')
+        ->name('data');
+    Route::post('/{enrollment}/approve', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'approve'])
+        ->middleware('permission:hr.face-enrollment.manage')
+        ->name('approve');
+    Route::post('/{enrollment}/reject', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'reject'])
+        ->middleware('permission:hr.face-enrollment.manage')
+        ->name('reject');
+
+    // Image proxy
+    Route::get('/photo/{fileId}', [\App\Http\Controllers\HR\FaceEnrollmentController::class, 'photo'])
+        ->name('photo')
+        ->where('fileId', '[a-zA-Z0-9_.=-]+');
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Library statistics printable report
 Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controllers\LibraryAttendanceController::class, 'report'])->name('library.statistics.report');
     // Students CRUD (Registrar / public admin may use)

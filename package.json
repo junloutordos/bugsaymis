@@ -9,6 +9,7 @@
   "devDependencies": {
     "@inertiajs/vue3": "^2.0.0",
     "@tailwindcss/forms": "^0.5.7",
+    "@vitejs/plugin-react": "^5.2.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "autoprefixer": "^10.4.20",
     "axios": "^1.16.1",
@@ -19,6 +20,8 @@
     "vue": "^3.4.38"
   },
   "dependencies": {
+    "@aws-amplify/ui-react": "^6.15.4",
+    "@aws-amplify/ui-react-liveness": "^3.6.7",
     "@fontsource/inter": "^5.2.6",
     "@fullcalendar/daygrid": "^6.1.19",
     "@fullcalendar/vue3": "^6.1.19",
@@ -41,6 +44,7 @@
     "@tiptap/pm": "^3.23.6",
     "@tiptap/starter-kit": "^3.23.6",
     "@tiptap/vue-3": "^3.23.6",
+    "aws-amplify": "^6.18.0",
     "chart.js": "^4.5.1",
     "cropperjs": "^2.1.0",
     "datatables.net": "^2.3.3",
@@ -49,6 +53,8 @@
     "html2pdf.js": "^0.14.0",
     "laravel-echo": "^2.3.1",
     "pusher-js": "^8.5.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "simple-datatables": "^10.0.0",
     "sweetalert2": "^11.22.4",
     "vue-chartjs": "^5.3.2",

@@ -44,6 +44,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'WFH',      'name' => 'wfh.accomplishments.delete', 'description' => 'Delete own WFH accomplishments'],
             ['module' => 'WFH',      'name' => 'wfh.monitor',      'description' => 'Monitor WFH attendance of subordinates'],
 
+            // ── Online Time Punches (Facial Recognition) ─────────────────────────
+            ['module' => 'OnlinePunch', 'name' => 'hr.online-punch.record',  'description' => 'Record own time punches via facial recognition'],
+            ['module' => 'OnlinePunch', 'name' => 'hr.online-punch.monitor', 'description' => 'Monitor online time punches of subordinates'],
+            ['module' => 'OnlinePunch', 'name' => 'hr.face-enrollment.self', 'description' => 'Self-enroll own face for Online Time Punches'],
+            ['module' => 'OnlinePunch', 'name' => 'hr.face-enrollment.manage', 'description' => 'Review and approve/reject face enrollments'],
+
             // ── Performance / IPCR ────────────────────────────────────────────
             ['module' => 'IPCR',     'name' => 'ipcr.view',        'description' => 'View own IPCR'],
             ['module' => 'IPCR',     'name' => 'ipcr.create',      'description' => 'Create IPCR entries'],
