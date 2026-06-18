@@ -280,7 +280,7 @@ html, body { background: #f1f5f9; }
   justify-content: center;
   background: #fff;
 }
-.id-photo img { width: 100%; height: 100%; object-fit: contain; }
+.id-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
 .id-photo-empty { font-size: 6px; color: #94a3b8; }
 
 .id-name {
