@@ -235,15 +235,44 @@ class GeneticSchedulingService
                 'lectureRoomIds' => [],
                 'allRoomIds'     => [],
                 'dayConfigs'     => $dayConfigs,
+                'sectionDayConfigs' => [],
             ];
         }
 
         // Section home-room map
         $sectionIds        = $assignments->pluck('section_id')->filter()->unique()->values()->toArray();
-        $sectionClassrooms = Section::whereIn('id', $sectionIds)
-            ->whereNotNull('classroom_id')
-            ->pluck('classroom_id', 'id')
-            ->toArray();
+        $sections          = Section::whereIn('id', $sectionIds)->get();
+        $sectionClassrooms = $sections->whereNotNull('classroom_id')->pluck('classroom_id', 'id')->toArray();
+
+        // Per-section break windows (recess/lunch/afternoon break), merged into each
+        // section's day config alongside the global school_day_configs blocks.
+        $sectionDayConfigs = [];
+        foreach ($sections as $section) {
+            $ownBreaks = [];
+            foreach ([
+                [$section->recess_start, $section->recess_end],
+                [$section->lunch_start, $section->lunch_end],
+                [$section->afternoon_break_start, $section->afternoon_break_end],
+            ] as [$breakStart, $breakEnd]) {
+                if ($breakStart && $breakEnd) {
+                    $ownBreaks[] = ['s' => $this->timeToMinutes($breakStart), 'e' => $this->timeToMinutes($breakEnd)];
+                }
+            }
+
+            if (empty($ownBreaks)) {
+                continue;
+            }
+
+            $sectionDayConfigs[$section->id] = [];
+            foreach (self::DAYS as $day) {
+                $base = $dayConfigs[$day];
+                $sectionDayConfigs[$section->id][$day] = [
+                    'start'   => $base['start'],
+                    'end'     => $base['end'],
+                    'blocked' => array_merge($base['blocked'], $ownBreaks),
+                ];
+            }
+        }
 
         $requirements = [];
         $reqId        = 0;
@@ -288,7 +317,19 @@ class GeneticSchedulingService
             'lectureRoomIds' => $lectureRoomIds,
             'allRoomIds'     => $allRoomIds,
             'dayConfigs'     => $dayConfigs,
+            'sectionDayConfigs' => $sectionDayConfigs,
         ];
+    }
+
+    /**
+     * Resolve the effective day config for a section, merging in its own
+     * recess/lunch/afternoon break windows (set in the Sections module) on
+     * top of the global school_day_configs blocks. Falls back to the global
+     * config when the section has no break times configured.
+     */
+    private function dayConfigFor(array $context, int $sectionId, string $day): array
+    {
+        return $context['sectionDayConfigs'][$sectionId][$day] ?? $context['dayConfigs'][$day];
     }
 
     // ── Population Initialization ─────────────────────────────────────────
@@ -328,7 +369,7 @@ class GeneticSchedulingService
 
                 for ($offset = 0; $offset < count($days); $offset++) {
                     $candidate = $days[($i + $offset) % count($days)];
-                    $cfg       = $context['dayConfigs'][$candidate];
+                    $cfg       = $this->dayConfigFor($context, $req['section_id'], $candidate);
                     if (!empty($this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']))) {
                         $day = $candidate;
                         break;
@@ -351,7 +392,7 @@ class GeneticSchedulingService
     {
         $day = $preferredDay ?? self::DAYS[array_rand(self::DAYS)];
 
-        $cfg         = $context['dayConfigs'][$day];
+        $cfg         = $this->dayConfigFor($context, $req['section_id'], $day);
         $validStarts = $this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']);
 
         $start = empty($validStarts) ? $cfg['start'] : $validStarts[array_rand($validStarts)];
@@ -432,10 +473,8 @@ class GeneticSchedulingService
 
         // ── Day boundary violations (hard) ────────────────────────────────
         foreach ($chromosome as $gene) {
-            $cfg = $context['dayConfigs'][$gene['day']] ?? null;
-            if ($cfg === null) {
-                continue;
-            }
+            $req = $context['requirements'][$gene['req_id']];
+            $cfg = $this->dayConfigFor($context, $req['section_id'], $gene['day']);
 
             if ($gene['start_min'] < $cfg['start'] || $gene['end_min'] > $cfg['end']) {
                 $score -= self::W_DAY_BOUNDARY;
@@ -613,14 +652,15 @@ class GeneticSchedulingService
             switch ($mutationType) {
                 case 0: // New day — only pick days that have valid slots for this session
                     $candidates = [];
-                    foreach ($context['dayConfigs'] as $d => $cfg) {
+                    foreach (self::DAYS as $d) {
+                        $cfg = $this->dayConfigFor($context, $req['section_id'], $d);
                         if (!empty($this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']))) {
                             $candidates[] = $d;
                         }
                     }
                     if (!empty($candidates)) {
                         $newDay      = $candidates[array_rand($candidates)];
-                        $cfg         = $context['dayConfigs'][$newDay];
+                        $cfg         = $this->dayConfigFor($context, $req['section_id'], $newDay);
                         $validStarts = $this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']);
                         $start       = $validStarts[array_rand($validStarts)];
 
@@ -631,7 +671,7 @@ class GeneticSchedulingService
                     break;
 
                 case 1: // New start time within current day
-                    $cfg         = $context['dayConfigs'][$gene['day']];
+                    $cfg         = $this->dayConfigFor($context, $req['section_id'], $gene['day']);
                     $validStarts = $this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']);
                     if (!empty($validStarts)) {
                         $start             = $validStarts[array_rand($validStarts)];
@@ -717,10 +757,8 @@ class GeneticSchedulingService
 
         // Also count day boundary violations as hard conflicts
         foreach ($chromosome as $gene) {
-            $cfg = $context['dayConfigs'][$gene['day']] ?? null;
-            if ($cfg === null) {
-                continue;
-            }
+            $req = $context['requirements'][$gene['req_id']];
+            $cfg = $this->dayConfigFor($context, $req['section_id'], $gene['day']);
 
             if ($gene['start_min'] < $cfg['start'] || $gene['end_min'] > $cfg['end']) {
                 $count++;
@@ -748,10 +786,8 @@ class GeneticSchedulingService
     private function repairDayBoundaryViolations(array $chromosome, array $context): array
     {
         foreach ($chromosome as $reqId => &$gene) {
-            $cfg = $context['dayConfigs'][$gene['day']] ?? null;
-            if ($cfg === null) {
-                continue;
-            }
+            $req = $context['requirements'][$reqId];
+            $cfg = $this->dayConfigFor($context, $req['section_id'], $gene['day']);
 
             $violation = ($gene['start_min'] < $cfg['start'] || $gene['end_min'] > $cfg['end']);
 
@@ -768,8 +804,6 @@ class GeneticSchedulingService
                 continue;
             }
 
-            $req  = $context['requirements'][$reqId];
-
             // Try to find a valid slot on the same day first
             $validStarts = $this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']);
 
@@ -783,7 +817,7 @@ class GeneticSchedulingService
                     if ($otherDay === $gene['day']) {
                         continue;
                     }
-                    $otherCfg    = $context['dayConfigs'][$otherDay];
+                    $otherCfg    = $this->dayConfigFor($context, $req['section_id'], $otherDay);
                     $otherStarts = $this->validStartTimesForDay($otherCfg['start'], $otherCfg['end'], $otherCfg['blocked'], $req['minutes']);
                     if (!empty($otherStarts)) {
                         $start             = $otherStarts[array_rand($otherStarts)];
@@ -955,11 +989,7 @@ class GeneticSchedulingService
         $alternatives = [];
 
         foreach (self::DAYS as $day) {
-            $cfg         = $context['dayConfigs'][$day] ?? null;
-            if ($cfg === null) {
-                continue;
-            }
-
+            $cfg         = $this->dayConfigFor($context, $req['section_id'], $day);
             $validStarts = $this->validStartTimesForDay($cfg['start'], $cfg['end'], $cfg['blocked'], $req['minutes']);
 
             foreach ($validStarts as $start) {

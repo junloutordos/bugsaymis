@@ -54,26 +54,152 @@ class RotationGridBuilder
      */
     public function getWeeklyClassSlots(int $grade): array
     {
+        return $this->getWeeklyClassSlotsForSection($grade, []);
+    }
+
+    /**
+     * Same as getWeeklyClassSlots(), but rebuilds each day's CLASS slots
+     * around a section's own recess/lunch/afternoon-break overrides (set in
+     * the Sections module) instead of the grade's constant RECESS/LUNCH
+     * windows. Any break not overridden by the section falls back to the
+     * grade's constant window — RECESS and LUNCH always block (a default
+     * exists), AFTERNOON_BREAK only blocks when the section has set one.
+     *
+     * @param  int   $grade
+     * @param  array $breaks  ['recess'=>['start','end']|null, 'lunch'=>...|null, 'afternoon_break'=>...|null]
+     * @return array<int, array{day:string, start:string, end:string, label:string}>
+     */
+    public function getWeeklyClassSlotsForSection(int $grade, array $breaks): array
+    {
         $slots = [];
 
         foreach (SchedulingConstants::DAYS as $day) {
-            foreach (SchedulingConstants::getClassSlots($grade, $day) as $slot) {
+            foreach ($this->sectionClassSlots($grade, $day, $breaks) as $slot) {
                 $check = HardConstraintChecker::checkSpecialDayLocks(
                     $grade, $day, $slot['start'], $slot['end']
                 );
                 if ($check['passes']) {
-                    $slots[] = [
-                        'day'   => $day,
-                        'start' => $slot['start'],
-                        'end'   => $slot['end'],
-                        'label' => $slot['label'] ?? '',
-                    ];
+                    $slots[] = $slot;
                 }
             }
         }
 
         return $slots;
     }
+
+    /**
+     * Rebuild the CLASS-slot list for one grade/day, substituting a section's
+     * own recess/lunch/afternoon-break windows for the grade's constant ones.
+     *
+     * Structural (non-configurable) blocks — FLAG, HOMEROOM/ADVISING, DEAD,
+     * CONSULT — are taken from the constant timetable unchanged. The day is
+     * then greedily walked in fixed-length (PERIOD_MINUTES) chunks, skipping
+     * any chunk that overlaps a blocked window, which reproduces the original
+     * hand-authored period boundaries exactly when no override is set.
+     *
+     * @return array<int, array{day:string, start:string, end:string, label:string}>
+     */
+    private function sectionClassSlots(int $grade, string $day, array $breaks): array
+    {
+        $timetable = ($day === 'Monday')
+            ? SchedulingConstants::getMondayTimetable($grade)
+            : SchedulingConstants::getTueFriTimetable($grade);
+
+        $dayStart = min(array_column($timetable, 'start'));
+        $dayEnd   = max(array_column($timetable, 'end'));
+
+        $blocked = [];
+        foreach ($timetable as $entry) {
+            if (! in_array($entry['type'], ['CLASS', 'RECESS', 'LUNCH'], true)) {
+                $blocked[] = ['start' => $entry['start'], 'end' => $entry['end']];
+            }
+        }
+
+        $recess = $breaks['recess'] ?? null;
+        if ($recess) {
+            $blocked[] = $recess;
+        } else {
+            foreach (array_filter($timetable, fn ($s) => $s['type'] === 'RECESS') as $s) {
+                $blocked[] = ['start' => $s['start'], 'end' => $s['end']];
+            }
+        }
+
+        $lunch = $breaks['lunch'] ?? null;
+        if ($lunch) {
+            $blocked[] = $lunch;
+        } else {
+            foreach (array_filter($timetable, fn ($s) => $s['type'] === 'LUNCH') as $s) {
+                $blocked[] = ['start' => $s['start'], 'end' => $s['end']];
+            }
+        }
+
+        $afternoonBreak = $breaks['afternoon_break'] ?? null;
+        if ($afternoonBreak) {
+            $blocked[] = $afternoonBreak;
+        }
+
+        return $this->discretize($day, $dayStart, $dayEnd, $blocked);
+    }
+
+    /**
+     * Greedily walk [dayStart, dayEnd) in PERIOD_MINUTES chunks, skipping any
+     * chunk that overlaps a blocked window (jumping the cursor to the end of
+     * the furthest-reaching overlapping block before resuming).
+     *
+     * @return array<int, array{day:string, start:string, end:string, label:string}>
+     */
+    private function discretize(string $day, string $dayStart, string $dayEnd, array $blocked): array
+    {
+        $slots   = [];
+        $cursor  = $this->toMinutes($dayStart);
+        $end     = $this->toMinutes($dayEnd);
+        $blockedMin = array_map(fn ($b) => [
+            's' => $this->toMinutes($b['start']),
+            'e' => $this->toMinutes($b['end']),
+        ], $blocked);
+
+        $period = 1;
+        while ($cursor + self::PERIOD_MINUTES <= $end) {
+            $slotEnd    = $cursor + self::PERIOD_MINUTES;
+            $furthestEnd = null;
+
+            foreach ($blockedMin as $b) {
+                if ($cursor < $b['e'] && $slotEnd > $b['s']) {
+                    $furthestEnd = max($furthestEnd ?? 0, $b['e']);
+                }
+            }
+
+            if ($furthestEnd !== null) {
+                $cursor = $furthestEnd;
+                continue;
+            }
+
+            $slots[] = [
+                'day'   => $day,
+                'start' => $this->toTime($cursor),
+                'end'   => $this->toTime($slotEnd),
+                'label' => "Period {$period}",
+            ];
+            $period++;
+            $cursor = $slotEnd;
+        }
+
+        return $slots;
+    }
+
+    private function toMinutes(string $time): int
+    {
+        [$h, $m] = array_map('intval', explode(':', $time));
+        return $h * 60 + $m;
+    }
+
+    private function toTime(int $minutes): string
+    {
+        return sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    }
+
+    /** Standard class period length used across every PSHS-CRC timetable. */
+    private const PERIOD_MINUTES = 50;
 
     /**
      * Build the Latin Square rotation grid for a grade.
@@ -83,39 +209,81 @@ class RotationGridBuilder
      *
      * where T = total usable CLASS slots.
      *
+     * When $sectionBreaks gives every section in the grade the SAME effective
+     * availability (no overrides, or identical overrides), the classic Latin
+     * Square rotation is used and the anti-collision guarantee holds exactly
+     * as before. When sections have genuinely different break times, each
+     * section gets its own independent slot list instead — the Latin Square
+     * property can no longer be guaranteed in that case (two sections may
+     * legitimately need different times), so rely on checkCrossSection() /
+     * checkAntiCollision() to surface any resulting teacher/room clashes.
+     *
      * @param  int   $grade  7–10
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
      * @return array<int, list<array{day:string,start:string,end:string,label:string,slot_index:int,section_index:int,section_name:string}>>
      *               Outer index = section index (0-based).
      *               Inner index = slot position (0 = first preferred slot this week).
      */
-    public function buildGrid(int $grade): array
+    public function buildGrid(int $grade, array $sectionBreaks = []): array
     {
-        $allSlots    = $this->getWeeklyClassSlots($grade);
-        $T           = count($allSlots);
         $sections    = SchedulingConstants::GRADE_SECTIONS[$grade] ?? [];
         $numSections = count($sections);
 
-        if ($T === 0 || $numSections === 0) {
+        if ($numSections === 0) {
             return [];
         }
 
-        $step = (int) floor($T / $numSections);
+        $perSectionSlots = [];
+        foreach ($sections as $name) {
+            $perSectionSlots[$name] = $this->getWeeklyClassSlotsForSection($grade, $sectionBreaks[$name] ?? []);
+        }
+
+        $uniform = count(array_unique(array_map(
+            fn ($slots) => json_encode($slots),
+            $perSectionSlots
+        ))) === 1;
+
         $grid = [];
 
-        for ($s = 0; $s < $numSections; $s++) {
-            $offset       = ($s * $step) % $T;
-            $sectionSlots = [];
+        if ($uniform) {
+            $allSlots = reset($perSectionSlots);
+            $T        = count($allSlots);
 
-            for ($i = 0; $i < $T; $i++) {
-                $idx            = ($offset + $i) % $T;
-                $sectionSlots[] = array_merge($allSlots[$idx], [
-                    'slot_index'    => $idx,
-                    'section_index' => $s,
-                    'section_name'  => $sections[$s],
-                ]);
+            if ($T === 0) {
+                return [];
             }
 
-            $grid[$s] = $sectionSlots;
+            $step = (int) floor($T / $numSections);
+
+            for ($s = 0; $s < $numSections; $s++) {
+                $offset       = ($s * $step) % $T;
+                $sectionSlots = [];
+
+                for ($i = 0; $i < $T; $i++) {
+                    $idx            = ($offset + $i) % $T;
+                    $sectionSlots[] = array_merge($allSlots[$idx], [
+                        'slot_index'    => $idx,
+                        'section_index' => $s,
+                        'section_name'  => $sections[$s],
+                    ]);
+                }
+
+                $grid[$s] = $sectionSlots;
+            }
+
+            return $grid;
+        }
+
+        // Sections have genuinely different break times — each gets its own
+        // independent slot list (no rotation offset; positions don't line up
+        // across sections).
+        foreach ($sections as $s => $name) {
+            $slots = $perSectionSlots[$name];
+            $grid[$s] = array_map(fn ($slot, $idx) => array_merge($slot, [
+                'slot_index'    => $idx,
+                'section_index' => $s,
+                'section_name'  => $name,
+            ]), $slots, array_keys($slots));
         }
 
         return $grid;

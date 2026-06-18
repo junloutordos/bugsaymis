@@ -44,10 +44,15 @@ class ScienceCorePlacementService
      * Filters: Science Core days only + H9-H12 constant constraints.
      * Ordered by canonical day (Mon→Wed→Thu→Fri) then ascending start time.
      *
+     * Since Science Core runs all sections of a grade in parallel at the SAME
+     * timeslot (H15), a candidate slot must also avoid every section's own
+     * recess/lunch/afternoon-break windows — not just one section's.
+     *
      * @param  int   $grade  11 or 12
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
      * @return array<int, array{day:string, start:string, end:string, label:string}>
      */
-    public function getCandidateSlots(int $grade): array
+    public function getCandidateSlots(int $grade, array $sectionBreaks = []): array
     {
         $slots = [];
 
@@ -56,14 +61,18 @@ class ScienceCorePlacementService
                 $check = HardConstraintChecker::checkSpecialDayLocks(
                     $grade, $day, $slot['start'], $slot['end']
                 );
-                if ($check['passes']) {
-                    $slots[] = [
-                        'day'   => $day,
-                        'start' => $slot['start'],
-                        'end'   => $slot['end'],
-                        'label' => $slot['label'] ?? '',
-                    ];
+                if (! $check['passes']) {
+                    continue;
                 }
+                if ($this->overlapsAnySectionBreak($slot['start'], $slot['end'], $sectionBreaks)) {
+                    continue;
+                }
+                $slots[] = [
+                    'day'   => $day,
+                    'start' => $slot['start'],
+                    'end'   => $slot['end'],
+                    'label' => $slot['label'] ?? '',
+                ];
             }
         }
 
@@ -71,20 +80,38 @@ class ScienceCorePlacementService
     }
 
     /**
+     * True if [start, end) overlaps any recess/lunch/afternoon-break window
+     * configured for any section in $sectionBreaks.
+     */
+    private function overlapsAnySectionBreak(string $start, string $end, array $sectionBreaks): bool
+    {
+        foreach ($sectionBreaks as $breaks) {
+            foreach (['recess', 'lunch', 'afternoon_break'] as $key) {
+                $window = $breaks[$key] ?? null;
+                if ($window && SchedulingConstants::timesOverlap($start, $end, $window['start'], $window['end'])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Return the first eligible Science Core slot not already in $bookedSlots.
      *
      * @param  int   $grade        11 or 12
      * @param  array $bookedSlots  Array of ['day'=>..., 'start'=>...] to skip
+     * @param  array $sectionBreaks
      * @return array|null          First available slot, or null if fully booked
      */
-    public function findParallelSlot(int $grade, array $bookedSlots = []): ?array
+    public function findParallelSlot(int $grade, array $bookedSlots = [], array $sectionBreaks = []): ?array
     {
         $bookedKeys = array_map(
             static fn ($s) => $s['day'] . '|' . $s['start'],
             $bookedSlots
         );
 
-        foreach ($this->getCandidateSlots($grade) as $slot) {
+        foreach ($this->getCandidateSlots($grade, $sectionBreaks) as $slot) {
             if (! in_array($slot['day'] . '|' . $slot['start'], $bookedKeys, true)) {
                 return $slot;
             }
@@ -290,11 +317,12 @@ class ScienceCorePlacementService
      *
      * @param  int   $grade        11 or 12
      * @param  array $bookedSlots  Slots already claimed by other subjects
+     * @param  array $sectionBreaks
      * @return array|null          Placement plan, or null if no slot is available
      */
-    public function autoPlace(int $grade, array $bookedSlots = []): ?array
+    public function autoPlace(int $grade, array $bookedSlots = [], array $sectionBreaks = []): ?array
     {
-        $slot = $this->findParallelSlot($grade, $bookedSlots);
+        $slot = $this->findParallelSlot($grade, $bookedSlots, $sectionBreaks);
         if ($slot === null) {
             return null;
         }

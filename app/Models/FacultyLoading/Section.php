@@ -42,6 +42,8 @@ class Section extends Model
         'recess_end',
         'lunch_start',
         'lunch_end',
+        'afternoon_break_start',
+        'afternoon_break_end',
         'adviser',
         'syid',
         'is_active',
