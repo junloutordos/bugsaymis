@@ -40,34 +40,20 @@
     </div>
 
     @php
-      // Resolve FAD chief name and signature (similar to facility print logic)
-      $fadName = null; $fadSig = null;
+      // FAD chief name resolved from DB for display (sig URI comes from controller)
+      $fadName = null;
       try {
-        $div = \App\Models\Division::where('division_name', 'Finance and Administrative Division')->first();
-        if (! $div) {
-          $div = \App\Models\Division::where('division_name', 'Finance & Administrative Division')->first();
+        $fadDiv = \App\Models\Division::where(function ($q) {
+          $q->where('division_name', 'Finance and Administrative Division')
+            ->orWhere('division_name', 'Finance & Administrative Division')
+            ->orWhereRaw('lower(division_name) like ?', ['%finance%administrative%'])
+            ->orWhereRaw('lower(division_name) like ?', ['%finance%admin%']);
+        })->first();
+        if ($fadDiv) {
+          $fadName = $fadDiv->divisionchief?->name ?? $fadDiv->division_name ?? null;
         }
-        if (! $div) {
-          $div = \App\Models\Division::whereRaw('lower(division_name) like ?', ['%finance%'])
-            ->where(function($q){
-              $q->whereRaw('lower(division_name) like ?', ['%administrative%'])
-                ->orWhereRaw('lower(division_name) like ?', ['%admin%']);
-            })->first();
-        }
-        if ($div) {
-          $chief = $div->divisionchief;
-          $fadName = $chief->name ?? $div->division_name ?? null;
-          if (!empty($div->signature_path)) {
-            $fadSig = $div->signature_path;
-          } elseif ($chief && !empty($chief->electronic_signature)) {
-            $fadSig = $chief->electronic_signature;
-          }
-        }
-      } catch (\Throwable $e) {
-        $fadName = null; $fadSig = null;
-      }
+      } catch (\Throwable $e) {}
 
-      // Director resolved in controller via User::havingRole('OCD')->first()
       $directorName = $director?->name;
     @endphp
     <div class="two-up">
@@ -169,8 +155,8 @@
           <div style="font-style:italic">Requested by:</div>
           @if(isset($sigs['submission']['uri']))
             <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-          @elseif(!empty($request->user->electronic_signature))
-            <img src="{{ asset('storage/' . $request->user->electronic_signature) }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+          @elseif(!empty($requesterSigUri))
+            <img src="{{ $requesterSigUri }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
           @endif
           <div style="border-bottom:1px solid #000;width:78%;margin:0 auto"></div>
           @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
@@ -231,8 +217,8 @@
           <div style="text-align:center">
             @if(isset($sigs['fad_approval']['uri']))
               <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-            @elseif(!empty($fadSig))
-              <img src="{{ asset('storage/' . $fadSig) }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+            @elseif(!empty($fadSigUri))
+              <img src="{{ $fadSigUri }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
             @else
               <div style="height:48px"></div>
             @endif
@@ -338,8 +324,8 @@
               <div style="font-style:italic">Requested by:</div>
               @if(isset($sigs['submission']['uri']))
                 <img src="{{ $sigs['submission']['uri'] }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-              @elseif(!empty($request->user->electronic_signature))
-                <img src="{{ asset('storage/' . $request->user->electronic_signature) }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+              @elseif(!empty($requesterSigUri))
+                <img src="{{ $requesterSigUri }}" alt="requestor signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
               @endif
               <div style="border-bottom:1px solid #000;width:78%;margin:0 auto"></div>
               @if(isset($sigs['submission'])) <div class="dig-badge">✓ Digitally Signed · {{ optional($sigs['submission']['signed_at'])->format('M d, Y H:i') }}</div> @endif
@@ -381,8 +367,8 @@
               <div style="text-align:center">
                 @if(isset($sigs['fad_approval']['uri']))
                   <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-                @elseif(!empty($fadSig))
-                  <img src="{{ asset('storage/' . $fadSig) }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                @elseif(!empty($fadSigUri))
+                  <img src="{{ $fadSigUri }}" alt="FAD chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
                 @else
                   <div style="height:40px"></div>
                 @endif
@@ -527,8 +513,8 @@
                   <div style="text-align:center">
                     @if(isset($sigs['fad_approval']['uri']))
                       <img src="{{ $sigs['fad_approval']['uri'] }}" alt="FAD signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-                    @elseif(!empty($fadSig))
-                      <img src="{{ asset('storage/' . $fadSig) }}" alt="FAD signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+                    @elseif(!empty($fadSigUri))
+                      <img src="{{ $fadSigUri }}" alt="FAD signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
                     @else
                       <div style="height:48px"></div>
                     @endif
