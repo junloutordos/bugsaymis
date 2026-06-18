@@ -169,30 +169,10 @@
         </div>
 
         <div style="width:48%">
-          @php
-            $dcSig = null;
-            $dcName = $request->divisionChief->name ?? '—';
-            // show division chief signature only if request was approved by division chief
-            if (in_array($request->status, ['Approved', 'OCD Approved'])) {
-                if (!empty($request->divisionChief->electronic_signature)) {
-                    $dcSig = $request->divisionChief->electronic_signature;
-                } else {
-                    try {
-                        $divByChief = \App\Models\Division::where('division_chief_id', $request->division_chief_id)->first();
-                        if ($divByChief && !empty($divByChief->signature_path)) {
-                            $dcSig = $divByChief->signature_path;
-                        }
-                    } catch (\Throwable $e) {
-                        $dcSig = null;
-                    }
-                }
-            }
-          @endphp
+          @php $dcName = $request->divisionChief->name ?? '—'; @endphp
           <div style="font-style:italic">Noted:</div>
-          @if(isset($sigs['dc_approval']['uri']))
-            <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-          @elseif($dcSig)
-            <img src="{{ asset('storage/' . $dcSig) }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+          @if(!empty($dcSigUri))
+            <img src="{{ $dcSigUri }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
           @else
             <div style="height:48px"></div>
           @endif
@@ -339,10 +319,8 @@
 
             <div style="width:48%">
               <div style="font-style:italic">Noted:</div>
-              @if(isset($sigs['dc_approval']['uri']))
-                <img src="{{ $sigs['dc_approval']['uri'] }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
-              @elseif($dcSig)
-                <img src="{{ asset('storage/' . $dcSig) }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
+              @if(!empty($dcSigUri))
+                <img src="{{ $dcSigUri }}" alt="division chief signature" style="max-height:48px; display:block; margin:0 auto 4px;" />
               @else
                 <div style="height:48px"></div>
               @endif

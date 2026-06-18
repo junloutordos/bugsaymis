@@ -340,6 +340,23 @@ class VehicleRequestController extends Controller
         $vehicleRequest->save();
         if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief — pending FAD', route('vehicle-requests.index')); }
 
+        // Record DC digital signature (signed email link acts as authentication factor)
+        $chiefUser = \App\Models\User::find($chief);
+        if ($chiefUser) {
+            try {
+                $this->sigService->sign(
+                    signer:        $chiefUser,
+                    signableType:  VehicleRequest::class,
+                    signableId:    $vehicleRequest->id,
+                    documentTitle: "Vehicle Request #{$vehicleRequest->id}",
+                    contentToHash: VehicleRequest::class . $vehicleRequest->id . 'dc_approval',
+                    metadata:      ['stage' => 'dc_approval', 'source' => 'email_link'],
+                );
+            } catch (\Throwable $e) {
+                logger()->warning('DC email-link sign failed', ['error' => $e->getMessage(), 'vehicle_request_id' => $vehicleRequest->id]);
+            }
+        }
+
         // Notify FAD Chief users (next step after DC approval)
         $fadUsers = \App\Models\User::select('id', 'email', 'position')
             ->where('position', 'like', '%FAD%')
@@ -606,6 +623,15 @@ class VehicleRequestController extends Controller
         // Resolve requester signature as a data URI (S3-safe)
         $requesterSigUri = $this->sigService->getSignatureDataUri($vehicleRequest->user);
 
+        // Resolve Division Chief signature as a data URI (S3-safe fallback)
+        $dcSigUri = $sigs['dc_approval']['uri'] ?? null;
+        if (! $dcSigUri) {
+            $dcPath = $vehicleRequest->divisionChief?->electronic_signature ?? null;
+            if ($dcPath) {
+                $dcSigUri = $this->sigService->getImageDataUriFromPath($dcPath);
+            }
+        }
+
         // Resolve FAD Chief signature as a data URI (S3-safe fallback for older requests
         // that predate the FAD digital-signature step)
         $fadSigUri = null;
@@ -635,6 +661,7 @@ class VehicleRequestController extends Controller
             'directorSig'     => $directorSig,
             'sigs'            => $sigs,
             'requesterSigUri' => $requesterSigUri,
+            'dcSigUri'        => $dcSigUri,
             'fadSigUri'       => $fadSigUri,
             'qrSvg'           => $qrSvg,
             'verifyUrl'       => $verifyUrl,
