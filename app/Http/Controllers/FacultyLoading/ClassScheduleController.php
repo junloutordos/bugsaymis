@@ -142,11 +142,11 @@ class ClassScheduleController extends Controller
 
         $validation = $this->validation->validate($data);
 
-        // Hard block: errors must be resolved
-        if (! $validation['valid'] && ! ($request->boolean('force') && empty($validation['errors']))) {
-            if (! empty($validation['errors'])) {
-                return back()->withErrors($validation['errors'])->with('validation_result', $validation);
-            }
+        // Hard block: errors must be resolved. Warnings never block — `force`
+        // (the "I acknowledge the warnings" checkbox) only matters for those,
+        // and is implicitly honored since warnings alone never reach this branch.
+        if (! empty($validation['errors'])) {
+            return back()->withErrors($validation['errors'])->with('validation_result', $validation);
         }
 
         $facultyLoad = FacultyLoad::where('user_id', $data['faculty_id'])
@@ -207,10 +207,8 @@ class ClassScheduleController extends Controller
 
         $validation = $this->validation->validate($data, $classSchedule->id);
 
-        if (! $validation['valid'] && ! ($request->boolean('force') && empty($validation['errors']))) {
-            if (! empty($validation['errors'])) {
-                return back()->withErrors($validation['errors'])->with('validation_result', $validation);
-            }
+        if (! empty($validation['errors'])) {
+            return back()->withErrors($validation['errors'])->with('validation_result', $validation);
         }
 
         $classSchedule->update([
