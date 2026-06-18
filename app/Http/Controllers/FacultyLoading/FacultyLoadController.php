@@ -134,7 +134,7 @@ class FacultyLoadController extends Controller
     {
         $this->authorize('faculty_loading.view');
 
-        $facultyLoad->load(['faculty:id,name,position', 'academicTerm.schoolYear', 'assignments.subject.academicUnit.head']);
+        $facultyLoad->load(['faculty:id,name,position,academic_unit_id', 'faculty.academicUnit.head', 'academicTerm.schoolYear', 'assignments.subject']);
 
         [$sectionMap, $cidChief, $director] = $this->printDependencies();
 
@@ -151,7 +151,7 @@ class FacultyLoadController extends Controller
 
         $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
 
-        $load = FacultyLoad::with(['faculty:id,name,position', 'academicTerm.schoolYear', 'assignments.subject.academicUnit.head'])
+        $load = FacultyLoad::with(['faculty:id,name,position,academic_unit_id', 'faculty.academicUnit.head', 'academicTerm.schoolYear', 'assignments.subject'])
             ->where('user_id', Auth::id())
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->first();
@@ -173,7 +173,7 @@ class FacultyLoadController extends Controller
 
         $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
 
-        $loads = FacultyLoad::with(['faculty:id,name,position', 'academicTerm.schoolYear', 'assignments.subject.academicUnit.head'])
+        $loads = FacultyLoad::with(['faculty:id,name,position,academic_unit_id', 'faculty.academicUnit.head', 'academicTerm.schoolYear', 'assignments.subject'])
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->orderBy(User::select('name')->whereColumn('users.id', 'faculty_loads.user_id'))
             ->get();
@@ -219,21 +219,13 @@ class FacultyLoadController extends Controller
             ];
         })->values();
 
-        // Resolve AUH from the first teaching assignment's subject → academic unit
-        $auh              = null;
-        $academicUnitName = null;
-        foreach ($l->assignments as $a) {
-            if ($a->assignment_type === 'teaching' && $a->subject?->academicUnit) {
-                $academicUnitName = $a->subject->academicUnit->name;
-                if ($a->subject->academicUnit->head) {
-                    $auh = [
-                        'name'     => $a->subject->academicUnit->head->name,
-                        'position' => $a->subject->academicUnit->head->position ?? 'Academic Unit Head',
-                    ];
-                }
-                break;
-            }
-        }
+        // Resolve AUH from the faculty member's own academic unit
+        $academicUnit     = $l->faculty?->academicUnit;
+        $academicUnitName = $academicUnit?->name;
+        $auh = $academicUnit?->head ? [
+            'name'     => $academicUnit->head->name,
+            'position' => $academicUnit->head->position ?? 'Academic Unit Head',
+        ] : null;
 
         return [
             'id'                 => $l->id,
