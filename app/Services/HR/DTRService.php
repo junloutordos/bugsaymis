@@ -237,7 +237,6 @@ class DTRService
 
         DtrRecord::where('user_id', $leave->user_id)
             ->whereBetween('work_date', [$dateFrom, $dateTo])
-            ->where('is_locked', false)
             ->update([
                 'attendance_status'    => 'on_leave',
                 'leave_application_id' => $leave->id,
