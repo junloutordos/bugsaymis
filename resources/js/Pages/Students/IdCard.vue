@@ -204,7 +204,7 @@ html, body { background: #f1f5f9; }
   z-index: -1;
   background-size: cover;
   background-position: center;
-  opacity: 0.12;
+  opacity: 0.15;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -222,15 +222,15 @@ html, body { background: #f1f5f9; }
 }
 .id-logo { width: 9mm; height: 9mm; object-fit: contain; flex-shrink: 0; }
 .id-band-text { line-height: 1.25; }
-.id-republic { font-size: 4.5px; font-weight: 400; }
-.id-dost { font-size: 4.5px; font-weight: 400; }
-.id-school { font-size: 6.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
-.id-campus { font-size: 5px; font-weight: 700; text-transform: uppercase; letter-spacing: .2px; }
+.id-republic { font-size: 5.5px; font-weight: 400; }
+.id-dost { font-size: 5.5px; font-weight: 400; }
+.id-school { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.id-campus { font-size: 6.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .2px; }
 
 .id-footer-band {
   background: linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%);
   color: #fff;
-  font-size: 6px;
+  font-size: 8px;
   font-weight: 700;
   letter-spacing: 2px;
   text-align: center;
@@ -244,7 +244,7 @@ html, body { background: #f1f5f9; }
   padding: 1.5mm 2mm;
   border-bottom: 1.5px solid #1447c0;
 }
-.id-band-title { font-size: 7px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+.id-band-title { font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 .id-back-footer {
   border-top: 1.5px solid #1447c0;
   padding: 1.5mm 3mm;
@@ -284,7 +284,7 @@ html, body { background: #f1f5f9; }
 .id-photo-empty { font-size: 6px; color: #94a3b8; }
 
 .id-name {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 700;
   color: #1e293b;
   line-height: 1.3;
@@ -294,7 +294,7 @@ html, body { background: #f1f5f9; }
 .id-barcode { width: 100%; height: 7mm; margin-top: 1mm; }
 .id-barcode svg { width: 100%; height: 100%; }
 .id-barcode-no {
-  font-size: 5px;
+  font-size: 6.5px;
   font-weight: 600;
   color: #475569;
   letter-spacing: 1px;
@@ -308,14 +308,14 @@ html, body { background: #f1f5f9; }
   padding-top: 1mm;
 }
 .id-lrn-label {
-  font-size: 4.5px;
+  font-size: 6px;
   font-weight: 700;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .5px;
 }
 .id-lrn-value {
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 700;
   color: #1e293b;
   letter-spacing: 1px;
@@ -342,13 +342,13 @@ html, body { background: #f1f5f9; }
   margin-bottom: 0.8mm;
 }
 .id-sig-name {
-  font-size: 5.5px;
+  font-size: 7px;
   font-weight: 700;
   color: #1e293b;
   text-transform: uppercase;
 }
 .id-sig-position {
-  font-size: 4.5px;
+  font-size: 6px;
   color: #94a3b8;
   letter-spacing: .5px;
 }
@@ -357,14 +357,14 @@ html, body { background: #f1f5f9; }
 .id-emergency-field { width: 100%; margin-top: 2mm; }
 .id-emergency-field:first-child { margin-top: 1mm; }
 .id-emergency-label {
-  font-size: 5px;
+  font-size: 6.5px;
   font-weight: 700;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .5px;
 }
 .id-emergency-value {
-  font-size: 7.5px;
+  font-size: 9.5px;
   font-weight: 600;
   color: #1e293b;
   margin-top: 0.5mm;
@@ -373,14 +373,14 @@ html, body { background: #f1f5f9; }
 .id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 2mm 0; }
 
 .id-notice {
-  font-size: 6px;
+  font-size: 7.5px;
   color: #475569;
   line-height: 1.6;
   text-align: justify;
   width: 100%;
 }
 .id-notice-title {
-  font-size: 6.5px;
+  font-size: 8px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
@@ -395,7 +395,7 @@ html, body { background: #f1f5f9; }
   margin-top: 3mm;
   width: 100%;
   text-align: center;
-  font-size: 5.5px;
+  font-size: 7px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
