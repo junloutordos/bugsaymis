@@ -25,6 +25,7 @@ class ICTEquipmentController extends Controller
         $query = ICTEquipment::with([
             'owner',
             'room',
+            'agentDevice',
             'pmsHistory' => function ($q) {
                 $q->orderBy('pms_date', 'desc');
             }

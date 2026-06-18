@@ -338,6 +338,7 @@ const showAllChecked    = computed({
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Description</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Owner</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Agent</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap text-center">Action</th>
               </tr>
             </thead>
@@ -358,6 +359,12 @@ const showAllChecked    = computed({
                       'bg-slate-100 text-slate-600': !['Good Working','For Repair','Disposed'].includes(eq.status)
                     }"
                   >{{ eq.status }}</span>
+                </td>
+                <td class="px-4 py-3 text-xs">
+                  <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
+                  </span>
+                  <span v-else class="text-slate-400">—</span>
                 </td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
@@ -380,7 +387,7 @@ const showAllChecked    = computed({
                 </td>
               </tr>
               <tr v-if="visibleEquipments.length===0">
-                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">
+                <td colspan="7" class="py-16 text-center text-slate-400 text-sm">
                   No equipment found.
                 </td>
               </tr>

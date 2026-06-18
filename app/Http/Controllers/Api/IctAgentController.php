@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ICTEquipment;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
+use App\Models\IctEquipmentHealthSnapshot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -91,5 +92,42 @@ class IctAgentController extends Controller
             'hostname'     => $device->hostname,
             'last_checkin_at' => $device->last_checkin_at,
         ]);
+    }
+
+    /**
+     * POST /api/ict-agent/checkin
+     *
+     * Periodic hardware snapshot from an enrolled device. Phase 1 scope:
+     * store the latest snapshot only (overwritten each check-in) — no
+     * alerting/history yet, that's Phase 2.
+     */
+    public function checkin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'cpu'           => ['nullable', 'string', 'max:255'],
+            'ram_total_mb'  => ['nullable', 'integer'],
+            'ram_free_mb'   => ['nullable', 'integer'],
+            'disks'         => ['nullable', 'array'],
+            'disks.*.drive'    => ['nullable', 'string', 'max:10'],
+            'disks.*.total_gb' => ['nullable', 'numeric'],
+            'disks.*.free_gb'  => ['nullable', 'numeric'],
+            'os_version'    => ['nullable', 'string', 'max:255'],
+            'agent_version' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        $device = $request->user();
+
+        IctEquipmentHealthSnapshot::updateOrCreate(
+            ['device_id' => $device->id],
+            ['payload' => $validated, 'recorded_at' => now()]
+        );
+
+        $device->update([
+            'last_checkin_at' => now(),
+            'os_version'      => $validated['os_version'] ?? $device->os_version,
+            'agent_version'   => $validated['agent_version'] ?? $device->agent_version,
+        ]);
+
+        return response()->json(['status' => 'ok']);
     }
 }
