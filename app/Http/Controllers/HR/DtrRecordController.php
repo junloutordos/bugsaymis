@@ -688,10 +688,26 @@ class DtrRecordController extends Controller
             return back()->with('error', 'This DTR record is locked and cannot be edited.');
         }
 
-        $record->update(array_merge($request->validated(), [
+        $validated = $request->validated();
+
+        $record->update(array_merge($validated, [
             'processed_by' => Auth::id(),
             'processed_at' => now(),
         ]));
+
+        if ($record->wfh_attendance_id) {
+            $workDate   = Carbon::parse($record->work_date)->format('Y-m-d');
+            $toDatetime = fn (?string $t) => $t ? Carbon::parse("$workDate $t") : null;
+
+            WFHAttendance::where('id', $record->wfh_attendance_id)->update([
+                'time_in'   => $toDatetime($validated['time_in_am']  ?? null),
+                'break_out' => $toDatetime($validated['time_out_am'] ?? null),
+                'break_in'  => $toDatetime($validated['time_in_pm']  ?? null),
+                'time_out'  => $toDatetime($validated['time_out_pm'] ?? null),
+            ]);
+
+            $record->update(['wfh_overridden' => true]);
+        }
 
         app(DTRService::class)->recompute($record->fresh());
 

@@ -244,6 +244,7 @@ function cellStyle(rec, field) {
   const biometric = rec[field]
   const penned    = rec['penned_' + field]
   if (!biometric && penned) return { color: 'red' }
+  if (rec.wfh_attendance_id) return { color: 'red' }
 
   const val = biometric || penned
   if (!val) {

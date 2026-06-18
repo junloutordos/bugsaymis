@@ -212,7 +212,7 @@
               <tr v-if="!records.length">
                 <td colspan="14" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
               </tr>
-              <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'">
+              <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : (r.wfh_attendance_id && r.wfh_overridden ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50/60')">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
                 <template v-if="r.is_advance && (isAdmin || canManageDtr)">
