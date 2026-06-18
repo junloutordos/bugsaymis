@@ -354,28 +354,28 @@ html, body { background: #f1f5f9; }
 }
 
 /* ── Back face ─────────────────────────────────────────────────── */
-.id-emergency-field { width: 100%; margin-top: 2mm; }
-.id-emergency-field:first-child { margin-top: 1mm; }
+.id-emergency-field { width: 100%; margin-top: 1.5mm; }
+.id-emergency-field:first-child { margin-top: 0.5mm; }
 .id-emergency-label {
-  font-size: 6.5px;
+  font-size: 6px;
   font-weight: 700;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: .5px;
 }
 .id-emergency-value {
-  font-size: 9.5px;
+  font-size: 8px;
   font-weight: 600;
   color: #1e293b;
   margin-top: 0.5mm;
 }
 
-.id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 2mm 0; }
+.id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 1mm 0; }
 
 .id-notice {
   font-size: 6px;
   color: #475569;
-  line-height: 1.6;
+  line-height: 1.4;
   text-align: justify;
   width: 100%;
 }
