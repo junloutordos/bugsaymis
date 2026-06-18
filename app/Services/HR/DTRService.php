@@ -7,6 +7,7 @@ use App\Models\HR\DtrRecord;
 use App\Models\HR\EmployeeSchedule;
 use App\Models\HR\Holiday;
 use App\Models\HR\LeaveApplication;
+use App\Models\HR\OnlineTimePunch;
 use App\Models\User;
 use App\Models\WFHAttendance;
 use Carbon\Carbon;
@@ -49,6 +50,13 @@ class DTRService
             ->whereBetween('date', [$dateFrom, $dateTo])
             ->get()
             ->keyBy(fn ($w) => Carbon::parse($w->date)->toDateString());
+
+        // Load verified Online Time Punches for this range, grouped by date
+        $onlinePunches = OnlineTimePunch::where('user_id', $userId)
+            ->where('match_status', 'verified')
+            ->whereBetween('work_date', [$dateFrom, $dateTo])
+            ->get()
+            ->groupBy(fn ($p) => Carbon::parse($p->work_date)->toDateString());
 
         // Load approved leave applications overlapping the range
         $leaves = LeaveApplication::where('user_id', $userId)
@@ -112,20 +120,43 @@ class DTRService
                 $schedule
             );
 
-            // WFH fallback: when there are no biometric logs for this date but
-            // the employee has a WFH attendance record, map all four WFH slots
-            // onto the DTR time columns so hours & late/undertime compute correctly.
+            // Online Time Punch fallback: ranks above WFH (algorithmically
+            // face-verified) but below a physical biometric device punch.
+            // Only used when no biometric logs exist for this date.
+            $onlineForDay   = $onlinePunches->get($dateStr, collect());
+            $hasOnlinePunch = $onlineForDay->isNotEmpty();
+
+            if ($hasOnlinePunch && $logsForDay->isEmpty()) {
+                $byPunchType = $onlineForDay->keyBy('punch_type');
+                $timeInAm    = $byPunchType->get('time_in_am')?->punched_at?->format('H:i:s');
+                $timeOutAm   = $byPunchType->get('time_out_am')?->punched_at?->format('H:i:s');
+                $timeInPm    = $byPunchType->get('time_in_pm')?->punched_at?->format('H:i:s');
+                $timeOutPm   = $byPunchType->get('time_out_pm')?->punched_at?->format('H:i:s');
+            }
+
+            // WFH fallback: when there are no biometric logs or online punches
+            // for this date but the employee has a WFH attendance record, map
+            // all four WFH slots onto the DTR time columns so hours &
+            // late/undertime compute correctly.
             //   time_in   → time_in_am  (morning arrival)
             //   break_out → time_out_am (lunch departure)
             //   break_in  → time_in_pm  (return from lunch)
             //   time_out  → time_out_pm (end of day)
             $wfh = $wfhAttendances->get($dateStr);
-            if ($wfh && $logsForDay->isEmpty()) {
+            if ($wfh && $logsForDay->isEmpty() && ! $hasOnlinePunch) {
                 $timeInAm  = $wfh->time_in   ? Carbon::parse($wfh->time_in)->format('H:i:s')   : null;
                 $timeOutAm = $wfh->break_out  ? Carbon::parse($wfh->break_out)->format('H:i:s') : null;
                 $timeInPm  = $wfh->break_in   ? Carbon::parse($wfh->break_in)->format('H:i:s')  : null;
                 $timeOutPm = $wfh->time_out   ? Carbon::parse($wfh->time_out)->format('H:i:s')  : null;
             }
+
+            $usedWfh    = $wfh && $logsForDay->isEmpty() && ! $hasOnlinePunch;
+            $source     = match (true) {
+                $logsForDay->isNotEmpty() => 'biometric',
+                $hasOnlinePunch            => 'online_punch',
+                $usedWfh                   => 'wfh',
+                default                    => null,
+            };
 
             // Compute metrics
             $isOvernight      = $schedule && $schedule->isOvernightShift($dateStr);
@@ -135,13 +166,17 @@ class DTRService
             $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
 
             // Determine attendance status.
-            // WFH days (no biometric logs, WFH attendance present) get their own
-            // status so they are never counted as absent.
-            if ($wfh && $logsForDay->isEmpty() && ! $leave) {
+            // WFH days (no biometric logs, no online punch, WFH attendance present)
+            // get their own status so they are never counted as absent.
+            // Online Punch days are treated like ordinary presence — the
+            // employee was physically present and verified via face match,
+            // so the normal present/half_day/absent logic applies.
+            if ($usedWfh && ! $leave) {
                 $attendanceStatus = 'wfh';
             } else {
+                $presenceLogs     = $logsForDay->isNotEmpty() ? $logsForDay : $onlineForDay;
                 $attendanceStatus = $this->getAttendanceStatus(
-                    $logsForDay,
+                    $presenceLogs,
                     $leave,
                     $dayType,
                     $hoursWorked,
@@ -167,7 +202,8 @@ class DTRService
                     'day_type'             => $dayType,
                     'attendance_status'    => $attendanceStatus,
                     'leave_application_id' => $leave?->id,
-                    'wfh_attendance_id'    => ($wfh && $logsForDay->isEmpty()) ? $wfh->id : null,
+                    'wfh_attendance_id'    => $usedWfh ? $wfh->id : null,
+                    'source'               => $source,
                     'is_advance'           => $isAdvance,
                     'processed_by'         => Auth::id(),
                     'processed_at'         => now(),
