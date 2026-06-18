@@ -237,6 +237,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::get('/',                      [AcademicUnitController::class, 'index'])->name('index');
                 Route::post('/',                     [AcademicUnitController::class, 'store'])->name('store');
                 Route::post('/copy-from-year',       [AcademicUnitController::class, 'copyFromYear'])->name('copy-from-year');
+                Route::post('/sync-to-offices',      [AcademicUnitController::class, 'syncToOffices'])->name('sync-to-offices');
                 Route::put('/{academicUnit}',         [AcademicUnitController::class, 'update'])->name('update');
                 Route::delete('/{academicUnit}',      [AcademicUnitController::class, 'destroy'])->name('destroy');
             });

@@ -10,6 +10,10 @@
           <p class="text-sm text-slate-500 mt-0.5">Manage JHS, SHS, SST and administrative units</p>
         </div>
         <div class="flex items-center gap-2">
+          <button @click="doSync" :disabled="syncing"
+            class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-medium transition-colors shadow-sm shrink-0 disabled:opacity-50">
+            <ArrowPathIcon class="h-4 w-4" /> Sync to Offices
+          </button>
           <button @click="copyModal = true"
             class="inline-flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-lg font-medium transition-colors shadow-sm shrink-0">
             <DocumentDuplicateIcon class="h-4 w-4" /> Copy from Year
@@ -192,7 +196,7 @@ import { ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
-  CheckCircleIcon, DocumentDuplicateIcon, ExclamationCircleIcon,
+  ArrowPathIcon, CheckCircleIcon, DocumentDuplicateIcon, ExclamationCircleIcon,
   PencilIcon, PlusIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -207,6 +211,15 @@ const selectedSy = ref(props.currentSchoolYearId)
 
 function switchYear() {
   router.get(route('faculty-loading.academic-units.index'), { school_year_id: selectedSy.value }, { preserveState: false })
+}
+
+const syncing = ref(false)
+function doSync() {
+  if (! confirm('Sync unit heads from academic units to matching offices? This will overwrite the current unit_head values in those offices.')) return
+  syncing.value = true
+  router.post(route('faculty-loading.academic-units.sync-to-offices'), { school_year_id: selectedSy.value }, {
+    onFinish: () => { syncing.value = false },
+  })
 }
 
 const modal = ref(false)

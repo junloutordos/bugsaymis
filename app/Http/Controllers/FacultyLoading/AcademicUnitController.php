@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FacultyLoading;
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AcademicUnit;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Office;
 use App\Models\User;
 use App\Services\FacultyLoading\HeadAdvisoryService;
 use Illuminate\Http\RedirectResponse;
@@ -123,6 +124,31 @@ class AcademicUnitController extends Controller
         $academicUnit->delete();
 
         return back()->with('success', 'Academic unit deleted.');
+    }
+
+    /**
+     * Sync active academic units from the selected school year into the offices table.
+     * Matches by name (case-insensitive) and updates offices.unit_head with the unit's head_user_id.
+     */
+    public function syncToOffices(Request $request): RedirectResponse
+    {
+        $this->authorize('faculty_loading.setup');
+
+        $schoolYearId = (int) $request->input('school_year_id',
+            SchoolYear::where('is_current', true)->value('id')
+        );
+
+        $units = AcademicUnit::where('school_year_id', $schoolYearId)
+            ->where('is_active', true)
+            ->get(['name', 'head_user_id']);
+
+        $synced = 0;
+        foreach ($units as $unit) {
+            $synced += Office::whereRaw('LOWER(TRIM(name)) = ?', [strtolower(trim($unit->name))])
+                ->update(['unit_head' => $unit->head_user_id]);
+        }
+
+        return back()->with('success', "{$synced} office(s) synced from academic units.");
     }
 
     /**
