@@ -170,7 +170,7 @@ class ConflictDetectionService
         int    $termId,
         ?int   $excludeId = null
     ): float {
-        $query = ClassSchedule::active()
+        $query = ClassSchedule::occupying()
             ->where('user_id', $facultyId)
             ->where('day_of_week', $day)
             ->where('academic_term_id', $termId);
@@ -223,7 +223,7 @@ class ConflictDetectionService
         $end   = $this->normalizeTime($end);
 
         $query = ClassSchedule::with(['subject', 'classroom', 'faculty'])
-            ->active()
+            ->occupying()
             ->where($column, $value)
             ->where('day_of_week', $day)
             ->where('academic_term_id', $termId)

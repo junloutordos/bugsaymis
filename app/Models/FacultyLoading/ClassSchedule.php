@@ -100,6 +100,17 @@ class ClassSchedule extends Model
         return $query->where('status', 'active');
     }
 
+    /**
+     * Rows that occupy a real time slot — active AND tentative (e.g. an
+     * unapplied/under-review AI-generated batch). Cancelled rows are excluded.
+     * Conflict detection must use this, not active(), or it will be blind to
+     * tentative schedules already sitting in the table.
+     */
+    public function scopeOccupying($query)
+    {
+        return $query->whereIn('status', ['active', 'tentative']);
+    }
+
     public function scopeForTerm($query, int $termId)
     {
         return $query->where('academic_term_id', $termId);

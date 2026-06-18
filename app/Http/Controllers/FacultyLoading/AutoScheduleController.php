@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\AiScheduleJob;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Services\FacultyLoading\ConflictDetectionService;
 use App\Services\FacultyLoading\GeneticSchedulingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,10 @@ use Throwable;
 
 class AutoScheduleController extends Controller
 {
-    public function __construct(private readonly GeneticSchedulingService $ga) {}
+    public function __construct(
+        private readonly GeneticSchedulingService $ga,
+        private readonly ConflictDetectionService $conflicts,
+    ) {}
 
     // ── Inertia Page ──────────────────────────────────────────────────────
 
@@ -161,6 +165,17 @@ class AutoScheduleController extends Controller
             return response()->json(['message' => 'No schedules to apply.'], 422);
         }
 
+        // Block the apply when the batch conflicts with already-committed (active)
+        // schedules, or contains internal faculty/room/section overlaps of its own —
+        // the GA's own fitness score is a soft heuristic, not a guarantee.
+        $conflictMessages = $this->detectApplyConflicts($schedules, (int) $aiScheduleJob->academic_term_id);
+        if (! empty($conflictMessages)) {
+            return response()->json([
+                'message'   => count($conflictMessages) . ' conflict(s) detected — resolve before applying.',
+                'conflicts' => $conflictMessages,
+            ], 422);
+        }
+
         DB::transaction(function () use ($aiScheduleJob, $schedules) {
             // Remove existing tentative schedules for this term
             ClassSchedule::where('academic_term_id', $aiScheduleJob->academic_term_id)
@@ -195,6 +210,70 @@ class AutoScheduleController extends Controller
         return response()->json([
             'message' => count($schedules) . ' schedules saved as tentative successfully.',
         ]);
+    }
+
+    /**
+     * Check a proposed schedule batch for:
+     *   1. Faculty/room/section overlap against already-committed ACTIVE schedules
+     *      for the term (tentative rows are excluded — this batch is about to
+     *      replace them, so comparing against them would produce false positives).
+     *   2. Faculty/room/section overlap WITHIN the batch itself — the GA's fitness
+     *      score only penalizes this, it doesn't guarantee zero conflicts.
+     *
+     * @return string[] Human-readable conflict descriptions (empty = clean)
+     */
+    private function detectApplyConflicts(array $schedules, int $termId): array
+    {
+        $messages = [];
+        $axes     = ['user_id' => 'Faculty', 'classroom_id' => 'Room', 'section_id' => 'Section'];
+
+        // 1. Against already-active (committed) schedules
+        foreach ($schedules as $s) {
+            foreach ($axes as $column => $label) {
+                $value = $s[$column] ?? null;
+                if (! $value) {
+                    continue;
+                }
+
+                $exists = ClassSchedule::active()
+                    ->where($column, $value)
+                    ->where('day_of_week', $s['day_of_week'])
+                    ->where('academic_term_id', $termId)
+                    ->where('start_time', '<', $s['end_time'])
+                    ->where('end_time', '>', $s['start_time'])
+                    ->exists();
+
+                if ($exists) {
+                    $messages[] = "{$label} conflict: {$s['day_of_week']} {$s['start_time']}–{$s['end_time']} "
+                        . 'overlaps an already-active (committed) schedule.';
+                }
+            }
+        }
+
+        // 2. Internal self-consistency within the proposed batch
+        $n = count($schedules);
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = $i + 1; $j < $n; $j++) {
+                $a = $schedules[$i];
+                $b = $schedules[$j];
+
+                if (($a['day_of_week'] ?? null) !== ($b['day_of_week'] ?? null)) {
+                    continue;
+                }
+                if (! $this->conflicts->timesOverlap($a['start_time'], $a['end_time'], $b['start_time'], $b['end_time'])) {
+                    continue;
+                }
+
+                foreach ($axes as $column => $label) {
+                    if (! empty($a[$column]) && ($a[$column] ?? null) === ($b[$column] ?? null)) {
+                        $messages[] = "{$label} conflict within generated batch: {$a['day_of_week']} "
+                            . "{$a['start_time']}–{$a['end_time']} overlaps {$b['start_time']}–{$b['end_time']}.";
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($messages));
     }
 
     // ── API: Job History ──────────────────────────────────────────────────

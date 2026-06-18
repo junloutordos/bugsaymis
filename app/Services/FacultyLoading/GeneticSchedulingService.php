@@ -280,10 +280,11 @@ class GeneticSchedulingService
         foreach ($assignments as $assignment) {
             $subject = $assignment->subject;
 
-            // load_units = total class hours per week; each session is always 1 hour.
-            // e.g. English 4 units → 4 sessions × 60 min (one per day, Mon–Fri).
+            // load_units = total class hours per week; session duration comes from
+            // the subject's own minutes_per_session (e.g. a 2-hour lab block),
+            // not a hardcoded 1 hour.
             $sessionsPerWeek   = max(1, (int) round((float) ($subject?->load_units ?? 1)));
-            $minutesPerSession = 60; // always 1 hour per session
+            $minutesPerSession = max(1, (int) ($subject?->minutes_per_session ?? 60));
             $isLab             = in_array($subject?->subject_type, self::LAB_SUBJECT_TYPES);
 
             $fixedRoomId = null;

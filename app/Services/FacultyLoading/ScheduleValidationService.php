@@ -6,6 +6,7 @@ use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\FacultyLoad;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
+use App\Models\FacultyLoading\TeacherOfficialTime;
 
 /**
  * ScheduleValidationService
@@ -102,6 +103,12 @@ class ScheduleValidationService
             }
         }
 
+        // ── 5b. Teacher official-time check ──────────────────────────────────
+        $officialTimeError = $this->checkOfficialTime($data['faculty_id'], $data['day_of_week'], $data['start_time'], $data['end_time']);
+        if ($officialTimeError) {
+            $errors[] = $officialTimeError;
+        }
+
         // ── 6. Classroom availability ────────────────────────────────────────
         $classroom = Classroom::find($data['classroom_id']);
         if ($classroom && ! $classroom->is_available) {
@@ -117,6 +124,12 @@ class ScheduleValidationService
                     $warnings[] = $roomWarning;
                 }
             }
+        }
+
+        // ── 8. Room capacity vs. section capacity ────────────────────────────
+        if ($classroom && $section && $section->capacity && $classroom->capacity < $section->capacity) {
+            $warnings[] = "Room '{$classroom->name}' capacity ({$classroom->capacity}) is smaller than "
+                . "section '{$section->sectionname}' capacity ({$section->capacity}).";
         }
 
         return [
@@ -216,6 +229,32 @@ class ScheduleValidationService
             if ($this->conflicts->timesOverlap($start, $end, $section->afternoon_break_start, $section->afternoon_break_end)) {
                 return "Schedule ({$start}–{$end}) overlaps with the section's afternoon break ({$section->afternoon_break_start}–{$section->afternoon_break_end}).";
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Block if the proposed slot falls outside the teacher's official working
+     * hours for that day. Falls back to the early shift (07:30-16:30) when no
+     * TeacherOfficialTime record exists for that teacher+day.
+     */
+    private function checkOfficialTime(int $facultyId, string $day, string $start, string $end): ?string
+    {
+        $ot = TeacherOfficialTime::where('user_id', $facultyId)
+            ->where('day_of_week', $day)
+            ->first();
+
+        if ($ot !== null) {
+            $otStart = substr($ot->start_time, 0, 5);
+            $otEnd   = substr($ot->end_time, 0, 5);
+        } else {
+            $otStart = SchedulingConstants::SHIFT_EARLY['start'];
+            $otEnd   = SchedulingConstants::SHIFT_EARLY['end'];
+        }
+
+        if ($start < $otStart || $end > $otEnd) {
+            return "Schedule ({$start}–{$end}) on {$day} is outside the teacher's official time ({$otStart}–{$otEnd}).";
         }
 
         return null;
