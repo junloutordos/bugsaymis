@@ -140,6 +140,12 @@ class User extends Authenticatable
         return $this->belongsTo(SstPosition::class, 'sst_position_id');
     }
 
+    /** Faculty Loading academic unit this user belongs to. */
+    public function academicUnit(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\FacultyLoading\AcademicUnit::class, 'academic_unit_id');
+    }
+
     // ─── Permission cache (per-request, cleared on role change) ──────────────
 
     /** @var array<string,bool>|null */
