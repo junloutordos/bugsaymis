@@ -152,6 +152,8 @@ class SectionController extends Controller
             'recess_end'   => 'nullable|date_format:H:i|after:recess_start',
             'lunch_start'  => 'nullable|date_format:H:i',
             'lunch_end'    => 'nullable|date_format:H:i|after:lunch_start',
+            'afternoon_break_start' => 'nullable|date_format:H:i',
+            'afternoon_break_end'   => 'nullable|date_format:H:i|after:afternoon_break_start',
             'adviser'      => 'nullable|exists:users,id',
             'syid'         => 'required|exists:school_years,id',
             'is_active'    => 'boolean',
@@ -203,6 +205,8 @@ class SectionController extends Controller
             'recess_end'   => 'nullable|date_format:H:i|after:recess_start',
             'lunch_start'  => 'nullable|date_format:H:i',
             'lunch_end'    => 'nullable|date_format:H:i|after:lunch_start',
+            'afternoon_break_start' => 'nullable|date_format:H:i',
+            'afternoon_break_end'   => 'nullable|date_format:H:i|after:afternoon_break_start',
             'adviser'      => 'nullable|exists:users,id',
             'is_active'    => 'boolean',
         ]);
@@ -265,7 +269,7 @@ class SectionController extends Controller
      */
     private function normaliseBreakTimes(Request $request): array
     {
-        $fields = ['recess_start', 'recess_end', 'lunch_start', 'lunch_end'];
+        $fields = ['recess_start', 'recess_end', 'lunch_start', 'lunch_end', 'afternoon_break_start', 'afternoon_break_end'];
         $patch  = [];
         foreach ($fields as $field) {
             $val = $request->input($field);
@@ -294,6 +298,8 @@ class SectionController extends Controller
             'recess_end'   => $s->recess_end,
             'lunch_start'  => $s->lunch_start,
             'lunch_end'    => $s->lunch_end,
+            'afternoon_break_start' => $s->afternoon_break_start,
+            'afternoon_break_end'   => $s->afternoon_break_end,
             'is_active'    => $s->is_active,
             'adviser'      => $s->adviserUser ? ['id' => $s->adviserUser->id, 'name' => $s->adviserUser->name] : null,
             'school_year'  => $s->flSchoolYear ? ['id' => $s->flSchoolYear->id, 'name' => $s->flSchoolYear->name] : null,

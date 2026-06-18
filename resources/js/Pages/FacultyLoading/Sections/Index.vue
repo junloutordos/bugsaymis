@@ -166,6 +166,16 @@
                 <input v-model="form.lunch_end" type="time"
                   class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
               </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Afternoon Break Start</label>
+                <input v-model="form.afternoon_break_start" type="time"
+                  class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Afternoon Break End</label>
+                <input v-model="form.afternoon_break_end" type="time"
+                  class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              </div>
             </div>
           </div>
 
@@ -250,6 +260,8 @@ const form = useForm({
   recess_end: '',
   lunch_start: '',
   lunch_end: '',
+  afternoon_break_start: '',
+  afternoon_break_end: '',
   adviser: null,
   syid: null,
   is_active: true,
@@ -268,6 +280,8 @@ function openForm(s = null) {
       recess_end: s.recess_end ?? '',
       lunch_start: s.lunch_start ?? '',
       lunch_end: s.lunch_end ?? '',
+      afternoon_break_start: s.afternoon_break_start ?? '',
+      afternoon_break_end: s.afternoon_break_end ?? '',
       adviser: s.adviser?.id ?? null,
       syid: null,
       is_active: s.is_active,
@@ -282,6 +296,8 @@ function openForm(s = null) {
     form.recess_end = ''
     form.lunch_start = ''
     form.lunch_end = ''
+    form.afternoon_break_start = ''
+    form.afternoon_break_end = ''
     form.is_active = true
     const currentSy = props.schoolYears.find(sy => sy.is_current)
     form.syid = currentSy?.id ?? null

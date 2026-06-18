@@ -66,16 +66,17 @@ class CoreSubjectPlacementService
      *
      * @param  int   $grade     7–10
      * @param  array $subjects  [['name' => string, 'sessions_per_week' => int], ...]
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
      * @return array            Placement plan (see class docblock for shape)
      * @throws \InvalidArgumentException  if grade is outside G7–G10
      */
-    public function buildGradePlan(int $grade, array $subjects): array
+    public function buildGradePlan(int $grade, array $subjects, array $sectionBreaks = []): array
     {
         $this->assertRotationGrade($grade);
 
         $sections    = SchedulingConstants::GRADE_SECTIONS[$grade];
         $numSections = count($sections);
-        $rotGrid     = $this->rotationGrid->buildGrid($grade);
+        $rotGrid     = $this->rotationGrid->buildGrid($grade, $sectionBreaks);
 
         $sessionList   = $this->expandToSessions($subjects);
         $totalSessions = count($sessionList);
@@ -139,11 +140,12 @@ class CoreSubjectPlacementService
         int   $grade,
         int   $sectionIndex,
         array $subjects,
-        array $claimedKeys = []
+        array $claimedKeys = [],
+        array $sectionBreaks = []
     ): array {
         $this->assertRotationGrade($grade);
 
-        $rotGrid      = $this->rotationGrid->buildGrid($grade);
+        $rotGrid      = $this->rotationGrid->buildGrid($grade, $sectionBreaks);
         $sectionSlots = $rotGrid[$sectionIndex] ?? [];
 
         if (empty($sectionSlots)) {

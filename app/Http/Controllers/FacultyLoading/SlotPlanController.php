@@ -4,6 +4,7 @@ namespace App\Http\Controllers\FacultyLoading;
 
 use App\Http\Controllers\Controller;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
 use App\Services\FacultyLoading\ScheduleGeneratorService;
 use App\Services\FacultyLoading\SchedulingConstants;
@@ -123,9 +124,11 @@ class SlotPlanController extends Controller
         $sectionNames = SchedulingConstants::GRADE_SECTIONS[$grade]
             ?? array_values(SchedulingConstants::GRADE_SECTIONS)[0];
 
+        $sectionBreaks = $this->loadSectionBreaks($grade);
+
         // Run the deterministic slot plan generator
-        $plan       = $this->generator->generateSlotPlan($grade, $subjects, $sectionNames);
-        $validation = $this->generator->validateResult($plan);
+        $plan       = $this->generator->generateSlotPlan($grade, $subjects, $sectionNames, $sectionBreaks);
+        $validation = $this->generator->validateResult($plan, $sectionBreaks);
         $antiCol    = $this->generator->checkCrossSection($plan);
 
         return response()->json([
@@ -139,6 +142,37 @@ class SlotPlanController extends Controller
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /**
+     * Build the per-section break-time override map for the current FL
+     * school year, keyed by section name, in the shape the generator expects.
+     *
+     * @return array<string, array{recess: array|null, lunch: array|null, afternoon_break: array|null}>
+     */
+    private function loadSectionBreaks(int $grade): array
+    {
+        $schoolYearId = SchoolYear::where('is_current', true)->value('id');
+
+        if (! $schoolYearId) {
+            return [];
+        }
+
+        $normalize = fn (?string $start, ?string $end) => ($start && $end)
+            ? ['start' => substr($start, 0, 5), 'end' => substr($end, 0, 5)]
+            : null;
+
+        return Section::where('school_year_id', $schoolYearId)
+            ->where('levelid', $grade)
+            ->get(['sectionname', 'recess_start', 'recess_end', 'lunch_start', 'lunch_end', 'afternoon_break_start', 'afternoon_break_end'])
+            ->mapWithKeys(fn ($s) => [
+                $s->sectionname => [
+                    'recess'          => $normalize($s->recess_start, $s->recess_end),
+                    'lunch'           => $normalize($s->lunch_start, $s->lunch_end),
+                    'afternoon_break' => $normalize($s->afternoon_break_start, $s->afternoon_break_end),
+                ],
+            ])
+            ->all();
+    }
 
     /**
      * Map the DB subject_type enum value to the generator's type string.

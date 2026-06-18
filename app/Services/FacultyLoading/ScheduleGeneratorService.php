@@ -68,6 +68,7 @@ class ScheduleGeneratorService
         private readonly CoreSubjectPlacementService       $corePlacer,
         private readonly ElectiveAdvisoryPlacementService  $electivePlacer,
         private readonly ScienceCorePlacementService       $sciencePlacer,
+        private readonly RotationGridBuilder                $rotationGrid,
     ) {}
 
     // =========================================================================
@@ -85,9 +86,13 @@ class ScheduleGeneratorService
      * @param  int   $grade        7–12
      * @param  array $subjects     Subject list with 'type', 'name', 'sessions_per_week' keys
      * @param  array $sectionNames Ordered section names (must match GRADE_SECTIONS order)
+     * @param  array $sectionBreaks ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
+     *                              Per-section recess/lunch/afternoon-break overrides from the Sections module.
+     *                              Sections absent from this map (or with all-null entries) use the grade's
+     *                              constant RECESS/LUNCH windows, exactly as before.
      * @return array               GenerationResult (see class docblock)
      */
-    public function generateSlotPlan(int $grade, array $subjects, array $sectionNames): array
+    public function generateSlotPlan(int $grade, array $subjects, array $sectionNames, array $sectionBreaks = []): array
     {
         $coreSubjects        = $this->filterByType($subjects, 'core');
         $scienceCoreSubjects = $this->filterByType($subjects, 'science_core');
@@ -99,7 +104,7 @@ class ScheduleGeneratorService
         // ── 1. Elective placement (G10–G12) — FIRST so core can avoid these windows
         $reservedElectiveKeys = [];
         if (! empty($electiveSubjects) && $grade >= 10) {
-            $electivePlan = $this->electivePlacer->buildElectivePlan($grade, $electiveSubjects);
+            $electivePlan = $this->electivePlacer->buildElectivePlan($grade, $electiveSubjects, $sectionBreaks);
             $this->mergePlanIntoSections($electivePlan['sections'], 'elective', $sections);
             foreach ($electivePlan['unfilled'] as $u) {
                 $unresolved[] = array_merge($u, ['type' => 'elective']);
@@ -107,7 +112,7 @@ class ScheduleGeneratorService
             // Collect reserved elective slot keys so core placement avoids them
             $reservedElectiveKeys = array_unique(array_map(
                 fn ($s) => $s['day'] . '|' . $s['start'],
-                $this->electivePlacer->getCandidateElectiveSlots($grade)
+                $this->electivePlacer->getCandidateElectiveSlots($grade, $sectionBreaks)
             ));
         }
 
@@ -116,7 +121,7 @@ class ScheduleGeneratorService
         // automatically (SCIENCE_CORE_G11 / SCIENCE_CORE_G12 constants).
         // A non-empty $scienceCoreSubjects list signals that the block is needed.
         if (! empty($scienceCoreSubjects) && $grade >= 11) {
-            $sciencePlan = $this->sciencePlacer->autoPlace($grade);
+            $sciencePlan = $this->sciencePlacer->autoPlace($grade, [], $sectionBreaks);
             if ($sciencePlan !== null) {
                 foreach ($sciencePlan['placements'] as $p) {
                     if (! isset($sections[$p['section']])) {
@@ -137,9 +142,9 @@ class ScheduleGeneratorService
         // ── 3. Core subject placement (AFTER electives — avoid reserved windows)
         if (! empty($coreSubjects)) {
             if ($grade >= 7 && $grade <= 10) {
-                $this->placeJuniorCore($grade, $coreSubjects, $reservedElectiveKeys, $sections, $unresolved);
+                $this->placeJuniorCore($grade, $coreSubjects, $reservedElectiveKeys, $sections, $unresolved, $sectionBreaks);
             } else {
-                $this->placeSeniorCore($grade, $coreSubjects, $sectionNames, $sections, $unresolved);
+                $this->placeSeniorCore($grade, $coreSubjects, $sectionNames, $sections, $unresolved, $sectionBreaks);
             }
         }
 
@@ -181,17 +186,25 @@ class ScheduleGeneratorService
      *
      * Checks per section:
      *   1. No duplicate (day_of_week, start_time) within a section
-     *   2. All placements pass constant constraints (H4–H12)
+     *   2. All placements pass constant constraints (H4–H12), accounting for
+     *      that section's own recess/lunch/afternoon-break overrides
      *
-     * @param  array $result  Output of generateSlotPlan
+     * @param  array $result        Output of generateSlotPlan
+     * @param  array $sectionBreaks Same map passed to generateSlotPlan() — pass the
+     *                              identical value so validation matches what was generated
      * @return array{passes: bool, violations: list<string>}
      */
-    public function validateResult(array $result): array
+    public function validateResult(array $result, array $sectionBreaks = []): array
     {
         $violations = [];
         $grade      = (int) ($result['grade'] ?? 0);
 
         foreach ($result['sections'] ?? [] as $sectionName => $placements) {
+            $validSlotKeys = array_map(
+                fn ($s) => $s['day'] . '|' . $s['start'] . '|' . $s['end'],
+                $this->rotationGrid->getWeeklyClassSlotsForSection($grade, $sectionBreaks[$sectionName] ?? [])
+            );
+
             $seen = [];
             foreach ($placements as $p) {
                 $key = ($p['day_of_week'] ?? '') . '|' . ($p['start_time'] ?? '');
@@ -201,14 +214,17 @@ class ScheduleGeneratorService
                 }
                 $seen[$key] = true;
 
-                $check = HardConstraintChecker::checkAllConstantConstraints(
-                    $grade,
-                    $p['day_of_week'] ?? '',
-                    $p['start_time']  ?? '',
-                    $p['end_time']    ?? ''
-                );
-                if (! $check['passes']) {
-                    $violations[] = "{$sectionName} {$p['subject']} s{$p['session']}: {$check['reason']}";
+                $slotKey = ($p['day_of_week'] ?? '') . '|' . ($p['start_time'] ?? '') . '|' . ($p['end_time'] ?? '');
+                // Parallel block types (elective/science_core) intentionally sit outside
+                // this section's own CLASS-slot list when their shared window is dictated
+                // by ELECTIVE_WINDOWS / Science Core day-only constraints — skip those.
+                if (in_array($p['type'] ?? '', ['elective', 'science_core'], true)) {
+                    continue;
+                }
+                if (! in_array($slotKey, $validSlotKeys, true)) {
+                    $violations[] = "{$sectionName} {$p['subject']} s{$p['session']}: "
+                        . "{$p['day_of_week']} {$p['start_time']}\u{2013}{$p['end_time']} is not a valid class slot for this section "
+                        . '(overlaps a fixed period, special-day lock, or this section\'s break time)';
                 }
             }
         }
@@ -279,11 +295,12 @@ class ScheduleGeneratorService
         array $coreSubjects,
         array $reservedElectiveKeys,
         array &$sections,
-        array &$unresolved
+        array &$unresolved,
+        array $sectionBreaks = []
     ): void {
         if (empty($reservedElectiveKeys)) {
             // No elective windows to avoid — use efficient grade-level plan
-            $plan = $this->corePlacer->buildGradePlan($grade, $coreSubjects);
+            $plan = $this->corePlacer->buildGradePlan($grade, $coreSubjects, $sectionBreaks);
 
             foreach ($plan['sections'] as $sectionName => $placements) {
                 if (! isset($sections[$sectionName])) {
@@ -308,7 +325,7 @@ class ScheduleGeneratorService
             }
 
             $placements = $this->corePlacer->buildSectionPlan(
-                $grade, $idx, $coreSubjects, $reservedElectiveKeys
+                $grade, $idx, $coreSubjects, $reservedElectiveKeys, $sectionBreaks
             );
 
             foreach ($placements as $p) {
@@ -337,14 +354,15 @@ class ScheduleGeneratorService
         array $coreSubjects,
         array $sectionNames,
         array &$sections,
-        array &$unresolved
+        array &$unresolved,
+        array $sectionBreaks = []
     ): void {
-        $allSlots = $this->getValidWeekSlots($grade);
-
         foreach ($sectionNames as $sectionName) {
             if (! isset($sections[$sectionName])) {
                 $sections[$sectionName] = [];
             }
+
+            $allSlots = $this->getValidWeekSlots($grade, $sectionBreaks[$sectionName] ?? []);
 
             // Build claimed-key list from already-placed slots for this section
             $claimed = $this->extractClaimedKeys($sections[$sectionName]);
@@ -433,27 +451,18 @@ class ScheduleGeneratorService
     }
 
     /**
-     * Return all CLASS slots for the full week that pass constant constraints.
+     * Return all CLASS slots for the full week that pass constant constraints,
+     * rebuilt around a section's own recess/lunch/afternoon-break overrides
+     * (falls back to the grade's constant RECESS/LUNCH windows when a break
+     * isn't overridden — see RotationGridBuilder::getWeeklyClassSlotsForSection).
      * No DB access — safe for pure-logic generation.
      *
+     * @param  array $sectionBreaks ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null]
      * @return list<array{day:string, start:string, end:string, label:string}>
      */
-    private function getValidWeekSlots(int $grade): array
+    private function getValidWeekSlots(int $grade, array $sectionBreaks = []): array
     {
-        $slots = [];
-
-        foreach (SchedulingConstants::DAYS as $day) {
-            foreach (SchedulingConstants::getClassSlots($grade, $day) as $slot) {
-                $check = HardConstraintChecker::checkAllConstantConstraints(
-                    $grade, $day, $slot['start'], $slot['end']
-                );
-                if ($check['passes']) {
-                    $slots[] = array_merge($slot, ['day' => $day]);
-                }
-            }
-        }
-
-        return $slots;
+        return $this->rotationGrid->getWeeklyClassSlotsForSection($grade, $sectionBreaks);
     }
 
     /**

@@ -64,17 +64,22 @@ class ElectiveAdvisoryPlacementService
      * G10       → 2 slots
      * G11/G12   → 5 slots
      *
+     * Since electives run all sections of a grade in parallel at the SAME
+     * timeslot, a candidate slot must also avoid every section's own
+     * recess/lunch/afternoon-break windows — not just one section's.
+     *
      * @param  int   $grade
+     * @param  array $sectionBreaks  ['SectionName' => ['recess'=>[..]|null, 'lunch'=>[..]|null, 'afternoon_break'=>[..]|null], ...]
      * @return array<int, array{day:string, start:string, end:string, label:string}>
      */
-    public function getCandidateElectiveSlots(int $grade): array
+    public function getCandidateElectiveSlots(int $grade, array $sectionBreaks = []): array
     {
         $windows = $this->getElectiveWindows($grade);
         $seen    = [];
         $slots   = [];
 
         foreach ($windows as $window) {
-            foreach ($this->getSlotsInWindow($grade, $window['day'], $window['start'], $window['end']) as $slot) {
+            foreach ($this->getSlotsInWindow($grade, $window['day'], $window['start'], $window['end'], $sectionBreaks) as $slot) {
                 $key = $slot['day'] . '|' . $slot['start'];
                 if (! isset($seen[$key])) {
                     $seen[$key] = true;
@@ -110,9 +115,9 @@ class ElectiveAdvisoryPlacementService
      * @param  array $electiveSubjects [['name' => string, 'sessions_per_week' => int], ...]
      * @return array Placement plan (see class docblock for shape)
      */
-    public function buildElectivePlan(int $grade, array $electiveSubjects): array
+    public function buildElectivePlan(int $grade, array $electiveSubjects, array $sectionBreaks = []): array
     {
-        $candidateSlots = $this->getCandidateElectiveSlots($grade);
+        $candidateSlots = $this->getCandidateElectiveSlots($grade, $sectionBreaks);
         $sections       = SchedulingConstants::GRADE_SECTIONS[$grade] ?? [];
         $sessionList    = $this->expandToSessions($electiveSubjects);
         $totalSessions  = count($sessionList);
@@ -375,7 +380,8 @@ class ElectiveAdvisoryPlacementService
         int    $grade,
         string $day,
         string $winStart,
-        string $winEnd
+        string $winEnd,
+        array  $sectionBreaks = []
     ): array {
         $slots = [];
 
@@ -385,12 +391,35 @@ class ElectiveAdvisoryPlacementService
             }
 
             $check = HardConstraintChecker::checkSpecialDayLocks($grade, $day, $slot['start'], $slot['end']);
-            if ($check['passes']) {
-                $slots[] = array_merge($slot, ['day' => $day]);
+            if (! $check['passes']) {
+                continue;
             }
+
+            if ($this->overlapsAnySectionBreak($slot['start'], $slot['end'], $sectionBreaks)) {
+                continue;
+            }
+
+            $slots[] = array_merge($slot, ['day' => $day]);
         }
 
         return $slots;
+    }
+
+    /**
+     * True if [start, end) overlaps any recess/lunch/afternoon-break window
+     * configured for any section in $sectionBreaks.
+     */
+    private function overlapsAnySectionBreak(string $start, string $end, array $sectionBreaks): bool
+    {
+        foreach ($sectionBreaks as $breaks) {
+            foreach (['recess', 'lunch', 'afternoon_break'] as $key) {
+                $window = $breaks[$key] ?? null;
+                if ($window && SchedulingConstants::timesOverlap($start, $end, $window['start'], $window['end'])) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
