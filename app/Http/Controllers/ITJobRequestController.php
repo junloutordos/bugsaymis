@@ -172,20 +172,6 @@ public function index(Request $request)
             'posting_type.required'     => 'Please specify whether this posting is Financial or General.',
         ]);
 
-        // Auto-resolve approver (Division Chief or Information Officer)
-        try {
-            $validated['divisionchief_id'] = $this->resolveApprover(
-                $request->user(),
-                $validated['category'],
-                $validated['posting_type'] ?? null
-            );
-        } catch (\RuntimeException $e) {
-            return back()->withErrors(['category' => $e->getMessage()]);
-        }
-
-        // Auto-assign MIS personnel (category-routed)
-        $validated['assignedto'] = $this->autoAssignMIS($validated['category']);
-
         // Duplicate guard: same user submitted identical title+category within the last 30 seconds
         $isDuplicate = ITJobRequest::where('user_id', $request->user()->id)
             ->where('title', $validated['title'])
@@ -197,7 +183,40 @@ public function index(Request $request)
             return back()->withErrors(['title' => 'Duplicate request detected. Please wait before submitting again.']);
         }
 
-        $jobRequest = DB::transaction(function () use ($validated, $request) {
+        try {
+            $jobRequest = $this->createJobRequest($validated, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['category' => $e->getMessage()]);
+        }
+
+        // Optional digital signing on submission
+        $this->trySign($request, $jobRequest, 'submission',
+            "IT Job Request #{$jobRequest->itjr_no} — {$jobRequest->title}",
+            $jobRequest->itjr_no . $jobRequest->title . $jobRequest->user_id
+        );
+
+        return back()->with('success', 'Request submitted successfully.');
+    }
+
+    /**
+     * Shared creation path for both the web form (store) and the ICT
+     * Agent's alert-escalation endpoint. Resolves the approver, auto-assigns
+     * MIS personnel, generates the ITJR number, and sends the same
+     * notifications regardless of submission source.
+     *
+     * @throws \RuntimeException if no Division Chief/Information Officer can be resolved for the submitting user
+     */
+    public function createJobRequest(array $validated, User $submittingUser): ITJobRequest
+    {
+        $validated['divisionchief_id'] = $this->resolveApprover(
+            $submittingUser,
+            $validated['category'],
+            $validated['posting_type'] ?? null
+        );
+
+        $validated['assignedto'] = $this->autoAssignMIS($validated['category']);
+
+        $jobRequest = DB::transaction(function () use ($validated, $submittingUser) {
             // Generate ITJR number (inside transaction to prevent race conditions)
             $prefix = now()->format('Y-m');
             $latestSeq = ITJobRequest::where('itjr_no', 'like', "{$prefix}-%")
@@ -206,7 +225,7 @@ public function index(Request $request)
                 ->value('seq');
 
             $validated['itjr_no'] = sprintf('%s-%04d', $prefix, ($latestSeq ?? 0) + 1);
-            $validated['user_id'] = $request->user()->id;
+            $validated['user_id'] = $submittingUser->id;
             $validated['status'] = 'Pending Division Chief Approval';
 
             $jobRequest = ITJobRequest::create($validated);
@@ -215,7 +234,7 @@ public function index(Request $request)
                 'it_job_request_id' => $jobRequest->id,
                 'status' => 'Submitted IT Job Request',
                 'remarks' => 'Request submitted by user.',
-                'updated_by' => $request->user()->id,
+                'updated_by' => $submittingUser->id,
             ]);
 
             return $jobRequest;
@@ -253,13 +272,7 @@ public function index(Request $request)
             }
         }
 
-        // Optional digital signing on submission
-        $this->trySign($request, $jobRequest, 'submission',
-            "IT Job Request #{$jobRequest->itjr_no} — {$jobRequest->title}",
-            $jobRequest->itjr_no . $jobRequest->title . $jobRequest->user_id
-        );
-
-        return back()->with('success', 'Request submitted successfully.');
+        return $jobRequest;
     }
 
     /* =====================================================

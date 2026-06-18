@@ -3,18 +3,23 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ITJobRequestController;
 use App\Models\ICTEquipment;
+use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\IctEquipmentHealthSnapshot;
+use App\Models\User;
 use App\Services\IctAgentHealthEvaluator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class IctAgentController extends Controller
 {
-    public function __construct(private IctAgentHealthEvaluator $healthEvaluator)
-    {
+    public function __construct(
+        private IctAgentHealthEvaluator $healthEvaluator,
+        private ITJobRequestController $jobRequests,
+    ) {
     }
 
     /**
@@ -145,5 +150,73 @@ class IctAgentController extends Controller
         $this->healthEvaluator->evaluate($device, $validated);
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * GET /api/ict-agent/alerts
+     *
+     * Open alerts for the authenticated device — polled by the tray app to
+     * decide what to surface to the user.
+     */
+    public function alerts(Request $request): JsonResponse
+    {
+        $device = $request->user();
+
+        $alerts = IctEquipmentAlert::where('device_id', $device->id)
+            ->where('status', 'open')
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'code', 'issue', 'severity', 'created_at']);
+
+        return response()->json(['alerts' => $alerts]);
+    }
+
+    /**
+     * POST /api/ict-agent/alerts/{alert}/escalate
+     *
+     * One-click "file an IT Job Request" from the tray app. Submitted as
+     * the equipment's assigned owner so it goes through the normal
+     * Division Chief → OCD approval chain like any other request — if no
+     * owner is assigned yet, this fails with a clear message rather than
+     * fabricating a submitter.
+     */
+    public function escalate(Request $request, IctEquipmentAlert $alert): JsonResponse
+    {
+        $device = $request->user();
+
+        if ($alert->device_id !== $device->id) {
+            abort(403);
+        }
+
+        if ($alert->status !== 'open') {
+            return response()->json(['message' => 'This alert is no longer open.'], 422);
+        }
+
+        $equipment = ICTEquipment::find($alert->equipment_id);
+        $owner = $equipment?->owner_id ? User::find($equipment->owner_id) : null;
+
+        if (! $owner) {
+            return response()->json([
+                'message' => 'This equipment has no assigned owner yet. Ask MIS to assign one in the ICT Equipments page before filing a ticket.',
+            ], 422);
+        }
+
+        try {
+            $jobRequest = $this->jobRequests->createJobRequest([
+                'category'    => 'Hardware',
+                'title'       => 'Auto-detected issue: ' . ($equipment->description ?? 'ICT equipment'),
+                'description' => $alert->issue . " (auto-detected by the ICT Agent on {$device->hostname})",
+                'priority'    => $alert->severity === 'critical' ? 'high' : 'normal',
+                'ict_equipment_id' => $equipment->id,
+            ], $owner);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $alert->update(['status' => 'escalated', 'it_job_request_id' => $jobRequest->id]);
+
+        return response()->json([
+            'itjr_no' => $jobRequest->itjr_no,
+            'job_request_id' => $jobRequest->id,
+        ]);
     }
 }

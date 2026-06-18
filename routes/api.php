@@ -106,5 +106,7 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
     Route::middleware(['auth:sanctum', 'ict-agent'])->group(function () {
         Route::get('/me', [IctAgentController::class, 'me'])->name('me');
         Route::post('/checkin', [IctAgentController::class, 'checkin'])->name('checkin');
+        Route::get('/alerts', [IctAgentController::class, 'alerts'])->name('alerts');
+        Route::post('/alerts/{alert}/escalate', [IctAgentController::class, 'escalate'])->name('alerts.escalate');
     });
 });
