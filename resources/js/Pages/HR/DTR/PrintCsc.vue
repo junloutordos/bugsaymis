@@ -211,6 +211,7 @@ function cellStyle(rec, field) {
   const bio    = rec[field]
   const penned = rec['penned_' + field]
   if (!bio && penned) return { color: 'red' }
+  if (rec.wfh_attendance_id) return { color: 'red' }
   if (!bio && !penned) {
     const s = rec.attendance_status
     if (s === 'absent' || s === 'on_official_business') return { color: 'red' }
