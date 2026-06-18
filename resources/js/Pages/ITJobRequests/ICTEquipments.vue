@@ -14,6 +14,7 @@ import {
   ChartBarIcon,
   PlusIcon,
   KeyIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -82,6 +83,17 @@ async function generateEnrollmentToken() {
 async function copyEnrollmentToken() {
   await navigator.clipboard.writeText(enrollmentToken.value)
   tokenCopied.value = true
+}
+
+// ICT Agent open alerts
+const showAlertsModal = ref(false)
+const selectedAlerts = ref([])
+const selectedAlertsEquipment = ref(null)
+
+function openAlerts(eq) {
+  selectedAlerts.value = eq.alerts ?? []
+  selectedAlertsEquipment.value = eq
+  showAlertsModal.value = true
 }
 
 // Group all equipments by category or location for the print report
@@ -361,10 +373,20 @@ const showAllChecked    = computed({
                   >{{ eq.status }}</span>
                 </td>
                 <td class="px-4 py-3 text-xs">
-                  <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
-                  </span>
-                  <span v-else class="text-slate-400">—</span>
+                  <div class="flex items-center gap-2">
+                    <span v-if="eq.agent_device" class="inline-flex items-center gap-1 text-emerald-700" :title="`Last check-in: ${formatDate(eq.agent_device.last_checkin_at)}`">
+                      <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Linked
+                    </span>
+                    <span v-else class="text-slate-400">—</span>
+                    <button
+                      v-if="eq.alerts?.length"
+                      @click="openAlerts(eq)"
+                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                      :title="`${eq.alerts.length} open alert(s)`"
+                    >
+                      <ExclamationTriangleIcon class="w-3 h-3" /> {{ eq.alerts.length }}
+                    </button>
+                  </div>
                 </td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex justify-center gap-1 items-center">
@@ -832,6 +854,49 @@ const showAllChecked    = computed({
             >
               Close
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ICT AGENT OPEN ALERTS MODAL -->
+      <div
+        v-if="showAlertsModal"
+        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      >
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">
+              Open Alerts for {{ selectedAlertsEquipment?.description }} / {{ selectedAlertsEquipment?.serial_no }}
+            </h2>
+            <button
+              @click="showAlertsModal = false"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <div class="px-6 py-5">
+            <div v-if="selectedAlerts.length === 0" class="py-16 text-center text-slate-400 text-sm">
+              No open alerts.
+            </div>
+
+            <ul v-else class="space-y-3 max-h-96 overflow-y-auto">
+              <li
+                v-for="alert in selectedAlerts"
+                :key="alert.id"
+                class="border border-slate-100 p-4 rounded-lg bg-slate-50/50"
+              >
+                <div class="flex items-center gap-2">
+                  <span
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
+                    :class="alert.severity === 'critical' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'"
+                  >{{ alert.severity }}</span>
+                  <span class="text-xs text-slate-400">{{ formatDate(alert.created_at) }}</span>
+                </div>
+                <div class="text-sm text-slate-700 mt-2">{{ alert.issue }}</div>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

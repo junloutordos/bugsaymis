@@ -26,6 +26,9 @@ class ICTEquipmentController extends Controller
             'owner',
             'room',
             'agentDevice',
+            'alerts' => function ($q) {
+                $q->where('status', 'open')->orderBy('created_at', 'desc');
+            },
             'pmsHistory' => function ($q) {
                 $q->orderBy('pms_date', 'desc');
             }

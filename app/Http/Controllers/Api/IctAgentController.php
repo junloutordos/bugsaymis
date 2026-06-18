@@ -7,11 +7,16 @@ use App\Models\ICTEquipment;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\IctEquipmentHealthSnapshot;
+use App\Services\IctAgentHealthEvaluator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class IctAgentController extends Controller
 {
+    public function __construct(private IctAgentHealthEvaluator $healthEvaluator)
+    {
+    }
+
     /**
      * POST /api/ict-agent/enroll
      *
@@ -97,9 +102,11 @@ class IctAgentController extends Controller
     /**
      * POST /api/ict-agent/checkin
      *
-     * Periodic hardware snapshot from an enrolled device. Phase 1 scope:
-     * store the latest snapshot only (overwritten each check-in) — no
-     * alerting/history yet, that's Phase 2.
+     * Periodic hardware/peripheral snapshot from an enrolled device. Stores
+     * the latest snapshot (overwritten each check-in) and runs it through
+     * IctAgentHealthEvaluator, which logs routine findings into the
+     * equipment's existing PMS history and tracks actionable findings as
+     * open alerts.
      */
     public function checkin(Request $request): JsonResponse
     {
@@ -111,6 +118,13 @@ class IctAgentController extends Controller
             'disks.*.drive'    => ['nullable', 'string', 'max:10'],
             'disks.*.total_gb' => ['nullable', 'numeric'],
             'disks.*.free_gb'  => ['nullable', 'numeric'],
+            'printers'      => ['nullable', 'array'],
+            'printers.*.name'                  => ['nullable', 'string', 'max:255'],
+            'printers.*.detected_error_state'  => ['nullable', 'string', 'max:50'],
+            'printers.*.pending_jobs'          => ['nullable', 'integer'],
+            'pnp_issues'    => ['nullable', 'array'],
+            'pnp_issues.*.device_name' => ['nullable', 'string', 'max:255'],
+            'pnp_issues.*.error_code'  => ['nullable', 'string', 'max:50'],
             'os_version'    => ['nullable', 'string', 'max:255'],
             'agent_version' => ['nullable', 'string', 'max:20'],
         ]);
@@ -127,6 +141,8 @@ class IctAgentController extends Controller
             'os_version'      => $validated['os_version'] ?? $device->os_version,
             'agent_version'   => $validated['agent_version'] ?? $device->agent_version,
         ]);
+
+        $this->healthEvaluator->evaluate($device, $validated);
 
         return response()->json(['status' => 'ok']);
     }
