@@ -491,17 +491,14 @@ class DTRService
         // late/afternoon-only arrival).  A first punch at or after noon is NEVER
         // placed in AM_IN regardless of the schedule's break midpoint.
         if ($mins[0] >= 720) {
-            if ($mins[0] <= $pmInCutoffMin) {
-                // With 3+ punches: the noon-ish punch may be a lunch departure
-                // (AM_OUT) and the immediately following punch the afternoon return
-                // (PM_IN).  Detect this pattern only when a distinct PM_OUT exists.
-                if ($count >= 3 && $mins[1] <= $pmInCutoffMin && $mins[1] > $mins[0]) {
-                    return [null, $times[0], $times[1], $times[$count - 1]]; // AM_OUT + PM_IN + PM_OUT
-                }
-                return [null, null, $times[0], $times[$count - 1]]; // PM arrival + end-of-day
+            // With 3+ punches where both first punches are within the PM-in window:
+            // the first two may form a short break pattern (AM_OUT + PM_IN).
+            if ($count >= 3 && $mins[0] <= $pmInCutoffMin && $mins[1] <= $pmInCutoffMin && $mins[1] > $mins[0]) {
+                return [null, $times[0], $times[1], $times[$count - 1]]; // AM_OUT + PM_IN + PM_OUT
             }
-            // First punch is after the PM-in window — treat last punch as PM_OUT.
-            return [null, null, null, $times[$count - 1]];
+            // All other PM-only sessions: first punch is PM-in, last punch is PM-out.
+            // Covers employees arriving after $pmInCutoffMin (e.g. approved half-day AM leave at 14:30).
+            return [null, null, $times[0], $times[$count - 1]];
         }
 
         // ── 2+ punches with an AM arrival ─────────────────────────────────────
@@ -557,13 +554,21 @@ class DTRService
                 continue; // AM session too short to be a real lunch departure
             }
 
+            $nextIdx = $i + 1;
+
+            // If this is the only remaining middle punch and it falls at or after
+            // the break midpoint, it is more likely a PM-in return than a lunch
+            // departure — skip it so Phase 2 can assign it as time_in_pm.
+            if ($nextIdx > $count - 2 && $outMin >= $breakMinutes) {
+                continue;
+            }
+
             $timeOutAm  = $times[$i];
             $lunchFound = true;
 
             // Check whether the very next middle punch is a post-lunch return.
             // No upper-time ceiling: once AM-out is confirmed the immediately
             // following middle punch is PM-in regardless of how late it occurs.
-            $nextIdx = $i + 1;
             if ($nextIdx <= $count - 2) {
                 $nextMin = $mins[$nextIdx];
                 if ($nextMin > $outMin) {
