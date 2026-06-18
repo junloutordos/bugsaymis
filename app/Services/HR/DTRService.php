@@ -566,13 +566,15 @@ class DTRService
             $timeOutAm  = $times[$i];
             $lunchFound = true;
 
-            // Check whether the very next middle punch is a post-lunch return.
-            // No upper-time ceiling: once AM-out is confirmed the immediately
-            // following middle punch is PM-in regardless of how late it occurs.
-            if ($nextIdx <= $count - 2) {
-                $nextMin = $mins[$nextIdx];
-                if ($nextMin > $outMin) {
-                    $timeInPm = $times[$nextIdx];
+            // Scan forward through remaining middle punches for the first one in a
+            // strictly later minute than AM-out. A plain i+1 check fails when the
+            // employee taps the reader multiple times in rapid succession — the punch
+            // immediately after AM-out may be a same-minute duplicate of that action,
+            // so we skip same-minute punches to reach the actual PM-in tap.
+            for ($j = $i + 1; $j <= $count - 2; $j++) {
+                if ($mins[$j] > $outMin) {
+                    $timeInPm = $times[$j];
+                    break;
                 }
             }
             break; // stop at the first valid AM-out
