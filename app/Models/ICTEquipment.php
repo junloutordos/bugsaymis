@@ -64,4 +64,14 @@ class ICTEquipment extends Model
         return $this->belongsTo(Room::class,'room_id');
     }
 
+    public function agentDevice()
+    {
+        return $this->hasOne(IctEquipmentDevice::class, 'equipment_id');
+    }
+
+    public function alerts()
+    {
+        return $this->hasMany(IctEquipmentAlert::class, 'equipment_id');
+    }
+
 }

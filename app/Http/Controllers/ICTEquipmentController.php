@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ICTEquipment;
+use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\User;
 use App\Models\Room;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +25,10 @@ class ICTEquipmentController extends Controller
         $query = ICTEquipment::with([
             'owner',
             'room',
+            'agentDevice',
+            'alerts' => function ($q) {
+                $q->where('status', 'open')->orderBy('created_at', 'desc');
+            },
             'pmsHistory' => function ($q) {
                 $q->orderBy('pms_date', 'desc');
             }
@@ -247,5 +253,24 @@ class ICTEquipmentController extends Controller
             logger()->error('PDF generation error', ['error' => $e->getMessage()]);
             return back()->with('error', 'Error generating PDF: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Generate a one-time enrollment token an MIS staff member hands to the
+     * ICT agent installer. The agent exchanges it for a device token on
+     * first enroll; it expires after 24h whether used or not.
+     */
+    public function generateEnrollmentToken(Request $request)
+    {
+        $token = IctEquipmentEnrollmentToken::create([
+            'token' => Str::random(40),
+            'created_by' => $request->user()->id,
+            'expires_at' => now()->addHours(24),
+        ]);
+
+        return response()->json([
+            'token' => $token->token,
+            'expires_at' => $token->expires_at,
+        ]);
     }
 }
