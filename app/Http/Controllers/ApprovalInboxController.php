@@ -288,7 +288,7 @@ class ApprovalInboxController extends Controller
     {
         $pendingStatuses = [
             'it_job_requests'      => ['Pending Division Chief Approval', 'Pending OCD Approval'],
-            'vehicle_requests'     => ['Pending', 'Approved'],
+            'vehicle_requests'     => ['Pending', 'Pending FAD Approval', 'FAD Approved', 'Approved'],
             'facility_requests'    => ['Pending', 'Pending FAD Approval', 'Pending OCD Approval'],
             'work_requests'        => ['Pending', 'GSU Approved', 'Pending FAD Approval'],
             'service_requests'     => ['Pending', 'Approved'],
@@ -330,6 +330,11 @@ class ApprovalInboxController extends Controller
                 if ($status === 'Pending') {
                     return app(\App\Http\Controllers\VehicleRequestController::class)
                         ->approveInApp($request, $record);
+                }
+                if ($status === 'Pending FAD Approval') {
+                    $request->merge(['action' => 'approve']);
+                    return app(\App\Http\Controllers\VehicleRequestController::class)
+                        ->fadApproveInApp($request, $record);
                 }
                 $request->merge(['action' => 'approve']);
                 return app(\App\Http\Controllers\VehicleRequestController::class)
@@ -422,6 +427,11 @@ class ApprovalInboxController extends Controller
                 if ($status === 'Pending') {
                     return app(\App\Http\Controllers\VehicleRequestController::class)
                         ->declineInApp($request, $record);
+                }
+                if ($status === 'Pending FAD Approval') {
+                    $request->merge(['action' => 'reject']);
+                    return app(\App\Http\Controllers\VehicleRequestController::class)
+                        ->fadApproveInApp($request, $record);
                 }
                 $request->merge(['action' => 'reject']);
                 return app(\App\Http\Controllers\VehicleRequestController::class)

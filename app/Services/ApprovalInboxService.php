@@ -175,6 +175,11 @@ class ApprovalInboxService
 
         // ── FAD Chief ─────────────────────────────────────────────────────────
         if ($isFADChief) {
+            $vrFAD = VehicleRequest::with(['requester:id,name', 'divisionChief:id,name'])
+                ->where('status', 'Pending FAD Approval')->latest()->get()
+                ->map(fn($r) => $this->normaliseVehicleRequest($r))->values()->all();
+            $this->mergeOrAddTab($tabs, 'vehicle_requests', 'Vehicle Requests', $vrFAD);
+
             $frFAD = FacilityRequest::with('requester:id,name')
                 ->where('status', 'Pending FAD Approval')->latest()->get()
                 ->map(fn($r) => $this->normaliseFacilityRequest($r))->values()->all();
@@ -216,8 +221,9 @@ class ApprovalInboxService
                 ->map(fn($r) => $this->normaliseITJobRequest($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'it_job_requests', 'IT Job Requests', $itOCD);
 
+            // 'Approved' kept for legacy requests that predate the FAD step
             $vrOCD = VehicleRequest::with(['requester:id,name', 'divisionChief:id,name'])
-                ->where('status', 'Approved')->latest()->get()
+                ->whereIn('status', ['FAD Approved', 'Approved'])->latest()->get()
                 ->map(fn($r) => $this->normaliseVehicleRequest($r))->values()->all();
             $this->mergeOrAddTab($tabs, 'vehicle_requests', 'Vehicle Requests', $vrOCD);
 
