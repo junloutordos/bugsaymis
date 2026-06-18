@@ -2,6 +2,8 @@
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { ref, computed, watch } from "vue"
+import axios from "axios"
+import Swal from "sweetalert2"
 import {
   EyeIcon,
   PencilSquareIcon,
@@ -11,6 +13,7 @@ import {
   ClockIcon,
   ChartBarIcon,
   PlusIcon,
+  KeyIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -53,6 +56,33 @@ const csrfToken = page.props.csrf_token || document.querySelector('meta[name="cs
 // Report state
 const showReportModal = ref(false)
 const reportGroupBy = ref('category') // 'category' or 'location'
+
+// ICT Agent enrollment token state
+const showEnrollmentModal = ref(false)
+const enrollmentToken = ref(null)
+const enrollmentExpiresAt = ref(null)
+const isGeneratingToken = ref(false)
+const tokenCopied = ref(false)
+
+async function generateEnrollmentToken() {
+  isGeneratingToken.value = true
+  tokenCopied.value = false
+  try {
+    const { data } = await axios.post(route('ict-equipments.enrollment-token'))
+    enrollmentToken.value = data.token
+    enrollmentExpiresAt.value = data.expires_at
+    showEnrollmentModal.value = true
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'Could not generate enrollment token.', 'error')
+  } finally {
+    isGeneratingToken.value = false
+  }
+}
+
+async function copyEnrollmentToken() {
+  await navigator.clipboard.writeText(enrollmentToken.value)
+  tokenCopied.value = true
+}
 
 // Group all equipments by category or location for the print report
 const groupedEquipments = computed(() => {
@@ -203,12 +233,21 @@ const showAllChecked    = computed({
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 class="text-xl font-semibold text-slate-800">ICT Equipment Inventory</h1>
-        <button
-          @click="openModal('create')"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          + Add Equipment
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            @click="generateEnrollmentToken"
+            :disabled="isGeneratingToken"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+          >
+            <KeyIcon class="w-4 h-4" /> Generate Enrollment Token
+          </button>
+          <button
+            @click="openModal('create')"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >
+            + Add Equipment
+          </button>
+        </div>
       </div>
 
       <!-- Filter bar -->
@@ -736,6 +775,55 @@ const showAllChecked    = computed({
               class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
               Generate & Print
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ICT AGENT ENROLLMENT TOKEN MODAL -->
+      <div
+        v-if="showEnrollmentModal"
+        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      >
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">ICT Agent Enrollment Token</h2>
+            <button
+              @click="showEnrollmentModal = false"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <div class="px-6 py-5 space-y-3">
+            <p class="text-sm text-slate-600">
+              Paste this token into the ICT Agent installer on the target desktop/laptop. It expires in 24 hours and can only be used once.
+            </p>
+            <div class="flex items-center gap-2">
+              <input
+                :value="enrollmentToken"
+                readonly
+                class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 font-mono w-full"
+              />
+              <button
+                @click="copyEnrollmentToken"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+              >
+                {{ tokenCopied ? 'Copied!' : 'Copy' }}
+              </button>
+            </div>
+            <p class="text-xs text-slate-400">
+              Expires: {{ formatDate(enrollmentExpiresAt) }}
+            </p>
+          </div>
+
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end">
+            <button
+              @click="showEnrollmentModal = false"
+              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+            >
+              Close
             </button>
           </div>
         </div>

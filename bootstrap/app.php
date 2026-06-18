@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission'    => \App\Http\Middleware\CheckPermission::class,
             'pshs.email'    => \App\Http\Middleware\EnsurePshsEmail::class,
             'student.portal'=> \App\Http\Middleware\StudentPortalMiddleware::class,
+            'ict-agent'     => \App\Http\Middleware\EnsureIctAgentDevice::class,
         ]);
     })
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\StudentAttendance\Api\RegisterController;
 use App\Http\Controllers\StudentAttendance\Api\ScheduleApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
+use App\Http\Controllers\Api\IctAgentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -86,4 +87,23 @@ Route::prefix('mobile')->name('mobile.')->group(function () {
 // ALB health check — always returns 200
 Route::get('/_ping', function () {
     return response()->json(['status' => 'ok'], 200);
+});
+
+/*
+|--------------------------------------------------------------------------
+| ICT Agent Routes
+|--------------------------------------------------------------------------
+| Windows desktop agent installed by MIS. Enrollment exchanges a one-time
+| token (generated from the ICT Equipments page) for a long-lived device
+| Sanctum token; everything after that is authenticated as that specific
+| device (see EnsureIctAgentDevice middleware — no cross-device access).
+*/
+Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
+    Route::post('/enroll', [IctAgentController::class, 'enroll'])
+        ->name('enroll')
+        ->middleware('throttle:10,1');
+
+    Route::middleware(['auth:sanctum', 'ict-agent'])->group(function () {
+        Route::get('/me', [IctAgentController::class, 'me'])->name('me');
+    });
 });
