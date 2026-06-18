@@ -142,13 +142,36 @@ class AcademicUnitController extends Controller
             ->where('is_active', true)
             ->get(['name', 'head_user_id']);
 
-        $synced = 0;
+        $cidDivisionId = \App\Models\Division::where('acronym', 'CID')->value('id');
+
+        $synced  = 0;
+        $created = 0;
+
         foreach ($units as $unit) {
-            $synced += Office::whereRaw('LOWER(TRIM(name)) = ?', [strtolower(trim($unit->name))])
-                ->update(['unit_head' => $unit->head_user_id]);
+            $lower    = strtolower(trim($unit->name));
+            $affected = Office::where(function ($q) use ($lower) {
+                $q->whereRaw('LOWER(TRIM(name)) = ?', [$lower])
+                  ->orWhereRaw('LOWER(TRIM(name)) = ?', [$lower . ' unit']);
+            })->update(['unit_head' => $unit->head_user_id]);
+
+            if ($affected > 0) {
+                $synced += $affected;
+            } else {
+                Office::create([
+                    'name'        => $unit->name . ' Unit',
+                    'division_id' => $cidDivisionId,
+                    'unit_head'   => $unit->head_user_id,
+                ]);
+                $created++;
+            }
         }
 
-        return back()->with('success', "{$synced} office(s) synced from academic units.");
+        $msg = "{$synced} office(s) updated";
+        if ($created > 0) {
+            $msg .= ", {$created} office(s) created";
+        }
+
+        return back()->with('success', $msg . ' from academic units.');
     }
 
     /**
