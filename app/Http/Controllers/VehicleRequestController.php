@@ -222,11 +222,11 @@ class VehicleRequestController extends Controller
             return back()->with('error', 'You are not authorized to approve this request.');
         }
 
-        if ($vehicleRequest->status === 'Approved') return back()->with('success', 'Already approved');
+        if ($vehicleRequest->status === 'Pending FAD Approval') return back()->with('success', 'Already forwarded for FAD approval.');
 
-        $vehicleRequest->status = 'Approved';
+        $vehicleRequest->status = 'Pending FAD Approval';
         $vehicleRequest->save();
-        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief', route('vehicle-requests.index')); }
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief — pending FAD', route('vehicle-requests.index')); }
 
         $this->snapshots->recordApproval(
             approvable: $vehicleRequest,
@@ -236,29 +236,31 @@ class VehicleRequestController extends Controller
             approver:   $user,
         );
 
-        try {
-            // Notify all GSU Head users (so GSU handles driver assignment)
-            $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
-            foreach ($gsuHeads as $gsuHead) {
-                if ($gsuHead->email) {
-                    try {
-                        Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
-                    } catch (\Throwable $e) {
-                        logger()->error('Failed to send GSU Head vehicle request notification (in-app)', ['error' => $e->getMessage(), 'gsu_id' => $gsuHead->id]);
-                    }
-                }
-            }
-        } catch (\Throwable $e) {
-            logger()->error('Failed to notify GSU Head users after in-app approval', ['error' => $e->getMessage()]);
-        }
-
         $this->performSign($request, VehicleRequest::class, $vehicleRequest->id,
             'dc_approval',
             "Vehicle Request #{$vehicleRequest->id}",
             VehicleRequest::class . $vehicleRequest->id . 'dc_approval'
         );
 
-        return back()->with('success', 'Vehicle request approved.');
+        try {
+            $fadUsers = \App\Models\User::select('id', 'email', 'position')
+                ->where('position', 'like', '%FAD%')
+                ->whereNotNull('email')
+                ->get();
+            foreach ($fadUsers as $fad) {
+                try {
+                    $approveUrl = URL::signedRoute('vehicle-requests.fad.approve', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
+                    $declineUrl = URL::signedRoute('vehicle-requests.fad.decline', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
+                    Mail::to($fad->email)->send(new \App\Mail\VehicleRequestFADMail($vehicleRequest, $approveUrl, $declineUrl));
+                } catch (\Throwable $e) {
+                    logger()->error('Failed to send FAD vehicle request notification', ['error' => $e->getMessage(), 'fad_id' => $fad->id]);
+                }
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Failed to notify FAD users after DC approval', ['error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Vehicle request approved and forwarded to FAD for recommendation.');
     }
 
     public function declineInApp(Request $request, VehicleRequest $vehicleRequest)
@@ -330,30 +332,29 @@ class VehicleRequestController extends Controller
             abort(403);
         }
 
-        // If already approved, show a friendly message and do not change state.
-        if ($vehicleRequest->status === 'Approved') {
+        if (in_array($vehicleRequest->status, ['Pending FAD Approval', 'FAD Approved', 'OCD Approved'])) {
             return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => true]);
         }
 
-        $vehicleRequest->status = 'Approved';
+        $vehicleRequest->status = 'Pending FAD Approval';
         $vehicleRequest->save();
-        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief', route('vehicle-requests.index')); }
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Approved by Division Chief — pending FAD', route('vehicle-requests.index')); }
 
-        // Notify all GSU Head users (Division Chief approved -> GSU assigns driver)
-        $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
-        foreach ($gsuHeads as $gsuHead) {
-            if ($gsuHead->email) {
-                try {
-                    \Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
-                } catch (\Throwable $e) {
-                    \Log::error('Failed to send GSU Head vehicle request notification', ['error' => $e->getMessage()]);
-                }
+        // Notify FAD Chief users (next step after DC approval)
+        $fadUsers = \App\Models\User::select('id', 'email', 'position')
+            ->where('position', 'like', '%FAD%')
+            ->whereNotNull('email')
+            ->get();
+        foreach ($fadUsers as $fad) {
+            if (! $fad->email) continue;
+            try {
+                $approveUrl = URL::signedRoute('vehicle-requests.fad.approve', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
+                $declineUrl = URL::signedRoute('vehicle-requests.fad.decline', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
+                \Mail::to($fad->email)->send(new \App\Mail\VehicleRequestFADMail($vehicleRequest, $approveUrl, $declineUrl));
+            } catch (\Throwable $e) {
+                \Log::error('Failed to send FAD vehicle request notification', ['error' => $e->getMessage()]);
             }
         }
-
-        // OCD notification is sent only after GSU Head assigns a driver.
-        // Previously we notified OCD users here immediately after Division Chief approval.
-        // That behavior was changed so OCD receives notification only after driver assignment by GSU Head.
 
         return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => false]);
     }
@@ -595,23 +596,48 @@ class VehicleRequestController extends Controller
             abort(403, 'Request not ready for printing');
         }
 
-        $vehicleRequest->load(['requester','driver', 'divisionChief']);
+        $vehicleRequest->load(['requester', 'driver', 'divisionChief']);
 
         $director    = User::havingRole('OCD')->first();
         $directorSig = $this->sigDataUri($director?->electronic_signature);
 
         $sigs = $this->loadSigsForPrint(VehicleRequest::class, $vehicleRequest->id);
 
+        // Resolve requester signature as a data URI (S3-safe)
+        $requesterSigUri = $this->sigService->getSignatureDataUri($vehicleRequest->user);
+
+        // Resolve FAD Chief signature as a data URI (S3-safe fallback for older requests
+        // that predate the FAD digital-signature step)
+        $fadSigUri = null;
+        if (! isset($sigs['fad_approval']['uri'])) {
+            try {
+                $fadDiv = \App\Models\Division::where(function ($q) {
+                    $q->where('division_name', 'Finance and Administrative Division')
+                      ->orWhere('division_name', 'Finance & Administrative Division')
+                      ->orWhereRaw('lower(division_name) like ?', ['%finance%administrative%'])
+                      ->orWhereRaw('lower(division_name) like ?', ['%finance%admin%']);
+                })->first();
+                $fadPath = $fadDiv?->divisionchief?->electronic_signature
+                        ?? $fadDiv?->signature_path
+                        ?? null;
+                if ($fadPath) {
+                    $fadSigUri = $this->sigService->getImageDataUriFromPath($fadPath);
+                }
+            } catch (\Throwable) {}
+        }
+
         $verifyUrl = route('document.verify.doc', ['type' => 'vehicle', 'id' => $vehicleRequest->id]);
         $qrSvg     = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(120)->margin(1)->generate($verifyUrl));
 
         return view('vehicle_requests.print_ticket', [
-            'request'     => $vehicleRequest,
-            'director'    => $director,
-            'directorSig' => $directorSig,
-            'sigs'        => $sigs,
-            'qrSvg'       => $qrSvg,
-            'verifyUrl'   => $verifyUrl,
+            'request'         => $vehicleRequest,
+            'director'        => $director,
+            'directorSig'     => $directorSig,
+            'sigs'            => $sigs,
+            'requesterSigUri' => $requesterSigUri,
+            'fadSigUri'       => $fadSigUri,
+            'qrSvg'           => $qrSvg,
+            'verifyUrl'       => $verifyUrl,
         ]);
     }
 
@@ -681,6 +707,165 @@ class VehicleRequestController extends Controller
     }
 
     /* =====================================================
+     | FAD IN-APP APPROVAL DASHBOARD
+     |=====================================================*/
+    public function fadApproval(Request $request)
+    {
+        $user = $request->user();
+        if (! $user->isSuperAdmin() && ! str_contains($user->position ?? '', 'FAD')) {
+            abort(403);
+        }
+
+        $search  = trim($request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 15), 50);
+
+        $requests = VehicleRequest::with('requester:id,name')
+            ->where('status', 'Pending FAD Approval')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('purpose',      'like', "%{$search}%")
+                      ->orWhere('destination', 'like', "%{$search}%")
+                      ->orWhereHas('requester', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+            }))
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('VehicleRequests/FADApproval', [
+            'requests'     => $requests,
+            'filters'      => ['search' => $search],
+            'hasPin'       => ! empty($user->signature_pin),
+            'signatureUri' => $this->sigService->getSignatureDataUri($user),
+        ]);
+    }
+
+    public function fadApproveInApp(Request $request, VehicleRequest $vehicleRequest)
+    {
+        $user = $request->user();
+        if (! $user->isSuperAdmin() && ! str_contains($user->position ?? '', 'FAD')) {
+            return back()->with('error', 'You are not authorized to act on this request.');
+        }
+
+        $request->validate(['action' => 'required|in:approve,reject']);
+
+        if ($request->action === 'approve') {
+            if ($vehicleRequest->status !== 'Pending FAD Approval') {
+                return back()->with('error', 'This request is not pending FAD approval.');
+            }
+
+            $vehicleRequest->update(['status' => 'FAD Approved']);
+            if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'FAD recommendation recorded', route('vehicle-requests.index')); }
+
+            $this->snapshots->recordApproval(
+                approvable: $vehicleRequest,
+                step:       ApprovalStep::REQ_FAD,
+                sequence:   2,
+                action:     'approved',
+                approver:   $user,
+            );
+
+            $this->performSign($request, VehicleRequest::class, $vehicleRequest->id,
+                'fad_approval',
+                "Vehicle Request #{$vehicleRequest->id}",
+                VehicleRequest::class . $vehicleRequest->id . 'fad_approval'
+            );
+
+            // Notify GSU Head to assign driver (previously happened after DC approval)
+            try {
+                $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
+                foreach ($gsuHeads as $gsuHead) {
+                    if ($gsuHead->email) {
+                        try {
+                            Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
+                        } catch (\Throwable $e) {
+                            logger()->error('Failed to send GSU Head notification after FAD approval', ['error' => $e->getMessage()]);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Failed to notify GSU after FAD approval', ['error' => $e->getMessage()]);
+            }
+        } else {
+            $vehicleRequest->update(['status' => 'Declined', 'decline_reason' => 'Declined by FAD.']);
+            if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Declined by FAD', route('vehicle-requests.index')); }
+
+            $this->snapshots->recordApproval(
+                approvable: $vehicleRequest,
+                step:       ApprovalStep::REQ_FAD,
+                sequence:   2,
+                action:     'rejected',
+                approver:   $user,
+            );
+
+            try {
+                if ($vehicleRequest->requester?->email) {
+                    Mail::to($vehicleRequest->requester->email)->send(
+                        new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by FAD.', $user->name)
+                    );
+                }
+            } catch (\Throwable $e) {
+                logger()->error('Vehicle FAD declined email failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'FAD action recorded.');
+    }
+
+    /** Signed-link FAD approval from email */
+    public function fadApproveByEmail(Request $request, VehicleRequest $vehicleRequest, $fad)
+    {
+        if (in_array($vehicleRequest->status, ['FAD Approved', 'OCD Approved'])) {
+            return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => true]);
+        }
+
+        if ($vehicleRequest->status !== 'Pending FAD Approval') {
+            return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => true]);
+        }
+
+        $vehicleRequest->status = 'FAD Approved';
+        $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'FAD recommendation recorded', route('vehicle-requests.index')); }
+
+        // Notify GSU Head to assign driver
+        $gsuHeads = \App\Models\User::havingRole('GSU Head')->get();
+        foreach ($gsuHeads as $gsuHead) {
+            if ($gsuHead->email) {
+                try {
+                    \Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
+                } catch (\Throwable $e) {
+                    \Log::error('Failed to send GSU Head notification after FAD email approval', ['error' => $e->getMessage()]);
+                }
+            }
+        }
+
+        return view('vehicle_request_approved', ['vehicleRequest' => $vehicleRequest, 'already' => false]);
+    }
+
+    /** Signed-link FAD decline from email */
+    public function fadDeclineByEmail(Request $request, VehicleRequest $vehicleRequest, $fad)
+    {
+        if (in_array($vehicleRequest->status, ['Declined', 'FAD Approved', 'OCD Approved'])) {
+            return view('vehicle_request_declined', ['vehicleRequest' => $vehicleRequest, 'reason' => $vehicleRequest->decline_reason ?? '—']);
+        }
+
+        $vehicleRequest->status = 'Declined';
+        $vehicleRequest->decline_reason = 'Declined by FAD.';
+        $vehicleRequest->declined_at = now();
+        $vehicleRequest->save();
+        if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Declined by FAD', route('vehicle-requests.index')); }
+
+        $requester = $vehicleRequest->requester;
+        if ($requester?->email) {
+            try {
+                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by FAD.', 'FAD Chief'));
+            } catch (\Throwable $e) {
+                \Log::error('Failed to send vehicle declined notification after FAD email decline', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return view('vehicle_request_declined', ['vehicleRequest' => $vehicleRequest, 'reason' => $vehicleRequest->decline_reason]);
+    }
+
+    /* =====================================================
      | OCD IN-APP APPROVAL DASHBOARD
      |=====================================================*/
     public function ocdApproval(Request $request)
@@ -689,7 +874,7 @@ class VehicleRequestController extends Controller
         $perPage = min((int) $request->query('per_page', 15), 50);
 
         $requests = VehicleRequest::with('requester:id,name')
-            ->where('status', 'Approved')
+            ->whereIn('status', ['FAD Approved', 'Approved']) // 'Approved' = legacy pre-FAD-step
             ->when($search, fn($q) => $q->where(function ($inner) use ($search) {
                 $inner->where('purpose',     'like', "%{$search}%")
                       ->orWhere('destination','like', "%{$search}%")
@@ -712,6 +897,10 @@ class VehicleRequestController extends Controller
         $request->validate(['action' => 'required|in:approve,reject']);
 
         if ($request->action === 'approve') {
+            if (! in_array($vehicleRequest->status, ['FAD Approved', 'Approved'])) {
+                return back()->with('error', 'This request is not yet ready for OCD approval.');
+            }
+
             $vehicleRequest->update(['status' => 'OCD Approved']);
             if ($vehicleRequest->requester) { NotificationService::notifyUser($vehicleRequest->requester, 'Vehicle Request', "#{$vehicleRequest->id}", 'Fully Approved — request scheduled', route('vehicle-requests.index')); }
 

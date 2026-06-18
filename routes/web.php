@@ -461,6 +461,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/service-requests/fad-approval',                           [\App\Http\Controllers\ServiceRequestController::class,  'fadApproval'])->name('service-requests.fad-approval')->middleware('permission:facilities.fad-approve');
     Route::post('/service-requests/{serviceRequest}/fad-action',           [\App\Http\Controllers\ServiceRequestController::class,  'fadAction'])->name('service-requests.fad-action')->middleware('permission:facilities.fad-approve');
 
+    // Vehicle FAD Approval Dashboard
+    Route::get('/vehicle-requests/fad-approval', [VehicleRequestController::class, 'fadApproval'])->name('vehicle-requests.fad-approval');
+    Route::post('/vehicle-requests/{vehicleRequest}/fad-action', [VehicleRequestController::class, 'fadApproveInApp'])->name('vehicle-requests.fad-action');
+
     // OCD Approval Dashboards
     Route::get('/vehicle-requests/ocd-approval', [VehicleRequestController::class, 'ocdApproval'])->name('vehicle-requests.ocd-approval');
     Route::post('/vehicle-requests/{vehicleRequest}/ocd-action', [VehicleRequestController::class, 'approveByOCDInApp'])->name('vehicle-requests.ocd-action');
@@ -608,6 +612,15 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     // Signed approval link: includes the approver id so the link can be used from email
     Route::get('/vehicle-requests/{vehicleRequest}/approve/{chief}', [VehicleRequestController::class, 'approveByDivisionChief'])
         ->name('vehicle-requests.approve')
+        ->middleware(['signed']);
+
+    // FAD approval via signed link (sent to FAD users)
+    Route::get('/vehicle-requests/{vehicleRequest}/fad/approve/{fad}', [VehicleRequestController::class, 'fadApproveByEmail'])
+        ->name('vehicle-requests.fad.approve')
+        ->middleware(['signed']);
+
+    Route::get('/vehicle-requests/{vehicleRequest}/fad/decline/{fad}', [VehicleRequestController::class, 'fadDeclineByEmail'])
+        ->name('vehicle-requests.fad.decline')
         ->middleware(['signed']);
 
     // OCD approval via signed link (sent to OCD users)
