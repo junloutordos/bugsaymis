@@ -134,7 +134,7 @@ class FacultyLoadController extends Controller
     {
         $this->authorize('faculty_loading.view');
 
-        $facultyLoad->load(['faculty:id,name,position,academic_unit_id', 'faculty.academicUnit.head', 'academicTerm.schoolYear', 'assignments.subject']);
+        $facultyLoad->load(['faculty:id,name,position,office_id', 'faculty.office.unitHeadUser', 'academicTerm.schoolYear', 'assignments.subject']);
 
         [$sectionMap, $cidChief, $director] = $this->printDependencies();
 
@@ -151,7 +151,7 @@ class FacultyLoadController extends Controller
 
         $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
 
-        $load = FacultyLoad::with(['faculty:id,name,position,academic_unit_id', 'faculty.academicUnit.head', 'academicTerm.schoolYear', 'assignments.subject'])
+        $load = FacultyLoad::with(['faculty:id,name,position,office_id', 'faculty.office.unitHeadUser', 'academicTerm.schoolYear', 'assignments.subject'])
             ->where('user_id', Auth::id())
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->first();
@@ -173,7 +173,7 @@ class FacultyLoadController extends Controller
 
         $termId = $request->input('term_id', AcademicTerm::where('is_current', true)->value('id'));
 
-        $loads = FacultyLoad::with(['faculty:id,name,position,academic_unit_id', 'faculty.academicUnit.head', 'academicTerm.schoolYear', 'assignments.subject'])
+        $loads = FacultyLoad::with(['faculty:id,name,position,office_id', 'faculty.office.unitHeadUser', 'academicTerm.schoolYear', 'assignments.subject'])
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->orderBy(User::select('name')->whereColumn('users.id', 'faculty_loads.user_id'))
             ->get();
@@ -219,12 +219,12 @@ class FacultyLoadController extends Controller
             ];
         })->values();
 
-        // Resolve AUH from the faculty member's own academic unit
-        $academicUnit     = $l->faculty?->academicUnit;
-        $academicUnitName = $academicUnit?->name;
-        $auh = $academicUnit?->head ? [
-            'name'     => $academicUnit->head->name,
-            'position' => $academicUnit->head->position ?? 'Academic Unit Head',
+        // Resolve AUH from the faculty member's office (Office/Unit under CID Division)
+        $office           = $l->faculty?->office;
+        $academicUnitName = $office?->name;
+        $auh = $office?->unitHeadUser ? [
+            'name'     => $office->unitHeadUser->name,
+            'position' => $office->unitHeadUser->position ?? 'Academic Unit Head',
         ] : null;
 
         return [
