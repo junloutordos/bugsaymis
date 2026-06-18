@@ -224,8 +224,8 @@ html, body { background: #f1f5f9; }
 .id-band-text { line-height: 1.25; }
 .id-republic { font-size: 5.5px; font-weight: 400; }
 .id-dost { font-size: 5.5px; font-weight: 400; }
-.id-school { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
-.id-campus { font-size: 6.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .2px; }
+.id-school { font-size: 6.5px; font-weight: 700; text-transform: uppercase; }
+.id-campus { font-size: 5.5px; font-weight: 700; text-transform: uppercase; }
 
 .id-footer-band {
   background: linear-gradient(135deg,#060e50 0%,#1447c0 65%,#0093b8 100%);
@@ -373,14 +373,14 @@ html, body { background: #f1f5f9; }
 .id-divider { width: 100%; border-top: 1px solid #f1f5f9; margin: 2mm 0; }
 
 .id-notice {
-  font-size: 7.5px;
+  font-size: 6px;
   color: #475569;
   line-height: 1.6;
   text-align: justify;
   width: 100%;
 }
 .id-notice-title {
-  font-size: 8px;
+  font-size: 6.5px;
   font-weight: 700;
   color: #1447c0;
   text-transform: uppercase;
