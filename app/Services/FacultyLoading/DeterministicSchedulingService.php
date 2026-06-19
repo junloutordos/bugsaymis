@@ -36,6 +36,13 @@ class DeterministicSchedulingService
     /** Maximum displacement depth for the relocation (augmenting-path) search. */
     private const RELOCATION_DEPTH = 4;
 
+    /**
+     * Number of randomized restart attempts when sessions remain unplaced.
+     * The loop exits as soon as a fully-placed (zero-unplaced) schedule is found,
+     * so this cost is only paid for genuinely over-subscribed grades.
+     */
+    private const MAX_RESTARTS = 100;
+
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
     /** @var array<int,array<string,array<int,array{0:int,1:int,2:int}>>> */
@@ -83,56 +90,43 @@ class DeterministicSchedulingService
             $this->gridByGrade[$grade] = $this->buildSlotGrid((int) $grade);
         }
 
-        // Reset scheduling state.
-        $this->sectionBusy     = [];   // [section_id][day] => [[startMin,endMin,placementIdx], ...]
-        $this->facultyBusy     = [];   // [faculty_id][day] => [[startMin,endMin,placementIdx], ...]
-        $this->sectionDayCount = [];   // [section_id][day] => int (load balancing)
-        $this->sectionSubjDays = [];   // [section_id][subject_id][day] => count
-        $this->placements      = [];   // [idx] => ['s'=>session, 'slot'=>slot] | null when relocated
-
         // Flatten requirements into individual session instances.
-        $sessions = [];
+        $baseSessions = [];
         foreach ($requirements as $req) {
             for ($i = 0; $i < $req['sessions_needed']; $i++) {
-                $sessions[] = $req;
+                $baseSessions[] = $req;
             }
         }
 
-        // Most-constrained-first: place the busiest faculty's sessions earliest,
-        // then heavier subjects, so tight faculty calendars are satisfied before
-        // the grid fills up.
-        usort($sessions, function ($a, $b) {
+        // Attempt 0 — deterministic most-constrained-first ordering: place the
+        // busiest faculty's sessions earliest so tight calendars are satisfied
+        // before the grid fills up.
+        $ordered = $baseSessions;
+        usort($ordered, function ($a, $b) {
             return [$b['faculty_total'], $b['sessions_needed'], $a['section_id']]
                 <=> [$a['faculty_total'], $a['sessions_needed'], $b['section_id']];
         });
+        $best = $this->runPlacement($ordered, $schoolYearId, $termId);
 
-        // Pass 1 — greedy placement.
-        $deferred = [];
-        foreach ($sessions as $s) {
-            $slot = $this->findBestSlot($s);
-            if ($slot === null) {
-                $deferred[] = $s;
-                continue;
-            }
-            $this->commit($s, $slot);
-        }
+        // Randomized restarts — when a near-fully-packed week leaves feasible
+        // sessions unplaced, a different tie-break order often resolves them.
+        // PHP's usort is stable, so shuffling first then sorting by the
+        // constraint key keeps most-constrained-first while varying ties.
+        for ($attempt = 1; $attempt <= self::MAX_RESTARTS && ! empty($best['unplaceable']); $attempt++) {
+            mt_srand($attempt * 7919);
+            $shuffled = $baseSessions;
+            shuffle($shuffled);
+            usort($shuffled, fn ($a, $b) =>
+                [$b['faculty_total'], $b['sessions_needed']] <=> [$a['faculty_total'], $a['sessions_needed']]);
 
-        // Pass 2 — recursive relocation (bounded augmenting-path search) to
-        // recover feasible-but-tight misses.
-        $unplaceable = [];
-        foreach ($deferred as $s) {
-            if (! $this->attemptPlace($s, self::RELOCATION_DEPTH)) {
-                $unplaceable[] = $this->describeSession($s);
+            $candidate = $this->runPlacement($shuffled, $schoolYearId, $termId);
+            if (count($candidate['unplaceable']) < count($best['unplaceable'])) {
+                $best = $candidate;
             }
         }
 
-        // Materialise the surviving placements into schedule rows.
-        $placed = [];
-        foreach ($this->placements as $p) {
-            if ($p !== null) {
-                $placed[] = $this->toScheduleRow($p['s'], $p['slot'], $schoolYearId, $termId);
-            }
-        }
+        $placed       = $best['placed'];
+        $unplaceable  = $best['unplaceable'];
 
         return [
             'fitness'              => -count($unplaceable),
@@ -146,6 +140,51 @@ class DeterministicSchedulingService
                 ? null
                 : count($unplaceable) . ' session(s) could not be placed (grade likely over-subscribed). See unplaceable report.',
         ];
+    }
+
+    /**
+     * Run one full placement pass (greedy + relocation) over a session ordering,
+     * resetting all scheduling state first. Returns the placed schedule rows and
+     * the sessions that could not be placed.
+     *
+     * @param array<int,array<string,mixed>> $sessions
+     * @return array{placed:array<int,array<string,mixed>>,unplaceable:array<int,array<string,mixed>>}
+     */
+    private function runPlacement(array $sessions, int $schoolYearId, int $termId): array
+    {
+        $this->sectionBusy     = [];
+        $this->facultyBusy     = [];
+        $this->sectionDayCount = [];
+        $this->sectionSubjDays = [];
+        $this->placements      = [];
+
+        // Pass 1 — greedy placement.
+        $deferred = [];
+        foreach ($sessions as $s) {
+            $slot = $this->findBestSlot($s);
+            if ($slot === null) {
+                $deferred[] = $s;
+                continue;
+            }
+            $this->commit($s, $slot);
+        }
+
+        // Pass 2 — recursive relocation (bounded augmenting-path search).
+        $unplaceable = [];
+        foreach ($deferred as $s) {
+            if (! $this->attemptPlace($s, self::RELOCATION_DEPTH)) {
+                $unplaceable[] = $this->describeSession($s);
+            }
+        }
+
+        $placed = [];
+        foreach ($this->placements as $p) {
+            if ($p !== null) {
+                $placed[] = $this->toScheduleRow($p['s'], $p['slot'], $schoolYearId, $termId);
+            }
+        }
+
+        return ['placed' => $placed, 'unplaceable' => $unplaceable];
     }
 
     // ── Requirements ────────────────────────────────────────────────────────
@@ -232,8 +271,10 @@ class DeterministicSchedulingService
      */
     private function buildSlotGrid(int $grade): array
     {
-        $group  = SchedulingConstants::getGradeGroup($grade);
-        $wedCut = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$group] ?? '23:59';
+        $group     = SchedulingConstants::getGradeGroup($grade);
+        $wedCut    = SchedulingConstants::WEDNESDAY_ACTIVITY_START[$group] ?? '23:59';
+        $fullWed   = in_array($grade, SchedulingConstants::WEDNESDAY_FULL_GRADES, true);
+        $reclaimMon = in_array($grade, SchedulingConstants::MONDAY_RECLAIM_GAP_GRADES, true);
 
         $slots = [];
         foreach (self::DAYS as $day) {
@@ -242,8 +283,21 @@ class DeterministicSchedulingService
                 continue;
             }
 
-            foreach (SchedulingConstants::getClassSlots($grade, $day) as $slot) {
-                if ($day === 'Wednesday') {
+            $daySlots = SchedulingConstants::getClassSlots($grade, $day);
+
+            // Reclaim the Monday 08:50–09:40 gap (the "DEAD" slot) for grades that
+            // need the extra teaching period.
+            if ($reclaimMon && $day === 'Monday') {
+                foreach (SchedulingConstants::getMondayTimetable($grade) as $row) {
+                    if (($row['type'] ?? '') === 'DEAD') {
+                        $daySlots[] = ['start' => $row['start'], 'end' => $row['end']];
+                    }
+                }
+            }
+
+            foreach ($daySlots as $slot) {
+                // Wednesday restrictions do not apply to "full Wednesday" grades.
+                if ($day === 'Wednesday' && ! $fullWed) {
                     // No teaching after the activity cutoff.
                     if ($slot['start'] >= $wedCut) {
                         continue;
