@@ -41,7 +41,7 @@ class ApplicationWorkflowService
                 throw new \RuntimeException('Applicant has already applied for this vacancy.');
             }
 
-            if ($vacancy->status !== 'open') {
+            if ($vacancy->status !== 'open' || $vacancy->jobItem->status !== 'published') {
                 throw new \RuntimeException('This vacancy is no longer accepting applications.');
             }
 
