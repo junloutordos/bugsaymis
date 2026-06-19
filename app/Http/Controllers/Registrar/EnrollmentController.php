@@ -56,11 +56,19 @@ class EnrollmentController extends Controller
             'transferred'  => $enrollmentCounts->get($s->id, collect())->get('transferred_out', 0),
         ]);
 
+        // Enrolled but not yet placed in a section ("pending"), per grade level
+        $pendingByGrade = StudentEnrollment::where('school_year_id', $schoolYearId)
+            ->whereNull('section_id')
+            ->selectRaw('grade_level, COUNT(*) as count')
+            ->groupBy('grade_level')
+            ->pluck('count', 'grade_level');
+
         return Inertia::render('Registrar/Enrollment/Index', [
             'sections'           => $sectionData,
             'schoolYears'        => $schoolYears,
             'selectedSchoolYear' => $schoolYearId,
             'gradeLevels'        => range(7, 12),
+            'pendingByGrade'     => $pendingByGrade,
         ]);
     }
 
@@ -186,7 +194,7 @@ class EnrollmentController extends Controller
         $data = $request->validate([
             'student_id'       => ['required', 'integer'],
             'school_year_id'   => ['required', 'integer', 'exists:school_years,id'],
-            'section_id'       => ['required', 'integer'],
+            'grade_level'      => ['required', 'integer', 'between:7,12'],
             'enrollment_type'  => ['required', Rule::in(['new', 'returning', 'transferee', 'returnee'])],
             'enrollment_date'  => ['required', 'date'],
             'notes'            => ['nullable', 'string', 'max:500'],
@@ -194,19 +202,6 @@ class EnrollmentController extends Controller
 
         // Verify student exists
         abort_unless(Student::where('id', $data['student_id'])->exists(), 404, 'Student not found.');
-
-        // Verify section exists and belongs to correct school year
-        $section = Section::where('id', $data['section_id'])
-            ->where('school_year_id', $data['school_year_id'])
-            ->firstOrFail();
-
-        // Check capacity
-        $currentCount = StudentEnrollment::where('section_id', $section->id)
-            ->where('school_year_id', $data['school_year_id'])
-            ->where('status', 'enrolled')
-            ->count();
-
-        abort_if($currentCount >= $section->capacity, 422, 'Section is already at capacity.');
 
         // Guard: already enrolled this school year
         abort_if(
@@ -218,11 +213,12 @@ class EnrollmentController extends Controller
             'Student is already enrolled for this school year.'
         );
 
+        // Section is assigned separately, after enrollment (see Assign by Grade List).
         StudentEnrollment::create([
             'student_id'      => $data['student_id'],
             'school_year_id'  => $data['school_year_id'],
-            'section_id'      => $section->id,
-            'grade_level'     => $section->levelid,
+            'section_id'      => null,
+            'grade_level'     => $data['grade_level'],
             'enrollment_type' => $data['enrollment_type'],
             'status'          => 'enrolled',
             'enrollment_date' => $data['enrollment_date'],
@@ -230,7 +226,7 @@ class EnrollmentController extends Controller
             'encoded_by'      => Auth::id(),
         ]);
 
-        return back()->with('success', 'Student enrolled successfully.');
+        return back()->with('success', 'Student enrolled successfully. Assign their section from "Assign by Grade List".');
     }
 
     // ── Bulk enroll via CSV (JSON array posted as JSON body) ──────────────────
@@ -241,16 +237,12 @@ class EnrollmentController extends Controller
 
         $data = $request->validate([
             'school_year_id'  => ['required', 'integer', 'exists:school_years,id'],
-            'section_id'      => ['required', 'integer'],
+            'grade_level'     => ['required', 'integer', 'between:7,12'],
             'enrollment_type' => ['required', Rule::in(['new', 'returning', 'transferee', 'returnee'])],
             'enrollment_date' => ['required', 'date'],
             'pisays_ids'      => ['required', 'array', 'min:1', 'max:60'],
             'pisays_ids.*'    => ['required', 'string'],
         ]);
-
-        $section = Section::where('id', $data['section_id'])
-            ->where('school_year_id', $data['school_year_id'])
-            ->firstOrFail();
 
         $students = Student::whereIn('pisaysystemID', $data['pisays_ids'])
             ->get(['id', 'pisaysystemID']);
@@ -263,7 +255,8 @@ class EnrollmentController extends Controller
         $enrolled = 0;
         $skipped  = 0;
 
-        DB::transaction(function () use ($students, $alreadyEnrolledIds, $data, $section, &$enrolled, &$skipped) {
+        // Section is assigned separately, after enrollment (see Assign by Grade List).
+        DB::transaction(function () use ($students, $alreadyEnrolledIds, $data, &$enrolled, &$skipped) {
             foreach ($students as $student) {
                 if ($alreadyEnrolledIds->has($student->id)) {
                     $skipped++;
@@ -273,8 +266,8 @@ class EnrollmentController extends Controller
                 StudentEnrollment::create([
                     'student_id'      => $student->id,
                     'school_year_id'  => $data['school_year_id'],
-                    'section_id'      => $section->id,
-                    'grade_level'     => $section->levelid,
+                    'section_id'      => null,
+                    'grade_level'     => $data['grade_level'],
                     'enrollment_type' => $data['enrollment_type'],
                     'status'          => 'enrolled',
                     'enrollment_date' => $data['enrollment_date'],
@@ -288,6 +281,9 @@ class EnrollmentController extends Controller
         $message = "{$enrolled} student(s) enrolled.";
         if ($skipped > 0) {
             $message .= " {$skipped} skipped (already enrolled).";
+        }
+        if ($enrolled > 0) {
+            $message .= ' Assign their sections from "Assign by Grade List".';
         }
 
         return back()->with('success', $message);
