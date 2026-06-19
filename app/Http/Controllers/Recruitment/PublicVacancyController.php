@@ -39,7 +39,8 @@ class PublicVacancyController extends Controller
     {
         $query = JobVacancy::with(['jobItem.office', 'jobItem.recruitmentType'])
             ->where('status', 'open')
-            ->where('closing_date', '>=', now()->toDateString());
+            ->where('closing_date', '>=', now()->toDateString())
+            ->whereHas('jobItem', fn ($q) => $q->where('status', 'published'));
 
         if ($typeId = $request->integer('type_id')) {
             $query->whereHas('jobItem', fn ($q) => $q->where('recruitment_type_id', $typeId));
@@ -65,7 +66,7 @@ class PublicVacancyController extends Controller
 
     public function show(JobVacancy $vacancy)
     {
-        abort_if($vacancy->status !== 'open', 404);
+        abort_if($vacancy->status !== 'open' || $vacancy->jobItem->status !== 'published', 404);
         $vacancy->load([
             'jobItem.office',
             'jobItem.recruitmentType.evaluationCriteria',
@@ -83,7 +84,7 @@ class PublicVacancyController extends Controller
 
     public function apply(Request $request, JobVacancy $vacancy)
     {
-        if ($vacancy->status !== 'open') {
+        if ($vacancy->status !== 'open' || $vacancy->jobItem->status !== 'published') {
             return response()->json([
                 'errors' => ['_general' => ['This vacancy is no longer accepting applications.']],
             ], 422);
