@@ -144,6 +144,39 @@ class EnrollmentController extends Controller
         ]));
     }
 
+    // ── Unassigned students for a grade level (pending section placement) ─────
+
+    public function unassigned(Request $request): JsonResponse
+    {
+        $this->authorize('students.enrollment.view');
+
+        $schoolYearId = (int) $request->input('school_year_id',
+            SchoolYear::where('is_current', true)->value('id'));
+        $gradeLevel = (int) $request->input('grade_level');
+
+        $enrollments = StudentEnrollment::where('school_year_id', $schoolYearId)
+            ->where('grade_level', $gradeLevel)
+            ->whereNull('section_id')
+            ->get();
+
+        $studentIds = $enrollments->pluck('student_id')->unique()->values();
+        $students   = Student::whereIn('id', $studentIds)
+            ->get(['id', 'firstname', 'lastname', 'middlename', 'pisaysystemID', 'lrn', 'sex'])
+            ->keyBy('id');
+
+        $result = $enrollments->map(fn ($e) => [
+            'enrollment_id'   => $e->id,
+            'student_id'      => $e->student_id,
+            'full_name'       => $students->get($e->student_id)?->full_name ?? 'Unknown',
+            'pisays_id'       => $students->get($e->student_id)?->pisaysystemID,
+            'lrn'             => $students->get($e->student_id)?->lrn,
+            'sex'             => $students->get($e->student_id)?->sex,
+            'enrollment_type' => $e->enrollment_type,
+        ])->sortBy('full_name')->values();
+
+        return response()->json($result);
+    }
+
     // ── Enroll a student ──────────────────────────────────────────────────────
 
     public function store(Request $request): RedirectResponse
@@ -258,6 +291,62 @@ class EnrollmentController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    // ── Bulk-assign pending students to a section (checkbox picker) ───────────
+
+    public function bulkAssignSection(Request $request): RedirectResponse
+    {
+        $this->authorize('students.enrollment.manage');
+
+        $data = $request->validate([
+            'school_year_id'   => ['required', 'integer', 'exists:school_years,id'],
+            'section_id'       => ['required', 'integer'],
+            'enrollment_ids'   => ['required', 'array', 'min:1'],
+            'enrollment_ids.*' => ['required', 'integer'],
+        ]);
+
+        $section = Section::where('id', $data['section_id'])
+            ->where('school_year_id', $data['school_year_id'])
+            ->firstOrFail();
+
+        $enrollments = StudentEnrollment::whereIn('id', $data['enrollment_ids'])
+            ->where('school_year_id', $data['school_year_id'])
+            ->whereNull('section_id')
+            ->get();
+
+        abort_if(
+            $enrollments->count() !== count($data['enrollment_ids']),
+            422,
+            'One or more selected students are no longer available for assignment.'
+        );
+
+        abort_if(
+            $enrollments->firstWhere('grade_level', '!=', $section->levelid),
+            422,
+            "Selected students do not match {$section->sectionname}'s grade level."
+        );
+
+        $currentCount = StudentEnrollment::where('section_id', $section->id)
+            ->where('school_year_id', $data['school_year_id'])
+            ->where('status', 'enrolled')
+            ->count();
+
+        abort_if(
+            $currentCount + $enrollments->count() > $section->capacity,
+            422,
+            "Assigning these students would exceed {$section->sectionname}'s capacity ({$section->capacity})."
+        );
+
+        DB::transaction(function () use ($enrollments, $section) {
+            foreach ($enrollments as $enrollment) {
+                $enrollment->update(['section_id' => $section->id]);
+            }
+        });
+
+        $count = $enrollments->count();
+
+        return back()->with('success', "{$count} student(s) assigned to {$section->sectionname}.");
     }
 
     // ── Update enrollment (status / section transfer) ─────────────────────────

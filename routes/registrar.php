@@ -78,12 +78,20 @@ Route::middleware(['auth'])->group(function () {
         ->name('registrar.enrollment.section-students')
         ->middleware('permission:students.enrollment.view');
 
+    Route::get('/registrar/enrollment/unassigned', [EnrollmentController::class, 'unassigned'])
+        ->name('registrar.enrollment.unassigned')
+        ->middleware('permission:students.enrollment.view');
+
     Route::post('/registrar/enrollment', [EnrollmentController::class, 'store'])
         ->name('registrar.enrollment.store')
         ->middleware('permission:students.enrollment.manage');
 
     Route::post('/registrar/enrollment/bulk', [EnrollmentController::class, 'bulkStore'])
         ->name('registrar.enrollment.bulk-store')
+        ->middleware('permission:students.enrollment.manage');
+
+    Route::post('/registrar/enrollment/bulk-assign', [EnrollmentController::class, 'bulkAssignSection'])
+        ->name('registrar.enrollment.bulk-assign')
         ->middleware('permission:students.enrollment.manage');
 
     Route::put('/registrar/enrollment/{enrollment}', [EnrollmentController::class, 'update'])
