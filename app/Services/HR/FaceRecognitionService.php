@@ -286,13 +286,21 @@ class FaceRecognitionService
 
     private function rekognition(): RekognitionClient
     {
-        return new RekognitionClient([
-            'version'     => 'latest',
-            'region'      => config('services.rekognition.region'),
-            'credentials' => [
-                'key'    => env('AWS_ACCESS_KEY_ID'),
-                'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            ],
-        ]);
+        $config = [
+            'version' => 'latest',
+            'region'  => config('services.rekognition.region'),
+        ];
+
+        // Only pass explicit static credentials when both are set (local dev
+        // with an IAM access key). In production there are none — the AWS
+        // SDK falls back to its default provider chain (ECS task role),
+        // exactly like Storage::disk('s3') already does.
+        $key    = env('AWS_ACCESS_KEY_ID');
+        $secret = env('AWS_SECRET_ACCESS_KEY');
+        if (! empty($key) && ! empty($secret)) {
+            $config['credentials'] = ['key' => $key, 'secret' => $secret];
+        }
+
+        return new RekognitionClient($config);
     }
 }
