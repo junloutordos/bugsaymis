@@ -77,7 +77,9 @@ import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
-import { mountLivenessCheck } from './Liveness/mountLiveness.js'
+
+// Lazy-loaded: the React + AWS Amplify Face Liveness bundle is large and
+// only needed once the user actually starts a punch, not on page load.
 
 const props = defineProps({
   today:                  { type: String, required: true },
@@ -160,6 +162,8 @@ async function startPunch(type) {
     const sessionId = data.session_id
 
     await new Promise(resolve => setTimeout(resolve, 0)) // wait for v-if DOM mount
+
+    const { mountLivenessCheck } = await import('./Liveness/mountLiveness.js')
 
     unmountLiveness = mountLivenessCheck(livenessContainer.value, {
       region: props.awsRegion,
