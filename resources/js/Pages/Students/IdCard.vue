@@ -370,7 +370,7 @@ html, body { background: #f1f5f9; }
 }
 .id-sig-position {
   font-size: 6px;
-  color: #94a3b8;
+  color: #1e293b;
   letter-spacing: .5px;
 }
 
