@@ -92,6 +92,8 @@ const docStatusColors = {
 
 const formatDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
 
+const formatDateTime = (iso) => iso ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'
+
 const docTypes = [
   'Resume / Application Letter', 'Transcript of Records', 'Diploma',
   'PRC License', 'CSC Eligibility Certificate', 'NBI Clearance',
@@ -242,7 +244,7 @@ const docTypes = [
               </div>
               <div class="text-xs text-slate-400 mt-0.5">
                 {{ app.job_vacancy?.job_item?.recruitment_type?.name ?? '—' }}
-                · Applied {{ formatDate(app.application_date) }}
+                · Applied {{ formatDateTime(app.created_at) }}
               </div>
               <div v-if="app.ranking_summary?.rank" class="text-xs text-slate-500 mt-1">
                 Rank #{{ app.ranking_summary.rank }}
