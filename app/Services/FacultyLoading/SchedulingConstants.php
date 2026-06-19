@@ -259,8 +259,12 @@ class SchedulingConstants
 
     // ── Friday Special ────────────────────────────────────────────────────────
 
-    /** Grades locked for ILA (no in-person teaching on Fridays) */
-    public const FRIDAY_ILA_GRADES = [7, 8];
+    /**
+     * Grades locked for ILA (no in-person teaching on Fridays).
+     * G8 retains in-person Friday classes — its weekly load does not fit within
+     * a Friday-ILA week.
+     */
+    public const FRIDAY_ILA_GRADES = [7];
 
     // ── Official Time Shifts ──────────────────────────────────────────────────
 
