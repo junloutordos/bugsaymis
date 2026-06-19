@@ -21,6 +21,7 @@ const props = defineProps({
   schoolYears: Array,
   selectedSchoolYear: Number,
   gradeLevels: Array,
+  pendingByGrade: Object,
 })
 
 // ── School year filter ────────────────────────────────────────────────────────
@@ -60,8 +61,6 @@ async function openSection(section) {
 function closeSection() {
   selectedSection.value = null
   sectionStudents.value = []
-  showEnrollModal.value = false
-  showBulkModal.value   = false
   showAssignModal.value = false
 }
 
@@ -91,7 +90,7 @@ let searchTimeout = null
 const enrollForm = useForm({
   student_id:       null,
   school_year_id:   props.selectedSchoolYear,
-  section_id:       null,
+  grade_level:      props.gradeLevels?.[0] ?? 7,
   enrollment_type:  'returning',
   enrollment_date:  new Date().toISOString().slice(0, 10),
   notes:            '',
@@ -102,7 +101,7 @@ const selectedStudent = ref(null)
 function openEnrollModal() {
   enrollForm.reset()
   enrollForm.school_year_id = schoolYearId.value
-  enrollForm.section_id     = selectedSection.value?.id
+  enrollForm.grade_level    = activeGrade.value
   selectedStudent.value     = null
   studentQuery.value        = ''
   studentResults.value      = []
@@ -136,7 +135,6 @@ function submitEnroll() {
   enrollForm.post(route('registrar.enrollment.store'), {
     onSuccess: () => {
       showEnrollModal.value = false
-      openSection(selectedSection.value)
     },
   })
 }
@@ -227,7 +225,7 @@ const bulkParseError = ref('')
 
 const bulkForm = useForm({
   school_year_id:  props.selectedSchoolYear,
-  section_id:      null,
+  grade_level:     props.gradeLevels?.[0] ?? 7,
   enrollment_type: 'returning',
   enrollment_date: new Date().toISOString().slice(0, 10),
   pisays_ids:      [],
@@ -236,7 +234,7 @@ const bulkForm = useForm({
 function openBulkModal() {
   bulkForm.reset()
   bulkForm.school_year_id = schoolYearId.value
-  bulkForm.section_id     = selectedSection.value?.id
+  bulkForm.grade_level    = activeGrade.value
   bulkCsvText.value       = ''
   bulkParsed.value        = []
   bulkParseError.value    = ''
@@ -266,7 +264,6 @@ function submitBulk() {
   bulkForm.post(route('registrar.enrollment.bulk-store'), {
     onSuccess: () => {
       showBulkModal.value = false
-      openSection(selectedSection.value)
     },
   })
 }
@@ -354,22 +351,52 @@ function statusLabel(status) {
       </div>
     </div>
 
-    <!-- Grade level tabs -->
-    <div class="flex gap-1 mb-5 border-b border-slate-200">
-      <button
-        v-for="grade in gradeLevels"
-        :key="grade"
-        @click="activeGrade = grade"
-        :class="[
-          'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-          activeGrade === grade
-            ? 'bg-indigo-600 text-white'
-            : 'text-slate-600 hover:bg-slate-100'
-        ]"
-      >
-        Grade {{ grade }}
-      </button>
+    <!-- Grade level tabs + enroll actions -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-200">
+      <div class="flex gap-1">
+        <button
+          v-for="grade in gradeLevels"
+          :key="grade"
+          @click="activeGrade = grade"
+          :class="[
+            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
+            activeGrade === grade
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          ]"
+        >
+          Grade {{ grade }}
+          <span
+            v-if="pendingByGrade?.[grade]"
+            class="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5"
+          >
+            {{ pendingByGrade[grade] }} pending
+          </span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 pb-2">
+        <button
+          @click="openEnrollModal"
+          class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+        >
+          <UserPlusIcon class="w-4 h-4" />
+          Enroll Student
+        </button>
+        <button
+          @click="openBulkModal"
+          class="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium"
+        >
+          <ArrowUpTrayIcon class="w-4 h-4" />
+          Bulk Import
+        </button>
+      </div>
     </div>
+
+    <p class="text-xs text-slate-500 -mt-3 mb-5">
+      Enroll Student / Bulk Import add students to a grade level only. Once enrolled, place them into a
+      section using "Assign by Grade List" inside a section below.
+    </p>
 
     <!-- Section cards grid -->
     <div v-if="sectionsByGrade.length === 0" class="text-slate-500 text-sm py-8 text-center">
@@ -434,25 +461,11 @@ function statusLabel(status) {
             </div>
             <div class="flex items-center gap-2">
               <button
-                @click="openEnrollModal"
-                class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
-              >
-                <UserPlusIcon class="w-4 h-4" />
-                Enroll Student
-              </button>
-              <button
                 @click="openAssignModal"
-                class="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium"
+                class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
               >
                 <UserGroupIcon class="w-4 h-4" />
                 Assign by Grade List
-              </button>
-              <button
-                @click="openBulkModal"
-                class="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium"
-              >
-                <ArrowUpTrayIcon class="w-4 h-4" />
-                Bulk Import
               </button>
               <button @click="closeSection" class="p-1 rounded-lg hover:bg-slate-100">
                 <XMarkIcon class="w-5 h-5 text-slate-500" />
@@ -541,9 +554,23 @@ function statusLabel(status) {
       >
         <div class="absolute inset-0 bg-black/40" @click="showEnrollModal = false" />
         <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-          <h3 class="font-semibold text-slate-800 mb-4">Enroll Student — {{ selectedSection?.name }}</h3>
+          <h3 class="font-semibold text-slate-800 mb-1">Enroll Student</h3>
+          <p class="text-xs text-slate-500 mb-4">
+            Adds the student to this school year. Section is assigned separately afterward.
+          </p>
 
           <form @submit.prevent="submitEnroll" class="space-y-4">
+
+            <!-- Grade level -->
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
+              <select
+                v-model.number="enrollForm.grade_level"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
+              </select>
+            </div>
 
             <!-- Student search -->
             <div class="relative">
@@ -753,8 +780,11 @@ function statusLabel(status) {
       >
         <div class="absolute inset-0 bg-black/40" @click="showBulkModal = false" />
         <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
-          <h3 class="font-semibold text-slate-800 mb-1">Bulk Enroll — {{ selectedSection?.name }}</h3>
-          <p class="text-xs text-slate-500 mb-4">Paste PISAY IDs separated by commas, semicolons, or new lines (max 60).</p>
+          <h3 class="font-semibold text-slate-800 mb-1">Bulk Enroll</h3>
+          <p class="text-xs text-slate-500 mb-4">
+            Paste PISAY IDs separated by commas, semicolons, or new lines (max 60). Adds students to this
+            school year — section is assigned separately afterward.
+          </p>
 
           <form @submit.prevent="submitBulk" class="space-y-4">
             <textarea
@@ -776,7 +806,16 @@ function statusLabel(status) {
               </span>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Grade Level</label>
+                <select
+                  v-model.number="bulkForm.grade_level"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option v-for="grade in gradeLevels" :key="grade" :value="grade">Grade {{ grade }}</option>
+                </select>
+              </div>
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">Enrollment Type</label>
                 <select
