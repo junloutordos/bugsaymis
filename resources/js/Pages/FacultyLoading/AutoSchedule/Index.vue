@@ -16,18 +16,6 @@
         </div>
       </div>
 
-      <!-- Alert / notification -->
-      <div v-if="alert.message" :class="[
-          'rounded-lg px-4 py-3 text-sm flex items-start gap-2',
-          alert.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-            : alert.type === 'warning' ? 'bg-amber-50 border border-amber-200 text-amber-700'
-            : 'bg-red-50 border border-red-200 text-red-700'
-        ]">
-        <CheckCircleIcon v-if="alert.type === 'success'" class="h-4 w-4 mt-0.5 shrink-0" />
-        <ExclamationTriangleIcon v-else class="h-4 w-4 mt-0.5 shrink-0" />
-        <span>{{ alert.message }}</span>
-      </div>
-
       <!-- ── Configuration Panel ─────────────────────────────────────── -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-5">
         <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
@@ -435,6 +423,7 @@
 import { ref, computed, reactive } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import axios from 'axios'
+import Swal from 'sweetalert2'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   SparklesIcon,
@@ -490,12 +479,6 @@ const conflictSuggestions = ref([])    // suggestions returned alongside the job
 const resolvedConflicts  = ref(new Set()) // indices of conflicts user has fixed
 const unplaceable        = ref([])     // sessions that could not be placed
 const sectionReport      = ref([])     // per-section placed vs needed coverage
-const alert              = reactive({ type: '', message: '' })
-
-function clearAlert() {
-  alert.type    = ''
-  alert.message = ''
-}
 
 async function runGenerate() {
   if (!canGenerate.value || generating.value) return
@@ -505,7 +488,6 @@ async function runGenerate() {
   resolvedConflicts.value   = new Set()
   unplaceable.value   = []
   sectionReport.value = []
-  clearAlert()
 
   try {
     const { data } = await axios.post('/faculty-loading/auto-schedule/generate', {
@@ -519,15 +501,12 @@ async function runGenerate() {
     sectionReport.value      = data.section_report ?? []
 
     if (data.warning) {
-      alert.type    = 'warning'
-      alert.message = data.warning
+      await Swal.fire('Warning', data.warning, 'warning')
     } else if (data.job.hard_conflicts === 0) {
-      alert.type    = 'success'
-      alert.message = 'Conflict-free schedule generated successfully!'
+      await Swal.fire('Success', 'Conflict-free schedule generated successfully!', 'success')
     }
   } catch (err) {
-    alert.type    = 'error'
-    alert.message = err.response?.data?.message ?? 'Generation failed. Please try again.'
+    await Swal.fire('Error', err.response?.data?.message ?? 'Generation failed. Please try again.', 'error')
   } finally {
     generating.value = false
   }
@@ -625,7 +604,6 @@ const applying = ref(false)
 async function applySchedules() {
   if (!result.value?.id || applying.value) return
   applying.value = true
-  clearAlert()
 
   try {
     // Send local (possibly patched) schedules so conflict fixes are persisted
@@ -633,11 +611,17 @@ async function applySchedules() {
       `/faculty-loading/auto-schedule/jobs/${result.value.id}/apply`,
       { schedules: result.value.schedules }
     )
-    alert.type    = 'success'
-    alert.message = data.message
+    await Swal.fire('Success', data.message, 'success')
   } catch (err) {
-    alert.type    = 'error'
-    alert.message = err.response?.data?.message ?? 'Failed to save schedules.'
+    const conflicts = err.response?.data?.conflicts ?? []
+    const message   = err.response?.data?.message ?? 'Failed to save schedules.'
+    await Swal.fire({
+      title: 'Error',
+      icon:  'error',
+      html:  conflicts.length
+        ? `<p>${message}</p><ul class="text-left text-sm mt-2">${conflicts.map(c => `<li>• ${c}</li>`).join('')}</ul>`
+        : message,
+    })
   } finally {
     applying.value = false
   }
@@ -649,7 +633,6 @@ function discardResult() {
   resolvedConflicts.value   = new Set()
   unplaceable.value        = []
   sectionReport.value      = []
-  clearAlert()
 }
 
 // ── History ─────────────────────────────────────────────────────────────────
@@ -668,8 +651,7 @@ function loadJob(job) {
       form.academic_term_id     = data.academic_term_id
     })
     .catch(() => {
-      alert.type    = 'error'
-      alert.message = 'Could not load the selected job.'
+      Swal.fire('Error', 'Could not load the selected job.', 'error')
     })
 }
 
