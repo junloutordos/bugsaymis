@@ -11,7 +11,7 @@
             AI Timetable Generator
           </h1>
           <p class="text-sm text-slate-500 mt-0.5">
-            Automatically generate an optimized class schedule using a Genetic Algorithm.
+            Automatically generate a conflict-free class schedule using the constraint-based scheduler.
           </p>
         </div>
       </div>
@@ -60,53 +60,6 @@
           </div>
         </div>
 
-        <!-- Advanced GA Parameters -->
-        <div>
-          <button @click="showAdvanced = !showAdvanced"
-            class="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors">
-            <ChevronDownIcon :class="['h-3.5 w-3.5 transition-transform', showAdvanced ? 'rotate-180' : '']" />
-            Advanced GA Parameters
-          </button>
-
-          <div v-if="showAdvanced" class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-slate-100">
-            <!-- Population Size -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                Population Size
-                <span class="text-slate-400 font-normal">(10–100)</span>
-              </label>
-              <input type="number" v-model.number="form.population_size"
-                min="10" max="100" step="5"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-              <p class="text-xs text-slate-400 mt-1">More = better results, slower run</p>
-            </div>
-
-            <!-- Mutation Rate -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                Mutation Rate
-                <span class="text-slate-400 font-normal">(0.01–0.30)</span>
-              </label>
-              <input type="number" v-model.number="form.mutation_rate"
-                min="0.01" max="0.30" step="0.01"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-              <p class="text-xs text-slate-400 mt-1">Higher = more exploration</p>
-            </div>
-
-            <!-- Max Generations -->
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                Max Generations
-                <span class="text-slate-400 font-normal">(20–500)</span>
-              </label>
-              <input type="number" v-model.number="form.max_generations"
-                min="20" max="500" step="10"
-                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-              <p class="text-xs text-slate-400 mt-1">Stops early if conflict-free</p>
-            </div>
-          </div>
-        </div>
-
         <!-- Generate button -->
         <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
           <button @click="runGenerate"
@@ -117,7 +70,7 @@
             {{ generating ? 'Generating…' : 'Generate Schedule' }}
           </button>
           <p v-if="generating" class="text-xs text-slate-400">
-            Running GA — this may take a few seconds…
+            Generating — this may take a few seconds…
           </p>
         </div>
       </div>
@@ -139,10 +92,10 @@
             <p class="text-xs text-slate-500 mt-1">Slots Generated</p>
           </div>
           <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
-            <p class="text-2xl font-bold" :class="result.fitness_score >= 0 ? 'text-emerald-600' : 'text-amber-600'">
-              {{ result.fitness_score?.toLocaleString() ?? '—' }}
+            <p class="text-2xl font-bold" :class="unplaceable.length === 0 ? 'text-emerald-600' : 'text-amber-600'">
+              {{ unplaceable.length }}
             </p>
-            <p class="text-xs text-slate-500 mt-1">Fitness Score</p>
+            <p class="text-xs text-slate-500 mt-1">Unplaced</p>
           </div>
           <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 text-center">
             <p class="text-2xl font-bold text-slate-700">{{ result.duration_seconds ?? '—' }}s</p>
@@ -154,6 +107,75 @@
         <div v-if="liveConflictCount === 0" class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 flex items-center gap-3">
           <CheckCircleIcon class="h-5 w-5 text-emerald-500 shrink-0" />
           <p class="text-sm font-semibold text-emerald-800">Conflict-free schedule generated!</p>
+        </div>
+
+        <!-- ── Per-section coverage report ─────────────────────────────── -->
+        <div v-if="sectionReport.length" class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 border-b border-slate-100">
+            <h2 class="text-sm font-semibold text-slate-700">Section Coverage</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Sessions placed vs. required per section.</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-50 text-sm">
+              <thead>
+                <tr class="text-xs text-slate-400 uppercase tracking-wide bg-slate-50">
+                  <th class="px-4 py-2.5 text-left">Grade</th>
+                  <th class="px-4 py-2.5 text-left">Section</th>
+                  <th class="px-4 py-2.5 text-center">Needed</th>
+                  <th class="px-4 py-2.5 text-center">Placed</th>
+                  <th class="px-4 py-2.5 text-center">Unplaced</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                <tr v-for="r in sectionReport" :key="r.section_id"
+                  :class="['hover:bg-slate-50/50', r.unplaced > 0 ? 'bg-amber-50/40' : '']">
+                  <td class="px-4 py-2 text-slate-500">G{{ r.grade }}</td>
+                  <td class="px-4 py-2 font-medium text-slate-700">{{ r.section_name }}</td>
+                  <td class="px-4 py-2 text-center text-slate-600">{{ r.needed }}</td>
+                  <td class="px-4 py-2 text-center text-emerald-600 font-semibold">{{ r.placed }}</td>
+                  <td class="px-4 py-2 text-center font-semibold"
+                    :class="r.unplaced > 0 ? 'text-amber-600' : 'text-slate-300'">{{ r.unplaced }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Unplaced sessions ──────────────────────────────────────── -->
+        <div v-if="unplaceable.length" class="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+            <ExclamationTriangleIcon class="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+            <div>
+              <p class="text-sm font-semibold text-amber-800">
+                {{ unplaceable.length }} session(s) could not be placed
+              </p>
+              <p class="text-xs text-amber-700 mt-0.5">
+                These exceed the available periods for the grade (over-subscribed) or hit a fully-packed
+                section. Reduce the grade's load, adjust the bell schedule, or place these manually in the
+                Schedules module.
+              </p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-50 text-sm">
+              <thead>
+                <tr class="text-xs text-slate-400 uppercase tracking-wide bg-slate-50">
+                  <th class="px-4 py-2.5 text-left">Grade</th>
+                  <th class="px-4 py-2.5 text-left">Section</th>
+                  <th class="px-4 py-2.5 text-left">Subject</th>
+                  <th class="px-4 py-2.5 text-left">Faculty</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-50">
+                <tr v-for="(u, ui) in unplaceable" :key="ui" class="hover:bg-slate-50/50">
+                  <td class="px-4 py-2 text-slate-500">G{{ u.grade }}</td>
+                  <td class="px-4 py-2 font-medium text-slate-700">{{ u.section_name }}</td>
+                  <td class="px-4 py-2 text-slate-600">{{ u.subject_code }} — {{ u.subject_name }}</td>
+                  <td class="px-4 py-2 text-slate-500">{{ u.faculty_name }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- ── Conflict Resolution Panel ──────────────────────────────── -->
@@ -265,8 +287,8 @@
               {{ liveConflictCount }} hard conflict(s) remain
             </p>
             <p class="text-xs text-amber-700 mt-0.5">
-              Try increasing population size or max generations, then re-run.
-              You can still save and fix conflicts manually in the Schedules module.
+              The generated schedule is conflict-free by construction; this should not normally appear.
+              You can still save and review in the Schedules module.
             </p>
           </div>
         </div>
@@ -313,7 +335,7 @@
                   </td>
                   <td class="px-4 py-2.5 text-slate-700">{{ s._faculty_name }}</td>
                   <td class="px-4 py-2.5 text-slate-700">{{ s._subject_name }}</td>
-                  <td class="px-4 py-2.5 text-slate-500">{{ s._section_id }}</td>
+                  <td class="px-4 py-2.5 text-slate-500">{{ s._section_name }}</td>
                   <td class="px-4 py-2.5 text-slate-500">{{ s._classroom_name }}</td>
                   <td class="px-4 py-2.5 text-center">
                     <span v-if="hasConflict(s)"
@@ -368,7 +390,7 @@
               <th class="px-4 py-2.5 text-left">Generated</th>
               <th class="px-4 py-2.5 text-center">Slots</th>
               <th class="px-4 py-2.5 text-center">Conflicts</th>
-              <th class="px-4 py-2.5 text-center">Fitness</th>
+              <th class="px-4 py-2.5 text-center">Unplaced</th>
               <th class="px-4 py-2.5 text-center">Status</th>
               <th class="px-4 py-2.5 text-center">Action</th>
             </tr>
@@ -388,7 +410,7 @@
                   ]">{{ job.hard_conflicts }}</span>
               </td>
               <td class="px-4 py-2.5 text-center text-slate-500 tabular-nums text-xs">
-                {{ job.fitness_score?.toLocaleString() ?? '—' }}
+                {{ job.fitness_score != null ? Math.abs(job.fitness_score) : '—' }}
               </td>
               <td class="px-4 py-2.5 text-center">
                 <span :class="statusClass(job.status)">{{ job.status }}</span>
@@ -419,7 +441,6 @@ import {
   ArrowPathIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  ChevronDownIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -436,12 +457,7 @@ const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 const form = reactive({
   school_year_id:   null,
   academic_term_id: null,
-  population_size:  30,
-  mutation_rate:    0.05,
-  max_generations:  100,
 })
-
-const showAdvanced = ref(false)
 
 const selectedSchoolYear = computed(() =>
   props.schoolYears?.find(sy => sy.id === form.school_year_id) ?? null
@@ -472,6 +488,8 @@ const generating         = ref(false)
 const result             = ref(null)   // the job object returned from the API
 const conflictSuggestions = ref([])    // suggestions returned alongside the job
 const resolvedConflicts  = ref(new Set()) // indices of conflicts user has fixed
+const unplaceable        = ref([])     // sessions that could not be placed
+const sectionReport      = ref([])     // per-section placed vs needed coverage
 const alert              = reactive({ type: '', message: '' })
 
 function clearAlert() {
@@ -485,19 +503,20 @@ async function runGenerate() {
   result.value        = null
   conflictSuggestions.value = []
   resolvedConflicts.value   = new Set()
+  unplaceable.value   = []
+  sectionReport.value = []
   clearAlert()
 
   try {
     const { data } = await axios.post('/faculty-loading/auto-schedule/generate', {
       school_year_id:   form.school_year_id,
       academic_term_id: form.academic_term_id,
-      population_size:  form.population_size,
-      mutation_rate:    form.mutation_rate,
-      max_generations:  form.max_generations,
     })
 
     result.value             = data.job
     conflictSuggestions.value = data.conflict_suggestions ?? []
+    unplaceable.value        = data.unplaceable ?? []
+    sectionReport.value      = data.section_report ?? []
 
     if (data.warning) {
       alert.type    = 'warning'
@@ -625,6 +644,8 @@ function discardResult() {
   result.value             = null
   conflictSuggestions.value = []
   resolvedConflicts.value   = new Set()
+  unplaceable.value        = []
+  sectionReport.value      = []
   clearAlert()
 }
 
@@ -639,6 +660,8 @@ function loadJob(job) {
       result.value              = data
       conflictSuggestions.value = []
       resolvedConflicts.value   = new Set()
+      unplaceable.value         = []
+      sectionReport.value       = []
       form.academic_term_id     = data.academic_term_id
     })
     .catch(() => {

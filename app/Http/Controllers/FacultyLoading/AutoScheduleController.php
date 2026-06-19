@@ -7,7 +7,7 @@ use App\Models\FacultyLoading\AiScheduleJob;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Services\FacultyLoading\ConflictDetectionService;
-use App\Services\FacultyLoading\GeneticSchedulingService;
+use App\Services\FacultyLoading\DeterministicSchedulingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +19,7 @@ use Throwable;
 class AutoScheduleController extends Controller
 {
     public function __construct(
-        private readonly GeneticSchedulingService $ga,
+        private readonly DeterministicSchedulingService $scheduler,
         private readonly ConflictDetectionService $conflicts,
     ) {}
 
@@ -61,18 +61,18 @@ class AutoScheduleController extends Controller
         ]);
     }
 
-    // ── API: Run GA ───────────────────────────────────────────────────────
+    // ── API: Run scheduler ──────────────────────────────────────────────────
 
     /**
-     * Execute the Genetic Algorithm synchronously and store the result.
+     * Run the deterministic constraint-based scheduler synchronously and store
+     * the result. The generated schedule is conflict-free by construction; any
+     * sessions that could not be placed (e.g. an over-subscribed grade) are
+     * returned in `unplaceable` alongside a per-section coverage report.
      *
      * POST /faculty-loading/auto-schedule/generate
      * Body: {
-     *   school_year_id:  int  (required)
-     *   academic_term_id: int  (required)
-     *   population_size:  int   (optional, 10–100)
-     *   mutation_rate:    float (optional, 0.01–0.30)
-     *   max_generations:  int   (optional, 20–500)
+     *   school_year_id:   int (required)
+     *   academic_term_id: int (required)
      * }
      */
     public function generate(Request $request): JsonResponse
@@ -82,36 +82,22 @@ class AutoScheduleController extends Controller
         $data = $request->validate([
             'school_year_id'   => 'required|integer',
             'academic_term_id' => 'required|integer',
-            'population_size'  => 'nullable|integer|min:10|max:100',
-            'mutation_rate'    => 'nullable|numeric|min:0.01|max:0.30',
-            'max_generations'  => 'nullable|integer|min:20|max:500',
         ]);
-
-        $params = array_filter([
-            'population_size'  => $data['population_size']  ?? null,
-            'mutation_rate'    => $data['mutation_rate']    ?? null,
-            'max_generations'  => $data['max_generations']  ?? null,
-        ], fn ($v) => $v !== null);
 
         // Create a job record
         $job = AiScheduleJob::create([
             'school_year_id'   => $data['school_year_id'],
             'academic_term_id' => $data['academic_term_id'],
             'status'           => 'running',
-            'parameters'       => $params + [
-                'population_size'  => $params['population_size']  ?? 30,
-                'mutation_rate'    => $params['mutation_rate']    ?? 0.05,
-                'max_generations'  => $params['max_generations']  ?? 100,
-            ],
-            'started_at' => now(),
-            'created_by' => Auth::id(),
+            'parameters'       => ['engine' => 'deterministic'],
+            'started_at'       => now(),
+            'created_by'       => Auth::id(),
         ]);
 
         try {
-            $result = $this->ga->generate(
+            $result = $this->scheduler->generate(
                 schoolYearId: (int) $data['school_year_id'],
                 termId:       (int) $data['academic_term_id'],
-                params:       $params,
             );
 
             $job->update([
@@ -124,9 +110,11 @@ class AutoScheduleController extends Controller
             ]);
 
             return response()->json([
-                'job'                 => $this->serializeJob($job->fresh(), true),
+                'job'                  => $this->serializeJob($job->fresh(), true),
                 'conflict_suggestions' => $result['conflict_suggestions'] ?? [],
-                'warning'             => $result['warning'] ?? null,
+                'unplaceable'          => $result['unplaceable'] ?? [],
+                'section_report'       => $result['section_report'] ?? [],
+                'warning'              => $result['warning'] ?? null,
             ]);
 
         } catch (Throwable $e) {
