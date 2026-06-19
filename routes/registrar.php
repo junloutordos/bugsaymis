@@ -7,7 +7,6 @@ use App\Http\Controllers\Registrar\EnrollmentPeriodController;
 use App\Http\Controllers\Registrar\PromotionController;
 use App\Http\Controllers\Registrar\ReportCardController;
 use App\Http\Controllers\Registrar\RetentionPolicyController;
-use App\Http\Controllers\Registrar\SectionAssignmentController;
 use App\Http\Controllers\Registrar\StudentDocumentController;
 use App\Http\Controllers\Registrar\TranscriptController;
 use App\Http\Controllers\StudentPortal\GradesController;
@@ -54,16 +53,6 @@ Route::middleware(['auth'])->group(function () {
         ->name('registrar.enrollment-applications.reopen')
         ->middleware('permission:students.enrollment.manage');
 
-    // ── Legacy Section Assignment (one-time import wizard) ───────────────────
-
-    Route::get('/registrar/section-assignment', [SectionAssignmentController::class, 'index'])
-        ->name('registrar.section-assignment.index')
-        ->middleware('permission:students.enrollment.manage');
-
-    Route::post('/registrar/section-assignment', [SectionAssignmentController::class, 'store'])
-        ->name('registrar.section-assignment.store')
-        ->middleware('permission:students.enrollment.manage');
-
     // ── Enrollment Management ─────────────────────────────────────────────────
 
     Route::get('/registrar/enrollment', [EnrollmentController::class, 'index'])
@@ -81,6 +70,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/registrar/enrollment/unassigned', [EnrollmentController::class, 'unassigned'])
         ->name('registrar.enrollment.unassigned')
         ->middleware('permission:students.enrollment.view');
+
+    Route::get('/registrar/enrollment/continuing-students', [EnrollmentController::class, 'continuingStudents'])
+        ->name('registrar.enrollment.continuing-students')
+        ->middleware('permission:students.enrollment.manage');
 
     Route::post('/registrar/enrollment', [EnrollmentController::class, 'store'])
         ->name('registrar.enrollment.store')

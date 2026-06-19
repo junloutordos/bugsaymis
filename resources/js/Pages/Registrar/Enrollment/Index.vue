@@ -231,6 +231,8 @@ const bulkForm = useForm({
   pisays_ids:      [],
 })
 
+const loadingContinuing = ref(false)
+
 function openBulkModal() {
   bulkForm.reset()
   bulkForm.school_year_id = schoolYearId.value
@@ -252,12 +254,35 @@ function parseBulkCsv() {
     bulkParseError.value = 'No PISAY IDs found.'
     return
   }
-  if (ids.length > 60) {
-    bulkParseError.value = 'Maximum 60 students per bulk import.'
+  if (ids.length > 200) {
+    bulkParseError.value = 'Maximum 200 students per bulk import.'
     return
   }
   bulkParsed.value    = ids
   bulkForm.pisays_ids = ids
+}
+
+async function loadContinuingStudents() {
+  bulkParseError.value    = ''
+  loadingContinuing.value = true
+  try {
+    const { data } = await axios.get(route('registrar.enrollment.continuing-students'), {
+      params: {
+        school_year_id: bulkForm.school_year_id,
+        grade_level: bulkForm.grade_level,
+      },
+    })
+    if (data.length === 0) {
+      bulkParseError.value = `No continuing students found for Grade ${bulkForm.grade_level}.`
+      bulkCsvText.value = ''
+      bulkParsed.value  = []
+      return
+    }
+    bulkCsvText.value = data.map(s => s.pisays_id).filter(Boolean).join('\n')
+    parseBulkCsv()
+  } finally {
+    loadingContinuing.value = false
+  }
 }
 
 function submitBulk() {
@@ -717,10 +742,8 @@ function statusLabel(status) {
             <div v-else-if="filteredUnassigned.length === 0" class="flex flex-col items-center gap-1 py-10 text-center text-sm">
               <p class="text-slate-400">No students are currently pending placement for Grade {{ selectedSection?.grade_level }}.</p>
               <p class="text-xs text-slate-400 max-w-md">
-                Students appear here once an enrollment application is approved. If you're migrating continuing
-                students from last year, use
-                <a :href="route('registrar.section-assignment.index')" class="text-indigo-600 hover:underline">Continuing Student Migration</a>
-                in the sidebar first.
+                Students appear here once they're enrolled — either via an approved enrollment application, or
+                manually using "Enroll Student" / "Bulk Import" above.
               </p>
             </div>
             <label
@@ -782,11 +805,23 @@ function statusLabel(status) {
         <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
           <h3 class="font-semibold text-slate-800 mb-1">Bulk Enroll</h3>
           <p class="text-xs text-slate-500 mb-4">
-            Paste PISAY IDs separated by commas, semicolons, or new lines (max 60). Adds students to this
+            Paste PISAY IDs separated by commas, semicolons, or new lines (max 200). Adds students to this
             school year — section is assigned separately afterward.
           </p>
 
           <form @submit.prevent="submitBulk" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-medium text-slate-600">PISAY IDs</label>
+              <button
+                type="button"
+                @click="loadContinuingStudents"
+                :disabled="loadingContinuing"
+                class="flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50"
+              >
+                <UserGroupIcon class="w-3.5 h-3.5" />
+                {{ loadingContinuing ? 'Loading…' : `Load Continuing Students (Grade ${bulkForm.grade_level})` }}
+              </button>
+            </div>
             <textarea
               v-model="bulkCsvText"
               rows="6"
