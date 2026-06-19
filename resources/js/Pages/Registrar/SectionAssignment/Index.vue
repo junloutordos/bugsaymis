@@ -157,9 +157,11 @@ function submit() {
       <!-- Header row -->
       <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-slate-800">Legacy Import — SY 2026-2027</h2>
+          <h2 class="text-base font-semibold text-slate-800">Continuing Student Migration — SY 2026-2027</h2>
           <p class="text-xs text-slate-500 mt-0.5">
-            Assign {{ totalStudents }} continuing students (Grades 8–12) to sections before confirming enrollment.
+            One-time migration of {{ totalStudents }} continuing students (Grades 8–12) from last year's records into
+            this year's sections. For new admissions, transfers, or day-to-day section placement, use
+            <a :href="route('registrar.enrollment.index')" class="text-indigo-600 hover:underline">Enrollment</a> instead.
           </p>
         </div>
         <div class="flex items-center gap-2">
