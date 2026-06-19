@@ -41,7 +41,7 @@ class DeterministicSchedulingService
      * The loop exits as soon as a fully-placed (zero-unplaced) schedule is found,
      * so this cost is only paid for genuinely over-subscribed grades.
      */
-    private const MAX_RESTARTS = 100;
+    private const MAX_RESTARTS = 150;
 
     /** @var array<int,array<int,array<string,mixed>>> available slots per grade */
     private array $gridByGrade = [];
@@ -215,14 +215,14 @@ class DeterministicSchedulingService
         // Faculty total teaching sessions (for most-constrained ordering).
         $facultyTotal = [];
 
+        // Grades whose bell schedule reserves elective windows (and can therefore
+        // schedule cross-section elective groups).
+        $electiveGrades = $this->gradesWithElectiveWindows();
+
         $requirements = [];
         foreach ($assignments as $la) {
             $section = $sections->get($la->section_id);
             if (! $section) {
-                continue;
-            }
-            // Skip synthetic elective sections.
-            if (str_starts_with((string) $section->sectionname, 'ELEC-')) {
                 continue;
             }
             $grade = (int) $section->levelid;
@@ -230,9 +230,24 @@ class DeterministicSchedulingService
                 continue;
             }
 
+            $isElectiveSection = str_starts_with((string) $section->sectionname, 'ELEC-');
+            // Elective (cross-section) groups are only schedulable for grades that
+            // have elective windows; for other grades they remain out of scope.
+            if ($isElectiveSection && ! in_array($grade, $electiveGrades, true)) {
+                continue;
+            }
+
             $sessions = max(1, (int) round((float) ($la->subject->load_units ?? 1)));
-            $facultyId = (int) $la->user_id;
-            $facultyTotal[$facultyId] = ($facultyTotal[$facultyId] ?? 0) + $sessions;
+
+            // TBA / vacant placeholder faculty must never create false conflicts —
+            // give each such session its own unique sentinel "faculty".
+            $facultyName = $la->faculty?->name ?? 'TBA';
+            $isPlaceholder = str_starts_with($facultyName, 'TBA');
+            $facultyId = $isPlaceholder ? -((int) $la->id) : (int) $la->user_id;
+
+            if (! $isPlaceholder) {
+                $facultyTotal[$facultyId] = ($facultyTotal[$facultyId] ?? 0) + $sessions;
+            }
 
             $requirements[] = [
                 'load_assignment_id' => (int) $la->id,
@@ -246,8 +261,9 @@ class DeterministicSchedulingService
                 'subject_name'       => $la->subject->name,
                 'subject_type'       => $la->subject->subject_type,
                 'faculty_id'         => $facultyId,
-                'faculty_name'       => $la->faculty?->name ?? 'TBA',
+                'faculty_name'       => $facultyName,
                 'sessions_needed'    => $sessions,
+                'is_elective'        => $isElectiveSection || $la->subject->subject_type === 'elective',
             ];
         }
 
@@ -258,6 +274,26 @@ class DeterministicSchedulingService
         unset($req);
 
         return $requirements;
+    }
+
+    /**
+     * Grades whose bell schedule contains elective-labeled periods. Only these
+     * grades can schedule cross-section elective groups.
+     *
+     * @return array<int,int>
+     */
+    private function gradesWithElectiveWindows(): array
+    {
+        $grades = [];
+        foreach (range(7, 12) as $grade) {
+            foreach ($this->buildSlotGrid($grade) as $slot) {
+                if ($slot['is_elective']) {
+                    $grades[] = $grade;
+                    break;
+                }
+            }
+        }
+        return $grades;
     }
 
     // ── Slot grid ─────────────────────────────────────────────────────────
@@ -283,28 +319,26 @@ class DeterministicSchedulingService
                 continue;
             }
 
-            $daySlots = SchedulingConstants::getClassSlots($grade, $day);
+            $timetable = ($day === 'Monday')
+                ? SchedulingConstants::getMondayTimetable($grade)
+                : SchedulingConstants::getTueFriTimetable($grade);
 
-            // Reclaim the Monday 08:50–09:40 gap (the "DEAD" slot) for grades that
-            // need the extra teaching period.
-            if ($reclaimMon && $day === 'Monday') {
-                foreach (SchedulingConstants::getMondayTimetable($grade) as $row) {
-                    if (($row['type'] ?? '') === 'DEAD') {
-                        $daySlots[] = ['start' => $row['start'], 'end' => $row['end']];
-                    }
+            foreach ($timetable as $row) {
+                // Usable teaching rows: CLASS periods, plus the Monday DEAD gap for
+                // grades that reclaim it.
+                $isClass = ($row['type'] ?? '') === 'CLASS';
+                $isReclaimedGap = $reclaimMon && $day === 'Monday' && ($row['type'] ?? '') === 'DEAD';
+                if (! $isClass && ! $isReclaimedGap) {
+                    continue;
                 }
-            }
 
-            foreach ($daySlots as $slot) {
                 // Wednesday restrictions do not apply to "full Wednesday" grades.
                 if ($day === 'Wednesday' && ! $fullWed) {
-                    // No teaching after the activity cutoff.
-                    if ($slot['start'] >= $wedCut) {
+                    if ($row['start'] >= $wedCut) {
                         continue;
                     }
-                    // Skip the Wednesday wellness block.
                     if (SchedulingConstants::timesOverlap(
-                        $slot['start'], $slot['end'],
+                        $row['start'], $row['end'],
                         SchedulingConstants::WEDNESDAY_WELLNESS['start'],
                         SchedulingConstants::WEDNESDAY_WELLNESS['end'],
                     )) {
@@ -313,11 +347,14 @@ class DeterministicSchedulingService
                 }
 
                 $slots[] = [
-                    'day'       => $day,
-                    'start'     => $slot['start'],
-                    'end'       => $slot['end'],
-                    'start_min' => SchedulingConstants::toMinutes($slot['start']),
-                    'end_min'   => SchedulingConstants::toMinutes($slot['end']),
+                    'day'         => $day,
+                    'start'       => $row['start'],
+                    'end'         => $row['end'],
+                    'start_min'   => SchedulingConstants::toMinutes($row['start']),
+                    'end_min'     => SchedulingConstants::toMinutes($row['end']),
+                    // Periods the bell schedule reserves for electives — core
+                    // (homeroom) subjects avoid these; electives only use these.
+                    'is_elective' => str_contains($row['label'] ?? '', 'Elective'),
                 ];
             }
         }
@@ -344,6 +381,10 @@ class DeterministicSchedulingService
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
             $day = $slot['day'];
 
+            // Electives only use elective windows; core subjects only use the rest.
+            if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
+                continue;
+            }
             if ($this->overlapsReserved($slot, $reserved)) {
                 continue;
             }
@@ -399,6 +440,10 @@ class DeterministicSchedulingService
         }
 
         foreach ($this->gridByGrade[$s['grade']] ?? [] as $slot) {
+            // Electives only use elective windows; core subjects only use the rest.
+            if (($slot['is_elective'] ?? false) !== ($s['is_elective'] ?? false)) {
+                continue;
+            }
             if ($this->overlapsReserved($slot, $reserved)) {
                 continue;
             }
