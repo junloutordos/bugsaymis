@@ -96,6 +96,10 @@ const formatDate = (iso) => iso
   ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
   : '—'
 
+const formatDateTime = (iso) => iso
+  ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  : '—'
+
 // Active stages that can still be processed
 const terminalStages = ['rejected', 'withdrawn', 'placement']
 </script>
@@ -166,7 +170,7 @@ const terminalStages = ['rejected', 'withdrawn', 'placement']
                 <td class="px-4 py-3 text-sm text-slate-700">
                   {{ app.job_vacancy?.job_item?.recruitment_type?.name ?? '—' }}
                 </td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(app.application_date) }}</td>
+                <td class="px-4 py-3 text-sm text-slate-700">{{ formatDateTime(app.created_at) }}</td>
                 <td class="px-4 py-3 text-center">
                   <span v-if="app.ranking_summary?.rank" class="font-bold text-indigo-600">#{{ app.ranking_summary.rank }}</span>
                   <span v-else class="text-slate-300">—</span>
