@@ -45,7 +45,7 @@
               <span v-if="punchFor(slot.type)" class="text-[10px]" :class="statusTextClass(punchFor(slot.type).match_status)">
                 {{ statusLabel(punchFor(slot.type).match_status) }}
               </span>
-              <button v-if="canPunch(slot.type)" @click="startPunch(slot.type)"
+              <button v-if="canPunch(slot.type)" @click="openCamera(slot.type)"
                       class="mt-1 w-full inline-flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                 Punch
               </button>
@@ -54,16 +54,38 @@
         </div>
       </template>
 
-      <!-- Liveness Modal -->
-      <div v-if="showLiveness" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-4 space-y-3">
-          <h3 class="text-base font-semibold text-slate-800 text-center">
-            {{ activeSlotLabel }} — Face Verification
-          </h3>
-          <div ref="livenessContainer" style="min-height: 400px;"></div>
-          <button @click="cancelLiveness" class="text-sm text-slate-400 hover:text-slate-600 w-full text-center">
+      <!-- Camera Modal -->
+      <div v-if="showCamera" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-4 space-y-3">
+          <h3 class="text-base font-semibold text-slate-800 text-center">{{ activeSlotLabel }}</h3>
+
+          <div v-if="!capturedImage" class="relative">
+            <video ref="videoEl" autoplay playsinline class="w-full rounded-lg bg-black" style="max-height:280px;" />
+            <button @click="capture"
+                    class="mt-3 w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              📸 Capture Photo
+            </button>
+          </div>
+
+          <div v-else class="space-y-3">
+            <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" style="max-height:280px;object-fit:cover;" alt="Captured photo" />
+            <div class="flex gap-3">
+              <button @click="retake"
+                      class="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                Retake
+              </button>
+              <button @click="confirmPunch" :disabled="loading"
+                      class="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                {{ loading ? 'Verifying…' : 'Confirm Punch' }}
+              </button>
+            </div>
+          </div>
+
+          <button @click="cancelCamera" class="text-sm text-slate-400 hover:text-slate-600 w-full text-center">
             Cancel
           </button>
+
+          <canvas ref="canvasEl" class="hidden" />
         </div>
       </div>
 
@@ -78,15 +100,10 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 
-// Lazy-loaded: the React + AWS Amplify Face Liveness bundle is large and
-// only needed once the user actually starts a punch, not on page load.
-
 const props = defineProps({
-  today:                  { type: String, required: true },
-  enrollmentStatus:       { type: String, default: null },
-  todayPunches:           { type: Array, default: () => [] },
-  awsRegion:              { type: String, default: null },
-  cognitoIdentityPoolId:  { type: String, default: null },
+  today:            { type: String, required: true },
+  enrollmentStatus: { type: String, default: null },
+  todayPunches:     { type: Array, default: () => [] },
 })
 
 const punches = ref(props.todayPunches)
@@ -145,44 +162,68 @@ function fmtTime(val) {
   return d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
 }
 
-// ── Liveness flow ────────────────────────────────────────────────────────────
-const showLiveness     = ref(false)
-const activeSlotType   = ref(null)
-const livenessContainer = ref(null)
-let unmountLiveness = null
+// ── Camera ────────────────────────────────────────────────────────────────────
+const showCamera     = ref(false)
+const activeSlotType = ref(null)
+const capturedImage  = ref(null)
+const loading        = ref(false)
+const videoEl        = ref(null)
+const canvasEl       = ref(null)
+let mediaStream = null
 
 const activeSlotLabel = computed(() => punchSlots.find(s => s.type === activeSlotType.value)?.label ?? '')
 
-async function startPunch(type) {
+async function openCamera(type) {
   activeSlotType.value = type
-  showLiveness.value = true
+  capturedImage.value  = null
+  showCamera.value     = true
+
+  await new Promise(resolve => setTimeout(resolve, 0)) // wait for v-if DOM mount
 
   try {
-    const { data } = await axios.post(route('hr.online-punch.liveness-session'))
-    const sessionId = data.session_id
-
-    await new Promise(resolve => setTimeout(resolve, 0)) // wait for v-if DOM mount
-
-    const { mountLivenessCheck } = await import('./Liveness/mountLiveness.js')
-
-    unmountLiveness = mountLivenessCheck(livenessContainer.value, {
-      region: props.awsRegion,
-      identityPoolId: props.cognitoIdentityPoolId,
-      sessionId,
-      onAnalysisComplete: () => submitPunch(type, sessionId),
-      onError: (err) => {
-        Swal.fire('Camera Error', err?.message || 'Could not start face verification.', 'error')
-        cancelLiveness()
-      },
-      onUserCancel: cancelLiveness,
-    })
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+    } catch {
+      mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    }
+    if (videoEl.value) videoEl.value.srcObject = mediaStream
   } catch (err) {
-    Swal.fire('Error', 'Could not start the liveness check. Please try again.', 'error')
-    showLiveness.value = false
+    Swal.fire('Camera Error', 'Could not access your camera. Please allow camera access and try again.', 'error')
+    showCamera.value = false
   }
 }
 
-async function submitPunch(type, sessionId) {
+function capture() {
+  if (!videoEl.value || !canvasEl.value) return
+  const video = videoEl.value, canvas = canvasEl.value
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  canvas.getContext('2d').drawImage(video, 0, 0)
+  capturedImage.value = canvas.toDataURL('image/jpeg', 0.9)
+  stopStream()
+}
+
+function retake() {
+  capturedImage.value = null
+  openCamera(activeSlotType.value)
+}
+
+function cancelCamera() {
+  stopStream()
+  capturedImage.value = null
+  showCamera.value = false
+  activeSlotType.value = null
+}
+
+function stopStream() {
+  mediaStream?.getTracks().forEach(t => t.stop())
+  mediaStream = null
+}
+
+async function confirmPunch() {
+  if (!capturedImage.value || loading.value) return
+  loading.value = true
+
   let latitude = null, longitude = null
   try {
     const pos = await getPosition()
@@ -192,17 +233,17 @@ async function submitPunch(type, sessionId) {
 
   try {
     const { data } = await axios.post(route('hr.online-punch.punch'), {
-      punch_type: type,
-      session_id: sessionId,
+      punch_type: activeSlotType.value,
+      photo: capturedImage.value,
       latitude,
       longitude,
     })
 
-    const idx = punches.value.findIndex(p => p.punch_type === type)
+    const idx = punches.value.findIndex(p => p.punch_type === activeSlotType.value)
     if (idx !== -1) punches.value[idx] = data.punch
     else punches.value.push(data.punch)
 
-    cancelLiveness()
+    cancelCamera()
 
     const icon = data.punch.match_status === 'verified' ? 'success' : 'warning'
     await Swal.fire({ icon, title: data.message, timer: 2500, showConfirmButton: false })
@@ -211,15 +252,9 @@ async function submitPunch(type, sessionId) {
       ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
       ?? 'Something went wrong.'
     Swal.fire('Error', msg, 'error')
-    cancelLiveness()
+  } finally {
+    loading.value = false
   }
-}
-
-function cancelLiveness() {
-  unmountLiveness?.()
-  unmountLiveness = null
-  showLiveness.value = false
-  activeSlotType.value = null
 }
 
 function getPosition() {
@@ -229,5 +264,5 @@ function getPosition() {
   })
 }
 
-onUnmounted(() => unmountLiveness?.())
+onUnmounted(stopStream)
 </script>

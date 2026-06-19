@@ -1103,8 +1103,6 @@ Route::middleware(['auth', 'permission:hr.online-punch.record'])->prefix('hr/onl
     Route::get('/', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'index'])
         ->name('index');
 
-    Route::post('/liveness-session', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'createLivenessSession'])
-        ->name('liveness-session');
     Route::post('/punch', [\App\Http\Controllers\HR\OnlineTimePunchController::class, 'punch'])
         ->name('punch');
 
