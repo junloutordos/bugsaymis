@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, nextTick, ref } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import { ArrowLeftIcon, PrinterIcon } from '@heroicons/vue/24/outline'
 import { storageUrl } from '@/Composables/useStorage.js'
@@ -23,6 +23,32 @@ const photoUrl = computed(() => {
 function printCard() {
   window.print()
 }
+
+const NAME_BASE_FONT_SIZE = 10
+const NAME_MIN_FONT_SIZE = 6
+const nameEl = ref(null)
+const nameFontSize = ref(NAME_BASE_FONT_SIZE)
+
+function fitNameToOneLine() {
+  const el = nameEl.value
+  if (!el) return
+  const availableWidth = el.clientWidth
+  if (!availableWidth) return
+
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  ctx.font = `700 ${NAME_BASE_FONT_SIZE}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`
+  const textWidth = ctx.measureText(props.student.full_name).width
+
+  if (textWidth > availableWidth) {
+    const scaled = NAME_BASE_FONT_SIZE * (availableWidth / textWidth) * 0.98
+    nameFontSize.value = Math.max(NAME_MIN_FONT_SIZE, scaled)
+  }
+}
+
+onMounted(() => {
+  nextTick(fitNameToOneLine)
+})
 </script>
 
 <template>
@@ -65,7 +91,7 @@ function printCard() {
             <div v-else class="id-photo-empty">No Photo</div>
           </div>
 
-          <div class="id-name">{{ student.full_name }}</div>
+          <div ref="nameEl" class="id-name" :style="{ fontSize: nameFontSize + 'px' }">{{ student.full_name }}</div>
 
           <div v-if="barcode_svg" class="id-barcode" v-html="barcode_svg"></div>
           <div v-if="student.barcode" class="id-barcode-no">{{ student.barcode }}</div>
@@ -77,7 +103,6 @@ function printCard() {
 
           <div class="id-sig-block">
             <img v-if="ocd.signature_uri" :src="ocd.signature_uri" class="id-sig-img" alt="" />
-            <div class="id-sig-rule"></div>
             <div class="id-sig-name">{{ ocd.name }}</div>
             <div class="id-sig-position">{{ ocd.position }}</div>
           </div>
@@ -285,11 +310,12 @@ html, body { background: #f1f5f9; }
 .id-photo-empty { font-size: 6px; color: #94a3b8; }
 
 .id-name {
-  font-size: 10px;
   font-weight: 700;
   color: #1e293b;
   line-height: 1.3;
   margin-top: 1.5mm;
+  width: 100%;
+  white-space: nowrap;
 }
 
 .id-barcode { width: 100%; height: 7mm; margin-top: 1mm; }
@@ -335,12 +361,7 @@ html, body { background: #f1f5f9; }
   height: 5mm;
   max-width: 80%;
   object-fit: contain;
-  margin-bottom: 0.5mm;
-}
-.id-sig-rule {
-  width: 80%;
-  border-top: 1px solid #94a3b8;
-  margin-bottom: 0.8mm;
+  margin-bottom: -1.5mm;
 }
 .id-sig-name {
   font-size: 7px;
