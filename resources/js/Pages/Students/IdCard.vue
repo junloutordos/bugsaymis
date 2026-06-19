@@ -271,6 +271,7 @@ html, body { background: #f1f5f9; }
 .id-photo {
   width: 30mm;
   height: 30mm;
+  flex-shrink: 0;
   margin-top: 1mm;
   border: 1px solid #e2e8f0;
   border-radius: 1.5mm;
@@ -345,7 +346,6 @@ html, body { background: #f1f5f9; }
   font-size: 7px;
   font-weight: 700;
   color: #1e293b;
-  text-transform: uppercase;
 }
 .id-sig-position {
   font-size: 6px;
