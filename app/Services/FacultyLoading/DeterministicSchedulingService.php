@@ -261,6 +261,12 @@ class DeterministicSchedulingService
                 'subject_name'       => $la->subject->name,
                 'subject_type'       => $la->subject->subject_type,
                 'faculty_id'         => $facultyId,
+                // The real DB user id (e.g. the "TBA (Vacant)" placeholder account) —
+                // $facultyId above is a negative sentinel for placeholders, used only
+                // to keep parallel TBA sessions from being treated as the same
+                // double-booked faculty during placement. It must never be persisted:
+                // user_id is an unsigned FK and a negative value fails on insert.
+                'real_user_id'       => (int) $la->user_id,
                 'faculty_name'       => $facultyName,
                 'sessions_needed'    => $sessions,
                 'is_elective'        => $isElectiveSection || $la->subject->subject_type === 'elective',
@@ -585,7 +591,7 @@ class DeterministicSchedulingService
     {
         return [
             'load_assignment_id' => $s['load_assignment_id'],
-            'user_id'            => $s['faculty_id'],
+            'user_id'            => $s['real_user_id'],
             'subject_id'         => $s['subject_id'],
             'section_id'         => $s['section_id'],
             'classroom_id'       => $s['classroom_id'],
