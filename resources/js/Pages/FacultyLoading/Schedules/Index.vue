@@ -32,19 +32,34 @@
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-2 items-center">
+        <div class="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm shrink-0">
+          <button type="button" @click="setViewBy('section')"
+            :class="['px-3 py-1.5 font-medium transition-colors', viewBy === 'section' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            By Section
+          </button>
+          <button type="button" @click="setViewBy('faculty')"
+            :class="['px-3 py-1.5 font-medium border-l border-slate-200 transition-colors', viewBy === 'faculty' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            By Faculty
+          </button>
+        </div>
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option v-for="t in terms" :key="t.id" :value="t.id">
             {{ t.label }}{{ t.is_current ? ' (current)' : '' }}
           </option>
         </select>
-        <select v-model="filters.section_id" @change="applyFilters"
+        <select v-if="viewBy === 'section'" v-model="filters.section_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option :value="null">All Sections</option>
           <option v-for="sec in sections" :key="sec.id" :value="sec.id">
             Grade {{ sec.levelid }} — {{ sec.sectionname }}
           </option>
+        </select>
+        <select v-else v-model="filters.faculty_id" @change="applyFilters"
+          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option :value="null">All Faculty</option>
+          <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
         </select>
       </div>
 
@@ -56,23 +71,23 @@
         <p class="text-xs text-slate-400 mt-1">Assign a schedule or use AI Generate to get started.</p>
       </div>
 
-      <!-- Calendar cards per section -->
+      <!-- Calendar cards per section / per faculty -->
       <div v-else class="space-y-6">
-        <div v-for="sectionId in sectionsWithSchedules" :key="sectionId"
+        <div v-for="groupId in groupsWithSchedules" :key="groupId"
           class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
 
-          <!-- Section header -->
+          <!-- Group header -->
           <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
-                Grade {{ bySection[sectionId][0].grade_level }}
+              <span v-if="viewBy === 'section'" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
+                Grade {{ byGroup[groupId][0].grade_level }}
               </span>
               <h3 class="text-sm font-semibold text-slate-800">
-                {{ bySection[sectionId][0].section_name }}
+                {{ viewBy === 'faculty' ? (byGroup[groupId][0].faculty?.name ?? 'Unassigned / TBA') : byGroup[groupId][0].section_name }}
               </h3>
-              <span class="text-xs text-slate-400">· {{ bySection[sectionId].length }} slot(s)</span>
+              <span class="text-xs text-slate-400">· {{ byGroup[groupId].length }} slot(s)</span>
             </div>
-            <button @click="openForm({ section_id: sectionId })"
+            <button v-if="viewBy === 'section'" @click="openForm({ section_id: groupId })"
               class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md font-medium transition-colors">
               <PlusIcon class="h-3 w-3" /> Add
             </button>
@@ -148,7 +163,7 @@
                     </div>
 
                     <!-- Schedule event blocks -->
-                    <div v-for="s in (bySectionDay[sectionId]?.[day] ?? [])" :key="s.id"
+                    <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
                       :style="[eventStyle(s), subjectColorStyle(s.subject?.id)]"
                       class="absolute rounded border z-10 overflow-hidden cursor-pointer transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]"
                       @click="openForm(s)">
@@ -156,8 +171,8 @@
                         <div class="text-xs font-bold leading-tight truncate">
                           {{ s.subject?.code }}
                         </div>
-                        <div v-if="s.faculty?.name" class="text-xs leading-tight truncate opacity-75">
-                          {{ lastNameOf(s.faculty.name) }}
+                        <div class="text-xs leading-tight truncate opacity-75">
+                          {{ secondaryLabel(s) }}
                         </div>
                         <div class="text-xs leading-tight opacity-55 tabular-nums">
                           {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
@@ -179,9 +194,9 @@
             </div>
           </div>
 
-          <!-- Legend: subjects for this section -->
+          <!-- Legend: subjects for this group -->
           <div class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
-            <div v-for="sub in subjectsInSection(sectionId)" :key="sub.id"
+            <div v-for="sub in subjectsInGroup(groupId)" :key="sub.id"
               :style="subjectColorStyle(sub.id)"
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
               {{ sub.code }}
@@ -381,51 +396,82 @@ const props = defineProps({
 const filters = reactive({
   term_id:    props.filters.term_id    ?? props.currentTerm?.id ?? null,
   section_id: props.filters.section_id ?? null,
+  faculty_id: props.filters.faculty_id ?? null,
 })
 
 function applyFilters() {
   router.get(route('faculty-loading.schedules.index'), filters, { preserveState: true })
 }
 
+// ── View mode (group calendar cards by section or by faculty) ────────────────
+
+const viewBy = ref(props.filters.faculty_id ? 'faculty' : 'section')
+
+function setViewBy(mode) {
+  if (viewBy.value === mode) return
+  viewBy.value = mode
+  if (mode === 'section') {
+    filters.faculty_id = null
+  } else {
+    filters.section_id = null
+  }
+  applyFilters()
+}
+
 // ── Grouping ─────────────────────────────────────────────────────────────────
 
-/** { section_id: [schedules] } */
-const bySection = computed(() => {
+/** Group key for a schedule row, depending on the active view mode. */
+function groupKeyOf(s) {
+  return viewBy.value === 'faculty' ? (s.faculty?.id ?? 'unassigned') : s.section_id
+}
+
+/** { groupId: [schedules] } */
+const byGroup = computed(() => {
   const map = {}
   for (const s of props.schedules) {
-    if (!map[s.section_id]) map[s.section_id] = []
-    map[s.section_id].push(s)
+    const k = groupKeyOf(s)
+    if (!map[k]) map[k] = []
+    map[k].push(s)
   }
   return map
 })
 
-/** Section IDs in display order (backend already sorted by grade + name) */
-const sectionsWithSchedules = computed(() => {
+/** Group IDs in display order (backend already sorted by grade + name + day + time) */
+const groupsWithSchedules = computed(() => {
   const seen = []
   for (const s of props.schedules) {
-    if (!seen.includes(s.section_id)) seen.push(s.section_id)
+    const k = groupKeyOf(s)
+    if (!seen.includes(k)) seen.push(k)
   }
   return seen
 })
 
-/** { section_id: { day: [schedules] } } */
-const bySectionDay = computed(() => {
+/** { groupId: { day: [schedules] } } */
+const byGroupDay = computed(() => {
   const map = {}
   for (const s of props.schedules) {
-    if (!map[s.section_id]) map[s.section_id] = {}
-    if (!map[s.section_id][s.day_of_week]) map[s.section_id][s.day_of_week] = []
-    map[s.section_id][s.day_of_week].push(s)
+    const k = groupKeyOf(s)
+    if (!map[k]) map[k] = {}
+    if (!map[k][s.day_of_week]) map[k][s.day_of_week] = []
+    map[k][s.day_of_week].push(s)
   }
   return map
 })
 
-/** Unique subjects for the legend of a given section */
-function subjectsInSection(sectionId) {
+/** Unique subjects for the legend of a given group */
+function subjectsInGroup(groupId) {
   const seen = new Map()
-  for (const s of (bySection.value[sectionId] ?? [])) {
+  for (const s of (byGroup.value[groupId] ?? [])) {
     if (s.subject && !seen.has(s.subject.id)) seen.set(s.subject.id, s.subject)
   }
   return [...seen.values()]
+}
+
+/** Text shown inside an event block for the dimension that ISN'T the grouping axis. */
+function secondaryLabel(s) {
+  return viewBy.value === 'faculty'
+    ? `G${s.grade_level} ${s.section_name}`
+    : (s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA')
 }
 
 // ── Calendar helpers ─────────────────────────────────────────────────────────

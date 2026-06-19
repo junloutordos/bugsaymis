@@ -35,10 +35,12 @@ class ClassScheduleController extends Controller
         $currentTerm = AcademicTerm::where('is_current', true)->first();
         $termId      = $request->input('term_id', $currentTerm?->id);
         $sectionId   = $request->input('section_id');
+        $facultyId   = $request->input('faculty_id');
 
         $query = ClassSchedule::with(['subject', 'classroom', 'faculty:id,name', 'section:id,sectionname,levelid'])
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
-            ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId));
+            ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId))
+            ->when($facultyId, fn ($q) => $q->where('class_schedules.user_id', $facultyId));
 
         // Order by grade level + section name + day + time for clean grouping
         $dayOrder = "FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')";
@@ -92,7 +94,7 @@ class ClassScheduleController extends Controller
             'classrooms'  => $classrooms,
             'sections'    => $sections,
             'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
-            'filters'     => $request->only(['term_id', 'section_id']),
+            'filters'     => $request->only(['term_id', 'section_id', 'faculty_id']),
             'dayConfigs'  => $dayConfigs,
         ]);
     }
