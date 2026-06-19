@@ -12,6 +12,7 @@ import {
   FunnelIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  UserGroupIcon,
 } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
@@ -61,6 +62,7 @@ function closeSection() {
   sectionStudents.value = []
   showEnrollModal.value = false
   showBulkModal.value   = false
+  showAssignModal.value = false
 }
 
 const filteredStudents = computed(() => {
@@ -136,6 +138,84 @@ function submitEnroll() {
       showEnrollModal.value = false
       openSection(selectedSection.value)
     },
+  })
+}
+
+// ── Assign by grade modal (checkbox picker) ───────────────────────────────────
+const showAssignModal     = ref(false)
+const unassignedStudents  = ref([])
+const loadingUnassigned   = ref(false)
+const assignSearch        = ref('')
+const selectedAssignIds   = ref(new Set())
+const assigning           = ref(false)
+const assignError         = ref('')
+
+const filteredUnassigned = computed(() => {
+  if (!assignSearch.value) return unassignedStudents.value
+  const q = assignSearch.value.toLowerCase()
+  return unassignedStudents.value.filter(s =>
+    s.full_name.toLowerCase().includes(q) ||
+    (s.pisays_id || '').toLowerCase().includes(q) ||
+    (s.lrn || '').toLowerCase().includes(q)
+  )
+})
+
+const remainingCapacity = computed(() => {
+  if (!selectedSection.value) return 0
+  return selectedSection.value.capacity - selectedSection.value.enrolled
+})
+
+async function openAssignModal() {
+  showAssignModal.value    = true
+  assignSearch.value       = ''
+  assignError.value        = ''
+  selectedAssignIds.value  = new Set()
+  unassignedStudents.value = []
+  loadingUnassigned.value  = true
+  try {
+    const { data } = await axios.get(route('registrar.enrollment.unassigned'), {
+      params: {
+        school_year_id: schoolYearId.value,
+        grade_level: selectedSection.value.grade_level,
+      },
+    })
+    unassignedStudents.value = data
+  } finally {
+    loadingUnassigned.value = false
+  }
+}
+
+function toggleAssign(enrollmentId) {
+  const next = new Set(selectedAssignIds.value)
+  if (next.has(enrollmentId)) next.delete(enrollmentId)
+  else next.add(enrollmentId)
+  selectedAssignIds.value = next
+}
+
+function toggleSelectAllAssign() {
+  if (selectedAssignIds.value.size === filteredUnassigned.value.length) {
+    selectedAssignIds.value = new Set()
+  } else {
+    selectedAssignIds.value = new Set(filteredUnassigned.value.map(s => s.enrollment_id))
+  }
+}
+
+function submitAssign() {
+  assignError.value = ''
+  assigning.value = true
+  router.post(route('registrar.enrollment.bulk-assign'), {
+    school_year_id: schoolYearId.value,
+    section_id: selectedSection.value.id,
+    enrollment_ids: Array.from(selectedAssignIds.value),
+  }, {
+    onSuccess: () => {
+      showAssignModal.value = false
+      openSection(selectedSection.value)
+    },
+    onError: (errors) => {
+      assignError.value = Object.values(errors)[0] ?? 'An error occurred.'
+    },
+    onFinish: () => { assigning.value = false },
   })
 }
 
@@ -361,6 +441,13 @@ function statusLabel(status) {
                 Enroll Student
               </button>
               <button
+                @click="openAssignModal"
+                class="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium"
+              >
+                <UserGroupIcon class="w-4 h-4" />
+                Assign by Grade List
+              </button>
+              <button
                 @click="openBulkModal"
                 class="flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 py-1.5 rounded-lg text-sm font-medium"
               >
@@ -547,6 +634,107 @@ function statusLabel(status) {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── Assign by grade list modal (checkbox picker) ───────────────────────── -->
+    <Teleport to="body">
+      <div
+        v-if="showAssignModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div class="absolute inset-0 bg-black/40" @click="showAssignModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+
+          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h3 class="font-semibold text-slate-800">Assign by Grade List — {{ selectedSection?.name }}</h3>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Students awaiting section placement for Grade {{ selectedSection?.grade_level }}.
+              </p>
+            </div>
+            <button @click="showAssignModal = false" class="p-1 rounded-lg hover:bg-slate-100">
+              <XMarkIcon class="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+
+          <!-- Filter + select-all -->
+          <div class="flex items-center gap-3 px-6 py-3 border-b border-slate-100">
+            <div class="relative flex-1">
+              <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                v-model="assignSearch"
+                type="text"
+                placeholder="Filter by name, PISAY ID, or LRN…"
+                class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <button
+              type="button"
+              @click="toggleSelectAllAssign"
+              class="text-xs font-medium text-indigo-600 hover:underline whitespace-nowrap"
+            >
+              {{ selectedAssignIds.size === filteredUnassigned.length && filteredUnassigned.length > 0 ? 'Clear all' : 'Select all' }}
+            </button>
+          </div>
+
+          <!-- Error -->
+          <div v-if="assignError" class="px-6 pt-3 text-xs text-red-600">{{ assignError }}</div>
+
+          <!-- List -->
+          <div class="flex-1 overflow-y-auto px-6 py-2">
+            <div v-if="loadingUnassigned" class="flex justify-center py-10 text-slate-400 text-sm">
+              Loading students…
+            </div>
+            <div v-else-if="filteredUnassigned.length === 0" class="flex justify-center py-10 text-slate-400 text-sm">
+              No unassigned students found for this grade level.
+            </div>
+            <label
+              v-for="s in filteredUnassigned"
+              :key="s.enrollment_id"
+              class="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedAssignIds.has(s.enrollment_id)"
+                @change="toggleAssign(s.enrollment_id)"
+                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-800">{{ s.full_name }}</p>
+                <p class="text-xs text-slate-500">
+                  {{ s.pisays_id ?? '—' }}
+                  <span v-if="s.sex" class="mx-1">·</span>
+                  {{ s.sex }}
+                </p>
+              </div>
+              <span class="text-xs text-slate-400 capitalize">{{ s.enrollment_type }}</span>
+            </label>
+          </div>
+
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+            <span class="text-xs text-slate-500">
+              {{ selectedAssignIds.size }} selected · {{ remainingCapacity }} slot(s) remaining
+            </span>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="showAssignModal = false"
+                class="px-4 py-2 rounded-lg text-sm text-slate-600 border border-slate-200 hover:bg-slate-50"
+              >Cancel</button>
+              <button
+                type="button"
+                @click="submitAssign"
+                :disabled="selectedAssignIds.size === 0 || assigning"
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+              >
+                {{ assigning ? 'Assigning…' : `Assign ${selectedAssignIds.size} Student(s)` }}
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </Teleport>
