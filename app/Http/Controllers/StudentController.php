@@ -214,7 +214,7 @@ class StudentController extends Controller
             ? (new BarcodeGeneratorSVG())->getBarcode($student->pisaysystemID, BarcodeGeneratorSVG::TYPE_CODE_128, 2, 40)
             : null;
 
-        $ocd = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
+        $ocdUser = User::whereHas('roles', fn ($q) => $q->where('name', 'OCD'))->first();
 
         $address = implode(', ', array_filter([
             $student->houseno,
@@ -236,11 +236,11 @@ class StudentController extends Controller
             ] : null,
             'school_year' => $currentSY?->name,
             'barcode_svg' => $barcodeSvg,
-            'ocd' => $ocd ? [
-                'name'          => $ocd->name,
-                'position'      => $ocd->position,
-                'signature_uri' => $this->sigService->getSignatureDataUri($ocd),
-            ] : null,
+            'ocd' => [
+                'name'          => 'MELBA C. PATACSIL, PhD',
+                'position'      => 'Campus Director',
+                'signature_uri' => $ocdUser ? $this->sigService->getSignatureDataUri($ocdUser) : null,
+            ],
             'emergency' => [
                 'guardian_name' => $student->contactperson ?: null,
                 'contact_no'    => $student->contactno1 ?: null,

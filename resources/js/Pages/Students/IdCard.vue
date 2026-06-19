@@ -75,7 +75,7 @@ function printCard() {
             <div class="id-lrn-value">{{ student.lrn || '—' }}</div>
           </div>
 
-          <div v-if="ocd" class="id-sig-block">
+          <div class="id-sig-block">
             <img v-if="ocd.signature_uri" :src="ocd.signature_uri" class="id-sig-img" alt="" />
             <div class="id-sig-rule"></div>
             <div class="id-sig-name">{{ ocd.name }}</div>
@@ -204,7 +204,7 @@ html, body { background: #f1f5f9; }
   z-index: -1;
   background-size: cover;
   background-position: center;
-  opacity: 0.15;
+  opacity: 0.2;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
