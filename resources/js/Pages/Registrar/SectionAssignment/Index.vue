@@ -90,22 +90,24 @@ function autoBalance(grade) {
   const sections  = props.sections[grade] ?? []
   if (!students.length || !sections.length) return
 
+  const numSections = sections.length
   const males   = shuffle(students.filter(s => s.sex === 'Male').map(s => s.student_id))
   const females = shuffle(students.filter(s => s.sex === 'Female').map(s => s.student_id))
   const others  = shuffle(students.filter(s => s.sex !== 'Male' && s.sex !== 'Female').map(s => s.student_id))
 
-  // Interleave M/F, append unknowns at end
-  const interleaved = []
-  const maxLen = Math.max(males.length, females.length)
-  for (let i = 0; i < maxLen; i++) {
-    if (i < males.length)   interleaved.push(males[i])
-    if (i < females.length) interleaved.push(females[i])
-  }
-  interleaved.push(...others)
-
-  // Round-robin across sections
-  interleaved.forEach((sid, idx) => {
-    assignments.value[sid] = sections[idx % sections.length].id
+  // Distribute each sex independently round-robin so every section gets an
+  // even split of M and F (interleaving first then taking idx % numSections
+  // skews whole sections to one sex when numSections is even).
+  males.forEach((sid, idx) => {
+    assignments.value[sid] = sections[idx % numSections].id
+  })
+  // Offset the female rotation so leftover students from uneven division
+  // don't land on the same sections as the male leftovers.
+  females.forEach((sid, idx) => {
+    assignments.value[sid] = sections[(idx + Math.floor(numSections / 2)) % numSections].id
+  })
+  others.forEach((sid, idx) => {
+    assignments.value[sid] = sections[idx % numSections].id
   })
 }
 
