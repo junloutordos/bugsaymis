@@ -136,6 +136,7 @@ class EnrollmentController extends Controller
                       ->orWhere('pisaysystemID', 'like', "%{$q}%")
                       ->orWhere('lrn', 'like', "%{$q}%");
             })
+            ->where('status', 'Enrolled')
             ->whereNotIn('id', $enrolledIds)
             ->orderBy('lastname')
             ->orderBy('firstname')
@@ -183,6 +184,41 @@ class EnrollmentController extends Controller
         ])->sortBy('full_name')->values();
 
         return response()->json($result);
+    }
+
+    // ── Continuing students from last year, not yet enrolled this SY ──────────
+
+    public function continuingStudents(Request $request): JsonResponse
+    {
+        $this->authorize('students.enrollment.manage');
+
+        $schoolYearId  = (int) $request->input('school_year_id',
+            SchoolYear::where('is_current', true)->value('id'));
+        $gradeLevel    = (int) $request->input('grade_level');
+        $previousLevel = $gradeLevel - 1;
+
+        // Already has an enrollment record for this SY (any status) — exclude
+        $alreadyEnrolledIds = StudentEnrollment::where('school_year_id', $schoolYearId)
+            ->pluck('student_id');
+
+        $students = DB::table('section_students as ss')
+            ->join('students as s', 's.id', '=', 'ss.studentid')
+            ->where('ss.syid', 12)
+            ->where('s.status', 'Enrolled')
+            ->where('ss.levelid', $previousLevel)
+            ->whereNotIn('s.id', $alreadyEnrolledIds)
+            ->select('s.id', 's.lastname', 's.firstname', 's.middlename', 's.pisaysystemID', 's.sex')
+            ->distinct()
+            ->orderBy('s.lastname')
+            ->orderBy('s.firstname')
+            ->get();
+
+        return response()->json($students->map(fn ($s) => [
+            'id'        => $s->id,
+            'full_name' => trim("{$s->lastname}, {$s->firstname}" . ($s->middlename ? " {$s->middlename}" : '')),
+            'pisays_id' => $s->pisaysystemID,
+            'sex'       => $s->sex,
+        ]));
     }
 
     // ── Enroll a student ──────────────────────────────────────────────────────
@@ -240,11 +276,12 @@ class EnrollmentController extends Controller
             'grade_level'     => ['required', 'integer', 'between:7,12'],
             'enrollment_type' => ['required', Rule::in(['new', 'returning', 'transferee', 'returnee'])],
             'enrollment_date' => ['required', 'date'],
-            'pisays_ids'      => ['required', 'array', 'min:1', 'max:60'],
+            'pisays_ids'      => ['required', 'array', 'min:1', 'max:200'],
             'pisays_ids.*'    => ['required', 'string'],
         ]);
 
         $students = Student::whereIn('pisaysystemID', $data['pisays_ids'])
+            ->where('status', 'Enrolled')
             ->get(['id', 'pisaysystemID']);
 
         $alreadyEnrolledIds = StudentEnrollment::where('school_year_id', $data['school_year_id'])
@@ -278,9 +315,14 @@ class EnrollmentController extends Controller
             }
         });
 
+        $notFound = count($data['pisays_ids']) - $students->count();
+
         $message = "{$enrolled} student(s) enrolled.";
         if ($skipped > 0) {
             $message .= " {$skipped} skipped (already enrolled).";
+        }
+        if ($notFound > 0) {
+            $message .= " {$notFound} PISAY ID(s) not found or not an active student.";
         }
         if ($enrolled > 0) {
             $message .= ' Assign their sections from "Assign by Grade List".';
