@@ -266,6 +266,22 @@ class SchedulingConstants
      */
     public const FRIDAY_ILA_GRADES = [7];
 
+    // ── Over-subscribed-grade exceptions ───────────────────────────────────────
+    // G8 carries the heaviest weekly load (39h). Its load only fits when the
+    // full Wednesday and the otherwise-idle Monday gap are opened for teaching.
+
+    /**
+     * Grades that hold regular classes through the FULL Wednesday — the activity
+     * cutoff and the Wednesday wellness block do not apply to these grades.
+     */
+    public const WEDNESDAY_FULL_GRADES = [8];
+
+    /**
+     * Grades that reclaim the Monday 08:50–09:40 gap (the "DEAD" slot between
+     * homeroom and recess) as a teaching period.
+     */
+    public const MONDAY_RECLAIM_GAP_GRADES = [8];
+
     // ── Official Time Shifts ──────────────────────────────────────────────────
 
     public const SHIFT_EARLY = ['start' => '07:30', 'end' => '16:30'];
