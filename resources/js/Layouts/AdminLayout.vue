@@ -1638,7 +1638,7 @@ const menuItems = [
         permissions: ["students.enrollment.manage"],
       },
       {
-        label: "Section Assignment",
+        label: "Continuing Student Migration",
         routeName: "registrar.section-assignment.index",
         href: route("registrar.section-assignment.index"),
         icon: TableCellsIcon,

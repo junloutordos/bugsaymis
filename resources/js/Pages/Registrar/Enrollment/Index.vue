@@ -687,8 +687,14 @@ function statusLabel(status) {
             <div v-if="loadingUnassigned" class="flex justify-center py-10 text-slate-400 text-sm">
               Loading students…
             </div>
-            <div v-else-if="filteredUnassigned.length === 0" class="flex justify-center py-10 text-slate-400 text-sm">
-              No unassigned students found for this grade level.
+            <div v-else-if="filteredUnassigned.length === 0" class="flex flex-col items-center gap-1 py-10 text-center text-sm">
+              <p class="text-slate-400">No students are currently pending placement for Grade {{ selectedSection?.grade_level }}.</p>
+              <p class="text-xs text-slate-400 max-w-md">
+                Students appear here once an enrollment application is approved. If you're migrating continuing
+                students from last year, use
+                <a :href="route('registrar.section-assignment.index')" class="text-indigo-600 hover:underline">Continuing Student Migration</a>
+                in the sidebar first.
+              </p>
             </div>
             <label
               v-for="s in filteredUnassigned"
