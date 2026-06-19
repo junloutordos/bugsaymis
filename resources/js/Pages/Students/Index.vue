@@ -460,6 +460,7 @@ const confirmCrop = async () => {
                 class="absolute pointer-events-none"
                 :style="{
                   width: imgDispW + 'px',
+                  maxWidth: 'none',
                   left: imgLeft + 'px',
                   top: imgTop + 'px',
                 }"
