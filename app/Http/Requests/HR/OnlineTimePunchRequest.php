@@ -15,7 +15,7 @@ class OnlineTimePunchRequest extends FormRequest
     {
         return [
             'punch_type'  => ['required', 'string', 'in:time_in_am,time_out_am,time_in_pm,time_out_pm'],
-            'session_id'  => ['required', 'string'],
+            'photo'       => ['required', 'string'], // base64 data URI
             'latitude'    => ['nullable', 'numeric', 'between:-90,90'],
             'longitude'   => ['nullable', 'numeric', 'between:-180,180'],
         ];

@@ -15,7 +15,6 @@ class FaceRecognitionService
     /** Punch types must be recorded in this order within a single work day. */
     private const PUNCH_SEQUENCE = ['time_in_am', 'time_out_am', 'time_in_pm', 'time_out_pm'];
 
-    private const LIVENESS_THRESHOLD = 90.0;
     private const MATCH_VERIFIED_THRESHOLD = 90.0;
     private const MATCH_REVIEW_THRESHOLD = 80.0;
     private const LOCKOUT_WINDOW_MINUTES = 5;
@@ -92,20 +91,22 @@ class FaceRecognitionService
         ]);
     }
 
-    // ─── Liveness Session ─────────────────────────────────────────────────────
-
-    public function createLivenessSession(): string
-    {
-        $result = $this->rekognition()->createFaceLivenessSession([]);
-
-        return $result['SessionId'];
-    }
-
     // ─── Punch Verification ───────────────────────────────────────────────────
 
+    /**
+     * Verify a punch photo against the employee's enrolled reference face.
+     *
+     * No liveness/anti-spoofing step — that requires AWS Rekognition Face
+     * Liveness, which is blocked account-wide by an AWS Organizations
+     * Service Control Policy outside our control. This is the "practical
+     * baseline": live camera capture only (no file upload, enforced
+     * client-side) + DetectFaces quality gate + CompareFaces identity match
+     * + failed-attempt lockout, with a full audit trail. Same trust level
+     * as the existing WFH selfie punch, not a hard anti-fraud guarantee.
+     */
     public function verifyPunch(
         User $user,
-        string $sessionId,
+        string $photoBase64,
         string $punchType,
         ?string $ip,
         ?float $lat,
@@ -156,37 +157,36 @@ class FaceRecognitionService
             ], $ip, $lat, $lng, $userAgent);
         }
 
-        $liveness = $this->rekognition()->getFaceLivenessSessionResults(['SessionId' => $sessionId]);
+        $capturedBytes = $this->decodeBase64Image($photoBase64);
 
-        if (($liveness['Status'] ?? null) !== 'SUCCEEDED') {
-            throw ValidationException::withMessages([
-                'liveness' => 'Face liveness check did not complete. Please try again.',
-            ]);
-        }
+        $faces = $this->rekognition()->detectFaces([
+            'Image'      => ['Bytes' => $capturedBytes],
+            'Attributes' => ['DEFAULT'],
+        ]);
+        $faceCount = count($faces['FaceDetails'] ?? []);
 
-        $confidence       = (float) ($liveness['Confidence'] ?? 0);
-        $referenceBytes   = isset($liveness['ReferenceImage']['Bytes']) ? (string) $liveness['ReferenceImage']['Bytes'] : null;
-        $photoS3Key       = null;
+        $photoS3Key = "online_punches/{$user->id}/{$today}/{$punchType}.jpg";
+        Storage::disk('s3')->put($photoS3Key, $capturedBytes);
 
-        if ($referenceBytes) {
-            $photoS3Key = "online_punches/{$user->id}/{$today}/{$punchType}.jpg";
-            Storage::disk('s3')->put($photoS3Key, $referenceBytes);
-        }
-
-        if ($confidence < self::LIVENESS_THRESHOLD || ! $referenceBytes) {
+        if ($faceCount === 0) {
             return $this->savePunch($user, $enrollment, $punchType, $today, [
-                'liveness_session_id'  => $sessionId,
-                'liveness_confidence'  => $confidence,
-                'photo_s3_key'         => $photoS3Key,
-                'match_status'         => 'rejected',
-                'failure_reason'       => 'liveness_failed',
+                'photo_s3_key'   => $photoS3Key,
+                'match_status'   => 'rejected',
+                'failure_reason' => 'no_face_detected',
+            ], $ip, $lat, $lng, $userAgent);
+        }
+        if ($faceCount > 1) {
+            return $this->savePunch($user, $enrollment, $punchType, $today, [
+                'photo_s3_key'   => $photoS3Key,
+                'match_status'   => 'rejected',
+                'failure_reason' => 'multiple_faces',
             ], $ip, $lat, $lng, $userAgent);
         }
 
         $enrolledBytes = Storage::disk('s3')->get($enrollment->s3_key);
 
         $compare = $this->rekognition()->compareFaces([
-            'SourceImage'         => ['Bytes' => $referenceBytes],
+            'SourceImage'         => ['Bytes' => $capturedBytes],
             'TargetImage'         => ['Bytes' => $enrolledBytes],
             'SimilarityThreshold' => 0,
         ]);
@@ -200,12 +200,10 @@ class FaceRecognitionService
         };
 
         $punch = $this->savePunch($user, $enrollment, $punchType, $today, [
-            'liveness_session_id'  => $sessionId,
-            'liveness_confidence'  => $confidence,
-            'photo_s3_key'         => $photoS3Key,
-            'match_score'          => $similarity,
-            'match_status'         => $matchStatus,
-            'failure_reason'       => $failureReason,
+            'photo_s3_key' => $photoS3Key,
+            'match_score'  => $similarity,
+            'match_status' => $matchStatus,
+            'failure_reason' => $failureReason,
         ], $ip, $lat, $lng, $userAgent);
 
         if ($matchStatus === 'verified') {

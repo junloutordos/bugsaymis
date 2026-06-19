@@ -35,21 +35,10 @@ class OnlineTimePunchController extends Controller
             ->get();
 
         return Inertia::render('HumanResource/OnlinePunch/Dashboard', [
-            'today'             => $today,
-            'enrollmentStatus'  => $enrollment?->status,
-            'todayPunches'      => $todayPunches,
-            'awsRegion'         => config('services.rekognition.region'),
-            'cognitoIdentityPoolId' => config('services.rekognition.cognito_identity_pool_id'),
+            'today'            => $today,
+            'enrollmentStatus' => $enrollment?->status,
+            'todayPunches'     => $todayPunches,
         ]);
-    }
-
-    // ─── API: Create Liveness Session ────────────────────────────────────────
-
-    public function createLivenessSession()
-    {
-        $sessionId = $this->faceService->createLivenessSession();
-
-        return response()->json(['session_id' => $sessionId]);
     }
 
     // ─── API: Submit Punch ────────────────────────────────────────────────────
@@ -58,7 +47,7 @@ class OnlineTimePunchController extends Controller
     {
         $punch = $this->faceService->verifyPunch(
             user:       Auth::user(),
-            sessionId:  $request->validated('session_id'),
+            photoBase64: $request->validated('photo'),
             punchType:  $request->validated('punch_type'),
             ip:         $request->ip(),
             lat:        $request->validated('latitude'),
