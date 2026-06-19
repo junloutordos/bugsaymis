@@ -207,7 +207,7 @@ class StudentController extends Controller
             ->with('section')
             ->first();
 
-        $middle   = $student->middlename ? " {$student->middlename}" : '';
+        $middle   = $student->middlename ? ' ' . mb_strtoupper(mb_substr($student->middlename, 0, 1)) . '.' : '';
         $fullName = trim("{$student->lastname}, {$student->firstname}{$middle}");
 
         $barcodeSvg = $student->pisaysystemID
