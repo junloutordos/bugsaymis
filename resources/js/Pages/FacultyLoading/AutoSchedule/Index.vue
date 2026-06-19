@@ -607,10 +607,13 @@ function hasConflict(schedule) {
     const oEnd   = timeToMin(o.end_time)
     const overlap = sStart < oEnd && sEnd > oStart
     if (!overlap) return false
+    // Electives intentionally share a reserved window with no dedicated
+    // classroom (classroom_id is null) — only compare non-null values so
+    // those parallel, unrelated sessions aren't flagged as room conflicts.
     return (
-      o.user_id      === schedule.user_id      ||
-      o.classroom_id === schedule.classroom_id ||
-      o.section_id   === schedule.section_id
+      (schedule.user_id      != null && o.user_id      === schedule.user_id)      ||
+      (schedule.classroom_id != null && o.classroom_id === schedule.classroom_id) ||
+      (schedule.section_id   != null && o.section_id   === schedule.section_id)
     )
   })
 }
