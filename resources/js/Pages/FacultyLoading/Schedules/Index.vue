@@ -164,6 +164,7 @@
 
                   <!-- Day columns -->
                   <div v-for="day in WEEKDAYS" :key="day"
+                    v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), dayConfigs[day]]"
                     class="flex-1 relative border-l border-slate-100 overflow-hidden"
                     @dragover.prevent="onDragOverColumn($event, groupId, day)"
                     @drop.prevent="onDropColumn($event, groupId, day)">
@@ -530,6 +531,17 @@ const byGroupDay = computed(() => {
   return map
 })
 
+/** { day: [schedules] } — used by the drag-over conflict pre-check so it
+ *  only scans the one day under the pointer instead of every schedule. */
+const schedulesByDay = computed(() => {
+  const map = {}
+  for (const s of props.schedules) {
+    if (!map[s.day_of_week]) map[s.day_of_week] = []
+    map[s.day_of_week].push(s)
+  }
+  return map
+})
+
 /** Unique subjects for the legend of a given group */
 function subjectsInGroup(groupId) {
   const seen = new Map()
@@ -616,9 +628,8 @@ function schoolYearIdForTerm(termId) {
   return props.terms.find(t => String(t.id) === String(termId))?.school_year_id ?? null
 }
 
-function minutesFromPointer(e, columnEl) {
-  const rect = columnEl.getBoundingClientRect()
-  const y = e.clientY - rect.top
+function minutesFromPointerY(clientY, rect) {
+  const y = clientY - rect.top
   let min = CAL_START + Math.round(y / SCALE)
   min = Math.round(min / DRAG_SNAP_MIN) * DRAG_SNAP_MIN
   return Math.max(CAL_START, Math.min(CAL_END, min))
@@ -650,9 +661,8 @@ function isTbaName(name) {
  */
 function findLiveConflicts({ facultyId, facultyName, classroomId, sectionId, day, startTime, endTime, excludeId }) {
   let faculty = null, room = null, section = null
-  for (const s of props.schedules) {
+  for (const s of (schedulesByDay.value[day] ?? [])) {
     if (s.id === excludeId || s.status === 'cancelled') continue
-    if (s.day_of_week !== day) continue
     if (!timesOverlapLocal(startTime, endTime, s.start_time, s.end_time)) continue
 
     if (!faculty && facultyId && s.faculty?.id === facultyId && !isTbaName(facultyName)) faculty = s
@@ -660,6 +670,28 @@ function findLiveConflicts({ facultyId, facultyName, classroomId, sectionId, day
     if (!section && sectionId && s.section_id === sectionId) section = s
   }
   return { faculty, room, section }
+}
+
+function dropTargetsEqual(a, b) {
+  if (!a || !b) return a === b
+  return a.groupId === b.groupId && a.day === b.day && a.startMin === b.startMin
+    && a.endMin === b.endMin && a.hasConflict === b.hasConflict && a.message === b.message
+}
+
+/** Per-column memo key for v-memo — only the column actually under the
+ *  pointer should re-render when dropTarget changes. */
+function dropPreviewKey(groupId, day) {
+  const d = dropTarget.value
+  if (!d || d.groupId !== groupId || d.day !== day) return 'none'
+  return `${d.startMin}-${d.endMin}-${d.hasConflict}-${d.message ?? ''}`
+}
+
+/** Per-column memo key for v-memo — only the column holding the dragged-from
+ *  event needs to re-render to apply the dimmed/opacity style. */
+function dragDimKey(groupId, day) {
+  if (dragPayload.value?.kind !== 'move') return null
+  const s = dragPayload.value.schedule
+  return (groupKeyOf(s) === groupId && s.day_of_week === day) ? s.id : null
 }
 
 function onDragStartEvent(e, s) {
@@ -676,14 +708,47 @@ function onDragStartLoad(e, load) {
   e.dataTransfer.setData('text/plain', 'load:' + load.load_assignment_id)
 }
 
+// rAF-throttled drag-over processing: native `dragover` can fire dozens of
+// times per second, so the actual conflict-check work only runs once per
+// animation frame, using whatever the latest pointer position was.
+let dragFrame = null
+let pendingDragOver = null
+// Column geometry never moves during a drag — cache each column's rect for
+// the duration of the drag instead of forcing a layout read on every event.
+const columnRectCache = new Map()
+
 function onDragEnd() {
   dragPayload.value = null
   dropTarget.value  = null
+  pendingDragOver = null
+  if (dragFrame) {
+    cancelAnimationFrame(dragFrame)
+    dragFrame = null
+  }
+  columnRectCache.clear()
 }
 
 function onDragOverColumn(e, groupId, day) {
   if (!dragPayload.value) return
-  const startMin = minutesFromPointer(e, e.currentTarget)
+  pendingDragOver = { clientY: e.clientY, columnEl: e.currentTarget, groupId, day }
+  if (dragFrame) return
+  dragFrame = requestAnimationFrame(processPendingDragOver)
+}
+
+function processPendingDragOver() {
+  dragFrame = null
+  const pending = pendingDragOver
+  pendingDragOver = null
+  if (!pending || !dragPayload.value) return
+  const { clientY, columnEl, groupId, day } = pending
+
+  let rect = columnRectCache.get(columnEl)
+  if (!rect) {
+    rect = columnEl.getBoundingClientRect()
+    columnRectCache.set(columnEl, rect)
+  }
+
+  const startMin = minutesFromPointerY(clientY, rect)
   const isMove   = dragPayload.value.kind === 'move'
   const item     = isMove ? dragPayload.value.schedule : dragPayload.value.load
   const duration = isMove ? durationOf(item) : 60
@@ -707,7 +772,10 @@ function onDragOverColumn(e, groupId, day) {
     : conflicts.room ? `Room busy: ${conflicts.room.subject?.code ?? ''}`
     : null
 
-  dropTarget.value = { groupId, day, startMin, endMin, hasConflict: !!hit, message: label }
+  const candidate = { groupId, day, startMin, endMin, hasConflict: !!hit, message: label }
+  if (!dropTargetsEqual(candidate, dropTarget.value)) {
+    dropTarget.value = candidate
+  }
 }
 
 function dropPreviewStyle() {
