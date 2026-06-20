@@ -63,8 +63,32 @@
         </select>
       </div>
 
+      <!-- Unplaced subjects tray -->
+      <div v-if="unplacedLoads.length"
+        class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-2">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+          Unplaced Subjects — drag onto a slot below
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <div v-for="load in unplacedLoads" :key="load.load_assignment_id"
+            :draggable="!load.is_locked"
+            @dragstart="onDragStartLoad($event, load)"
+            @dragend="onDragEnd"
+            :class="['inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium select-none',
+              load.is_locked
+                ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
+                : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing']">
+            <LockClosedIcon v-if="load.is_locked" class="h-3 w-3" />
+            <span class="font-bold">{{ load.subject?.code }}</span>
+            <span>· {{ load.faculty?.name ?? 'TBA' }}</span>
+            <span>· G{{ load.grade_level }} {{ load.section_name }}</span>
+            <span class="bg-amber-200/60 px-1.5 py-0.5 rounded-full">needs {{ load.still_needed }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Empty state -->
-      <div v-if="schedules.length === 0"
+      <div v-if="groupsWithSchedules.length === 0"
         class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
         <CalendarIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
         <p class="text-sm font-medium text-slate-500">No schedules found</p>
@@ -80,12 +104,12 @@
           <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span v-if="viewBy === 'section'" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
-                Grade {{ byGroup[groupId][0].grade_level }}
+                Grade {{ groupHeaderInfo(groupId).grade_level }}
               </span>
               <h3 class="text-sm font-semibold text-slate-800">
-                {{ viewBy === 'faculty' ? (byGroup[groupId][0].faculty?.name ?? 'Unassigned / TBA') : byGroup[groupId][0].section_name }}
+                {{ viewBy === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name }}
               </h3>
-              <span class="text-xs text-slate-400">· {{ byGroup[groupId].length }} slot(s)</span>
+              <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
             </div>
             <button v-if="viewBy === 'section'" @click="openForm({ section_id: groupId })"
               class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md font-medium transition-colors">
@@ -140,7 +164,19 @@
 
                   <!-- Day columns -->
                   <div v-for="day in WEEKDAYS" :key="day"
-                    class="flex-1 relative border-l border-slate-100 overflow-hidden">
+                    class="flex-1 relative border-l border-slate-100 overflow-hidden"
+                    @dragover.prevent="onDragOverColumn($event, groupId, day)"
+                    @drop.prevent="onDropColumn($event, groupId, day)">
+
+                    <!-- Drag-and-drop preview -->
+                    <div v-if="dropTarget && dropTarget.groupId === groupId && dropTarget.day === day"
+                      :style="dropPreviewStyle()"
+                      :class="['absolute rounded border-2 z-30 pointer-events-none flex items-center justify-center px-1 text-center',
+                        dropTarget.hasConflict ? 'bg-red-100/85 border-red-400' : 'bg-emerald-100/85 border-emerald-400']">
+                      <span :class="['text-xs font-semibold truncate', dropTarget.hasConflict ? 'text-red-700' : 'text-emerald-700']">
+                        {{ dropTarget.hasConflict ? (dropTarget.message ?? 'Conflict') : 'Drop here' }}
+                      </span>
+                    </div>
 
                     <!-- Blocked period overlays -->
                     <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
@@ -165,7 +201,12 @@
                     <!-- Schedule event blocks -->
                     <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
                       :style="[eventStyle(s), subjectColorStyle(s.subject?.id)]"
-                      class="absolute rounded border z-10 overflow-hidden cursor-pointer transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]"
+                      :draggable="canDrag(s)"
+                      :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
+                        canDrag(s) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                        dragPayload?.kind === 'move' && dragPayload.schedule.id === s.id ? 'opacity-30' : '']"
+                      @dragstart="onDragStartEvent($event, s)"
+                      @dragend="onDragEnd"
                       @click="openForm(s)">
                       <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
                         <div class="text-xs font-bold leading-tight truncate">
@@ -181,6 +222,8 @@
                       <!-- Status indicator bar -->
                       <div v-if="s.status === 'tentative'"
                         class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
+                      <LockClosedIcon v-if="s.is_locked"
+                        class="absolute top-0.5 right-0.5 h-3 w-3 text-slate-400" title="Locked — drag disabled" />
                       <div v-if="s.status === 'cancelled'"
                         class="absolute inset-0 bg-white/60 flex items-center justify-center">
                         <span class="text-xs text-slate-400 font-medium">Cancelled</span>
@@ -346,9 +389,10 @@ import { computed, reactive, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
+import Swal from 'sweetalert2'
 import {
   CalendarIcon, CheckCircleIcon, ExclamationCircleIcon, ExclamationTriangleIcon,
-  MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
+  LockClosedIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, SparklesIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 // ── Calendar constants ───────────────────────────────────────────────────────
@@ -389,6 +433,7 @@ const props = defineProps({
   currentTerm: { type: Object, default: null },
   filters:     { type: Object, default: () => ({}) },
   dayConfigs:  { type: Object, default: () => ({}) },
+  unplacedLoads: { type: Array, default: () => [] },
 })
 
 // ── Filters ──────────────────────────────────────────────────────────────────
@@ -443,8 +488,35 @@ const groupsWithSchedules = computed(() => {
     const k = groupKeyOf(s)
     if (!seen.includes(k)) seen.push(k)
   }
+  // Sections/faculty with unplaced loads but zero schedules yet still need a
+  // calendar card to render so there's somewhere to drop the tray chip.
+  for (const load of props.unplacedLoads) {
+    const k = viewBy.value === 'faculty' ? (load.faculty?.id ?? 'unassigned') : load.section_id
+    if (!seen.includes(k)) seen.push(k)
+  }
   return seen
 })
+
+/** Header info for a group card — falls back to an unplaced-load entry when
+ *  the group has no schedules yet (brand-new section/faculty with no slots). */
+function groupHeaderInfo(groupId) {
+  const fromSchedule = byGroup.value[groupId]?.[0]
+  if (fromSchedule) {
+    return {
+      grade_level:  fromSchedule.grade_level,
+      section_name: fromSchedule.section_name,
+      faculty_name: fromSchedule.faculty?.name ?? 'Unassigned / TBA',
+    }
+  }
+  const fromLoad = props.unplacedLoads.find(l =>
+    (viewBy.value === 'faculty' ? l.faculty?.id : l.section_id) === groupId
+  )
+  return {
+    grade_level:  fromLoad?.grade_level,
+    section_name: fromLoad?.section_name,
+    faculty_name: fromLoad?.faculty?.name ?? 'Unassigned / TBA',
+  }
+}
 
 /** { groupId: { day: [schedules] } } */
 const byGroupDay = computed(() => {
@@ -523,6 +595,250 @@ function subjectColorStyle(subjectId) {
   }
 }
 
+// ── Drag and drop ────────────────────────────────────────────────────────────
+
+const DRAG_SNAP_MIN = 5
+
+/** dragPayload: { kind: 'move', schedule, groupId } | { kind: 'place', load } */
+const dragPayload = ref(null)
+/** Live drop preview for the column currently under the pointer */
+const dropTarget  = ref(null)
+const dragBusy     = ref(false)
+
+function canDrag(s) {
+  return s.status !== 'cancelled' && !s.is_locked
+}
+
+function schoolYearIdForTerm(termId) {
+  // filters.term_id can be a string when it comes straight from the URL query
+  // string (Request::only() doesn't cast it), while terms[].id is numeric —
+  // compare loosely so the lookup doesn't silently miss.
+  return props.terms.find(t => String(t.id) === String(termId))?.school_year_id ?? null
+}
+
+function minutesFromPointer(e, columnEl) {
+  const rect = columnEl.getBoundingClientRect()
+  const y = e.clientY - rect.top
+  let min = CAL_START + Math.round(y / SCALE)
+  min = Math.round(min / DRAG_SNAP_MIN) * DRAG_SNAP_MIN
+  return Math.max(CAL_START, Math.min(CAL_END, min))
+}
+
+function minToTime(min) {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function durationOf(s) {
+  return timeToMin(s.end_time) - timeToMin(s.start_time)
+}
+
+function timesOverlapLocal(aStart, aEnd, bStart, bEnd) {
+  return timeToMin(aStart) < timeToMin(bEnd) && timeToMin(aEnd) > timeToMin(bStart)
+}
+
+function isTbaName(name) {
+  return !!name && name.startsWith('TBA')
+}
+
+/**
+ * Instant client-side overlap pre-check against the schedules already on the
+ * page — mirrors ConflictDetectionService's three axes (faculty/room/section)
+ * for live highlighting while dragging. The authoritative check still happens
+ * server-side via /schedules/validate before anything is committed.
+ */
+function findLiveConflicts({ facultyId, facultyName, classroomId, sectionId, day, startTime, endTime, excludeId }) {
+  let faculty = null, room = null, section = null
+  for (const s of props.schedules) {
+    if (s.id === excludeId || s.status === 'cancelled') continue
+    if (s.day_of_week !== day) continue
+    if (!timesOverlapLocal(startTime, endTime, s.start_time, s.end_time)) continue
+
+    if (!faculty && facultyId && s.faculty?.id === facultyId && !isTbaName(facultyName)) faculty = s
+    if (!room && classroomId && s.classroom?.id === classroomId) room = s
+    if (!section && sectionId && s.section_id === sectionId) section = s
+  }
+  return { faculty, room, section }
+}
+
+function onDragStartEvent(e, s) {
+  if (!canDrag(s)) { e.preventDefault(); return }
+  dragPayload.value = { kind: 'move', schedule: s }
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', 'schedule:' + s.id)
+}
+
+function onDragStartLoad(e, load) {
+  if (load.is_locked) { e.preventDefault(); return }
+  dragPayload.value = { kind: 'place', load }
+  e.dataTransfer.effectAllowed = 'copy'
+  e.dataTransfer.setData('text/plain', 'load:' + load.load_assignment_id)
+}
+
+function onDragEnd() {
+  dragPayload.value = null
+  dropTarget.value  = null
+}
+
+function onDragOverColumn(e, groupId, day) {
+  if (!dragPayload.value) return
+  const startMin = minutesFromPointer(e, e.currentTarget)
+  const isMove   = dragPayload.value.kind === 'move'
+  const item     = isMove ? dragPayload.value.schedule : dragPayload.value.load
+  const duration = isMove ? durationOf(item) : 60
+  const endMin   = Math.min(CAL_END, startMin + duration)
+  const startTime = minToTime(startMin)
+  const endTime   = minToTime(endMin)
+
+  const conflicts = findLiveConflicts({
+    facultyId:   item.faculty?.id ?? null,
+    facultyName: item.faculty?.name,
+    classroomId: isMove ? (item.classroom?.id ?? null) : null,
+    sectionId:   item.section_id,
+    day,
+    startTime,
+    endTime,
+    excludeId: isMove ? item.id : null,
+  })
+  const hit   = conflicts.faculty || conflicts.section || conflicts.room
+  const label = conflicts.faculty ? `Faculty busy: ${conflicts.faculty.subject?.code ?? ''}`
+    : conflicts.section ? `Section busy: ${conflicts.section.subject?.code ?? ''}`
+    : conflicts.room ? `Room busy: ${conflicts.room.subject?.code ?? ''}`
+    : null
+
+  dropTarget.value = { groupId, day, startMin, endMin, hasConflict: !!hit, message: label }
+}
+
+function dropPreviewStyle() {
+  if (!dropTarget.value) return {}
+  const sm = Math.max(dropTarget.value.startMin, CAL_START)
+  const em = Math.min(dropTarget.value.endMin, CAL_END)
+  return {
+    position: 'absolute',
+    top:    ((sm - CAL_START) * SCALE) + 'px',
+    height: Math.max((em - sm) * SCALE, 16) + 'px',
+    left:   '2px',
+    right:  '2px',
+  }
+}
+
+async function onDropColumn(e, groupId, day) {
+  const payload = dragPayload.value
+  const target  = dropTarget.value
+  dragPayload.value = null
+  dropTarget.value  = null
+  if (!payload || !target) return
+
+  const startTime = minToTime(target.startMin)
+  const endTime   = minToTime(target.endMin)
+
+  if (payload.kind === 'move') {
+    await commitMove(payload.schedule, day, startTime, endTime)
+  } else {
+    openPlaceForm(payload.load, day, startTime, endTime)
+  }
+}
+
+async function commitMove(schedule, day, startTime, endTime) {
+  if (dragBusy.value) return
+  if (schedule.day_of_week === day
+      && schedule.start_time?.slice(0, 5) === startTime
+      && schedule.end_time?.slice(0, 5) === endTime) {
+    return
+  }
+
+  dragBusy.value = true
+  try {
+    const { data: result } = await axios.post(route('faculty-loading.schedules.validate'), {
+      faculty_id:       schedule.faculty?.id   ?? 0,
+      subject_id:       schedule.subject?.id   ?? 0,
+      section_id:       schedule.section_id,
+      classroom_id:     schedule.classroom?.id ?? 0,
+      academic_term_id: filters.term_id,
+      day_of_week:      day,
+      start_time:       startTime,
+      end_time:         endTime,
+      exclude_id:       schedule.id,
+    })
+
+    if (result.errors?.length) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Cannot move schedule',
+        html: `<ul class="text-left text-sm">${result.errors.map(m => `<li>• ${m}</li>`).join('')}</ul>`,
+      })
+      return
+    }
+    if (result.warnings?.length) {
+      const confirmed = await Swal.fire({
+        icon: 'warning',
+        title: 'Move with warnings?',
+        html: `<ul class="text-left text-sm">${result.warnings.map(m => `<li>• ${m}</li>`).join('')}</ul>`,
+        showCancelButton: true,
+        confirmButtonText: 'Move anyway',
+      })
+      if (!confirmed.isConfirmed) return
+    }
+
+    // Inertia's router.put() (not a raw axios.put) — Laravel's back() redirect
+    // after a PUT must be auto-upgraded to 303 by Inertia's own middleware
+    // (it only does this for requests carrying the X-Inertia header), otherwise
+    // browsers re-issue the redirect as PUT against a GET-only route and 405.
+    await new Promise((resolve, reject) => {
+      router.put(route('faculty-loading.schedules.update', schedule.id), {
+        faculty_id:       schedule.faculty?.id   ?? null,
+        subject_id:       schedule.subject?.id   ?? null,
+        section_id:       schedule.section_id,
+        classroom_id:     schedule.classroom?.id ?? null,
+        school_year_id:   schedule.school_year_id,
+        academic_term_id: filters.term_id,
+        day_of_week:      day,
+        start_time:       startTime,
+        end_time:         endTime,
+        status:           schedule.status,
+        remarks:          schedule.remarks ?? '',
+        force:            true,
+      }, {
+        preserveScroll: true,
+        onSuccess: () => resolve(),
+        onError:   (errors) => reject(errors),
+      })
+    })
+  } catch (errors) {
+    const message = errors && typeof errors === 'object'
+      ? Object.values(errors).flat().join('\n')
+      : 'Failed to move schedule.'
+    await Swal.fire('Error', message, 'error')
+  } finally {
+    dragBusy.value = false
+  }
+}
+
+/** Open the edit modal prefilled from a dragged "unplaced subjects" tray chip. */
+function openPlaceForm(load, day, startTime, endTime) {
+  validationResult.value = null
+  form.reset()
+  Object.assign(form, {
+    id:                 null,
+    load_assignment_id: load.load_assignment_id,
+    faculty_id:         load.faculty?.id ?? null,
+    subject_id:         load.subject?.id ?? null,
+    section_id:         load.section_id,
+    classroom_id:       null,
+    school_year_id:     schoolYearIdForTerm(filters.term_id),
+    academic_term_id:   filters.term_id,
+    day_of_week:        day,
+    start_time:         startTime,
+    end_time:           endTime,
+    status:             'active',
+    remarks:            '',
+    force:              false,
+  })
+  modal.value = true
+  checkConflicts()
+}
+
 // ── Formatters ───────────────────────────────────────────────────────────────
 
 function fmtTime(t) {
@@ -553,7 +869,7 @@ const modal            = ref(false)
 const validationResult = ref(null)
 
 const form = useForm({
-  id: null, faculty_id: null, subject_id: null, section_id: null, classroom_id: null,
+  id: null, load_assignment_id: null, faculty_id: null, subject_id: null, section_id: null, classroom_id: null,
   school_year_id: null, academic_term_id: null, day_of_week: '',
   start_time: '', end_time: '', status: 'active', remarks: '', force: false,
 })
@@ -568,19 +884,20 @@ function openForm(s = null) {
   validationResult.value = null
   if (s && s.id) {
     Object.assign(form, {
-      id:               s.id,
-      faculty_id:       s.faculty?.id      ?? null,
-      subject_id:       s.subject?.id      ?? null,
-      section_id:       s.section_id,
-      classroom_id:     s.classroom?.id    ?? null,
-      school_year_id:   null,
-      academic_term_id: filters.term_id    ?? null,
-      day_of_week:      s.day_of_week,
-      start_time:       s.start_time?.slice(0, 5) ?? '',
-      end_time:         s.end_time?.slice(0, 5)   ?? '',
-      status:           s.status,
-      remarks:          s.remarks ?? '',
-      force:            false,
+      id:                 s.id,
+      load_assignment_id: s.load_assignment_id ?? null,
+      faculty_id:         s.faculty?.id      ?? null,
+      subject_id:         s.subject?.id      ?? null,
+      section_id:         s.section_id,
+      classroom_id:       s.classroom?.id    ?? null,
+      school_year_id:     s.school_year_id ?? schoolYearIdForTerm(filters.term_id),
+      academic_term_id:   filters.term_id    ?? null,
+      day_of_week:        s.day_of_week,
+      start_time:         s.start_time?.slice(0, 5) ?? '',
+      end_time:           s.end_time?.slice(0, 5)   ?? '',
+      status:             s.status,
+      remarks:            s.remarks ?? '',
+      force:              false,
     })
   } else {
     form.reset()
@@ -588,6 +905,7 @@ function openForm(s = null) {
     form.status           = 'active'
     form.force            = false
     form.academic_term_id = filters.term_id    ?? null
+    form.school_year_id   = schoolYearIdForTerm(filters.term_id)
     form.section_id       = s?.section_id ?? filters.section_id ?? null
   }
   modal.value = true
