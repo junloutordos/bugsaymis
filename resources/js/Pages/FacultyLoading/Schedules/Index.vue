@@ -63,9 +63,9 @@
         </select>
       </div>
 
-      <!-- Unplaced subjects tray -->
+      <!-- Unplaced subjects tray (mobile/tablet — full-width horizontal bar) -->
       <div v-if="unplacedLoads.length"
-        class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-2">
+        class="lg:hidden bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-2">
         <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
           Unplaced Subjects — drag onto a slot below
         </p>
@@ -87,167 +87,204 @@
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div v-if="groupsWithSchedules.length === 0"
-        class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <CalendarIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No schedules found</p>
-        <p class="text-xs text-slate-400 mt-1">Assign a schedule or use AI Generate to get started.</p>
-      </div>
+      <!-- Calendars (left) + sticky Unplaced Subjects panel (right, lg+) -->
+      <div class="flex gap-5 items-start">
+        <div class="flex-1 min-w-0 space-y-6">
 
-      <!-- Calendar cards per section / per faculty -->
-      <div v-else class="space-y-6">
-        <div v-for="groupId in groupsWithSchedules" :key="groupId"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-
-          <!-- Group header -->
-          <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span v-if="viewBy === 'section'" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
-                Grade {{ groupHeaderInfo(groupId).grade_level }}
-              </span>
-              <h3 class="text-sm font-semibold text-slate-800">
-                {{ viewBy === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name }}
-              </h3>
-              <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
-            </div>
-            <button v-if="viewBy === 'section'" @click="openForm({ section_id: groupId })"
-              class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md font-medium transition-colors">
-              <PlusIcon class="h-3 w-3" /> Add
-            </button>
+          <!-- Empty state -->
+          <div v-if="groupsWithSchedules.length === 0"
+            class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
+            <CalendarIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
+            <p class="text-sm font-medium text-slate-500">No schedules found</p>
+            <p class="text-xs text-slate-400 mt-1">Assign a schedule or use AI Generate to get started.</p>
           </div>
 
-          <!-- Calendar grid -->
-          <div class="overflow-x-auto">
-            <div style="min-width: 580px">
+          <!-- Calendar cards per section / per faculty -->
+          <template v-else>
+            <div v-for="groupId in groupsWithSchedules" :key="groupId"
+              class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
 
-              <!-- Day column headers -->
-              <div class="flex border-b border-slate-100">
-                <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
-                <div v-for="day in WEEKDAYS" :key="day"
-                  class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
-                  <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    {{ day.slice(0, 3) }}
+              <!-- Group header -->
+              <div class="px-4 py-3 bg-gradient-to-r from-indigo-50 to-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span v-if="viewBy === 'section'" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
+                    Grade {{ groupHeaderInfo(groupId).grade_level }}
                   </span>
-                  <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
-                    {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
-                  </span>
+                  <h3 class="text-sm font-semibold text-slate-800">
+                    {{ viewBy === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name }}
+                  </h3>
+                  <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
                 </div>
+                <button v-if="viewBy === 'section'" @click="openForm({ section_id: groupId })"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-md font-medium transition-colors">
+                  <PlusIcon class="h-3 w-3" /> Add
+                </button>
               </div>
 
-              <!-- Time axis + columns -->
-              <div class="flex" :style="{ height: CAL_H + 'px' }">
+              <!-- Calendar grid -->
+              <div class="overflow-x-auto">
+                <div style="min-width: 580px">
 
-                <!-- Time gutter -->
-                <div class="shrink-0 relative border-r border-slate-100" :style="{ width: GUTTER + 'px' }">
-                  <div v-for="h in HOURS" :key="h"
-                    :style="{ top: hourTop(h) + 'px' }"
-                    class="absolute right-2 -translate-y-2.5 select-none">
-                    <span class="text-xs text-slate-400 font-medium">
-                      {{ h === 12 ? '12PM' : h < 12 ? h + 'AM' : (h - 12) + 'PM' }}
-                    </span>
+                  <!-- Day column headers -->
+                  <div class="flex border-b border-slate-100">
+                    <div class="shrink-0 border-r border-slate-100" :style="{ width: GUTTER + 'px' }" />
+                    <div v-for="day in WEEKDAYS" :key="day"
+                      class="flex-1 text-center py-2 border-l border-slate-100 first:border-l-0">
+                      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                        {{ day.slice(0, 3) }}
+                      </span>
+                      <span v-if="dayConfigs[day]" class="block text-xs text-slate-400 leading-tight">
+                        {{ fmtConfigTime(dayConfigs[day].start) }}–{{ fmtConfigTime(dayConfigs[day].end) }}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <!-- Grid body: gridlines + day columns -->
-                <div class="flex-1 relative flex">
+                  <!-- Time axis + columns -->
+                  <div class="flex" :style="{ height: CAL_H + 'px' }">
 
-                  <!-- Horizontal hour lines (drawn over all columns) -->
-                  <div v-for="h in HOURS" :key="'hl-' + h"
-                    :style="{ top: hourTop(h) + 'px' }"
-                    class="absolute inset-x-0 border-t border-slate-100 pointer-events-none z-0" />
-
-                  <!-- Half-hour dashed lines -->
-                  <div v-for="h in HOURS" :key="'hl30-' + h"
-                    :style="{ top: (hourTop(h) + SCALE * 30) + 'px' }"
-                    class="absolute inset-x-0 border-t border-dashed border-slate-50 pointer-events-none z-0" />
-
-                  <!-- Day columns -->
-                  <div v-for="day in WEEKDAYS" :key="day"
-                    v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), dayConfigs[day]]"
-                    class="flex-1 relative border-l border-slate-100 overflow-hidden"
-                    @dragover.prevent="onDragOverColumn($event, groupId, day)"
-                    @drop.prevent="onDropColumn($event, groupId, day)">
-
-                    <!-- Drag-and-drop preview -->
-                    <div v-if="dropTarget && dropTarget.groupId === groupId && dropTarget.day === day"
-                      :style="dropPreviewStyle()"
-                      :class="['absolute rounded border-2 z-30 pointer-events-none flex items-center justify-center px-1 text-center',
-                        dropTarget.hasConflict ? 'bg-red-100/85 border-red-400' : 'bg-emerald-100/85 border-emerald-400']">
-                      <span :class="['text-xs font-semibold truncate', dropTarget.hasConflict ? 'text-red-700' : 'text-emerald-700']">
-                        {{ dropTarget.hasConflict ? (dropTarget.message ?? 'Conflict') : 'Drop here' }}
-                      </span>
-                    </div>
-
-                    <!-- Blocked period overlays -->
-                    <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
-                      :style="blockedStyle(bp)"
-                      class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
-                      <div class="absolute inset-0 bg-slate-100/70" />
-                      <span class="relative text-xs text-slate-400 font-medium px-1 text-center leading-tight select-none">
-                        {{ bp.label }}
-                      </span>
-                    </div>
-
-                    <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
-                    <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
-                      :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"
-                      class="pointer-events-none z-[1]">
-                      <div class="absolute inset-0 bg-slate-50/80 border-t border-slate-200/50" />
-                      <span class="relative block text-center text-xs text-slate-300 mt-2 select-none font-medium">
-                        No Classes
-                      </span>
-                    </div>
-
-                    <!-- Schedule event blocks -->
-                    <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
-                      :style="[eventStyle(s), subjectColorStyle(s.subject?.id)]"
-                      :draggable="canDrag(s)"
-                      :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
-                        canDrag(s) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-                        dragPayload?.kind === 'move' && dragPayload.schedule.id === s.id ? 'opacity-30' : '']"
-                      @dragstart="onDragStartEvent($event, s)"
-                      @dragend="onDragEnd"
-                      @click="openForm(s)">
-                      <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
-                        <div class="text-xs font-bold leading-tight truncate">
-                          {{ s.subject?.code }}
-                        </div>
-                        <div class="text-xs leading-tight truncate opacity-75">
-                          {{ secondaryLabel(s) }}
-                        </div>
-                        <div class="text-xs leading-tight opacity-55 tabular-nums">
-                          {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
-                        </div>
-                      </div>
-                      <!-- Status indicator bar -->
-                      <div v-if="s.status === 'tentative'"
-                        class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
-                      <LockClosedIcon v-if="s.is_locked"
-                        class="absolute top-0.5 right-0.5 h-3 w-3 text-slate-400" title="Locked — drag disabled" />
-                      <div v-if="s.status === 'cancelled'"
-                        class="absolute inset-0 bg-white/60 flex items-center justify-center">
-                        <span class="text-xs text-slate-400 font-medium">Cancelled</span>
+                    <!-- Time gutter -->
+                    <div class="shrink-0 relative border-r border-slate-100" :style="{ width: GUTTER + 'px' }">
+                      <div v-for="h in HOURS" :key="h"
+                        :style="{ top: hourTop(h) + 'px' }"
+                        class="absolute right-2 -translate-y-2.5 select-none">
+                        <span class="text-xs text-slate-400 font-medium">
+                          {{ h === 12 ? '12PM' : h < 12 ? h + 'AM' : (h - 12) + 'PM' }}
+                        </span>
                       </div>
                     </div>
 
+                    <!-- Grid body: gridlines + day columns -->
+                    <div class="flex-1 relative flex">
+
+                      <!-- Horizontal hour lines (drawn over all columns) -->
+                      <div v-for="h in HOURS" :key="'hl-' + h"
+                        :style="{ top: hourTop(h) + 'px' }"
+                        class="absolute inset-x-0 border-t border-slate-100 pointer-events-none z-0" />
+
+                      <!-- Half-hour dashed lines -->
+                      <div v-for="h in HOURS" :key="'hl30-' + h"
+                        :style="{ top: (hourTop(h) + SCALE * 30) + 'px' }"
+                        class="absolute inset-x-0 border-t border-dashed border-slate-50 pointer-events-none z-0" />
+
+                      <!-- Day columns -->
+                      <div v-for="day in WEEKDAYS" :key="day"
+                        v-memo="[byGroupDay[groupId]?.[day], dropPreviewKey(groupId, day), dragDimKey(groupId, day), dayConfigs[day]]"
+                        class="flex-1 relative border-l border-slate-100 overflow-hidden"
+                        @dragover.prevent="onDragOverColumn($event, groupId, day)"
+                        @drop.prevent="onDropColumn($event, groupId, day)">
+
+                        <!-- Drag-and-drop preview -->
+                        <div v-if="dropTarget && dropTarget.groupId === groupId && dropTarget.day === day"
+                          :style="dropPreviewStyle()"
+                          :class="['absolute rounded border-2 z-30 pointer-events-none flex items-center justify-center px-1 text-center',
+                            dropTarget.hasConflict ? 'bg-red-100/85 border-red-400' : 'bg-emerald-100/85 border-emerald-400']">
+                          <span :class="['text-xs font-semibold truncate', dropTarget.hasConflict ? 'text-red-700' : 'text-emerald-700']">
+                            {{ dropTarget.hasConflict ? (dropTarget.message ?? 'Conflict') : 'Drop here' }}
+                          </span>
+                        </div>
+
+                        <!-- Blocked period overlays -->
+                        <div v-for="bp in (dayConfigs[day]?.blocked ?? [])" :key="bp.label"
+                          :style="blockedStyle(bp)"
+                          class="absolute inset-x-0 pointer-events-none z-[1] flex items-center justify-center">
+                          <div class="absolute inset-0 bg-slate-100/70" />
+                          <span class="relative text-xs text-slate-400 font-medium px-1 text-center leading-tight select-none">
+                            {{ bp.label }}
+                          </span>
+                        </div>
+
+                        <!-- No-class afternoon overlay (Wed & Fri end at 12:00) -->
+                        <div v-if="dayConfigs[day] && timeToMin(dayConfigs[day].end) <= 12 * 60"
+                          :style="{ position: 'absolute', top: ((12 * 60 - CAL_START) * SCALE) + 'px', bottom: 0, left: 0, right: 0 }"
+                          class="pointer-events-none z-[1]">
+                          <div class="absolute inset-0 bg-slate-50/80 border-t border-slate-200/50" />
+                          <span class="relative block text-center text-xs text-slate-300 mt-2 select-none font-medium">
+                            No Classes
+                          </span>
+                        </div>
+
+                        <!-- Schedule event blocks -->
+                        <div v-for="s in (byGroupDay[groupId]?.[day] ?? [])" :key="s.id"
+                          :style="[eventStyle(s), subjectColorStyle(s.subject?.id)]"
+                          :draggable="canDrag(s)"
+                          :class="['absolute rounded border z-10 overflow-hidden transition-all hover:shadow-md hover:z-20 hover:scale-[1.01]',
+                            canDrag(s) ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                            dragPayload?.kind === 'move' && dragPayload.schedule.id === s.id ? 'opacity-30' : '']"
+                          @dragstart="onDragStartEvent($event, s)"
+                          @dragend="onDragEnd"
+                          @click="openForm(s)">
+                          <div class="px-1.5 py-0.5 h-full flex flex-col gap-px overflow-hidden">
+                            <div class="text-xs font-bold leading-tight truncate">
+                              {{ s.subject?.code }}
+                            </div>
+                            <div class="text-xs leading-tight truncate opacity-75">
+                              {{ secondaryLabel(s) }}
+                            </div>
+                            <div class="text-xs leading-tight opacity-55 tabular-nums">
+                              {{ fmtTime(s.start_time) }}–{{ fmtTime(s.end_time) }}
+                            </div>
+                          </div>
+                          <!-- Status indicator bar -->
+                          <div v-if="s.status === 'tentative'"
+                            class="absolute top-0 right-0 bottom-0 w-0.5 bg-amber-400" />
+                          <LockClosedIcon v-if="s.is_locked"
+                            class="absolute top-0.5 right-0.5 h-3 w-3 text-slate-400" title="Locked — drag disabled" />
+                          <div v-if="s.status === 'cancelled'"
+                            class="absolute inset-0 bg-white/60 flex items-center justify-center">
+                            <span class="text-xs text-slate-400 font-medium">Cancelled</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
                   </div>
+
+                </div>
+              </div>
+
+              <!-- Legend: subjects for this group -->
+              <div class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
+                <div v-for="sub in subjectsInGroup(groupId)" :key="sub.id"
+                  :style="subjectColorStyle(sub.id)"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
+                  {{ sub.code }}
                 </div>
               </div>
 
             </div>
-          </div>
-
-          <!-- Legend: subjects for this group -->
-          <div class="px-4 py-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
-            <div v-for="sub in subjectsInGroup(groupId)" :key="sub.id"
-              :style="subjectColorStyle(sub.id)"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border">
-              {{ sub.code }}
-            </div>
-          </div>
+          </template>
 
         </div>
+
+        <!-- Unplaced subjects panel (desktop — sticky right rail) -->
+        <div v-if="unplacedLoads.length"
+          class="hidden lg:block w-80 shrink-0 bg-white rounded-xl border border-slate-100 shadow-sm sticky top-4">
+          <div class="px-4 py-3 border-b border-slate-100">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Unplaced Subjects ({{ unplacedLoads.length }})
+            </p>
+            <p class="text-xs text-slate-400 mt-0.5">Drag onto a slot in the calendar</p>
+          </div>
+          <div class="p-3 space-y-2 max-h-[calc(100vh-8rem)] overflow-y-auto">
+            <div v-for="load in unplacedLoads" :key="load.load_assignment_id"
+              :draggable="!load.is_locked"
+              @dragstart="onDragStartLoad($event, load)"
+              @dragend="onDragEnd"
+              :class="['rounded-lg border px-3 py-2 text-xs font-medium select-none',
+                load.is_locked
+                  ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400'
+                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100 cursor-grab active:cursor-grabbing']">
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-bold">{{ load.subject?.code }}</span>
+                <LockClosedIcon v-if="load.is_locked" class="h-3 w-3 shrink-0" />
+                <span v-else class="bg-amber-200/60 px-1.5 py-0.5 rounded-full shrink-0">needs {{ load.still_needed }}</span>
+              </div>
+              <div class="mt-0.5 text-slate-500">{{ load.faculty?.name ?? 'TBA' }}</div>
+              <div class="text-slate-500">G{{ load.grade_level }} {{ load.section_name }}</div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
     </div>
