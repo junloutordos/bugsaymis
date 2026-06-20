@@ -7,6 +7,7 @@ use App\Models\FacultyLoading\AcademicTerm;
 use App\Models\FacultyLoading\ClassSchedule;
 use App\Models\FacultyLoading\Classroom;
 use App\Models\FacultyLoading\FacultyLoad;
+use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolDayConfig;
 use App\Models\FacultyLoading\Section;
 use App\Models\FacultyLoading\Subject;
@@ -16,6 +17,7 @@ use App\Services\FacultyLoading\ScheduleValidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -37,6 +39,13 @@ class ClassScheduleController extends Controller
         $sectionId   = $request->input('section_id');
         $facultyId   = $request->input('faculty_id');
 
+        // Faculty whose load is locked for this term — schedules/unplaced loads for
+        // them must render as non-draggable on the calendar.
+        $lockedFacultyIds = FacultyLoad::where('academic_term_id', $termId)
+            ->where('is_locked', true)
+            ->pluck('user_id')
+            ->all();
+
         $query = ClassSchedule::with(['subject', 'classroom', 'faculty:id,name', 'section:id,sectionname,levelid'])
             ->when($termId, fn ($q) => $q->where('academic_term_id', $termId))
             ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId))
@@ -52,12 +61,17 @@ class ClassScheduleController extends Controller
             ->orderBy('class_schedules.start_time')
             ->select('class_schedules.*')
             ->get()
-            ->map(fn ($s) => $this->mapSchedule($s));
+            ->map(fn ($s) => $this->mapSchedule($s, $lockedFacultyIds));
 
         $terms = AcademicTerm::with('schoolYear')
             ->orderByDesc('start_date')
             ->get()
-            ->map(fn ($t) => ['id' => $t->id, 'label' => $t->full_label, 'is_current' => $t->is_current]);
+            ->map(fn ($t) => [
+                'id'             => $t->id,
+                'label'          => $t->full_label,
+                'is_current'     => $t->is_current,
+                'school_year_id' => $t->school_year_id,
+            ]);
 
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
             ->where(fn ($q) => $q->where('on_study_leave', false)->orWhereNull('on_study_leave'))
@@ -86,17 +100,92 @@ class ClassScheduleController extends Controller
                 ],
             ]);
 
+        $unplacedLoads = $this->buildUnplacedLoads($termId, $sectionId, $facultyId, $lockedFacultyIds, $sections);
+
         return Inertia::render('FacultyLoading/Schedules/Index', [
-            'schedules'   => $schedules,
-            'terms'       => $terms,
-            'faculty'     => $faculty,
-            'subjects'    => $subjects,
-            'classrooms'  => $classrooms,
-            'sections'    => $sections,
-            'currentTerm' => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
-            'filters'     => $request->only(['term_id', 'section_id', 'faculty_id']),
-            'dayConfigs'  => $dayConfigs,
+            'schedules'     => $schedules,
+            'terms'         => $terms,
+            'faculty'       => $faculty,
+            'subjects'      => $subjects,
+            'classrooms'    => $classrooms,
+            'sections'      => $sections,
+            'currentTerm'   => $currentTerm ? ['id' => $currentTerm->id, 'label' => $currentTerm->full_label] : null,
+            'filters'       => $request->only(['term_id', 'section_id', 'faculty_id']),
+            'dayConfigs'    => $dayConfigs,
+            'unplacedLoads' => $unplacedLoads,
         ]);
+    }
+
+    /**
+     * Teaching load assignments for the filtered term/section/faculty that still
+     * need one or more weekly sessions placed on the calendar — drag targets for
+     * the "unplaced subjects" tray.
+     */
+    private function buildUnplacedLoads(
+        ?int $termId,
+        ?int $sectionId,
+        ?int $facultyId,
+        array $lockedFacultyIds,
+        Collection $sections
+    ): array {
+        if (! $termId) {
+            return [];
+        }
+
+        $loads = LoadAssignment::with(['subject:id,code,name,load_units', 'faculty:id,name'])
+            ->where('academic_term_id', $termId)
+            ->where('assignment_type', 'teaching')
+            ->whereNotNull('section_id')
+            ->whereNotNull('subject_id')
+            ->when($sectionId, fn ($q) => $q->where('section_id', $sectionId))
+            ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId))
+            ->get();
+
+        if ($loads->isEmpty()) {
+            return [];
+        }
+
+        $scheduledCounts = ClassSchedule::occupying()
+            ->whereIn('load_assignment_id', $loads->pluck('id'))
+            ->selectRaw('load_assignment_id, COUNT(*) as cnt')
+            ->groupBy('load_assignment_id')
+            ->pluck('cnt', 'load_assignment_id');
+
+        $sectionsById = $sections->keyBy('id');
+
+        return $loads
+            ->map(function ($la) use ($scheduledCounts, $sectionsById, $lockedFacultyIds) {
+                $required    = max(1, (int) round((float) ($la->subject->load_units ?? 1)));
+                $scheduled   = (int) ($scheduledCounts[$la->id] ?? 0);
+                $stillNeeded = max(0, $required - $scheduled);
+
+                if ($stillNeeded === 0) {
+                    return null;
+                }
+
+                $section = $sectionsById->get($la->section_id);
+
+                return [
+                    'load_assignment_id' => $la->id,
+                    'subject'            => $la->subject ? [
+                        'id'   => $la->subject->id,
+                        'code' => $la->subject->code,
+                        'name' => $la->subject->name,
+                    ] : null,
+                    'faculty' => $la->faculty ? [
+                        'id'   => $la->faculty->id,
+                        'name' => $la->faculty->name,
+                    ] : null,
+                    'section_id'   => $la->section_id,
+                    'section_name' => $section?->sectionname ?? "Section {$la->section_id}",
+                    'grade_level'  => $section?->levelid,
+                    'still_needed' => $stillNeeded,
+                    'is_locked'    => in_array((int) $la->user_id, $lockedFacultyIds, true),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -140,6 +229,7 @@ class ClassScheduleController extends Controller
             'status'             => 'in:active,tentative',
             'remarks'            => 'nullable|string|max:500',
             'force'              => 'boolean',   // override warnings only
+            'load_assignment_id' => 'nullable|exists:load_assignments,id',
         ]);
 
         $validation = $this->validation->validate($data);
@@ -159,18 +249,19 @@ class ClassScheduleController extends Controller
         }
 
         $schedule = ClassSchedule::create([
-            'user_id'          => $data['faculty_id'],
-            'subject_id'       => $data['subject_id'],
-            'section_id'       => $data['section_id'],
-            'classroom_id'     => $data['classroom_id'],
-            'school_year_id'   => $data['school_year_id'],
-            'academic_term_id' => $data['academic_term_id'],
-            'day_of_week'      => $data['day_of_week'],
-            'start_time'       => $data['start_time'],
-            'end_time'         => $data['end_time'],
-            'status'           => $data['status'] ?? 'active',
-            'remarks'          => $data['remarks'] ?? null,
-            'created_by'       => Auth::id(),
+            'load_assignment_id' => $data['load_assignment_id'] ?? null,
+            'user_id'            => $data['faculty_id'],
+            'subject_id'         => $data['subject_id'],
+            'section_id'         => $data['section_id'],
+            'classroom_id'       => $data['classroom_id'],
+            'school_year_id'     => $data['school_year_id'],
+            'academic_term_id'   => $data['academic_term_id'],
+            'day_of_week'        => $data['day_of_week'],
+            'start_time'         => $data['start_time'],
+            'end_time'           => $data['end_time'],
+            'status'             => $data['status'] ?? 'active',
+            'remarks'            => $data['remarks'] ?? null,
+            'created_by'         => Auth::id(),
         ]);
 
         $msg = 'Schedule created.';
@@ -246,16 +337,18 @@ class ClassScheduleController extends Controller
         return back()->with('success', 'Schedule cancelled.');
     }
 
-    private function mapSchedule(ClassSchedule $s): array
+    private function mapSchedule(ClassSchedule $s, array $lockedFacultyIds = []): array
     {
         return [
-            'id'           => $s->id,
-            'day_of_week'  => $s->day_of_week,
-            'start_time'   => $s->start_time,
-            'end_time'     => $s->end_time,
-            'status'       => $s->status,
-            'remarks'      => $s->remarks,
-            'subject'      => $s->subject ? [
+            'id'                 => $s->id,
+            'load_assignment_id' => $s->load_assignment_id,
+            'school_year_id'     => $s->school_year_id,
+            'day_of_week'        => $s->day_of_week,
+            'start_time'         => $s->start_time,
+            'end_time'           => $s->end_time,
+            'status'             => $s->status,
+            'remarks'            => $s->remarks,
+            'subject'            => $s->subject ? [
                 'id'   => $s->subject->id,
                 'code' => $s->subject->code,
                 'name' => $s->subject->name,
@@ -272,6 +365,7 @@ class ClassScheduleController extends Controller
             'section_id'   => $s->section_id,
             'section_name' => $s->section?->sectionname ?? "Section {$s->section_id}",
             'grade_level'  => $s->section?->levelid ?? null,
+            'is_locked'    => in_array((int) $s->user_id, $lockedFacultyIds, true),
         ];
     }
 }

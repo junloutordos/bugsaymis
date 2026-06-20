@@ -3,6 +3,7 @@
 namespace App\Services\FacultyLoading;
 
 use App\Models\FacultyLoading\ClassSchedule;
+use App\Models\User;
 use Illuminate\Support\Collection;
 
 /**
@@ -20,6 +21,9 @@ use Illuminate\Support\Collection;
  */
 class ConflictDetectionService
 {
+    /** @var array<int, bool> Per-request cache of faculty-id => is-TBA-placeholder */
+    private array $placeholderCache = [];
+
     // ── Core Overlap Check ───────────────────────────────────────────────────
 
     /**
@@ -51,7 +55,28 @@ class ConflictDetectionService
         int    $termId,
         ?int   $excludeId = null
     ): Collection {
+        // TBA/vacant placeholder faculty share one DB account across many unrelated
+        // sessions — they don't represent a real person being double-booked, so the
+        // faculty axis doesn't apply (mirrors the placement-time check in
+        // DeterministicSchedulingService).
+        if ($this->isPlaceholderFaculty($facultyId)) {
+            return new Collection();
+        }
+
         return $this->findConflicts('user_id', $facultyId, $day, $start, $end, $termId, $excludeId);
+    }
+
+    /**
+     * True if the given user is a TBA/vacant placeholder faculty account.
+     */
+    private function isPlaceholderFaculty(int $facultyId): bool
+    {
+        if (! array_key_exists($facultyId, $this->placeholderCache)) {
+            $name = User::find($facultyId)?->name ?? '';
+            $this->placeholderCache[$facultyId] = str_starts_with($name, 'TBA');
+        }
+
+        return $this->placeholderCache[$facultyId];
     }
 
     // ── Axis B: Room Conflict ────────────────────────────────────────────────
