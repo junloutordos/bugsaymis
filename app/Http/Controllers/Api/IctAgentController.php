@@ -11,6 +11,7 @@ use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\IctEquipmentHealthSnapshot;
 use App\Models\User;
 use App\Services\IctAgentHealthEvaluator;
+use App\Services\IctAgentNetworkLocationResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,6 +20,7 @@ class IctAgentController extends Controller
     public function __construct(
         private IctAgentHealthEvaluator $healthEvaluator,
         private ITJobRequestController $jobRequests,
+        private IctAgentNetworkLocationResolver $networkLocationResolver,
     ) {
     }
 
@@ -132,6 +134,7 @@ class IctAgentController extends Controller
             'pnp_issues.*.error_code'  => ['nullable', 'string', 'max:50'],
             'os_version'    => ['nullable', 'string', 'max:255'],
             'agent_version' => ['nullable', 'string', 'max:20'],
+            'wifi_ssid'     => ['nullable', 'string', 'max:255'],
         ]);
 
         $device = $request->user();
@@ -141,11 +144,20 @@ class IctAgentController extends Controller
             ['payload' => $validated, 'recorded_at' => now()]
         );
 
-        $device->update([
+        $networkLocation = $this->networkLocationResolver->resolve($validated['wifi_ssid'] ?? null, $request->ip());
+
+        $deviceUpdate = [
             'last_checkin_at' => now(),
             'os_version'      => $validated['os_version'] ?? $device->os_version,
             'agent_version'   => $validated['agent_version'] ?? $device->agent_version,
-        ]);
+        ];
+
+        if ($networkLocation !== $device->network_location) {
+            $deviceUpdate['network_location'] = $networkLocation;
+            $deviceUpdate['network_location_changed_at'] = now();
+        }
+
+        $device->update($deviceUpdate);
 
         $this->healthEvaluator->evaluate($device, $validated);
 
