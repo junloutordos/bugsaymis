@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#059669,#10b981)')
 @section('header-title','Placement Confirmation — Congratulations!')
-@section('header-subtitle','PSHS-CRC MIS — Recruitment & Selection')
+@section('header-subtitle','Atlas — Recruitment & Selection')
 
 @section('content')
 <div style="text-align:center;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:20px;margin-bottom:20px;">

@@ -2,7 +2,7 @@
 
 @section('header-gradient', str_contains(strtolower($status ?? ''), 'approved') ? 'linear-gradient(90deg,#059669,#10b981)' : (str_contains(strtolower($status ?? ''), 'declined') ? 'linear-gradient(90deg,#dc2626,#ef4444)' : 'linear-gradient(90deg,#7c3aed,#8b5cf6)'))
 @section('header-title')Work Request — {{ $status }}@endsection
-@section('header-subtitle','PSHS-CRC MIS — GSU Work Requests')
+@section('header-subtitle','Atlas — GSU Work Requests')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $request->requester?->name ?? 'Requestor' }}</strong>,</p>

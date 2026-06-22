@@ -58,7 +58,7 @@ class OrgExportController extends Controller
         ]);
 
         $mpdf->SetTitle('Organizational Structure');
-        $mpdf->SetAuthor('BUGSAYMIS');
+        $mpdf->SetAuthor('Atlas');
         $mpdf->WriteHTML($html);
 
         $content = $mpdf->Output('', 'S');

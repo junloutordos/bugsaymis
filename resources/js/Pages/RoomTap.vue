@@ -94,7 +94,7 @@ function formatTime(t) {
 
       <!-- School branding -->
       <div class="text-center mb-8">
-        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest">PSHS-CRC MIS</p>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest">Atlas</p>
         <p class="text-sm text-slate-500 mt-1">Class Attendance</p>
       </div>
 

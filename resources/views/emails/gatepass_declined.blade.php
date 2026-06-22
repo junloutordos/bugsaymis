@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#dc2626,#ef4444)')
 @section('header-title','Gate Pass Declined')
-@section('header-subtitle','PSHS-CRC MIS — Gate Pass System')
+@section('header-subtitle','Atlas — Gate Pass System')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $gatepass->name ?? ($gatepass->employee_name ?? 'Requester') }}</strong>,</p>

@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#059669,#10b981)')
 @section('header-title','Work Request Completed ✓')
-@section('header-subtitle','PSHS-CRC MIS — GSU Work Requests')
+@section('header-subtitle','Atlas — GSU Work Requests')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $request->requester?->name ?? 'Requester' }}</strong>,</p>
@@ -22,6 +22,6 @@
 
 <div class="callout callout-green">
     <div class="callout-title">Issue resolved</div>
-    If the issue has not been fully resolved, please file a follow-up work request in CRCMIS.
+    If the issue has not been fully resolved, please file a follow-up work request in Atlas.
 </div>
 @endsection

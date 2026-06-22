@@ -23,7 +23,7 @@
 <div class="card">
     <div class="card-header">
         <h1>✓ Action Recorded</h1>
-        <p>IT Job Request — PSHS-CRC MIS</p>
+        <p>IT Job Request — Atlas</p>
     </div>
     <div class="card-body">
         <p style="color:#475569;margin:0 0 16px;font-size:14px;">Your approval has been recorded successfully. The request will proceed to the next step.</p>
@@ -32,7 +32,7 @@
         <div class="detail"><span class="lbl">Submitted By</span><span class="val">{{ $jobRequest->user?->name ?? '—' }}</span></div>
         <div class="detail"><span class="lbl">Status</span><span class="val"><span class="badge">{{ $jobRequest->status }}</span></span></div>
     </div>
-    <div class="footer">PSHS-CRC MIS — You may close this window.</div>
+    <div class="footer">Atlas — You may close this window.</div>
 </div>
 </body>
 </html>

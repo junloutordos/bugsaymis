@@ -1933,10 +1933,10 @@ filteredMenu.value.forEach((item) => {
     >
       <!-- Logo -->
       <div class="h-16 flex items-center gap-3 border-b border-white/10 px-4 shrink-0">
-        <img src="/images/pshslogo.png" alt="PSHS-CRC Logo" class="h-8 w-8 shrink-0 rounded-lg object-contain" style="filter: drop-shadow(0 0 8px rgba(0,200,232,0.45));" />
+        <img src="/images/atlas-mark.png" alt="Atlas Logo" class="h-8 w-8 shrink-0 object-contain" style="filter: drop-shadow(0 0 8px rgba(251,144,2,0.45));" />
         <div v-if="!collapsed" class="min-w-0">
-          <p class="text-sm font-bold text-white leading-tight truncate tracking-wide">CRCMIS</p>
-          <p class="text-[10px] text-blue-200/50 truncate">Management Information System</p>
+          <p class="font-heading text-sm font-bold text-white leading-tight truncate tracking-wide">Atlas</p>
+          <p class="text-[10px] text-blue-200/50 truncate">Digital Campus Management Platform</p>
         </div>
         <!-- Close button (mobile only) -->
         <button

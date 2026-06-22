@@ -57,7 +57,7 @@
 </div>
 
 <div class="footer">
-  Printed from BUGSAYMIS &bull; {{ $generatedAt }}
+  Printed from Atlas &bull; {{ $generatedAt }}
 </div>
 
 </body>

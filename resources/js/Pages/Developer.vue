@@ -19,7 +19,7 @@ const team = [
     icon: CodeBracketIcon,
     name: 'Junlou Tordos',
     role: 'Lead Developer & System Architect',
-    bio: 'Designed and built CRCMIS from the ground up — from the data layer and backend API to the cloud infrastructure and CI/CD pipeline. Specializes in building practical, role-based management platforms for Philippine government institutions.',
+    bio: 'Designed and built Atlas from the ground up — from the data layer and backend API to the cloud infrastructure and CI/CD pipeline. Specializes in building practical, role-based management platforms for Philippine government institutions.',
     contacts: [
       { icon: EnvelopeIcon, label: 'jtordos@crc.pshs.edu.ph',  href: 'mailto:jtordos@crc.pshs.edu.ph' },
       { icon: PhoneIcon,    label: '+63 955 559 8885',        href: 'tel:+639555598885' },
@@ -31,7 +31,7 @@ const team = [
     icon: CpuChipIcon,
     name: 'Michael Francisco',
     role: 'Support Developer & System Analyst',
-    bio: 'Responsible for system analysis, requirements gathering, quality assurance, and end-user support. Works closely with campus stakeholders to ensure CRCMIS aligns with the operational and administrative needs of PSHS-CRC.',
+    bio: 'Responsible for system analysis, requirements gathering, quality assurance, and end-user support. Works closely with campus stakeholders to ensure Atlas aligns with the operational and administrative needs of PSHS-CRC.',
     contacts: [
       { icon: EnvelopeIcon, label: 'mafrancisco@crc.pshs.edu.ph', href: 'mailto:mafrancisco@crc.pshs.edu.ph' },
     ],
@@ -56,7 +56,7 @@ const stack = [
 </script>
 
 <template>
-  <Head title="Development Team — CRCMIS" />
+  <Head title="Development Team — Atlas" />
   <div class="page">
 
     <!-- ── Nav ───────────────────────────────────────── -->
@@ -64,7 +64,7 @@ const stack = [
       <div class="nav-inner">
         <a href="/" class="back-link">
           <ArrowLeftIcon class="back-icon" />
-          Back to CRCMIS
+          Back to Atlas
         </a>
       </div>
     </header>
@@ -76,7 +76,7 @@ const stack = [
       <div class="hero-glow2" />
       <div class="hero-inner">
         <div class="hero-head">
-          <p class="hero-eyebrow">PSHS-CRC · CRCMIS</p>
+          <p class="hero-eyebrow">PSHS-CRC · Atlas</p>
           <h1 class="hero-title">Development Team</h1>
           <p class="hero-sub">The people behind the Campus Resource and Management Information System.</p>
         </div>
@@ -116,7 +116,7 @@ const stack = [
     <section class="section bg-white">
       <div class="section-inner">
         <p class="eyebrow">Featured Project</p>
-        <h2 class="section-h2">CRCMIS</h2>
+        <h2 class="section-h2">Atlas</h2>
         <p class="section-lead">Campus Resource and Management Information System — PSHS-CRC, Butuan City</p>
         <div class="project-card">
           <div class="pc-meta">
@@ -171,7 +171,7 @@ const stack = [
     <!-- ── Footer ─────────────────────────────────────── -->
     <footer class="dev-footer">
       <p class="df-copy">© 2026 PSHS-CRC Development Team</p>
-      <a href="/" class="df-back">← Back to CRCMIS</a>
+      <a href="/" class="df-back">← Back to Atlas</a>
     </footer>
 
   </div>

@@ -141,7 +141,7 @@ Route::get('/', function () {
 
 Route::get('/hello', function () {
     return Inertia::render('Hello', [
-        'message' => 'Welcome to BUGSAYMIS!',
+        'message' => 'Welcome to Atlas!',
     ]);
 })->name('hello');
 
@@ -1964,8 +1964,8 @@ Route::middleware(['auth'])->prefix('student-attendance')->name('student-attenda
 // Development-only: send a test email
 if (app()->environment('local')) {
     Route::get('/dev/send-test-email', function () {
-        \Illuminate\Support\Facades\Mail::raw('Test email from BugsayMIS (dev route)', function ($m) {
-            $m->to('mikelfrancisco@gmail.com')->subject('BugsayMIS dev test');
+        \Illuminate\Support\Facades\Mail::raw('Test email from Atlas (dev route)', function ($m) {
+            $m->to('mikelfrancisco@gmail.com')->subject('Atlas dev test');
         });
         return response('OK');
     });

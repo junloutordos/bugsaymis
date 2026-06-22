@@ -238,7 +238,7 @@ function submit() {
 
       <!-- Footer -->
       <p class="text-center text-xs text-slate-400 pb-6">
-        Philippine Science High School – Caraga Region Campus &bull; BugSayMIS
+        Philippine Science High School – Caraga Region Campus &bull; Atlas
       </p>
 
     </div>

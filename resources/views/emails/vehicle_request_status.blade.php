@@ -2,7 +2,7 @@
 
 @section('header-gradient', str_contains(strtolower($status ?? ''), 'approved') ? 'linear-gradient(90deg,#059669,#10b981)' : 'linear-gradient(90deg,#dc2626,#ef4444)')
 @section('header-title')Vehicle Request — {{ $status }}@endsection
-@section('header-subtitle','PSHS-CRC MIS — GSU Transport')
+@section('header-subtitle','Atlas — GSU Transport')
 
 @section('content')
 @php

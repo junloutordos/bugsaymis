@@ -2,7 +2,7 @@
 
 @section('header-gradient', str_contains(strtolower($status ?? ''), 'approved') ? 'linear-gradient(90deg,#059669,#10b981)' : 'linear-gradient(90deg,#dc2626,#ef4444)')
 @section('header-title')Service Request — {{ $status }}@endsection
-@section('header-subtitle','PSHS-CRC MIS — GSU Service Requests')
+@section('header-subtitle','Atlas — GSU Service Requests')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $requestor ?? ($request->requestor ?? 'Requestor') }}</strong>,</p>
@@ -28,7 +28,7 @@
 @if(!str_contains(strtolower($status ?? ''), 'approved'))
 <div class="callout callout-blue">
     <div class="callout-title">What to do next</div>
-    If you need this service, you may re-file a new service request in CRCMIS with updated details.
+    If you need this service, you may re-file a new service request in Atlas with updated details.
 </div>
 @endif
 @endsection

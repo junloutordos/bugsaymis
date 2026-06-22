@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#7c3aed,#8b5cf6)')
 @section('header-title','Work Request — Staff Assignment Needed')
-@section('header-subtitle','PSHS-CRC MIS — GSU Work Requests')
+@section('header-subtitle','Atlas — GSU Work Requests')
 
 @section('content')
 <p class="greeting">Hello GSU Head,</p>
@@ -19,7 +19,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">Action Required</div>
-    Open the work request in CRCMIS and assign it to the appropriate staff member.
+    Open the work request in Atlas and assign it to the appropriate staff member.
 </div>
 @endsection
 

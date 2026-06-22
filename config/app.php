@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Atlas'),
 
     'agency_name' => env('AGENCY_NAME', 'Philippine Science High School - Caraga Region Campus'),
 

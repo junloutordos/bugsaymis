@@ -1,5 +1,5 @@
 /**
- * Canonical table class tokens for BugSayMis.
+ * Canonical table class tokens for Atlas.
  *
  * Import these in any page that still uses inline table HTML so that
  * a single change here propagates everywhere. New pages should use

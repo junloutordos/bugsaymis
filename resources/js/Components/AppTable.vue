@@ -1,6 +1,6 @@
 <script setup>
 /**
- * AppTable — the authoritative table component for BugSayMis.
+ * AppTable — the authoritative table component for Atlas.
  *
  * Provides the full shell: card wrapper, scroll container, thead/tbody
  * semantics, loading skeleton, and optional empty/footer slots.

@@ -23,14 +23,14 @@
 <div class="card">
     <div class="card-header">
         <h1>Already Processed</h1>
-        <p>IT Job Request — PSHS-CRC MIS</p>
+        <p>IT Job Request — Atlas</p>
     </div>
     <div class="card-body">
         <p style="color:#475569;margin:0 0 16px;font-size:14px;">This IT Job Request has already been processed. No further action is needed from you.</p>
         <div class="detail"><span class="lbl">ITJR No.</span><span class="val" style="font-family:monospace;">{{ $jobRequest->itjr_no }}</span></div>
         <div class="detail"><span class="lbl">Current Status</span><span class="val"><span class="badge">{{ $jobRequest->status }}</span></span></div>
     </div>
-    <div class="footer">PSHS-CRC MIS — You may close this window.</div>
+    <div class="footer">Atlas — You may close this window.</div>
 </div>
 </body>
 </html>

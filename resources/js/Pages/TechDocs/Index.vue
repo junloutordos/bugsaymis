@@ -242,9 +242,9 @@ const modules = [
     controller: 'NotificationController, PushSubscriptionController',
     models: ['Notification', 'PushSubscription'],
     permissions: [],
-    description: 'Two-layer notification system: in-app bell (database + Soketi broadcast) and Web Push (FCM via minishlink/web-push, VAPID keys). Service worker: crcmis-sw.js.',
+    description: 'Two-layer notification system: in-app bell (database + Soketi broadcast) and Web Push (FCM via minishlink/web-push, VAPID keys). Service worker: atlas-sw.js.',
     workflow: 'Action → NotificationService::notifyUser() → DB + Soketi + FCM',
-    rules: ['VAPID_PUBLIC_KEY baked into Vite bundle at build time', 'crcmis-sw.js handles push events (not sw.js)'],
+    rules: ['VAPID_PUBLIC_KEY baked into Vite bundle at build time', 'atlas-sw.js handles push events (not sw.js)'],
   },
 ]
 
@@ -433,7 +433,7 @@ function fmtType(t) {
       <!-- ── Left Sidebar ─────────────────────────────────────────────────── -->
       <aside class="hidden lg:flex flex-col w-56 shrink-0 border-r border-slate-200 bg-slate-50 pt-4 pb-8 sticky top-0 max-h-screen overflow-y-auto">
         <div class="px-4 mb-4">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CRCMIS v2.5</p>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Atlas v2.5</p>
           <p class="text-xs text-slate-500 mt-0.5">Technical Reference</p>
         </div>
 
@@ -499,7 +499,7 @@ function fmtType(t) {
         <section v-if="activeSection === 'overview'" class="space-y-6">
           <div>
             <h1 class="text-2xl font-bold text-slate-800">System Overview</h1>
-            <p class="text-slate-500 mt-1">PSHS-CRC Campus Management Information System — CRCMIS</p>
+            <p class="text-slate-500 mt-1">Atlas — Digital Campus Management Platform of PSHS-CRC</p>
           </div>
 
           <!-- Stack -->
@@ -820,7 +820,7 @@ function fmtType(t) {
         <!-- ══ 8. CHANGELOG ════════════════════════════════════════════════ -->
         <section v-if="activeSection === 'changelog'" class="space-y-4">
           <h1 class="text-2xl font-bold text-slate-800">Changelog</h1>
-          <p class="text-slate-500 text-sm">Release history for CRCMIS</p>
+          <p class="text-slate-500 text-sm">Release history for Atlas</p>
 
           <div v-for="release in changelog" :key="release.version"
             class="bg-white border border-slate-200 rounded-xl shadow-sm p-5">

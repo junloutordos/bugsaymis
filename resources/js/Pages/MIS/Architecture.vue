@@ -16,7 +16,7 @@ function printDiagram() {
     <div class="flex items-center justify-between mb-5">
       <div>
         <h1 class="text-xl font-bold text-slate-800">System Architecture</h1>
-        <p class="text-sm text-slate-400 mt-0.5">CRCMIS (crcmis-prod) — AWS Deployment Architecture</p>
+        <p class="text-sm text-slate-400 mt-0.5">Atlas (crcmis-prod) — AWS Deployment Architecture</p>
       </div>
       <button
         @click="printDiagram"
@@ -244,7 +244,7 @@ function printDiagram() {
 ══════════════════════════════════════════════════════════════ -->
 <rect width="1366" height="42" fill="#1E293B"/>
 <text x="683" y="25" text-anchor="middle" font-size="15" font-weight="700" fill="white" letter-spacing="-.2">
-  CRCMIS (crcmis-prod) — AWS Deployment Architecture
+  Atlas (crcmis-prod) — AWS Deployment Architecture
 </text>
 <text x="683" y="37" text-anchor="middle" font-size="9" fill="#94A3B8">
   Philippine Science High School – Caraga Region Campus  ·  AWS ap-southeast-1 (Singapore)  ·  May 2026
@@ -739,7 +739,7 @@ function printDiagram() {
 <text x="434" y="223" text-anchor="middle" font-size="8" font-weight="700" fill="#E07B00">HTTP 80</text>
 
 <text x="683" y="872" text-anchor="middle" font-size="8.5" fill="#94A3B8">
-  May 2026  ·  CRCMIS  ·  PSHS-CRC  ·  AWS ap-southeast-1  ·  Architecture by Claude Sonnet 4.6
+  May 2026  ·  Atlas  ·  PSHS-CRC  ·  AWS ap-southeast-1  ·  Architecture by Claude Sonnet 4.6
 </text>
 
 </svg>

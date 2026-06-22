@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#0ea5e9,#3b82f6)')
 @section('header-title','Facility Request — Approval Needed')
-@section('header-subtitle','PSHS-CRC MIS — Facility Management')
+@section('header-subtitle','Atlas — Facility Management')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $request->unit ?? 'Division Chief' }}</strong>,</p>

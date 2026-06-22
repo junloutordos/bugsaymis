@@ -49,7 +49,7 @@ const docStatusColors = {
 </script>
 
 <template>
-  <Head title="Track Application — CRCMIS" />
+  <Head title="Track Application — Atlas" />
 
   <div class="min-h-screen relative">
     <div class="fixed inset-0 bg-cover bg-center -z-10" :style="{ backgroundImage: `url(${storageUrl('bg.jpg')})` }" />

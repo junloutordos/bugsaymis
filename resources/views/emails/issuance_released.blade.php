@@ -47,7 +47,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">Action Required — Acknowledge Receipt</div>
-    Log in to CRCMIS, open this issuance, and click <strong>Acknowledge Receipt</strong> to confirm you have read and received this official document. This is required for all recipients.
+    Log in to Atlas, open this issuance, and click <strong>Acknowledge Receipt</strong> to confirm you have read and received this official document. This is required for all recipients.
 </div>
 @endsection
 

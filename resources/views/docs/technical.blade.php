@@ -83,7 +83,7 @@ code { font-family: DejaVu Sans Mono, Courier New, monospace; font-size: 7.5pt; 
 {{-- ═══════════════════════════════════════════════════════════════════════ --}}
 <div class="cover">
   <div class="cover-logo">Philippine Science High School — Caraga Region Campus</div>
-  <div class="cover-title">CRCMIS</div>
+  <div class="cover-title">Atlas</div>
   <div class="cover-sub">Technical Documentation</div>
 
   <div class="cover-stats">
@@ -147,7 +147,7 @@ code { font-family: DejaVu Sans Mono, Courier New, monospace; font-size: 7.5pt; 
   <h1>System Overview</h1>
 
   <h2>Purpose</h2>
-  <p>CRCMIS (Campus Resource and Campus Management Information System) is a comprehensive MIS for the Philippine Science High School – Caraga Region Campus (PSHS-CRC). It covers HR, payroll, faculty loading, performance management (IPCR/PMS), recruitment, library, service requests, SALN, document tracking, class records, WFH attendance, and more.</p>
+  <p>Atlas is the unified digital campus management platform for the Philippine Science High School – Caraga Region Campus (PSHS-CRC). It covers HR, payroll, faculty loading, performance management (IPCR/PMS), recruitment, library, service requests, SALN, document tracking, class records, WFH attendance, and more.</p>
 
   <h2>Technology Stack</h2>
   <table>
@@ -159,7 +159,7 @@ code { font-family: DejaVu Sans Mono, Courier New, monospace; font-size: 7.5pt; 
       ['Database',         'MySQL 8.0 (AWS RDS Multi-AZ, KMS-encrypted)'],
       ['Cache / Queue',    'Redis 7.0 (AWS ElastiCache)'],
       ['Real-time',        'Soketi (self-hosted Pusher) · Laravel Echo · Pusher JS SDK'],
-      ['Web Push',         'minishlink/web-push v9 · VAPID · FCM · crcmis-sw.js'],
+      ['Web Push',         'minishlink/web-push v9 · VAPID · FCM · atlas-sw.js'],
       ['File Storage',     'AWS S3 (Block Public Access ON) — served via /media/ proxy'],
       ['PDF',              'mPDF 8 (tempDir = sys_get_temp_dir())'],
       ['Excel',            'PhpSpreadsheet · Maatwebsite Excel'],
@@ -233,7 +233,7 @@ code { font-family: DejaVu Sans Mono, Courier New, monospace; font-size: 7.5pt; 
     ['PDS',                        'pds.*',                         'PDSController',                              'Personal Data Sheet (CSC Form 212 Rev. 2025) with Work Experience Sheet (WES) tab. Employee self-service with HR review.', ['hr.employees.view']],
     ['Requests (4 modules)',       'vehicle-requests.*|facility-requests.*|service-requests.*|messengerial.*', 'VehicleRequestController et al.', 'Campus service requests with multi-stage approval. Facility/Vehicle require 3-day advance filing. Messengerial has transmittal slip PDF; signature not placed in "Received By".', ['vehicles.view','facilities.view']],
     ['Chat',                       'chat.*',                        'ChatController',                             'Real-time messaging via Soketi (Pusher protocol). Falls back to HTTP polling when Cloudflare blocks WebSocket upgrades. Initials-based avatars.', []],
-    ['Notifications',              'api/notifications.*',           'NotificationController',                     'In-app bell (database + Soketi broadcast) + Web Push via FCM (VAPID). Service worker: crcmis-sw.js. VAPID public key baked into Vite bundle at build time.', []],
+    ['Notifications',              'api/notifications.*',           'NotificationController',                     'In-app bell (database + Soketi broadcast) + Web Push via FCM (VAPID). Service worker: atlas-sw.js. VAPID public key baked into Vite bundle at build time.', []],
   ] as [$name, $route, $ctrl, $desc, $perms])
   <div class="module-card">
     <div class="module-header">

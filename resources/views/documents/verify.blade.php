@@ -77,7 +77,7 @@
       </div>
       <div class="school">
         PHILIPPINE SCIENCE HIGH SCHOOL
-        <strong>CRCMIS Document Verification</strong>
+        <strong>Atlas Document Verification</strong>
       </div>
     </div>
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Issuance Verification — CRCMIS</title>
+<title>Issuance Verification — Atlas</title>
 <style>
   *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
   body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; background:#f1f5f9; color:#1e293b; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -50,7 +50,7 @@
       <div class="status-icon">❌</div>
       <div>
         <div class="status-title" style="color:#dc2626;">Document Not Found</div>
-        <div class="status-sub">This QR code does not match any released issuance in the CRCMIS system.</div>
+        <div class="status-sub">This QR code does not match any released issuance in the Atlas system.</div>
       </div>
     </div>
 
@@ -168,7 +168,7 @@
   </div>
 
   <div class="footer">
-    Verified via CRCMIS · Philippine Science High School – Caraga Region Campus · mis.crc.pshs.edu.ph
+    Verified via Atlas · Philippine Science High School – Caraga Region Campus · mis.crc.pshs.edu.ph
   </div>
 </div>
 </body>

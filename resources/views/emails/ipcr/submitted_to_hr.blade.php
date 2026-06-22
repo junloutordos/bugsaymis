@@ -32,7 +32,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">For HR Action</div>
-    Review this IPCR in CRCMIS and submit it to the PMT for review when ready.
+    Review this IPCR in Atlas and submit it to the PMT for review when ready.
 </div>
 @endsection
 

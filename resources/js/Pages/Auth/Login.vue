@@ -29,7 +29,7 @@ import {
 const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
 const isLoading = ref(false)
 
-const showAlert = (options) => Swal.fire({ confirmButtonColor: '#1447c0', ...options })
+const showAlert = (options) => Swal.fire({ confirmButtonColor: '#0867DB', ...options })
 const isAuthorizedEmail = (email) => email?.toLowerCase().endsWith(OFFICIAL_DOMAIN)
 
 const page = usePage()
@@ -113,7 +113,7 @@ const stats = [
 </script>
 
 <template>
-  <Head title="CRCMIS — Campus Management Information System" />
+  <Head title="Atlas — Digital Campus Management Platform" />
 
   <div class="site">
 
@@ -123,9 +123,9 @@ const stats = [
     <header class="navbar">
       <div class="nav-inner">
         <div class="nav-brand">
-          <img src="/images/pshslogo.png" alt="PSHS-CRC" class="nav-logo" />
+          <img src="/images/atlas-mark.png" alt="Atlas" class="nav-logo" />
           <div>
-            <span class="nav-name">CRCMIS</span>
+            <span class="nav-name font-heading">Atlas</span>
             <span class="nav-sub">PSHS – Caraga Region Campus in Butuan City</span>
           </div>
         </div>
@@ -149,6 +149,7 @@ const stats = [
       <!-- bottom-left ambient glows -->
       <div class="deco deco-cyan" />
       <div class="deco deco-bl" />
+      <img src="/images/atlas-mark-white.png" alt="" class="hero-watermark" aria-hidden="true" />
 
       <div class="hero-inner">
         <!-- Left: hero text + stats + chips -->
@@ -158,14 +159,14 @@ const stats = [
             Philippine Science High School – Caraga Region Campus in Butuan City
           </div>
 
-          <h1 class="hero-h1">
-            a Way Forward <br>
+          <h1 class="hero-h1 font-heading">
+            Charting the Way Forward <br>
             <span class="hero-accent">to Digital Transformation.</span>
           </h1>
 
           <p class="hero-p">
-            CRCMIS is the Centralized Resource and Campus Management Information System of PSHS-CRC in Butuan City.
-            It unifies HR, activity, academics, student services, and campus operations into a single secure platform.
+            Atlas is the unified digital management platform of PSHS-CRC in Butuan City.
+            It consolidates HR, activity, academics, student services, and campus operations into one secure, cloud-native system.
           </p>
 
           <div class="chip-box">
@@ -223,10 +224,10 @@ const stats = [
     <section id="about" class="section bg-white">
       <div class="section-inner">
         <div class="section-hd">
-          <p class="eyebrow">About CRCMIS</p>
-          <h2 class="section-h2">Built for PSHS-CRC.<br>Designed for everyone in it.</h2>
+          <p class="eyebrow">About Atlas</p>
+          <h2 class="section-h2 font-heading">Built for PSHS-CRC.<br>Designed for everyone in it.</h2>
           <p class="section-lead">
-            From the mancom to faculty, staff and students, CRCMIS gives each stakeholder
+            From the mancom to faculty, staff and students, Atlas gives each stakeholder
             the exact tools and data they need — nothing more, nothing less.
           </p>
         </div>
@@ -265,9 +266,9 @@ const stats = [
       <div class="section-inner">
         <div class="section-hd">
           <p class="eyebrow">System Modules</p>
-          <h2 class="section-h2">Everything campus administration needs, unified.</h2>
+          <h2 class="section-h2 font-heading">Everything campus administration needs, unified.</h2>
           <p class="section-lead">
-            CRCMIS covers all aspects of campus life — from personnel management and service requests
+            Atlas covers all aspects of campus life — from personnel management and service requests
             to student attendance and library services.
           </p>
         </div>
@@ -318,10 +319,10 @@ const stats = [
     <footer class="site-footer">
       <div class="footer-inner">
         <div class="footer-brand">
-          <img src="/images/pshslogo.png" alt="PSHS-CRC" class="footer-logo" />
+          <img src="/images/atlas-mark.png" alt="Atlas" class="footer-logo" />
           <div>
-            <p class="footer-name">CRCMIS</p>
-            <p class="footer-sub">Campus Management Information System</p>
+            <p class="footer-name font-heading">Atlas</p>
+            <p class="footer-sub">Digital Campus Management Platform</p>
             <p class="footer-sub">Philippine Science High School – Caraga Region Campus in Butuan City</p>
           </div>
         </div>
@@ -339,15 +340,19 @@ const stats = [
 <style scoped>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── CSS custom properties (DOST-SEI palette) ─────────── */
+/* ── CSS custom properties (Atlas brand palette) ─────────── */
 .site {
-  --navy:   #060e50;
-  --blue:   #1447c0;
-  --blue2:  #1a5cd8;
-  --bright: #1e7de8;
-  --cyan:   #00c8e8;
-  --gold:   #f5c000;
-  --white:  #ffffff;
+  --navy:      #0A2A5E;
+  --navy-2:    #073E85;
+  --navy-dark: #061A3D;
+  --blue:      #0867DB;
+  --blue-lt:   #058FE0;
+  --cyan:      #019FE6;
+  --cyan-lt:   #92CBFC;
+  --cyan-pale: #BFE0FD;
+  --orange:    #FB9002;
+  --gold:      #FDBE0E;
+  --white:     #ffffff;
   font-family: 'Inter', system-ui, Arial, sans-serif;
   color: #0f172a;
   background: #fff;
@@ -361,9 +366,9 @@ const stats = [
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(6, 14, 80, 0.97);
+  background: rgba(10, 42, 94, 0.97);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(0,200,232,.15);
+  border-bottom: 1px solid rgba(1,159,230,.15);
 }
 .nav-inner {
   max-width: 1200px;
@@ -375,14 +380,14 @@ const stats = [
   gap: 24px;
 }
 .nav-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.nav-logo  { width: 36px; height: 36px; filter: drop-shadow(0 0 10px rgba(0,200,232,.5)); }
+.nav-logo  { width: auto; height: 36px; filter: drop-shadow(0 0 10px rgba(251,144,2,.5)); }
 .nav-name  { display: block; font-size: .92rem; font-weight: 800; color: #ffffff; letter-spacing: .06em; }
-.nav-sub   { display: block; font-size: .58rem; color: #93c5fd; }
+.nav-sub   { display: block; font-size: .58rem; color: var(--cyan-lt); }
 
 .nav-links { display: flex; gap: 4px; margin-left: auto; }
 .nav-link  {
   padding: 7px 16px; font-size: .82rem; font-weight: 500;
-  color: #bfdbfe; text-decoration: none; border-radius: 8px;
+  color: var(--cyan-pale); text-decoration: none; border-radius: 8px;
   transition: color .15s, background .15s;
 }
 .nav-link:hover { color: #fff; background: rgba(255,255,255,.09); }
@@ -390,14 +395,14 @@ const stats = [
 .nav-cta {
   display: flex; align-items: center; gap: 6px;
   padding: 9px 20px;
-  background: linear-gradient(135deg, #1447c0, #00c8e8);
+  background: linear-gradient(135deg, var(--orange), var(--gold));
   color: #fff; border: none; border-radius: 10px;
   font-size: .82rem; font-weight: 700; cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,200,232,.35);
+  box-shadow: 0 4px 16px rgba(251,144,2,.35);
   transition: opacity .15s, transform .15s, box-shadow .15s;
   flex-shrink: 0;
 }
-.nav-cta:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(0,200,232,.45); }
+.nav-cta:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(251,144,2,.45); }
 .nav-cta-icon { width: 14px; height: 14px; }
 
 /* ════════════════════════════════
@@ -414,7 +419,7 @@ const stats = [
 /* Deep navy-to-blue base gradient */
 .hero-base {
   position: absolute; inset: 0;
-  background: linear-gradient(145deg, #060e50 0%, #0d1f8a 30%, #1447c0 60%, #1a5cd8 85%, #1e7de8 100%);
+  background: linear-gradient(145deg, var(--navy) 0%, var(--navy-2) 30%, var(--blue) 60%, var(--blue-lt) 85%, var(--cyan) 100%);
 }
 
 /* Ambient glow elements */
@@ -427,13 +432,23 @@ const stats = [
 .deco-cyan {
   width: 500px; height: 500px;
   bottom: -200px; left: -100px;
-  background: radial-gradient(circle, rgba(0,200,232,.15) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(1,159,230,.15) 0%, transparent 65%);
 }
 /* Subtle glow bottom-right */
 .deco-bl {
   width: 300px; height: 300px;
   bottom: 10%; right: 20%;
-  background: radial-gradient(circle, rgba(30,125,232,.10) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(8,103,219,.10) 0%, transparent 65%);
+}
+
+/* Brand watermark — large, low-opacity arrow behind the login card */
+.hero-watermark {
+  position: absolute;
+  right: 2%; bottom: -40px;
+  height: 420px;
+  opacity: .08;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .hero-inner {
@@ -448,37 +463,37 @@ const stats = [
   display: inline-flex; align-items: center; gap: 8px;
   align-self: flex-start;
   padding: 6px 16px;
-  background: rgba(0,200,232,.12);
-  border: 1px solid rgba(0,200,232,.3);
+  background: rgba(1,159,230,.12);
+  border: 1px solid rgba(1,159,230,.3);
   border-radius: 100px;
-  font-size: .72rem; font-weight: 500; color: #7dd3fc;
+  font-size: .72rem; font-weight: 500; color: var(--cyan-lt);
   letter-spacing: .02em; margin-bottom: 28px;
 }
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #00c8e8; box-shadow: 0 0 8px #00c8e8;
+  background: var(--orange); box-shadow: 0 0 8px var(--orange);
   animation: pulse-dot 2s ease-in-out infinite;
   flex-shrink: 0;
 }
 @keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 8px #00c8e8; }
-  50%       { box-shadow: 0 0 2px #00c8e8; opacity: .5; }
+  0%, 100% { box-shadow: 0 0 8px #FB9002; }
+  50%       { box-shadow: 0 0 2px #FB9002; opacity: .5; }
 }
 
 .hero-h1 {
   font-size: 3.6rem; font-weight: 900; color: #ffffff;
   line-height: 1.1; letter-spacing: -.03em; margin-bottom: 22px;
 }
-/* Cyan gradient accent text — same feel as "15 May 2026" in the reference */
+/* Cyan gradient accent text */
 .hero-accent {
-  background: linear-gradient(90deg, #00c8e8 0%, #7dd3fc 60%, #bfdbfe 100%);
+  background: linear-gradient(90deg, var(--cyan) 0%, var(--cyan-lt) 60%, var(--cyan-pale) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .hero-p {
-  font-size: .95rem; color: #bfdbfe;
+  font-size: .95rem; color: var(--cyan-pale);
   line-height: 1.8; margin-bottom: 40px; max-width: 500px;
 }
 
@@ -488,18 +503,18 @@ const stats = [
   border: 1px solid rgba(255,255,255,.15);
   border-radius: 20px; padding: 28px; width: 100%;
   backdrop-filter: blur(14px);
-  box-shadow: 0 24px 64px rgba(6,14,80,.5), inset 0 1px 0 rgba(255,255,255,.1);
+  box-shadow: 0 24px 64px rgba(10,42,94,.5), inset 0 1px 0 rgba(255,255,255,.1);
 }
 .lc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .lc-icon-wrap {
   width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
-  background: linear-gradient(135deg, #1447c0, #00c8e8);
+  background: linear-gradient(135deg, var(--orange), var(--gold));
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 14px rgba(0,200,232,.35);
+  box-shadow: 0 4px 14px rgba(251,144,2,.35);
 }
 .lc-icon  { width: 22px; height: 22px; color: #fff; }
 .lc-title { font-size: .95rem; font-weight: 700; color: #f0f9ff; }
-.lc-sub   { font-size: .74rem; color: #93c5fd; margin-top: 3px; }
+.lc-sub   { font-size: .74rem; color: var(--cyan-lt); margin-top: 3px; }
 
 .gbtn {
   display: flex; align-items: center; gap: 12px; width: 100%;
@@ -511,10 +526,10 @@ const stats = [
 }
 .gbtn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0,200,232,.28);
+  box-shadow: 0 10px 30px rgba(1,159,230,.28);
 }
 .gbtn:active:not(:disabled) { transform: translateY(0); }
-.gbtn:focus-visible { outline: 2px solid #00c8e8; outline-offset: 3px; }
+.gbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .gbtn:disabled { opacity: .6; cursor: not-allowed; }
 .g-icon-wrap {
   width: 36px; height: 36px; background: #f8fafc;
@@ -523,22 +538,22 @@ const stats = [
 }
 .g-icon  { width: 20px; height: 20px; }
 .g-label { flex: 1; text-align: left; }
-.g-spin  { width: 16px; height: 16px; animation: spin .75s linear infinite; color: #1447c0; flex-shrink: 0; }
+.g-spin  { width: 16px; height: 16px; animation: spin .75s linear infinite; color: var(--blue); flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .lc-notice {
   display: flex; align-items: flex-start; gap: 7px;
-  font-size: .72rem; color: #93c5fd; margin-top: 14px; line-height: 1.5;
+  font-size: .72rem; color: var(--cyan-lt); margin-top: 14px; line-height: 1.5;
 }
 .lc-notice strong { white-space: nowrap; }
-.notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: #00c8e8; }
+.notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--cyan); }
 
 .dev-link {
   font-size: .64rem; color: #4a5568;
   text-decoration: none; letter-spacing: .03em;
   transition: color .2s;
 }
-.dev-link:hover { color: #93c5fd; }
+.dev-link:hover { color: var(--cyan-lt); }
 
 /* ── Hero left (hero text + stats + chips) ─────────── */
 .hero-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
@@ -547,36 +562,20 @@ const stats = [
 /* padding-top = badge height (~30px) + badge margin-bottom (28px) to align with h1 */
 .hero-right { width: 380px; flex-shrink: 0; padding-top: 58px; }
 
-.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-.stat-card {
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.11);
-  border-radius: 18px; padding: 22px 16px;
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
-  transition: background .2s, border-color .2s;
-}
-.stat-card:hover { background: rgba(0,200,232,.1); border-color: rgba(0,200,232,.35); }
-.stat-val {
-  font-size: 2rem; font-weight: 900; line-height: 1;
-  background: linear-gradient(90deg, #00c8e8, #7dd3fc);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.stat-lbl { font-size: .64rem; color: #93c5fd; text-transform: uppercase; letter-spacing: .09em; text-align: center; }
-
 .chip-box {
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 18px; padding: 18px;
 }
-.chip-box-label { font-size: .64rem; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: .09em; margin-bottom: 12px; }
+.chip-box-label { font-size: .64rem; font-weight: 700; color: var(--cyan-lt); text-transform: uppercase; letter-spacing: .09em; margin-bottom: 12px; }
 .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 4px 10px;
-  background: rgba(0,200,232,.12);
-  border: 1px solid rgba(0,200,232,.22);
+  background: rgba(1,159,230,.12);
+  border: 1px solid rgba(1,159,230,.22);
   border-radius: 100px;
-  font-size: .63rem; font-weight: 500; color: #7dd3fc;
+  font-size: .63rem; font-weight: 500; color: var(--cyan-lt);
 }
 .chip-icon { width: 11px; height: 11px; flex-shrink: 0; }
 
@@ -586,9 +585,9 @@ const stats = [
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   padding-bottom: 32px;
 }
-.scroll-text { font-size: .68rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: .1em; }
+.scroll-text { font-size: .68rem; font-weight: 600; color: var(--cyan-lt); text-transform: uppercase; letter-spacing: .1em; }
 .scroll-icon {
-  width: 20px; height: 20px; color: #00c8e8;
+  width: 20px; height: 20px; color: var(--cyan);
   animation: bounce-down 2s ease-in-out infinite;
 }
 @keyframes bounce-down {
@@ -609,7 +608,7 @@ const stats = [
   display: inline-block;
   font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em;
   margin-bottom: 14px;
-  background: linear-gradient(90deg, #1447c0, #00c8e8);
+  background: linear-gradient(90deg, var(--blue), var(--cyan));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
 .section-h2 {
@@ -630,7 +629,7 @@ const stats = [
   border: 1px solid #dbeafe; border-radius: 22px;
   transition: box-shadow .25s, transform .25s;
 }
-.pillar:hover { box-shadow: 0 20px 48px rgba(20,71,192,.13); transform: translateY(-6px); }
+.pillar:hover { box-shadow: 0 20px 48px rgba(8,103,219,.13); transform: translateY(-6px); }
 .pillar-icon-wrap {
   width: 56px; height: 56px; border-radius: 16px;
   display: flex; align-items: center; justify-content: center;
@@ -646,16 +645,16 @@ const stats = [
 .stats-band { position: relative; padding: 72px 32px; overflow: hidden; }
 .sb-base {
   position: absolute; inset: 0;
-  background: linear-gradient(130deg, #060e50 0%, #0d1f8a 35%, #1447c0 65%, #1a5cd8 100%);
+  background: linear-gradient(130deg, var(--navy) 0%, var(--navy-2) 35%, var(--blue) 65%, var(--blue-lt) 100%);
 }
 .sb-deco { position: absolute; border-radius: 50%; pointer-events: none; }
 .sb-deco1 {
   width: 500px; height: 500px; right: -100px; top: -200px;
-  background: radial-gradient(circle, rgba(0,200,232,.25) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(1,159,230,.25) 0%, transparent 65%);
 }
 .sb-deco2 {
   width: 350px; height: 350px; left: -80px; bottom: -150px;
-  background: radial-gradient(circle, rgba(245,192,0,.1) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(253,190,14,.1) 0%, transparent 65%);
 }
 .sb-inner {
   position: relative; z-index: 2;
@@ -665,10 +664,10 @@ const stats = [
 .sb-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .sb-val {
   font-size: 3rem; font-weight: 900; line-height: 1;
-  background: linear-gradient(90deg, #f5c000 0%, #00c8e8 60%, #7dd3fc 100%);
+  background: linear-gradient(90deg, var(--gold) 0%, var(--cyan) 60%, var(--cyan-lt) 100%);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
 }
-.sb-lbl { font-size: .72rem; font-weight: 600; color: #93c5fd; text-transform: uppercase; letter-spacing: .1em; }
+.sb-lbl { font-size: .72rem; font-weight: 600; color: var(--cyan-lt); text-transform: uppercase; letter-spacing: .1em; }
 
 /* ════════════════════════════════
    MODULES
@@ -679,7 +678,7 @@ const stats = [
   padding: 26px 22px; display: flex; flex-direction: column; gap: 14px;
   transition: box-shadow .25s, transform .25s, border-color .25s;
 }
-.mod-card:hover { box-shadow: 0 12px 32px rgba(20,71,192,.14); transform: translateY(-4px); border-color: #93c5fd; }
+.mod-card:hover { box-shadow: 0 12px 32px rgba(8,103,219,.14); transform: translateY(-4px); border-color: var(--cyan-lt); }
 .mod-icon-wrap {
   width: 48px; height: 48px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
@@ -695,32 +694,32 @@ const stats = [
 .cta-section { position: relative; padding: 100px 32px; text-align: center; overflow: hidden; }
 .cta-base {
   position: absolute; inset: 0;
-  background: linear-gradient(160deg, #060e50 0%, #0d1f8a 40%, #1447c0 70%, #1a5cd8 100%);
+  background: linear-gradient(160deg, var(--navy) 0%, var(--navy-2) 40%, var(--blue) 70%, var(--blue-lt) 100%);
 }
 .cta-deco { position: absolute; border-radius: 50%; pointer-events: none; }
 .cta-d1 {
   width: 600px; height: 600px; top: -200px; left: 50%; transform: translateX(-60%);
-  background: radial-gradient(circle, rgba(0,200,232,.2) 0%, transparent 60%);
+  background: radial-gradient(circle, rgba(1,159,230,.2) 0%, transparent 60%);
 }
 .cta-d2 {
   width: 400px; height: 400px; bottom: -150px; right: -80px;
-  background: radial-gradient(circle, rgba(245,192,0,.12) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(253,190,14,.12) 0%, transparent 65%);
 }
 .cta-d3 {
   width: 300px; height: 300px; top: 20%; left: -60px;
-  background: radial-gradient(circle, rgba(30,125,232,.15) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(8,103,219,.15) 0%, transparent 65%);
 }
 
 .cta-inner { position: relative; z-index: 2; max-width: 560px; margin: 0 auto; }
 .cta-icon-wrap {
   width: 64px; height: 64px; border-radius: 20px;
-  background: linear-gradient(135deg, #1447c0, #00c8e8);
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 28px; box-shadow: 0 8px 24px rgba(0,200,232,.4);
+  margin: 0 auto 28px; box-shadow: 0 8px 24px rgba(1,159,230,.4);
 }
 .cta-icon { width: 32px; height: 32px; color: #fff; }
 .cta-h2   { font-size: 2.5rem; font-weight: 900; color: #ffffff; letter-spacing: -.025em; margin-bottom: 16px; line-height: 1.15; }
-.cta-p    { font-size: .9rem; color: #93c5fd; line-height: 1.75; margin-bottom: 36px; }
+.cta-p    { font-size: .9rem; color: var(--cyan-lt); line-height: 1.75; margin-bottom: 36px; }
 .cta-btn  {
   display: inline-flex; align-items: center; gap: 12px;
   padding: 16px 36px; background: #fff; color: #0a1040;
@@ -728,21 +727,21 @@ const stats = [
   cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.22);
   transition: transform .2s, box-shadow .2s;
 }
-.cta-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,200,232,.25); }
+.cta-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(1,159,230,.25); }
 .cta-btn:disabled { opacity: .6; cursor: not-allowed; }
-.cta-note { font-size: .72rem; color: #7dd3fc; margin-top: 18px; }
+.cta-note { font-size: .72rem; color: var(--cyan-lt); margin-top: 18px; }
 
 /* ════════════════════════════════
    FOOTER
 ════════════════════════════════ */
-.site-footer { background: #03071e; padding: 44px 32px; border-top: 1px solid #0d1f8a; }
+.site-footer { background: var(--navy-dark); padding: 44px 32px; border-top: 1px solid var(--navy-2); }
 .footer-inner {
   max-width: 1200px; margin: 0 auto;
   display: flex; align-items: center; justify-content: space-between;
   gap: 24px; flex-wrap: wrap;
 }
 .footer-brand { display: flex; align-items: center; gap: 14px; }
-.footer-logo  { width: 40px; height: 40px; opacity: .55; }
+.footer-logo  { width: auto; height: 40px; opacity: .55; }
 .footer-name  { font-size: .88rem; font-weight: 700; color: #e2e8f0; letter-spacing: .06em; }
 .footer-sub   { font-size: .64rem; color: #94a3b8; margin-top: 3px; line-height: 1.5; }
 .footer-right { text-align: right; }
@@ -799,12 +798,8 @@ const stats = [
   .g-icon-wrap  { width: 30px; height: 30px; }
   .g-icon       { width: 18px; height: 18px; }
 
-  /* Hero left (stats) */
+  /* Hero left */
   .hero-left    { gap: 12px; }
-  .stats-grid   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .stat-card    { padding: 16px 12px; border-radius: 14px; }
-  .stat-val     { font-size: 1.7rem; }
-  .stat-lbl     { font-size: .6rem; }
   .chip-box     { display: none; } /* Covered by the Modules section */
 
   /* Sections */

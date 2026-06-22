@@ -2,7 +2,7 @@
 
 @section('header-gradient'){{ $headerColor ?? '#6366f1' }}@endsection
 @section('header-title'){{ $headline }}@endsection
-@section('header-subtitle','PSHS-CRC MIS — Document Tracking System')
+@section('header-subtitle','Atlas — Document Tracking System')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $recipientName }}</strong>,</p>
@@ -28,7 +28,7 @@
     @endif
 </table>
 
-<p style="font-size:13px;color:#64748b;margin-top:12px;">Log in to CRCMIS to view the document, scan, and full routing trail.</p>
+<p style="font-size:13px;color:#64748b;margin-top:12px;">Log in to Atlas to view the document, scan, and full routing trail.</p>
 @endsection
 
 @section('actions')

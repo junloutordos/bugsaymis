@@ -21,7 +21,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">Action Required</div>
-    Open the IPCR in CRCMIS and for <strong>each work plan</strong> enter the supervisor ratings on a 1–5 scale:<br>
+    Open the IPCR in Atlas and for <strong>each work plan</strong> enter the supervisor ratings on a 1–5 scale:<br>
     <strong>Quality</strong> — <strong>Efficiency</strong> — <strong>Timeliness</strong>.<br>
     Once all plans are rated, click <strong>Save Ratings</strong> to finalize and submit to PMT.
 </div>

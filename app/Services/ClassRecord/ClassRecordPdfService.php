@@ -78,7 +78,7 @@ class ClassRecordPdfService
                 $classRecord->subject_name,
                 $classRecord->year_level_section,
             ));
-            $mpdf->SetAuthor('PSHS-CRC MIS');
+            $mpdf->SetAuthor('Atlas');
 
             $mpdf->WriteHTML($html);
 

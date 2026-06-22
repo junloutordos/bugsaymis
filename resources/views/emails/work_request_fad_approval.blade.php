@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#7c3aed,#8b5cf6)')
 @section('header-title','Work Request — FAD Approval Needed')
-@section('header-subtitle','PSHS-CRC MIS — GSU Work Requests')
+@section('header-subtitle','Atlas — GSU Work Requests')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $chief?->name ?? $request->divisionChief?->name ?? 'FAD Chief' }}</strong>,</p>

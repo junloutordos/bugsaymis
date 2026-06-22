@@ -2,11 +2,11 @@
 
 @section('header-gradient','linear-gradient(90deg,#0ea5e9,#3b82f6)')
 @section('header-title','Guidance Consultation — New Entry')
-@section('header-subtitle','PSHS-CRC MIS — Guidance Office')
+@section('header-subtitle','Atlas — Guidance Office')
 
 @section('content')
 <p class="greeting">Hello,</p>
-<p class="lead">A new guidance consultation was scheduled via the kiosk. Please log in to CRCMIS to review and assign a counsellor.</p>
+<p class="lead">A new guidance consultation was scheduled via the kiosk. Please log in to Atlas to review and assign a counsellor.</p>
 
 <table class="details" role="presentation">
     <tr><td class="lbl">Request ID</td><td class="val"><strong>#{{ $consult->id }}</strong></td></tr>

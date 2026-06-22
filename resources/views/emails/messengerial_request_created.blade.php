@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#6366f1,#8b5cf6)')
 @section('header-title','Messengerial Request — Approval Needed')
-@section('header-subtitle','PSHS-CRC MIS — Records & Messengerial Services')
+@section('header-subtitle','Atlas — Records & Messengerial Services')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $request->unit ?? 'Division Chief' }}</strong>,</p>

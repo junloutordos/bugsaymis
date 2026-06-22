@@ -2,11 +2,11 @@
 
 @section('header-gradient','linear-gradient(90deg,#f97316,#fb923c)')
 @section('header-title','Messengerial Request — Records Action Required')
-@section('header-subtitle','PSHS-CRC MIS — Records & Messengerial Services')
+@section('header-subtitle','Atlas — Records & Messengerial Services')
 
 @section('content')
 <p class="greeting">Hello Records Team,</p>
-<p class="lead">A messengerial request has been approved by the Division Chief and requires your action in CRCMIS.</p>
+<p class="lead">A messengerial request has been approved by the Division Chief and requires your action in Atlas.</p>
 
 <table class="details" role="presentation">
     <tr><td class="lbl">Request ID</td><td class="val"><strong>#{{ $request->id }}</strong></td></tr>
@@ -19,7 +19,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">Action Required</div>
-    Log in to CRCMIS and process this approved messengerial request.
+    Log in to Atlas and process this approved messengerial request.
 </div>
 @endsection
 

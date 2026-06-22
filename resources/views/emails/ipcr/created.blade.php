@@ -6,7 +6,7 @@
 
 @section('content')
 <p class="greeting">Dear <strong>{{ $recipientName }}</strong>,</p>
-<p class="lead">An employee under your division has submitted a new IPCR target for your review and approval. Please log in to CRCMIS to review the targets and approve or return for revision.</p>
+<p class="lead">An employee under your division has submitted a new IPCR target for your review and approval. Please log in to Atlas to review the targets and approve or return for revision.</p>
 
 <table class="details" role="presentation">
     <tr><td class="lbl">Employee</td><td class="val"><strong>{{ $ipcr->user?->name ?? '—' }}</strong></td></tr>
@@ -21,7 +21,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">Action Required</div>
-    Open the IPCR in CRCMIS, review the employee's committed targets for each work plan, then click <strong>Approve Targets</strong> or <strong>Return for Revision</strong> with your remarks.
+    Open the IPCR in Atlas, review the employee's committed targets for each work plan, then click <strong>Approve Targets</strong> or <strong>Return for Revision</strong> with your remarks.
 </div>
 @endsection
 

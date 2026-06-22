@@ -12,7 +12,7 @@ use Mpdf\Config\FontVariables;
 class GenerateTechnicalDocs extends Command
 {
     protected $signature   = 'docs:generate {--output= : Full path for the PDF output file}';
-    protected $description = 'Generate a comprehensive technical documentation PDF for CRCMIS';
+    protected $description = 'Generate a comprehensive technical documentation PDF for Atlas';
 
     public function handle(): int
     {
@@ -22,7 +22,7 @@ class GenerateTechnicalDocs extends Command
         ini_set('pcre.recursion_limit', 10000000);
 
         $output = $this->option('output')
-            ?? storage_path('app/crcmis-technical-docs-' . date('Y-m-d') . '.pdf');
+            ?? storage_path('app/atlas-technical-docs-' . date('Y-m-d') . '.pdf');
 
         $this->info('Collecting data…');
 
@@ -57,14 +57,14 @@ class GenerateTechnicalDocs extends Command
             'fontdata'          => (new FontVariables())->getDefaults()['fontdata'],
         ]);
 
-        $mpdf->SetTitle('CRCMIS Technical Documentation');
+        $mpdf->SetTitle('Atlas Technical Documentation');
         $mpdf->SetAuthor('Philippine Science High School — Caraga Region Campus');
-        $mpdf->SetCreator('CRCMIS docs:generate');
+        $mpdf->SetCreator('Atlas docs:generate');
 
         $mpdf->SetHTMLHeader('
             <table width="100%" style="font-size:8pt; color:#94a3b8; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">
                 <tr>
-                    <td>CRCMIS — Technical Documentation</td>
+                    <td>Atlas — Technical Documentation</td>
                     <td style="text-align:right;">PSHS-CRC · Confidential</td>
                 </tr>
             </table>
