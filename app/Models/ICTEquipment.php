@@ -66,7 +66,9 @@ class ICTEquipment extends Model
 
     public function agentDevice()
     {
-        return $this->hasOne(IctEquipmentDevice::class, 'equipment_id');
+        // A reinstall/re-enroll creates a new device row rather than reusing
+        // the old one, so always resolve to the most recently created one.
+        return $this->hasOne(IctEquipmentDevice::class, 'equipment_id')->latestOfMany();
     }
 
     public function alerts()
