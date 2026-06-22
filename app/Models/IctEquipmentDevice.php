@@ -18,10 +18,13 @@ class IctEquipmentDevice extends Model
         'os_version',
         'agent_version',
         'last_checkin_at',
+        'network_location',
+        'network_location_changed_at',
     ];
 
     protected $casts = [
         'last_checkin_at' => 'datetime',
+        'network_location_changed_at' => 'datetime',
     ];
 
     public function equipment()

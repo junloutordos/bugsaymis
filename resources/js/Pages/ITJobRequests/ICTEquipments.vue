@@ -966,7 +966,18 @@ const showAllChecked    = computed({
             <div v-else class="space-y-4">
               <!-- Header band -->
               <div class="rounded-xl bg-gradient-to-r from-indigo-50 to-slate-50 border border-indigo-100 px-4 py-3">
-                <div class="text-sm font-semibold text-slate-800">{{ selectedSpecsEquipment.agent_device.hostname }}</div>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm font-semibold text-slate-800">{{ selectedSpecsEquipment.agent_device.hostname }}</div>
+                  <span
+                    v-if="selectedSpecsEquipment.agent_device.network_location === 'on_campus'"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700"
+                  >On Campus</span>
+                  <span
+                    v-else-if="selectedSpecsEquipment.agent_device.network_location === 'off_campus'"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700"
+                    :title="`Since ${formatDateTime(selectedSpecsEquipment.agent_device.network_location_changed_at)}`"
+                  >Off Campus</span>
+                </div>
                 <div class="text-xs text-slate-500 mt-0.5">
                   {{ selectedSpecsEquipment.agent_device.os_version }}
                   &middot; Agent v{{ selectedSpecsEquipment.agent_device.agent_version }}
