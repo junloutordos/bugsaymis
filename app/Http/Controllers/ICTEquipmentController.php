@@ -25,7 +25,7 @@ class ICTEquipmentController extends Controller
         $query = ICTEquipment::with([
             'owner',
             'room',
-            'agentDevice',
+            'agentDevice.healthSnapshot',
             'alerts' => function ($q) {
                 $q->where('status', 'open')->orderBy('created_at', 'desc');
             },

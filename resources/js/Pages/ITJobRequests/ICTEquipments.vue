@@ -96,6 +96,15 @@ function openAlerts(eq) {
   showAlertsModal.value = true
 }
 
+// ICT Agent latest reported specs
+const showSpecsModal = ref(false)
+const selectedSpecsEquipment = ref(null)
+
+function openSpecs(eq) {
+  selectedSpecsEquipment.value = eq
+  showSpecsModal.value = true
+}
+
 // Group all equipments by category or location for the print report
 const groupedEquipments = computed(() => {
   const groups = {}
@@ -392,6 +401,9 @@ const showAllChecked    = computed({
                   <div class="flex justify-center gap-1 items-center">
                     <button @click="viewEquipment(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
                       <EyeIcon class="w-4 h-4"/>
+                    </button>
+                    <button v-if="eq.agent_device" @click="openSpecs(eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-sky-600 transition-colors" title="Agent Specs">
+                      <ChartBarIcon class="w-4 h-4"/>
                     </button>
                     <button @click="openModal('edit', eq)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
                       <PencilSquareIcon class="w-4 h-4"/>
@@ -897,6 +909,72 @@ const showAllChecked    = computed({
                 <div class="text-sm text-slate-700 mt-2">{{ alert.issue }}</div>
               </li>
             </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ICT AGENT SPECS MODAL -->
+      <div
+        v-if="showSpecsModal"
+        class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+      >
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-800">
+              Agent Specs for {{ selectedSpecsEquipment?.description }} / {{ selectedSpecsEquipment?.serial_no }}
+            </h2>
+            <button
+              @click="showSpecsModal = false"
+              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <div class="px-6 py-5">
+            <div v-if="!selectedSpecsEquipment?.agent_device?.health_snapshot" class="py-16 text-center text-slate-400 text-sm">
+              No check-in data yet — the agent reports every 20 minutes, so this fills in shortly after install.
+            </div>
+
+            <div v-else class="space-y-4">
+              <div class="text-xs text-slate-400">
+                Last reported {{ formatDate(selectedSpecsEquipment.agent_device.health_snapshot.recorded_at) }}
+                &middot; Agent v{{ selectedSpecsEquipment.agent_device.agent_version }}
+                &middot; {{ selectedSpecsEquipment.agent_device.os_version }}
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</div>
+                  <div class="mt-1 text-slate-700">{{ selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu ?? '—' }}</div>
+                </div>
+                <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">RAM</div>
+                  <div class="mt-1 text-slate-700">
+                    <template v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.ram_total_mb">
+                      {{ Math.round(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb / 1024) }} GB free of
+                      {{ Math.round(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb / 1024) }} GB
+                    </template>
+                    <template v-else>—</template>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Disks</div>
+                <div v-if="!selectedSpecsEquipment.agent_device.health_snapshot.payload?.disks?.length" class="text-sm text-slate-400">—</div>
+                <ul v-else class="space-y-2">
+                  <li
+                    v-for="disk in selectedSpecsEquipment.agent_device.health_snapshot.payload.disks"
+                    :key="disk.drive"
+                    class="flex items-center justify-between text-sm border border-slate-100 rounded-lg p-3 bg-slate-50/50"
+                  >
+                    <span class="font-medium text-slate-700">{{ disk.drive }}</span>
+                    <span class="text-slate-600">{{ disk.free_gb }} GB free of {{ disk.total_gb }} GB</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>
