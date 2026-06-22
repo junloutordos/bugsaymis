@@ -20,7 +20,7 @@
 
 @section('header-gradient'){{ $gradients[$stage] ?? 'linear-gradient(90deg,#3b82f6,#2563eb)' }}@endsection
 @section('header-title'){{ $subject }}@endsection
-@section('header-subtitle','PSHS-CRC MIS — Recruitment & Selection')
+@section('header-subtitle','Atlas — Recruitment & Selection')
 
 @section('content')
 <p class="greeting">Dear <strong>{{ $applicant?->full_name ?? 'Applicant' }}</strong>,</p>

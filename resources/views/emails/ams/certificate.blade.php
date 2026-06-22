@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#10b981,#059669)')
 @section('header-title','Certificate of Participation')
-@section('header-subtitle','PSHS-CRC MIS — Activity Management System')
+@section('header-subtitle','Atlas — Activity Management System')
 
 @section('content')
 <p class="greeting">Dear <strong>{{ $recipientName }}</strong>,</p>

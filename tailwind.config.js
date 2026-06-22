@@ -28,19 +28,25 @@ export default {
           'Noto Sans',
           'sans-serif',
         ],
+        // Atlas brand heading typeface — apply via `font-heading`
+        heading: ['Poppins', ...defaultTheme.fontFamily.sans],
       },
       colors: {
-        primary: {
-          50: '#EEF2FF',
-          100: '#E0E7FF',
-          200: '#C7D2FE',
-          300: '#A5B4FC',
-          400: '#818CF8',
-          500: '#6366F1',
-          600: '#4F46E5',
-          700: '#4338CA',
-          800: '#3730A3',
-          900: '#312E81',
+        // Atlas brand blue scale — overrides Tailwind's stock `indigo`.
+        // 500 = Sky Cyan (#019FE6), 600 = Wordmark Blue (#0867DB), 900 = Navy Deep (#0A2A5E),
+        // per the Atlas Brand Identity Guide. This repaints every existing `indigo-*` class
+        // (buttons, links, focus rings) app-wide without touching individual components.
+        indigo: {
+          50: '#EFF6FF',
+          100: '#DCEEFE',
+          200: '#BFE0FD',
+          300: '#92CBFC',
+          400: '#58AEF8',
+          500: '#019FE6',
+          600: '#0867DB',
+          700: '#0552B0',
+          800: '#073E85',
+          900: '#0A2A5E',
         },
         success: {
           50: '#ECFDF5',

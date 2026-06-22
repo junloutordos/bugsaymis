@@ -26,7 +26,7 @@
 <div class="card">
     <div class="card-header">
         <h1>Decline IT Job Request</h1>
-        <p>PSHS-CRC MIS — Division Chief Action</p>
+        <p>Atlas — Division Chief Action</p>
     </div>
     <div class="card-body">
         <p style="color:#475569;font-size:14px;margin:0 0 16px;">You are declining the following IT Job Request. Please provide a reason so the requestor is informed.</p>
@@ -40,7 +40,7 @@
             <button type="submit">Submit Decline</button>
         </form>
     </div>
-    <div class="footer">PSHS-CRC MIS</div>
+    <div class="footer">Atlas</div>
 </div>
 </body>
 </html>

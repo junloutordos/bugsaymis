@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#6366f1,#3b82f6)')
 @section('header-title','Facility Request — GSU Action Required')
-@section('header-subtitle','PSHS-CRC MIS — Facility Management')
+@section('header-subtitle','Atlas — Facility Management')
 
 @section('content')
 <p class="greeting">Hello,</p>

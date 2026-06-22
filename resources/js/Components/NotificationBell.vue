@@ -94,19 +94,19 @@ async function registerServiceWorker() {
   if (!vapidKey) return
 
   try {
-    // Unregister any stale SW registrations that aren't crcmis-sw.js so their
+    // Unregister any stale SW registrations that aren't atlas-sw.js so their
     // push subscriptions stop receiving FCM deliveries bound to the wrong SW.
     const allRegs = await navigator.serviceWorker.getRegistrations()
     for (const r of allRegs) {
       const script = r.active?.scriptURL ?? r.installing?.scriptURL ?? r.waiting?.scriptURL ?? ''
-      if (!script.endsWith('/crcmis-sw.js')) {
+      if (!script.endsWith('/atlas-sw.js')) {
         const oldSub = await r.pushManager.getSubscription().catch(() => null)
         if (oldSub) await oldSub.unsubscribe().catch(() => null)
         await r.unregister()
       }
     }
 
-    const reg = await navigator.serviceWorker.register('/crcmis-sw.js')
+    const reg = await navigator.serviceWorker.register('/atlas-sw.js')
     const perm = await Notification.requestPermission()
     if (perm !== 'granted') return
 

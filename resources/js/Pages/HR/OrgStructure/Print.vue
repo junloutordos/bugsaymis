@@ -55,7 +55,7 @@ function nodePadding(depth) {
 
     <!-- Footer -->
     <div class="print-footer">
-      Printed from BUGSAYMIS &bull; {{ generatedAt }}
+      Printed from Atlas &bull; {{ generatedAt }}
     </div>
   </div>
 </template>

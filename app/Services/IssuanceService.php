@@ -245,7 +245,7 @@ class IssuanceService
 
         try {
             $pdf = new \setasign\Fpdi\Tcpdf\Fpdi('P', 'mm', 'A4', true, 'UTF-8', false);
-            $pdf->SetCreator('CRCMIS');
+            $pdf->SetCreator('Atlas');
             $pdf->SetTitle($issuance->type_label . ' — ' . $issuance->control_number);
             $pdf->SetPrintHeader(false);
             $pdf->SetPrintFooter(false);

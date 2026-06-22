@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#0891b2,#06b6d4)')
 @section('header-title','Your Student Has Been Referred to Guidance')
-@section('header-subtitle','PSHS-CRC MIS — Guidance Office')
+@section('header-subtitle','Atlas — Guidance Office')
 
 @section('content')
 <p class="greeting">Dear <strong>{{ $teacherName ?? 'Teacher' }}</strong>,</p>

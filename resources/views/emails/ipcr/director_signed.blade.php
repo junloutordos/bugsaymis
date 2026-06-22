@@ -40,7 +40,7 @@
 
 <div class="callout callout-green">
     <div class="callout-title">Your IPCR is complete</div>
-    Log in to CRCMIS to view and download your fully signed IPCR. Keep a copy for your records.
+    Log in to Atlas to view and download your fully signed IPCR. Keep a copy for your records.
 </div>
 @endsection
 

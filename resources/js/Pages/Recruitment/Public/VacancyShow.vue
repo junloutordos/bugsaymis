@@ -101,7 +101,7 @@ const submitApply = async () => {
 </script>
 
 <template>
-  <Head :title="`${item.position_title ?? 'Job Opening'} — CRCMIS`" />
+  <Head :title="`${item.position_title ?? 'Job Opening'} — Atlas`" />
 
   <div class="min-h-screen relative">
     <!-- Background -->

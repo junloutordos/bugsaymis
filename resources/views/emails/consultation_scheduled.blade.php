@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#059669,#10b981)')
 @section('header-title','Consultation Appointment Scheduled')
-@section('header-subtitle','PSHS-CRC MIS — School Clinic')
+@section('header-subtitle','Atlas — School Clinic')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $consult->requestor ?? ($requestor->name ?? 'Requestor') }}</strong>,</p>

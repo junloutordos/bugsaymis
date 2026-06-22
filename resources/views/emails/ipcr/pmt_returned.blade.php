@@ -19,7 +19,7 @@
 
 <div class="callout callout-red">
     <div class="callout-title">Action Required</div>
-    Review the PMT's feedback in CRCMIS, inform the employee of the required revisions, then use <strong>Return to Employee</strong> and resubmit after corrections.
+    Review the PMT's feedback in Atlas, inform the employee of the required revisions, then use <strong>Return to Employee</strong> and resubmit after corrections.
 </div>
 @endsection
 

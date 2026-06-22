@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#d97706,#f59e0b)')
 @section('header-title','Purchase Request — Approval Needed')
-@section('header-subtitle','PSHS-CRC MIS — Procurement')
+@section('header-subtitle','Atlas — Procurement')
 
 @section('content')
 <p class="greeting">Hello,</p>

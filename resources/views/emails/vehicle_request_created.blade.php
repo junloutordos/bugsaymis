@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#0ea5e9,#3b82f6)')
 @section('header-title','Vehicle Request — Approval Needed')
-@section('header-subtitle','PSHS-CRC MIS — GSU Transport')
+@section('header-subtitle','Atlas — GSU Transport')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $request->divisionChief?->name ?? 'Division Chief' }}</strong>,</p>

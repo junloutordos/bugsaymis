@@ -557,7 +557,7 @@ const totalArticles = computed(() =>
       <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-8 text-white">
         <div class="flex items-center gap-3 mb-3">
           <QuestionMarkCircleIcon class="w-8 h-8 text-indigo-200" />
-          <h1 class="text-2xl font-bold">CRCMIS Help Center</h1>
+          <h1 class="font-heading text-2xl font-bold">Atlas Help Center</h1>
         </div>
         <p class="text-indigo-200 text-sm mb-6">
           Find answers to common questions about all modules in the PSHS Caraga Region Campus Management Information System.
@@ -626,7 +626,7 @@ const totalArticles = computed(() =>
           Can't find what you're looking for? Contact your system administrator or reach out via
           <a href="/chat" class="text-indigo-600 hover:text-indigo-800 font-medium">Chat</a>.
         </p>
-        <p class="text-xs text-slate-400 mt-1">BugSayMis — PSHS Caraga Region Campus Management Information System</p>
+        <p class="text-xs text-slate-400 mt-1">Atlas — PSHS Caraga Region Campus Digital Management Platform</p>
       </div>
 
     </div>

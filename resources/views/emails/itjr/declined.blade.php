@@ -24,7 +24,7 @@
 <div class="card">
     <div class="card-header">
         <h1>Request Declined</h1>
-        <p>IT Job Request — PSHS-CRC MIS</p>
+        <p>IT Job Request — Atlas</p>
     </div>
     <div class="card-body">
         <p style="color:#475569;margin:0 0 16px;font-size:14px;">The following IT Job Request has been declined. The requestor has been notified.</p>
@@ -35,7 +35,7 @@
         <div class="reason-box"><strong style="display:block;margin-bottom:4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Reason for Decline</strong>{{ $reason }}</div>
         @endif
     </div>
-    <div class="footer">PSHS-CRC MIS — You may close this window.</div>
+    <div class="footer">Atlas — You may close this window.</div>
 </div>
 </body>
 </html>

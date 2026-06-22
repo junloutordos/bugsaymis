@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#0ea5e9,#3b82f6)')
 @section('header-title','IT Job Request — Status Update')
-@section('header-subtitle','CRCMIS IT Services')
+@section('header-subtitle','Atlas IT Services')
 
 @section('content')
 @php
@@ -46,12 +46,12 @@
 @if($isDeclined)
 <div class="callout callout-blue">
     <div class="callout-title">What to do next</div>
-    If you believe this request was declined in error, or if the issue still needs to be resolved, please file a new IT Job Request in CRCMIS with more details.
+    If you believe this request was declined in error, or if the issue still needs to be resolved, please file a new IT Job Request in Atlas with more details.
 </div>
 @elseif($isCompleted)
 <div class="callout callout-green">
     <div class="callout-title">Request completed</div>
-    If the issue has not been fully resolved, please file a follow-up IT Job Request in CRCMIS.
+    If the issue has not been fully resolved, please file a follow-up IT Job Request in Atlas.
 </div>
 @elseif($isInProgress)
 <div class="callout callout-blue">

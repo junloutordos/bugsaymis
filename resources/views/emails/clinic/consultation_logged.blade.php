@@ -2,11 +2,11 @@
 
 @section('header-gradient','linear-gradient(90deg,#0ea5e9,#3b82f6)')
 @section('header-title','Clinic Consultation — New Entry')
-@section('header-subtitle','PSHS-CRC MIS — School Clinic')
+@section('header-subtitle','Atlas — School Clinic')
 
 @section('content')
 <p class="greeting">Hello Nurse,</p>
-<p class="lead">A new clinic consultation was logged via the kiosk. Please log in to CRCMIS to review.</p>
+<p class="lead">A new clinic consultation was logged via the kiosk. Please log in to Atlas to review.</p>
 
 <table class="details" role="presentation">
     <tr><td class="lbl">Request ID</td><td class="val"><strong>#{{ $consult->id }}</strong></td></tr>

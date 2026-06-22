@@ -2,7 +2,7 @@
 
 @section('header-gradient','linear-gradient(90deg,#7c3aed,#8b5cf6)')
 @section('header-title','Work Request Assigned to You')
-@section('header-subtitle','PSHS-CRC MIS — GSU Work Requests')
+@section('header-subtitle','Atlas — GSU Work Requests')
 
 @section('content')
 <p class="greeting">Hello <strong>{{ $request->assignedUser?->name ?? 'Staff' }}</strong>,</p>
@@ -20,7 +20,7 @@
 
 <div class="callout callout-blue">
     <div class="callout-title">Action Required</div>
-    Log in to CRCMIS, open the work request, and update its status as you work on it. Mark as Completed once resolved.
+    Log in to Atlas, open the work request, and update its status as you work on it. Mark as Completed once resolved.
 </div>
 @endsection
 

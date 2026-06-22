@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('email-title', 'PSHS-CRC MIS Notification')</title>
+    <title>@yield('email-title', 'Atlas Notification')</title>
     <style>
         *{box-sizing:border-box}
         body{background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#334155;margin:0;padding:20px 12px}
@@ -104,7 +104,7 @@
 
         {{-- Footer --}}
         <div class="footer">
-            This is an automated notification from PSHS-CRC MIS. Please do not reply to this email.
+            This is an automated notification from Atlas. Please do not reply to this email.
             @hasSection('footer-note')
             <br>@yield('footer-note')
             @endif

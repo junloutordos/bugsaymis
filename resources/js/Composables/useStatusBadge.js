@@ -1,5 +1,5 @@
 /**
- * Central source of truth for all badge/pill colour classes across CRCMIS.
+ * Central source of truth for all badge/pill colour classes across Atlas.
  *
  * Usage:
  *   import { statusBadgeClass, badgeBase, priorityBadgeClass,
