@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ICTPMSHistory;
 use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentDevice;
+use App\Models\PMS;
 
 /**
  * Classifies a check-in payload into routine findings (logged into the
@@ -28,11 +29,13 @@ class IctAgentHealthEvaluator
             return;
         }
 
-        $this->evaluateDisks($equipmentId, $payload['disks'] ?? []);
-        $this->evaluateRam($equipmentId, $payload);
+        $pmsId = $this->activePmsId($equipmentId);
+
+        $this->evaluateDisks($equipmentId, $pmsId, $payload['disks'] ?? []);
+        $this->evaluateRam($equipmentId, $pmsId, $payload);
 
         if (array_key_exists('printers', $payload)) {
-            $this->evaluatePrinters($device, $equipmentId, $payload['printers'] ?? []);
+            $this->evaluatePrinters($device, $equipmentId, $pmsId, $payload['printers'] ?? []);
         }
 
         if (array_key_exists('pnp_issues', $payload)) {
@@ -40,7 +43,7 @@ class IctAgentHealthEvaluator
         }
     }
 
-    private function evaluateDisks(int $equipmentId, array $disks): void
+    private function evaluateDisks(int $equipmentId, ?int $pmsId, array $disks): void
     {
         foreach ($disks as $disk) {
             $total = $disk['total_gb'] ?? null;
@@ -58,11 +61,11 @@ class IctAgentHealthEvaluator
 
             $code = 'low_disk_' . preg_replace('/[^A-Za-z0-9]/', '', $drive);
             $message = "Low disk space on {$drive} — {$percentFree}% free ({$free} GB of {$total} GB).";
-            $this->logRoutine($equipmentId, $code, $message);
+            $this->logRoutine($equipmentId, $pmsId, $code, $message);
         }
     }
 
-    private function evaluateRam(int $equipmentId, array $payload): void
+    private function evaluateRam(int $equipmentId, ?int $pmsId, array $payload): void
     {
         $total = $payload['ram_total_mb'] ?? null;
         $free = $payload['ram_free_mb'] ?? null;
@@ -77,10 +80,10 @@ class IctAgentHealthEvaluator
         }
 
         $message = "Low available memory — {$percentFree}% free ({$free} MB of {$total} MB).";
-        $this->logRoutine($equipmentId, 'low_ram', $message);
+        $this->logRoutine($equipmentId, $pmsId, 'low_ram', $message);
     }
 
-    private function evaluatePrinters(IctEquipmentDevice $device, int $equipmentId, array $printers): void
+    private function evaluatePrinters(IctEquipmentDevice $device, int $equipmentId, ?int $pmsId, array $printers): void
     {
         $activeCodes = [];
 
@@ -92,7 +95,7 @@ class IctAgentHealthEvaluator
 
             if ($state && in_array($state, self::PRINTER_ROUTINE_STATES, true)) {
                 $code = "printer_{$slug}_{$state}";
-                $this->logRoutine($equipmentId, $code, "Printer \"{$name}\" needs attention: {$state}.");
+                $this->logRoutine($equipmentId, $pmsId, $code, "Printer \"{$name}\" needs attention: {$state}.");
             }
 
             if ($state && in_array($state, self::PRINTER_ACTIONABLE_STATES, true)) {
@@ -130,12 +133,28 @@ class IctAgentHealthEvaluator
     }
 
     /**
-     * Routine findings just join the equipment's existing PMS history —
-     * deduped per day per code so a 20-minute check-in interval doesn't
-     * spam the timeline.
+     * Equipment not enrolled in an active (Pending/Ongoing) PMS program has
+     * no maintenance record to attach routine findings to, so those findings
+     * are skipped entirely rather than logged unattached.
      */
-    private function logRoutine(int $equipmentId, string $code, string $message): void
+    private function activePmsId(int $equipmentId): ?int
     {
+        return PMS::whereHas('equipments', function ($q) use ($equipmentId) {
+            $q->where('ict_equipments.id', $equipmentId);
+        })->whereIn('status', ['Pending', 'Ongoing'])->value('id');
+    }
+
+    /**
+     * Routine findings join the equipment's existing PMS history — deduped
+     * per day per code so a 20-minute check-in interval doesn't spam the
+     * timeline. Skipped entirely if the equipment has no active PMS program.
+     */
+    private function logRoutine(int $equipmentId, ?int $pmsId, string $code, string $message): void
+    {
+        if ($pmsId === null) {
+            return;
+        }
+
         $today = now()->toDateString();
         $tag = "[{$code}]";
 
@@ -150,6 +169,7 @@ class IctAgentHealthEvaluator
         }
 
         ICTPMSHistory::create([
+            'ict_pms_id'   => $pmsId,
             'equipment_id' => $equipmentId,
             'pms_date'     => $today,
             'description'  => "{$tag} {$message}",
