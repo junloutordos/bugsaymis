@@ -15,6 +15,9 @@ import {
   PlusIcon,
   KeyIcon,
   ExclamationTriangleIcon,
+  CpuChipIcon,
+  Square3Stack3DIcon,
+  CircleStackIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -103,6 +106,30 @@ const selectedSpecsEquipment = ref(null)
 function openSpecs(eq) {
   selectedSpecsEquipment.value = eq
   showSpecsModal.value = true
+}
+
+// Same thresholds as IctAgentHealthEvaluator, so the bar's color always
+// matches whether this reading would actually trigger a PMS/alert finding.
+const RAM_LOW_THRESHOLD = 10
+const DISK_LOW_THRESHOLD = 15
+
+function percentFree(free, total) {
+  if (!total) return null
+  return Math.round((free / total) * 1000) / 10
+}
+
+function freeBarColor(percent, threshold) {
+  if (percent === null) return 'bg-slate-300'
+  if (percent < threshold) return 'bg-red-500'
+  if (percent < threshold * 2) return 'bg-amber-500'
+  return 'bg-emerald-500'
+}
+
+function formatDateTime(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleString('en-PH', {
+    year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
 }
 
 // Group all equipments by category or location for the print report
@@ -937,42 +964,97 @@ const showAllChecked    = computed({
             </div>
 
             <div v-else class="space-y-4">
-              <div class="text-xs text-slate-400">
-                Last reported {{ formatDate(selectedSpecsEquipment.agent_device.health_snapshot.recorded_at) }}
-                &middot; Agent v{{ selectedSpecsEquipment.agent_device.agent_version }}
-                &middot; {{ selectedSpecsEquipment.agent_device.os_version }}
+              <!-- Header band -->
+              <div class="rounded-xl bg-gradient-to-r from-indigo-50 to-slate-50 border border-indigo-100 px-4 py-3">
+                <div class="text-sm font-semibold text-slate-800">{{ selectedSpecsEquipment.agent_device.hostname }}</div>
+                <div class="text-xs text-slate-500 mt-0.5">
+                  {{ selectedSpecsEquipment.agent_device.os_version }}
+                  &middot; Agent v{{ selectedSpecsEquipment.agent_device.agent_version }}
+                </div>
+                <div class="text-xs text-indigo-600 mt-1">
+                  Last reported {{ formatDateTime(selectedSpecsEquipment.agent_device.health_snapshot.recorded_at) }}
+                </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-3 text-sm">
-                <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+              <!-- CPU -->
+              <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
+                <CpuChipIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div>
                   <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</div>
-                  <div class="mt-1 text-slate-700">{{ selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu ?? '—' }}</div>
+                  <div class="mt-0.5 text-sm text-slate-700">{{ selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu ?? '—' }}</div>
                 </div>
-                <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">RAM</div>
-                  <div class="mt-1 text-slate-700">
-                    <template v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.ram_total_mb">
+              </div>
+
+              <!-- RAM -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.ram_total_mb"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
+              >
+                <Square3Stack3DIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">RAM</div>
+                    <div class="text-xs text-slate-500">
                       {{ Math.round(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb / 1024) }} GB free of
                       {{ Math.round(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb / 1024) }} GB
-                    </template>
-                    <template v-else>—</template>
+                    </div>
+                  </div>
+                  <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all"
+                      :class="freeBarColor(percentFree(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb, selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb), RAM_LOW_THRESHOLD)"
+                      :style="{ width: percentFree(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb, selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb) + '%' }"
+                    ></div>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Disks</div>
-                <div v-if="!selectedSpecsEquipment.agent_device.health_snapshot.payload?.disks?.length" class="text-sm text-slate-400">—</div>
-                <ul v-else class="space-y-2">
-                  <li
-                    v-for="disk in selectedSpecsEquipment.agent_device.health_snapshot.payload.disks"
-                    :key="disk.drive"
-                    class="flex items-center justify-between text-sm border border-slate-100 rounded-lg p-3 bg-slate-50/50"
-                  >
-                    <span class="font-medium text-slate-700">{{ disk.drive }}</span>
-                    <span class="text-slate-600">{{ disk.free_gb }} GB free of {{ disk.total_gb }} GB</span>
-                  </li>
-                </ul>
+              <!-- Disks -->
+              <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
+                <CircleStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Disks</div>
+                  <div v-if="!selectedSpecsEquipment.agent_device.health_snapshot.payload?.disks?.length" class="text-sm text-slate-400">—</div>
+                  <div v-else class="space-y-2.5">
+                    <div v-for="disk in selectedSpecsEquipment.agent_device.health_snapshot.payload.disks" :key="disk.drive">
+                      <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-slate-700">{{ disk.drive }}</span>
+                        <span class="text-slate-500 text-xs flex items-center gap-1">
+                          {{ disk.free_gb }} GB free of {{ disk.total_gb }} GB
+                          <ExclamationTriangleIcon
+                            v-if="percentFree(disk.free_gb, disk.total_gb) < DISK_LOW_THRESHOLD"
+                            class="w-3.5 h-3.5 text-red-500"
+                            title="Low disk space"
+                          />
+                        </span>
+                      </div>
+                      <div class="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          class="h-full rounded-full transition-all"
+                          :class="freeBarColor(percentFree(disk.free_gb, disk.total_gb), DISK_LOW_THRESHOLD)"
+                          :style="{ width: percentFree(disk.free_gb, disk.total_gb) + '%' }"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Printers summary -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.printers?.length"
+                class="border border-slate-100 rounded-lg p-3 flex items-center gap-3"
+              >
+                <PrinterIcon class="w-5 h-5 text-slate-400 shrink-0" />
+                <div class="text-sm text-slate-600">
+                  {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.printers.length }} printer(s) detected
+                  <template v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.printers.some(p => p.pending_jobs > 0)">
+                    &middot;
+                    <span class="text-amber-600">
+                      {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.printers.reduce((sum, p) => sum + (p.pending_jobs || 0), 0) }} job(s) pending
+                    </span>
+                  </template>
+                </div>
               </div>
             </div>
           </div>
