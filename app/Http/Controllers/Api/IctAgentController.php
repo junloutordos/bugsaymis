@@ -224,7 +224,12 @@ class IctAgentController extends Controller
         }
 
         $latestRelease = IctAgentRelease::latestRelease();
-        if ($latestRelease && $latestRelease->version !== ($validated['agent_version'] ?? $device->agent_version)) {
+        // version_compare (not !==) — the release version is stored as typed
+        // on the artisan command ("1.0.2") while the agent reports its
+        // 4-part AssemblyVersion ("1.0.2.0"); a strict string compare never
+        // matches even right after a successful update, causing a pointless
+        // re-update offer every checkin forever.
+        if ($latestRelease && version_compare($latestRelease->version, $validated['agent_version'] ?? $device->agent_version ?? '') !== 0) {
             $response['update'] = [
                 'version'      => $latestRelease->version,
                 'download_url' => route('ict-agent.releases.show', ['encodedKey' => $this->encodeS3Key($latestRelease->s3_key)]),
