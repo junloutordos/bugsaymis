@@ -1001,7 +1001,7 @@ const showAllChecked    = computed({
         v-if="showSpecsModal"
         class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
       >
-        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
+        <div class="bg-white w-full max-w-3xl rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-semibold text-slate-800">
               Agent Specs for {{ selectedSpecsEquipment?.description }} / {{ selectedSpecsEquipment?.serial_no }}
