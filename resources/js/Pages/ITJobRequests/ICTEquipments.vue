@@ -18,6 +18,11 @@ import {
   CpuChipIcon,
   Square3Stack3DIcon,
   CircleStackIcon,
+  WifiIcon,
+  FireIcon,
+  BoltIcon,
+  ShieldCheckIcon,
+  ServerStackIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -118,6 +123,13 @@ function percentFree(free, total) {
   return Math.round((free / total) * 1000) / 10
 }
 
+// Bar width uses % used (fills up as space runs out, matching every OS
+// storage-meter convention) — color stays keyed off % free via freeBarColor.
+function percentUsed(free, total) {
+  const freePct = percentFree(free, total)
+  return freePct === null ? 0 : 100 - freePct
+}
+
 function freeBarColor(percent, threshold) {
   if (percent === null) return 'bg-slate-300'
   if (percent < threshold) return 'bg-red-500'
@@ -130,6 +142,32 @@ function formatDateTime(dateStr) {
   return new Date(dateStr).toLocaleString('en-PH', {
     year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
   })
+}
+
+const HIGH_CPU_USAGE_THRESHOLD = 85
+
+// Inverted sense from freeBarColor — here a HIGH percent (CPU usage) is bad.
+function usageBarColor(percent, threshold) {
+  if (percent === null || percent === undefined) return 'bg-slate-300'
+  if (percent > threshold) return 'bg-red-500'
+  if (percent > threshold * 0.7) return 'bg-amber-500'
+  return 'bg-emerald-500'
+}
+
+const riskTierClasses = {
+  critical: 'bg-red-100 text-red-700',
+  high: 'bg-orange-100 text-orange-700',
+  medium: 'bg-amber-100 text-amber-700',
+  low: 'bg-emerald-100 text-emerald-700',
+}
+
+function batteryWearPct(battery) {
+  if (!battery?.design_capacity_mwh || !battery?.full_charge_capacity_mwh) return null
+  return Math.round((1 - battery.full_charge_capacity_mwh / battery.design_capacity_mwh) * 1000) / 10
+}
+
+function securityRowClass(value) {
+  return value === false ? 'text-red-600' : value === true ? 'text-emerald-600' : 'text-slate-400'
 }
 
 // Group all equipments by category or location for the print report
@@ -986,15 +1024,22 @@ const showAllChecked    = computed({
               <div class="rounded-xl bg-gradient-to-r from-indigo-50 to-slate-50 border border-indigo-100 px-4 py-3">
                 <div class="flex items-center justify-between">
                   <div class="text-sm font-semibold text-slate-800">{{ selectedSpecsEquipment.agent_device.hostname }}</div>
-                  <span
-                    v-if="selectedSpecsEquipment.agent_device.network_location === 'on_campus'"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700"
-                  >On Campus</span>
-                  <span
-                    v-else-if="selectedSpecsEquipment.agent_device.network_location === 'off_campus'"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700"
-                    :title="`Since ${formatDateTime(selectedSpecsEquipment.agent_device.network_location_changed_at)}`"
-                  >Off Campus</span>
+                  <div class="flex items-center gap-1.5">
+                    <span
+                      v-if="selectedSpecsEquipment.agent_device.risk_tier"
+                      :class="riskTierClasses[selectedSpecsEquipment.agent_device.risk_tier]"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium capitalize"
+                    >{{ selectedSpecsEquipment.agent_device.risk_tier }} risk</span>
+                    <span
+                      v-if="selectedSpecsEquipment.agent_device.network_location === 'on_campus'"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700"
+                    >On Campus</span>
+                    <span
+                      v-else-if="selectedSpecsEquipment.agent_device.network_location === 'off_campus'"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700"
+                      :title="`Since ${formatDateTime(selectedSpecsEquipment.agent_device.network_location_changed_at)}`"
+                    >Off Campus</span>
+                  </div>
                 </div>
                 <div class="text-xs text-slate-500 mt-0.5">
                   {{ selectedSpecsEquipment.agent_device.os_version }}
@@ -1008,9 +1053,117 @@ const showAllChecked    = computed({
               <!-- CPU -->
               <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
                 <CpuChipIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</div>
+                    <div v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu_temp_c" class="text-xs text-slate-500 flex items-center gap-1">
+                      <FireIcon class="w-3.5 h-3.5 text-slate-400" />
+                      {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.cpu_temp_c }}&deg;C
+                    </div>
+                  </div>
                   <div class="mt-0.5 text-sm text-slate-700">{{ selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu ?? '—' }}</div>
+                  <template v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu_usage_pct !== undefined && selectedSpecsEquipment.agent_device.health_snapshot.payload?.cpu_usage_pct !== null">
+                    <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all"
+                        :class="usageBarColor(selectedSpecsEquipment.agent_device.health_snapshot.payload.cpu_usage_pct, HIGH_CPU_USAGE_THRESHOLD)"
+                        :style="{ width: selectedSpecsEquipment.agent_device.health_snapshot.payload.cpu_usage_pct + '%' }"
+                      ></div>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">{{ selectedSpecsEquipment.agent_device.health_snapshot.payload.cpu_usage_pct }}% usage</div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Network -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.network"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
+              >
+                <WifiIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Network</div>
+                    <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.link_up === false" class="text-[11px] font-medium text-red-600">Link Down</span>
+                  </div>
+                  <div class="mt-0.5 text-sm text-slate-700 space-x-3">
+                    <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.gateway_latency_ms !== null">
+                      {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.network.gateway_latency_ms }}ms latency
+                    </span>
+                    <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.packet_loss_pct" :class="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.packet_loss_pct > 20 ? 'text-red-600' : ''">
+                      {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.network.packet_loss_pct }}% loss
+                    </span>
+                    <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.link_speed_mbps">
+                      {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.network.link_speed_mbps }} Mbps
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Watched services -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.services?.length"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
+              >
+                <ServerStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Services</div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <span
+                      v-for="svc in selectedSpecsEquipment.agent_device.health_snapshot.payload.services"
+                      :key="svc.name"
+                      :class="svc.status === 'Running' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                    >{{ svc.name }}: {{ svc.status }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Battery -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.hardware_inventory?.battery"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
+              >
+                <BoltIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Battery</div>
+                  <template v-if="batteryWearPct(selectedSpecsEquipment.agent_device.hardware_inventory.battery) !== null">
+                    <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all"
+                        :class="usageBarColor(batteryWearPct(selectedSpecsEquipment.agent_device.hardware_inventory.battery), 20)"
+                        :style="{ width: batteryWearPct(selectedSpecsEquipment.agent_device.hardware_inventory.battery) + '%' }"
+                      ></div>
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">{{ batteryWearPct(selectedSpecsEquipment.agent_device.hardware_inventory.battery) }}% worn from design capacity</div>
+                  </template>
+                  <div v-else class="mt-0.5 text-sm text-slate-400">—</div>
+                </div>
+              </div>
+
+              <!-- Security posture -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.security_status"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
+              >
+                <ShieldCheckIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Security</div>
+                  <div class="grid grid-cols-2 gap-1 text-xs">
+                    <div :class="securityRowClass(selectedSpecsEquipment.agent_device.security_status.antivirus_enabled)">
+                      Antivirus: {{ selectedSpecsEquipment.agent_device.security_status.antivirus_enabled === false ? 'Disabled' : selectedSpecsEquipment.agent_device.security_status.antivirus_enabled === true ? 'Enabled' : '—' }}
+                    </div>
+                    <div :class="securityRowClass(selectedSpecsEquipment.agent_device.security_status.firewall_enabled)">
+                      Firewall: {{ selectedSpecsEquipment.agent_device.security_status.firewall_enabled === false ? 'Disabled' : selectedSpecsEquipment.agent_device.security_status.firewall_enabled === true ? 'Enabled' : '—' }}
+                    </div>
+                    <div class="text-slate-500">
+                      Pending updates: {{ selectedSpecsEquipment.agent_device.security_status.pending_updates_count ?? '—' }}
+                    </div>
+                    <div :class="selectedSpecsEquipment.agent_device.security_status.unauthorized_software_count > 0 ? 'text-amber-600' : 'text-slate-500'">
+                      Unauthorized software: {{ selectedSpecsEquipment.agent_device.security_status.unauthorized_software_count ?? 0 }}
+                    </div>
+                  </div>
+                  <div v-if="selectedSpecsEquipment.agent_device.security_status.reboot_required" class="mt-1 text-xs text-amber-600">Reboot required</div>
                 </div>
               </div>
 
@@ -1032,7 +1185,7 @@ const showAllChecked    = computed({
                     <div
                       class="h-full rounded-full transition-all"
                       :class="freeBarColor(percentFree(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb, selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb), RAM_LOW_THRESHOLD)"
-                      :style="{ width: percentFree(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb, selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb) + '%' }"
+                      :style="{ width: percentUsed(selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_free_mb, selectedSpecsEquipment.agent_device.health_snapshot.payload.ram_total_mb) + '%' }"
                     ></div>
                   </div>
                 </div>
@@ -1061,9 +1214,26 @@ const showAllChecked    = computed({
                         <div
                           class="h-full rounded-full transition-all"
                           :class="freeBarColor(percentFree(disk.free_gb, disk.total_gb), DISK_LOW_THRESHOLD)"
-                          :style="{ width: percentFree(disk.free_gb, disk.total_gb) + '%' }"
+                          :style="{ width: percentUsed(disk.free_gb, disk.total_gb) + '%' }"
                         ></div>
                       </div>
+                    </div>
+                  </div>
+
+                  <!-- Physical disk SMART status — separate from the volume
+                       list above since logical drive letters (C:, D:) don't
+                       map 1:1 to physical disk device paths. -->
+                  <div v-if="selectedSpecsEquipment.agent_device.hardware_inventory?.disks?.length" class="mt-3 pt-2 border-t border-slate-100 space-y-1">
+                    <div
+                      v-for="pdisk in selectedSpecsEquipment.agent_device.hardware_inventory.disks"
+                      :key="pdisk.drive"
+                      class="flex items-center justify-between text-xs"
+                    >
+                      <span class="text-slate-500">{{ pdisk.model || pdisk.drive }}</span>
+                      <span
+                        :class="pdisk.smart_status === 'failing' ? 'bg-red-50 text-red-700' : pdisk.smart_status === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                        class="px-1.5 py-0.5 rounded-full font-medium"
+                      >SMART: {{ pdisk.smart_status ?? 'unknown' }}</span>
                     </div>
                   </div>
                 </div>
