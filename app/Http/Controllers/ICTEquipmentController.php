@@ -7,10 +7,12 @@ use App\Models\IctEquipmentAssignmentHistory;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
 use App\Models\IctEquipmentHealthHistory;
+use App\Models\IctEquipmentManualRemediationRequest;
 use App\Models\User;
 use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
@@ -31,6 +33,12 @@ class ICTEquipmentController extends Controller
             'agentDevice.healthSnapshot',
             'agentDevice.hardwareInventory',
             'agentDevice.securityStatus',
+            // No ->limit() here — Eloquent applies a hasMany eager-load
+            // limit() globally across all parent rows, not per-device.
+            // The frontend takes the first few off this already-sorted list.
+            'agentDevice.manualRemediationRequests' => function ($q) {
+                $q->orderByDesc('requested_at');
+            },
             'alerts' => function ($q) {
                 $q->where('status', 'open')->orderBy('created_at', 'desc');
             },
@@ -344,6 +352,73 @@ class ICTEquipmentController extends Controller
         return response()->json([
             'token' => $token->token,
             'expires_at' => $token->expires_at,
+        ]);
+    }
+
+    private const REMEDIATION_ACTIONS = [
+        'service_restart',
+        'print_spooler_recovery',
+        'temp_file_cleanup',
+        'dns_flush',
+        'windows_maintenance_task',
+    ];
+
+    /**
+     * POST /ict-equipments/{ictEquipment}/remediate
+     *
+     * Admin-triggered "Fix Now" — bypasses the ict_remediation_rules
+     * enabled/auto_execute gate entirely since a human explicitly asked for
+     * it here. Queued as a IctEquipmentManualRemediationRequest and carried
+     * out on the device's next checkin (no push channel to the agent
+     * exists, so this can lag up to the ~20-minute checkin interval).
+     */
+    public function remediate(Request $request, ICTEquipment $ictEquipment)
+    {
+        $validated = $request->validate([
+            'action' => ['required', 'string', Rule::in(self::REMEDIATION_ACTIONS)],
+            'target' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $device = $ictEquipment->agentDevice;
+        if (! $device) {
+            return response()->json(['message' => 'This equipment has no enrolled agent device.'], 422);
+        }
+
+        $target = $validated['target'] ?? null;
+
+        if ($validated['action'] === 'service_restart') {
+            $reportedServices = collect($device->healthSnapshot?->payload['services'] ?? [])->pluck('name');
+            if (! $target || ! $reportedServices->contains($target)) {
+                return response()->json([
+                    'message' => 'That service was not found in this device\'s last reported status.',
+                ], 422);
+            }
+        }
+
+        $alreadyPending = IctEquipmentManualRemediationRequest::where('device_id', $device->id)
+            ->where('action', $validated['action'])
+            ->where('target', $target)
+            ->whereIn('status', ['pending', 'delivered'])
+            ->exists();
+
+        if ($alreadyPending) {
+            return response()->json([
+                'message' => 'A fix for this is already queued or running on the device.',
+            ], 422);
+        }
+
+        IctEquipmentManualRemediationRequest::create([
+            'device_id'    => $device->id,
+            'equipment_id' => $ictEquipment->id,
+            'action'       => $validated['action'],
+            'target'       => $target,
+            'requested_by' => $request->user()->id,
+            'status'       => 'pending',
+            'requested_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Fix queued — it will run on the device\'s next check-in (up to 20 minutes).',
         ]);
     }
 }

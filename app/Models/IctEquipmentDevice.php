@@ -76,4 +76,9 @@ class IctEquipmentDevice extends Model
     {
         return $this->hasMany(IctEquipmentRemediationLog::class, 'device_id');
     }
+
+    public function manualRemediationRequests()
+    {
+        return $this->hasMany(IctEquipmentManualRemediationRequest::class, 'device_id');
+    }
 }
