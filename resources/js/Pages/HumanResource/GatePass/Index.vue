@@ -100,7 +100,7 @@
                               class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors" title="Edit">
                         <PencilSquareIcon class="w-4 h-4" />
                       </button>
-                      <button v-if="isAdmin && r.status === 'OCD Approved'" @click="openActual(r)"
+                      <button v-if="canRecordActualTime && r.status === 'OCD Approved'" @click="openActual(r)"
                               class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Record Actual Time">
                         <ClockIcon class="w-4 h-4" />
                       </button>
@@ -378,6 +378,7 @@ const currentUser = computed(() => page.props.auth?.user ?? {})
 const isSelf      = computed(() => ['Staff', 'Faculty'].includes(currentUser.value.role?.name ?? ''))
 const isDivisionChief = computed(() => currentUser.value.role?.name === 'DivisionChief')
 const isAdmin     = computed(() => (currentUser.value.role?.name ?? '').toLowerCase() === 'administrator')
+const canRecordActualTime = computed(() => currentUser.value.permissions?.includes('hr.gatepass.approve') ?? false)
 
 // ── Filters ──────────────────────────────────────────────────────────────────
 const statusOptions = [
