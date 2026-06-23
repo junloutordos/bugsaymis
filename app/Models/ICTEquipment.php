@@ -23,11 +23,16 @@ class ICTEquipment extends Model
         'room_id',
         'remarks',
         'qr_code_path',
+        'warranty_expires_at',
+        'warranty_provider',
+        'decommissioned_at',
     ];
 
     protected $casts = [
-        'date_acquired' => 'date',
-        'amount'        => 'decimal:2',
+        'date_acquired'       => 'date',
+        'amount'              => 'decimal:2',
+        'warranty_expires_at' => 'date',
+        'decommissioned_at'   => 'date',
     ];
 
     /**
@@ -74,6 +79,11 @@ class ICTEquipment extends Model
     public function alerts()
     {
         return $this->hasMany(IctEquipmentAlert::class, 'equipment_id');
+    }
+
+    public function assignmentHistory()
+    {
+        return $this->hasMany(IctEquipmentAssignmentHistory::class, 'equipment_id');
     }
 
 }

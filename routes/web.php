@@ -844,6 +844,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     ->name('job-requests.update');
 
     Route::get('/ict-equipments', [ICTEquipmentController::class, 'index'])->name('ict-equipments.index');
+    Route::get('/ict-agent/health-dashboard', [ICTEquipmentController::class, 'healthDashboard'])
+        ->middleware('permission:it.equipment.view')
+        ->name('ict-agent.health-dashboard');
+    Route::get('/ict-agent/health-dashboard/{device}/history', [ICTEquipmentController::class, 'healthHistory'])
+        ->middleware('permission:it.equipment.view')
+        ->name('ict-agent.health-dashboard.history');
     Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('ict-equipments.store');
     Route::put('/ict-equipments/{ictEquipment}', [ICTEquipmentController::class, 'update'])
     ->name('ict-equipments.update');
