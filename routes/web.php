@@ -869,6 +869,10 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.enrollment-token');
 
+    Route::post('/ict-equipments/{ictEquipment}/remediate', [ICTEquipmentController::class, 'remediate'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('ict-equipments.remediate');
+
     // PMS History routes
     Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');
 

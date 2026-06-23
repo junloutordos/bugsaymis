@@ -23,6 +23,8 @@ import {
   BoltIcon,
   ShieldCheckIcon,
   ServerStackIcon,
+  WrenchScrewdriverIcon,
+  CheckBadgeIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -104,13 +106,62 @@ function openAlerts(eq) {
   showAlertsModal.value = true
 }
 
-// ICT Agent latest reported specs
+// ICT Agent latest reported specs — kept as a lookup by id (not a stored
+// object reference) so it stays live across the router.reload() a "Fix Now"
+// click triggers; the modal would otherwise keep showing pre-reload data.
 const showSpecsModal = ref(false)
-const selectedSpecsEquipment = ref(null)
+const selectedSpecsEquipmentId = ref(null)
+const selectedSpecsEquipment = computed(() =>
+  visibleEquipments.value.find(eq => eq.id === selectedSpecsEquipmentId.value) ?? null
+)
 
 function openSpecs(eq) {
-  selectedSpecsEquipment.value = eq
+  selectedSpecsEquipmentId.value = eq.id
   showSpecsModal.value = true
+}
+
+// Admin-triggered "Fix Now" — bypasses the auto_execute rule gate; the
+// device only picks it up on its next ~20-min check-in, so this is a queue,
+// not an instant action. fixingKeys covers the gap between click and the
+// page reload picking up the new 'pending' row from the backend.
+const fixingKeys = ref(new Set())
+const QUICK_FIX_ACTIONS = [
+  { action: 'print_spooler_recovery', label: 'Clear print queue', description: 'Restarts the spooler and clears stuck jobs' },
+  { action: 'temp_file_cleanup', label: 'Clean temp files', description: 'Frees disk space from temp folders' },
+  { action: 'dns_flush', label: 'Flush DNS', description: 'Clears the DNS resolver cache' },
+  { action: 'windows_maintenance_task', label: 'Run disk cleanup', description: 'Triggers the Windows SilentCleanup task' },
+]
+
+function fixKey(action, target) {
+  return `${action}::${target ?? ''}`
+}
+
+function findManualRequest(eq, action, target, statuses) {
+  const requests = eq?.agent_device?.manual_remediation_requests ?? []
+  return requests.find(r => r.action === action && (r.target ?? null) === (target ?? null) && statuses.includes(r.status))
+}
+
+function isFixPending(eq, action, target = null) {
+  if (fixingKeys.value.has(fixKey(action, target))) return true
+  return !!findManualRequest(eq, action, target, ['pending', 'delivered'])
+}
+
+function lastFixResult(eq, action, target = null) {
+  return findManualRequest(eq, action, target, ['completed', 'failed'])
+}
+
+async function runFix(eq, action, target = null) {
+  const key = fixKey(action, target)
+  fixingKeys.value.add(key)
+  try {
+    const { data } = await axios.post(route('ict-equipments.remediate', eq.id), { action, target })
+    Swal.fire({ icon: 'success', title: 'Fix queued', text: data.message, timer: 2500, showConfirmButton: false })
+    router.reload({ only: ['equipments'] })
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'Could not queue this fix.', 'error')
+  } finally {
+    fixingKeys.value.delete(key)
+  }
 }
 
 // Same thresholds as IctAgentHealthEvaluator, so the bar's color always
@@ -1108,13 +1159,23 @@ const showAllChecked    = computed({
                 <ServerStackIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                 <div class="flex-1">
                   <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Services</div>
-                  <div class="flex flex-wrap gap-1.5">
+                  <div class="flex flex-wrap gap-1.5 items-center">
                     <span
                       v-for="svc in selectedSpecsEquipment.agent_device.health_snapshot.payload.services"
                       :key="svc.name"
-                      :class="svc.status === 'Running' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
-                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    >{{ svc.name }}: {{ svc.status }}</span>
+                      class="inline-flex items-center gap-1"
+                    >
+                      <span
+                        :class="svc.status === 'Running' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                      >{{ svc.name }}: {{ svc.status }}</span>
+                      <button
+                        v-if="svc.status !== 'Running' && svc.status !== 'NotInstalled'"
+                        @click="runFix(selectedSpecsEquipment, 'service_restart', svc.name)"
+                        :disabled="isFixPending(selectedSpecsEquipment, 'service_restart', svc.name)"
+                        class="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >{{ isFixPending(selectedSpecsEquipment, 'service_restart', svc.name) ? 'Queued…' : 'Restart' }}</button>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1239,20 +1300,62 @@ const showAllChecked    = computed({
                 </div>
               </div>
 
-              <!-- Printers summary -->
+              <!-- Printers -->
               <div
                 v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.printers?.length"
-                class="border border-slate-100 rounded-lg p-3 flex items-center gap-3"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
               >
-                <PrinterIcon class="w-5 h-5 text-slate-400 shrink-0" />
-                <div class="text-sm text-slate-600">
-                  {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.printers.length }} printer(s) detected
-                  <template v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.printers.some(p => p.pending_jobs > 0)">
-                    &middot;
-                    <span class="text-amber-600">
-                      {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.printers.reduce((sum, p) => sum + (p.pending_jobs || 0), 0) }} job(s) pending
-                    </span>
-                  </template>
+                <PrinterIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Printers</div>
+                  <div class="space-y-2">
+                    <div
+                      v-for="printer in selectedSpecsEquipment.agent_device.health_snapshot.payload.printers"
+                      :key="printer.name"
+                      class="flex items-center justify-between text-sm"
+                    >
+                      <span class="flex items-center gap-1.5">
+                        <span class="text-slate-700">{{ printer.name }}</span>
+                        <CheckBadgeIcon v-if="printer.is_default" class="w-4 h-4 text-indigo-500" title="Default printer" />
+                      </span>
+                      <span class="flex items-center gap-2 text-xs">
+                        <span v-if="printer.detected_error_state" class="px-1.5 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">{{ printer.detected_error_state }}</span>
+                        <span v-if="printer.pending_jobs > 0" class="text-slate-500">{{ printer.pending_jobs }} job(s) pending</span>
+                        <button
+                          v-if="printer.detected_error_state || printer.pending_jobs > 0"
+                          @click="runFix(selectedSpecsEquipment, 'print_spooler_recovery')"
+                          :disabled="isFixPending(selectedSpecsEquipment, 'print_spooler_recovery')"
+                          class="font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >{{ isFixPending(selectedSpecsEquipment, 'print_spooler_recovery') ? 'Queued…' : 'Clear queue' }}</button>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Fixes — admin-triggered, bypasses the auto_execute
+                   rule gate; runs on the device's next check-in (~20 min). -->
+              <div class="border border-slate-100 rounded-lg p-3 flex items-start gap-3">
+                <WrenchScrewdriverIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Quick Fixes</div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div v-for="qf in QUICK_FIX_ACTIONS" :key="qf.action">
+                      <button
+                        @click="runFix(selectedSpecsEquipment, qf.action)"
+                        :disabled="isFixPending(selectedSpecsEquipment, qf.action)"
+                        class="w-full text-left rounded-lg border border-slate-200 hover:bg-slate-50 px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <div class="text-xs font-medium text-slate-700">
+                          {{ isFixPending(selectedSpecsEquipment, qf.action) ? 'Queued…' : qf.label }}
+                        </div>
+                        <div class="text-[11px] text-slate-400">{{ qf.description }}</div>
+                        <div v-if="lastFixResult(selectedSpecsEquipment, qf.action)" class="text-[11px] mt-0.5"
+                          :class="lastFixResult(selectedSpecsEquipment, qf.action).status === 'completed' ? 'text-emerald-600' : 'text-red-600'"
+                        >Last run: {{ lastFixResult(selectedSpecsEquipment, qf.action).status === 'completed' ? 'succeeded' : 'failed' }}, {{ formatDateTime(lastFixResult(selectedSpecsEquipment, qf.action).completed_at) }}</div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -147,6 +147,7 @@ class IctAgentController extends Controller
             'printers.*.name'                  => ['nullable', 'string', 'max:255'],
             'printers.*.detected_error_state'  => ['nullable', 'string', 'max:50'],
             'printers.*.pending_jobs'          => ['nullable', 'integer'],
+            'printers.*.is_default'            => ['nullable', 'boolean'],
             'pnp_issues'    => ['nullable', 'array'],
             'pnp_issues.*.device_name' => ['nullable', 'string', 'max:255'],
             'pnp_issues.*.error_code'  => ['nullable', 'string', 'max:50'],
