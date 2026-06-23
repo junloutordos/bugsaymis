@@ -1148,6 +1148,16 @@ const showAllChecked    = computed({
                       {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.network.link_speed_mbps }} Mbps
                     </span>
                   </div>
+                  <div class="mt-1 text-xs text-slate-500">
+                    <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.wifi_ssid">
+                      Wi-Fi: {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.wifi_ssid }}
+                      <span v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload?.wifi_bssid">&middot; AP {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.wifi_bssid }}</span>
+                    </span>
+                    <span v-else-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.link_up">Wired connection</span>
+                  </div>
+                  <div v-if="selectedSpecsEquipment.agent_device.health_snapshot.payload.network.local_ip" class="text-xs text-slate-500">
+                    Local IP: {{ selectedSpecsEquipment.agent_device.health_snapshot.payload.network.local_ip }}
+                  </div>
                 </div>
               </div>
 
