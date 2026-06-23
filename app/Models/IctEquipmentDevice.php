@@ -20,11 +20,21 @@ class IctEquipmentDevice extends Model
         'last_checkin_at',
         'network_location',
         'network_location_changed_at',
+        'last_update_attempted_at',
+        'last_update_result',
+        'health_score',
+        'risk_score',
+        'risk_tier',
+        'last_full_inventory_at',
+        'last_diagnostics_at',
     ];
 
     protected $casts = [
         'last_checkin_at' => 'datetime',
         'network_location_changed_at' => 'datetime',
+        'last_update_attempted_at' => 'datetime',
+        'last_full_inventory_at' => 'datetime',
+        'last_diagnostics_at' => 'datetime',
     ];
 
     public function equipment()
@@ -40,5 +50,30 @@ class IctEquipmentDevice extends Model
     public function alerts()
     {
         return $this->hasMany(IctEquipmentAlert::class, 'device_id');
+    }
+
+    public function healthHistory()
+    {
+        return $this->hasMany(IctEquipmentHealthHistory::class, 'device_id');
+    }
+
+    public function hardwareInventory()
+    {
+        return $this->hasOne(IctEquipmentHardwareInventory::class, 'device_id');
+    }
+
+    public function softwareInventory()
+    {
+        return $this->hasOne(IctEquipmentSoftwareInventory::class, 'device_id');
+    }
+
+    public function securityStatus()
+    {
+        return $this->hasOne(IctEquipmentSecurityStatus::class, 'device_id');
+    }
+
+    public function remediationLog()
+    {
+        return $this->hasMany(IctEquipmentRemediationLog::class, 'device_id');
     }
 }

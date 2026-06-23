@@ -5,15 +5,26 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\ITJobRequestController;
 use App\Models\ICTEquipment;
+use App\Models\IctAgentRelease;
 use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
+use App\Models\IctEquipmentHardwareInventory;
+use App\Models\IctEquipmentHardwareInventoryChange;
+use App\Models\IctEquipmentHealthHistory;
 use App\Models\IctEquipmentHealthSnapshot;
+use App\Models\IctEquipmentSecurityStatus;
+use App\Models\IctEquipmentSoftwareInventory;
 use App\Models\User;
+use App\Services\IctAgentDiagnosticsService;
 use App\Services\IctAgentHealthEvaluator;
 use App\Services\IctAgentNetworkLocationResolver;
+use App\Services\IctAgentRemediationDispatcher;
+use App\Services\IctAgentScoringService;
+use App\Services\IctAgentSecurityEvaluator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class IctAgentController extends Controller
 {
@@ -21,6 +32,10 @@ class IctAgentController extends Controller
         private IctAgentHealthEvaluator $healthEvaluator,
         private ITJobRequestController $jobRequests,
         private IctAgentNetworkLocationResolver $networkLocationResolver,
+        private IctAgentScoringService $scoringService,
+        private IctAgentDiagnosticsService $diagnosticsService,
+        private IctAgentSecurityEvaluator $securityEvaluator,
+        private IctAgentRemediationDispatcher $remediationDispatcher,
     ) {
     }
 
@@ -119,8 +134,11 @@ class IctAgentController extends Controller
     {
         $validated = $request->validate([
             'cpu'           => ['nullable', 'string', 'max:255'],
+            'cpu_usage_pct' => ['nullable', 'numeric'],
+            'cpu_temp_c'    => ['nullable', 'numeric'],
             'ram_total_mb'  => ['nullable', 'integer'],
             'ram_free_mb'   => ['nullable', 'integer'],
+            'uptime_seconds' => ['nullable', 'integer'],
             'disks'         => ['nullable', 'array'],
             'disks.*.drive'    => ['nullable', 'string', 'max:10'],
             'disks.*.total_gb' => ['nullable', 'numeric'],
@@ -132,9 +150,26 @@ class IctAgentController extends Controller
             'pnp_issues'    => ['nullable', 'array'],
             'pnp_issues.*.device_name' => ['nullable', 'string', 'max:255'],
             'pnp_issues.*.error_code'  => ['nullable', 'string', 'max:50'],
+            'network'                      => ['nullable', 'array'],
+            'network.gateway_latency_ms'   => ['nullable', 'numeric'],
+            'network.packet_loss_pct'      => ['nullable', 'numeric'],
+            'network.link_speed_mbps'      => ['nullable', 'integer'],
+            'network.link_up'              => ['nullable', 'boolean'],
+            'services'      => ['nullable', 'array'],
+            'services.*.name'   => ['nullable', 'string', 'max:255'],
+            'services.*.status' => ['nullable', 'string', 'max:50'],
             'os_version'    => ['nullable', 'string', 'max:255'],
             'agent_version' => ['nullable', 'string', 'max:20'],
             'wifi_ssid'     => ['nullable', 'string', 'max:255'],
+            'update_result' => ['nullable', 'array'],
+            'update_result.version' => ['nullable', 'string', 'max:20'],
+            'update_result.result'  => ['nullable', 'string', 'in:success,failed'],
+            'remediation_results'   => ['nullable', 'array'],
+            'remediation_results.*.action'       => ['nullable', 'string', 'max:50'],
+            'remediation_results.*.target'       => ['nullable', 'string', 'max:255'],
+            'remediation_results.*.trigger_code' => ['nullable', 'string', 'max:50'],
+            'remediation_results.*.result'       => ['nullable', 'string', 'in:success,failed'],
+            'remediation_results.*.details'      => ['nullable', 'string'],
         ]);
 
         $device = $request->user();
@@ -143,6 +178,12 @@ class IctAgentController extends Controller
             ['device_id' => $device->id],
             ['payload' => $validated, 'recorded_at' => now()]
         );
+
+        $historyRow = IctEquipmentHealthHistory::create([
+            'device_id'   => $device->id,
+            'payload'     => $validated,
+            'recorded_at' => now(),
+        ]);
 
         $networkLocation = $this->networkLocationResolver->resolve($validated['wifi_ssid'] ?? null, $request->ip());
 
@@ -157,11 +198,219 @@ class IctAgentController extends Controller
             $deviceUpdate['network_location_changed_at'] = now();
         }
 
+        if (isset($validated['update_result']['result'])) {
+            $deviceUpdate['last_update_attempted_at'] = now();
+            $deviceUpdate['last_update_result'] = $validated['update_result']['result'];
+        }
+
         $device->update($deviceUpdate);
 
         $this->healthEvaluator->evaluate($device, $validated);
+        $this->diagnosticsService->diagnoseFastLoop($device, $validated);
+        $this->scoringService->scoreAndStore($device, $validated, $historyRow);
+
+        if (! empty($validated['remediation_results'])) {
+            $this->remediationDispatcher->recordResults($device, $validated['remediation_results']);
+        }
+
+        $response = ['status' => 'ok'];
+
+        $pendingRemediations = $this->remediationDispatcher->pendingActions($device, $validated);
+        if ($pendingRemediations) {
+            $response['remediations'] = $pendingRemediations;
+        }
+
+        $latestRelease = IctAgentRelease::latestRelease();
+        if ($latestRelease && $latestRelease->version !== ($validated['agent_version'] ?? $device->agent_version)) {
+            $response['update'] = [
+                'version'      => $latestRelease->version,
+                'download_url' => route('ict-agent.releases.show', ['encodedKey' => $this->encodeS3Key($latestRelease->s3_key)]),
+                'sha256'       => $latestRelease->sha256,
+            ];
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * POST /api/ict-agent/inventory-checkin
+     *
+     * Daily (slow-loop) hardware/software/security inventory — separate
+     * from the 20-min checkin() so data that barely changes doesn't churn
+     * the DB 72x/day. Hardware changes are diffed against the previous
+     * snapshot before being overwritten, so swaps (new RAM, new disk) are
+     * traceable; everything else is latest-only, same pattern as
+     * IctEquipmentHealthSnapshot.
+     */
+    public function inventoryCheckin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'hardware'                       => ['nullable', 'array'],
+            'hardware.cpu_model'              => ['nullable', 'string', 'max:255'],
+            'hardware.cpu_cores'              => ['nullable', 'integer'],
+            'hardware.ram_modules'            => ['nullable', 'array'],
+            'hardware.ram_modules.*.slot'      => ['nullable', 'string', 'max:50'],
+            'hardware.ram_modules.*.size_mb'   => ['nullable', 'integer'],
+            'hardware.ram_modules.*.speed_mhz' => ['nullable', 'integer'],
+            'hardware.disks'                  => ['nullable', 'array'],
+            'hardware.disks.*.drive'          => ['nullable', 'string', 'max:50'],
+            'hardware.disks.*.model'          => ['nullable', 'string', 'max:255'],
+            'hardware.disks.*.serial'         => ['nullable', 'string', 'max:255'],
+            'hardware.disks.*.smart_status'   => ['nullable', 'string', 'max:20'],
+            'hardware.disks.*.wear_level_pct' => ['nullable', 'numeric'],
+            'hardware.gpu'                    => ['nullable', 'array'],
+            'hardware.gpu.name'               => ['nullable', 'string', 'max:255'],
+            'hardware.gpu.vram_mb'            => ['nullable', 'integer'],
+            'hardware.peripherals'            => ['nullable', 'array'],
+            'hardware.peripherals.*.type'     => ['nullable', 'string', 'max:50'],
+            'hardware.peripherals.*.name'     => ['nullable', 'string', 'max:255'],
+            'hardware.battery'                => ['nullable', 'array'],
+            'hardware.battery.design_capacity_mwh'      => ['nullable', 'integer'],
+            'hardware.battery.full_charge_capacity_mwh' => ['nullable', 'integer'],
+            'hardware.battery.cycle_count'              => ['nullable', 'integer'],
+            'software'                        => ['nullable', 'array'],
+            'software.installed'              => ['nullable', 'array'],
+            'software.installed.*.name'         => ['nullable', 'string', 'max:255'],
+            'software.installed.*.version'      => ['nullable', 'string', 'max:100'],
+            'software.installed.*.publisher'    => ['nullable', 'string', 'max:255'],
+            'software.installed.*.install_date' => ['nullable', 'string', 'max:50'],
+            'security'                         => ['nullable', 'array'],
+            'security.antivirus_enabled'       => ['nullable', 'boolean'],
+            'security.antivirus_up_to_date'    => ['nullable', 'boolean'],
+            'security.firewall_enabled'        => ['nullable', 'boolean'],
+            'security.pending_updates_count'   => ['nullable', 'integer'],
+            'security.last_update_installed_at' => ['nullable', 'string', 'max:20'],
+            'security.reboot_required'         => ['nullable', 'boolean'],
+            'event_log_entries'                       => ['nullable', 'array'],
+            'event_log_entries.*.channel'              => ['nullable', 'string', 'max:50'],
+            'event_log_entries.*.event_id'             => ['nullable', 'string', 'max:20'],
+            'event_log_entries.*.level'                => ['nullable', 'string', 'max:20'],
+            'event_log_entries.*.source'               => ['nullable', 'string', 'max:255'],
+            'event_log_entries.*.message'              => ['nullable', 'string'],
+            'event_log_entries.*.logged_at'             => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $device = $request->user();
+        $hardware = $validated['hardware'] ?? [];
+
+        $this->recordHardwareInventory($device, $hardware);
+
+        IctEquipmentSoftwareInventory::updateOrCreate(
+            ['device_id' => $device->id],
+            ['installed_software' => $validated['software']['installed'] ?? [], 'recorded_at' => now()]
+        );
+
+        if (isset($validated['security'])) {
+            IctEquipmentSecurityStatus::updateOrCreate(
+                ['device_id' => $device->id],
+                [
+                    'antivirus_enabled'         => $validated['security']['antivirus_enabled'] ?? null,
+                    'antivirus_up_to_date'      => $validated['security']['antivirus_up_to_date'] ?? null,
+                    'firewall_enabled'          => $validated['security']['firewall_enabled'] ?? null,
+                    'pending_updates_count'     => $validated['security']['pending_updates_count'] ?? null,
+                    'last_update_installed_at'  => $validated['security']['last_update_installed_at'] ?? null,
+                    'reboot_required'           => $validated['security']['reboot_required'] ?? false,
+                    'recorded_at'               => now(),
+                ]
+            );
+
+            $this->securityEvaluator->evaluate($device, $validated['software']['installed'] ?? [], $validated['security']);
+        }
+
+        $this->diagnosticsService->diagnoseInventoryLoop(
+            $device,
+            $hardware,
+            $validated['security'] ?? [],
+            $validated['event_log_entries'] ?? []
+        );
+
+        $device->update(['last_full_inventory_at' => now(), 'last_diagnostics_at' => now()]);
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Diffs the incoming hardware snapshot against whatever was recorded
+     * last time, logging only the fields that actually changed (a swapped
+     * stick of RAM, a replaced disk) before overwriting the latest-only row.
+     */
+    private function recordHardwareInventory(IctEquipmentDevice $device, array $hardware): void
+    {
+        $previous = IctEquipmentHardwareInventory::where('device_id', $device->id)->first();
+
+        $fields = ['cpu_model', 'cpu_cores', 'ram_modules', 'disks', 'gpu', 'peripherals', 'battery'];
+        if ($previous) {
+            foreach ($fields as $field) {
+                $oldValue = $previous->{$field};
+                $newValue = $hardware[$field] ?? null;
+
+                if (json_encode($oldValue) !== json_encode($newValue)) {
+                    IctEquipmentHardwareInventoryChange::create([
+                        'device_id'   => $device->id,
+                        'field'       => $field,
+                        'old_value'   => $oldValue !== null ? json_encode($oldValue) : null,
+                        'new_value'   => $newValue !== null ? json_encode($newValue) : null,
+                        'detected_at' => now(),
+                    ]);
+                }
+            }
+        }
+
+        IctEquipmentHardwareInventory::updateOrCreate(
+            ['device_id' => $device->id],
+            [
+                'cpu_model'   => $hardware['cpu_model'] ?? null,
+                'cpu_cores'   => $hardware['cpu_cores'] ?? null,
+                'ram_modules' => $hardware['ram_modules'] ?? [],
+                'disks'       => $hardware['disks'] ?? [],
+                'gpu'         => $hardware['gpu'] ?? null,
+                'peripherals' => $hardware['peripherals'] ?? [],
+                'battery'     => $hardware['battery'] ?? null,
+                'recorded_at' => now(),
+            ]
+        );
+    }
+
+    /**
+     * GET /api/ict-agent/releases/{encodedKey}
+     *
+     * Streams the private S3-stored agent release zip to an enrolled device.
+     * Same s3.<base64url> key-encoding pattern as the WFH photo proxy —
+     * never expose a raw/public S3 URL for these binaries.
+     */
+    public function releaseDownload(Request $request, string $encodedKey)
+    {
+        if (! preg_match('/^[a-zA-Z0-9_.=-]+$/', $encodedKey)) {
+            abort(400);
+        }
+
+        $s3Key = $this->decodeS3Key($encodedKey);
+        if (! $s3Key || ! Storage::disk('s3')->exists($s3Key)) {
+            abort(404);
+        }
+
+        $contents = Storage::disk('s3')->get($s3Key);
+
+        return response($contents, 200)
+            ->header('Content-Type', 'application/octet-stream')
+            ->header('Content-Disposition', 'attachment; filename="' . basename($s3Key) . '"');
+    }
+
+    private function encodeS3Key(string $s3Key): string
+    {
+        return 's3.' . rtrim(strtr(base64_encode($s3Key), '+/', '-_'), '=');
+    }
+
+    private function decodeS3Key(string $encodedKey): ?string
+    {
+        if (! str_starts_with($encodedKey, 's3.')) {
+            return null;
+        }
+        $padded = strtr(substr($encodedKey, 3), '-_', '+/');
+        $pad = strlen($padded) % 4;
+        if ($pad) $padded .= str_repeat('=', 4 - $pad);
+        $decoded = base64_decode($padded, true);
+        return $decoded !== false ? $decoded : null;
     }
 
     /**

@@ -16,6 +16,7 @@ class IctEquipmentAlert extends Model
         'severity',
         'status',
         'it_job_request_id',
+        'probable_cause',
     ];
 
     public function device()

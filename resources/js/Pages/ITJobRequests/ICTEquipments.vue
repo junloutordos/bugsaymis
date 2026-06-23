@@ -611,6 +611,24 @@ const showAllChecked    = computed({
               </div>
 
 
+              <!-- Warranty Expires -->
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Warranty Expires</label>
+                <input v-model="form.warranty_expires_at" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+
+              <!-- Warranty Provider -->
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Warranty Provider</label>
+                <input v-model="form.warranty_provider" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+
+              <!-- Decommissioned -->
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Decommissioned On</label>
+                <input v-model="form.decommissioned_at" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+              </div>
+
               <!-- Remarks -->
               <div class="col-span-2">
                 <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>

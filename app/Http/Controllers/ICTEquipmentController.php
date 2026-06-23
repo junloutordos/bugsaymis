@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\ICTEquipment;
+use App\Models\IctEquipmentAssignmentHistory;
+use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
+use App\Models\IctEquipmentHealthHistory;
 use App\Models\User;
 use App\Models\Room;
 use Illuminate\Http\Request;
@@ -64,6 +67,47 @@ class ICTEquipmentController extends Controller
         ]);
     }
 
+    /**
+     * GET /ict-agent/health-dashboard
+     *
+     * Campus-wide fleet view, sorted highest-risk-first by default. Trend
+     * data per device is intentionally NOT eager-loaded here — it's fetched
+     * on demand via healthHistory() when a row is expanded, since loading
+     * full history for every device upfront wouldn't scale with fleet size.
+     */
+    public function healthDashboard(Request $request)
+    {
+        $sort = $request->input('sort', 'risk_score');
+        $direction = $request->input('direction', 'desc');
+
+        $devices = IctEquipmentDevice::with(['equipment.owner', 'equipment.room'])
+            ->withCount(['alerts as open_alerts_count' => fn ($q) => $q->where('status', 'open')])
+            ->whereNotNull('equipment_id')
+            ->orderBy(in_array($sort, ['risk_score', 'health_score', 'last_checkin_at']) ? $sort : 'risk_score', $direction === 'asc' ? 'asc' : 'desc')
+            ->get();
+
+        return Inertia::render('ITJobRequests/IctAgentHealthDashboard', [
+            'devices' => $devices,
+            'sort'    => $sort,
+            'direction' => $direction,
+        ]);
+    }
+
+    /**
+     * GET /ict-agent/health-dashboard/{device}/history
+     *
+     * Last 30 days of scored checkins for one device's trend chart.
+     */
+    public function healthHistory(IctEquipmentDevice $device)
+    {
+        $history = IctEquipmentHealthHistory::where('device_id', $device->id)
+            ->where('recorded_at', '>=', now()->subDays(30))
+            ->orderBy('recorded_at')
+            ->get(['health_score', 'risk_score', 'recorded_at', 'payload']);
+
+        return response()->json(['history' => $history]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -80,9 +124,18 @@ class ICTEquipmentController extends Controller
             'room_id' => 'required|exists:rooms,id',
 
             'remarks' => 'nullable|string',
+            'warranty_expires_at' => 'nullable|date',
+            'warranty_provider' => 'nullable|string|max:255',
+            'decommissioned_at' => 'nullable|date',
         ]);
 
         $equipment = ICTEquipment::create($data);
+
+        IctEquipmentAssignmentHistory::create([
+            'equipment_id' => $equipment->id,
+            'user_id' => $equipment->owner_id,
+            'assigned_at' => now(),
+        ]);
 
         // QR Code (unchanged)
         $url = url('/equipment/' . $equipment->id);
@@ -110,10 +163,28 @@ class ICTEquipmentController extends Controller
         'status' => 'required|string|max:255',
         'room_id' => 'required|exists:rooms,id',
         'remarks' => 'nullable|string',
+        'warranty_expires_at' => 'nullable|date',
+        'warranty_provider' => 'nullable|string|max:255',
+        'decommissioned_at' => 'nullable|date',
     ]);
+
+    $previousOwnerId = $ictEquipment->owner_id;
 
     // Update equipment data
     $ictEquipment->update($data);
+
+    if ((int) $data['owner_id'] !== (int) $previousOwnerId) {
+        IctEquipmentAssignmentHistory::where('equipment_id', $ictEquipment->id)
+            ->where('user_id', $previousOwnerId)
+            ->whereNull('unassigned_at')
+            ->update(['unassigned_at' => now()]);
+
+        IctEquipmentAssignmentHistory::create([
+            'equipment_id' => $ictEquipment->id,
+            'user_id' => $data['owner_id'],
+            'assigned_at' => now(),
+        ]);
+    }
 
     /**
      * 🔁 REGENERATE QR CODE

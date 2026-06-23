@@ -42,6 +42,9 @@ export default function useEquipments(initialEquipments = [], users = []) {
     room_id: "",   // ✅ ADD
     location: "",
     remarks: "",
+    warranty_expires_at: "",
+    warranty_provider: "",
+    decommissioned_at: "",
   })
 
   const form = ref(emptyForm())

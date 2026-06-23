@@ -507,6 +507,13 @@ const menuItems = [
         permissions: ["it.equipment.view"],
       },
       {
+        label: "Agent Health Dashboard",
+        routeName: "ict-agent.health-dashboard",
+        href: route("ict-agent.health-dashboard"),
+        icon: ChartBarIcon,
+        permissions: ["it.equipment.view"],
+      },
+      {
         label: "PMS",
         routeName: "ict-pms.index",
         href: route("ict-pms.index"),
