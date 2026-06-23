@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Pds;
 use App\Models\PDSTraining;
+use App\Models\User;
+use App\Services\DigitalSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\MemoryDrawing;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Pdf\Mpdf as PdfWriter;
 use Carbon\Carbon;
@@ -713,6 +716,43 @@ foreach ($questions as $q) {
     $sheet->setCellValue('D64', $pds->otherInfo->date_place_issuance ?? '');
 
     /* =====================================================
+     | PASSPORT PHOTO, DIGITAL SIGNATURE & EXPORT DATE
+     ===================================================== */
+    $exportDate = now()->format('m-d-Y');
+
+    $photoData = null;
+    $photoKey = $pds->otherInfo->path_passport_photo ?? null;
+    if ($photoKey) {
+        try {
+            if (Storage::disk('s3')->exists($photoKey)) {
+                $photoData = Storage::disk('s3')->get($photoKey);
+            }
+        } catch (\Exception) {
+        }
+    }
+
+    $signatureData = null;
+    $pdsOwner = User::find($pds->user_id);
+    if ($pdsOwner) {
+        $signatureDataUri = (new DigitalSignatureService())->getSignatureDataUri($pdsOwner);
+        if ($signatureDataUri) {
+            $signatureData = base64_decode(preg_replace('/^data:image\/\w+;base64,/', '', $signatureDataUri));
+        }
+    }
+
+    $this->embedImage($spreadsheet->getSheetByName('C4'), $photoData, 'J50', 202, 204);
+
+    $this->embedImage($spreadsheet->getSheetByName('C1'), $signatureData, 'D60', 411, 37);
+    $this->embedImage($spreadsheet->getSheetByName('C2'), $signatureData, 'D47', 306, 37);
+    $this->embedImage($spreadsheet->getSheetByName('C3'), $signatureData, 'C50', 312, 38);
+    $this->embedImage($spreadsheet->getSheetByName('C4'), $signatureData, 'F60', 285, 83);
+
+    $spreadsheet->getSheetByName('C1')->setCellValue('L60', $exportDate);
+    $spreadsheet->getSheetByName('C2')->setCellValue('J47', $exportDate);
+    $spreadsheet->getSheetByName('C3')->setCellValue('I50', $exportDate);
+    $spreadsheet->getSheetByName('C4')->setCellValue('F64', $exportDate);
+
+    /* =====================================================
      | DOWNLOAD
      ===================================================== */
     $tempFile = tempnam(sys_get_temp_dir(), 'pds_');
@@ -746,6 +786,38 @@ private function markYesNo(Worksheet $sheet, string $yesCell, string $noCell, $v
     $isYes = in_array($value, [1, '1', 'yes', 'Yes', true], true);
     $sheet->setCellValue($yesCell, $isYes ? '☑ Yes' : '☐ Yes');
     $sheet->setCellValue($noCell,  $isYes ? '☐ No'  : '☑ No');
+}
+
+/**
+ * Draw image bytes into a sheet, scaled to fit (preserving aspect ratio)
+ * and centered inside a maxWidth x maxHeight box anchored at $coordinate.
+ */
+private function embedImage(Worksheet $sheet, ?string $imageData, string $coordinate, int $maxWidth, int $maxHeight): void
+{
+    if (empty($imageData)) {
+        return;
+    }
+
+    $gd = @imagecreatefromstring($imageData);
+    if (!$gd) {
+        return;
+    }
+
+    $padding = 4;
+    $scale = min(($maxWidth - $padding * 2) / imagesx($gd), ($maxHeight - $padding * 2) / imagesy($gd));
+    $width = (int) round(imagesx($gd) * $scale);
+    $height = (int) round(imagesy($gd) * $scale);
+
+    $drawing = new MemoryDrawing();
+    $drawing->setImageResource($gd);
+    $drawing->setRenderingFunction(MemoryDrawing::RENDERING_PNG);
+    $drawing->setMimeType(MemoryDrawing::MIMETYPE_DEFAULT);
+    $drawing->setCoordinates($coordinate);
+    $drawing->setOffsetX((int) round(($maxWidth - $width) / 2));
+    $drawing->setOffsetY((int) round(($maxHeight - $height) / 2));
+    $drawing->setWidth($width);
+    $drawing->setHeight($height);
+    $drawing->setWorksheet($sheet);
 }
 
 
