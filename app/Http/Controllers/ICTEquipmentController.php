@@ -29,6 +29,8 @@ class ICTEquipmentController extends Controller
             'owner',
             'room',
             'agentDevice.healthSnapshot',
+            'agentDevice.hardwareInventory',
+            'agentDevice.securityStatus',
             'alerts' => function ($q) {
                 $q->where('status', 'open')->orderBy('created_at', 'desc');
             },
