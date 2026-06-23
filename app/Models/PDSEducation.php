@@ -20,10 +20,6 @@ class PDSEducation extends Model
         'honors',
     ];
 
-    protected $casts = [
-        'year_graduated' => 'integer',
-    ];
-
     public function pds()
     {
         return $this->belongsTo(PDS::class);

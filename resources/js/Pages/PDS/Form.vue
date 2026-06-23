@@ -320,8 +320,8 @@ const submit = () => {
         editMode.value = false
         Swal.fire('Success', 'PDS updated successfully', 'success')
       },
-      onError: (page) => {
-        const serverErrors = Object.values(page.props.errors).join('<br>')
+      onError: (errors) => {
+        const serverErrors = Object.values(errors).join('<br>')
         Swal.fire({
           icon: 'error',
           title: 'Server Error',
@@ -336,8 +336,8 @@ const submit = () => {
         editMode.value = false
         Swal.fire('Success', 'PDS saved successfully', 'success')
       },
-      onError: (page) => {
-        const serverErrors = Object.values(page.props.errors).join('<br>')
+      onError: (errors) => {
+        const serverErrors = Object.values(errors).join('<br>')
         Swal.fire({
           icon: 'error',
           title: 'Server Error',

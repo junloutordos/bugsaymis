@@ -91,7 +91,7 @@ class PDSController extends Controller
                 ->with('success', 'Personal Data Sheet saved successfully!');
         } catch (\Throwable $e) {
             report($e);
-            return back()->with('error', 'Failed to save PDS. Please try again.');
+            return back()->withErrors(['pds' => 'Failed to save PDS. Please check your entries and try again.']);
         }
     }
 
@@ -122,7 +122,7 @@ class PDSController extends Controller
             return back()->with('success', 'Personal Data Sheet updated successfully!');
         } catch (\Throwable $e) {
             report($e);
-            return back()->with('error', 'Failed to update PDS. Please try again.');
+            return back()->withErrors(['pds' => 'Failed to update PDS. Please check your entries and try again.']);
         }
     }
 
@@ -205,6 +205,24 @@ class PDSController extends Controller
         if ($updating) {
             $pds->{$relation}()->delete();
         }
+
+        $data = array_filter($data, function ($row) {
+            if (!is_array($row)) {
+                return (bool) $row;
+            }
+            foreach ($row as $value) {
+                if (is_array($value)) {
+                    if (array_filter($value, fn ($v) => $v !== null && $v !== '')) {
+                        return true;
+                    }
+                    continue;
+                }
+                if ($value !== null && $value !== '') {
+                    return true;
+                }
+            }
+            return false;
+        });
 
         if (!empty($data)) {
             $pds->{$relation}()->createMany($data);
