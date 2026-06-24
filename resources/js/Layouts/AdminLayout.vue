@@ -507,6 +507,13 @@ const menuItems = [
         permissions: ["it.equipment.view"],
       },
       {
+        label: "Computer Laboratories",
+        routeName: "computer-labs.index",
+        href: route("computer-labs.index"),
+        icon: ComputerDesktopIcon,
+        permissions: ["it.equipment.view"],
+      },
+      {
         label: "Agent Health Dashboard",
         routeName: "ict-agent.health-dashboard",
         href: route("ict-agent.health-dashboard"),

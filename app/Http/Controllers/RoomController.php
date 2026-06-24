@@ -54,7 +54,7 @@ class RoomController extends Controller
             'section_id' => 'nullable|exists:sections,id',
             'capacity' => 'nullable|integer|min:0',
             'remarks' => 'nullable|string',
-            'room_type' => 'nullable|in:Classroom,Admin,Laboratory,Sports/Recreation,Assembly,Comfort Room',
+            'room_type' => 'nullable|in:Classroom,Admin,Laboratory,Computer Laboratory,Sports/Recreation,Assembly,Comfort Room',
             'comfort_gender' => 'nullable|in:Female,Male,All Gender',
         ]);
 
@@ -74,7 +74,7 @@ class RoomController extends Controller
             'section_id' => 'nullable|exists:sections,id',
             'capacity' => 'nullable|integer|min:0',
             'remarks' => 'nullable|string',
-            'room_type' => 'nullable|in:Classroom,Admin,Laboratory,Sports/Recreation,Assembly,Comfort Room',
+            'room_type' => 'nullable|in:Classroom,Admin,Laboratory,Computer Laboratory,Sports/Recreation,Assembly,Comfort Room',
             'comfort_gender' => 'nullable|in:Female,Male,All Gender',
         ]);
 

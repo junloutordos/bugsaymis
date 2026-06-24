@@ -157,6 +157,7 @@
                 <option value="Classroom">Classroom</option>
                 <option value="Admin">Admin</option>
                 <option value="Laboratory">Laboratory</option>
+                <option value="Computer Laboratory">Computer Laboratory</option>
                 <option value="Sports/Recreation">Sports/Recreation</option>
                 <option value="Assembly">Assembly</option>
                 <option value="Comfort Room">Comfort Room</option>

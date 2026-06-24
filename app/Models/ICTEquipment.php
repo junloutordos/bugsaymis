@@ -21,6 +21,8 @@ class ICTEquipment extends Model
         'amount',
         'status',
         'room_id',
+        'lab_seat_row',
+        'lab_seat_col',
         'remarks',
         'qr_code_path',
         'warranty_expires_at',

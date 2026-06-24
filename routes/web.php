@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ITJobRequestController;
 use App\Http\Controllers\ICTEquipmentController;
+use App\Http\Controllers\ComputerLabController;
 use App\Http\Controllers\HR\EmployeeDocumentController;
 use App\Http\Controllers\ApprovalInboxController;
 
@@ -872,6 +873,16 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/ict-equipments/{ictEquipment}/remediate', [ICTEquipmentController::class, 'remediate'])
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.remediate');
+
+    Route::get('/computer-labs', [ComputerLabController::class, 'index'])
+        ->middleware('permission:it.equipment.view')
+        ->name('computer-labs.index');
+    Route::get('/computer-labs/{room}', [ComputerLabController::class, 'show'])
+        ->middleware('permission:it.equipment.view')
+        ->name('computer-labs.show');
+    Route::patch('/computer-labs/equipment/{equipment}/seat', [ComputerLabController::class, 'updateSeat'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('computer-labs.update-seat');
 
     // PMS History routes
     Route::post('/ict-pms-history', [ICTPMSHistoryController::class, 'store'])->name('ict-pms-history.store');
