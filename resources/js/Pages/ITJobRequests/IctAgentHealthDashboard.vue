@@ -150,6 +150,17 @@ function formatDate(value) {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
 }
+
+// A failed self-update can leave the agent's Windows service down rather
+// than just on an old version — that looks identical to "all is well" here
+// unless we flag check-ins that never resumed afterward.
+const STALE_CHECKIN_MINUTES = 40
+function offlineAfterFailedUpdate(device) {
+  if (!['failed', 'failed_service_down'].includes(device.last_update_result)) return false
+  if (!device.last_checkin_at) return false
+  const minutesSinceCheckin = (Date.now() - new Date(device.last_checkin_at).getTime()) / 60000
+  return minutesSinceCheckin > STALE_CHECKIN_MINUTES
+}
 </script>
 
 <template>
@@ -191,6 +202,19 @@ function formatDate(value) {
                 <td class="px-4 py-3">
                   <div class="font-medium text-slate-700">{{ device.hostname || '—' }}</div>
                   <div class="text-xs text-slate-400">{{ device.equipment?.description }} ({{ device.equipment?.serial_no }})</div>
+                  <div
+                    v-if="offlineAfterFailedUpdate(device)"
+                    class="mt-1 inline-flex items-center gap-1 text-red-600 text-xs font-medium"
+                    :title="device.last_update_details || 'Update failed and no check-in since.'"
+                  >
+                    <ExclamationTriangleIcon class="w-3.5 h-3.5" /> Likely offline after failed update
+                  </div>
+                  <div v-else-if="device.last_update_result === 'failed' || device.last_update_result === 'failed_service_down'"
+                    class="mt-1 text-xs text-amber-600"
+                    :title="device.last_update_details || ''"
+                  >
+                    Last update failed ({{ formatDate(device.last_update_attempted_at) }})
+                  </div>
                 </td>
                 <td class="px-4 py-3 text-slate-600">
                   <div>{{ device.equipment?.owner?.name || '—' }}</div>

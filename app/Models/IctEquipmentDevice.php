@@ -22,6 +22,7 @@ class IctEquipmentDevice extends Model
         'network_location_changed_at',
         'last_update_attempted_at',
         'last_update_result',
+        'last_update_details',
         'health_score',
         'risk_score',
         'risk_tier',
