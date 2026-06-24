@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\CsmResponse;
+use App\Models\ICTEquipment;
+use App\Models\IctEquipmentAlert;
+use App\Models\IctEquipmentDevice;
+use App\Models\IctEquipmentSecurityStatus;
 use App\Models\ITJobRequest;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -143,6 +147,36 @@ class MISDashboardController extends Controller
             ->get(['id', 'itjr_no', 'title', 'category', 'user_id', 'assignedto', 'status', 'created_at'])
             ->makeHidden(['assigned_personnel']);
 
+        // ── Fleet & Infrastructure Health (live snapshot, not month-scoped) ────
+
+        $canViewFleet = $request->user()->hasPermission('it.equipment.view');
+        $fleet = null;
+
+        if ($canViewFleet) {
+            $riskTierBreakdown = IctEquipmentDevice::selectRaw('risk_tier, COUNT(*) as count')
+                ->groupBy('risk_tier')
+                ->pluck('count', 'risk_tier');
+
+            $topAtRiskDevices = IctEquipmentDevice::with('equipment.room')
+                ->withCount(['alerts as open_alerts_count' => fn ($q) => $q->where('status', 'open')])
+                ->whereNotNull('risk_score')
+                ->orderByDesc('risk_score')
+                ->take(5)
+                ->get(['id', 'hostname', 'equipment_id', 'risk_score', 'risk_tier', 'last_checkin_at']);
+
+            $fleet = [
+                'devices_enrolled'     => IctEquipmentDevice::count(),
+                'total_equipment'      => ICTEquipment::count(),
+                'open_alerts'          => IctEquipmentAlert::where('status', 'open')->count(),
+                'high_critical_risk'   => IctEquipmentDevice::whereIn('risk_tier', ['high', 'critical'])->count(),
+                'reboot_required'      => IctEquipmentSecurityStatus::where('reboot_required', true)->count(),
+                'antivirus_disabled'   => IctEquipmentSecurityStatus::where('antivirus_enabled', false)->count(),
+                'risk_tier_breakdown'  => $riskTierBreakdown,
+                'top_at_risk_devices'  => $topAtRiskDevices,
+                'labs'                 => ComputerLabController::summary(),
+            ];
+        }
+
         return Inertia::render('MIS/Dashboard', [
             'month'              => $month,
             'kpi'                => [
@@ -159,6 +193,8 @@ class MISDashboardController extends Controller
             'personnelWorkload'  => $personnelWorkload,
             'sqdBreakdown'       => $sqdBreakdown,
             'recentRequests'     => $recentRequests,
+            'canViewFleet'       => $canViewFleet,
+            'fleet'              => $fleet,
         ]);
     }
 

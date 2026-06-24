@@ -15,6 +15,17 @@ class ComputerLabController extends Controller
 
     public function index()
     {
+        return Inertia::render('ITJobRequests/ComputerLabs/Index', [
+            'labs' => self::summary(),
+        ]);
+    }
+
+    /**
+     * Per-lab unit/enrollment/risk counts — shared with the MIS Dashboard's
+     * fleet health summary so both stay in sync off one query.
+     */
+    public static function summary()
+    {
         $rooms = Room::where('room_type', 'Computer Laboratory')->orderBy('name')->get();
 
         $equipments = ICTEquipment::where('category', 'CPU/System Unit')
@@ -23,7 +34,7 @@ class ComputerLabController extends Controller
             ->get()
             ->groupBy('room_id');
 
-        $labs = $rooms->map(function ($room) use ($equipments) {
+        return $rooms->map(function ($room) use ($equipments) {
             $units = $equipments->get($room->id, collect());
 
             return [
@@ -32,11 +43,7 @@ class ComputerLabController extends Controller
                 'enrolled' => $units->filter(fn ($u) => $u->agentDevice)->count(),
                 'critical' => $units->filter(fn ($u) => $u->agentDevice?->risk_tier === 'critical')->count(),
             ];
-        });
-
-        return Inertia::render('ITJobRequests/ComputerLabs/Index', [
-            'labs' => $labs,
-        ]);
+        })->values();
     }
 
     public function show(Room $room)
