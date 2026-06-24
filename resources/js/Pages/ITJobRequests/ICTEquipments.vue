@@ -25,6 +25,8 @@ import {
   ServerStackIcon,
   WrenchScrewdriverIcon,
   CheckBadgeIcon,
+  ArchiveBoxIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/vue/24/outline"
 import useEquipments from "@/Composables/useEquipments.js"
 
@@ -118,6 +120,41 @@ const selectedSpecsEquipment = computed(() =>
 function openSpecs(eq) {
   selectedSpecsEquipmentId.value = eq.id
   showSpecsModal.value = true
+  softwareSearch.value = ''
+}
+
+// Installed software list — read-only display plus an opt-in uninstall
+// path. Only rows with a documented silent removal method (QuietUninstallString
+// or an MSI ProductCode) get an Uninstall button; everything else has no
+// reliable unattended path since the agent has no interactive desktop
+// session to click through a GUI uninstaller.
+const softwareSearch = ref('')
+const filteredSoftware = computed(() => {
+  const list = selectedSpecsEquipment.value?.agent_device?.software_inventory?.installed_software ?? []
+  const term = softwareSearch.value.trim().toLowerCase()
+  const sorted = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+  if (!term) return sorted
+  return sorted.filter(sw =>
+    (sw.name || '').toLowerCase().includes(term) || (sw.publisher || '').toLowerCase().includes(term)
+  )
+})
+
+function isSilentlyUninstallable(sw) {
+  return !!(sw.quiet_uninstall_string || sw.is_msi)
+}
+
+async function confirmUninstall(eq, sw) {
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: `Uninstall ${sw.name}?`,
+    html: `This will permanently remove <strong>${sw.name}</strong> from <strong>${eq.agent_device.hostname}</strong>. This cannot be undone.`,
+    showCancelButton: true,
+    confirmButtonText: 'Uninstall',
+    confirmButtonColor: '#dc2626',
+  })
+  if (result.isConfirmed) {
+    runFix(eq, 'software_uninstall', sw.uninstall_key)
+  }
 }
 
 // Admin-triggered "Fix Now" — bypasses the auto_execute rule gate; the
@@ -1365,6 +1402,55 @@ const showAllChecked    = computed({
                         >Last run: {{ lastFixResult(selectedSpecsEquipment, qf.action).status === 'completed' ? 'succeeded' : 'failed' }}, {{ formatDateTime(lastFixResult(selectedSpecsEquipment, qf.action).completed_at) }}</div>
                       </button>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Installed Software — read-only list from the daily
+                   inventory check-in. Uninstall is only offered for entries
+                   with a documented silent removal path; everything else
+                   has no reliable unattended uninstall (the agent has no
+                   interactive desktop session to click through a GUI
+                   uninstaller). -->
+              <div
+                v-if="selectedSpecsEquipment.agent_device.software_inventory?.installed_software?.length"
+                class="border border-slate-100 rounded-lg p-3 flex items-start gap-3"
+              >
+                <ArchiveBoxIcon class="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      Installed Software ({{ selectedSpecsEquipment.agent_device.software_inventory.installed_software.length }})
+                    </div>
+                  </div>
+                  <div class="relative mb-2">
+                    <MagnifyingGlassIcon class="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                    <input
+                      v-model="softwareSearch"
+                      type="text"
+                      placeholder="Search software or publisher…"
+                      class="w-full text-xs pl-7 pr-2 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div class="max-h-56 overflow-y-auto space-y-1">
+                    <div
+                      v-for="sw in filteredSoftware"
+                      :key="sw.uninstall_key ?? sw.name"
+                      class="flex items-center justify-between gap-2 text-xs py-1 border-b border-slate-50 last:border-b-0"
+                    >
+                      <div class="flex-1 min-w-0">
+                        <div class="text-slate-700 truncate">{{ sw.name }}</div>
+                        <div class="text-[11px] text-slate-400 truncate">{{ sw.publisher || '—' }} &middot; {{ sw.version || '—' }}</div>
+                      </div>
+                      <button
+                        v-if="isSilentlyUninstallable(sw)"
+                        @click="confirmUninstall(selectedSpecsEquipment, sw)"
+                        :disabled="isFixPending(selectedSpecsEquipment, 'software_uninstall', sw.uninstall_key)"
+                        class="shrink-0 text-[11px] font-medium text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >{{ isFixPending(selectedSpecsEquipment, 'software_uninstall', sw.uninstall_key) ? 'Queued…' : 'Uninstall' }}</button>
+                      <span v-else class="shrink-0 text-[11px] text-slate-300" title="No silent uninstall method available">—</span>
+                    </div>
+                    <div v-if="!filteredSoftware.length" class="text-center text-slate-400 py-2">No matches.</div>
                   </div>
                 </div>
               </div>
