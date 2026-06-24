@@ -499,7 +499,7 @@ function fmtType(t) {
         <section v-if="activeSection === 'overview'" class="space-y-6">
           <div>
             <h1 class="text-2xl font-bold text-slate-800">System Overview</h1>
-            <p class="text-slate-500 mt-1">Atlas — Digital Campus Management Platform of PSHS-CRC</p>
+            <p class="text-slate-500 mt-1">Atlas — Centralized MIS of PSHS-CRC</p>
           </div>
 
           <!-- Stack -->
