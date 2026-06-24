@@ -42,6 +42,10 @@
             :class="['px-3 py-1.5 font-medium border-l border-slate-200 transition-colors', viewBy === 'faculty' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
             By Faculty
           </button>
+          <button type="button" @click="setViewBy('grade')"
+            :class="['px-3 py-1.5 font-medium border-l border-slate-200 transition-colors', viewBy === 'grade' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+            By Year Level
+          </button>
         </div>
         <select v-model="filters.term_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -56,10 +60,15 @@
             Grade {{ sec.levelid }} — {{ sec.sectionname }}
           </option>
         </select>
-        <select v-else v-model="filters.faculty_id" @change="applyFilters"
+        <select v-else-if="viewBy === 'faculty'" v-model="filters.faculty_id" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option :value="null">All Faculty</option>
           <option v-for="f in faculty" :key="f.id" :value="f.id">{{ f.name }}</option>
+        </select>
+        <select v-else v-model="gradeFilter"
+          class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <option :value="null">All Grades</option>
+          <option v-for="g in GRADE_LEVELS" :key="g" :value="g">Grade {{ g }}</option>
         </select>
       </div>
 
@@ -110,7 +119,10 @@
                   <span v-if="viewBy === 'section'" class="text-xs font-bold text-white bg-indigo-500 px-2.5 py-0.5 rounded-full">
                     Grade {{ groupHeaderInfo(groupId).grade_level }}
                   </span>
-                  <h3 class="text-sm font-semibold text-slate-800">
+                  <h3 v-if="viewBy === 'grade'" class="text-sm font-semibold text-slate-800">
+                    Grade {{ groupId }} — Electives
+                  </h3>
+                  <h3 v-else class="text-sm font-semibold text-slate-800">
                     {{ viewBy === 'faculty' ? groupHeaderInfo(groupId).faculty_name : groupHeaderInfo(groupId).section_name }}
                   </h3>
                   <span class="text-xs text-slate-400">· {{ byGroup[groupId]?.length ?? 0 }} slot(s)</span>
@@ -490,28 +502,45 @@ function applyFilters() {
 
 const viewBy = ref(props.filters.faculty_id ? 'faculty' : 'section')
 
+const GRADE_LEVELS = [7, 8, 9, 10, 11, 12]
+const gradeFilter = ref(null)
+
 function setViewBy(mode) {
   if (viewBy.value === mode) return
   viewBy.value = mode
   if (mode === 'section') {
     filters.faculty_id = null
+  } else if (mode === 'faculty') {
+    filters.section_id = null
   } else {
     filters.section_id = null
+    filters.faculty_id = null
   }
   applyFilters()
 }
 
 // ── Grouping ─────────────────────────────────────────────────────────────────
 
+/** Schedules feeding the grouping logic — in "By Year Level" mode this is
+ *  narrowed to elective sessions only (and optionally one grade), since that
+ *  view exists to give a comprehensive cross-section elective overview. */
+const displaySchedules = computed(() => {
+  if (viewBy.value !== 'grade') return props.schedules
+  return props.schedules.filter(s =>
+    s.subject?.is_elective && (gradeFilter.value == null || s.grade_level === gradeFilter.value)
+  )
+})
+
 /** Group key for a schedule row, depending on the active view mode. */
 function groupKeyOf(s) {
+  if (viewBy.value === 'grade') return s.grade_level
   return viewBy.value === 'faculty' ? (s.faculty?.id ?? 'unassigned') : s.section_id
 }
 
 /** { groupId: [schedules] } */
 const byGroup = computed(() => {
   const map = {}
-  for (const s of props.schedules) {
+  for (const s of displaySchedules.value) {
     const k = groupKeyOf(s)
     if (!map[k]) map[k] = []
     map[k].push(s)
@@ -522,15 +551,21 @@ const byGroup = computed(() => {
 /** Group IDs in display order (backend already sorted by grade + name + day + time) */
 const groupsWithSchedules = computed(() => {
   const seen = []
-  for (const s of props.schedules) {
+  for (const s of displaySchedules.value) {
     const k = groupKeyOf(s)
     if (!seen.includes(k)) seen.push(k)
   }
   // Sections/faculty with unplaced loads but zero schedules yet still need a
-  // calendar card to render so there's somewhere to drop the tray chip.
-  for (const load of props.unplacedLoads) {
-    const k = viewBy.value === 'faculty' ? (load.faculty?.id ?? 'unassigned') : load.section_id
-    if (!seen.includes(k)) seen.push(k)
+  // calendar card to render so there's somewhere to drop the tray chip. Not
+  // applicable in "By Year Level" mode — that view is read-only overview, no
+  // drop target, and unplaced loads aren't elective-flagged here.
+  if (viewBy.value !== 'grade') {
+    for (const load of props.unplacedLoads) {
+      const k = viewBy.value === 'faculty' ? (load.faculty?.id ?? 'unassigned') : load.section_id
+      if (!seen.includes(k)) seen.push(k)
+    }
+  } else {
+    seen.sort((a, b) => a - b)
   }
   return seen
 })
@@ -559,7 +594,7 @@ function groupHeaderInfo(groupId) {
 /** { groupId: { day: [schedules] } } */
 const byGroupDay = computed(() => {
   const map = {}
-  for (const s of props.schedules) {
+  for (const s of displaySchedules.value) {
     const k = groupKeyOf(s)
     if (!map[k]) map[k] = {}
     if (!map[k][s.day_of_week]) map[k][s.day_of_week] = []
@@ -590,6 +625,7 @@ function subjectsInGroup(groupId) {
 
 /** Text shown inside an event block for the dimension that ISN'T the grouping axis. */
 function secondaryLabel(s) {
+  if (viewBy.value === 'grade') return `${s.section_name} · ${s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA'}`
   return viewBy.value === 'faculty'
     ? `G${s.grade_level} ${s.section_name}`
     : (s.faculty?.name ? lastNameOf(s.faculty.name) : 'TBA')
@@ -608,17 +644,88 @@ function hourTop(h) {
   return (h * 60 - CAL_START) * SCALE
 }
 
-/** Absolute positioning style for a schedule event block */
+/**
+ * Assigns each event in a single day-column a lane (and the lane count for
+ * its overlap cluster) so concurrent sessions render side-by-side instead of
+ * stacked. Standard greedy interval-packing: sort by start time, give each
+ * event the lowest-numbered lane whose previous occupant has already ended.
+ * Returns Map(scheduleId -> { lane, totalLanes }).
+ */
+function packOverlaps(events) {
+  const items = events
+    .map(s => ({ id: s.id, start: timeToMin(s.start_time), end: timeToMin(s.end_time) }))
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+
+  const result = new Map()
+  let lanesEnd = []
+  let cluster = []
+  let clusterMaxLane = 0
+  let clusterEnd = -Infinity
+
+  const flush = () => {
+    for (const id of cluster) result.get(id).totalLanes = clusterMaxLane + 1
+    cluster = []
+    clusterMaxLane = 0
+    lanesEnd = []
+  }
+
+  for (const item of items) {
+    if (item.start >= clusterEnd) {
+      flush()
+      clusterEnd = -Infinity
+    }
+    let lane = 0
+    while (lane < lanesEnd.length && lanesEnd[lane] > item.start) lane++
+    lanesEnd[lane] = item.end
+    result.set(item.id, { lane, totalLanes: 1 })
+    cluster.push(item.id)
+    clusterMaxLane = Math.max(clusterMaxLane, lane)
+    clusterEnd = Math.max(clusterEnd, item.end)
+  }
+  flush()
+  return result
+}
+
+/** { groupId: { day: Map(scheduleId -> {lane, totalLanes}) } } — only built
+ *  in "By Year Level" mode, where multiple sections' concurrent electives
+ *  share the same day column and need side-by-side lanes. */
+const lanePacking = computed(() => {
+  const map = {}
+  if (viewBy.value !== 'grade') return map
+  for (const [groupId, days] of Object.entries(byGroupDay.value)) {
+    map[groupId] = {}
+    for (const [day, events] of Object.entries(days)) {
+      map[groupId][day] = packOverlaps(events)
+    }
+  }
+  return map
+})
+
+/** Absolute positioning style for a schedule event block. In "By Year Level"
+ *  mode, horizontal position/width come from packOverlaps() so concurrent
+ *  sections' electives sit in side-by-side lanes instead of overlapping. */
 function eventStyle(s) {
   const sm = Math.max(timeToMin(s.start_time), CAL_START)
   const em = Math.min(timeToMin(s.end_time), CAL_END)
-  return {
+  const style = {
     position: 'absolute',
     top:    ((sm - CAL_START) * SCALE) + 'px',
     height: Math.max((em - sm) * SCALE, 24) + 'px',
-    left:   '2px',
-    right:  '2px',
   }
+
+  if (viewBy.value === 'grade') {
+    const pack  = lanePacking.value[groupKeyOf(s)]?.[s.day_of_week]?.get(s.id)
+    const lane  = pack?.lane ?? 0
+    const total = pack?.totalLanes ?? 1
+    const pct   = 100 / total
+    style.left  = `calc(${lane * pct}% + 1px)`
+    style.width = `calc(${pct}% - 2px)`
+  } else {
+    style.left  = '2px'
+    style.right = '2px'
+  }
+
+  return style
 }
 
 /** Absolute positioning style for a blocked-period overlay */
@@ -655,7 +762,7 @@ const dropTarget  = ref(null)
 const dragBusy     = ref(false)
 
 function canDrag(s) {
-  return s.status !== 'cancelled' && !s.is_locked
+  return viewBy.value !== 'grade' && s.status !== 'cancelled' && !s.is_locked
 }
 
 function schoolYearIdForTerm(termId) {
@@ -766,6 +873,7 @@ function onDragEnd() {
 }
 
 function onDragOverColumn(e, groupId, day) {
+  if (viewBy.value === 'grade') return
   if (!dragPayload.value) return
   pendingDragOver = { clientY: e.clientY, columnEl: e.currentTarget, groupId, day }
   if (dragFrame) return
@@ -829,6 +937,7 @@ function dropPreviewStyle() {
 }
 
 async function onDropColumn(e, groupId, day) {
+  if (viewBy.value === 'grade') return
   const payload = dragPayload.value
   const target  = dropTarget.value
   dragPayload.value = null

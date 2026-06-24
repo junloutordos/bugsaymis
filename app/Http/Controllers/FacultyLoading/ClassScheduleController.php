@@ -132,7 +132,7 @@ class ClassScheduleController extends Controller
             return [];
         }
 
-        $loads = LoadAssignment::with(['subject:id,code,name,load_units', 'faculty:id,name'])
+        $loads = LoadAssignment::with(['subject:id,code,name,load_units,grade_level,subject_type', 'faculty:id,name'])
             ->where('academic_term_id', $termId)
             ->where('assignment_type', 'teaching')
             ->whereNotNull('section_id')
@@ -168,9 +168,10 @@ class ClassScheduleController extends Controller
                 return [
                     'load_assignment_id' => $la->id,
                     'subject'            => $la->subject ? [
-                        'id'   => $la->subject->id,
-                        'code' => $la->subject->code,
-                        'name' => $la->subject->name,
+                        'id'          => $la->subject->id,
+                        'code'        => $la->subject->code,
+                        'name'        => $la->subject->name,
+                        'is_elective' => $la->subject->grade_level === 0 || $la->subject->subject_type === 'elective',
                     ] : null,
                     'faculty' => $la->faculty ? [
                         'id'   => $la->faculty->id,
@@ -349,9 +350,10 @@ class ClassScheduleController extends Controller
             'status'             => $s->status,
             'remarks'            => $s->remarks,
             'subject'            => $s->subject ? [
-                'id'   => $s->subject->id,
-                'code' => $s->subject->code,
-                'name' => $s->subject->name,
+                'id'          => $s->subject->id,
+                'code'        => $s->subject->code,
+                'name'        => $s->subject->name,
+                'is_elective' => $s->subject->grade_level === 0 || $s->subject->subject_type === 'elective',
             ] : null,
             'classroom'    => $s->classroom ? [
                 'id'   => $s->classroom->id,
