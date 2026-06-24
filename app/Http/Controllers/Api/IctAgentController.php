@@ -83,14 +83,26 @@ class IctAgentController extends Controller
             ]);
         }
 
-        $device = IctEquipmentDevice::create([
+        // Re-running install.ps1 on a machine already matched to this
+        // equipment (re-enrollment, reinstall) reuses its device row instead
+        // of leaving the old one stale forever with a dead token.
+        $device = IctEquipmentDevice::where('equipment_id', $equipment->id)->first();
+
+        $deviceAttributes = [
             'equipment_id'     => $equipment->id,
             'hostname'         => $validated['hostname'] ?? null,
             'mac_address'      => $validated['mac_address'] ?? null,
             'os_version'       => $validated['os_version'] ?? null,
             'agent_version'    => $validated['agent_version'] ?? null,
             'last_checkin_at'  => now(),
-        ]);
+        ];
+
+        if ($device) {
+            $device->tokens()->delete();
+            $device->update($deviceAttributes);
+        } else {
+            $device = IctEquipmentDevice::create($deviceAttributes);
+        }
 
         $deviceToken = $device->createToken('ict-agent', ['ict-agent'])->plainTextToken;
 
@@ -166,7 +178,8 @@ class IctAgentController extends Controller
             'wifi_bssid'    => ['nullable', 'string', 'max:50'],
             'update_result' => ['nullable', 'array'],
             'update_result.version' => ['nullable', 'string', 'max:20'],
-            'update_result.result'  => ['nullable', 'string', 'in:success,failed'],
+            'update_result.result'  => ['nullable', 'string', 'in:success,failed,failed_service_down'],
+            'update_result.details' => ['nullable', 'string', 'max:2000'],
             'remediation_results'   => ['nullable', 'array'],
             'remediation_results.*.action'       => ['nullable', 'string', 'max:50'],
             'remediation_results.*.target'       => ['nullable', 'string', 'max:255'],
@@ -204,6 +217,7 @@ class IctAgentController extends Controller
         if (isset($validated['update_result']['result'])) {
             $deviceUpdate['last_update_attempted_at'] = now();
             $deviceUpdate['last_update_result'] = $validated['update_result']['result'];
+            $deviceUpdate['last_update_details'] = $validated['update_result']['details'] ?? null;
         }
 
         $device->update($deviceUpdate);
