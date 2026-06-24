@@ -37,3 +37,7 @@ Schedule::command('log:health')->dailyAt('06:00');
 // ── Backup recency check: was a backup uploaded to Drive in the last 25h? ─
 Schedule::command('backup:verify')->dailyAt('06:30')->withoutOverlapping();
 
+// ── ICT Agent: expire manual "Fix Now" requests stuck 'delivered' with no
+//    result reported (device went offline/crashed mid-flight) ─────────────
+Schedule::command('ict-agent:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();
+
