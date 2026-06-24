@@ -127,7 +127,7 @@ const brandPillars = [
     <header class="navbar">
       <div class="nav-inner">
         <div class="nav-brand">
-          <img src="/images/atlas-logo-white.png" alt="Atlas" class="nav-logo" />
+          <img src="/images/atlas-logo-full.png" alt="Atlas" class="nav-logo" />
         </div>
         <nav class="nav-links">
           <a href="#about"      class="nav-link">About</a>
