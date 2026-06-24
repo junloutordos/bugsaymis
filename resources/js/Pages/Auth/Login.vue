@@ -24,6 +24,10 @@ import {
   LockClosedIcon,
   ChevronDoubleDownIcon,
   ArrowRightIcon,
+  ArrowTrendingUpIcon,
+  SparklesIcon,
+  RocketLaunchIcon,
+  HandRaisedIcon,
 } from '@heroicons/vue/24/outline'
 
 const OFFICIAL_DOMAIN = '@crc.pshs.edu.ph'
@@ -104,16 +108,16 @@ const pillars = [
   },
 ]
 
-const stats = [
-  { value: '12+',  label: 'Core Modules' },
-  { value: '500+', label: 'System Users' },
-  { value: '290+', label: 'DB Migrations' },
-  { value: '99.9%',label: 'Uptime' },
+const brandPillars = [
+  { icon: ArrowTrendingUpIcon, label: 'Direction', desc: 'The arrow mark points one way only — forward.' },
+  { icon: SparklesIcon,        label: 'Clarity',   desc: 'A single shape, instantly recognizable at any size.' },
+  { icon: RocketLaunchIcon,    label: 'Momentum',  desc: 'Built to move with PSHS-CRC into the future.' },
+  { icon: HandRaisedIcon,      label: 'Trust',     desc: 'PSHS-backed, campus-owned, people-centered.' },
 ]
 </script>
 
 <template>
-  <Head title="Atlas — Digital Campus Management Platform" />
+  <Head title="Atlas — Centralized MIS" />
 
   <div class="site">
 
@@ -123,11 +127,7 @@ const stats = [
     <header class="navbar">
       <div class="nav-inner">
         <div class="nav-brand">
-          <img src="/images/atlas-mark.png" alt="Atlas" class="nav-logo" />
-          <div>
-            <span class="nav-name font-heading">Atlas</span>
-            <span class="nav-sub">PSHS – Caraga Region Campus in Butuan City</span>
-          </div>
+          <img src="/images/atlas-logo-white.png" alt="Atlas" class="nav-logo" />
         </div>
         <nav class="nav-links">
           <a href="#about"      class="nav-link">About</a>
@@ -146,13 +146,15 @@ const stats = [
     <section class="hero">
       <!-- background layers -->
       <div class="hero-base" />
-      <!-- bottom-left ambient glows -->
       <div class="deco deco-cyan" />
-      <div class="deco deco-bl" />
-      <img src="/images/atlas-mark-white.png" alt="" class="hero-watermark" aria-hidden="true" />
+      <div class="deco deco-desc" />
+      <img src="/images/atlas-mark.png" alt="" class="hero-mark-bg" aria-hidden="true" />
+      <svg class="hero-route" viewBox="0 0 700 320" aria-hidden="true">
+        <path d="M10,170 C160,40 340,280 690,80" />
+      </svg>
 
       <div class="hero-inner">
-        <!-- Left: hero text + stats + chips -->
+        <!-- Left: hero text -->
         <div class="hero-left">
           <div class="hero-badge">
             <span class="badge-dot" />
@@ -160,54 +162,50 @@ const stats = [
           </div>
 
           <h1 class="hero-h1 font-heading">
-            Charting the Way Forward <br>
-            <span class="hero-accent">to Digital Transformation.</span>
+            Charting the Way <br>
+            <span class="hero-accent">Forward to Digital<br>Transformation.</span>
           </h1>
 
           <p class="hero-p">
-            Atlas is the unified digital management platform of PSHS-CRC in Butuan City.
-            It consolidates HR, activity, academics, student services, and campus operations into one secure, cloud-native system.
+            Atlas is the unified digital management platform of PSHS-CRC —
+            consolidating HR, faculty loading, student services, and campus operations
+            into one secure, cloud-native system backed by AWS and PSHS.
           </p>
-
-          <div class="chip-box">
-            <p class="chip-box-label">Integrated Modules</p>
-            <div class="chip-list">
-              <span v-for="m in modules" :key="m.name" class="chip">
-                <component :is="m.icon" class="chip-icon" />
-                {{ m.name }}
-              </span>
-            </div>
-          </div>
         </div>
 
         <!-- Right: login card only -->
         <div id="hero-login" class="hero-right">
+          <div class="lc-glow" />
           <div class="login-card">
-            <div class="lc-head">
-              <div class="lc-icon-wrap">
-                <LockClosedIcon class="lc-icon" />
+            <div class="lc-content">
+              <div class="lc-head">
+                <div class="lc-icon-wrap">
+                  <LockClosedIcon class="lc-icon" />
+                </div>
+                <div>
+                  <p class="lc-title">Sign In to Atlas</p>
+                  <p class="lc-sub">One login. Every tool you need today.</p>
+                </div>
               </div>
-              <div>
-                <p class="lc-title">Access the System</p>
-                <p class="lc-sub">Sign in with your official PSHS-CRC Google account.</p>
+
+              <div class="lc-divider" />
+
+              <button @click="googleLogin" :disabled="isLoading" class="gbtn">
+                <span class="g-icon-wrap">
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="g-icon" alt="Google" />
+                </span>
+                <span class="g-label">{{ isLoading ? 'Signing in…' : 'Continue with your PSHS-CRC Google Account' }}</span>
+                <svg v-if="isLoading" class="g-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
+                </svg>
+              </button>
+
+              <div class="lc-notice">
+                <LockClosedIcon class="notice-icon" />
+                <span>Only <strong>@crc.pshs.edu.ph</strong> accounts are authorized to sign in.</span>
               </div>
             </div>
-
-            <button @click="googleLogin" :disabled="isLoading" class="gbtn">
-              <span class="g-icon-wrap">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="g-icon" alt="Google" />
-              </span>
-              <span class="g-label">{{ isLoading ? 'Signing in…' : 'Continue with your PSHS-CRC Google Account' }}</span>
-              <svg v-if="isLoading" class="g-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
-              </svg>
-            </button>
-
-            <p class="lc-notice">
-              <LockClosedIcon class="notice-icon" />
-              <span>Only <strong>@crc.pshs.edu.ph</strong> accounts are authorized to sign in.</span>
-            </p>
           </div>
         </div>
       </div>
@@ -226,10 +224,41 @@ const stats = [
         <div class="section-hd">
           <p class="eyebrow">About Atlas</p>
           <h2 class="section-h2 font-heading">Built for PSHS-CRC.<br>Designed for everyone in it.</h2>
-          <p class="section-lead">
-            From the mancom to faculty, staff and students, Atlas gives each stakeholder
-            the exact tools and data they need — nothing more, nothing less.
+        </div>
+
+        <div class="about-body">
+          <p>
+            <strong>Atlas</strong> is the Centralized Management Information System of the
+            Philippine Science High School – Caraga Region Campus, designed to streamline
+            operations, enhance collaboration, and support data-driven decision-making across
+            the institution.
           </p>
+          <p>
+            Built and continuously developed in-house, Atlas serves as a unified digital
+            ecosystem that connects students, parents, faculty, staff, and administrators
+            through a centralized platform for academic, administrative, and institutional
+            services.
+          </p>
+          <p>
+            Inspired by the role of an atlas in providing direction and navigation, Atlas acts
+            as the digital compass of the campus — guiding the community through a seamless,
+            efficient, and future-ready digital experience. By bringing together information,
+            processes, and services in one platform, Atlas reduces manual work, improves
+            operational efficiency, and enables better access to information anytime and
+            anywhere.
+          </p>
+          <p>
+            More than an information system, Atlas represents the campus's commitment to
+            innovation, continuous improvement, and digital transformation. As it evolves,
+            Atlas is envisioned to become a comprehensive Government ERP platform that
+            empowers educational institutions through intelligent, connected, and sustainable
+            technology solutions.
+          </p>
+
+          <div class="about-signature">
+            <span class="about-signature-name font-heading">Atlas</span>
+            <span class="about-signature-tag">Charting the Way Forward to Digital Transformation.</span>
+          </div>
         </div>
 
         <div class="pillars">
@@ -245,16 +274,60 @@ const stats = [
     </section>
 
     <!-- ════════════════════════════
-         STATS BAND
+         WHY ATLAS
     ═════════════════════════════ -->
-    <section class="stats-band">
-      <div class="sb-base" />
-      <div class="sb-deco sb-deco1" />
-      <div class="sb-deco sb-deco2" />
-      <div class="sb-inner">
-        <div v-for="s in stats" :key="s.label" class="sb-item">
-          <span class="sb-val">{{ s.value }}</span>
-          <span class="sb-lbl">{{ s.label }}</span>
+    <section class="why-section">
+      <div class="why-base" />
+      <div class="why-deco" />
+      <div class="why-inner">
+        <div class="why-mark-wrap">
+          <img src="/images/atlas-mark-white.png" alt="Atlas mark" class="why-mark-img" />
+        </div>
+
+        <div class="why-text">
+          <p class="eyebrow eyebrow-dark">The Name</p>
+          <h2 class="why-h2 font-heading">Why "Atlas"?</h2>
+          <p class="why-p">
+            The name <strong>Atlas</strong> was chosen to reflect the system's purpose as the
+            central platform that guides, connects, and empowers the Philippine Science High
+            School – Caraga Region Campus community.
+          </p>
+          <p class="why-p">
+            Traditionally, an atlas is a collection of maps that helps people navigate, discover
+            information, and find direction. In the same way, Atlas serves as the campus's
+            digital compass — bringing together people, processes, data, and services into one
+            unified and accessible platform.
+          </p>
+          <p class="why-p">
+            The name embodies our vision of creating a connected, intelligent, and future-ready
+            digital ecosystem where students, parents, faculty, staff, and administrators can
+            seamlessly access the information and services they need.
+          </p>
+          <p class="why-p">
+            Atlas also represents the institution's commitment to innovation, efficiency,
+            collaboration, and continuous improvement. As the platform continues to grow, it
+            will serve as the foundation for the campus's digital transformation journey and
+            its future evolution into a comprehensive Government ERP platform.
+          </p>
+          <p class="why-p">
+            More than a name, Atlas symbolizes direction, connectivity, and progress — guiding
+            the Pisay community toward a smarter and more digitally empowered future.
+          </p>
+
+          <div class="why-pillars">
+            <div v-for="p in brandPillars" :key="p.label" class="why-pillar">
+              <component :is="p.icon" class="why-pillar-icon" />
+              <div>
+                <p class="why-pillar-label">{{ p.label }}</p>
+                <p class="why-pillar-desc">{{ p.desc }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="why-signature">
+            <span class="why-signature-name font-heading">Atlas</span>
+            <span class="why-signature-tag">Charting the Way Forward to Digital Transformation.</span>
+          </div>
         </div>
       </div>
     </section>
@@ -299,8 +372,8 @@ const stats = [
         <div class="cta-icon-wrap">
           <ShieldCheckIcon class="cta-icon" />
         </div>
-        <h2 class="cta-h2">Ready to get started?</h2>
-        <p class="cta-p">Sign in with your official PSHS-CRC Google account to access the system.</p>
+        <h2 class="cta-h2">Your Map to a Smarter PSHS.</h2>
+        <p class="cta-p">Atlas handles the paperwork. You handle the science. Sign in with your official PSHS-CRC Google account to get started.</p>
         <button @click="googleLogin" :disabled="isLoading" class="cta-btn">
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width:22px;height:22px;" alt="Google" />
           {{ isLoading ? 'Signing in…' : 'Sign in with Google' }}
@@ -322,7 +395,7 @@ const stats = [
           <img src="/images/atlas-mark.png" alt="Atlas" class="footer-logo" />
           <div>
             <p class="footer-name font-heading">Atlas</p>
-            <p class="footer-sub">Digital Campus Management Platform</p>
+            <p class="footer-sub">Centralized MIS</p>
             <p class="footer-sub">Philippine Science High School – Caraga Region Campus in Butuan City</p>
           </div>
         </div>
@@ -379,10 +452,8 @@ const stats = [
   align-items: center;
   gap: 24px;
 }
-.nav-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.nav-logo  { width: auto; height: 36px; filter: drop-shadow(0 0 10px rgba(251,144,2,.5)); }
-.nav-name  { display: block; font-size: .92rem; font-weight: 800; color: #ffffff; letter-spacing: .06em; }
-.nav-sub   { display: block; font-size: .58rem; color: var(--cyan-lt); }
+.nav-brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.nav-logo  { width: auto; height: 30px; }
 
 .nav-links { display: flex; gap: 4px; margin-left: auto; }
 .nav-link  {
@@ -416,10 +487,10 @@ const stats = [
   overflow: hidden;
 }
 
-/* Deep navy-to-blue base gradient */
+/* White-dominant base with a soft brand-tinted glow */
 .hero-base {
   position: absolute; inset: 0;
-  background: linear-gradient(145deg, var(--navy) 0%, var(--navy-2) 30%, var(--blue) 60%, var(--blue-lt) 85%, var(--cyan) 100%);
+  background: var(--white);
 }
 
 /* Ambient glow elements */
@@ -428,29 +499,43 @@ const stats = [
   border-radius: 50%;
   pointer-events: none;
 }
-/* Cyan glow bottom-left */
+/* Soft cyan glow behind the headline */
 .deco-cyan {
-  width: 500px; height: 500px;
-  bottom: -200px; left: -100px;
-  background: radial-gradient(circle, rgba(1,159,230,.15) 0%, transparent 65%);
+  width: 600px; height: 600px;
+  top: -260px; left: -160px;
+  background: radial-gradient(circle, rgba(1,159,230,.08) 0%, transparent 65%);
 }
-/* Subtle glow bottom-right */
-.deco-bl {
-  width: 300px; height: 300px;
-  bottom: 10%; right: 20%;
-  background: radial-gradient(circle, rgba(8,103,219,.10) 0%, transparent 65%);
+/* Soft glow behind the hero description paragraph */
+.deco-desc {
+  width: 380px; height: 380px;
+  top: -10px; left: 40px;
+  background: radial-gradient(circle, rgba(8,103,219,.08) 0%, transparent 65%);
 }
 
-/* Brand watermark — large, low-opacity arrow behind the login card */
-.hero-watermark {
+/* Large, faint arrow-mark watermark in the hero background */
+.hero-mark-bg {
   position: absolute;
-  right: 2%; bottom: -40px;
-  height: 420px;
-  opacity: .08;
+  right: -40px; top: 50%; transform: translateY(-50%);
+  height: 640px;
+  opacity: .05;
   pointer-events: none;
-  z-index: 1;
 }
 
+/* Faint charted-route line behind the hero text column */
+.hero-route {
+  position: absolute;
+  top: 10px; left: 30px;
+  width: 620px; height: 300px;
+  opacity: .09;
+  pointer-events: none;
+}
+.hero-route path {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-dasharray: 6 10;
+  stroke-linecap: round;
+}
 .hero-inner {
   position: relative; z-index: 2;
   flex: 1;
@@ -463,48 +548,52 @@ const stats = [
   display: inline-flex; align-items: center; gap: 8px;
   align-self: flex-start;
   padding: 6px 16px;
-  background: rgba(1,159,230,.12);
-  border: 1px solid rgba(1,159,230,.3);
+  background: #eaf4fe;
+  border: 1px solid #cfe6fb;
   border-radius: 100px;
-  font-size: .72rem; font-weight: 500; color: var(--cyan-lt);
+  font-size: .72rem; font-weight: 500; color: var(--navy-2);
   letter-spacing: .02em; margin-bottom: 28px;
 }
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: var(--orange); box-shadow: 0 0 8px var(--orange);
-  animation: pulse-dot 2s ease-in-out infinite;
+  background: var(--orange);
   flex-shrink: 0;
-}
-@keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 8px #FB9002; }
-  50%       { box-shadow: 0 0 2px #FB9002; opacity: .5; }
 }
 
 .hero-h1 {
-  font-size: 3.6rem; font-weight: 900; color: #ffffff;
+  font-size: 3.6rem; font-weight: 900; color: var(--navy);
   line-height: 1.1; letter-spacing: -.03em; margin-bottom: 22px;
 }
-/* Cyan gradient accent text */
+/* Wordmark gradient accent text (Blue → Cyan, per brand guide) */
 .hero-accent {
-  background: linear-gradient(90deg, var(--cyan) 0%, var(--cyan-lt) 60%, var(--cyan-pale) 100%);
+  background: linear-gradient(90deg, var(--blue) 0%, var(--cyan) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .hero-p {
-  font-size: .95rem; color: var(--cyan-pale);
+  font-size: .95rem; color: #334155;
   line-height: 1.8; margin-bottom: 40px; max-width: 500px;
 }
 
 /* Login card */
 .login-card {
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 20px; padding: 28px; width: 100%;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 24px 64px rgba(10,42,94,.5), inset 0 1px 0 rgba(255,255,255,.1);
+  position: relative; overflow: hidden;
+  background: var(--navy);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 20px; padding: 32px; width: 100%;
+  box-shadow: 0 28px 64px rgba(10,42,94,.28), inset 0 1px 0 rgba(255,255,255,.05);
 }
+.lc-content { position: relative; z-index: 1; }
+
+/* Soft blue→cyan glow tying the card back to the headline accent */
+.lc-glow {
+  position: absolute; inset: -60px;
+  background: radial-gradient(circle at 50% 40%, rgba(1,159,230,.18) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+
 .lc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .lc-icon-wrap {
   width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
@@ -515,6 +604,8 @@ const stats = [
 .lc-icon  { width: 22px; height: 22px; color: #fff; }
 .lc-title { font-size: .95rem; font-weight: 700; color: #f0f9ff; }
 .lc-sub   { font-size: .74rem; color: var(--cyan-lt); margin-top: 3px; }
+
+.lc-divider { height: 1px; background: rgba(255,255,255,.1); margin-bottom: 22px; }
 
 .gbtn {
   display: flex; align-items: center; gap: 12px; width: 100%;
@@ -542,8 +633,10 @@ const stats = [
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .lc-notice {
-  display: flex; align-items: flex-start; gap: 7px;
-  font-size: .72rem; color: var(--cyan-lt); margin-top: 14px; line-height: 1.5;
+  display: flex; align-items: flex-start; gap: 8px;
+  background: rgba(1,159,230,.1); border: 1px solid rgba(1,159,230,.22);
+  border-radius: 12px; padding: 10px 12px;
+  font-size: .72rem; color: var(--cyan-lt); margin-top: 18px; line-height: 1.5;
 }
 .lc-notice strong { white-space: nowrap; }
 .notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--cyan); }
@@ -555,29 +648,12 @@ const stats = [
 }
 .dev-link:hover { color: var(--cyan-lt); }
 
-/* ── Hero left (hero text + stats + chips) ─────────── */
+/* ── Hero left (hero text) ─────────── */
 .hero-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 
 /* ── Hero right (login card only) ─────────── */
 /* padding-top = badge height (~30px) + badge margin-bottom (28px) to align with h1 */
-.hero-right { width: 380px; flex-shrink: 0; padding-top: 58px; }
-
-.chip-box {
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 18px; padding: 18px;
-}
-.chip-box-label { font-size: .64rem; font-weight: 700; color: var(--cyan-lt); text-transform: uppercase; letter-spacing: .09em; margin-bottom: 12px; }
-.chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px;
-  background: rgba(1,159,230,.12);
-  border: 1px solid rgba(1,159,230,.22);
-  border-radius: 100px;
-  font-size: .63rem; font-weight: 500; color: var(--cyan-lt);
-}
-.chip-icon { width: 11px; height: 11px; flex-shrink: 0; }
+.hero-right { position: relative; width: 380px; flex-shrink: 0; padding-top: 58px; }
 
 /* Scroll hint */
 .scroll-hint {
@@ -585,15 +661,8 @@ const stats = [
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   padding-bottom: 32px;
 }
-.scroll-text { font-size: .68rem; font-weight: 600; color: var(--cyan-lt); text-transform: uppercase; letter-spacing: .1em; }
-.scroll-icon {
-  width: 20px; height: 20px; color: var(--cyan);
-  animation: bounce-down 2s ease-in-out infinite;
-}
-@keyframes bounce-down {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(6px); }
-}
+.scroll-text { font-size: .68rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .1em; }
+.scroll-icon { width: 20px; height: 20px; color: var(--blue); }
 
 /* ════════════════════════════════
    SHARED SECTION
@@ -621,6 +690,30 @@ const stats = [
 }
 
 /* ════════════════════════════════
+   ABOUT BODY
+════════════════════════════════ */
+.about-body {
+  max-width: 720px; margin: 0 auto 56px;
+}
+.about-body p {
+  font-size: .9rem; color: #334155; line-height: 1.8;
+  margin-bottom: 18px;
+}
+.about-body p strong { color: #0a1040; }
+.about-signature {
+  text-align: center; margin-top: 36px; padding-top: 28px;
+  border-top: 1px solid #e2e8f0;
+}
+.about-signature-name {
+  display: block; font-size: 1.3rem; font-weight: 800; color: var(--navy);
+  letter-spacing: -.01em;
+}
+.about-signature-tag {
+  display: block; font-size: .8rem; font-style: italic; color: #64748b;
+  margin-top: 4px;
+}
+
+/* ════════════════════════════════
    PILLARS
 ════════════════════════════════ */
 .pillars { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; }
@@ -629,7 +722,7 @@ const stats = [
   border: 1px solid #dbeafe; border-radius: 22px;
   transition: box-shadow .25s, transform .25s;
 }
-.pillar:hover { box-shadow: 0 20px 48px rgba(8,103,219,.13); transform: translateY(-6px); }
+.pillar:hover { box-shadow: 0 14px 32px rgba(8,103,219,.12); transform: translateY(-3px); }
 .pillar-icon-wrap {
   width: 56px; height: 56px; border-radius: 16px;
   display: flex; align-items: center; justify-content: center;
@@ -640,34 +733,52 @@ const stats = [
 .pillar-desc  { font-size: .83rem; color: #334155; line-height: 1.75; }
 
 /* ════════════════════════════════
-   STATS BAND
+   WHY ATLAS
 ════════════════════════════════ */
-.stats-band { position: relative; padding: 72px 32px; overflow: hidden; }
-.sb-base {
+.why-section { position: relative; padding: 96px 32px; overflow: hidden; }
+.why-base {
   position: absolute; inset: 0;
-  background: linear-gradient(130deg, var(--navy) 0%, var(--navy-2) 35%, var(--blue) 65%, var(--blue-lt) 100%);
+  background: linear-gradient(130deg, var(--navy) 0%, var(--navy-2) 45%, var(--blue) 100%);
 }
-.sb-deco { position: absolute; border-radius: 50%; pointer-events: none; }
-.sb-deco1 {
-  width: 500px; height: 500px; right: -100px; top: -200px;
-  background: radial-gradient(circle, rgba(1,159,230,.25) 0%, transparent 65%);
+.why-deco {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  width: 460px; height: 460px; right: -140px; top: -160px;
+  background: radial-gradient(circle, rgba(1,159,230,.18) 0%, transparent 65%);
 }
-.sb-deco2 {
-  width: 350px; height: 350px; left: -80px; bottom: -150px;
-  background: radial-gradient(circle, rgba(253,190,14,.1) 0%, transparent 65%);
-}
-.sb-inner {
+.why-inner {
   position: relative; z-index: 2;
-  max-width: 900px; margin: 0 auto;
-  display: flex; justify-content: space-around; gap: 32px; flex-wrap: wrap;
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; gap: 64px;
 }
-.sb-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.sb-val {
-  font-size: 3rem; font-weight: 900; line-height: 1;
-  background: linear-gradient(90deg, var(--gold) 0%, var(--cyan) 60%, var(--cyan-lt) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+.why-mark-wrap {
+  flex-shrink: 0; width: 220px; display: flex; justify-content: center;
 }
-.sb-lbl { font-size: .72rem; font-weight: 600; color: var(--cyan-lt); text-transform: uppercase; letter-spacing: .1em; }
+.why-mark-img { width: 140px; height: auto; opacity: .92; }
+.why-text { flex: 1; min-width: 0; }
+.eyebrow-dark { color: var(--cyan-lt); -webkit-text-fill-color: var(--cyan-lt); background: none; }
+.why-h2 { font-size: 2rem; font-weight: 800; color: #ffffff; letter-spacing: -.02em; margin-bottom: 18px; }
+.why-p { font-size: .88rem; color: var(--cyan-pale); line-height: 1.8; margin-bottom: 14px; max-width: 640px; }
+.why-pillars {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 28px;
+  margin-top: 28px;
+}
+.why-pillar { display: flex; align-items: flex-start; gap: 12px; }
+.why-pillar-icon { width: 22px; height: 22px; color: var(--gold); flex-shrink: 0; margin-top: 1px; }
+.why-pillar-label { font-size: .82rem; font-weight: 700; color: #ffffff; }
+.why-pillar-desc { font-size: .76rem; color: var(--cyan-lt); line-height: 1.55; margin-top: 2px; }
+
+.why-signature {
+  margin-top: 36px; padding-top: 26px;
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+.why-signature-name {
+  display: block; font-size: 1.2rem; font-weight: 800; color: #ffffff;
+  letter-spacing: -.01em;
+}
+.why-signature-tag {
+  display: block; font-size: .78rem; font-style: italic; color: var(--cyan-lt);
+  margin-top: 4px;
+}
 
 /* ════════════════════════════════
    MODULES
@@ -678,7 +789,7 @@ const stats = [
   padding: 26px 22px; display: flex; flex-direction: column; gap: 14px;
   transition: box-shadow .25s, transform .25s, border-color .25s;
 }
-.mod-card:hover { box-shadow: 0 12px 32px rgba(8,103,219,.14); transform: translateY(-4px); border-color: var(--cyan-lt); }
+.mod-card:hover { box-shadow: 0 10px 24px rgba(8,103,219,.12); transform: translateY(-2px); border-color: var(--cyan-lt); }
 .mod-icon-wrap {
   width: 48px; height: 48px; border-radius: 14px;
   display: flex; align-items: center; justify-content: center;
@@ -771,7 +882,11 @@ const stats = [
   .section      { padding: 72px 24px; }
   .section-hd   { margin-bottom: 48px; }
   .section-h2   { font-size: 2rem; }
-  .stats-band   { padding: 56px 24px; }
+  .why-section  { padding: 64px 24px; }
+  .why-inner    { flex-direction: column; gap: 32px; text-align: center; }
+  .why-mark-wrap{ width: auto; }
+  .why-p        { max-width: 100%; }
+  .why-pillars  { text-align: left; }
   .cta-section  { padding: 72px 24px; }
   .cta-h2       { font-size: 2.1rem; }
 }
@@ -781,7 +896,6 @@ const stats = [
   /* Navbar */
   .nav-inner    { padding: 0 16px; height: 58px; gap: 12px; }
   .nav-links    { display: none; }
-  .nav-sub      { display: none; }
   .nav-cta      { padding: 8px 14px; font-size: .78rem; }
 
   /* Hero */
@@ -800,7 +914,6 @@ const stats = [
 
   /* Hero left */
   .hero-left    { gap: 12px; }
-  .chip-box     { display: none; } /* Covered by the Modules section */
 
   /* Sections */
   .section      { padding: 56px 16px; }
@@ -814,11 +927,12 @@ const stats = [
   .pillar-title { font-size: .95rem; }
   .pillar-desc  { font-size: .8rem; }
 
-  /* Stats band */
-  .stats-band   { padding: 44px 16px; }
-  .sb-inner     { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 16px; justify-items: center; }
-  .sb-val       { font-size: 2.2rem; }
-  .sb-lbl       { font-size: .65rem; }
+  /* Why Atlas */
+  .why-section    { padding: 40px 16px; }
+  .why-mark-img   { width: 96px; }
+  .why-h2         { font-size: 1.6rem; }
+  .why-p          { font-size: .82rem; }
+  .why-pillars    { grid-template-columns: 1fr; gap: 14px; }
 
   /* Modules */
   .modules-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -850,6 +964,5 @@ const stats = [
   .modules-grid { grid-template-columns: 1fr; }
   .mod-card     { flex-direction: row; gap: 14px; padding: 16px 14px; }
   .mod-icon-wrap{ flex-shrink: 0; }
-  .stat-val     { font-size: 1.5rem; }
 }
 </style>
