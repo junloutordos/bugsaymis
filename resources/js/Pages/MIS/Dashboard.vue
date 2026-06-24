@@ -18,6 +18,11 @@ import {
   StarIcon,
   BoltIcon,
   ChatBubbleLeftRightIcon,
+  ServerStackIcon,
+  ExclamationTriangleIcon,
+  ShieldExclamationIcon,
+  ArrowPathIcon,
+  ComputerDesktopIcon,
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(
@@ -37,6 +42,8 @@ const props = defineProps({
   personnelWorkload: Array,
   sqdBreakdown:      Array,
   recentRequests:    Array,
+  canViewFleet:      Boolean,
+  fleet:             Object,
 })
 
 const currentMonth = ref(props.month)
@@ -260,6 +267,73 @@ function statusShort(status) {
   }
   return map[status] ?? status
 }
+
+// ── Fleet & Infrastructure Health ──────────────────────────────────────────────
+
+const fleetKpiCards = computed(() => {
+  if (!props.fleet) return []
+  return [
+    {
+      label: 'Devices Enrolled',
+      value: `${props.fleet.devices_enrolled} / ${props.fleet.total_equipment}`,
+      sub:   'ICT Agent rollout',
+      icon:  ServerStackIcon,
+      color: 'indigo',
+    },
+    {
+      label: 'Open Alerts',
+      value: props.fleet.open_alerts,
+      sub:   'Across the fleet',
+      icon:  ExclamationTriangleIcon,
+      color: props.fleet.open_alerts > 0 ? 'amber' : 'slate',
+    },
+    {
+      label: 'High/Critical Risk',
+      value: props.fleet.high_critical_risk,
+      sub:   'Devices needing attention',
+      icon:  ShieldExclamationIcon,
+      color: props.fleet.high_critical_risk > 0 ? 'rose' : 'slate',
+    },
+    {
+      label: 'Reboot Required',
+      value: props.fleet.reboot_required,
+      sub:   `${props.fleet.antivirus_disabled} antivirus disabled`,
+      icon:  ArrowPathIcon,
+      color: props.fleet.reboot_required > 0 ? 'sky' : 'slate',
+    },
+  ]
+})
+
+const riskTierLabels = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' }
+const riskTierColors = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', low: '#10b981' }
+
+const riskDonutData = computed(() => {
+  const breakdown = props.fleet?.risk_tier_breakdown ?? {}
+  const keys = Object.keys(breakdown)
+  return {
+    labels: keys.map(k => riskTierLabels[k] ?? 'Not Scored'),
+    datasets: [{
+      data: keys.map(k => breakdown[k]),
+      backgroundColor: keys.map(k => riskTierColors[k] ?? '#cbd5e1'),
+      borderWidth: 1,
+    }],
+  }
+})
+
+function riskTierBadge(tier) {
+  const map = {
+    critical: 'bg-red-100 text-red-700',
+    high:     'bg-orange-100 text-orange-700',
+    medium:   'bg-amber-100 text-amber-700',
+    low:      'bg-emerald-100 text-emerald-700',
+  }
+  return map[tier] ?? 'bg-slate-100 text-slate-500'
+}
+
+function fmtDateTime(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
 </script>
 
 <template>
@@ -418,6 +492,108 @@ function statusShort(status) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Fleet & Infrastructure Health -->
+      <div v-if="canViewFleet && fleet" class="space-y-4 pt-2 border-t border-slate-100">
+        <div>
+          <h1 class="text-lg font-bold text-slate-800">Fleet &amp; Infrastructure Health</h1>
+          <p class="text-sm text-slate-500 mt-0.5">Live ICT Agent fleet snapshot — not scoped to the month above</p>
+        </div>
+
+        <!-- Fleet KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div v-for="card in fleetKpiCards" :key="card.label"
+               :class="['rounded-xl border p-4 flex flex-col gap-2', cardColors[card.color]]">
+            <component :is="card.icon" class="h-5 w-5 opacity-70" />
+            <div class="text-2xl font-bold leading-none">{{ card.value ?? '—' }}</div>
+            <div class="text-xs font-semibold leading-tight">{{ card.label }}</div>
+            <div class="text-[10px] opacity-70 leading-tight">{{ card.sub }}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          <!-- Risk Tier Donut -->
+          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <h2 class="text-sm font-semibold text-slate-700 mb-4">Device Risk Tiers</h2>
+            <div v-if="!Object.keys(fleet.risk_tier_breakdown).length" class="py-16 text-center text-slate-400 text-sm">
+              No enrolled devices yet.
+            </div>
+            <div v-else style="height:240px;">
+              <Doughnut :data="riskDonutData" :options="donutOptions" />
+            </div>
+          </div>
+
+          <!-- Computer Laboratories -->
+          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-sm font-semibold text-slate-700">Computer Laboratories</h2>
+              <a :href="route('computer-labs.index')" class="text-xs text-indigo-600 hover:underline">View all →</a>
+            </div>
+            <div v-if="!fleet.labs.length" class="py-12 text-center text-slate-400 text-sm">
+              No rooms tagged as "Computer Laboratory" yet.
+            </div>
+            <div v-else class="space-y-2">
+              <a
+                v-for="lab in fleet.labs"
+                :key="lab.room.id"
+                :href="route('computer-labs.show', lab.room.id)"
+                class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-slate-100 hover:border-indigo-200 hover:bg-slate-50 transition-colors"
+              >
+                <div class="flex items-center gap-2">
+                  <ComputerDesktopIcon class="w-4 h-4 text-indigo-500" />
+                  <span class="text-sm text-slate-700">{{ lab.room.name }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-slate-400">{{ lab.enrolled }}/{{ lab.total }} enrolled</span>
+                  <span v-if="lab.critical > 0" class="px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-700">{{ lab.critical }} critical</span>
+                </div>
+              </a>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Top At-Risk Devices -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-slate-700">Top At-Risk Devices</h2>
+            <a :href="route('ict-agent.health-dashboard')" class="text-xs text-indigo-600 hover:underline">View Agent Health Dashboard →</a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-100 text-sm">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Device</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Risk</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Open Alerts</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Check-in</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-if="!fleet.top_at_risk_devices.length">
+                  <td colspan="5" class="px-4 py-8 text-center text-slate-400 text-sm">No scored devices yet.</td>
+                </tr>
+                <tr v-for="d in fleet.top_at_risk_devices" :key="d.id" class="hover:bg-slate-50/60">
+                  <td class="px-4 py-3 font-medium text-slate-700">{{ d.hostname || '—' }}</td>
+                  <td class="px-4 py-3 text-slate-500 text-xs">{{ d.equipment?.room?.name || '—' }}</td>
+                  <td class="px-4 py-3 text-center">
+                    <span :class="[riskTierBadge(d.risk_tier), 'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize']">
+                      {{ d.risk_tier ?? '—' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-center tabular-nums" :class="d.open_alerts_count > 0 ? 'text-amber-600 font-semibold' : 'text-slate-300'">
+                    {{ d.open_alerts_count > 0 ? d.open_alerts_count : '—' }}
+                  </td>
+                  <td class="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{{ fmtDateTime(d.last_checkin_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
     </div>
