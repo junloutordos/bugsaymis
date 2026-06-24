@@ -33,6 +33,7 @@ class ICTEquipmentController extends Controller
             'agentDevice.healthSnapshot',
             'agentDevice.hardwareInventory',
             'agentDevice.securityStatus',
+            'agentDevice.softwareInventory',
             // No ->limit() here — Eloquent applies a hasMany eager-load
             // limit() globally across all parent rows, not per-device.
             // The frontend takes the first few off this already-sorted list.
@@ -361,6 +362,7 @@ class ICTEquipmentController extends Controller
         'temp_file_cleanup',
         'dns_flush',
         'windows_maintenance_task',
+        'software_uninstall',
     ];
 
     /**
@@ -391,6 +393,23 @@ class ICTEquipmentController extends Controller
             if (! $target || ! $reportedServices->contains($target)) {
                 return response()->json([
                     'message' => 'That service was not found in this device\'s last reported status.',
+                ], 422);
+            }
+        }
+
+        if ($validated['action'] === 'software_uninstall') {
+            $installed = collect($device->softwareInventory?->installed_software ?? []);
+            $entry = $installed->firstWhere('uninstall_key', $target);
+
+            if (! $target || ! $entry) {
+                return response()->json([
+                    'message' => 'That software was not found in this device\'s last reported inventory.',
+                ], 422);
+            }
+
+            if (empty($entry['quiet_uninstall_string']) && empty($entry['is_msi'])) {
+                return response()->json([
+                    'message' => 'This software has no silent uninstall method and requires manual removal.',
                 ], 422);
             }
         }
