@@ -238,12 +238,14 @@ class IctAgentController extends Controller
         }
 
         $latestRelease = IctAgentRelease::latestRelease();
-        // version_compare (not !==) — the release version is stored as typed
-        // on the artisan command ("1.0.2") while the agent reports its
-        // 4-part AssemblyVersion ("1.0.2.0"); a strict string compare never
-        // matches even right after a successful update, causing a pointless
-        // re-update offer every checkin forever.
-        if ($latestRelease && version_compare($latestRelease->version, $validated['agent_version'] ?? $device->agent_version ?? '') !== 0) {
+        // version_compare alone isn't enough — it does NOT treat "1.0.3" and
+        // "1.0.3.0" as equal (verified: returns -1), so a device freshly
+        // updated to the latest release kept getting re-offered the same
+        // version forever, hammering the Updater every checkin. Truncate the
+        // agent's 4-part AssemblyVersion down to the release's 3-part scheme
+        // before comparing.
+        $reportedVersion = $this->truncateVersion($validated['agent_version'] ?? $device->agent_version ?? '');
+        if ($latestRelease && version_compare($latestRelease->version, $reportedVersion) !== 0) {
             $response['update'] = [
                 'version'      => $latestRelease->version,
                 'download_url' => route('ict-agent.releases.show', ['encodedKey' => $this->encodeS3Key($latestRelease->s3_key)]),
@@ -252,6 +254,16 @@ class IctAgentController extends Controller
         }
 
         return response()->json($response);
+    }
+
+    /**
+     * Drops to the first 3 dot-separated segments — release versions are
+     * always 3-part ("1.0.3"); the agent's .NET AssemblyVersion is always
+     * 4-part ("1.0.3.0"), and version_compare treats those as unequal.
+     */
+    private function truncateVersion(string $version): string
+    {
+        return implode('.', array_slice(explode('.', $version), 0, 3));
     }
 
     /**
