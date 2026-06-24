@@ -1939,11 +1939,11 @@ filteredMenu.value.forEach((item) => {
       style="background: linear-gradient(180deg, #060e50 0%, #0d1f8a 55%, #1447c0 100%); box-shadow: inset -1px 0 0 rgba(0,200,232,0.18), 4px 0 28px rgba(6,14,80,0.5);"
     >
       <!-- Logo -->
-      <div class="h-16 flex items-center gap-3 border-b border-white/10 px-4 shrink-0">
-        <img v-if="collapsed" src="/images/atlas-mark.png" alt="Atlas" class="h-8 w-8 shrink-0 object-contain" />
-        <div v-else class="min-w-0">
-          <img src="/images/atlas-logo-white.png" alt="Atlas" class="h-7 w-auto object-contain" />
-          <p class="text-[10px] text-blue-200/50 truncate mt-0.5">Centralized MIS</p>
+      <div class="min-h-16 flex items-center gap-3 border-b border-white/10 px-4 py-3 shrink-0">
+        <img v-if="collapsed" src="/images/atlas-mark.png" alt="Atlas" class="h-8 w-8 shrink-0 object-contain mx-auto" />
+        <div v-else class="flex-1 flex flex-col items-center text-center min-w-0">
+          <img src="/images/atlas-logo-full.png" alt="Atlas" class="h-7 w-auto object-contain" />
+          <p class="text-[10px] text-blue-200/50 leading-tight mt-1">Centralized Management Information System</p>
         </div>
         <!-- Close button (mobile only) -->
         <button
