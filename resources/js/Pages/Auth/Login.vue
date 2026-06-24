@@ -147,10 +147,15 @@ const brandPillars = [
       <!-- background layers -->
       <div class="hero-base" />
       <div class="deco deco-cyan" />
+      <div class="deco deco-badge" />
+      <div class="deco deco-h1" />
       <div class="deco deco-desc" />
       <img src="/images/atlas-mark.png" alt="" class="hero-mark-bg" aria-hidden="true" />
       <svg class="hero-route" viewBox="0 0 700 320" aria-hidden="true">
         <path d="M10,170 C160,40 340,280 690,80" />
+      </svg>
+      <svg class="hero-route-bottom" viewBox="0 0 1200 200" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,150 C250,-30 500,260 800,30 C950,-70 1050,180 1200,40" />
       </svg>
 
       <div class="hero-inner">
@@ -167,7 +172,7 @@ const brandPillars = [
           </h1>
 
           <p class="hero-p">
-            Atlas is the unified digital management platform of PSHS-CRC —
+            Atlas is the centralized campus management information system of PSHS-CRC —
             consolidating HR, faculty loading, student services, and campus operations
             into one secure, cloud-native system backed by AWS and PSHS.
           </p>
@@ -505,11 +510,27 @@ const brandPillars = [
   top: -260px; left: -160px;
   background: radial-gradient(circle, rgba(1,159,230,.08) 0%, transparent 65%);
 }
-/* Soft glow behind the hero description paragraph */
+/* "Big blue blur" treatment — reused behind the badge, headline, and
+   description, plus low in the hero behind "Scroll to explore" */
+.deco-h1, .deco-desc {
+  background: radial-gradient(circle, rgba(1,159,230,.20) 0%, rgba(8,103,219,.10) 42%, transparent 70%);
+  filter: blur(10px);
+}
+/* Dimmer than the other two — sits highest/left-most, closest to the navbar */
+.deco-badge {
+  background: radial-gradient(circle, rgba(1,159,230,.10) 0%, rgba(8,103,219,.05) 42%, transparent 70%);
+  filter: blur(10px);
+  width: 420px; height: 420px;
+  top: -110px; left: -20px;
+}
+.deco-h1 {
+  width: 560px; height: 560px;
+  top: -40px; left: -40px;
+}
 .deco-desc {
-  width: 380px; height: 380px;
-  top: -10px; left: 40px;
-  background: radial-gradient(circle, rgba(8,103,219,.08) 0%, transparent 65%);
+  width: 620px; height: 620px;
+  bottom: -120px; left: 50%;
+  transform: translateX(-50%);
 }
 
 /* Large, faint arrow-mark watermark in the hero background */
@@ -530,6 +551,22 @@ const brandPillars = [
   pointer-events: none;
 }
 .hero-route path {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-dasharray: 6 10;
+  stroke-linecap: round;
+}
+
+/* Same dashed curve treatment, mirrored full-width along the bottom edge */
+.hero-route-bottom {
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 220px;
+  opacity: .09;
+  pointer-events: none;
+}
+.hero-route-bottom path {
   fill: none;
   stroke: var(--blue);
   stroke-width: 2;
