@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\WFHAttendance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class DTRService
 {
@@ -69,6 +70,11 @@ class DTRService
         $user      = User::find($userId);
         $isCos     = in_array($user?->emp_category ?? '', ['COS Teaching', 'COS Non Teaching']);
         $tomorrow  = now()->addDay()->startOfDay();
+
+        // Approved gate passes with recorded actual times, grouped by date —
+        // derived live from the gatepass table so the deduction self-heals on
+        // every regeneration instead of being a one-time subtraction.
+        $gatepassDeductions = $this->gatepassDeductionsByDate($user?->badge_id, $dateFrom, $dateTo);
 
         // Iterate each calendar date in the range
         for ($date = $from->copy(); $date->lte($to); $date->addDay()) {
@@ -187,6 +193,15 @@ class DTRService
                 );
             }
 
+            // Apply approved gate-pass time deductions after attendance status is
+            // determined from raw punches — the deduction adjusts hours/undertime
+            // only, it never flips present/half_day/absent.
+            $gpDeduction = $gatepassDeductions[$dateStr] ?? ['total' => 0, 'undertime' => 0];
+            if ($gpDeduction['total'] > 0) {
+                $hoursWorked       = max(0, $hoursWorked - round($gpDeduction['total'] / 60, 2));
+                $undertimeMinutes += $gpDeduction['undertime'];
+            }
+
             DtrRecord::updateOrCreate(
                 ['user_id' => $userId, 'work_date' => $dateStr],
                 [
@@ -199,6 +214,8 @@ class DTRService
                     'late_minutes'         => round($lateMinutes, 2),
                     'undertime_minutes'    => round($undertimeMinutes, 2),
                     'overtime_minutes'     => round($overtimeMinutes, 2),
+                    'gatepass_deduction_minutes' => round($gpDeduction['total'], 2),
+                    'gatepass_undertime_minutes' => round($gpDeduction['undertime'], 2),
                     'day_type'             => $dayType,
                     'attendance_status'    => $attendanceStatus,
                     'leave_application_id' => $leave?->id,
@@ -213,18 +230,13 @@ class DTRService
     }
 
     /**
-     * Apply a gate pass time deduction to the employee's DTR record for the given date.
-     * Called when actual_timeout + actual_timein are recorded on an approved gate pass.
-     * Deducts the time spent outside from hours_worked and, for UT-type passes, adds
-     * the consumed minutes to undertime_minutes.
+     * Re-apply gate pass deductions to the employee's DTR record for the given date.
+     * Called when actual_timeout/actual_timein are recorded or corrected on an
+     * approved gate pass. Delegates to recompute(), which derives the deduction
+     * live from the gatepass table — safe to call repeatedly.
      */
-    public function applyGatepassToDate(
-        int    $userId,
-        string $date,
-        string $actualTimeout,
-        string $actualTimein,
-        string $gatepassType,
-    ): void {
+    public function applyGatepassToDate(int $userId, string $date): void
+    {
         $record = DtrRecord::where('user_id', $userId)
             ->where('work_date', $date)
             ->where('is_locked', false)
@@ -234,31 +246,59 @@ class DTRService
             return;
         }
 
-        try {
-            $out             = Carbon::parse($actualTimeout);
-            $in              = Carbon::parse($actualTimein);
-            $consumedMinutes = max(0, (int) $out->diffInMinutes($in));
-        } catch (\Throwable) {
-            return;
+        $this->recompute($record);
+    }
+
+    /**
+     * Sum approved (OCD Approved) gate-pass minutes with both actual times recorded,
+     * grouped by date, for an employee's badge within [$dateFrom, $dateTo]. Queried
+     * live from the gatepass table on every call (generate/recompute) so the
+     * deduction self-heals instead of being a one-time subtraction.
+     *
+     * @return array<string, array{total: int, undertime: int}>
+     */
+    private function gatepassDeductionsByDate(?string $badgeId, string $dateFrom, string $dateTo): array
+    {
+        if (! $badgeId) {
+            return [];
         }
 
-        if ($consumedMinutes === 0) {
-            return;
+        $rows = DB::table('gatepass')
+            ->whereRaw('CAST(badgeNumber AS CHAR) = ?', [(string) $badgeId])
+            ->where('status', 'OCD Approved')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $gp) {
+            $out = trim($gp->actual_timeout ?? '');
+            $in  = trim($gp->actual_timein ?? '');
+            if ($out === '' || $in === '') {
+                continue;
+            }
+
+            try {
+                $dateStr = Carbon::parse($gp->gatepass_date)->toDateString();
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($dateStr < $dateFrom || $dateStr > $dateTo) {
+                continue;
+            }
+
+            try {
+                $minutes = max(0, (int) Carbon::parse($out)->diffInMinutes(Carbon::parse($in)));
+            } catch (\Throwable) {
+                continue;
+            }
+
+            $result[$dateStr] ??= ['total' => 0, 'undertime' => 0];
+            $result[$dateStr]['total'] += $minutes;
+            if (strtolower(trim($gp->gatepass_type ?? '')) === 'undertime') {
+                $result[$dateStr]['undertime'] += $minutes;
+            }
         }
 
-        $hoursConsumed = round($consumedMinutes / 60, 2);
-        $updates       = [
-            'hours_worked' => max(0, round((float) $record->hours_worked - $hoursConsumed, 2)),
-        ];
-
-        // UT gate passes explicitly represent undertime — count toward undertime minutes.
-        // OB and OT are authorised absences; we still reduce hours_worked but do not
-        // double-count them as undertime (the schedule recompute already captures that).
-        if (strtolower(trim($gatepassType)) === 'undertime') {
-            $updates['undertime_minutes'] = round((float) $record->undertime_minutes + $consumedMinutes, 2);
-        }
-
-        $record->update($updates);
+        return $result;
     }
 
     /**
@@ -341,12 +381,24 @@ class DTRService
             $attendanceStatus = $record->attendance_status;
         }
 
+        // Re-apply approved gate-pass time deductions, derived live from the
+        // gatepass table — this is what makes the deduction survive a recompute
+        // triggered by a penned-entry edit, schedule change, or biometric resync.
+        $badgeId     = $record->user?->badge_id ?? User::find($record->user_id)?->badge_id;
+        $gpDeduction = $this->gatepassDeductionsByDate($badgeId, $date, $date)[$date] ?? ['total' => 0, 'undertime' => 0];
+        if ($gpDeduction['total'] > 0) {
+            $hoursWorked       = max(0, $hoursWorked - round($gpDeduction['total'] / 60, 2));
+            $undertimeMinutes += $gpDeduction['undertime'];
+        }
+
         $record->update([
             'schedule_id'       => $record->schedule_id,
             'hours_worked'      => round($hoursWorked, 2),
             'late_minutes'      => round($lateMinutes, 2),
             'undertime_minutes' => round($undertimeMinutes, 2),
             'overtime_minutes'  => round($overtimeMinutes, 2),
+            'gatepass_deduction_minutes' => round($gpDeduction['total'], 2),
+            'gatepass_undertime_minutes' => round($gpDeduction['undertime'], 2),
             'attendance_status' => $attendanceStatus,
         ]);
     }

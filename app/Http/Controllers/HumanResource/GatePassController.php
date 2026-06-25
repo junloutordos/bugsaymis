@@ -370,24 +370,20 @@ class GatePassController extends Controller
             ->where('gatepass.id', $id)
             ->first();
 
-        // When actual_timein is newly recorded (employee has returned), apply the time
-        // deduction to the corresponding DTR record automatically.
-        $hadActualTimein = ! empty(trim($existing->actual_timein ?? ''));
-        $nowActualTimein = ! empty(trim($update['actual_timein'] ?? ''));
-        $nowActualTimeout = ! empty(trim($update['actual_timeout'] ?? ''));
+        // When actual times are recorded or corrected, re-apply the DTR deduction.
+        // recompute() derives the deduction live from this table, so it's safe to
+        // call again on a later correction — not just the first recording.
+        $actualTimeoutChanged = trim($existing->actual_timeout ?? '') !== trim($update['actual_timeout'] ?? '');
+        $actualTimeinChanged  = trim($existing->actual_timein  ?? '') !== trim($update['actual_timein']  ?? '');
+        $nowActualTimein      = ! empty(trim($update['actual_timein'] ?? ''));
+        $nowActualTimeout     = ! empty(trim($update['actual_timeout'] ?? ''));
 
-        if (! $hadActualTimein && $nowActualTimein && $nowActualTimeout) {
+        if (($actualTimeoutChanged || $actualTimeinChanged) && $nowActualTimein && $nowActualTimeout) {
             try {
                 $gateDate = \Carbon\Carbon::parse($existing->gatepass_date)->toDateString();
                 $user     = \App\Models\User::whereRaw("CAST(badge_id AS CHAR) = ?", [(string) $existing->badgeNumber])->first();
                 if ($user && $gateDate) {
-                    app(\App\Services\HR\DTRService::class)->applyGatepassToDate(
-                        userId:        $user->id,
-                        date:          $gateDate,
-                        actualTimeout: $update['actual_timeout'],
-                        actualTimein:  $update['actual_timein'],
-                        gatepassType:  $existing->gatepass_type ?? 'official business',
-                    );
+                    app(\App\Services\HR\DTRService::class)->applyGatepassToDate($user->id, $gateDate);
                 }
             } catch (\Throwable $e) {
                 logger()->warning('Failed to apply gate pass deduction to DTR', [
