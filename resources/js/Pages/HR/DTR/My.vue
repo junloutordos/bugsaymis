@@ -36,7 +36,7 @@
             <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
               <ChevronRightIcon class="h-4 w-4 text-slate-600" />
             </button>
-            <button v-if="isCos && isCurrentMonth && !advanceRecord" @click="submitMyAdvanceGenerate" :disabled="advanceGenerating"
+            <button v-if="isCos && isCurrentMonth && !props.advanceRecord" @click="submitMyAdvanceGenerate" :disabled="advanceGenerating"
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
               title="Generate your advance cut-off entry for tomorrow">
               <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
@@ -61,17 +61,26 @@
       </div>
 
       <!-- COS Advance Entry Banner -->
-      <div v-if="isCos && advanceRecord"
-           class="bg-sky-50 border border-sky-200 rounded-xl p-4 flex items-start gap-3">
-        <InformationCircleIcon class="h-5 w-5 text-sky-500 shrink-0 mt-0.5" />
-        <div>
-          <p class="text-sm font-semibold text-sky-800">
-            Advance Entry — {{ toDateStr(advanceRecord.work_date) }}
-          </p>
-          <p class="text-xs text-sky-600 mt-0.5">
-            This row is your cut-off date advance entry. Fill in your expected time directly in the highlighted row before your payroll cut-off.
-          </p>
+      <div v-if="isCos && props.advanceRecord"
+           class="bg-sky-50 border border-sky-200 rounded-xl p-4 flex items-start gap-3 justify-between">
+        <div class="flex items-start gap-3">
+          <InformationCircleIcon class="h-5 w-5 text-sky-500 shrink-0 mt-0.5" />
+          <div>
+            <p class="text-sm font-semibold text-sky-800">
+              Advance Entry — {{ toDateStr(props.advanceRecord.work_date) }}
+            </p>
+            <p v-if="advanceInCurrentMonth" class="text-xs text-sky-600 mt-0.5">
+              This row is your cut-off date advance entry. Fill in your expected time directly in the highlighted row before your payroll cut-off.
+            </p>
+            <p v-else class="text-xs text-sky-600 mt-0.5">
+              This advance entry falls in {{ advanceMonthLabel }} — switch month to fill in your expected time.
+            </p>
+          </div>
         </div>
+        <button v-if="!advanceInCurrentMonth" @click="goToAdvanceMonth"
+          class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-medium transition-colors">
+          Go to {{ advanceMonthLabel }}
+        </button>
       </div>
 
       <!-- Submit Penned Entries Banner -->
@@ -455,6 +464,7 @@ const props = defineProps({
   gatepassByDate: { type: Object, default: () => ({}) },
   hasPenned:      { type: Boolean, default: false },
   allSubmitted:   { type: Boolean, default: false },
+  advanceRecord:  { type: Object, default: null },
 })
 
 const currentMonth = ref(props.month)
@@ -463,7 +473,21 @@ const isCos = computed(() =>
   ['COS Teaching', 'COS Non Teaching'].includes(props.employee?.emp_category)
 )
 
-const advanceRecord = computed(() => props.records.find(r => r.is_advance) ?? null)
+const advanceInCurrentMonth = computed(() =>
+  !!props.advanceRecord && toDateStr(props.advanceRecord.work_date).slice(0, 7) === currentMonth.value
+)
+
+const advanceMonthLabel = computed(() => {
+  if (!props.advanceRecord) return ''
+  const [y, m] = toDateStr(props.advanceRecord.work_date).slice(0, 7).split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+})
+
+function goToAdvanceMonth() {
+  if (!props.advanceRecord) return
+  currentMonth.value = toDateStr(props.advanceRecord.work_date).slice(0, 7)
+  goMonth()
+}
 
 const isCurrentMonth = computed(() => {
   const n = new Date()
@@ -777,11 +801,11 @@ function submitEdit() {
 // ── Inline advance penned entry ─────────────────────────────────────────────
 
 const advancePennedForm = useForm({
-  penned_time_in_am:  fmtTime(props.records.find(r => r.is_advance)?.penned_time_in_am)  || '',
-  penned_time_out_am: fmtTime(props.records.find(r => r.is_advance)?.penned_time_out_am) || '',
-  penned_time_in_pm:  fmtTime(props.records.find(r => r.is_advance)?.penned_time_in_pm)  || '',
-  penned_time_out_pm: fmtTime(props.records.find(r => r.is_advance)?.penned_time_out_pm) || '',
-  penned_remarks:     props.records.find(r => r.is_advance)?.penned_remarks || '',
+  penned_time_in_am:  fmtTime(props.advanceRecord?.penned_time_in_am)  || '',
+  penned_time_out_am: fmtTime(props.advanceRecord?.penned_time_out_am) || '',
+  penned_time_in_pm:  fmtTime(props.advanceRecord?.penned_time_in_pm)  || '',
+  penned_time_out_pm: fmtTime(props.advanceRecord?.penned_time_out_pm) || '',
+  penned_remarks:     props.advanceRecord?.penned_remarks || '',
 })
 
 function saveAdvancePenned(record) {

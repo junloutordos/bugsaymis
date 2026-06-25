@@ -120,6 +120,16 @@ class DtrRecordController extends Controller
         $month = $request->input('month', now()->format('Y-m'));
         [$y, $m] = explode('-', $month);
 
+        // Ensure today's record exists before the nightly cron processes it as
+        // "yesterday" — otherwise there is no row to bind a penned entry to.
+        if ($month === now()->format('Y-m')) {
+            $today = now()->toDateString();
+            $hasToday = DtrRecord::where('user_id', $user->id)->where('work_date', $today)->exists();
+            if (! $hasToday) {
+                app(DTRService::class)->generate($user->id, $today, $today);
+            }
+        }
+
         $records = DtrRecord::where('user_id', $user->id)
             ->whereYear('work_date', $y)
             ->whereMonth('work_date', $m)
@@ -161,6 +171,13 @@ class DtrRecordController extends Controller
         );
         $allSubmitted = $nonAdvance->isNotEmpty() && $nonAdvance->every(fn ($r) => $r->penned_submitted_at !== null);
 
+        // Resolved independently of the currently viewed month so the banner/button
+        // stay accurate even when "tomorrow" rolls into the next calendar month.
+        $advanceRecord = DtrRecord::where('user_id', $user->id)
+            ->where('is_advance', true)
+            ->orderByDesc('work_date')
+            ->first();
+
         return Inertia::render('HR/DTR/My', [
             'employee'       => $user->load('employeeProfile'),
             'records'        => $records,
@@ -170,6 +187,7 @@ class DtrRecordController extends Controller
             'gatepassByDate' => $gatepassByDate,
             'hasPenned'      => $hasPenned,
             'allSubmitted'   => $allSubmitted,
+            'advanceRecord'  => $advanceRecord,
         ]);
     }
 
@@ -342,6 +360,15 @@ class DtrRecordController extends Controller
         $dateTo   = $tomorrow->toDateString();
 
         $dtrService->generate($user->id, $dateFrom, $dateTo);
+
+        $created = DtrRecord::where('user_id', $user->id)
+            ->where('work_date', $tomorrow->toDateString())
+            ->where('is_advance', true)
+            ->exists();
+
+        if (! $created) {
+            return back()->with('error', 'Tomorrow is not a scheduled work day for you — no advance entry is needed.');
+        }
 
         return back()->with('success', 'Advance entry generated. Fill in your expected time below.');
     }
