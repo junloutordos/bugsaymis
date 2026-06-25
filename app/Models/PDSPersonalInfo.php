@@ -50,10 +50,6 @@ class PDSPersonalInfo extends Model
         'email_address',
     ];
 
-    protected $casts = [
-        'date_of_birth' => 'date',
-    ];
-
     public function pds()
     {
         return $this->belongsTo(PDS::class);

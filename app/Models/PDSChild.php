@@ -14,10 +14,6 @@ class PDSChild extends Model
         'child_date_of_birth',
     ];
 
-    protected $casts = [
-        'child_date_of_birth' => 'date',
-    ];
-
     public function pds()
     {
         return $this->belongsTo(PDS::class);

@@ -38,10 +38,6 @@ class PDSQuestions extends Model
         'q40c_solo_parent_id',
     ];
 
-    protected $casts = [
-        'q35b_date_filed' => 'date',
-    ];
-
     public function pds()
     {
         return $this->belongsTo(PDS::class);
