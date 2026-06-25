@@ -10,13 +10,18 @@ use App\Models\JobItem;
 use App\Models\Office;
 use App\Models\RecruitmentType;
 use App\Models\SalaryGrade;
+use App\Services\Recruitment\ArtCardService;
 use App\Services\Recruitment\JobItemService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class JobItemController extends Controller
 {
-    public function __construct(private JobItemService $service) {}
+    public function __construct(
+        private JobItemService $service,
+        private ArtCardService $artCardService,
+    ) {}
 
     public function index(Request $request)
     {
@@ -72,6 +77,7 @@ class JobItemController extends Controller
 
         // Sync requirements with mandatory flags
         $this->syncRequirements($item, $requirementIds, $mandatoryFlags);
+        $this->generateArtCard($item);
 
         return back()->with('success', "Job item '{$item->position_title}' created.");
     }
@@ -88,6 +94,7 @@ class JobItemController extends Controller
 
         $this->service->update($jobItem, $itemData);
         $this->syncRequirements($jobItem, $requirementIds, $mandatoryFlags);
+        $this->generateArtCard($jobItem);
 
         return back()->with('success', 'Job item updated.');
     }
@@ -114,6 +121,7 @@ class JobItemController extends Controller
         }
 
         $vacancy = $this->service->publish($jobItem, $request->validated());
+        $this->generateArtCard($jobItem);
 
         return back()->with('success', "Published. Vacancy #{$vacancy->id} is now open.");
     }
@@ -129,6 +137,48 @@ class JobItemController extends Controller
         }
 
         return back()->with('success', 'Job item deleted.');
+    }
+
+    // ── Art card ───────────────────────────────────────────────────────────────
+
+    public function downloadArtCard(Request $request, JobItem $jobItem, string $type)
+    {
+        $this->authorize('recruitment.view');
+        abort_unless(in_array($type, ['cover', 'detail'], true), 404);
+        abort_unless($jobItem->art_card_generated_at, 404, 'Art card has not been generated yet.');
+
+        $path = $type === 'cover' ? $this->artCardService->coverPath($jobItem) : $this->artCardService->detailPath($jobItem);
+        abort_unless(Storage::disk('s3')->exists($path), 404);
+
+        $content = Storage::disk('s3')->get($path);
+        $slug     = str()->slug($jobItem->position_title);
+        $filename = "{$slug}-{$type}.jpg";
+
+        return response($content, 200, [
+            'Content-Type'        => 'image/jpeg',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    public function regenerateArtCard(JobItem $jobItem)
+    {
+        $this->authorize('update', $jobItem);
+
+        $this->generateArtCard($jobItem);
+
+        return back()->with('success', 'Art card regenerated.');
+    }
+
+    private function generateArtCard(JobItem $item): void
+    {
+        try {
+            $this->artCardService->generate($item);
+        } catch (\Throwable $e) {
+            logger()->warning('Failed to generate recruitment art card', [
+                'job_item_id' => $item->id,
+                'error'       => $e->getMessage(),
+            ]);
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

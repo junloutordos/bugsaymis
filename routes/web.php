@@ -1350,6 +1350,10 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
             ->name('job-items.publish');
         Route::delete('/job-items/{jobItem}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'destroy'])
             ->name('job-items.destroy');
+        Route::get('/job-items/{jobItem}/art-card/{type}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'downloadArtCard'])
+            ->name('job-items.art-card.download');
+        Route::post('/job-items/{jobItem}/art-card/regenerate', [\App\Http\Controllers\Recruitment\JobItemController::class, 'regenerateArtCard'])
+            ->name('job-items.art-card.regenerate');
 
         // ── Applicants ────────────────────────────────────────────────────────
         Route::get('/applicants', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'index'])

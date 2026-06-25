@@ -11,7 +11,10 @@ class JobItem extends Model
     use HasFactory, SoftDeletes;
 
     protected $casts = [
-        'competencies' => 'array',
+        'competencies'           => 'array',
+        'contract_start_date'    => 'date:Y-m-d',
+        'contract_end_date'      => 'date:Y-m-d',
+        'art_card_generated_at'  => 'datetime',
     ];
 
     protected $fillable = [
@@ -33,9 +36,14 @@ class JobItem extends Model
         'competencies',
         'duration_type',
         'budget_source',
+        'submit_to_name',
+        'submit_to_title',
+        'contract_start_date',
+        'contract_end_date',
         'office_id',
         'status',
         'created_by',
+        'art_card_generated_at',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────────
