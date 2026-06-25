@@ -24,6 +24,7 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Roles',    'name' => 'roles.assign',     'description' => 'Assign roles to users'],
 
             // ── HR ────────────────────────────────────────────────────────────
+            ['module' => 'HR',       'name' => 'hr.dashboard.view','description' => 'View the comprehensive HR dashboard (HR, Recruitment, PMS, L&D, SALN, Rewards)'],
             ['module' => 'HR',       'name' => 'hr.view',          'description' => 'View HR module'],
             ['module' => 'HR',       'name' => 'hr.employees.view','description' => 'View employee list'],
             ['module' => 'HR',       'name' => 'hr.employees.manage','description' => 'Manage employees'],

@@ -1650,6 +1650,11 @@ Route::middleware(['auth'])->prefix('rewards')->name('rewards.')->group(function
 // ══════════════════════════════════════════════════════════════════════════════
 Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(function () {
 
+    // ── Comprehensive HR Dashboard ────────────────────────────────────────────
+    Route::get('/dashboard', [\App\Http\Controllers\HR\HRDashboardController::class, 'index'])
+        ->middleware('permission:hr.dashboard.view')
+        ->name('dashboard');
+
     // ── Employee Profiles ─────────────────────────────────────────────────────
     Route::get('/employees/{user}/profile', [\App\Http\Controllers\HR\EmployeeProfileController::class, 'show'])
         ->name('employees.profile.show');

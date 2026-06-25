@@ -94,6 +94,13 @@ class RolePermissionSeeder extends Seeder
             'chat.access',
         ]);
 
+        // ── HR Dashboard — comprehensive HR/Recruitment/PMS/L&D/SALN/Rewards overview ─
+        // Each section is independently gated by its own existing module permission,
+        // so granting page access here is safe even for roles missing some sections.
+        foreach (['HR', 'OCD', 'DivisionChief', 'PMT', 'Recruitment Officer', 'HRMPSB'] as $roleName) {
+            $assign($roleName, ['hr.dashboard.view']);
+        }
+
         // ── Payroll Officer ───────────────────────────────────────────────────
         $assign('Payroll Officer', [
             'payroll.view', 'payroll.process', 'payroll.approve',

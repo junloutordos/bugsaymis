@@ -77,9 +77,14 @@ class JobItemController extends Controller
 
         // Sync requirements with mandatory flags
         $this->syncRequirements($item, $requirementIds, $mandatoryFlags);
-        $this->generateArtCard($item);
+        $cardGenerated = $this->generateArtCard($item);
 
-        return back()->with('success', "Job item '{$item->position_title}' created.");
+        $message = "Job item '{$item->position_title}' created.";
+        if (! $cardGenerated) {
+            $message .= ' Note: art card generation failed — use "Regenerate Card" or contact MIS.';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function update(StoreJobItemRequest $request, JobItem $jobItem)
@@ -94,9 +99,14 @@ class JobItemController extends Controller
 
         $this->service->update($jobItem, $itemData);
         $this->syncRequirements($jobItem, $requirementIds, $mandatoryFlags);
-        $this->generateArtCard($jobItem);
+        $cardGenerated = $this->generateArtCard($jobItem);
 
-        return back()->with('success', 'Job item updated.');
+        $message = 'Job item updated.';
+        if (! $cardGenerated) {
+            $message .= ' Note: art card generation failed — use "Regenerate Card" or contact MIS.';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function changeStatus(Request $request, JobItem $jobItem)
@@ -121,9 +131,14 @@ class JobItemController extends Controller
         }
 
         $vacancy = $this->service->publish($jobItem, $request->validated());
-        $this->generateArtCard($jobItem);
+        $cardGenerated = $this->generateArtCard($jobItem);
 
-        return back()->with('success', "Published. Vacancy #{$vacancy->id} is now open.");
+        $message = "Published. Vacancy #{$vacancy->id} is now open.";
+        if (! $cardGenerated) {
+            $message .= ' Note: art card generation failed — use "Regenerate Card" or contact MIS.';
+        }
+
+        return back()->with('success', $message);
     }
 
     public function destroy(JobItem $jobItem)
@@ -164,20 +179,24 @@ class JobItemController extends Controller
     {
         $this->authorize('update', $jobItem);
 
-        $this->generateArtCard($jobItem);
+        if (! $this->generateArtCard($jobItem)) {
+            return back()->withErrors(['error' => 'Failed to generate art card. Please contact MIS if this persists.']);
+        }
 
         return back()->with('success', 'Art card regenerated.');
     }
 
-    private function generateArtCard(JobItem $item): void
+    private function generateArtCard(JobItem $item): bool
     {
         try {
             $this->artCardService->generate($item);
+            return true;
         } catch (\Throwable $e) {
             logger()->warning('Failed to generate recruitment art card', [
                 'job_item_id' => $item->id,
                 'error'       => $e->getMessage(),
             ]);
+            return false;
         }
     }
 
