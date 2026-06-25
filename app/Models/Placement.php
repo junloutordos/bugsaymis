@@ -40,6 +40,11 @@ class Placement extends Model
         return $this->hasMany(OnboardingTask::class);
     }
 
+    public function plantillaNumber()
+    {
+        return $this->hasOne(JobItemPlantillaNumber::class);
+    }
+
     // ── Scopes ─────────────────────────────────────────────────────────────────
 
     public function scopeActive($query)

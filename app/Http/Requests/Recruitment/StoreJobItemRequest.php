@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests\Recruitment;
 
+use App\Models\RecruitmentType;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreJobItemRequest extends FormRequest
 {
+    // Matches PLANTILLA_NAMES in resources/js/Pages/Recruitment/JobItems/Index.vue
+    private const PLANTILLA_TYPE_NAMES = ['Plantilla Teaching', 'Plantilla Non-Teaching'];
+
     public function authorize(): bool
     {
         return $this->user()->hasPermission('recruitment.manage');
@@ -13,10 +17,15 @@ class StoreJobItemRequest extends FormRequest
 
     public function rules(): array
     {
+        $isPlantilla = RecruitmentType::whereIn('name', self::PLANTILLA_TYPE_NAMES)
+            ->where('id', $this->input('recruitment_type_id'))
+            ->exists();
+
         return [
             'recruitment_type_id'     => ['required', 'integer', 'exists:recruitment_types,id'],
             'position_title'          => ['required', 'string', 'max:255'],
-            'plantilla_item_no'       => ['nullable', 'string', 'max:50'],
+            'plantilla_numbers'       => array_filter([$isPlantilla ? 'required' : 'nullable', 'array', $isPlantilla ? 'min:1' : null]),
+            'plantilla_numbers.*'     => ['required', 'string', 'max:50', 'distinct'],
             'salary_grade'            => ['nullable', 'integer', 'min:1', 'max:33'],
             'salary_step'             => ['nullable', 'integer', 'min:1', 'max:8'],
             'monthly_salary'          => ['nullable', 'numeric', 'min:0'],
@@ -47,5 +56,26 @@ class StoreJobItemRequest extends FormRequest
             'requirement_mandatory'   => ['nullable', 'array'],
             'requirement_mandatory.*' => ['boolean'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $jobItem = $this->route('jobItem');
+            if (! $jobItem) {
+                return;
+            }
+
+            $submitted = collect($this->input('plantilla_numbers', []))->filter()->values();
+            $filled    = $jobItem->plantillaNumbers()->where('status', 'filled')->pluck('plantilla_item_no');
+            $missing   = $filled->diff($submitted);
+
+            if ($missing->isNotEmpty()) {
+                $validator->errors()->add(
+                    'plantilla_numbers',
+                    'Cannot remove filled plantilla item number(s): ' . $missing->implode(', ')
+                );
+            }
+        });
     }
 }

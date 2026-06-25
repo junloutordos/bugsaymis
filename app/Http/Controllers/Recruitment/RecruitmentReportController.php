@@ -21,21 +21,43 @@ class RecruitmentReportController extends Controller
         $year = $request->integer('year', now()->year);
 
         // ── 1. Plantilla Utilization ────────────────────────────────────────
-        // Count filled vs total positions per recruitment type
+        // For Plantilla types, count individual plantilla item numbers (one job
+        // item can represent several vacancies). Other types have no plantilla
+        // item numbers, so fall back to a job-item-level count.
+        $plantillaTypeIds = RecruitmentType::whereIn('name', ['Plantilla Teaching', 'Plantilla Non-Teaching'])->pluck('id');
+
+        $plantillaStats = DB::table('job_item_plantilla_numbers')
+            ->join('job_items', 'job_item_plantilla_numbers.job_item_id', '=', 'job_items.id')
+            ->whereNull('job_items.deleted_at')
+            ->select(
+                'job_items.recruitment_type_id',
+                DB::raw('COUNT(*) as total'),
+                DB::raw("SUM(CASE WHEN job_item_plantilla_numbers.status = 'filled' THEN 1 ELSE 0 END) as filled")
+            )
+            ->groupBy('job_items.recruitment_type_id')
+            ->get()
+            ->keyBy('recruitment_type_id');
+
         $utilization = RecruitmentType::withCount([
             'jobItems as total_items',
-            'jobItems as filled_items' => fn ($q) => $q->where('status', 'filled'),
-            'jobItems as open_items'   => fn ($q) => $q->where('status', 'approved'),
-            'jobItems as vacant_items' => fn ($q) => $q->whereIn('status', ['approved', 'published']),
-        ])->get()->map(fn ($t) => [
-            'name'        => $t->name,
-            'total'       => $t->total_items,
-            'filled'      => $t->filled_items,
-            'open'        => $t->open_items,
-            'fill_rate'   => $t->total_items > 0
-                ? round(($t->filled_items / $t->total_items) * 100, 1)
-                : 0,
-        ]);
+            'jobItems as open_items' => fn ($q) => $q->where('status', 'approved'),
+        ])->get()->map(function ($t) use ($plantillaStats, $plantillaTypeIds) {
+            if ($plantillaTypeIds->contains($t->id) && $stat = $plantillaStats->get($t->id)) {
+                $total  = (int) $stat->total;
+                $filled = (int) $stat->filled;
+            } else {
+                $total  = $t->total_items;
+                $filled = 0;
+            }
+
+            return [
+                'name'      => $t->name,
+                'total'     => $total,
+                'filled'    => $filled,
+                'open'      => $t->open_items,
+                'fill_rate' => $total > 0 ? round(($filled / $total) * 100, 1) : 0,
+            ];
+        });
 
         // ── 2. Vacancy Fill Rate by Type ────────────────────────────────────
         $fillRate = JobVacancy::select('job_items.recruitment_type_id')
