@@ -18,11 +18,6 @@ class PDSWorkExperience extends Model
         'government_service',
     ];
 
-    protected $casts = [
-        'from_date' => 'date',
-        'to_date' => 'date',
-    ];
-
     public function pds()
     {
         return $this->belongsTo(PDS::class);
