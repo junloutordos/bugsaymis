@@ -10,12 +10,12 @@ use Illuminate\Support\Str;
 
 /**
  * Security posture for one device's daily inventory-checkin — same
- * routine/alert pattern as IctAgentHealthEvaluator, scoped to AV/firewall/
+ * routine/alert pattern as AtlasSentinelHealthEvaluator, scoped to AV/firewall/
  * patch/unauthorized-software signals instead of hardware. Computes
  * unauthorized_software_count + security_score into the row
  * inventoryCheckin() already wrote the raw AV/firewall/update fields into.
  */
-class IctAgentSecurityEvaluator
+class AtlasSentinelSecurityEvaluator
 {
     private const STALE_PATCH_WARNING_COUNT = 10;
 

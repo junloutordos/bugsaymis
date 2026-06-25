@@ -514,9 +514,9 @@ const menuItems = [
         permissions: ["it.equipment.view"],
       },
       {
-        label: "Agent Health Dashboard",
-        routeName: "ict-agent.health-dashboard",
-        href: route("ict-agent.health-dashboard"),
+        label: "Atlas Sentinel Health Dashboard",
+        routeName: "atlas-sentinel.health-dashboard",
+        href: route("atlas-sentinel.health-dashboard"),
         icon: ChartBarIcon,
         permissions: ["it.equipment.view"],
       },

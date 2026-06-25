@@ -74,7 +74,7 @@ class DatabaseSeeder extends Seeder
         $this->call(SalaryScheduleSeeder::class);    // DBM SSL V 2023 salary schedule (SG 1–33)
         $this->call(SectionSeeder::class);           // student sections (requires school year)
 
-        // ── ICT Agent Module ────────────────────────────────────────────────────
+        // ── Atlas Sentinel Module ───────────────────────────────────────────────
         $this->call(IctRemediationRuleSeeder::class); // self-healing rules, seeded inert (auto_execute=false)
     }
 }

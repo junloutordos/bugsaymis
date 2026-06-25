@@ -13,7 +13,7 @@ defineProps({
   <AdminLayout title="Computer Laboratories">
     <div class="space-y-4">
       <p class="text-sm text-slate-500">
-        Visual map of each computer laboratory. Click a lab to see its seating layout and click any unit to view its live ICT Agent specs.
+        Visual map of each computer laboratory. Click a lab to see its seating layout and click any unit to view its live Atlas Sentinel specs.
       </p>
 
       <div v-if="!labs.length" class="bg-white rounded-lg shadow-sm border border-slate-200 px-4 py-10 text-center text-slate-400 text-sm">
@@ -45,7 +45,7 @@ defineProps({
 
           <div class="mt-4 flex items-center gap-1.5 text-xs text-slate-500">
             <SignalIcon class="w-3.5 h-3.5 text-slate-400" />
-            {{ lab.enrolled }} of {{ lab.total }} enrolled with ICT Agent
+            {{ lab.enrolled }} of {{ lab.total }} enrolled with Atlas Sentinel
           </div>
           <div class="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
             <div

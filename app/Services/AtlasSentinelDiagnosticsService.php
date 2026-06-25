@@ -9,15 +9,15 @@ use Carbon\Carbon;
 
 /**
  * Correlates signals ACROSS checkins/history into diagnostic findings —
- * distinct from IctAgentHealthEvaluator, which only classifies a single
+ * distinct from AtlasSentinelHealthEvaluator, which only classifies a single
  * checkin's payload. Writes into the same ict_equipment_alerts table with
  * "diag_*" codes, so escalation/resolution reuses the existing pipeline.
  *
  * Root-cause output is a short rule-based "probable_cause" string attached
- * to the alert, not a trained model — see the ICT Agent plan's "AI
+ * to the alert, not a trained model — see the Atlas Sentinel plan's "AI
  * Readiness" section for why that's deliberate for v1.
  */
-class IctAgentDiagnosticsService
+class AtlasSentinelDiagnosticsService
 {
     private const SUSTAINED_CHECKINS = 3;
     private const HIGH_CPU_USAGE_PERCENT = 85;
@@ -32,7 +32,7 @@ class IctAgentDiagnosticsService
     private const FREQUENT_REBOOT_WINDOW_DAYS = 7;
 
     /**
-     * Called from the 20-min checkin() — after IctAgentHealthEvaluator, so
+     * Called from the 20-min checkin() — after AtlasSentinelHealthEvaluator, so
      * any severity escalation here (e.g. recurring driver errors) is what
      * actually persists until the next cycle re-runs both in the same order.
      */

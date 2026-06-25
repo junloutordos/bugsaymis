@@ -5,9 +5,9 @@ namespace App\Console\Commands;
 use App\Models\IctRemediationRule;
 use Illuminate\Console\Command;
 
-class IctAgentToggleRemediationRule extends Command
+class AtlasSentinelToggleRemediationRule extends Command
 {
-    protected $signature = 'ict-agent:toggle-remediation {metric_key} {--on} {--off}';
+    protected $signature = 'atlas-sentinel:toggle-remediation {metric_key} {--on} {--off}';
     protected $description = 'Flip a self-healing remediation rule\'s auto_execute flag on or off';
 
     public function handle(): int

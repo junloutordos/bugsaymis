@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class IctAgentRelease extends Model
+class AtlasSentinelRelease extends Model
 {
-    protected $table = 'ict_agent_releases';
+    protected $table = 'atlas_sentinel_releases';
 
     protected $fillable = [
         'version',

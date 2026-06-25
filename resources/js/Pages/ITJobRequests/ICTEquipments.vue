@@ -70,7 +70,7 @@ const csrfToken = page.props.csrf_token || document.querySelector('meta[name="cs
 const showReportModal = ref(false)
 const reportGroupBy = ref('category') // 'category' or 'location'
 
-// ICT Agent enrollment token state
+// Atlas Sentinel enrollment token state
 const showEnrollmentModal = ref(false)
 const enrollmentToken = ref(null)
 const enrollmentExpiresAt = ref(null)
@@ -97,7 +97,7 @@ async function copyEnrollmentToken() {
   tokenCopied.value = true
 }
 
-// ICT Agent open alerts
+// Atlas Sentinel open alerts
 const showAlertsModal = ref(false)
 const selectedAlerts = ref([])
 const selectedAlertsEquipment = ref(null)
@@ -108,7 +108,7 @@ function openAlerts(eq) {
   showAlertsModal.value = true
 }
 
-// ICT Agent latest reported specs — kept as a lookup by id (not a stored
+// Atlas Sentinel latest reported specs — kept as a lookup by id (not a stored
 // object reference) so it stays live across the router.reload() a "Fix Now"
 // click triggers; the modal would otherwise keep showing pre-reload data.
 const showSpecsModal = ref(false)
@@ -201,7 +201,7 @@ async function runFix(eq, action, target = null) {
   }
 }
 
-// Same thresholds as IctAgentHealthEvaluator, so the bar's color always
+// Same thresholds as AtlasSentinelHealthEvaluator, so the bar's color always
 // matches whether this reading would actually trigger a PMS/alert finding.
 const RAM_LOW_THRESHOLD = 10
 const DISK_LOW_THRESHOLD = 15
@@ -992,14 +992,14 @@ const showAllChecked    = computed({
         </div>
       </div>
 
-      <!-- ICT AGENT ENROLLMENT TOKEN MODAL -->
+      <!-- ATLAS SENTINEL ENROLLMENT TOKEN MODAL -->
       <div
         v-if="showEnrollmentModal"
         class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">ICT Agent Enrollment Token</h2>
+            <h2 class="text-base font-semibold text-slate-800">Atlas Sentinel Enrollment Token</h2>
             <button
               @click="showEnrollmentModal = false"
               class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
@@ -1010,7 +1010,7 @@ const showAllChecked    = computed({
 
           <div class="px-6 py-5 space-y-3">
             <p class="text-sm text-slate-600">
-              Paste this token into the ICT Agent installer on the target desktop/laptop. It expires in 24 hours and can only be used once.
+              Paste this token into the Atlas Sentinel installer on the target desktop/laptop. It expires in 24 hours and can only be used once.
             </p>
             <div class="flex items-center gap-2">
               <input
@@ -1041,7 +1041,7 @@ const showAllChecked    = computed({
         </div>
       </div>
 
-      <!-- ICT AGENT OPEN ALERTS MODAL -->
+      <!-- ATLAS SENTINEL OPEN ALERTS MODAL -->
       <div
         v-if="showAlertsModal"
         class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
@@ -1084,7 +1084,7 @@ const showAllChecked    = computed({
         </div>
       </div>
 
-      <!-- ICT AGENT SPECS MODAL -->
+      <!-- ATLAS SENTINEL SPECS MODAL -->
       <div
         v-if="showSpecsModal"
         class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
