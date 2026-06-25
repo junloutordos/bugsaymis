@@ -74,8 +74,32 @@ const reportGroupBy = ref('category') // 'category' or 'location'
 const showEnrollmentModal = ref(false)
 const enrollmentToken = ref(null)
 const enrollmentExpiresAt = ref(null)
+const enrollmentMaxUses = ref(1)
 const isGeneratingToken = ref(false)
 const tokenCopied = ref(false)
+const enrollmentMode = ref('single') // 'single' | 'bulk'
+const bulkLabel = ref('')
+const bulkUnlimited = ref(false)
+const bulkQuantity = ref(10)
+const bulkExpiryHours = ref(72)
+const outstandingTokens = ref([])
+const loadingTokens = ref(false)
+
+function switchEnrollmentMode(mode) {
+  enrollmentMode.value = mode
+  enrollmentToken.value = null
+  tokenCopied.value = false
+}
+
+async function loadOutstandingTokens() {
+  loadingTokens.value = true
+  try {
+    const { data } = await axios.get(route('ict-equipments.enrollment-tokens.index'))
+    outstandingTokens.value = data.tokens
+  } finally {
+    loadingTokens.value = false
+  }
+}
 
 async function generateEnrollmentToken() {
   isGeneratingToken.value = true
@@ -84,12 +108,49 @@ async function generateEnrollmentToken() {
     const { data } = await axios.post(route('ict-equipments.enrollment-token'))
     enrollmentToken.value = data.token
     enrollmentExpiresAt.value = data.expires_at
+    enrollmentMaxUses.value = data.max_uses
+    enrollmentMode.value = 'single'
     showEnrollmentModal.value = true
+    loadOutstandingTokens()
   } catch (e) {
     Swal.fire('Error', e.response?.data?.message || 'Could not generate enrollment token.', 'error')
   } finally {
     isGeneratingToken.value = false
   }
+}
+
+async function generateBulkToken() {
+  isGeneratingToken.value = true
+  tokenCopied.value = false
+  try {
+    const { data } = await axios.post(route('ict-equipments.enrollment-token'), {
+      max_uses: bulkUnlimited.value ? null : bulkQuantity.value,
+      expires_in_hours: bulkExpiryHours.value,
+      label: bulkLabel.value || null,
+    })
+    enrollmentToken.value = data.token
+    enrollmentExpiresAt.value = data.expires_at
+    enrollmentMaxUses.value = data.max_uses
+    loadOutstandingTokens()
+  } catch (e) {
+    Swal.fire('Error', e.response?.data?.message || 'Could not generate enrollment token.', 'error')
+  } finally {
+    isGeneratingToken.value = false
+  }
+}
+
+async function revokeToken(token) {
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: 'Revoke this token?',
+    text: 'Devices that haven\'t enrolled yet with this token will no longer be able to.',
+    showCancelButton: true,
+    confirmButtonText: 'Revoke',
+    confirmButtonColor: '#dc2626',
+  })
+  if (!result.isConfirmed) return
+  await axios.post(route('ict-equipments.enrollment-token.revoke', token))
+  loadOutstandingTokens()
 }
 
 async function copyEnrollmentToken() {
@@ -414,6 +475,12 @@ const showAllChecked    = computed({
             class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
           >
             <KeyIcon class="w-4 h-4" /> Generate Enrollment Token
+          </button>
+          <button
+            @click="switchEnrollmentMode('bulk'); showEnrollmentModal = true; loadOutstandingTokens()"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >
+            <Square3Stack3DIcon class="w-4 h-4" /> Bulk Enrollment
           </button>
           <button
             @click="openModal('create')"
@@ -1008,26 +1075,125 @@ const showAllChecked    = computed({
             </button>
           </div>
 
+          <div class="px-6 py-3 border-b border-slate-100 flex gap-1">
+            <button
+              @click="switchEnrollmentMode('single')"
+              :class="enrollmentMode === 'single' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              Single Device
+            </button>
+            <button
+              @click="switchEnrollmentMode('bulk')"
+              :class="enrollmentMode === 'bulk' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            >
+              Bulk (Lab / Office)
+            </button>
+          </div>
+
           <div class="px-6 py-5 space-y-3">
-            <p class="text-sm text-slate-600">
-              Paste this token into the Atlas Sentinel installer on the target desktop/laptop. It expires in 24 hours and can only be used once.
-            </p>
-            <div class="flex items-center gap-2">
-              <input
-                :value="enrollmentToken"
-                readonly
-                class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 font-mono w-full"
-              />
+            <!-- Bulk generation form — shown until a token has been generated for this tab -->
+            <div v-if="enrollmentMode === 'bulk' && !enrollmentToken" class="space-y-3">
+              <p class="text-sm text-slate-600">
+                Generates one token you can paste into the installer on every machine in this batch — no need to generate a fresh one per device.
+              </p>
+              <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Label (optional)</label>
+                <input
+                  v-model="bulkLabel"
+                  type="text"
+                  placeholder="e.g. Comp Lab 3 — June 2026"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full mt-1"
+                />
+              </div>
+              <div class="flex items-center gap-2">
+                <input id="bulk-unlimited" v-model="bulkUnlimited" type="checkbox" class="rounded border-slate-300" />
+                <label for="bulk-unlimited" class="text-sm text-slate-600">Unlimited devices (until it expires)</label>
+              </div>
+              <div v-if="!bulkUnlimited">
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Number of devices</label>
+                <input
+                  v-model.number="bulkQuantity"
+                  type="number"
+                  min="1"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full mt-1"
+                />
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Expires in</label>
+                <select v-model.number="bulkExpiryHours" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full mt-1">
+                  <option :value="24">24 hours</option>
+                  <option :value="72">3 days</option>
+                  <option :value="168">7 days</option>
+                </select>
+              </div>
               <button
-                @click="copyEnrollmentToken"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+                @click="generateBulkToken"
+                :disabled="isGeneratingToken"
+                class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 w-full"
               >
-                {{ tokenCopied ? 'Copied!' : 'Copy' }}
+                Generate Bulk Token
               </button>
             </div>
-            <p class="text-xs text-slate-400">
-              Expires: {{ formatDate(enrollmentExpiresAt) }}
-            </p>
+
+            <!-- Resulting token, either mode -->
+            <template v-if="enrollmentToken">
+              <p class="text-sm text-slate-600">
+                <template v-if="enrollmentMaxUses === 1">
+                  Paste this token into the Atlas Sentinel installer on the target desktop/laptop. It expires in 24 hours and can only be used once.
+                </template>
+                <template v-else>
+                  Paste this same token into the Atlas Sentinel installer on every machine in this batch —
+                  {{ enrollmentMaxUses ? `usable on up to ${enrollmentMaxUses} devices` : 'usable on unlimited devices' }}
+                  until it expires.
+                </template>
+              </p>
+              <div class="flex items-center gap-2">
+                <input
+                  :value="enrollmentToken"
+                  readonly
+                  class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 font-mono w-full"
+                />
+                <button
+                  @click="copyEnrollmentToken"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+                >
+                  {{ tokenCopied ? 'Copied!' : 'Copy' }}
+                </button>
+              </div>
+              <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-400">
+                  Expires: {{ formatDate(enrollmentExpiresAt) }}
+                </p>
+                <button @click="enrollmentToken = null" class="text-xs text-indigo-600 hover:underline">
+                  Generate another
+                </button>
+              </div>
+            </template>
+
+            <!-- Outstanding tokens -->
+            <div class="pt-2 border-t border-slate-100">
+              <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Outstanding Tokens</h3>
+              <div v-if="loadingTokens" class="text-xs text-slate-400">Loading…</div>
+              <div v-else-if="!outstandingTokens.length" class="text-xs text-slate-400">No active tokens.</div>
+              <ul v-else class="space-y-2 max-h-40 overflow-y-auto">
+                <li
+                  v-for="t in outstandingTokens"
+                  :key="t.id"
+                  class="flex items-center justify-between gap-2 text-xs border border-slate-100 rounded-lg px-3 py-2 bg-slate-50/50"
+                >
+                  <div>
+                    <div class="font-medium text-slate-700">{{ t.label || 'Untitled' }}</div>
+                    <div class="text-slate-400">
+                      {{ t.max_uses ? `${t.uses_count}/${t.max_uses} used` : `${t.uses_count} used (unlimited)` }}
+                      · expires {{ formatDate(t.expires_at) }}
+                    </div>
+                  </div>
+                  <button @click="revokeToken(t.token)" class="text-red-600 hover:underline shrink-0">Revoke</button>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end">

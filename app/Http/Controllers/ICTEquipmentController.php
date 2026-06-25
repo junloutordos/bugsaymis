@@ -338,22 +338,64 @@ class ICTEquipmentController extends Controller
     }
 
     /**
-     * Generate a one-time enrollment token an MIS staff member hands to the
-     * Atlas Sentinel installer. The agent exchanges it for a device token on
-     * first enroll; it expires after 24h whether used or not.
+     * Generate an enrollment token an MIS staff member hands to the Atlas
+     * Sentinel installer. The agent exchanges it for a device token on
+     * enroll. Called with no body, this is the original one-time/24h
+     * behavior; `max_uses`/`expires_in_hours`/`label` let MIS generate one
+     * reusable token for a whole batch of computer-lab/office machines
+     * instead of minting a fresh one per device.
      */
     public function generateEnrollmentToken(Request $request)
     {
+        $validated = $request->validate([
+            'max_uses' => ['nullable', 'integer', 'min:1'],
+            'expires_in_hours' => ['nullable', 'integer', 'min:1', 'max:168'],
+            'label' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        // `??` treats an explicit `max_uses: null` (the "unlimited" choice)
+        // the same as "key absent" — must check presence, not just nullness,
+        // or "unlimited" would silently fall back to the single-use default.
+        $maxUses = array_key_exists('max_uses', $validated) ? $validated['max_uses'] : 1;
+
         $token = IctEquipmentEnrollmentToken::create([
             'token' => Str::random(40),
+            'label' => $validated['label'] ?? null,
             'created_by' => $request->user()->id,
-            'expires_at' => now()->addHours(24),
+            'expires_at' => now()->addHours($validated['expires_in_hours'] ?? 24),
+            'max_uses' => $maxUses,
         ]);
 
         return response()->json([
             'token' => $token->token,
+            'label' => $token->label,
             'expires_at' => $token->expires_at,
+            'max_uses' => $token->max_uses,
         ]);
+    }
+
+    /**
+     * Outstanding (not yet expired/revoked) enrollment tokens — lets MIS see
+     * how far a batch has progressed (`uses_count`/`max_uses`) and revoke one
+     * early if a rollout finishes ahead of its expiry or a token leaks.
+     */
+    public function listEnrollmentTokens(Request $request)
+    {
+        $tokens = IctEquipmentEnrollmentToken::whereNull('revoked_at')
+            ->where('expires_at', '>', now())
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get(['id', 'token', 'label', 'expires_at', 'max_uses', 'uses_count', 'created_at']);
+
+        return response()->json(['tokens' => $tokens]);
+    }
+
+    public function revokeEnrollmentToken(Request $request, string $token)
+    {
+        $enrollmentToken = IctEquipmentEnrollmentToken::where('token', $token)->firstOrFail();
+        $enrollmentToken->update(['revoked_at' => now()]);
+
+        return response()->json(['status' => 'ok']);
     }
 
     private const REMEDIATION_ACTIONS = [

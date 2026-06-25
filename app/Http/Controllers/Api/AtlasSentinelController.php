@@ -28,6 +28,16 @@ use Illuminate\Support\Facades\Storage;
 
 class AtlasSentinelController extends Controller
 {
+    // Generic/assembled motherboards routinely report one of these instead
+    // of a real BIOS serial — identical across every machine that hits it,
+    // not just blank on one. The agent's own fallback for a blank read is
+    // literally "UNKNOWN-SERIAL", which is just as collision-prone.
+    private const UNRELIABLE_SERIALS = [
+        '', 'unknown-serial', 'to be filled by o.e.m.', 'system serial number',
+        'default string', 'none', 'not specified', '0123456789', '1234567890',
+        'serial number', 'n/a',
+    ];
+
     public function __construct(
         private AtlasSentinelHealthEvaluator $healthEvaluator,
         private ITJobRequestController $jobRequests,
@@ -61,24 +71,56 @@ class AtlasSentinelController extends Controller
         ]);
 
         $enrollmentToken = IctEquipmentEnrollmentToken::where('token', $validated['enrollment_token'])
-            ->whereNull('used_at')
+            ->whereNull('revoked_at')
             ->where('expires_at', '>', now())
+            ->where(function ($query) {
+                $query->whereNull('max_uses')->orWhereColumn('uses_count', '<', 'max_uses');
+            })
             ->first();
 
         if (! $enrollmentToken) {
             return response()->json([
-                'message' => 'This enrollment token is invalid, expired, or already used.',
+                'message' => 'This enrollment token is invalid, expired, already used up, or revoked.',
             ], 422);
         }
 
-        $equipment = ICTEquipment::where('serial_no', $validated['serial_no'])->first();
+        $serial = $validated['serial_no'];
+        $mac = $validated['mac_address'] ?? null;
+        $matchedByMac = false;
+
+        $equipment = $this->isUnreliableSerial($serial) ? null : ICTEquipment::where('serial_no', $serial)->first();
+
+        if ($equipment) {
+            $existingDevice = IctEquipmentDevice::where('equipment_id', $equipment->id)->first();
+            // Same serial, different MAC than what's already on file for it —
+            // a second machine sharing a non-unique/placeholder serial with
+            // one already enrolled. Don't let it steal that device's row;
+            // fall through to MAC-based matching/creation instead.
+            if ($existingDevice && $mac && $existingDevice->mac_address && $existingDevice->mac_address !== $mac) {
+                $equipment = null;
+            }
+        }
+
+        if (! $equipment && $mac) {
+            $deviceByMac = IctEquipmentDevice::where('mac_address', $mac)->first();
+            if ($deviceByMac) {
+                $equipment = ICTEquipment::find($deviceByMac->equipment_id);
+                $matchedByMac = true;
+            }
+        }
+
         $linked = (bool) $equipment;
 
         if (! $equipment) {
+            $description = $validated['model'] ?? ('Auto-detected device — ' . ($validated['hostname'] ?? 'unknown host'));
+            if (($matchedByMac || $this->isUnreliableSerial($serial)) && $mac) {
+                $description .= " (MAC {$mac})";
+            }
+
             $equipment = ICTEquipment::create([
                 'category'    => 'Other',
-                'serial_no'   => $validated['serial_no'],
-                'description' => $validated['model'] ?? ('Auto-detected device — ' . ($validated['hostname'] ?? 'unknown host')),
+                'serial_no'   => $serial,
+                'description' => $description,
                 'status'      => null,
             ]);
         }
@@ -88,10 +130,20 @@ class AtlasSentinelController extends Controller
         // of leaving the old one stale forever with a dead token.
         $device = IctEquipmentDevice::where('equipment_id', $equipment->id)->first();
 
+        if ($device && $device->hostname && ($validated['hostname'] ?? null) && $device->hostname !== $validated['hostname']) {
+            logger()->warning('Atlas Sentinel: device row reclaimed under a different hostname — possible serial/MAC collision or legitimate reinstall.', [
+                'equipment_id' => $equipment->id,
+                'previous_hostname' => $device->hostname,
+                'new_hostname' => $validated['hostname'],
+                'serial_no' => $serial,
+                'mac_address' => $mac,
+            ]);
+        }
+
         $deviceAttributes = [
             'equipment_id'     => $equipment->id,
             'hostname'         => $validated['hostname'] ?? null,
-            'mac_address'      => $validated['mac_address'] ?? null,
+            'mac_address'      => $mac,
             'os_version'       => $validated['os_version'] ?? null,
             'agent_version'    => $validated['agent_version'] ?? null,
             'last_checkin_at'  => now(),
@@ -106,13 +158,21 @@ class AtlasSentinelController extends Controller
 
         $deviceToken = $device->createToken('ict-agent', ['ict-agent'])->plainTextToken;
 
-        $enrollmentToken->update(['used_at' => now()]);
+        $enrollmentToken->increment('uses_count');
+        if (! $enrollmentToken->used_at) {
+            $enrollmentToken->update(['used_at' => now()]);
+        }
 
         return response()->json([
             'device_token' => $deviceToken,
             'equipment_id' => $equipment->id,
             'linked'       => $linked,
         ], 201);
+    }
+
+    private function isUnreliableSerial(?string $serial): bool
+    {
+        return in_array(strtolower(trim($serial ?? '')), self::UNRELIABLE_SERIALS, true);
     }
 
     /**
