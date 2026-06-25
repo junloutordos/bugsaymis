@@ -4,6 +4,7 @@ namespace App\Services\Recruitment;
 
 use App\Mail\ApplicationPlacedMail;
 use App\Models\Application;
+use App\Models\JobItemPlantillaNumber;
 use App\Models\OnboardingRequirement;
 use App\Models\OnboardingTask;
 use App\Models\Placement;
@@ -42,6 +43,11 @@ class OnboardingService
                 'status'           => 'pending',
                 'remarks'          => $placementData['remarks'] ?? null,
             ]);
+
+            if ($plantillaNumberId = $placementData['plantilla_number_id'] ?? null) {
+                JobItemPlantillaNumber::where('id', $plantillaNumberId)
+                    ->update(['status' => 'filled', 'placement_id' => $placement->id]);
+            }
 
             // Auto-generate tasks from onboarding requirements for this type
             $this->generateTasks($placement, $application->recruitment_type_id);

@@ -870,6 +870,14 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.enrollment-token');
 
+    Route::get('/ict-equipments/enrollment-tokens', [ICTEquipmentController::class, 'listEnrollmentTokens'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('ict-equipments.enrollment-tokens.index');
+
+    Route::post('/ict-equipments/enrollment-token/{token}/revoke', [ICTEquipmentController::class, 'revokeEnrollmentToken'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('ict-equipments.enrollment-token.revoke');
+
     Route::post('/ict-equipments/{ictEquipment}/remediate', [ICTEquipmentController::class, 'remediate'])
         ->middleware('permission:it.equipment.manage')
         ->name('ict-equipments.remediate');

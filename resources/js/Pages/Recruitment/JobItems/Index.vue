@@ -123,7 +123,6 @@ const competencyMap = ref(emptyCompetencies())
 const emptyForm = () => ({
   recruitment_type_id:     '',
   position_title:          '',
-  plantilla_item_no:       '',
   salary_grade:            '',
   salary_step:             1,
   monthly_salary:          '',
@@ -152,14 +151,23 @@ const isPlantilla = computed(() => {
   return t ? PLANTILLA_NAMES.includes(t.name) : false
 })
 
+// Plantilla item numbers — one job item can represent several vacancies (e.g.
+// "Special Science Teacher I" with 4 plantilla item numbers), tracked as a
+// repeater instead of forcing HR to create a separate job item per number.
+const plantillaRows = ref([]) // [{ id: number|null, plantilla_item_no: string, status: 'vacant'|'filled' }]
+const addPlantillaRow    = () => { plantillaRows.value.push({ id: null, plantilla_item_no: '', status: 'vacant' }) }
+const removePlantillaRow = (idx) => { plantillaRows.value.splice(idx, 1) }
+
 // When type changes, clear compensation fields that don't apply
 watch(() => form.value.recruitment_type_id, () => {
   if (isPlantilla.value) {
     form.value.daily_rate = ''
+    if (!plantillaRows.value.length) addPlantillaRow()
   } else {
     form.value.salary_grade   = ''
     form.value.salary_step    = 1
     form.value.monthly_salary = ''
+    plantillaRows.value = []
   }
 })
 const errors      = ref({})
@@ -174,7 +182,6 @@ const openModal = (item = null) => {
     form.value = {
       recruitment_type_id:     item.recruitment_type_id,
       position_title:          item.position_title,
-      plantilla_item_no:       item.plantilla_item_no       ?? '',
       salary_grade:            item.salary_grade            ?? '',
       salary_step:             item.salary_step             ?? 1,
       monthly_salary:          item.monthly_salary          ?? '',
@@ -195,9 +202,11 @@ const openModal = (item = null) => {
       requirement_mandatory:   reqMand,
     }
     competencyMap.value = deserializeCompetencies(item.competencies)
+    plantillaRows.value = (item.plantilla_numbers ?? []).map(p => ({ id: p.id, plantilla_item_no: p.plantilla_item_no, status: p.status }))
   } else {
     form.value = emptyForm()
     competencyMap.value = emptyCompetencies()
+    plantillaRows.value = []
   }
   showModal.value = true
 }
@@ -243,7 +252,11 @@ const submit = () => {
   const isEdit = !!editingItem.value
   const url    = isEdit ? route('recruitment.job-items.update', editingItem.value.id) : route('recruitment.job-items.store')
   const method = isEdit ? 'put' : 'post'
-  const payload = { ...form.value, competencies: serializeCompetencies(competencyMap.value) }
+  const payload = {
+    ...form.value,
+    competencies: serializeCompetencies(competencyMap.value),
+    plantilla_numbers: plantillaRows.value.map(r => r.plantilla_item_no.trim()).filter(Boolean),
+  }
   router[method](url, payload, {
     onSuccess: () => { closeModal(); Swal.fire({ icon: 'success', title: isEdit ? 'Updated!' : 'Created!', timer: 1500, showConfirmButton: false }) },
     onError:   (e) => { errors.value = e },
@@ -357,7 +370,11 @@ const regenerateArtCard = (item) => {
                 <td class="px-4 py-3 text-sm text-slate-700">{{ item.id }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">
                   <div class="font-medium text-slate-800">{{ item.position_title }}</div>
-                  <div v-if="item.plantilla_item_no" class="text-xs text-slate-400">{{ item.plantilla_item_no }}</div>
+                  <div v-if="item.plantilla_numbers?.length" class="text-xs text-slate-400">
+                    {{ item.plantilla_numbers.length }} item{{ item.plantilla_numbers.length !== 1 ? 's' : '' }}
+                    · {{ item.plantilla_numbers.filter(p => p.status === 'filled').length }} filled
+                    · {{ item.plantilla_numbers.filter(p => p.status === 'vacant').length }} vacant
+                  </div>
                 </td>
                 <td class="px-4 py-3 text-sm text-slate-700">{{ item.recruitment_type?.name ?? '—' }}</td>
                 <td class="px-4 py-3 text-sm text-slate-700">
@@ -466,10 +483,26 @@ const regenerateArtCard = (item) => {
                 <p v-if="errors.position_title" class="text-red-500 text-xs mt-1">{{ errors.position_title }}</p>
               </div>
 
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Plantilla Item No.</label>
-                <input v-model="form.plantilla_item_no" type="text" placeholder="e.g. PSHS-CRC-T-1-2024"
-                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <div v-if="isPlantilla" class="sm:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Plantilla Item No.(s) *</label>
+                <p class="text-xs text-slate-400 mb-2">Add one row per vacancy this position covers — e.g. 4 item numbers for 4 vacancies of the same position.</p>
+                <div class="space-y-2">
+                  <div v-for="(row, idx) in plantillaRows" :key="idx" class="flex items-center gap-2">
+                    <input v-model="row.plantilla_item_no" type="text" placeholder="e.g. PSHS-CRC-T-1-2024"
+                           :disabled="row.status === 'filled'"
+                           class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-500" />
+                    <span v-if="row.status === 'filled'" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 whitespace-nowrap">Filled</span>
+                    <button type="button" v-else @click="removePlantillaRow(idx)"
+                            class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                </div>
+                <button type="button" @click="addPlantillaRow"
+                        class="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                  + Add Plantilla Item
+                </button>
+                <p v-if="errors.plantilla_numbers" class="text-red-500 text-xs mt-1">{{ errors.plantilla_numbers }}</p>
               </div>
 
               <div>

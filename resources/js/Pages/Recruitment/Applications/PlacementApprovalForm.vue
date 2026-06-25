@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { router } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 
@@ -7,8 +7,13 @@ const props = defineProps({
   application: { type: Object, required: true },
 })
 
+const PLANTILLA_NAMES = ['Plantilla Teaching', 'Plantilla Non-Teaching']
+const jobItem = computed(() => props.application.job_vacancy?.job_item ?? {})
+const isPlantilla = computed(() => PLANTILLA_NAMES.includes(jobItem.value.recruitment_type?.name))
+const vacantPlantillaNumbers = computed(() => (jobItem.value.plantilla_numbers ?? []).filter(p => p.status === 'vacant'))
+
 // Approval form
-const approveForm   = ref({ assigned_office_id: props.application.job_vacancy?.job_item?.office_id ?? '', start_date: '', end_date: '', remarks: '' })
+const approveForm   = ref({ assigned_office_id: jobItem.value.office_id ?? '', plantilla_number_id: '', start_date: '', end_date: '', remarks: '' })
 const approveErrors = ref({})
 const approveLoading = ref(false)
 
@@ -46,6 +51,16 @@ const disapprove = async () => {
     <h4 class="text-sm font-semibold text-slate-700">Approve Selection &amp; Create Placement</h4>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div v-if="isPlantilla" class="sm:col-span-2">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Plantilla Item No. *</label>
+        <select v-model="approveForm.plantilla_number_id" required
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+          <option value="" disabled>Select the item number to fill</option>
+          <option v-for="p in vacantPlantillaNumbers" :key="p.id" :value="p.id">{{ p.plantilla_item_no }}</option>
+        </select>
+        <p v-if="!vacantPlantillaNumbers.length" class="text-amber-600 text-xs mt-1">No vacant plantilla item numbers left on this job item.</p>
+        <p v-if="approveErrors.plantilla_number_id" class="text-red-500 text-xs mt-1">{{ approveErrors.plantilla_number_id }}</p>
+      </div>
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">Start Date *</label>
         <input v-model="approveForm.start_date" type="date" required

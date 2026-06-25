@@ -15,12 +15,17 @@ class JobItemService
      */
     public function create(array $data): JobItem
     {
-        return DB::transaction(function () use ($data) {
+        $plantillaNumbers = $data['plantilla_numbers'] ?? [];
+        unset($data['plantilla_numbers']);
+
+        return DB::transaction(function () use ($data, $plantillaNumbers) {
             $item = JobItem::create([
                 ...$data,
                 'created_by' => Auth::id(),
                 'status'     => 'draft',
             ]);
+
+            $this->syncPlantillaNumbers($item, $plantillaNumbers);
 
             AuditLogger::logModelEvent($item, 'created');
 
@@ -33,11 +38,43 @@ class JobItemService
      */
     public function update(JobItem $item, array $data): JobItem
     {
-        return DB::transaction(function () use ($item, $data) {
+        $plantillaNumbers = $data['plantilla_numbers'] ?? null;
+        unset($data['plantilla_numbers']);
+
+        return DB::transaction(function () use ($item, $data, $plantillaNumbers) {
             $item->update($data);
+
+            if ($plantillaNumbers !== null) {
+                $this->syncPlantillaNumbers($item, $plantillaNumbers);
+            }
+
             AuditLogger::logModelEvent($item, 'updated');
             return $item->fresh();
         });
+    }
+
+    /**
+     * Sync the job item's plantilla item numbers to match the submitted list.
+     * Removing a number that is already "filled" is blocked by StoreJobItemRequest
+     * before this is ever called, so any row missing here is safe to drop.
+     */
+    private function syncPlantillaNumbers(JobItem $item, array $numbers): void
+    {
+        $numbers = array_values(array_filter($numbers));
+        $existing = $item->plantillaNumbers()->pluck('plantilla_item_no', 'id');
+
+        foreach ($existing as $id => $existingNo) {
+            if (! in_array($existingNo, $numbers, true)) {
+                $item->plantillaNumbers()->where('id', $id)->delete();
+            }
+        }
+
+        $current = $item->plantillaNumbers()->pluck('plantilla_item_no')->all();
+        foreach ($numbers as $number) {
+            if (! in_array($number, $current, true)) {
+                $item->plantillaNumbers()->create(['plantilla_item_no' => $number]);
+            }
+        }
     }
 
     /**

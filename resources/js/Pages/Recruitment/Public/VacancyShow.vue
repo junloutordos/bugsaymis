@@ -33,6 +33,7 @@ const docList = computed(() => {
 
 const PLANTILLA = ['Plantilla Teaching', 'Plantilla Non-Teaching']
 const isPlantilla = computed(() => PLANTILLA.includes(type.value.name))
+const vacantPlantillaNumbers = computed(() => (item.value.plantilla_numbers ?? []).filter(p => p.status === 'vacant'))
 
 const levelLabel = { basic: 'Basic', intermediate: 'Intermediate', advanced: 'Advanced' }
 
@@ -132,7 +133,9 @@ const submitApply = async () => {
             </span>
             <h1 class="text-2xl font-bold text-gray-900 leading-tight">{{ item.position_title }}</h1>
             <p v-if="item.office?.name" class="text-gray-500 text-sm mt-1">{{ item.office.name }}</p>
-            <p v-if="item.plantilla_item_no" class="text-gray-400 text-xs mt-0.5">Item No. {{ item.plantilla_item_no }}</p>
+            <p v-if="vacantPlantillaNumbers.length" class="text-gray-400 text-xs mt-0.5">
+              {{ vacantPlantillaNumbers.length > 1 ? `${vacantPlantillaNumbers.length} Item Nos.: ` : 'Item No. ' }}{{ vacantPlantillaNumbers.map(p => p.plantilla_item_no).join(', ') }}
+            </p>
           </div>
           <div class="text-right text-sm space-y-1 flex-shrink-0">
             <!-- Plantilla: SG + monthly salary -->

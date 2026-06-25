@@ -20,7 +20,6 @@ class JobItem extends Model
     protected $fillable = [
         'recruitment_type_id',
         'position_title',
-        'plantilla_item_no',
         'salary_grade',
         'salary_step',
         'monthly_salary',
@@ -81,6 +80,23 @@ class JobItem extends Model
     public function activeVacancy()
     {
         return $this->hasOne(JobVacancy::class)->where('status', 'open');
+    }
+
+    public function plantillaNumbers()
+    {
+        return $this->hasMany(JobItemPlantillaNumber::class);
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    public function vacantPlantillaCount(): int
+    {
+        return $this->plantillaNumbers->where('status', 'vacant')->count();
+    }
+
+    public function filledPlantillaCount(): int
+    {
+        return $this->plantillaNumbers->where('status', 'filled')->count();
     }
 
     // ── Scopes ─────────────────────────────────────────────────────────────────

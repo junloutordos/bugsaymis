@@ -27,13 +27,13 @@ class JobItemController extends Controller
     {
         $this->authorize('recruitment.view');
 
-        $query = JobItem::with(['recruitmentType', 'office', 'creator', 'requirements'])
+        $query = JobItem::with(['recruitmentType', 'office', 'creator', 'requirements', 'plantillaNumbers'])
             ->latest();
 
         if ($search = $request->input('search')) {
             $query->where(fn ($q) =>
                 $q->where('position_title', 'like', "%{$search}%")
-                  ->orWhere('plantilla_item_no', 'like', "%{$search}%")
+                  ->orWhereHas('plantillaNumbers', fn ($p) => $p->where('plantilla_item_no', 'like', "%{$search}%"))
             );
         }
 

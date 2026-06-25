@@ -64,6 +64,7 @@ class ApplicationController extends Controller
         $application->load([
             'applicant.documents',
             'jobVacancy.jobItem.recruitmentType',
+            'jobVacancy.jobItem.plantillaNumbers',
             'recruitmentType.evaluationCriteria',
             'evaluationScores.criteria',
             'evaluationScores.evaluator',

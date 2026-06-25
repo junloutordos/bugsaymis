@@ -52,7 +52,7 @@ class ArtCardService
      */
     public function generate(JobItem $jobItem): void
     {
-        $jobItem->loadMissing(['office', 'requirements', 'jobVacancies', 'recruitmentType']);
+        $jobItem->loadMissing(['office', 'requirements', 'jobVacancies', 'recruitmentType', 'plantillaNumbers']);
 
         // Decoding the logo PNG + two 1080x1080 truecolor canvases needs more
         // headroom than the default CLI/web memory_limit.
@@ -115,7 +115,7 @@ class ArtCardService
         $y = $this->drawParagraph($im, $this->fontExtraBold, $size, $lineHeight, $titleLines, 60, $y, $white);
 
         $subtitle = $isPlantilla
-            ? ($jobItem->plantilla_item_no ? "Plantilla Item No.: {$jobItem->plantilla_item_no}" : null)
+            ? $this->plantillaSubtitle($jobItem)
             : $jobItem->office?->name;
         if ($subtitle) {
             $y += 6;
@@ -262,6 +262,22 @@ class ArtCardService
         }
 
         return ! is_null($jobItem->salary_grade);
+    }
+
+    private function plantillaSubtitle(JobItem $jobItem): ?string
+    {
+        $numbers = $jobItem->plantillaNumbers->pluck('plantilla_item_no');
+        if ($numbers->isEmpty()) {
+            return null;
+        }
+        if ($numbers->count() === 1) {
+            return "Plantilla Item No.: {$numbers->first()}";
+        }
+
+        $preview = $numbers->take(3)->implode(', ');
+        $extra   = $numbers->count() > 3 ? ' +' . ($numbers->count() - 3) . ' more' : '';
+
+        return "Plantilla Item Nos.: {$preview}{$extra}";
     }
 
     private function deadlineText(JobItem $jobItem): string

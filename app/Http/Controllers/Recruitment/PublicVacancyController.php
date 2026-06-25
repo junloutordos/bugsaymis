@@ -71,6 +71,7 @@ class PublicVacancyController extends Controller
             'jobItem.office',
             'jobItem.recruitmentType.evaluationCriteria',
             'jobItem.requirements',
+            'jobItem.plantillaNumbers',
         ]);
 
         return Inertia::render('Recruitment/Public/VacancyShow', [
