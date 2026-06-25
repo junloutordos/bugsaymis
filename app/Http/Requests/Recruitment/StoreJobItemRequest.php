@@ -35,6 +35,10 @@ class StoreJobItemRequest extends FormRequest
             'competencies.*.research' => ['nullable', 'boolean'],
             'duration_type'           => ['nullable', 'string', 'max:50'],
             'budget_source'           => ['nullable', 'string', 'max:100'],
+            'submit_to_name'          => ['nullable', 'string', 'max:255'],
+            'submit_to_title'         => ['nullable', 'string', 'max:255'],
+            'contract_start_date'     => ['nullable', 'date'],
+            'contract_end_date'       => ['nullable', 'date', 'after_or_equal:contract_start_date'],
             'office_id'               => ['nullable', 'integer', 'exists:offices,id'],
             // Application requirements — array of requirement IDs
             'requirement_ids'         => ['nullable', 'array'],

@@ -10,10 +10,10 @@ use Carbon\Carbon;
 /**
  * Turns a checkin's raw metrics + open alerts into a single 0-100
  * health_score and a risk_score/risk_tier that also factors in device
- * age/warranty. Rule-based weighted deductions, not a model — see the ICT
- * Agent plan's "AI Readiness" section for why that's deliberate for now.
+ * age/warranty. Rule-based weighted deductions, not a model — see the Atlas
+ * Sentinel plan's "AI Readiness" section for why that's deliberate for now.
  */
-class IctAgentScoringService
+class AtlasSentinelScoringService
 {
     private const LOW_DISK_FREE_PERCENT = 15;
     private const LOW_RAM_FREE_PERCENT = 10;

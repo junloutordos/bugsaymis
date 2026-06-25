@@ -2,14 +2,14 @@
 
 namespace App\Console\Commands;
 
-use App\Models\IctAgentRelease;
+use App\Models\AtlasSentinelRelease;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
-class IctAgentPublishRelease extends Command
+class AtlasSentinelPublishRelease extends Command
 {
-    protected $signature = 'ict-agent:publish-release {version} {zipPath}';
-    protected $description = 'Upload a new ICT Agent release zip to S3 and mark it as the latest version for fleet auto-update';
+    protected $signature = 'atlas-sentinel:publish-release {version} {zipPath}';
+    protected $description = 'Upload a new Atlas Sentinel release zip to S3 and mark it as the latest version for fleet auto-update';
 
     public function handle(): int
     {
@@ -21,18 +21,18 @@ class IctAgentPublishRelease extends Command
             return self::FAILURE;
         }
 
-        if (IctAgentRelease::where('version', $version)->exists()) {
+        if (AtlasSentinelRelease::where('version', $version)->exists()) {
             $this->error("Version {$version} has already been published.");
             return self::FAILURE;
         }
 
         $sha256 = hash_file('sha256', $zipPath);
-        $s3Key = "ict-agent-releases/{$version}.zip";
+        $s3Key = "atlas-sentinel-releases/{$version}.zip";
 
         $this->info("Uploading to s3://{$s3Key} ...");
         Storage::disk('s3')->put($s3Key, fopen($zipPath, 'r'));
 
-        IctAgentRelease::create([
+        AtlasSentinelRelease::create([
             'version' => $version,
             's3_key' => $s3Key,
             'sha256' => $sha256,

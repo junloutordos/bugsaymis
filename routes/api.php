@@ -8,7 +8,7 @@ use App\Http\Controllers\StudentAttendance\Api\RegisterController;
 use App\Http\Controllers\StudentAttendance\Api\ScheduleApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
-use App\Http\Controllers\Api\IctAgentController;
+use App\Http\Controllers\Api\AtlasSentinelController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -91,24 +91,30 @@ Route::get('/_ping', function () {
 
 /*
 |--------------------------------------------------------------------------
-| ICT Agent Routes
+| Atlas Sentinel Routes
 |--------------------------------------------------------------------------
 | Windows desktop agent installed by MIS. Enrollment exchanges a one-time
 | token (generated from the ICT Equipments page) for a long-lived device
 | Sanctum token; everything after that is authenticated as that specific
-| device (see EnsureIctAgentDevice middleware — no cross-device access).
+| device (see EnsureAtlasSentinelDevice middleware — no cross-device access).
+|
+| NOTE: the 'ict-agent' URL prefix/route-name and the 'ict-agent' Sanctum
+| ability string below are intentionally NOT renamed — they're the wire
+| contract already baked into every enrolled device's installed agent and
+| issued device token. Renaming them requires a coordinated client+server
+| rollout; see the Atlas Sentinel rename plan.
 */
 Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
-    Route::post('/enroll', [IctAgentController::class, 'enroll'])
+    Route::post('/enroll', [AtlasSentinelController::class, 'enroll'])
         ->name('enroll')
         ->middleware('throttle:10,1');
 
     Route::middleware(['auth:sanctum', 'ict-agent'])->group(function () {
-        Route::get('/me', [IctAgentController::class, 'me'])->name('me');
-        Route::post('/checkin', [IctAgentController::class, 'checkin'])->name('checkin');
-        Route::post('/inventory-checkin', [IctAgentController::class, 'inventoryCheckin'])->name('inventory-checkin');
-        Route::get('/alerts', [IctAgentController::class, 'alerts'])->name('alerts');
-        Route::post('/alerts/{alert}/escalate', [IctAgentController::class, 'escalate'])->name('alerts.escalate');
-        Route::get('/releases/{encodedKey}', [IctAgentController::class, 'releaseDownload'])->name('releases.show');
+        Route::get('/me', [AtlasSentinelController::class, 'me'])->name('me');
+        Route::post('/checkin', [AtlasSentinelController::class, 'checkin'])->name('checkin');
+        Route::post('/inventory-checkin', [AtlasSentinelController::class, 'inventoryCheckin'])->name('inventory-checkin');
+        Route::get('/alerts', [AtlasSentinelController::class, 'alerts'])->name('alerts');
+        Route::post('/alerts/{alert}/escalate', [AtlasSentinelController::class, 'escalate'])->name('alerts.escalate');
+        Route::get('/releases/{encodedKey}', [AtlasSentinelController::class, 'releaseDownload'])->name('releases.show');
     });
 });

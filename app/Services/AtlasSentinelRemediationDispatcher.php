@@ -11,12 +11,12 @@ use App\Models\IctRemediationRule;
 /**
  * Decides WHAT to remediate (server-side, auditable) — the agent only
  * executes what this returns. Rule-based actions only fire when a rule is
- * enabled AND auto_execute, per the self-healing safety boundary in the ICT
- * Agent plan (detection needs to be observed on real devices first). Manual
+ * enabled AND auto_execute, per the self-healing safety boundary in the Atlas
+ * Sentinel plan (detection needs to be observed on real devices first). Manual
  * "Fix Now" requests (admin-triggered, see IctEquipmentManualRemediationRequest)
  * bypass that gate entirely since a human explicitly asked for it.
  */
-class IctAgentRemediationDispatcher
+class AtlasSentinelRemediationDispatcher
 {
     private const LOW_DISK_FREE_PERCENT = 10;
     private const HIGH_PACKET_LOSS_PERCENT = 50;

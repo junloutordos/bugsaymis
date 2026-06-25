@@ -79,7 +79,7 @@ class ICTEquipmentController extends Controller
     }
 
     /**
-     * GET /ict-agent/health-dashboard
+     * GET /atlas-sentinel/health-dashboard
      *
      * Campus-wide fleet view, sorted highest-risk-first by default. Trend
      * data per device is intentionally NOT eager-loaded here — it's fetched
@@ -97,7 +97,7 @@ class ICTEquipmentController extends Controller
             ->orderBy(in_array($sort, ['risk_score', 'health_score', 'last_checkin_at']) ? $sort : 'risk_score', $direction === 'asc' ? 'asc' : 'desc')
             ->get();
 
-        return Inertia::render('ITJobRequests/IctAgentHealthDashboard', [
+        return Inertia::render('ITJobRequests/AtlasSentinelHealthDashboard', [
             'devices' => $devices,
             'sort'    => $sort,
             'direction' => $direction,
@@ -105,7 +105,7 @@ class ICTEquipmentController extends Controller
     }
 
     /**
-     * GET /ict-agent/health-dashboard/{device}/history
+     * GET /atlas-sentinel/health-dashboard/{device}/history
      *
      * Last 30 days of scored checkins for one device's trend chart.
      */
@@ -339,7 +339,7 @@ class ICTEquipmentController extends Controller
 
     /**
      * Generate a one-time enrollment token an MIS staff member hands to the
-     * ICT agent installer. The agent exchanges it for a device token on
+     * Atlas Sentinel installer. The agent exchanges it for a device token on
      * first enroll; it expires after 24h whether used or not.
      */
     public function generateEnrollmentToken(Request $request)

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * An admin-triggered "Fix Now" request, separate from the rule-based
- * auto_execute pipeline (IctAgentRemediationDispatcher/ict_remediation_rules)
+ * auto_execute pipeline (AtlasSentinelRemediationDispatcher/ict_remediation_rules)
  * — this bypasses the enabled/auto_execute gate entirely since a human
  * explicitly asked for it. Delivered on the device's next checkin
  * (up to ~20 min later, no push channel to the agent exists).

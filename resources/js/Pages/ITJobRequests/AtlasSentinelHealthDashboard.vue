@@ -107,7 +107,7 @@ async function toggleExpand(device) {
   if (!historyByDevice.value[device.id]) {
     loadingHistory.value = true
     try {
-      const { data } = await axios.get(route('ict-agent.health-dashboard.history', device.id))
+      const { data } = await axios.get(route('atlas-sentinel.health-dashboard.history', device.id))
       historyByDevice.value[device.id] = data.history
     } finally {
       loadingHistory.value = false
@@ -164,8 +164,8 @@ function offlineAfterFailedUpdate(device) {
 </script>
 
 <template>
-  <Head title="Agent Health Dashboard" />
-  <AdminLayout title="Agent Health Dashboard">
+  <Head title="Atlas Sentinel Health Dashboard" />
+  <AdminLayout title="Atlas Sentinel Health Dashboard">
     <div class="space-y-4">
       <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         <table class="w-full text-sm">

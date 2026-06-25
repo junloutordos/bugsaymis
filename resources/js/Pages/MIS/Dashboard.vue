@@ -276,7 +276,7 @@ const fleetKpiCards = computed(() => {
     {
       label: 'Devices Enrolled',
       value: `${props.fleet.devices_enrolled} / ${props.fleet.total_equipment}`,
-      sub:   'ICT Agent rollout',
+      sub:   'Atlas Sentinel rollout',
       icon:  ServerStackIcon,
       color: 'indigo',
     },
@@ -498,7 +498,7 @@ function fmtDateTime(d) {
       <div v-if="canViewFleet && fleet" class="space-y-4 pt-2 border-t border-slate-100">
         <div>
           <h1 class="text-lg font-bold text-slate-800">Fleet &amp; Infrastructure Health</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Live ICT Agent fleet snapshot — not scoped to the month above</p>
+          <p class="text-sm text-slate-500 mt-0.5">Live Atlas Sentinel fleet snapshot — not scoped to the month above</p>
         </div>
 
         <!-- Fleet KPI Cards -->
@@ -559,7 +559,7 @@ function fmtDateTime(d) {
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-slate-700">Top At-Risk Devices</h2>
-            <a :href="route('ict-agent.health-dashboard')" class="text-xs text-indigo-600 hover:underline">View Agent Health Dashboard →</a>
+            <a :href="route('atlas-sentinel.health-dashboard')" class="text-xs text-indigo-600 hover:underline">View Atlas Sentinel Health Dashboard →</a>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-100 text-sm">

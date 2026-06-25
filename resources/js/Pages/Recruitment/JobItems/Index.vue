@@ -135,6 +135,10 @@ const emptyForm = () => ({
   eligibility:             '',
   duration_type:           '',
   budget_source:           '',
+  submit_to_name:          '',
+  submit_to_title:         '',
+  contract_start_date:     '',
+  contract_end_date:       '',
   office_id:               '',
   requirement_ids:         [],
   requirement_mandatory:   {},
@@ -182,6 +186,10 @@ const openModal = (item = null) => {
       eligibility:             item.eligibility             ?? '',
       duration_type:           item.duration_type           ?? '',
       budget_source:           item.budget_source           ?? '',
+      submit_to_name:          item.submit_to_name          ?? '',
+      submit_to_title:         item.submit_to_title         ?? '',
+      contract_start_date:     item.contract_start_date     ?? '',
+      contract_end_date:       item.contract_end_date       ?? '',
       office_id:               item.office_id               ?? '',
       requirement_ids:         reqIds,
       requirement_mandatory:   reqMand,
@@ -280,6 +288,16 @@ const deleteItem = async (item) => {
 }
 
 const fmtSalary = (v) => v ? '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'
+
+// ── Art card ───────────────────────────────────────────────────────────────────
+const regeneratingId = ref(null)
+const regenerateArtCard = (item) => {
+  regeneratingId.value = item.id
+  router.post(route('recruitment.job-items.art-card.regenerate', item.id), {}, {
+    onSuccess: () => Swal.fire({ icon: 'success', title: 'Art card regenerated!', timer: 1200, showConfirmButton: false }),
+    onFinish:  () => { regeneratingId.value = null },
+  })
+}
 </script>
 
 <template>
@@ -384,6 +402,16 @@ const fmtSalary = (v) => v ? '₱' + Number(v).toLocaleString('en-PH', { minimum
                             class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Close</button>
                     <button v-if="item.status === 'draft'" @click="deleteItem(item)"
                             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Delete</button>
+                    <template v-if="item.art_card_generated_at">
+                      <a :href="route('recruitment.job-items.art-card.download', [item.id, 'cover'])"
+                         class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Cover Card</a>
+                      <a :href="route('recruitment.job-items.art-card.download', [item.id, 'detail'])"
+                         class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Detail Card</a>
+                    </template>
+                    <button @click="regenerateArtCard(item)" :disabled="regeneratingId === item.id"
+                            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50">
+                      {{ regeneratingId === item.id ? 'Generating…' : (item.art_card_generated_at ? 'Regenerate Card' : 'Generate Card') }}
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -594,6 +622,37 @@ const fmtSalary = (v) => v ? '₱' + Number(v).toLocaleString('en-PH', { minimum
             <p class="text-xs text-indigo-500 mt-3 italic">
               {{ Object.values(competencyMap).filter(v => v.selected).length }} competenc{{ Object.values(competencyMap).filter(v => v.selected).length !== 1 ? 'ies' : 'y' }} selected.
             </p>
+          </fieldset>
+
+          <!-- Section 3c: Posting / Art Card Details -->
+          <fieldset class="border border-slate-200 rounded-xl p-4">
+            <legend class="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">Posting Card Details</legend>
+            <p class="text-xs text-slate-400 mt-2 mb-3">Used on the auto-generated art card (downloadable for social media / website posting).</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Submit Application To (Name)</label>
+                <input v-model="form.submit_to_name" type="text" placeholder="e.g. Engr. Ramil A. Sanchez"
+                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Title / Position</label>
+                <input v-model="form.submit_to_title" type="text" placeholder="e.g. Director III"
+                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              </div>
+              <template v-if="!isPlantilla">
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Contract Start Date</label>
+                  <input v-model="form.contract_start_date" type="date"
+                         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-600 mb-1">Contract End Date</label>
+                  <input v-model="form.contract_end_date" type="date"
+                         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                  <p v-if="errors.contract_end_date" class="text-red-500 text-xs mt-1">{{ errors.contract_end_date }}</p>
+                </div>
+              </template>
+            </div>
           </fieldset>
 
           <!-- Section 4: Application Document Requirements -->

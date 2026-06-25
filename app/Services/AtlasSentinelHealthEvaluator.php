@@ -13,7 +13,7 @@ use App\Models\PMS;
  * versus actionable findings (tracked as open alerts until resolved or
  * escalated). Detect + report only — this never executes a fix itself.
  */
-class IctAgentHealthEvaluator
+class AtlasSentinelHealthEvaluator
 {
     private const LOW_DISK_FREE_PERCENT = 15;
     private const LOW_RAM_FREE_PERCENT = 10;

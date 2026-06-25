@@ -845,12 +845,12 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     ->name('job-requests.update');
 
     Route::get('/ict-equipments', [ICTEquipmentController::class, 'index'])->name('ict-equipments.index');
-    Route::get('/ict-agent/health-dashboard', [ICTEquipmentController::class, 'healthDashboard'])
+    Route::get('/atlas-sentinel/health-dashboard', [ICTEquipmentController::class, 'healthDashboard'])
         ->middleware('permission:it.equipment.view')
-        ->name('ict-agent.health-dashboard');
-    Route::get('/ict-agent/health-dashboard/{device}/history', [ICTEquipmentController::class, 'healthHistory'])
+        ->name('atlas-sentinel.health-dashboard');
+    Route::get('/atlas-sentinel/health-dashboard/{device}/history', [ICTEquipmentController::class, 'healthHistory'])
         ->middleware('permission:it.equipment.view')
-        ->name('ict-agent.health-dashboard.history');
+        ->name('atlas-sentinel.health-dashboard.history');
     Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('ict-equipments.store');
     Route::put('/ict-equipments/{ictEquipment}', [ICTEquipmentController::class, 'update'])
     ->name('ict-equipments.update');
@@ -1350,6 +1350,10 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
             ->name('job-items.publish');
         Route::delete('/job-items/{jobItem}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'destroy'])
             ->name('job-items.destroy');
+        Route::get('/job-items/{jobItem}/art-card/{type}', [\App\Http\Controllers\Recruitment\JobItemController::class, 'downloadArtCard'])
+            ->name('job-items.art-card.download');
+        Route::post('/job-items/{jobItem}/art-card/regenerate', [\App\Http\Controllers\Recruitment\JobItemController::class, 'regenerateArtCard'])
+            ->name('job-items.art-card.regenerate');
 
         // ── Applicants ────────────────────────────────────────────────────────
         Route::get('/applicants', [\App\Http\Controllers\Recruitment\ApplicantController::class, 'index'])

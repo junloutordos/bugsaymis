@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\ITJobRequestController;
 use App\Models\ICTEquipment;
-use App\Models\IctAgentRelease;
+use App\Models\AtlasSentinelRelease;
 use App\Models\IctEquipmentAlert;
 use App\Models\IctEquipmentDevice;
 use App\Models\IctEquipmentEnrollmentToken;
@@ -16,26 +16,26 @@ use App\Models\IctEquipmentHealthSnapshot;
 use App\Models\IctEquipmentSecurityStatus;
 use App\Models\IctEquipmentSoftwareInventory;
 use App\Models\User;
-use App\Services\IctAgentDiagnosticsService;
-use App\Services\IctAgentHealthEvaluator;
-use App\Services\IctAgentNetworkLocationResolver;
-use App\Services\IctAgentRemediationDispatcher;
-use App\Services\IctAgentScoringService;
-use App\Services\IctAgentSecurityEvaluator;
+use App\Services\AtlasSentinelDiagnosticsService;
+use App\Services\AtlasSentinelHealthEvaluator;
+use App\Services\AtlasSentinelNetworkLocationResolver;
+use App\Services\AtlasSentinelRemediationDispatcher;
+use App\Services\AtlasSentinelScoringService;
+use App\Services\AtlasSentinelSecurityEvaluator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
-class IctAgentController extends Controller
+class AtlasSentinelController extends Controller
 {
     public function __construct(
-        private IctAgentHealthEvaluator $healthEvaluator,
+        private AtlasSentinelHealthEvaluator $healthEvaluator,
         private ITJobRequestController $jobRequests,
-        private IctAgentNetworkLocationResolver $networkLocationResolver,
-        private IctAgentScoringService $scoringService,
-        private IctAgentDiagnosticsService $diagnosticsService,
-        private IctAgentSecurityEvaluator $securityEvaluator,
-        private IctAgentRemediationDispatcher $remediationDispatcher,
+        private AtlasSentinelNetworkLocationResolver $networkLocationResolver,
+        private AtlasSentinelScoringService $scoringService,
+        private AtlasSentinelDiagnosticsService $diagnosticsService,
+        private AtlasSentinelSecurityEvaluator $securityEvaluator,
+        private AtlasSentinelRemediationDispatcher $remediationDispatcher,
     ) {
     }
 
@@ -138,7 +138,7 @@ class IctAgentController extends Controller
      *
      * Periodic hardware/peripheral snapshot from an enrolled device. Stores
      * the latest snapshot (overwritten each check-in) and runs it through
-     * IctAgentHealthEvaluator, which logs routine findings into the
+     * AtlasSentinelHealthEvaluator, which logs routine findings into the
      * equipment's existing PMS history and tracks actionable findings as
      * open alerts.
      */
@@ -237,7 +237,7 @@ class IctAgentController extends Controller
             $response['remediations'] = $pendingRemediations;
         }
 
-        $latestRelease = IctAgentRelease::latestRelease();
+        $latestRelease = AtlasSentinelRelease::latestRelease();
         // version_compare alone isn't enough — it does NOT treat "1.0.3" and
         // "1.0.3.0" as equal (verified: returns -1), so a device freshly
         // updated to the latest release kept getting re-offered the same
@@ -502,7 +502,7 @@ class IctAgentController extends Controller
             $jobRequest = $this->jobRequests->createJobRequest([
                 'category'    => 'Hardware',
                 'title'       => 'Auto-detected issue: ' . ($equipment->description ?? 'ICT equipment'),
-                'description' => $alert->issue . " (auto-detected by the ICT Agent on {$device->hostname})",
+                'description' => $alert->issue . " (auto-detected by Atlas Sentinel on {$device->hostname})",
                 'priority'    => $alert->severity === 'critical' ? 'high' : 'normal',
                 'ict_equipment_id' => $equipment->id,
             ], $owner);

@@ -6,7 +6,7 @@ use App\Models\IctEquipmentManualRemediationRequest;
 use Illuminate\Console\Command;
 
 /**
- * IctAgentRemediationDispatcher marks a manual "Fix Now" request 'delivered'
+ * AtlasSentinelRemediationDispatcher marks a manual "Fix Now" request 'delivered'
  * the moment it's handed to the device on checkin, before the device has
  * actually run it — deliberately, so a missed/delayed result report doesn't
  * cause the same fix to be resent later. The gap: if the device never
@@ -14,9 +14,9 @@ use Illuminate\Console\Command;
  * request sits 'delivered' forever with no way to ever complete, and the
  * Agent Specs UI shows it as permanently "Queued…". This sweeps those out.
  */
-class IctAgentExpireStaleRemediations extends Command
+class AtlasSentinelExpireStaleRemediations extends Command
 {
-    protected $signature = 'ict-agent:expire-stale-remediations';
+    protected $signature = 'atlas-sentinel:expire-stale-remediations';
     protected $description = 'Mark manual remediation requests as failed if delivered but never reported back within the timeout window';
 
     // Generously above the ~20-min checkin interval — a healthy device
