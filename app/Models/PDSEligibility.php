@@ -18,11 +18,6 @@ class PDSEligibility extends Model
         'license_validity',
     ];
 
-    protected $casts = [
-        'exam_date' => 'date',
-        'license_validity' => 'date',
-    ];
-
     public function pds()
     {
         return $this->belongsTo(PDS::class);

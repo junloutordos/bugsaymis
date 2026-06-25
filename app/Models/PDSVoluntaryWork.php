@@ -18,8 +18,6 @@ class PDSVoluntaryWork extends Model
     ];
 
     protected $casts = [
-        'from_date' => 'date',
-        'to_date' => 'date',
         'hours' => 'integer',
     ];
 
