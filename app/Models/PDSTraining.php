@@ -19,8 +19,6 @@ class PDSTraining extends Model
     ];
 
     protected $casts = [
-        'date_from' => 'date',
-        'date_to' => 'date',
         'hours' => 'decimal:2',
     ];
 
