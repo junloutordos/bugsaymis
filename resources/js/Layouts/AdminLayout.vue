@@ -564,6 +564,13 @@ const menuItems = [
       roles: ["Administrator", "HR", "Faculty", "Staff", "DivisionChief", "OCD"],
       children: [
       {
+        label: "HR Dashboard",
+        routeName: "hr.dashboard",
+        href: route("hr.dashboard"),
+        icon: ChartBarIcon,
+        permissions: ["hr.dashboard.view"],
+      },
+      {
         label: "My PDS",
         routeName: "pds.my",
         href: route("pds.my"),
