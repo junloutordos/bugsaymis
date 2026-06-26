@@ -6,8 +6,16 @@ use Illuminate\Support\Facades\Storage;
 
 class PdfTextExtractorService
 {
-    // Minimum character count to consider smalot extraction "successful" and skip Textract
+    // Minimum character count (after stripping stamp artifacts) to consider smalot "successful"
     private const MIN_TEXT_LENGTH = 50;
+
+    // Patterns stamped onto every scanned PDF by our QR process — not real document content
+    private const STAMP_PATTERNS = [
+        '/Scan to verify/i',
+        '/[-\s]{3,}/i',                              // dash separators "- - - - - - -"
+        '/Powered by TCPDF[^\n]*/i',
+        '/[a-f0-9]{16}[…\.]+/i',                    // 16-char hash fragment + ellipsis
+    ];
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -26,14 +34,15 @@ class PdfTextExtractorService
 
         $text = $this->tryPdfParser($bytes);
 
-        if (strlen(trim($text)) >= self::MIN_TEXT_LENGTH) {
+        if ($this->isSubstantialText($text)) {
             return $this->cleanText($text);
         }
 
-        // Image-based or empty PDF — try Textract
-        logger()->info('PdfTextExtractorService: smalot yielded short text, trying Textract', [
-            'path'   => $s3Path,
-            'length' => strlen(trim($text)),
+        // Image-based PDF, or only QR stamp text was found — fall back to Textract
+        logger()->info('PdfTextExtractorService: smalot yielded no substantial text, trying Textract', [
+            'path'          => $s3Path,
+            'raw_length'    => strlen(trim($text)),
+            'stripped_text' => $this->stripStampArtifacts($text),
         ]);
 
         try {
@@ -176,6 +185,25 @@ class PdfTextExtractorService
         }
 
         return new \Aws\Textract\TextractClient($config);
+    }
+
+    /**
+     * Returns true only if the extracted text contains meaningful content
+     * beyond the QR stamp footer we add to every scanned PDF.
+     */
+    private function isSubstantialText(string $text): bool
+    {
+        $stripped = $this->stripStampArtifacts($text);
+        return strlen($stripped) >= self::MIN_TEXT_LENGTH;
+    }
+
+    private function stripStampArtifacts(string $text): string
+    {
+        $stripped = $text;
+        foreach (self::STAMP_PATTERNS as $pattern) {
+            $stripped = preg_replace($pattern, '', $stripped);
+        }
+        return trim(preg_replace('/\s+/', ' ', $stripped));
     }
 
     private function cleanText(string $text): string
