@@ -54,14 +54,31 @@ class DtrRecordController extends Controller
             ->sortBy('user.name')
             ->values();
 
+        $pennedSubmissions = DtrRecord::whereYear('work_date', $y)
+            ->whereMonth('work_date', $m)
+            ->whereNotNull('penned_submitted_at')
+            ->select('user_id', DB::raw('MIN(penned_submitted_at) as submitted_at'), DB::raw('COUNT(*) as entry_count'))
+            ->groupBy('user_id')
+            ->with('user:id,name')
+            ->get()
+            ->filter(fn ($r) => $r->user !== null)
+            ->map(fn ($r) => [
+                'id'           => $r->user_id,
+                'name'         => $r->user->name,
+                'entry_count'  => $r->entry_count,
+                'submitted_at' => $r->submitted_at,
+            ])
+            ->values();
+
         return Inertia::render('HR/DTR/Index', [
-            'summaries' => $rows,
-            'users'     => User::where('status', 'active')
+            'summaries'         => $rows,
+            'pennedSubmissions' => $pennedSubmissions,
+            'users'             => User::where('status', 'active')
                 ->select('id', 'name', 'badge_id')
                 ->orderBy('name')
                 ->get(),
-            'filters'   => $request->only(['user_id', 'month']),
-            'month'     => $month,
+            'filters'           => $request->only(['user_id', 'month']),
+            'month'             => $month,
         ]);
     }
 
@@ -102,11 +119,20 @@ class DtrRecordController extends Controller
             'total_ot'    => round($records->sum('overtime_minutes'), 2),
         ];
 
+        $nonAdvance   = $records->filter(fn ($r) => ! $r->is_advance);
+        $hasPenned    = $nonAdvance->contains(fn ($r) =>
+            $r->penned_time_in_am || $r->penned_time_out_am ||
+            $r->penned_time_in_pm || $r->penned_time_out_pm || $r->penned_remarks
+        );
+        $allSubmitted = $nonAdvance->isNotEmpty() && $nonAdvance->every(fn ($r) => $r->penned_submitted_at !== null);
+
         return Inertia::render('HR/DTR/Show', [
-            'employee' => $user->load('employeeProfile'),
-            'records'  => $records,
-            'summary'  => $summary,
-            'month'    => $month,
+            'employee'     => $user->load('employeeProfile'),
+            'records'      => $records,
+            'summary'      => $summary,
+            'month'        => $month,
+            'hasPenned'    => $hasPenned,
+            'allSubmitted' => $allSubmitted,
         ]);
     }
 
@@ -160,8 +186,10 @@ class DtrRecordController extends Controller
             'total_ot'    => round($records->sum('overtime_minutes'), 2),
         ];
 
-        $wfhByDate      = $this->loadWfhByDate($user->id, $y, $m);
-        $gatepassByDate = $this->loadGatepassByDate($user->badge_id, $y, $m);
+        $wfhDateFrom    = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+        $wfhDateTo      = date('Y-m-t', strtotime($wfhDateFrom));
+        $wfhByDate      = $this->loadWfhByDate($user->id, $wfhDateFrom, $wfhDateTo);
+        $gatepassByDate = $this->loadGatepassByDate($user->badge_id, $wfhDateFrom, $wfhDateTo);
 
         // Advance records are not included in the Submit & Lock flow
         $nonAdvance   = $records->filter(fn ($r) => ! $r->is_advance);
@@ -198,11 +226,23 @@ class DtrRecordController extends Controller
         $user  = Auth::user();
         $month = $request->input('month', now()->format('Y-m'));
         [$y, $m] = explode('-', $month);
-        $firstDay = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+
+        $isCos = in_array($user->emp_category, ['COS Teaching', 'COS Non Teaching']);
+        if ($isCos && $request->filled('date_from') && $request->filled('date_to')) {
+            $dateFrom = $request->input('date_from');
+            $dateTo   = $request->input('date_to');
+            if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+                abort(422, 'Invalid date format.');
+            }
+            $firstDay = $dateFrom;
+        } else {
+            $dateFrom = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+            $dateTo   = date('Y-m-t', strtotime($dateFrom));
+            $firstDay = $dateFrom;
+        }
 
         $records = DtrRecord::where('user_id', $user->id)
-            ->whereYear('work_date', $y)
-            ->whereMonth('work_date', $m)
+            ->whereBetween('work_date', [$dateFrom, $dateTo])
             ->with(['schedule', 'leaveApplication.leaveType'])
             ->orderBy('work_date')
             ->get();
@@ -257,20 +297,22 @@ class DtrRecordController extends Controller
         })->values();
 
         [$wfhEntries, $gatepassEntries, $leaveEntries] = $this->buildChecklistEntries(
-            $user->id, $user->badge_id, $records, $y, $m
+            $user->id, $user->badge_id, $records, $dateFrom, $dateTo
         );
 
         return Inertia::render('HR/DTR/PrintChecklist', [
-            'employee'       => $user->load('employeeProfile'),
-            'month'          => $month,
-            'officialTimes'  => $officialTimes,
-            'pennedEntries'  => $pennedEntries,
-            'declaredRows'   => $declaredRows,
-            'wfhEntries'     => $wfhEntries,
-            'gatepassEntries'=> $gatepassEntries,
-            'leaveEntries'   => $leaveEntries,
-            'absentCount'    => $records->where('attendance_status', 'absent')->count(),
-            'totalTardy'     => (int) round($records->sum(fn ($r) => (float) $r->late_minutes + (float) $r->undertime_minutes)),
+            'employee'        => $user->load('employeeProfile'),
+            'month'           => $month,
+            'date_from'       => $dateFrom,
+            'date_to'         => $dateTo,
+            'officialTimes'   => $officialTimes,
+            'pennedEntries'   => $pennedEntries,
+            'declaredRows'    => $declaredRows,
+            'wfhEntries'      => $wfhEntries,
+            'gatepassEntries' => $gatepassEntries,
+            'leaveEntries'    => $leaveEntries,
+            'absentCount'     => $records->where('attendance_status', 'absent')->count(),
+            'totalTardy'      => (int) round($records->sum(fn ($r) => (float) $r->late_minutes + (float) $r->undertime_minutes)),
         ]);
     }
 
@@ -610,11 +652,23 @@ class DtrRecordController extends Controller
 
         $month = $request->input('month', now()->format('Y-m'));
         [$y, $m] = explode('-', $month);
-        $firstDay = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+
+        $isCos = in_array($user->emp_category, ['COS Teaching', 'COS Non Teaching']);
+        if ($isCos && $request->filled('date_from') && $request->filled('date_to')) {
+            $dateFrom = $request->input('date_from');
+            $dateTo   = $request->input('date_to');
+            if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+                abort(422, 'Invalid date format.');
+            }
+            $firstDay = $dateFrom;
+        } else {
+            $dateFrom = "$y-" . str_pad($m, 2, '0', STR_PAD_LEFT) . "-01";
+            $dateTo   = date('Y-m-t', strtotime($dateFrom));
+            $firstDay = $dateFrom;
+        }
 
         $records = DtrRecord::where('user_id', $user->id)
-            ->whereYear('work_date', $y)
-            ->whereMonth('work_date', $m)
+            ->whereBetween('work_date', [$dateFrom, $dateTo])
             ->with(['schedule', 'leaveApplication.leaveType'])
             ->orderBy('work_date')
             ->get();
@@ -692,12 +746,14 @@ class DtrRecordController extends Controller
         ));
 
         [$wfhEntries, $gatepassEntries, $leaveEntries] = $this->buildChecklistEntries(
-            $user->id, $user->badge_id, $records, $y, $m
+            $user->id, $user->badge_id, $records, $dateFrom, $dateTo
         );
 
         return Inertia::render('HR/DTR/PrintChecklist', [
             'employee'        => $user->load('employeeProfile'),
             'month'           => $month,
+            'date_from'       => $dateFrom,
+            'date_to'         => $dateTo,
             'officialTimes'   => $officialTimes,
             'pennedEntries'   => $pennedEntries,
             'declaredRows'    => $declaredRows,
@@ -818,11 +874,10 @@ class DtrRecordController extends Controller
      * Load WFH attendances for the user/month, keyed by date string.
      * Returns array of { time_in, time_out } per date.
      */
-    private function loadWfhByDate(int $userId, int $year, int $month): array
+    private function loadWfhByDate(int $userId, string $dateFrom, string $dateTo): array
     {
         return WFHAttendance::where('user_id', $userId)
-            ->whereYear('date', $year)
-            ->whereMonth('date', $month)
+            ->whereBetween('date', [$dateFrom, $dateTo])
             ->get()
             ->mapWithKeys(fn ($w) => [
                 Carbon::parse($w->date)->toDateString() => [
@@ -842,7 +897,7 @@ class DtrRecordController extends Controller
      * Accepted final statuses: 'OCD Approved' (standard flow), 'Approved' (legacy/manual).
      * 'Division Approved' is intentionally excluded — it is an intermediate step, not final.
      */
-    private function loadGatepassByDate(?string $badgeId, int $year, int $month): array
+    private function loadGatepassByDate(?string $badgeId, string $dateFrom, string $dateTo): array
     {
         if (! $badgeId) {
             return [];
@@ -866,10 +921,10 @@ class DtrRecordController extends Controller
             } catch (\Throwable) {
                 continue;
             }
-            if ($parsed->year !== $year || $parsed->month !== $month) {
+            $dateStr = $parsed->toDateString();
+            if ($dateStr < $dateFrom || $dateStr > $dateTo) {
                 continue;
             }
-            $dateStr = $parsed->toDateString();
             $label   = $typeMap[strtolower(trim($gp->gatepass_type ?? ''))] ?? 'OB';
 
             // Compute minutes consumed from actual times when both are recorded
@@ -904,11 +959,11 @@ class DtrRecordController extends Controller
         int $userId,
         ?string $badgeId,
         \Illuminate\Support\Collection $records,
-        int $year,
-        int $month
+        string $dateFrom,
+        string $dateTo
     ): array {
         // ── WFH entries ───────────────────────────────────────────────────────
-        $wfhByDate = $this->loadWfhByDate($userId, $year, $month);
+        $wfhByDate = $this->loadWfhByDate($userId, $dateFrom, $dateTo);
         $wfhEntries = [];
         foreach ($wfhByDate as $dateStr => $w) {
             $wfhEntries[] = [
@@ -919,7 +974,7 @@ class DtrRecordController extends Controller
         }
 
         // ── Gate pass entries ─────────────────────────────────────────────────
-        $gpByDate = $this->loadGatepassByDate($badgeId, $year, $month);
+        $gpByDate = $this->loadGatepassByDate($badgeId, $dateFrom, $dateTo);
         $gatepassEntries = [];
         foreach ($gpByDate as $dateStr => $gp) {
             $gatepassEntries[] = [

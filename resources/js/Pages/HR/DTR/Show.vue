@@ -48,7 +48,17 @@
               <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
               {{ advanceGenerating ? 'Generating…' : 'Advance Entry' }}
             </button>
-            <a :href="route('hr.dtr.checklist', employee.id) + '?month=' + currentMonth" target="_blank"
+            <!-- COS: date range pickers for checklist -->
+            <template v-if="isCos">
+              <input v-model="cosDateFrom" type="date"
+                class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                title="Checklist date from" />
+              <span class="text-slate-400 text-sm">–</span>
+              <input v-model="cosDateTo" type="date"
+                class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                title="Checklist date to" />
+            </template>
+            <a :href="cosChecklistUrl()" target="_blank"
                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium">
               <ClipboardDocumentListIcon class="h-4 w-4" />Checklist
             </a>
@@ -58,6 +68,22 @@
             </a>
           </div>
         </div>
+      </div>
+
+      <!-- Penned entries submitted banner + unlock -->
+      <div v-if="allSubmitted" class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden">
+        <div class="flex items-start gap-2">
+          <LockClosedIcon class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p class="text-sm font-semibold text-amber-800">Penned entries submitted</p>
+            <p class="text-xs text-amber-600 mt-0.5">{{ employee.name }} has locked their penned entries for {{ currentMonth }}. Review and unlock if corrections are needed.</p>
+          </div>
+        </div>
+        <button @click="unlockPenned" :disabled="unlocking"
+          class="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg font-medium shrink-0 transition-colors">
+          <LockOpenIcon class="h-4 w-4" />
+          {{ unlocking ? 'Unlocking…' : 'Unlock Submissions' }}
+        </button>
       </div>
 
       <!-- Summary Stats -->
@@ -362,14 +388,16 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, ArrowPathIcon,
-  ClipboardDocumentListIcon, BoltIcon,
+  ClipboardDocumentListIcon, BoltIcon, LockOpenIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  employee: Object,
-  records:  Array,
-  summary:  Object,
-  month:    String,
+  employee:     Object,
+  records:      Array,
+  summary:      Object,
+  month:        String,
+  hasPenned:    { type: Boolean, default: false },
+  allSubmitted: { type: Boolean, default: false },
 })
 
 const page = usePage()
@@ -417,6 +445,29 @@ function submitAdvanceGenerate() {
 }
 
 const currentMonth = ref(props.month)
+
+// ── COS checklist date range ───────────────────────────────────────────────
+const cosDateFrom = ref('')
+const cosDateTo   = ref('')
+
+function cosChecklistUrl() {
+  const base = route('hr.dtr.checklist', props.employee.id)
+  if (isCos.value && cosDateFrom.value && cosDateTo.value) {
+    return `${base}?date_from=${cosDateFrom.value}&date_to=${cosDateTo.value}`
+  }
+  return `${base}?month=${currentMonth.value}`
+}
+
+// ── Unlock penned entries ──────────────────────────────────────────────────
+const unlocking = ref(false)
+
+function unlockPenned() {
+  unlocking.value = true
+  router.post(route('hr.dtr.unlock-penned', props.employee.id), { month: currentMonth.value }, {
+    preserveScroll: true,
+    onFinish: () => { unlocking.value = false },
+  })
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

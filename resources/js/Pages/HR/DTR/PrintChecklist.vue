@@ -162,6 +162,8 @@ import { Head } from '@inertiajs/vue3'
 const props = defineProps({
   employee:      Object,
   month:         String,
+  date_from:     { type: String, default: null },
+  date_to:       { type: String, default: null },
   officialTimes: Object,   // keyed by Mon/Tue/… → { time_in, time_out }
   pennedEntries: Array,    // [{ date, time, reason }]
   declaredRows:  Array,    // [{ nature, date, minutes, reason }]
@@ -171,11 +173,23 @@ const props = defineProps({
 
 const [yr, mo] = props.month.split('-').map(Number)
 
-const monthLabel = computed(() =>
-  new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
-)
+const monthLabel = computed(() => {
+  if (props.date_from && props.date_to) {
+    const from = new Date(props.date_from + 'T00:00:00')
+    const to   = new Date(props.date_to   + 'T00:00:00')
+    const fmt  = { month: 'short', day: 'numeric', year: 'numeric' }
+    return `${from.toLocaleDateString('en-PH', fmt)} – ${to.toLocaleDateString('en-PH', fmt)}`
+  }
+  return new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+})
 
 const periodLabel = computed(() => {
+  if (props.date_from && props.date_to) {
+    const from = new Date(props.date_from + 'T00:00:00')
+    const to   = new Date(props.date_to   + 'T00:00:00')
+    const fmt  = { month: 'long', day: 'numeric', year: 'numeric' }
+    return `${from.toLocaleDateString('en-PH', fmt)} – ${to.toLocaleDateString('en-PH', fmt)}`
+  }
   const last  = new Date(yr, mo, 0).getDate()
   const mName = new Date(yr, mo - 1, 1).toLocaleDateString('en-PH', { month: 'long' })
   return `${mName} 1-${mName} ${last}, ${yr}`
