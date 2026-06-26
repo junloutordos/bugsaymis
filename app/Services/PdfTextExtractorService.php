@@ -144,7 +144,7 @@ class PdfTextExtractorService
         return implode("\n", $lines);
     }
 
-    private function collectTextLines(\Aws\Textract\TextractClient $textract, string $jobId, array $firstPage): array
+    private function collectTextLines(\Aws\Textract\TextractClient $textract, string $jobId, \Aws\Result $firstPage): array
     {
         $lines = [];
 
