@@ -35,6 +35,30 @@
         <XCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
       </div>
 
+      <!-- ── Penned Submissions ────────────────────────────────────── -->
+      <div v-if="pennedSubmissions.length" class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <InboxArrowDownIcon class="h-4 w-4 text-amber-600" />
+          <h3 class="text-sm font-semibold text-amber-800">Penned Entries Awaiting Review</h3>
+          <span class="ml-auto text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">{{ pennedSubmissions.length }}</span>
+        </div>
+        <div class="divide-y divide-amber-100">
+          <div v-for="sub in pennedSubmissions" :key="sub.id" class="py-2 flex items-center justify-between gap-3">
+            <div>
+              <span class="text-sm font-medium text-slate-800">{{ sub.name }}</span>
+              <span class="ml-2 text-xs text-amber-600">{{ sub.entry_count }} record(s)</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-slate-500">Submitted {{ new Date(sub.submitted_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}</span>
+              <a :href="route('hr.dtr.show', sub.id) + '?month=' + month"
+                class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors">
+                <EyeIcon class="h-3.5 w-3.5" />View
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Controls: Month + Search ──────────────────────────────── -->
       <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
         <div class="flex gap-3 items-end">
@@ -392,13 +416,15 @@ import {
   XMarkIcon,
   CalendarDaysIcon,
   ClipboardDocumentListIcon,
+  InboxArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-  summaries: Array,
-  users:     Array,
-  filters:   Object,
-  month:     String,
+  summaries:          Array,
+  pennedSubmissions:  { type: Array, default: () => [] },
+  users:              Array,
+  filters:            Object,
+  month:              String,
 })
 
 // ── Month label ─────────────────────────────────────────────────────────────

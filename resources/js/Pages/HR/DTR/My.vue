@@ -42,7 +42,17 @@
               <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
               {{ advanceGenerating ? 'Generating…' : 'Generate Advance Entry' }}
             </button>
-            <a :href="route('hr.my-dtr.checklist') + '?month=' + currentMonth" target="_blank"
+            <!-- COS: date range pickers for checklist -->
+            <template v-if="isCos">
+              <input v-model="cosDateFrom" type="date"
+                class="ml-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                title="Checklist date from" />
+              <span class="text-slate-400 text-sm">–</span>
+              <input v-model="cosDateTo" type="date"
+                class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                title="Checklist date to" />
+            </template>
+            <a :href="cosChecklistUrl()" target="_blank"
                class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
               <PrinterIcon class="h-4 w-4" />Print Checklist
             </a>
@@ -472,6 +482,18 @@ const currentMonth = ref(props.month)
 const isCos = computed(() =>
   ['COS Teaching', 'COS Non Teaching'].includes(props.employee?.emp_category)
 )
+
+// ── COS checklist date range ───────────────────────────────────────────────
+const cosDateFrom = ref('')
+const cosDateTo   = ref('')
+
+function cosChecklistUrl() {
+  const base = route('hr.my-dtr.checklist')
+  if (isCos.value && cosDateFrom.value && cosDateTo.value) {
+    return `${base}?date_from=${cosDateFrom.value}&date_to=${cosDateTo.value}`
+  }
+  return `${base}?month=${currentMonth.value}`
+}
 
 const advanceInCurrentMonth = computed(() =>
   !!props.advanceRecord && toDateStr(props.advanceRecord.work_date).slice(0, 7) === currentMonth.value
