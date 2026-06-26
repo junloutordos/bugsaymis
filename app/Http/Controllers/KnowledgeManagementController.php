@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ExtractDocumentTextJob;
 use App\Models\Division;
 use App\Models\OedIssuance;
 use App\Models\OedIssuanceCategory;
@@ -21,8 +22,9 @@ class KnowledgeManagementController extends Controller
 
     public function index(Request $request)
     {
-        $user       = $request->user();
-        $canManage  = $user->hasPermission('km.manage');
+        $user      = $request->user();
+        $canManage = $user->hasPermission('km.manage');
+        $search    = trim($request->input('search', ''));
 
         $query = OedIssuance::with(['category', 'uploader:id,name'])
             ->withCount(['acknowledgments', 'recipients'])
@@ -36,6 +38,16 @@ class KnowledgeManagementController extends Controller
                 });
         }
 
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $query->where(function ($q) use ($like) {
+                $q->where('title', 'LIKE', $like)
+                  ->orWhere('reference_no', 'LIKE', $like)
+                  ->orWhere('description', 'LIKE', $like)
+                  ->orWhere('content_text', 'LIKE', $like);
+            });
+        }
+
         $issuances = $query->orderByDesc('issued_date')->get();
 
         return Inertia::render('KnowledgeManagement/Index', [
@@ -46,6 +58,7 @@ class KnowledgeManagementController extends Controller
                 : [],
             'canManage'        => $canManage,
             'totalActiveUsers' => User::where('status', '<>', 'inactive')->count(),
+            'filters'          => ['search' => $search],
         ]);
     }
 
@@ -107,6 +120,8 @@ class KnowledgeManagementController extends Controller
                 $this->svc->linkSupersession($old, $issuance);
             }
         }
+
+        ExtractDocumentTextJob::dispatch('oed_issuance', $issuance->id);
 
         $this->svc->notifyUpload($issuance);
 
@@ -205,7 +220,8 @@ class KnowledgeManagementController extends Controller
             'recipient_type' => $validated['recipient_type'],
         ];
 
-        if (! empty($validated['file_base64'])) {
+        $fileReplaced = ! empty($validated['file_base64']);
+        if ($fileReplaced) {
             $this->svc->deleteFile($oedIssuance->file_path);
             $file = $this->svc->storeFile(
                 $validated['file_base64'],
@@ -213,13 +229,18 @@ class KnowledgeManagementController extends Controller
                 $validated['file_mime'] ?? null,
                 (int) now()->year,
             );
-            $data['file_path'] = $file['file_path'];
-            $data['file_name'] = $file['file_name'];
-            $data['file_mime'] = $file['file_mime'];
-            $data['file_size'] = $file['file_size'];
+            $data['file_path']    = $file['file_path'];
+            $data['file_name']    = $file['file_name'];
+            $data['file_mime']    = $file['file_mime'];
+            $data['file_size']    = $file['file_size'];
+            $data['content_text'] = null; // will be re-indexed by job below
         }
 
         $oedIssuance->update($data);
+
+        if ($fileReplaced) {
+            ExtractDocumentTextJob::dispatch('oed_issuance', $oedIssuance->id);
+        }
 
         $this->svc->rebuildRecipients($oedIssuance, $validated['recipient_type'], $validated['recipient_ids'] ?? []);
 

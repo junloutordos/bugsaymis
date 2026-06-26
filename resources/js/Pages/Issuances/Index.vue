@@ -20,34 +20,46 @@ const props = defineProps({
   issuances:  Array,
   isAdmin:    Boolean,
   typeLabels: Object,
+  filters:    Object,
 })
 
 // ── Filters ────────────────────────────────────────────────────────────────
-const search      = ref('')
+const search      = ref(props.filters?.search ?? '')
 const filterType  = ref('')
 const filterYear  = ref('')
 const activeTab   = ref('all') // all | pending | released
 const currentPage = ref(1)
 const PER_PAGE    = 15
 
-watch([search, filterType, filterYear, activeTab], () => { currentPage.value = 1 })
+watch([filterType, filterYear, activeTab], () => { currentPage.value = 1 })
+
+// Text search is server-side (searches content_text too) — debounced Inertia reload
+let searchTimer = null
+watch(search, (val) => {
+  currentPage.value = 1
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    router.get(
+      route('issuances.index'),
+      val ? { search: val } : {},
+      { preserveState: true, replace: true, only: ['issuances', 'filters'] }
+    )
+  }, 400)
+})
 
 const pendingCount = computed(() =>
   (props.issuances ?? []).filter(i => !i.my_acknowledged_at && i.status === 'released').length
 )
 
+// Text search is handled server-side; only type/year/tab filter client-side here
 const filtered = computed(() => {
-  const q = search.value.toLowerCase()
   return (props.issuances ?? []).filter(i => {
     if (activeTab.value === 'pending' && (i.my_acknowledged_at || i.status !== 'released')) return false
     if (activeTab.value === 'released' && i.status !== 'released') return false
     if (activeTab.value === 'draft' && i.status !== 'draft') return false
     if (filterType.value && i.type !== filterType.value) return false
     if (filterYear.value && !i.control_number.includes(filterYear.value)) return false
-    if (!q) return true
-    return i.control_number.toLowerCase().includes(q)
-        || i.title.toLowerCase().includes(q)
-        || i.creator?.name?.toLowerCase().includes(q)
+    return true
   })
 })
 
