@@ -30,8 +30,8 @@ class OrganizationalVersion extends Model
 
     protected $casts = [
         'snapshot'       => 'array',
-        'effective_date' => 'date',
-        'end_date'       => 'date',
+        'effective_date' => 'date:Y-m-d',
+        'end_date'       => 'date:Y-m-d',
         'approved_at'    => 'datetime',
     ];
 

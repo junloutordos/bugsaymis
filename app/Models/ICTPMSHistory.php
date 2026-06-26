@@ -24,7 +24,7 @@ class IctPmsHistory extends Model
     ];
 
     protected $casts = [
-        'pms_date' => 'date',
+        'pms_date' => 'date:Y-m-d',
         'cost_of_repair' => 'decimal:2',
     ];
 

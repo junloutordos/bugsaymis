@@ -24,7 +24,7 @@ class CidSchedule extends Model
     ];
 
     protected $casts = [
-        'scheduled_date' => 'date',
+        'scheduled_date' => 'date:Y-m-d',
         'school_year_id' => 'integer',
         'section_id'     => 'integer',
         'subject_id'     => 'integer',

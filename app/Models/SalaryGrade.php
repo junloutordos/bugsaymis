@@ -17,7 +17,7 @@ class SalaryGrade extends Model
 
     protected $casts = [
         'monthly_rate'   => 'decimal:2',
-        'effective_date' => 'date',
+        'effective_date' => 'date:Y-m-d',
         'is_current'     => 'boolean',
         'grade'          => 'integer',
         'step'           => 'integer',

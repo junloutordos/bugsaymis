@@ -33,8 +33,8 @@ class EmployeeUnitAssignment extends Model
 
     protected $casts = [
         'is_primary'     => 'boolean',
-        'effective_date' => 'date',
-        'end_date'       => 'date',
+        'effective_date' => 'date:Y-m-d',
+        'end_date'       => 'date:Y-m-d',
     ];
 
     // ── Assignment Type Constants ──────────────────────────────────────────────

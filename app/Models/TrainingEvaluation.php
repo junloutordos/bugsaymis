@@ -51,8 +51,8 @@ class TrainingEvaluation extends Model
         'behavior_score'       => 'integer',
         'results_score'        => 'integer',
         'overall_average'      => 'decimal:2',
-        'behavior_assessed_date' => 'date',
-        'results_assessed_date'  => 'date',
+        'behavior_assessed_date' => 'date:Y-m-d',
+        'results_assessed_date'  => 'date:Y-m-d',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────────

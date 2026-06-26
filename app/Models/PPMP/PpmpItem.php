@@ -61,7 +61,7 @@ class PpmpItem extends Model
         'is_ps_dbm'           => 'boolean',
         'procurement_quarter' => 'integer',
         'delivery_quarter'    => 'integer',
-        'price_validity_date' => 'date',
+        'price_validity_date' => 'date:Y-m-d',
         'catalogue_id'        => 'integer',
     ];
 

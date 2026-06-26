@@ -35,7 +35,7 @@ class Application extends Model
     ];
 
     protected $casts = [
-        'application_date' => 'date',
+        'application_date' => 'date:Y-m-d',
         'is_internal'      => 'boolean',
         'priority_score'   => 'decimal:4',
     ];

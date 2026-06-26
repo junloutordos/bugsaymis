@@ -36,8 +36,8 @@ class PurchaseOrder extends Model
     ];
 
     protected $casts = [
-        'po_date'                   => 'date',
-        'delivery_date'             => 'date',
+        'po_date'                   => 'date:Y-m-d',
+        'delivery_date'             => 'date:Y-m-d',
         'total_amount'              => 'decimal:2',
         'procurement_officer_at'    => 'datetime',
         'ocd_at'                    => 'datetime',

@@ -24,7 +24,7 @@ class SalarySchedule extends Model
         'step'           => 'integer',
         'monthly_rate'   => 'decimal:2',
         'annual_rate'    => 'decimal:2',
-        'effective_date' => 'date',
+        'effective_date' => 'date:Y-m-d',
         'is_current'     => 'boolean',
     ];
 

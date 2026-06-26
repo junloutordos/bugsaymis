@@ -17,7 +17,7 @@ class Reward extends Model
     ];
 
     protected $casts = [
-        'award_date'      => 'date',
+        'award_date'      => 'date:Y-m-d',
         'incentive_value' => 'decimal:2',
     ];
 

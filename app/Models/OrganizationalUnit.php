@@ -43,8 +43,8 @@ class OrganizationalUnit extends Model
 
     protected $casts = [
         'is_active'        => 'boolean',
-        'established_date' => 'date',
-        'abolished_date'   => 'date',
+        'established_date' => 'date:Y-m-d',
+        'abolished_date'   => 'date:Y-m-d',
         'depth'            => 'integer',
         'order_index'      => 'integer',
     ];

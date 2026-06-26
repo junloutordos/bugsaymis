@@ -17,7 +17,7 @@ class PropertyTransfer extends Model
     ];
 
     protected $casts = [
-        'transfer_date' => 'date',
+        'transfer_date' => 'date:Y-m-d',
     ];
 
     public function fromOfficer(): BelongsTo

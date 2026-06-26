@@ -21,7 +21,7 @@ class SalnBusinessInterest extends Model
     ];
 
     protected $casts = [
-        'date_acquired'             => 'date',
+        'date_acquired'             => 'date:Y-m-d',
         'acquisition_cost'          => 'decimal:2',
         'present_fair_market_value' => 'decimal:2',
     ];

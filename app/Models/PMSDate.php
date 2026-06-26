@@ -17,7 +17,7 @@ class PMSDate extends Model
     ];
 
     protected $casts = [
-        'schedule_date' => 'date',
+        'schedule_date' => 'date:Y-m-d',
     ];
 
     /**

@@ -27,7 +27,7 @@ class PpmpCatalogue extends Model
 
     protected $casts = [
         'unit_cost'           => 'decimal:2',
-        'price_validity_date' => 'date',
+        'price_validity_date' => 'date:Y-m-d',
         'is_active'           => 'boolean',
         'is_price_fixed'      => 'boolean',
         'fiscal_year'         => 'integer',

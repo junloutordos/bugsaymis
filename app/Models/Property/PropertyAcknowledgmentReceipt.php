@@ -18,7 +18,7 @@ class PropertyAcknowledgmentReceipt extends Model
     ];
 
     protected $casts = [
-        'issue_date' => 'date',
+        'issue_date' => 'date:Y-m-d',
     ];
 
     public function issuer(): BelongsTo

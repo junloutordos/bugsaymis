@@ -14,7 +14,7 @@ class Accomplishment extends Model
     ];
 
     protected $casts = [
-        'accomplishment_date' => 'date',
+        'accomplishment_date' => 'date:Y-m-d',
     ];
 
     public function user()

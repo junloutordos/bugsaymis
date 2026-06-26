@@ -32,8 +32,8 @@ class Document extends Model
 
     protected $casts = [
         'is_confidential'  => 'boolean',
-        'date_of_document' => 'date',
-        'date_received'    => 'date',
+        'date_of_document' => 'date:Y-m-d',
+        'date_received'    => 'date:Y-m-d',
         'deadline_at'      => 'datetime',
         'completed_at'     => 'datetime',
     ];

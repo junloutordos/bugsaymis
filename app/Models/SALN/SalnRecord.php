@@ -40,7 +40,7 @@ class SalnRecord extends Model
 
     protected $casts = [
         'year'                      => 'integer',
-        'as_of_date'                => 'date',
+        'as_of_date'                => 'date:Y-m-d',
         'total_real_properties'     => 'decimal:2',
         'total_personal_properties' => 'decimal:2',
         'total_assets'              => 'decimal:2',

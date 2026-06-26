@@ -31,10 +31,10 @@ class ICTEquipment extends Model
     ];
 
     protected $casts = [
-        'date_acquired'       => 'date',
+        'date_acquired'       => 'date:Y-m-d',
         'amount'              => 'decimal:2',
-        'warranty_expires_at' => 'date',
-        'decommissioned_at'   => 'date',
+        'warranty_expires_at' => 'date:Y-m-d',
+        'decommissioned_at'   => 'date:Y-m-d',
     ];
 
     /**

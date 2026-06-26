@@ -14,8 +14,8 @@ class OedIssuance extends Model
     ];
 
     protected $casts = [
-        'issued_date'    => 'date',
-        'effective_date' => 'date',
+        'issued_date'    => 'date:Y-m-d',
+        'effective_date' => 'date:Y-m-d',
         'file_size'      => 'integer',
     ];
 

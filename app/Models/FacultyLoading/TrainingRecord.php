@@ -29,8 +29,8 @@ class TrainingRecord extends Model
     ];
 
     protected $casts = [
-        'date_from'    => 'date',
-        'date_to'      => 'date',
+        'date_from'    => 'date:Y-m-d',
+        'date_to'      => 'date:Y-m-d',
         'hours_earned' => 'decimal:2',
         'load_units'   => 'decimal:2',
         'verified_at'  => 'datetime',
