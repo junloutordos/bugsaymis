@@ -1810,6 +1810,41 @@ const menuItems = [
     ],
   },
   {
+    label: "Student Discipline",
+    icon: ShieldCheckIcon,
+    permissions: ["discipline.file", "discipline.view", "discipline.manage"],
+    children: [
+      {
+        label: "File a Report",
+        routeName: "discipline.cases.create",
+        href: "/discipline/cases/create",
+        icon: ClipboardDocumentListIcon,
+        permissions: ["discipline.file"],
+      },
+      {
+        label: "Cases",
+        routeName: "discipline.cases.index",
+        href: "/discipline/cases",
+        icon: DocumentTextIcon,
+        permissions: ["discipline.view", "discipline.manage"],
+      },
+      {
+        label: "Offense Catalog",
+        routeName: "discipline.offenses.index",
+        href: "/discipline/offenses",
+        icon: BookOpenIcon,
+        permissions: ["discipline.manage"],
+      },
+      {
+        label: "Confiscated Items",
+        routeName: "discipline.confiscated.index",
+        href: "/discipline/confiscated",
+        icon: ArchiveBoxIcon,
+        permissions: ["discipline.manage"],
+      },
+    ],
+  },
+  {
     label: "Library Services",
     icon: BookOpenIcon,
     roles: ["Administrator", "Librarian"],

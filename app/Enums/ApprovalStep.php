@@ -72,6 +72,12 @@ class ApprovalStep
     const IDP_SUPERVISOR = 'supervisor';
     const IDP_APPROVER   = 'approver';
 
+    // ── Student Discipline (SDO) ──────────────────────────────────────────────
+    const DISCIPLINE_FILED    = 'discipline_filed';     // seq 1 — filer submits the report
+    const DISCIPLINE_RECEIVED = 'discipline_received';  // seq 2 — SDO receives
+    const DISCIPLINE_REVIEW   = 'discipline_review';    // seq 3 — SDO investigates / recommends
+    const DISCIPLINE_RESOLVED = 'discipline_resolved';  // seq 4 — resolution + sanction
+
     // ── Signatory role labels (for signatory_snapshots.role_label) ────────────
     const SIG_CERTIFYING_OFFICER  = 'Certifying Officer';
     const SIG_AUTHORIZED_OFFICER  = 'Authorized Officer';

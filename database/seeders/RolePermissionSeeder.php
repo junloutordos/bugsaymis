@@ -332,6 +332,22 @@ class RolePermissionSeeder extends Seeder
             'chat.access',
         ]);
 
+        // ── Student Discipline (SDO) ──────────────────────────────────────────
+        // Discipline Officers receive, review, and resolve cases.
+        $assign('Student Discipline Officer', [
+            'discipline.file', 'discipline.view', 'discipline.manage', 'discipline.report',
+            'students.enrollment.view',
+            'reports.view',
+            'chat.access',
+        ]);
+        // CID Chief & Guidance can view discipline cases (oversight).
+        $assign('CID Chief', ['discipline.view', 'discipline.report']);
+        $assign('Guidance',  ['discipline.view']);
+        // Any faculty/staff (and advisers/division chiefs) may file an Anecdotal Report.
+        foreach (['Faculty', 'Staff', 'DivisionChief', 'CID Chief', 'OCD'] as $r) {
+            $assign($r, ['discipline.file', 'discipline.view']);
+        }
+
         // ── GSU Head ──────────────────────────────────────────────────────────
         $assign('GSU Head', [
             'facilities.view', 'facilities.manage',

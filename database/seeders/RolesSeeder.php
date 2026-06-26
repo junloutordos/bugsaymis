@@ -27,6 +27,7 @@ class RolesSeeder extends Seeder
             ['name' => 'Staff',              'description' => 'Non-teaching staff with standard operational access.'],
             ['name' => 'Registrar',          'description' => 'Manages student records and registration.'],
             ['name' => 'Guidance',           'description' => 'Guidance counselor with access to consultation records.'],
+            ['name' => 'Student Discipline Officer', 'description' => 'Manages student discipline cases, offense catalog, and confiscated items.'],
             ['name' => 'Nurse',              'description' => 'Health personnel with access to clinic and health records.'],
             ['name' => 'Librarian',          'description' => 'Manages library collections, borrowings, and attendance.'],
             ['name' => 'Records',            'description' => 'Records officer. Manages document tracking.'],
