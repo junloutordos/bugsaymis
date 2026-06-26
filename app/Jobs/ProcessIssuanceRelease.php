@@ -6,6 +6,7 @@ use App\Mail\IssuanceReleasedMail;
 use App\Models\Issuance;
 use App\Services\IssuanceService;
 use App\Services\NotificationService;
+use App\Jobs\ExtractDocumentTextJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -64,7 +65,17 @@ class ProcessIssuanceRelease implements ShouldQueue
             ]);
         }
 
-        // 2. Notify all recipients (email + bell + push)
+        // 2. Extract text for content search (async — does not block notifications)
+        try {
+            ExtractDocumentTextJob::dispatch('issuance', $issuance->id);
+        } catch (\Throwable $e) {
+            logger()->warning('ProcessIssuanceRelease: text extraction dispatch failed', [
+                'issuance_id' => $issuance->id,
+                'error'       => $e->getMessage(),
+            ]);
+        }
+
+        // 3. Notify all recipients (email + bell + push)
         $recipients = $issuance->recipients()->with('user')->get();
         $sent       = 0;
         $skipped    = 0;

@@ -9,7 +9,7 @@ class Issuance extends Model
 {
     protected $fillable = [
         'type', 'control_number', 'series_no', 'year', 'month',
-        'title', 'content', 'attachment_path', 'attachment_filename', 'attachment_mime',
+        'title', 'content', 'content_text', 'attachment_path', 'attachment_filename', 'attachment_mime',
         'recipient_type', 'status', 'content_hash', 'qr_token', 'released_at', 'created_by',
     ];
 

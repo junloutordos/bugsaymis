@@ -36,6 +36,7 @@ class IssuanceController extends Controller
     {
         $user    = $request->user();
         $isAdmin = $user->hasPermission('issuances.manage');
+        $search  = trim($request->input('search', ''));
 
         $query = Issuance::with(['creator:id,name,position'])
             ->withCount([
@@ -47,6 +48,16 @@ class IssuanceController extends Controller
             // Staff: only see released issuances addressed to them
             $query->where('status', 'released')
                 ->whereHas('recipients', fn($q) => $q->where('user_id', $user->id));
+        }
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $query->where(function ($q) use ($like) {
+                $q->where('title', 'LIKE', $like)
+                  ->orWhere('control_number', 'LIKE', $like)
+                  ->orWhereHas('creator', fn($c) => $c->where('name', 'LIKE', $like))
+                  ->orWhere('content_text', 'LIKE', $like);
+            });
         }
 
         $issuances = $query->latest()->get()->map(fn($i) => [
@@ -70,6 +81,7 @@ class IssuanceController extends Controller
             'issuances'  => $issuances,
             'isAdmin'    => $isAdmin,
             'typeLabels' => Issuance::typeLabels(),
+            'filters'    => ['search' => $search],
         ]);
     }
 

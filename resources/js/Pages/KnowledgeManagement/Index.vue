@@ -18,15 +18,30 @@ const props = defineProps({
   allCategories:    Array,
   canManage:        Boolean,
   totalActiveUsers: Number,
+  filters:          Object,
 })
 
-const search        = ref('')
-const filterCategory= ref('')
-const filterYear    = ref('')
-const currentPage   = ref(1)
-const PER_PAGE      = 15
+const search         = ref(props.filters?.search ?? '')
+const filterCategory = ref('')
+const filterYear     = ref('')
+const currentPage    = ref(1)
+const PER_PAGE       = 15
 
-watch([search, filterCategory, filterYear], () => { currentPage.value = 1 })
+watch([filterCategory, filterYear], () => { currentPage.value = 1 })
+
+// Text search is server-side (searches content_text too) — debounced Inertia reload
+let searchTimer = null
+watch(search, (val) => {
+  currentPage.value = 1
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    router.get(
+      route('km.index'),
+      val ? { search: val } : {},
+      { preserveState: true, replace: true, only: ['issuances', 'filters'] }
+    )
+  }, 400)
+})
 
 const categoryColors = {
   MEMO:  'bg-violet-100 text-violet-700',
@@ -52,15 +67,12 @@ const years = computed(() => {
   return [...y].sort().reverse()
 })
 
+// Text search is handled server-side; only category/year filter client-side here
 const filtered = computed(() => {
-  const q = search.value.toLowerCase()
   return (props.issuances ?? []).filter(i => {
     if (filterCategory.value && i.category_code !== filterCategory.value) return false
     if (filterYear.value && i.issued_date?.slice(0, 4) !== filterYear.value) return false
-    if (!q) return true
-    return i.title.toLowerCase().includes(q)
-        || (i.reference_no ?? '').toLowerCase().includes(q)
-        || (i.description ?? '').toLowerCase().includes(q)
+    return true
   })
 })
 

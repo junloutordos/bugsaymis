@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class OedIssuance extends Model
 {
     protected $fillable = [
-        'category_code', 'reference_no', 'title', 'description',
+        'category_code', 'reference_no', 'title', 'description', 'content_text',
         'issued_date', 'effective_date',
         'file_path', 'file_name', 'file_mime', 'file_size',
         'status', 'superseded_by_id', 'recipient_type', 'uploaded_by',
