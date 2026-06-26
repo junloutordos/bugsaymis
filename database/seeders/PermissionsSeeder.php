@@ -117,6 +117,12 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Guidance', 'name' => 'guidance.cumulative.view',   'description' => 'View student cumulative guidance records (EGCU profiles)'],
             ['module' => 'Guidance', 'name' => 'guidance.cumulative.manage', 'description' => 'Add and edit student cumulative guidance records'],
 
+            // ── Student Discipline (SDO) ──────────────────────────────────────
+            ['module' => 'Discipline', 'name' => 'discipline.file',    'description' => 'File an Anecdotal Report against a student'],
+            ['module' => 'Discipline', 'name' => 'discipline.view',    'description' => 'View student discipline cases'],
+            ['module' => 'Discipline', 'name' => 'discipline.manage',  'description' => 'Receive, review, and resolve cases; manage offense catalog & confiscated items'],
+            ['module' => 'Discipline', 'name' => 'discipline.report',  'description' => 'View student discipline reports and analytics'],
+
             // ── Registrar ─────────────────────────────────────────────────────
             ['module' => 'Registrar', 'name' => 'students.enrollment.view',   'description' => 'View enrollment records, section rosters'],
             ['module' => 'Registrar', 'name' => 'students.enrollment.manage', 'description' => 'Enroll, drop, transfer students; manage enrollment periods'],

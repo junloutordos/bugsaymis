@@ -76,5 +76,8 @@ class DatabaseSeeder extends Seeder
 
         // ── Atlas Sentinel Module ───────────────────────────────────────────────
         $this->call(IctRemediationRuleSeeder::class); // self-healing rules, seeded inert (auto_execute=false)
+
+        // ── Student Discipline (SDO) ────────────────────────────────────────────
+        $this->call(DisciplineOffenseSeeder::class); // offense catalog starter set
     }
 }
