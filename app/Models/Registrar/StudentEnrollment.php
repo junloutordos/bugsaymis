@@ -31,7 +31,7 @@ class StudentEnrollment extends Model
         'school_year_id'  => 'integer',
         'section_id'      => 'integer',
         'grade_level'     => 'integer',
-        'enrollment_date' => 'date',
+        'enrollment_date' => 'date:Y-m-d',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────────

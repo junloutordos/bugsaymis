@@ -19,8 +19,8 @@ class InspectionAcceptanceReport extends Model
     ];
 
     protected $casts = [
-        'delivery_date'   => 'date',
-        'inspection_date' => 'date',
+        'delivery_date'   => 'date:Y-m-d',
+        'inspection_date' => 'date:Y-m-d',
         'accepted_at'     => 'datetime',
     ];
 

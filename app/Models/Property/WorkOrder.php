@@ -20,9 +20,9 @@ class WorkOrder extends Model
     protected $casts = [
         'estimated_cost'  => 'decimal:2',
         'actual_cost'     => 'decimal:2',
-        'requested_date'  => 'date',
-        'target_date'     => 'date',
-        'completed_date'  => 'date',
+        'requested_date'  => 'date:Y-m-d',
+        'target_date'     => 'date:Y-m-d',
+        'completed_date'  => 'date:Y-m-d',
     ];
 
     public function propertyItem(): BelongsTo

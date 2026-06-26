@@ -30,7 +30,7 @@ class Procurement extends Model
     ];
 
     protected $casts = [
-        'pr_date'                      => 'date',
+        'pr_date'                      => 'date:Y-m-d',
         'is_supplemental'              => 'boolean',
         'ppmp_checked'                 => 'boolean',
         'supplemental_budget_officer_at' => 'datetime',
@@ -39,14 +39,14 @@ class Procurement extends Model
         'ocd_at'                       => 'datetime',
         'rejected_at'                  => 'datetime',
         // Legacy
-        'date_approved_budget_officer' => 'date',
-        'date_decline_budget_officer'  => 'date',
-        'date_approved_procurement'    => 'date',
-        'date_decline_procurement'     => 'date',
-        'date_approved_division_chief' => 'date',
-        'date_decline_division_chief'  => 'date',
-        'ocd_approve_date'             => 'date',
-        'ocd_decline_date'             => 'date',
+        'date_approved_budget_officer' => 'date:Y-m-d',
+        'date_decline_budget_officer'  => 'date:Y-m-d',
+        'date_approved_procurement'    => 'date:Y-m-d',
+        'date_decline_procurement'     => 'date:Y-m-d',
+        'date_approved_division_chief' => 'date:Y-m-d',
+        'date_decline_division_chief'  => 'date:Y-m-d',
+        'ocd_approve_date'             => 'date:Y-m-d',
+        'ocd_decline_date'             => 'date:Y-m-d',
     ];
 
     public function ppmp(): BelongsTo

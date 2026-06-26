@@ -19,8 +19,8 @@ class JobVacancy extends Model
     ];
 
     protected $casts = [
-        'posting_date' => 'date',
-        'closing_date' => 'date',
+        'posting_date' => 'date:Y-m-d',
+        'closing_date' => 'date:Y-m-d',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────────

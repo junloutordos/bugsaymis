@@ -17,7 +17,7 @@ class IcsItem extends Model
     protected $casts = [
         'quantity'              => 'decimal:3',
         'unit_cost'             => 'decimal:4',
-        'estimated_useful_life' => 'date',
+        'estimated_useful_life' => 'date:Y-m-d',
     ];
 
     public function ics(): BelongsTo

@@ -19,8 +19,8 @@ class RequisitionIssueSlip extends Model
     ];
 
     protected $casts = [
-        'date_requested' => 'date',
-        'date_needed'    => 'date',
+        'date_requested' => 'date:Y-m-d',
+        'date_needed'    => 'date:Y-m-d',
         'approved_at'    => 'datetime',
         'issued_at'      => 'datetime',
     ];

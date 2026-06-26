@@ -18,7 +18,7 @@ class Selection extends Model
     ];
 
     protected $casts = [
-        'approval_date' => 'date',
+        'approval_date' => 'date:Y-m-d',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────────

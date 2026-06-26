@@ -25,7 +25,7 @@ class Rfq extends Model
     ];
 
     protected $casts = [
-        'rfq_date'   => 'date',
+        'rfq_date'   => 'date:Y-m-d',
         'closed_at'  => 'datetime',
         'awarded_at' => 'datetime',
     ];

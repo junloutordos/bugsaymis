@@ -21,7 +21,7 @@ class PropertyItem extends Model
     protected $casts = [
         'quantity'         => 'decimal:3',
         'unit_cost'        => 'decimal:4',
-        'acquisition_date' => 'date',
+        'acquisition_date' => 'date:Y-m-d',
     ];
 
     public function category(): BelongsTo

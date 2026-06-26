@@ -25,9 +25,9 @@ class ServiceCreditRecord extends Model
     ];
 
     protected $casts = [
-        'service_date'    => 'date',
-        'approved_at'     => 'date',
-        'expires_at'      => 'date',
+        'service_date'    => 'date:Y-m-d',
+        'approved_at'     => 'date:Y-m-d',
+        'expires_at'      => 'date:Y-m-d',
         'hours_rendered'  => 'decimal:2',
         'days_equivalent' => 'decimal:4',
     ];

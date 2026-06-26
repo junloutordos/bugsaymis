@@ -18,7 +18,7 @@ class DisposalRecord extends Model
     ];
 
     protected $casts = [
-        'disposal_date'    => 'date',
+        'disposal_date'    => 'date:Y-m-d',
         'proceeds_amount'  => 'decimal:2',
         'approved_at'      => 'datetime',
     ];

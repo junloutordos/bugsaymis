@@ -40,9 +40,9 @@ class EmployeeProfile extends Model
     ];
 
     protected $casts = [
-        'date_original_appointment' => 'date',
-        'date_last_promotion'       => 'date',
-        'date_of_birth'             => 'date',
+        'date_original_appointment' => 'date:Y-m-d',
+        'date_last_promotion'       => 'date:Y-m-d',
+        'date_of_birth'             => 'date:Y-m-d',
         'is_active'                 => 'boolean',
     ];
 

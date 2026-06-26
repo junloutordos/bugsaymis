@@ -37,8 +37,8 @@ class IndividualDevelopmentPlan extends Model
 
     protected $casts = [
         'year'           => 'integer',
-        'timeline_start' => 'date',
-        'timeline_end'   => 'date',
+        'timeline_start' => 'date:Y-m-d',
+        'timeline_end'   => 'date:Y-m-d',
         'approved_at'    => 'datetime',
     ];
 

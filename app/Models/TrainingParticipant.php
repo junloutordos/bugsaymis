@@ -25,7 +25,7 @@ class TrainingParticipant extends Model
     ];
 
     protected $casts = [
-        'certificate_issued_date' => 'date',
+        'certificate_issued_date' => 'date:Y-m-d',
         'approved_at'             => 'datetime',
     ];
 

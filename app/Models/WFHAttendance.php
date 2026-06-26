@@ -25,7 +25,7 @@ class WFHAttendance extends Model
     ];
 
     protected $casts = [
-        'date'      => 'date',
+        'date'      => 'date:Y-m-d',
         'time_in'   => 'datetime',
         'break_out' => 'datetime',
         'break_in'  => 'datetime',

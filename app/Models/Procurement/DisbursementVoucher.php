@@ -29,7 +29,7 @@ class DisbursementVoucher extends Model
     ];
 
     protected $casts = [
-        'activity_date'           => 'date',
+        'activity_date'           => 'date:Y-m-d',
         'gross_amount'            => 'decimal:2',
         'tax_amount'              => 'decimal:2',
         'net_amount'              => 'decimal:2',

@@ -29,7 +29,7 @@ class GuidanceSessionReport extends Model
     ];
 
     protected $casts = [
-        'date_filed'         => 'date',
+        'date_filed'         => 'date:Y-m-d',
         'referral_strategies' => 'array',
         'client_age'         => 'integer',
     ];

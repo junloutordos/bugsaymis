@@ -30,8 +30,8 @@ class OblRequest extends Model
     ];
 
     protected $casts = [
-        'activity_date'               => 'date',
-        'log_activity_date'           => 'date',
+        'activity_date'               => 'date:Y-m-d',
+        'log_activity_date'           => 'date:Y-m-d',
         'amount'                      => 'decimal:2',
         'log_amount'                  => 'decimal:2',
         'logged_at'                   => 'datetime',

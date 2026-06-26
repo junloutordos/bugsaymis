@@ -47,8 +47,8 @@ class LeaveApplication extends Model
     ];
 
     protected $casts = [
-        'date_from'         => 'date',
-        'date_to'           => 'date',
+        'date_from'         => 'date:Y-m-d',
+        'date_to'           => 'date:Y-m-d',
         'dates'             => 'array',
         'days_applied'      => 'decimal:2',
         'days_deducted'     => 'decimal:2',

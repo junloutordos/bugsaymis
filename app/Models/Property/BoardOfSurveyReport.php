@@ -18,7 +18,7 @@ class BoardOfSurveyReport extends Model
     ];
 
     protected $casts = [
-        'inspection_date' => 'date',
+        'inspection_date' => 'date:Y-m-d',
         'board_members'   => 'array',
         'approved_at'     => 'datetime',
     ];

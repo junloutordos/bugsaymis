@@ -33,8 +33,8 @@ class EmployeeSchedule extends Model
     protected $casts = [
         'work_days'              => 'array',
         'daily_schedules'        => 'array',
-        'effective_date'         => 'date',
-        'end_date'               => 'date',
+        'effective_date'         => 'date:Y-m-d',
+        'end_date'               => 'date:Y-m-d',
         'is_default'             => 'boolean',
         'grace_period_minutes'   => 'integer',
         'late_threshold_minutes' => 'integer',

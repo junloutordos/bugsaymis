@@ -24,11 +24,11 @@ class PayrollBatch extends Model
     ];
 
     protected $casts = [
-        'period_start'            => 'date',
-        'period_end'              => 'date',
-        'first_half_credit_date'  => 'date',
-        'second_half_credit_date' => 'date',
-        'credit_date'             => 'date',
+        'period_start'            => 'date:Y-m-d',
+        'period_end'              => 'date:Y-m-d',
+        'first_half_credit_date'  => 'date:Y-m-d',
+        'second_half_credit_date' => 'date:Y-m-d',
+        'credit_date'             => 'date:Y-m-d',
         'disbursement_type'       => 'array',
         'is_primary'              => 'boolean',
     ];

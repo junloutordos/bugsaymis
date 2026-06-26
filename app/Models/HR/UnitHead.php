@@ -33,9 +33,9 @@ class UnitHead extends Model
     protected $casts = [
         'is_acting'              => 'boolean',
         'is_current'             => 'boolean',
-        'effective_date'         => 'date',
-        'end_date'               => 'date',
-        'designation_order_date' => 'date',
+        'effective_date'         => 'date:Y-m-d',
+        'end_date'               => 'date:Y-m-d',
+        'designation_order_date' => 'date:Y-m-d',
     ];
 
     // ── Model Boot ─────────────────────────────────────────────────────────────

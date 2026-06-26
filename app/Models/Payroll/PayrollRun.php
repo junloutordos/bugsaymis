@@ -36,9 +36,9 @@ class PayrollRun extends Model
     ];
 
     protected $casts = [
-        'period_start'    => 'date',
-        'period_end'      => 'date',
-        'pay_date'        => 'date',
+        'period_start'    => 'date:Y-m-d',
+        'period_end'      => 'date:Y-m-d',
+        'pay_date'        => 'date:Y-m-d',
         'approved_at'     => 'datetime',
         'total_gross'     => 'decimal:4',
         'total_deductions' => 'decimal:4',

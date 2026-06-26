@@ -17,7 +17,7 @@ class SupplyLedgerEntry extends Model
     ];
 
     protected $casts = [
-        'transaction_date' => 'date',
+        'transaction_date' => 'date:Y-m-d',
         'qty_received'     => 'decimal:3',
         'qty_issued'       => 'decimal:3',
         'qty_returned'     => 'decimal:3',

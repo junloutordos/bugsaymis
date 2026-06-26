@@ -24,7 +24,7 @@ class EmployeeDocument extends Model
     ];
 
     protected $casts = [
-        'document_date' => 'date',
+        'document_date' => 'date:Y-m-d',
         'file_size'     => 'integer',
     ];
 

@@ -28,7 +28,7 @@ class VehicleRequest extends Model
     ];
 
     protected $casts = [
-        'date_needed' => 'date',
+        'date_needed' => 'date:Y-m-d',
         'date_needed_multiple' => 'array',
         'time_of_departure' => 'string',
         'eta' => 'string',
