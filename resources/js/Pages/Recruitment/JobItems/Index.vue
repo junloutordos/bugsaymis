@@ -419,16 +419,19 @@ const regenerateArtCard = (item) => {
                             class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Close</button>
                     <button v-if="item.status === 'draft'" @click="deleteItem(item)"
                             class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Delete</button>
-                    <template v-if="item.art_card_generated_at">
-                      <a :href="route('recruitment.job-items.art-card.download', [item.id, 'cover'])"
-                         class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Cover Card</a>
-                      <a :href="route('recruitment.job-items.art-card.download', [item.id, 'detail'])"
-                         class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Detail Card</a>
+                    <!-- Art card buttons hidden until generation is fixed -->
+                    <template v-if="false">
+                      <template v-if="item.art_card_generated_at">
+                        <a :href="route('recruitment.job-items.art-card.download', [item.id, 'cover'])"
+                           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Cover Card</a>
+                        <a :href="route('recruitment.job-items.art-card.download', [item.id, 'detail'])"
+                           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Detail Card</a>
+                      </template>
+                      <button @click="regenerateArtCard(item)" :disabled="regeneratingId === item.id"
+                              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50">
+                        {{ regeneratingId === item.id ? 'Generating…' : (item.art_card_generated_at ? 'Regenerate Card' : 'Generate Card') }}
+                      </button>
                     </template>
-                    <button @click="regenerateArtCard(item)" :disabled="regeneratingId === item.id"
-                            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50">
-                      {{ regeneratingId === item.id ? 'Generating…' : (item.art_card_generated_at ? 'Regenerate Card' : 'Generate Card') }}
-                    </button>
                   </div>
                 </td>
               </tr>
