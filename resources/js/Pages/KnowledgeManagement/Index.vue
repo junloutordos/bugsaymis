@@ -38,7 +38,7 @@ watch(search, (val) => {
     router.get(
       route('km.index'),
       val ? { search: val } : {},
-      { preserveState: true, replace: true, only: ['issuances', 'filters'] }
+      { preserveState: true, preserveScroll: true, replace: true }
     )
   }, 400)
 })
