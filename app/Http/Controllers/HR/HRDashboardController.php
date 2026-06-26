@@ -52,8 +52,11 @@ class HRDashboardController extends Controller
             ->whereNotNull('emp_category')
             ->where('emp_category', '!=', '');
 
+        // Deduplicate by name — one physical person may have multiple accounts
+        $distinctName = DB::raw('DISTINCT LOWER(TRIM(name))');
+
         $categoryBreakdown = $activeEmployees()
-            ->select('emp_category', DB::raw('count(*) as total'))
+            ->select('emp_category', DB::raw('COUNT(DISTINCT LOWER(TRIM(name))) as total'))
             ->groupBy('emp_category')
             ->pluck('total', 'emp_category');
 
@@ -101,10 +104,46 @@ class HRDashboardController extends Controller
                 'days'  => (float) $r->days,
             ]);
 
+        $today = now()->toDateString();
+
+        $onLeaveToday = LeaveApplication::where('status', 'approved')
+            ->whereDate('date_from', '<=', $today)
+            ->whereDate('date_to', '>=', $today)
+            ->with('user:id,name', 'leaveType:id,name')
+            ->get()
+            ->filter(fn ($la) => $la->user !== null)
+            ->groupBy(fn ($la) => strtolower(trim($la->user->name)))
+            ->map(fn ($group) => $group->first())
+            ->map(fn ($la) => [
+                'name'       => $la->user->name,
+                'leave_type' => $la->leaveType?->name ?? 'Leave',
+                'date_from'  => $la->date_from,
+                'date_to'    => $la->date_to,
+            ])
+            ->values();
+
+        $onGatepassToday = DB::table('gatepass')
+            ->leftJoin('users', DB::raw('CAST(users.badge_id AS CHAR)'), '=', DB::raw('CAST(gatepass.badgeNumber AS CHAR)'))
+            ->where('gatepass.gatepass_date', 'LIKE', $today . '%')
+            ->whereIn('gatepass.status', ['Approved', 'OCD Approved'])
+            ->whereNotNull('users.name')
+            ->select('users.name', 'gatepass.gatepass_type', 'gatepass.purpose', 'gatepass.gatepass_timeout', 'gatepass.gatepass_timein')
+            ->get()
+            ->groupBy(fn ($gp) => strtolower(trim($gp->name)))
+            ->map(fn ($group) => $group->first())
+            ->map(fn ($gp) => [
+                'name'     => $gp->name,
+                'type'     => $gp->gatepass_type,
+                'purpose'  => $gp->purpose,
+                'timeout'  => $gp->gatepass_timeout,
+                'timein'   => $gp->gatepass_timein,
+            ])
+            ->values();
+
         return [
             'month'              => $month,
             'kpi'                => [
-                'total_active_employees' => $activeEmployees()->count(),
+                'total_active_employees' => $activeEmployees()->count($distinctName),
                 'attendance_rate'         => $attendanceRate,
                 'pending_leave'           => LeaveApplication::whereNotIn('status', ['approved', 'rejected', 'cancelled'])->count(),
                 'pending_gate_pass'       => DB::table('gatepass')->where('status', 'Pending')->count(),
@@ -112,6 +151,8 @@ class HRDashboardController extends Controller
             'categoryBreakdown'  => $categoryBreakdown,
             'attendanceTrend'    => $attendanceTrend,
             'leaveTypeBreakdown' => $leaveTypeBreakdown,
+            'onLeaveToday'       => $onLeaveToday,
+            'onGatepassToday'    => $onGatepassToday,
         ];
     }
 
@@ -192,7 +233,7 @@ class HRDashboardController extends Controller
 
         $divisionTotals = User::where('status', '!=', 'inactive')
             ->whereNotNull('emp_category')
-            ->select('division_id', DB::raw('count(*) as total'))
+            ->select('division_id', DB::raw('COUNT(DISTINCT LOWER(TRIM(name))) as total'))
             ->groupBy('division_id')
             ->pluck('total', 'division_id');
 
@@ -318,7 +359,7 @@ class HRDashboardController extends Controller
 
         $totalEmployees = User::whereHas('roles', fn ($q) => $q->whereNotIn('name', ['Student', 'Parent']))
             ->where('status', '!=', 'inactive')
-            ->count();
+            ->count(DB::raw('DISTINCT LOWER(TRIM(name))'));
 
         $statusCounts = SalnRecord::where('year', $year)
             ->select('status', DB::raw('count(*) as total'))

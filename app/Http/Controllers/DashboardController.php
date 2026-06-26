@@ -75,33 +75,36 @@ class DashboardController extends Controller
                 ->whereNotNull('emp_category')
                 ->where('emp_category', '!=', '');
 
-            $totalEmployees = $activeEmployeeBase()->count();
+            // Deduplicate by name — one physical person may have multiple accounts
+            $dn = DB::raw('DISTINCT LOWER(TRIM(name))');
+
+            $totalEmployees = $activeEmployeeBase()->count($dn);
 
             $facultyCount = $activeEmployeeBase()
                 ->whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
-                ->count();
+                ->count($dn);
 
             $staffCount = $activeEmployeeBase()
                 ->whereHas('roles', fn ($q) => $q->where('roles.name', 'Staff'))
-                ->count();
+                ->count($dn);
 
             $activeDivisions     = Division::where('status', 'active')->count();
-            $employeeMaleCount   = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
-            $employeeFemaleCount = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+            $employeeMaleCount   = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count($dn);
+            $employeeFemaleCount = $activeEmployeeBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count($dn);
 
             $facultyBase = fn () => $activeEmployeeBase()->whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'));
             $staffBase   = fn () => $activeEmployeeBase()->whereHas('roles', fn ($q) => $q->where('roles.name', 'Staff'));
 
-            $facultyMaleCount   = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
-            $facultyFemaleCount = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
-            $staffMaleCount     = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count();
-            $staffFemaleCount   = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count();
+            $facultyMaleCount   = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count($dn);
+            $facultyFemaleCount = $facultyBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count($dn);
+            $staffMaleCount     = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('male','m')")->count($dn);
+            $staffFemaleCount   = $staffBase()->whereRaw("LOWER(TRIM(COALESCE(sex,''))) IN ('female','f')")->count($dn);
 
             $divRows = DB::table('users')
                 ->join('divisions', 'users.division_id', '=', 'divisions.id')
                 ->select(
                     DB::raw("COALESCE(NULLIF(TRIM(divisions.acronym),''), divisions.division_name) as division"),
-                    DB::raw('COUNT(*) as cnt')
+                    DB::raw('COUNT(DISTINCT LOWER(TRIM(users.name))) as cnt')
                 )
                 ->where('users.status', '!=', 'inactive')
                 ->whereNotNull('users.emp_category')
@@ -471,7 +474,7 @@ class DashboardController extends Controller
                     'divisions.id as div_id',
                     DB::raw("COALESCE(NULLIF(TRIM(divisions.acronym),''), divisions.division_name) as div_name"),
                     DB::raw("LOWER(TRIM(COALESCE(users.sex,''))) as sex"),
-                    DB::raw('COUNT(*) as cnt')
+                    DB::raw('COUNT(DISTINCT LOWER(TRIM(users.name))) as cnt')
                 )
                 ->where('users.status', '!=', 'inactive')
                 ->whereNotNull('users.emp_category')
