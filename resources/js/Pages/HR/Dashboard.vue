@@ -17,7 +17,7 @@ import {
   ChartBarIcon, ExclamationTriangleIcon,
   AcademicCapIcon, UsersIcon,
   DocumentTextIcon, ShieldExclamationIcon,
-  TrophyIcon, BanknotesIcon,
+  TrophyIcon, BanknotesIcon, ArrowRightEndOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler)
@@ -243,6 +243,52 @@ const rewardsByTypeData = computed(() => ({
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Today at a Glance -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- On Leave Today -->
+          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <CalendarDaysIcon class="h-4 w-4 text-amber-500" />
+              <h3 class="text-sm font-semibold text-slate-700">On Leave Today</h3>
+              <span class="ml-auto text-xs font-semibold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">{{ hr.onLeaveToday?.length ?? 0 }}</span>
+            </div>
+            <div v-if="hr.onLeaveToday?.length" class="divide-y divide-slate-100">
+              <div v-for="emp in hr.onLeaveToday" :key="emp.name" class="py-2 flex items-start justify-between gap-2">
+                <div>
+                  <div class="text-sm font-medium text-slate-800">{{ emp.name }}</div>
+                  <div class="text-xs text-slate-500">{{ emp.leave_type }}</div>
+                </div>
+                <div class="text-right text-xs text-slate-500 whitespace-nowrap">
+                  {{ new Date(emp.date_from).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) }}
+                  <template v-if="emp.date_from !== emp.date_to"> – {{ new Date(emp.date_to).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }) }}</template>
+                </div>
+              </div>
+            </div>
+            <p v-else class="text-sm text-slate-400">No approved leaves for today.</p>
+          </div>
+
+          <!-- On Gate Pass Today -->
+          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <ArrowRightEndOnRectangleIcon class="h-4 w-4 text-sky-500" />
+              <h3 class="text-sm font-semibold text-slate-700">On Gate Pass Today</h3>
+              <span class="ml-auto text-xs font-semibold text-sky-600 bg-sky-50 rounded-full px-2 py-0.5">{{ hr.onGatepassToday?.length ?? 0 }}</span>
+            </div>
+            <div v-if="hr.onGatepassToday?.length" class="divide-y divide-slate-100">
+              <div v-for="emp in hr.onGatepassToday" :key="emp.name" class="py-2 flex items-start justify-between gap-2">
+                <div>
+                  <div class="text-sm font-medium text-slate-800">{{ emp.name }}</div>
+                  <div class="text-xs text-slate-500">{{ emp.type }}<template v-if="emp.purpose"> — {{ emp.purpose }}</template></div>
+                </div>
+                <div class="text-right text-xs text-slate-500 whitespace-nowrap">
+                  {{ emp.timeout }}<template v-if="emp.timein"> – {{ emp.timein }}</template>
+                </div>
+              </div>
+            </div>
+            <p v-else class="text-sm text-slate-400">No approved gate passes for today.</p>
+          </div>
         </div>
       </section>
 
