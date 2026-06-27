@@ -78,7 +78,7 @@ class RhRoomController extends Controller
         $this->authorize('rh.rooms.manage');
 
         if ($rhRoom->activeInterns()->exists()) {
-            return back()->with('error', 'Cannot delete a room with active interns.');
+            return back()->with('error', 'Cannot delete a room with active dormers.');
         }
 
         $rhRoom->delete();

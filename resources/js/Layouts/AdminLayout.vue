@@ -1870,7 +1870,7 @@ const menuItems = [
         permissions: ["rh.applications.view", "rh.applications.evaluate", "rh.applications.approve"],
       },
       {
-        label: "Interns",
+        label: "Dormers",
         routeName: "rh.interns.index",
         href: "/rh/interns",
         icon: UserGroupIcon,

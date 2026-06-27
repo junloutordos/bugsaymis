@@ -58,7 +58,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
           <div class="grid grid-cols-2 gap-3">
             <div class="text-center p-3 bg-slate-50 rounded-lg">
               <div class="text-2xl font-bold text-indigo-600">{{ hall.active_interns }}</div>
-              <div class="text-xs text-slate-500 mt-1">Active Interns</div>
+              <div class="text-xs text-slate-500 mt-1">Active Dormers</div>
             </div>
             <div class="text-center p-3 bg-slate-50 rounded-lg">
               <div class="text-2xl font-bold text-slate-700">{{ hall.total_rooms }}</div>
@@ -80,7 +80,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
           <div class="flex gap-2 mt-4">
             <Link :href="route('rh.interns.index')"
                   class="flex-1 text-center text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium">
-              View Interns
+              View Dormers
             </Link>
             <Link :href="route('rh.applications.index')"
                   class="flex-1 text-center text-xs py-1.5 rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 font-medium">
@@ -100,7 +100,7 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
         <Link :href="route('rh.interns.index')"
               class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
           <UserGroupIcon class="w-6 h-6 text-indigo-500" />
-          <span class="text-xs font-medium text-slate-700">Interns</span>
+          <span class="text-xs font-medium text-slate-700">Dormers</span>
         </Link>
         <Link :href="route('rh.rooms.index')"
               class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">

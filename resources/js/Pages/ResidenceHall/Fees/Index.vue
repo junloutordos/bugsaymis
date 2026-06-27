@@ -81,7 +81,7 @@ const currentYears = computed(() => {
       <!-- Summary Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
-          <p class="text-xs text-slate-500 mb-1">Total Interns</p>
+          <p class="text-xs text-slate-500 mb-1">Total Dormers</p>
           <p class="text-2xl font-bold text-slate-800">{{ summary.total_interns }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
@@ -176,7 +176,7 @@ const currentYears = computed(() => {
             <tr v-if="!displayed.length">
               <td colspan="7" class="text-center py-12 text-slate-400 text-sm">
                 No fee records for this period.
-                <span class="block mt-1 text-xs">Use "Generate Month" to create fee records for all active interns.</span>
+                <span class="block mt-1 text-xs">Use "Generate Month" to create fee records for all active dormers.</span>
               </td>
             </tr>
           </tbody>
@@ -198,7 +198,7 @@ const currentYears = computed(() => {
     <div v-if="showGenerate" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
         <h3 class="text-base font-semibold text-slate-800 mb-1">Generate Monthly Fees</h3>
-        <p class="text-sm text-slate-500 mb-4">Creates fee records for all active interns in the selected month.</p>
+        <p class="text-sm text-slate-500 mb-4">Creates fee records for all active dormers in the selected month.</p>
         <div class="flex gap-3">
           <div class="flex-1">
             <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>

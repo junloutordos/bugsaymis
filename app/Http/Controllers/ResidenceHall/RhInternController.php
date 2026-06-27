@@ -130,12 +130,12 @@ class RhInternController extends Controller
             ->exists();
 
         if ($exists) {
-            return back()->with('error', 'This student already has an active intern record for the selected school year.');
+            return back()->with('error', 'This student already has an active dormer record for the selected school year.');
         }
 
         RhIntern::create($validated);
 
-        return back()->with('success', 'Intern enrolled and room assigned.');
+        return back()->with('success', 'Dormer enrolled and room assigned.');
     }
 
     public function update(Request $request, RhIntern $rhIntern)
@@ -155,7 +155,7 @@ class RhInternController extends Controller
 
         $rhIntern->update(array_filter($validated, fn ($v) => $v !== null));
 
-        return back()->with('success', 'Intern record updated.');
+        return back()->with('success', 'Dormer record updated.');
     }
 
     public function checkOut(RhIntern $rhIntern)
@@ -167,7 +167,7 @@ class RhInternController extends Controller
             'check_out_date' => now()->toDateString(),
         ]);
 
-        return back()->with('success', 'Intern checked out successfully.');
+        return back()->with('success', 'Dormer checked out successfully.');
     }
 
     private function studentNameMap($studentIds): array

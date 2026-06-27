@@ -89,6 +89,14 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
         </div>
       </div>
 
+      <!-- Empty state -->
+      <div v-if="!rooms.length" class="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center">
+        <ClipboardDocumentCheckIcon class="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p class="text-slate-500 font-medium">No active rooms configured.</p>
+        <p class="text-sm text-slate-400 mt-1">Set up rooms first before running inspections.</p>
+        <a href="/rh/rooms" class="mt-4 inline-block text-sm text-indigo-600 hover:underline font-medium">Go to Rooms →</a>
+      </div>
+
       <!-- Room Grid by Hall -->
       <div v-for="hall in ['BRH', 'GRH']" :key="hall">
         <div v-if="rooms.some(r => r.residence_hall === hall)">
@@ -163,15 +171,15 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
         <div v-if="showModal.check" class="border-t border-slate-100 pt-4 mb-4">
           <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Intern Conforme</h4>
           <div v-if="roomInterns.length" class="space-y-1">
-            <div v-for="intern in roomInterns" :key="intern.id" class="flex items-center justify-between">
-              <span class="text-sm text-slate-700">Intern #{{ intern.id }}</span>
-              <span v-if="showModal.check.conforme_ids?.includes(intern.id)"
+            <div v-for="dormer in roomInterns" :key="dormer.id" class="flex items-center justify-between">
+              <span class="text-sm text-slate-700">{{ dormer.name }}</span>
+              <span v-if="showModal.check.conforme_ids?.includes(dormer.id)"
                     class="text-xs text-emerald-600 font-medium">Signed</span>
-              <button v-else @click="logConforme(showModal.check, intern.id)"
+              <button v-else @click="logConforme(showModal.check, dormer.id)"
                       class="text-xs text-indigo-600 hover:underline">Record Conforme</button>
             </div>
           </div>
-          <p v-else class="text-xs text-slate-400">No active interns in this room.</p>
+          <p v-else class="text-xs text-slate-400">No active dormers in this room.</p>
         </div>
 
         <div class="flex gap-3">
