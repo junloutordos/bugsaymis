@@ -133,7 +133,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
 </script>
 
 <template>
-  <Head :title="student.name || 'Intern Profile'" />
+  <Head :title="student.name || 'Dormer Profile'" />
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
 
@@ -145,7 +145,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
         </Link>
         <div class="flex-1">
           <div class="flex items-center gap-3 flex-wrap">
-            <h1 class="text-xl font-semibold text-slate-800">{{ student.name || 'Intern #' + intern.id }}</h1>
+            <h1 class="text-xl font-semibold text-slate-800">{{ student.name || 'Dormer #' + intern.id }}</h1>
             <span :class="['text-xs px-3 py-1 rounded-full font-semibold capitalize', statusClass(intern.status)]">
               {{ intern.status.replace('_', ' ') }}
             </span>
@@ -364,10 +364,10 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
 
     </div>
 
-    <!-- Edit Intern Modal -->
+    <!-- Edit Dormer Modal -->
     <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h3 class="text-base font-semibold text-slate-800 mb-4">Edit Intern Record</h3>
+        <h3 class="text-base font-semibold text-slate-800 mb-4">Edit Dormer Record</h3>
         <div class="space-y-3 text-sm">
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Room</label>
@@ -375,7 +375,7 @@ const purposeLabel = (p) => ({ go_home: 'Go Home', school_activity: 'School Acti
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="">— Unassigned —</option>
               <option v-for="r in availableRooms" :key="r.id" :value="r.id">
-                {{ r.residence_hall }} – Room {{ r.room_number }} ({{ r.active_interns_count }}/{{ r.capacity }})
+                {{ r.residence_hall }} – Room {{ r.room_number }} ({{ r.active_interns_count }}/{{ r.capacity }} dormers)
               </option>
             </select>
           </div>

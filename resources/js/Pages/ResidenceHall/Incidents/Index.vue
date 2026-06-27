@@ -203,7 +203,7 @@ const fmtDate = (d) => d
         <h3 class="text-base font-semibold text-slate-800 mb-4">Log Incident</h3>
         <div class="space-y-3">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Intern ID</label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Dormer ID</label>
             <input v-model.number="addForm.rh_intern_id" type="number" placeholder="Intern record ID"
                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>

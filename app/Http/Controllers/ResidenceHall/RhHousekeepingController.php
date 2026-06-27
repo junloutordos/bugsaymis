@@ -7,8 +7,10 @@ use App\Models\ResidenceHall\RhHousekeepingCheck;
 use App\Models\ResidenceHall\RhHousekeepingConforme;
 use App\Models\ResidenceHall\RhRoom;
 use App\Models\ResidenceHall\RhIntern;
+use App\Services\Discipline\StudentResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class RhHousekeepingController extends Controller
@@ -76,14 +78,26 @@ class RhHousekeepingController extends Controller
             ];
         });
 
-        // Interns for conforme signing (active, in hall)
-        $interns = RhIntern::whereIn('rh_room_id', $rooms->pluck('id'))
+        // Dormers for conforme signing — resolve student names
+        $internRows = RhIntern::whereIn('rh_room_id', $rooms->pluck('id'))
             ->where('status', 'active')
-            ->get()
-            ->map(fn($i) => [
-                'id'      => $i->id,
-                'room_id' => $i->rh_room_id,
-            ]);
+            ->get(['id', 'rh_room_id', 'student_id']);
+
+        $studentIds = $internRows->pluck('student_id')->unique()->values();
+        $nameMap = $studentIds->isNotEmpty()
+            ? DB::table('students')
+                ->whereIn('id', $studentIds)
+                ->get(['id', 'lastname', 'firstname'])
+                ->keyBy('id')
+                ->map(fn($s) => trim($s->lastname . ', ' . $s->firstname))
+                ->toArray()
+            : [];
+
+        $interns = $internRows->map(fn($i) => [
+            'id'      => $i->id,
+            'room_id' => $i->rh_room_id,
+            'name'    => $nameMap[$i->student_id] ?? ('Dormer #' . $i->id),
+        ]);
 
         return Inertia::render('ResidenceHall/Housekeeping/Index', [
             'rooms'      => $roomData,

@@ -98,18 +98,18 @@ const hallBadge = (h) => h === 'BRH'
 </script>
 
 <template>
-  <Head title="RH Interns" />
+  <Head title="Dormer Roster" />
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
 
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 class="text-xl font-semibold text-slate-800">Intern Roster</h1>
+          <h1 class="text-xl font-semibold text-slate-800">Dormer Roster</h1>
           <p class="text-sm text-slate-500">Active dormitory residents</p>
         </div>
         <button @click="showAdd = true"
                 class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <PlusIcon class="w-4 h-4" /> Enroll Intern
+          <PlusIcon class="w-4 h-4" /> Enroll Dormer
         </button>
       </div>
 
@@ -182,7 +182,7 @@ const hallBadge = (h) => h === 'BRH'
               </td>
             </tr>
             <tr v-if="!displayed.length">
-              <td colspan="7" class="text-center py-12 text-slate-400 text-sm">No interns found.</td>
+              <td colspan="7" class="text-center py-12 text-slate-400 text-sm">No dormers found.</td>
             </tr>
           </tbody>
         </table>
@@ -201,7 +201,7 @@ const hallBadge = (h) => h === 'BRH'
       <!-- Add Intern Modal -->
       <div v-if="showAdd" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-          <h3 class="text-base font-semibold text-slate-800 mb-4">Enroll New Intern</h3>
+          <h3 class="text-base font-semibold text-slate-800 mb-4">Enroll New Dormer</h3>
           <div class="space-y-3">
 
             <!-- Student search -->
@@ -276,7 +276,7 @@ const hallBadge = (h) => h === 'BRH'
             </button>
             <button @click="submitAdd" :disabled="!addForm.student_id || !addForm.rh_room_id || addForm.processing"
                     class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-              Enroll Intern
+              Enroll Dormer
             </button>
           </div>
         </div>
