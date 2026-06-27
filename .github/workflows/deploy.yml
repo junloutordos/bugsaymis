@@ -190,20 +190,43 @@ jobs:
             --force-new-deployment
           echo "Worker service rolled to $WORKER_NEW_ARN"
 
-      - name: Wait for stable deployment
+      - name: Wait for blue/green deployment to finish
         run: |
-          # Poll manually with a longer timeout (waiter default is ~10 min, not enough for npm build)
-          for i in $(seq 1 40); do
-            STATUS=$(aws ecs describe-services --cluster crcmis-prod --services crcmis-prod-service \
-              --query 'services[0].deployments[0].{status:status,running:runningCount,desired:desiredCount}' \
-              --output json)
-            RUNNING=$(echo $STATUS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['running'])")
-            DESIRED=$(echo $STATUS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['desired'])")
-            echo "[$i/40] running=$RUNNING desired=$DESIRED"
-            if [ "$RUNNING" = "$DESIRED" ] && [ "$DESIRED" != "0" ]; then
-              echo "Deployment stable."
-              exit 0
-            fi
+          # The service uses the ECS-native BLUE_GREEN strategy, so the web rollout
+          # is a "service deployment" that runs through scale-up → traffic shift →
+          # bake → clean-up. The old runningCount==desired heuristic was wrong here:
+          # it reported success as soon as green tasks were RUNNING, i.e. BEFORE the
+          # traffic shift and bake. Instead, poll the service deployment to a terminal
+          # state and fail the job if it rolled back.
+
+          # Find the most recent service deployment for the web service.
+          SD=""
+          for i in $(seq 1 10); do
+            SD=$(aws ecs list-service-deployments \
+              --cluster crcmis-prod --service crcmis-prod-service \
+              --query 'sort_by(serviceDeployments, &createdAt)[-1].serviceDeploymentArn' \
+              --output text 2>/dev/null)
+            [ -n "$SD" ] && [ "$SD" != "None" ] && break
+            echo "Waiting for service deployment to appear... ($i)"
+            sleep 10
+          done
+          echo "Tracking service deployment: $SD"
+
+          # Poll to terminal. Timeout generous enough for scale-up + shift + bake + cleanup.
+          for i in $(seq 1 60); do
+            STATUS=$(aws ecs describe-service-deployments --service-deployment-arns "$SD" \
+              --query 'serviceDeployments[0].status' --output text)
+            STAGE=$(aws ecs describe-service-deployments --service-deployment-arns "$SD" \
+              --query 'serviceDeployments[0].lifecycleStage' --output text)
+            echo "[$i/60] status=$STATUS stage=$STAGE"
+            case "$STATUS" in
+              SUCCESSFUL)
+                echo "Blue/green deployment succeeded." && exit 0 ;;
+              ROLLBACK_SUCCESSFUL|ROLLBACK_FAILED|ROLLBACK_IN_PROGRESS|STOPPED|STOP_REQUESTED)
+                echo "::error::Deployment did not succeed (status=$STATUS). Rolled back — live traffic remains on the previous (blue) version."
+                exit 1 ;;
+            esac
             sleep 30
           done
-          echo "Timeout — service may still be stabilizing." && exit 0
+          echo "::error::Timed out waiting for deployment to reach a terminal state (last status=$STATUS)."
+          exit 1
