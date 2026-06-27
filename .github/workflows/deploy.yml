@@ -104,12 +104,91 @@ jobs:
 
           echo "New task definition: $NEW_TASK_ARN"
 
+          # ── Pre-deploy migration (blue-green safety) ──────────────────────────
+          # Run migrations ONCE as a one-off task using the NEW image, BEFORE the
+          # service is updated. Migrations no longer run on container boot. The
+          # container's CMD (docker-entrypoint.sh) is overridden with the `migrate`
+          # arg so it runs `artisan migrate --force` and exits. If this fails, the
+          # job stops here and live traffic is never touched.
+          NETCFG=$(aws ecs describe-services \
+            --cluster crcmis-prod \
+            --services crcmis-prod-service \
+            --query 'services[0].networkConfiguration' \
+            --output json)
+
+          echo "Running pre-deploy migration task..."
+          MIGRATE_TASK_ARN=$(aws ecs run-task \
+            --cluster crcmis-prod \
+            --task-definition "$NEW_TASK_ARN" \
+            --launch-type FARGATE \
+            --network-configuration "$NETCFG" \
+            --started-by github-actions-migrate \
+            --overrides '{"containerOverrides":[{"name":"nginx","command":["/usr/local/bin/docker-entrypoint.sh","migrate"]}]}' \
+            --query 'tasks[0].taskArn' \
+            --output text)
+
+          echo "Migration task: $MIGRATE_TASK_ARN"
+          aws ecs wait tasks-stopped --cluster crcmis-prod --tasks "$MIGRATE_TASK_ARN"
+
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster crcmis-prod --tasks "$MIGRATE_TASK_ARN" \
+            --query 'tasks[0].containers[?name==`nginx`].exitCode | [0]' \
+            --output text)
+          echo "Migration task exit code: $EXIT_CODE"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::Pre-deploy migration failed (exit $EXIT_CODE). Aborting deploy — live traffic untouched."
+            exit 1
+          fi
+          echo "Migrations applied successfully."
+
           # Update the service to use the new revision
           aws ecs update-service \
             --cluster crcmis-prod \
             --service crcmis-prod-service \
             --task-definition "$NEW_TASK_ARN" \
             --force-new-deployment
+
+      - name: Roll the worker service (cron + queue)
+        run: |
+          # The dedicated worker service runs cron + queue on its own image.
+          # Skip cleanly if it doesn't exist yet (before Phase 1c infra is created).
+          WORKER_STATUS=$(aws ecs describe-services \
+            --cluster crcmis-prod \
+            --services crcmis-prod-worker \
+            --query 'services[0].status' \
+            --output text 2>/dev/null || echo "MISSING")
+
+          if [ "$WORKER_STATUS" != "ACTIVE" ]; then
+            echo "Worker service not present (status=$WORKER_STATUS) — skipping."
+            exit 0
+          fi
+
+          WORKER_TASK_DEF=$(aws ecs describe-services \
+            --cluster crcmis-prod --services crcmis-prod-worker \
+            --query 'services[0].taskDefinition' --output text)
+
+          WORKER_NEW=$(aws ecs describe-task-definition \
+            --task-definition "$WORKER_TASK_DEF" \
+            --query 'taskDefinition' --output json | \
+            jq --arg app "$ECR/crcmis/app:${{ github.sha }}" \
+            '.containerDefinitions |= map(
+              if (.image | contains("crcmis/app")) then .image = $app else . end
+            ) | del(
+              .taskDefinitionArn, .revision, .status,
+              .requiresAttributes, .compatibilities,
+              .registeredAt, .registeredBy
+            )')
+
+          WORKER_NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$WORKER_NEW" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          aws ecs update-service \
+            --cluster crcmis-prod \
+            --service crcmis-prod-worker \
+            --task-definition "$WORKER_NEW_ARN" \
+            --force-new-deployment
+          echo "Worker service rolled to $WORKER_NEW_ARN"
 
       - name: Wait for stable deployment
         run: |

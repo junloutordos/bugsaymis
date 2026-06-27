@@ -1,0 +1,204 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "worker",
+      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app:c3835ad160dcf87102a4aed3f5eb724f8bfe30c4",
+      "cpu": 0,
+      "essential": true,
+      "environment": [
+        {
+          "name": "SESSION_DRIVER",
+          "value": "redis"
+        },
+        {
+          "name": "QUEUE_CONNECTION",
+          "value": "redis"
+        },
+        {
+          "name": "AWS_URL",
+          "value": "https://crcmis-mis-storage.s3.ap-southeast-1.amazonaws.com"
+        },
+        {
+          "name": "VAPID_SUBJECT",
+          "value": "mailto:jtordos@crc.pshs.edu.ph"
+        },
+        {
+          "name": "DB_CONNECTION",
+          "value": "mysql"
+        },
+        {
+          "name": "LOG_CHANNEL",
+          "value": "stderr"
+        },
+        {
+          "name": "AWS_DEFAULT_REGION",
+          "value": "ap-southeast-1"
+        },
+        {
+          "name": "AWS_BUCKET",
+          "value": "crcmis-mis-storage"
+        },
+        {
+          "name": "VAPID_PUBLIC_KEY",
+          "value": "BGjayfMJ-1SnmGT9rb3rLrdBbUWM5418Zgqa0-ihCTef_EvmxejnBnC22AwVxKbI6-jcHC60KQalylpWV6FYXNU"
+        },
+        {
+          "name": "GOOGLE_DRIVE_CREDENTIALS",
+          "value": "/var/www/google-credentials.json"
+        },
+        {
+          "name": "CACHE_DRIVER",
+          "value": "redis"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "APP_ENV",
+          "valueFrom": "/crcmis/prod/APP_ENV"
+        },
+        {
+          "name": "APP_KEY",
+          "valueFrom": "/crcmis/prod/APP_KEY"
+        },
+        {
+          "name": "APP_URL",
+          "valueFrom": "/crcmis/prod/APP_URL"
+        },
+        {
+          "name": "APP_DEBUG",
+          "valueFrom": "/crcmis/prod/APP_DEBUG"
+        },
+        {
+          "name": "DB_HOST",
+          "valueFrom": "/crcmis/prod/DB_HOST"
+        },
+        {
+          "name": "DB_DATABASE",
+          "valueFrom": "/crcmis/prod/DB_DATABASE"
+        },
+        {
+          "name": "DB_USERNAME",
+          "valueFrom": "/crcmis/prod/DB_USERNAME"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "/crcmis/prod/DB_PASSWORD"
+        },
+        {
+          "name": "REDIS_HOST",
+          "valueFrom": "/crcmis/prod/REDIS_HOST"
+        },
+        {
+          "name": "REDIS_PORT",
+          "valueFrom": "/crcmis/prod/REDIS_PORT"
+        },
+        {
+          "name": "SOKETI_DEFAULT_APP_ID",
+          "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_ID"
+        },
+        {
+          "name": "SOKETI_DEFAULT_APP_KEY",
+          "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_KEY"
+        },
+        {
+          "name": "SOKETI_DEFAULT_APP_SECRET",
+          "valueFrom": "/crcmis/prod/SOKETI_DEFAULT_APP_SECRET"
+        },
+        {
+          "name": "GOOGLE_DRIVE_FOLDER_ID",
+          "valueFrom": "/crcmis/prod/GOOGLE_DRIVE_FOLDER_ID"
+        },
+        {
+          "name": "MAIL_MAILER",
+          "valueFrom": "/crcmis/prod/MAIL_MAILER"
+        },
+        {
+          "name": "MAIL_HOST",
+          "valueFrom": "/crcmis/prod/MAIL_HOST"
+        },
+        {
+          "name": "MAIL_PORT",
+          "valueFrom": "/crcmis/prod/MAIL_PORT"
+        },
+        {
+          "name": "MAIL_ENCRYPTION",
+          "valueFrom": "/crcmis/prod/MAIL_ENCRYPTION"
+        },
+        {
+          "name": "MAIL_USERNAME",
+          "valueFrom": "/crcmis/prod/MAIL_USERNAME"
+        },
+        {
+          "name": "MAIL_PASSWORD",
+          "valueFrom": "/crcmis/prod/MAIL_PASSWORD"
+        },
+        {
+          "name": "MAIL_FROM_ADDRESS",
+          "valueFrom": "/crcmis/prod/MAIL_FROM_ADDRESS"
+        },
+        {
+          "name": "MAIL_FROM_NAME",
+          "valueFrom": "/crcmis/prod/MAIL_FROM_NAME"
+        },
+        {
+          "name": "KMS_SIGNING_KEY_ARN",
+          "valueFrom": "/crcmis/prod/KMS_SIGNING_KEY_ARN"
+        },
+        {
+          "name": "VAPID_PRIVATE_KEY",
+          "valueFrom": "arn:aws:ssm:ap-southeast-1:971422671747:parameter/crcmis/prod/VAPID_PRIVATE_KEY"
+        },
+        {
+          "name": "SMS_GATE_URL",
+          "valueFrom": "/crcmis/prod/SMS_GATE_URL"
+        },
+        {
+          "name": "SMS_GATE_USERNAME",
+          "valueFrom": "/crcmis/prod/SMS_GATE_USERNAME"
+        },
+        {
+          "name": "SMS_GATE_PASSWORD",
+          "valueFrom": "/crcmis/prod/SMS_GATE_PASSWORD"
+        },
+        {
+          "name": "SMS_GATE_DEVICE_ID",
+          "valueFrom": "/crcmis/prod/SMS_GATE_DEVICE_ID"
+        },
+        {
+          "name": "ICT_AGENT_CAMPUS_SSIDS",
+          "valueFrom": "/crcmis/prod/ICT_AGENT_CAMPUS_SSIDS"
+        },
+        {
+          "name": "ICT_AGENT_CAMPUS_IPS",
+          "valueFrom": "/crcmis/prod/ICT_AGENT_CAMPUS_IPS"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/crcmis",
+          "awslogs-region": "ap-southeast-1",
+          "awslogs-stream-prefix": "worker"
+        }
+      },
+      "systemControls": [],
+      "command": [
+        "/usr/local/bin/docker-entrypoint.sh",
+        "worker"
+      ]
+    }
+  ],
+  "family": "crcmis-prod-worker",
+  "taskRoleArn": "arn:aws:iam::971422671747:role/crcmisECSTaskRole",
+  "executionRoleArn": "arn:aws:iam::971422671747:role/crcmisECSExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024"
+}

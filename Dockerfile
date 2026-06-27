@@ -91,6 +91,7 @@ RUN rm -f /etc/nginx/sites-enabled/default.conf 2>/dev/null; \
     rm -f /etc/nginx/conf.d/default.conf 2>/dev/null; true
 
 COPY docker/supervisord.conf /etc/supervisor/conf.d/bugsaymis.conf
+COPY docker/supervisord-worker.conf /etc/supervisor/conf.d/bugsaymis-worker.conf
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

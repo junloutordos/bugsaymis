@@ -166,6 +166,15 @@ return redirect()->route('resource.index')->with('success', 'Created.');
 - Always write a `down()` method
 - Run in dev: `docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan migrate --path=database/migrations/<file>"`
 
+### Migration discipline (blue-green) ⚠️
+Migrations run as a **pre-deploy one-off task** (deploy.yml), **not** on container boot, and during a deploy the **old (blue) and new (green) code run side-by-side against the same RDS schema**. Therefore every migration must be **backward-compatible with the currently-deployed code**:
+- **Additive changes are safe** — new nullable columns (`->after()`), new tables, new indexes. This covers ~95% of migrations; nothing changes for these.
+- **Destructive changes (drop/rename column, change type, NOT NULL on existing) must be split across TWO deploys** — **expand/contract**:
+  1. **Expand:** add the new shape (nullable). Ship code that writes both old + new, reads new-or-old. Old code keeps working.
+  2. **Contract (a later deploy, after all code uses the new shape):** drop the old column.
+- **Never** drop/rename a column in the same deploy as the code that stops using it — it breaks live blue traffic before the flip.
+- `migrate --force` was removed from `docker-entrypoint.sh` on purpose — do not re-add it.
+
 ### Key Models
 | Model | Key Fields / Notes |
 |---|---|
