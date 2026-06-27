@@ -2156,4 +2156,5 @@ require __DIR__.'/property.php';
 require __DIR__.'/registrar.php';
 require __DIR__.'/cid.php';
 require __DIR__.'/discipline.php';
+require __DIR__.'/residence-hall.php';
 require __DIR__.'/auth.php';
