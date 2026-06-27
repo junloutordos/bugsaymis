@@ -6,13 +6,15 @@ import {
     AcademicCapIcon, TrophyIcon, UserGroupIcon, BriefcaseIcon,
     HomeIcon, HeartIcon, ShieldCheckIcon, ExclamationTriangleIcon,
     ClipboardDocumentListIcon, BeakerIcon, CheckCircleIcon, ClockIcon,
+    HomeModernIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
-    student:     Object,
-    grade_level: Number,
-    school_year: String,
-    completion:  Array,
+    student:         Object,
+    grade_level:     Number,
+    school_year:     String,
+    completion:      Array,
+    rhApplication:   Object,
     total_done:  Number,
     total:       Number,
 })
@@ -136,6 +138,28 @@ function fmtDate(d) {
                         <CheckCircleIcon v-if="s.submitted" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                     </button>
                 </div>
+            </section>
+
+            <!-- Residence Hall -->
+            <section>
+                <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Residence Hall</h2>
+                <a href="/student-portal/rh-application"
+                   class="flex items-start gap-3 bg-white border rounded-xl p-4 text-left hover:shadow-md transition-all group"
+                   :class="rhApplication?.status === 'approved' ? 'border-emerald-200 hover:border-emerald-300' : 'border-slate-200 hover:border-indigo-300'">
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                         :class="rhApplication?.status === 'approved' ? 'bg-emerald-100' : 'bg-slate-100 group-hover:bg-indigo-50'">
+                        <HomeModernIcon class="w-5 h-5" :class="rhApplication?.status === 'approved' ? 'text-emerald-600' : 'text-slate-500 group-hover:text-indigo-600'" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-slate-800">Residence Hall Application</p>
+                        <p v-if="!rhApplication" class="text-xs text-slate-400 mt-0.5">Apply for accommodation</p>
+                        <p v-else-if="rhApplication.status === 'approved'" class="text-xs text-emerald-600 mt-0.5">Approved — {{ rhApplication.preferred_hall }}</p>
+                        <p v-else-if="rhApplication.status === 'rejected'" class="text-xs text-rose-500 mt-0.5">Not approved</p>
+                        <p v-else class="text-xs text-amber-600 mt-0.5">{{ rhApplication.status === 'waitlisted' ? 'Waitlisted' : 'Under review' }}</p>
+                    </div>
+                    <CheckCircleIcon v-if="rhApplication?.status === 'approved'" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <ClockIcon v-else-if="rhApplication && rhApplication.status !== 'rejected'" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                </a>
             </section>
 
         </div>
