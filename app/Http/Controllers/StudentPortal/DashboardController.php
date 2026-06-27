@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\ResidenceHall\RhApplication;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -55,13 +56,21 @@ class DashboardController extends Controller
 
         $totalDone = count(array_filter($completion, fn ($s) => $s['submitted']));
 
+        $rhApplication = ($sy && $student)
+            ? RhApplication::where('student_id', $student->id)
+                ->where('school_year_id', $sy->id)
+                ->latest()
+                ->first(['id', 'status', 'preferred_hall', 'created_at'])
+            : null;
+
         return Inertia::render('StudentPortal/Dashboard', [
-            'student'     => $student,
-            'grade_level' => $gradeLevel,
-            'school_year' => $sy?->name,
-            'completion'  => $completion,
-            'total_done'  => $totalDone,
-            'total'       => count($sections),
+            'student'       => $student,
+            'grade_level'   => $gradeLevel,
+            'school_year'   => $sy?->name,
+            'completion'    => $completion,
+            'total_done'    => $totalDone,
+            'total'         => count($sections),
+            'rhApplication' => $rhApplication,
         ]);
     }
 }

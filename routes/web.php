@@ -2125,6 +2125,9 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
         Route::get('/medical',                   [\App\Http\Controllers\StudentPortal\MedicalController::class, 'show'])->name('medical');
         Route::post('/medical/{section}',        [\App\Http\Controllers\StudentPortal\MedicalController::class, 'saveSection'])->name('medical.save')
             ->where('section', 'allergies|immunizations|medical_history|vitamins');
+
+        Route::get('/rh-application',  [\App\Http\Controllers\StudentPortal\RhApplicationController::class, 'show'])->name('rh-application.show');
+        Route::post('/rh-application', [\App\Http\Controllers\StudentPortal\RhApplicationController::class, 'store'])->name('rh-application.store');
     });
 });
 
