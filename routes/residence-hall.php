@@ -48,9 +48,12 @@ Route::middleware(['web', 'auth', 'verified'])
         // ── Rooms ─────────────────────────────────────────────────────────────
         Route::middleware('permission:rh.rooms.manage')->group(function () {
             Route::get('/rooms', [RhRoomController::class, 'index'])->name('rooms.index');
+            Route::get('/rooms/{rhRoom}', [RhRoomController::class, 'show'])->name('rooms.show');
             Route::post('/rooms', [RhRoomController::class, 'store'])->name('rooms.store');
             Route::put('/rooms/{rhRoom}', [RhRoomController::class, 'update'])->name('rooms.update');
             Route::delete('/rooms/{rhRoom}', [RhRoomController::class, 'destroy'])->name('rooms.destroy');
+            Route::post('/rooms/{rhRoom}/assign-bed', [RhRoomController::class, 'assignBed'])->name('rooms.assign-bed');
+            Route::post('/rooms/{rhRoom}/unassign-bed', [RhRoomController::class, 'unassignBed'])->name('rooms.unassign-bed');
         });
 
         // ── Applications ──────────────────────────────────────────────────────

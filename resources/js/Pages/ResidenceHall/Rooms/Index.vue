@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, PencilIcon, TrashIcon, MapIcon, ListBulletIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   rooms: Array,
@@ -65,14 +65,39 @@ function remove(room) {
   router.delete(route('rh.rooms.destroy', room.id), { preserveScroll: true })
 }
 
+const viewMode = ref('list')
+
 const brhRooms = computed(() => props.rooms.filter(r => r.residence_hall === 'BRH'))
 const grhRooms = computed(() => props.rooms.filter(r => r.residence_hall === 'GRH'))
+
+const brhByFloor = computed(() => groupByFloor(brhRooms.value))
+const grhByFloor = computed(() => groupByFloor(grhRooms.value))
+
+function groupByFloor(rooms) {
+  const floors = {}
+  rooms.forEach(r => {
+    const f = r.floor ?? 0
+    if (!floors[f]) floors[f] = []
+    floors[f].push(r)
+  })
+  return Object.entries(floors)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([floor, rooms]) => ({ floor: Number(floor), rooms }))
+}
 
 const occupancyColor = (room) => {
   const pct = room.active_interns_count / room.capacity
   if (pct >= 1) return 'bg-rose-500'
   if (pct >= 0.75) return 'bg-amber-400'
   return 'bg-emerald-400'
+}
+
+const mapCardClass = (room) => {
+  const pct = room.active_interns_count / room.capacity
+  if (room.status === 'inactive') return 'border-slate-200 bg-slate-50 opacity-60'
+  if (pct >= 1) return 'border-rose-300 bg-rose-50'
+  if (pct >= 0.75) return 'border-amber-300 bg-amber-50'
+  return 'border-emerald-200 bg-emerald-50'
 }
 </script>
 
@@ -85,11 +110,69 @@ const occupancyColor = (room) => {
           <h1 class="text-xl font-semibold text-slate-800">Room Management</h1>
           <p class="text-sm text-slate-500">{{ myHall ? (myHall === 'BRH' ? 'Boys Residence Hall' : 'Girls Residence Hall') : 'All Halls' }}</p>
         </div>
-        <button @click="openAdd"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <PlusIcon class="w-4 h-4" /> Add Room
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- View toggle -->
+          <div class="flex rounded-lg border border-slate-200 overflow-hidden">
+            <button @click="viewMode = 'list'"
+                    :class="['px-3 py-2 text-sm flex items-center gap-1.5 transition-colors', viewMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+              <ListBulletIcon class="w-4 h-4" /> List
+            </button>
+            <button @click="viewMode = 'map'"
+                    :class="['px-3 py-2 text-sm flex items-center gap-1.5 transition-colors', viewMode === 'map' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50']">
+              <MapIcon class="w-4 h-4" /> Floor Map
+            </button>
+          </div>
+          <button @click="openAdd"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <PlusIcon class="w-4 h-4" /> Add Room
+          </button>
+        </div>
       </div>
+
+      <!-- Legend (map view only) -->
+      <div v-if="viewMode === 'map'" class="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded border-2 border-emerald-300 bg-emerald-50 inline-block"></span> Available</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded border-2 border-amber-300 bg-amber-50 inline-block"></span> Almost Full</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded border-2 border-rose-300 bg-rose-50 inline-block"></span> Full</span>
+        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded border-2 border-slate-200 bg-slate-50 inline-block opacity-60"></span> Inactive</span>
+      </div>
+
+      <!-- ═══ MAP VIEW ════════════════════════════════════════════════════════ -->
+      <template v-if="viewMode === 'map'">
+        <div v-for="hall in (!myHall ? ['BRH','GRH'] : [myHall])" :key="'map-' + hall">
+          <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+            {{ hall === 'BRH' ? "Boys Residence Hall (BRH)" : "Girls Residence Hall (GRH)" }}
+          </h2>
+          <div class="space-y-4 mb-6">
+            <div v-for="{ floor, rooms: floorRooms } in (hall === 'BRH' ? brhByFloor : grhByFloor)"
+                 :key="floor"
+                 class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                {{ floor > 0 ? 'Floor ' + floor : 'Unspecified Floor' }}
+              </p>
+              <div class="flex flex-wrap gap-3">
+                <Link v-for="room in floorRooms" :key="room.id"
+                      :href="route('rh.rooms.show', room.id)"
+                      :class="['relative rounded-xl border-2 p-4 w-32 text-center transition-all hover:shadow-md', mapCardClass(room)]">
+                  <div class="text-2xl font-bold text-slate-700 mb-1">{{ room.room_number }}</div>
+                  <div class="text-xs font-medium text-slate-600">
+                    {{ room.active_interns_count }} / {{ room.capacity }}
+                  </div>
+                  <div class="mt-2 w-full bg-white/60 rounded-full h-1.5">
+                    <div :class="['h-1.5 rounded-full', occupancyColor(room)]"
+                         :style="`width: ${Math.min(100, room.active_interns_count / room.capacity * 100)}%`"></div>
+                  </div>
+                </Link>
+              </div>
+            </div>
+            <p v-if="!(hall === 'BRH' ? brhByFloor : grhByFloor).length"
+               class="text-sm text-slate-400 text-center py-6">No {{ hall }} rooms configured.</p>
+          </div>
+        </div>
+      </template>
+
+      <!-- ═══ LIST VIEW ═══════════════════════════════════════════════════════ -->
+      <template v-else>
 
       <!-- BRH -->
       <div v-if="!myHall || myHall === 'BRH'">
@@ -119,9 +202,13 @@ const occupancyColor = (room) => {
             </div>
             <p v-if="room.description" class="text-xs text-slate-400 mb-3 truncate">{{ room.description }}</p>
             <div class="flex gap-2">
+              <Link :href="route('rh.rooms.show', room.id)"
+                    class="flex-1 text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center justify-center gap-1 font-medium">
+                <MapIcon class="w-3 h-3" /> Bed Map
+              </Link>
               <button @click="openEdit(room)"
-                      class="flex-1 text-xs py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
-                <PencilIcon class="w-3 h-3" /> Edit
+                      class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                <PencilIcon class="w-3 h-3" />
               </button>
               <button @click="remove(room)"
                       class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-rose-500 hover:bg-rose-50">
@@ -162,9 +249,13 @@ const occupancyColor = (room) => {
             </div>
             <p v-if="room.description" class="text-xs text-slate-400 mb-3 truncate">{{ room.description }}</p>
             <div class="flex gap-2">
+              <Link :href="route('rh.rooms.show', room.id)"
+                    class="flex-1 text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center justify-center gap-1 font-medium">
+                <MapIcon class="w-3 h-3" /> Bed Map
+              </Link>
               <button @click="openEdit(room)"
-                      class="flex-1 text-xs py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center gap-1">
-                <PencilIcon class="w-3 h-3" /> Edit
+                      class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                <PencilIcon class="w-3 h-3" />
               </button>
               <button @click="remove(room)"
                       class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-rose-500 hover:bg-rose-50">
@@ -177,6 +268,8 @@ const occupancyColor = (room) => {
           </div>
         </div>
       </div>
+
+      </template><!-- end list view -->
 
       <!-- Add/Edit Modal -->
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
