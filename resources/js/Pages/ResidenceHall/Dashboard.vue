@@ -1,0 +1,147 @@
+<script setup>
+import { Head, Link } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import {
+  HomeModernIcon, UserGroupIcon, DocumentTextIcon,
+  ExclamationTriangleIcon, ClipboardDocumentListIcon,
+} from '@heroicons/vue/24/outline'
+
+const props = defineProps({
+  stats: Array,
+  recentApplications: Array,
+  currentSy: String,
+  myHall: String,
+})
+
+const fmtDate = (d) => d
+  ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+  : '—'
+
+const statusClass = (s) => ({
+  pending:   'bg-amber-100 text-amber-700',
+  evaluated: 'bg-sky-100 text-sky-700',
+  approved:  'bg-emerald-100 text-emerald-700',
+  rejected:  'bg-rose-100 text-rose-700',
+  waitlisted: 'bg-slate-100 text-slate-600',
+}[s] || 'bg-slate-100 text-slate-600')
+
+const hallLabel = (h) => h === 'BRH' ? 'Boys Residence Hall' : 'Girls Residence Hall'
+const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-500'
+</script>
+
+<template>
+  <Head title="Residence Hall Dashboard" />
+  <AdminLayout title="Residence Hall">
+    <div class="space-y-6">
+
+      <!-- Header -->
+      <div>
+        <h1 class="text-xl font-semibold text-slate-800">Residence Hall Dashboard</h1>
+        <p class="text-sm text-slate-500">
+          {{ myHall ? hallLabel(myHall) : 'All Halls' }}
+          <span v-if="currentSy"> · SY {{ currentSy }}</span>
+        </p>
+      </div>
+
+      <!-- Hall Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div v-for="hall in stats" :key="hall.hall"
+             :class="['bg-white rounded-xl border border-slate-100 shadow-sm border-l-4 p-5', hallColor(hall.hall)]">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ hall.hall }}</span>
+              <h2 class="text-base font-semibold text-slate-800">{{ hall.label }}</h2>
+            </div>
+            <HomeModernIcon class="w-8 h-8 text-slate-300" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="text-center p-3 bg-slate-50 rounded-lg">
+              <div class="text-2xl font-bold text-indigo-600">{{ hall.active_interns }}</div>
+              <div class="text-xs text-slate-500 mt-1">Active Interns</div>
+            </div>
+            <div class="text-center p-3 bg-slate-50 rounded-lg">
+              <div class="text-2xl font-bold text-slate-700">{{ hall.total_rooms }}</div>
+              <div class="text-xs text-slate-500 mt-1">Rooms</div>
+            </div>
+            <div class="text-center p-3 bg-amber-50 rounded-lg">
+              <div class="text-2xl font-bold text-amber-600">{{ hall.pending_apps }}</div>
+              <div class="text-xs text-slate-500 mt-1">Pending Apps</div>
+            </div>
+            <div class="text-center p-3 rounded-lg"
+                 :class="hall.overdue_passes > 0 ? 'bg-rose-50' : 'bg-slate-50'">
+              <div class="text-2xl font-bold" :class="hall.overdue_passes > 0 ? 'text-rose-600' : 'text-slate-700'">
+                {{ hall.overdue_passes }}
+              </div>
+              <div class="text-xs text-slate-500 mt-1">Overdue Passes</div>
+            </div>
+          </div>
+
+          <div class="flex gap-2 mt-4">
+            <Link :href="route('rh.interns.index')"
+                  class="flex-1 text-center text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium">
+              View Interns
+            </Link>
+            <Link :href="route('rh.applications.index')"
+                  class="flex-1 text-center text-xs py-1.5 rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 font-medium">
+              Applications
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Nav -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link :href="route('rh.applications.index')"
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
+          <DocumentTextIcon class="w-6 h-6 text-indigo-500" />
+          <span class="text-xs font-medium text-slate-700">Applications</span>
+        </Link>
+        <Link :href="route('rh.interns.index')"
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
+          <UserGroupIcon class="w-6 h-6 text-indigo-500" />
+          <span class="text-xs font-medium text-slate-700">Interns</span>
+        </Link>
+        <Link :href="route('rh.rooms.index')"
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-colors">
+          <HomeModernIcon class="w-6 h-6 text-indigo-500" />
+          <span class="text-xs font-medium text-slate-700">Rooms</span>
+        </Link>
+        <Link href="#"
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-slate-100 shadow-sm opacity-50 cursor-not-allowed">
+          <ClipboardDocumentListIcon class="w-6 h-6 text-slate-400" />
+          <span class="text-xs font-medium text-slate-500">Housekeeping</span>
+        </Link>
+      </div>
+
+      <!-- Recent Pending Applications -->
+      <div v-if="recentApplications.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-700">Pending Applications</h3>
+          <Link :href="route('rh.applications.index')" class="text-xs text-indigo-600 hover:underline">View all</Link>
+        </div>
+        <div class="divide-y divide-slate-50">
+          <Link v-for="app in recentApplications" :key="app.id"
+                :href="route('rh.applications.show', app.id)"
+                class="flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors">
+            <div>
+              <p class="text-sm font-medium text-slate-800">{{ app.student_name }}</p>
+              <p class="text-xs text-slate-500">{{ app.preferred_hall }} · Grade {{ app.grade_level || '—' }}</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-slate-400">{{ fmtDate(app.created_at) }}</span>
+              <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', statusClass(app.status)]">
+                {{ app.status }}
+              </span>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm p-10 text-center text-slate-400 text-sm">
+        No pending applications for {{ currentSy || 'the current school year' }}.
+      </div>
+
+    </div>
+  </AdminLayout>
+</template>

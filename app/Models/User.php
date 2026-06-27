@@ -36,6 +36,7 @@ class User extends Authenticatable
         'on_study_leave',
         'salary_grade',
         'salary_step',
+        'rh_hall',
     ];
 
     protected $hidden = [

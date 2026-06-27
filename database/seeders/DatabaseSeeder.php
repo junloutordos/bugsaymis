@@ -79,5 +79,8 @@ class DatabaseSeeder extends Seeder
 
         // ── Student Discipline (SDO) ────────────────────────────────────────────
         $this->call(DisciplineOffenseSeeder::class); // offense catalog starter set
+
+        // ── Residence Hall (RHU) ────────────────────────────────────────────────
+        $this->call(RhPermissionSeeder::class);
     }
 }
