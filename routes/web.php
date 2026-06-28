@@ -2172,6 +2172,12 @@ Route::middleware(['auth', 'permission:atlas.modules.view'])
             ->name('modules.index');
         Route::post('/modules/refresh', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'refresh'])
             ->name('modules.refresh');
+        Route::get('/modules/{key}/metrics', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'moduleMetrics'])
+            ->name('modules.metrics');
+        Route::post('/modules/{key}/maturity', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'saveMaturity'])
+            ->name('modules.maturity.save');
+        Route::post('/modules/{key}/settings', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'saveSettings'])
+            ->name('modules.settings.save');
     });
 
 require __DIR__.'/auth.php';

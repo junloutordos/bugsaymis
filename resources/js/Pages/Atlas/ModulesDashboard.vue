@@ -15,20 +15,41 @@ import {
   ArrowTopRightOnSquareIcon,
   CpuChipIcon,
   LinkIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '@heroicons/vue/24/outline'
 import { StarIcon as StarSolid } from '@heroicons/vue/24/solid'
 import { StarIcon as StarOutline } from '@heroicons/vue/24/outline'
+import {
+  Chart as ChartJS,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+import { Radar, Bar } from 'vue-chartjs'
+
+ChartJS.register(
+  RadialLinearScale, PointElement, LineElement, Filler,
+  CategoryScale, LinearScale, BarElement,
+  Tooltip, Legend
+)
 
 const props = defineProps({
-  modules:        { type: Array,  default: () => [] },
-  summary:        { type: Object, default: () => ({}) },
-  integrations:   { type: Array,  default: () => [] },
-  categoryLabels: { type: Object, default: () => ({}) },
-  maturityLabels: { type: Object, default: () => ({}) },
-  cachedAt:       { type: String, default: null },
+  modules:            { type: Array,  default: () => [] },
+  summary:            { type: Object, default: () => ({}) },
+  integrations:       { type: Array,  default: () => [] },
+  categoryLabels:     { type: Object, default: () => ({}) },
+  maturityLabels:     { type: Object, default: () => ({}) },
+  maturityDimensions: { type: Object, default: () => ({}) },
+  cachedAt:           { type: String, default: null },
 })
 
-// Reactive — updated in-place by refresh POST without a full page reload
 const modules      = ref(props.modules)
 const summary      = ref(props.summary)
 const integrations = ref(props.integrations)
@@ -37,29 +58,45 @@ const cachedAt     = ref(props.cachedAt)
 const refreshing      = ref(false)
 const selectedModule  = ref(null)
 const showDetailModal = ref(false)
-const filterCategory  = ref('all')
-const filterHealth    = ref('all')
-const filterMaturity  = ref('all')
+const activeTab       = ref('health')
+
+const metricsLoading = ref(false)
+const metricData     = ref(null)
+
+const filterCategory = ref('all')
+const filterHealth   = ref('all')
+const filterMaturity = ref('all')
+
+const scoringDimension = ref(null)
+const dimensionForm    = ref({ criteria_checks: [], notes: '' })
+const savingDimension  = ref(false)
+const settingsForm     = ref({ version: '1.0.0', sla_hours: null, notes: '' })
+const savingSettings   = ref(false)
 
 const healthConfig = {
-  healthy:  { label: 'Healthy',  badgeColor: 'green',  icon: CheckCircleIcon,         iconClass: 'text-emerald-500' },
-  idle:     { label: 'Idle',     badgeColor: 'slate',  icon: ClockIcon,               iconClass: 'text-slate-400'   },
-  degraded: { label: 'Degraded', badgeColor: 'amber',  icon: ExclamationTriangleIcon,  iconClass: 'text-amber-500'   },
-  critical: { label: 'Critical', badgeColor: 'red',    icon: XCircleIcon,             iconClass: 'text-red-500'     },
-  info:     { label: 'Info',     badgeColor: 'slate',  icon: InformationCircleIcon,   iconClass: 'text-slate-400'   },
+  healthy:  { label: 'Healthy',  badgeColor: 'green', icon: CheckCircleIcon,        iconClass: 'text-emerald-500' },
+  idle:     { label: 'Idle',     badgeColor: 'slate', icon: ClockIcon,              iconClass: 'text-slate-400'   },
+  degraded: { label: 'Degraded', badgeColor: 'amber', icon: ExclamationTriangleIcon, iconClass: 'text-amber-500'   },
+  critical: { label: 'Critical', badgeColor: 'red',   icon: XCircleIcon,            iconClass: 'text-red-500'     },
+  info:     { label: 'Info',     badgeColor: 'slate', icon: InformationCircleIcon,  iconClass: 'text-slate-400'   },
 }
 
-// Ordered category list derived from the module set (preserves registry order)
+const tabs = [
+  { key: 'health',     label: 'Technical Health' },
+  { key: 'usage',      label: 'Usage' },
+  { key: 'operations', label: 'Operations' },
+  { key: 'maturity',   label: 'Maturity' },
+]
+
 const categories = computed(() => {
   const seen = new Set()
-  const result = []
-  for (const m of modules.value) {
+  return modules.value.reduce((acc, m) => {
     if (!seen.has(m.category)) {
       seen.add(m.category)
-      result.push({ key: m.category, label: props.categoryLabels[m.category] ?? m.category })
+      acc.push({ key: m.category, label: props.categoryLabels[m.category] ?? m.category })
     }
-  }
-  return result
+    return acc
+  }, [])
 })
 
 const filteredModules = computed(() =>
@@ -73,20 +110,77 @@ const filteredModules = computed(() =>
 
 const cachedAtFormatted = computed(() =>
   cachedAt.value
-    ? new Intl.DateTimeFormat('en-PH', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-        timeZone: 'Asia/Manila',
-      }).format(new Date(cachedAt.value))
+    ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' }).format(new Date(cachedAt.value))
     : null
 )
 
+const radarChartData = computed(() => {
+  const radar = metricData.value?.maturity?.radar
+  if (!radar) return null
+  return {
+    labels: radar.labels,
+    datasets: [{
+      label: selectedModule.value?.name ?? 'Module',
+      data: radar.data,
+      backgroundColor: 'rgba(99, 102, 241, 0.15)',
+      borderColor: '#6366f1',
+      pointBackgroundColor: '#6366f1',
+      pointBorderColor: '#fff',
+      pointHoverBackgroundColor: '#fff',
+      pointHoverBorderColor: '#6366f1',
+    }],
+  }
+})
+
+const radarChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  scales: {
+    r: {
+      min: 0,
+      max: 100,
+      ticks: { display: false, stepSize: 20 },
+      grid: { color: '#e2e8f0' },
+      pointLabels: { font: { size: 10 }, color: '#64748b' },
+      angleLines: { color: '#e2e8f0' },
+    },
+  },
+  plugins: { legend: { display: false } },
+}
+
+const peakChartData = computed(() => {
+  const peak = metricData.value?.metrics?.usage?.peak_hours?.value
+  if (!Array.isArray(peak)) return null
+
+  const labels = peak.map((_, i) => {
+    if (i === 0) return '12am'
+    if (i < 12) return `${i}am`
+    if (i === 12) return '12pm'
+    return `${i - 12}pm`
+  })
+
+  return {
+    labels,
+    datasets: [{ data: peak, backgroundColor: '#6366f1', borderRadius: 2, barThickness: 'flex' }],
+  }
+})
+
+const peakChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: { callbacks: { label: ctx => `${ctx.raw} records at ${ctx.label}` } },
+  },
+  scales: {
+    x: { display: false },
+    y: { display: false, beginAtZero: true },
+  },
+}
+
 function formatDate(val) {
   if (!val) return '—'
-  return new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeZone: 'Asia/Manila',
-  }).format(new Date(val))
+  return new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeZone: 'Asia/Manila' }).format(new Date(val))
 }
 
 function formatNumber(val) {
@@ -94,10 +188,30 @@ function formatNumber(val) {
   return Number(val).toLocaleString('en-PH')
 }
 
-// Integration label lookup by key
 function integrationLabel(key) {
-  const found = integrations.value.find(i => i.key === key)
-  return found ? found.label : key
+  return integrations.value.find(i => i.key === key)?.label ?? key
+}
+
+function statusDotClass(status) {
+  return {
+    ok:    'bg-emerald-500',
+    warn:  'bg-amber-500',
+    error: 'bg-red-500',
+    stub:  'bg-slate-300',
+  }[status] ?? 'bg-slate-300'
+}
+
+function dimensionScore(dimKey) {
+  return metricData.value?.maturity?.scores?.[dimKey]?.score ?? 0
+}
+
+function dimensionScoredAt(dimKey) {
+  const scored = metricData.value?.maturity?.scores?.[dimKey]?.scored_at
+  return scored ? formatDate(scored) : null
+}
+
+function dimensionScoredBy(dimKey) {
+  return metricData.value?.maturity?.scores?.[dimKey]?.scorer?.name ?? null
 }
 
 async function refreshHealth() {
@@ -113,13 +227,83 @@ async function refreshHealth() {
   }
 }
 
-function openDetail(mod) {
-  selectedModule.value  = mod
-  showDetailModal.value = true
+async function openDetail(mod) {
+  selectedModule.value   = mod
+  showDetailModal.value  = true
+  activeTab.value        = 'health'
+  metricData.value       = null
+  scoringDimension.value = null
+  metricsLoading.value   = true
+
+  try {
+    const res = await window.axios.get(route('atlas.modules.metrics', { key: mod.key }))
+    metricData.value = res.data
+    const s = res.data.settings ?? {}
+    settingsForm.value = {
+      version:   s.version   ?? '1.0.0',
+      sla_hours: s.sla_hours ?? null,
+      notes:     s.notes     ?? '',
+    }
+  } catch {
+    // silently leave metricData null — tabs will show an error state
+  } finally {
+    metricsLoading.value = false
+  }
 }
 
 function closeDetail() {
-  showDetailModal.value = false
+  showDetailModal.value  = false
+  selectedModule.value   = null
+  metricData.value       = null
+  scoringDimension.value = null
+}
+
+function expandDimension(dimKey) {
+  if (scoringDimension.value === dimKey) {
+    scoringDimension.value = null
+    return
+  }
+  scoringDimension.value = dimKey
+  const existing       = metricData.value?.maturity?.scores?.[dimKey]
+  const criteriaCount  = metricData.value?.dimensions?.[dimKey]?.criteria?.length ?? 5
+  dimensionForm.value  = {
+    criteria_checks: existing?.criteria_checks ? [...existing.criteria_checks] : Array(criteriaCount).fill(false),
+    notes: existing?.notes ?? '',
+  }
+}
+
+async function saveDimension(dimKey) {
+  if (!selectedModule.value || savingDimension.value) return
+  savingDimension.value = true
+  try {
+    const res = await window.axios.post(
+      route('atlas.modules.maturity.save', { key: selectedModule.value.key }),
+      { dimension: dimKey, criteria_checks: dimensionForm.value.criteria_checks, notes: dimensionForm.value.notes }
+    )
+    if (metricData.value) {
+      metricData.value.maturity.radar   = res.data.radar
+      metricData.value.maturity.overall = res.data.overall
+      if (!metricData.value.maturity.scores) metricData.value.maturity.scores = {}
+      metricData.value.maturity.scores[dimKey] = res.data.score
+    }
+    scoringDimension.value = null
+  } finally {
+    savingDimension.value = false
+  }
+}
+
+async function saveSettings() {
+  if (!selectedModule.value || savingSettings.value) return
+  savingSettings.value = true
+  try {
+    const res = await window.axios.post(
+      route('atlas.modules.settings.save', { key: selectedModule.value.key }),
+      settingsForm.value
+    )
+    if (metricData.value) metricData.value.settings = res.data.settings
+  } finally {
+    savingSettings.value = false
+  }
 }
 </script>
 
@@ -153,7 +337,6 @@ function closeDetail() {
     <!-- ── System Summary Bar ────────────────────────────────────────────── -->
     <AppCard :padded="true" class="mb-6">
       <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <!-- Total -->
         <div class="flex items-center gap-2">
           <CpuChipIcon class="h-5 w-5 text-slate-400" />
           <span class="text-2xl font-bold text-slate-800">{{ summary.total }}</span>
@@ -162,13 +345,8 @@ function closeDetail() {
 
         <div class="hidden h-6 w-px bg-slate-200 sm:block" />
 
-        <!-- Health status pills -->
         <div class="flex flex-wrap items-center gap-4">
-          <div
-            v-for="(cfg, key) in healthConfig"
-            :key="key"
-            class="flex items-center gap-1.5"
-          >
+          <div v-for="(cfg, key) in healthConfig" :key="key" class="flex items-center gap-1.5">
             <component :is="cfg.icon" :class="['h-4 w-4', cfg.iconClass]" />
             <span class="text-sm font-bold" :class="cfg.iconClass">{{ summary[key] ?? 0 }}</span>
             <span class="text-xs text-slate-500">{{ cfg.label }}</span>
@@ -177,14 +355,9 @@ function closeDetail() {
 
         <div class="hidden h-6 w-px bg-slate-200 sm:block" />
 
-        <!-- Maturity distribution -->
         <div class="flex items-center gap-3">
           <span class="text-xs text-slate-400">Maturity:</span>
-          <div
-            v-for="level in [1, 2, 3, 4, 5]"
-            :key="level"
-            class="flex flex-col items-center"
-          >
+          <div v-for="level in [1, 2, 3, 4, 5]" :key="level" class="flex flex-col items-center">
             <span class="text-sm font-semibold text-slate-700">{{ summary.maturity?.[level] ?? 0 }}</span>
             <span class="text-[10px] text-slate-400">L{{ level }}</span>
           </div>
@@ -206,9 +379,7 @@ function closeDetail() {
           v-for="integration in integrations"
           :key="integration.key"
           class="rounded-lg border p-3 transition-colors"
-          :class="integration.configured
-            ? 'border-emerald-100 bg-emerald-50'
-            : 'border-slate-100 bg-slate-50'"
+          :class="integration.configured ? 'border-emerald-100 bg-emerald-50' : 'border-slate-100 bg-slate-50'"
         >
           <div class="mb-1 flex items-center justify-between gap-1">
             <span class="truncate text-sm font-medium text-slate-700">{{ integration.label }}</span>
@@ -223,32 +394,17 @@ function closeDetail() {
 
     <!-- ── Filter Bar ────────────────────────────────────────────────────── -->
     <div class="mb-4 flex flex-wrap items-center gap-3">
-      <!-- Category pills -->
       <div class="flex flex-wrap gap-1.5">
         <button
           @click="filterCategory = 'all'"
-          :class="[
-            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-            filterCategory === 'all'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-          ]"
-        >
-          All
-        </button>
+          :class="['rounded-full px-3 py-1 text-xs font-medium transition-colors', filterCategory === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200']"
+        >All</button>
         <button
           v-for="cat in categories"
           :key="cat.key"
           @click="filterCategory = cat.key"
-          :class="[
-            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-            filterCategory === cat.key
-              ? 'bg-indigo-600 text-white'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-          ]"
-        >
-          {{ cat.label }}
-        </button>
+          :class="['rounded-full px-3 py-1 text-xs font-medium transition-colors', filterCategory === cat.key ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200']"
+        >{{ cat.label }}</button>
       </div>
 
       <div class="ml-auto flex items-center gap-2">
@@ -257,9 +413,7 @@ function closeDetail() {
           class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400"
         >
           <option value="all">All Health</option>
-          <option v-for="(cfg, key) in healthConfig" :key="key" :value="key">
-            {{ cfg.label }}
-          </option>
+          <option v-for="(cfg, key) in healthConfig" :key="key" :value="key">{{ cfg.label }}</option>
         </select>
 
         <select
@@ -267,11 +421,7 @@ function closeDetail() {
           class="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400"
         >
           <option value="all">All Maturity</option>
-          <option
-            v-for="(ml, level) in maturityLabels"
-            :key="level"
-            :value="String(level)"
-          >
+          <option v-for="(ml, level) in maturityLabels" :key="level" :value="String(level)">
             L{{ level }} — {{ ml.label }}
           </option>
         </select>
@@ -290,7 +440,7 @@ function closeDetail() {
         @click="openDetail(mod)"
         class="cursor-pointer rounded-xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
       >
-        <!-- Card header: name + badges -->
+        <!-- Card header -->
         <div class="mb-3 flex items-start justify-between gap-2">
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-semibold text-slate-800">{{ mod.name }}</p>
@@ -299,28 +449,20 @@ function closeDetail() {
             </AppBadge>
           </div>
           <AppBadge :color="healthConfig[mod.health_status]?.badgeColor ?? 'slate'" class="shrink-0">
-            <component
-              :is="healthConfig[mod.health_status]?.icon"
-              class="mr-1 inline h-3 w-3"
-            />
+            <component :is="healthConfig[mod.health_status]?.icon" class="mr-1 inline h-3 w-3" />
             {{ healthConfig[mod.health_status]?.label ?? mod.health_status }}
           </AppBadge>
         </div>
 
-        <!-- Maturity stars -->
+        <!-- Maturity stars + overall % from DB scoring -->
         <div class="mb-3 flex items-center gap-0.5">
-          <StarSolid
-            v-for="i in mod.maturity"
-            :key="'f' + i"
-            class="h-4 w-4 text-amber-400"
-          />
-          <StarOutline
-            v-for="i in (5 - mod.maturity)"
-            :key="'e' + i"
-            class="h-4 w-4 text-slate-200"
-          />
+          <StarSolid v-for="i in mod.maturity" :key="'f' + i" class="h-4 w-4 text-amber-400" />
+          <StarOutline v-for="i in (5 - mod.maturity)" :key="'e' + i" class="h-4 w-4 text-slate-200" />
           <span class="ml-1.5 text-xs text-slate-500">
             {{ maturityLabels[mod.maturity]?.label ?? ('L' + mod.maturity) }}
+          </span>
+          <span v-if="mod.maturity_overall !== null" class="ml-auto rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">
+            {{ mod.maturity_overall }}% scored
           </span>
         </div>
 
@@ -351,9 +493,7 @@ function closeDetail() {
             v-for="dep in mod.dependencies"
             :key="dep"
             class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500"
-          >
-            {{ dep }}
-          </span>
+          >{{ dep }}</span>
         </div>
 
         <!-- Card footer -->
@@ -365,130 +505,384 @@ function closeDetail() {
             @click.stop
             class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
           >
-            Open
-            <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" />
+            Open <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" />
           </a>
         </div>
       </div>
     </div>
 
-    <!-- ── Module Detail Modal ───────────────────────────────────────────── -->
+    <!-- ── Module Detail Modal (4 tabs) ─────────────────────────────────── -->
     <AppModal
       :show="showDetailModal"
       :title="selectedModule?.name ?? 'Module Detail'"
-      size="2xl"
+      size="4xl"
       @close="closeDetail"
     >
       <template v-if="selectedModule">
-        <!-- Health + stars row -->
-        <div class="mb-4 flex items-center justify-between gap-3">
+        <!-- Module meta row -->
+        <div class="mb-4 flex flex-wrap items-center gap-3">
           <AppBadge :color="healthConfig[selectedModule.health_status]?.badgeColor ?? 'slate'">
-            <component
-              :is="healthConfig[selectedModule.health_status]?.icon"
-              class="mr-1 inline h-4 w-4"
-            />
+            <component :is="healthConfig[selectedModule.health_status]?.icon" class="mr-1 inline h-4 w-4" />
             {{ healthConfig[selectedModule.health_status]?.label }}
           </AppBadge>
-
-          <div class="flex items-center gap-0.5">
-            <StarSolid
-              v-for="i in selectedModule.maturity"
-              :key="'f' + i"
-              class="h-5 w-5 text-amber-400"
-            />
-            <StarOutline
-              v-for="i in (5 - selectedModule.maturity)"
-              :key="'e' + i"
-              class="h-5 w-5 text-slate-200"
-            />
+          <AppBadge color="indigo">{{ categoryLabels[selectedModule.category] ?? selectedModule.category }}</AppBadge>
+          <div class="flex items-center gap-0.5 ml-auto">
+            <StarSolid v-for="i in selectedModule.maturity" :key="'f' + i" class="h-4 w-4 text-amber-400" />
+            <StarOutline v-for="i in (5 - selectedModule.maturity)" :key="'e' + i" class="h-4 w-4 text-slate-200" />
+            <span class="ml-1.5 text-xs text-slate-500">{{ maturityLabels[selectedModule.maturity]?.label ?? ('L' + selectedModule.maturity) }}</span>
           </div>
         </div>
 
-        <!-- Category badge -->
-        <div class="mb-3">
-          <AppBadge color="indigo">
-            {{ categoryLabels[selectedModule.category] ?? selectedModule.category }}
-          </AppBadge>
+        <p class="mb-5 text-sm leading-relaxed text-slate-600">{{ selectedModule.description }}</p>
+
+        <!-- Tab nav -->
+        <div class="mb-5 border-b border-slate-200">
+          <nav class="-mb-px flex">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              @click="activeTab = tab.key"
+              :class="[
+                'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                activeTab === tab.key
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              ]"
+            >{{ tab.label }}</button>
+          </nav>
         </div>
 
-        <!-- Description -->
-        <p class="mb-5 text-sm leading-relaxed text-slate-600">
-          {{ selectedModule.description }}
-        </p>
-
-        <!-- Maturity level description -->
-        <div class="mb-5 rounded-lg bg-indigo-50 p-3">
-          <p class="mb-0.5 text-xs font-semibold text-indigo-700">
-            Level {{ selectedModule.maturity }} — {{ maturityLabels[selectedModule.maturity]?.label }}
-          </p>
-          <p class="text-xs text-indigo-600">
-            {{ maturityLabels[selectedModule.maturity]?.description }}
-          </p>
+        <!-- Loading skeleton -->
+        <div v-if="metricsLoading" class="space-y-3 py-4">
+          <div v-for="i in 5" :key="i" class="h-14 animate-pulse rounded-lg bg-slate-100" />
         </div>
 
-        <!-- Metrics grid -->
-        <div class="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div class="rounded-lg bg-slate-50 p-3">
-            <p class="mb-1 text-xs text-slate-400">7-day records</p>
-            <p class="text-lg font-bold text-slate-800">{{ formatNumber(selectedModule.activity_count_7d) }}</p>
+        <!-- Metrics load error -->
+        <div v-else-if="!metricData" class="rounded-lg bg-red-50 p-4 text-sm text-red-600">
+          Failed to load module metrics. Try closing and reopening the module detail.
+        </div>
+
+        <template v-else>
+
+          <!-- ── Tab 1: Technical Health ──────────────────────────────────── -->
+          <div v-show="activeTab === 'health'">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <template v-for="(metric, mKey) in metricData.metrics.technical" :key="mKey">
+                <div class="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <div class="mb-1.5 flex items-center justify-between gap-1">
+                    <p class="text-xs font-medium text-slate-500">{{ metric.label }}</p>
+                    <span
+                      v-if="metric.real"
+                      class="h-2 w-2 flex-shrink-0 rounded-full"
+                      :class="statusDotClass(metric.status)"
+                    />
+                    <span v-else class="text-[10px] text-slate-300 font-medium">STUB</span>
+                  </div>
+                  <template v-if="metric.real">
+                    <p class="text-sm font-bold text-slate-800">
+                      {{ metric.value !== null && metric.value !== undefined ? metric.value : '—' }}
+                      <span v-if="metric.unit" class="text-xs font-normal text-slate-400"> {{ metric.unit }}</span>
+                    </p>
+                    <p v-if="metric.note" class="mt-0.5 text-[10px] text-slate-400">{{ metric.note }}</p>
+                  </template>
+                  <p v-else class="text-xs text-slate-400 italic leading-snug">{{ metric.stub_message }}</p>
+                </div>
+              </template>
+            </div>
+
+            <!-- Dependencies + integrations -->
+            <div class="mt-5 grid grid-cols-2 gap-4">
+              <div v-if="selectedModule.dependencies?.length">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Dependencies</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="dep in selectedModule.dependencies"
+                    :key="dep"
+                    class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600"
+                  >{{ dep }}</span>
+                </div>
+              </div>
+              <div v-if="selectedModule.integrations?.length">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Integrations</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <AppBadge v-for="intg in selectedModule.integrations" :key="intg" color="blue">
+                    {{ integrationLabel(intg) }}
+                  </AppBadge>
+                </div>
+              </div>
+            </div>
+
+            <!-- Module notes -->
+            <div v-if="selectedModule.notes" class="mt-4 rounded-lg bg-amber-50 p-3">
+              <p class="text-xs leading-relaxed text-amber-700">
+                <span class="font-semibold">Note: </span>{{ selectedModule.notes }}
+              </p>
+            </div>
           </div>
-          <div class="rounded-lg bg-slate-50 p-3">
-            <p class="mb-1 text-xs text-slate-400">30-day records</p>
-            <p class="text-lg font-bold text-slate-800">{{ formatNumber(selectedModule.activity_count_30d) }}</p>
-          </div>
-          <div class="rounded-lg bg-slate-50 p-3">
-            <p class="mb-1 text-xs text-slate-400">Failed jobs</p>
-            <p
-              class="text-lg font-bold"
-              :class="selectedModule.failed_jobs_count > 0 ? 'text-red-600' : 'text-slate-800'"
-            >
-              {{ selectedModule.failed_jobs_count }}
+
+          <!-- ── Tab 2: Usage ─────────────────────────────────────────────── -->
+          <div v-show="activeTab === 'usage'">
+            <!-- KPI row: DAU / WAU / MAU / transactions -->
+            <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div class="rounded-lg bg-indigo-50 p-3 text-center">
+                <p class="text-xs text-indigo-500">DAU</p>
+                <p class="text-xl font-bold text-indigo-700">{{ formatNumber(metricData.metrics.usage.dau.value) }}</p>
+                <p class="text-[10px] text-indigo-400">today</p>
+              </div>
+              <div class="rounded-lg bg-indigo-50 p-3 text-center">
+                <p class="text-xs text-indigo-500">WAU</p>
+                <p class="text-xl font-bold text-indigo-700">{{ formatNumber(metricData.metrics.usage.wau.value) }}</p>
+                <p class="text-[10px] text-indigo-400">7 days</p>
+              </div>
+              <div class="rounded-lg bg-indigo-50 p-3 text-center">
+                <p class="text-xs text-indigo-500">MAU</p>
+                <p class="text-xl font-bold text-indigo-700">{{ formatNumber(metricData.metrics.usage.mau.value) }}</p>
+                <p class="text-[10px] text-indigo-400">30 days</p>
+              </div>
+              <div class="rounded-lg bg-slate-50 p-3 text-center">
+                <p class="text-xs text-slate-500">Records (7d)</p>
+                <p class="text-xl font-bold text-slate-700">{{ formatNumber(metricData.metrics.usage.transactions_7d.value) }}</p>
+                <p class="text-[10px] text-slate-400">module table</p>
+              </div>
+            </div>
+
+            <p class="mb-3 text-[10px] text-slate-400">
+              Active Users (DAU/WAU/MAU) are system-wide across all modules — module-specific attribution requires activity middleware.
             </p>
-          </div>
-          <div class="rounded-lg bg-slate-50 p-3">
-            <p class="mb-1 text-xs text-slate-400">Last activity</p>
-            <p class="text-sm font-semibold text-slate-800">{{ formatDate(selectedModule.last_activity_at) }}</p>
-          </div>
-        </div>
 
-        <!-- Dependencies -->
-        <div v-if="selectedModule.dependencies?.length" class="mb-4">
-          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Dependencies
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <span
-              v-for="dep in selectedModule.dependencies"
-              :key="dep"
-              class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600"
-            >
-              {{ dep }}
-            </span>
-          </div>
-        </div>
+            <!-- Peak hours chart -->
+            <div v-if="peakChartData" class="mb-4">
+              <p class="mb-2 text-xs font-semibold text-slate-600">Peak Usage Hours (last 30 days — module transactions by hour)</p>
+              <div class="h-20 w-full rounded-lg bg-slate-50 p-2">
+                <Bar :data="peakChartData" :options="peakChartOptions" />
+              </div>
+              <div class="mt-1 flex justify-between text-[10px] text-slate-400">
+                <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
+              </div>
+            </div>
 
-        <!-- Integrations -->
-        <div v-if="selectedModule.integrations?.length" class="mb-4">
-          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            External Integrations
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <AppBadge
-              v-for="intg in selectedModule.integrations"
-              :key="intg"
-              color="blue"
-            >
-              {{ integrationLabel(intg) }}
-            </AppBadge>
+            <!-- Stub metrics -->
+            <div class="grid grid-cols-3 gap-3">
+              <div
+                v-for="(metric, mKey) in metricData.metrics.usage"
+                :key="mKey"
+                v-show="!metric.real"
+                class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3"
+              >
+                <p class="text-xs font-medium text-slate-400">{{ metric.label }}</p>
+                <p class="mt-1 text-xs text-slate-300 italic">{{ metric.stub_message }}</p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <!-- Notes -->
-        <div v-if="selectedModule.notes" class="rounded-lg bg-amber-50 p-3">
-          <p class="text-xs leading-relaxed text-amber-700">
-            <span class="font-semibold">Note: </span>{{ selectedModule.notes }}
-          </p>
-        </div>
+          <!-- ── Tab 3: Operations ─────────────────────────────────────────── -->
+          <div v-show="activeTab === 'operations'">
+            <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <!-- Pending approvals -->
+              <div class="rounded-lg bg-slate-50 p-3">
+                <p class="mb-1 text-xs font-medium text-slate-500">Pending Approvals</p>
+                <p
+                  class="text-2xl font-bold"
+                  :class="metricData.metrics.operational.pending_approvals.value > 0 ? 'text-amber-600' : 'text-slate-800'"
+                >{{ formatNumber(metricData.metrics.operational.pending_approvals.value) }}</p>
+                <div v-if="metricData.metrics.operational.pending_approvals.details?.length" class="mt-1 space-y-0.5">
+                  <p
+                    v-for="cfg in metricData.metrics.operational.pending_approvals.details"
+                    :key="cfg.label"
+                    class="text-[10px] text-slate-400"
+                  >{{ cfg.label }}</p>
+                </div>
+              </div>
+
+              <div class="rounded-lg bg-slate-50 p-3">
+                <p class="mb-1 text-xs font-medium text-slate-500">Queue Backlog</p>
+                <p
+                  class="text-2xl font-bold"
+                  :class="metricData.metrics.operational.queue_backlog.value > 0 ? 'text-amber-600' : 'text-slate-800'"
+                >{{ formatNumber(metricData.metrics.operational.queue_backlog.value) }}</p>
+                <p class="text-[10px] text-slate-400">jobs pending</p>
+              </div>
+
+              <div class="rounded-lg bg-slate-50 p-3">
+                <p class="mb-1 text-xs font-medium text-slate-500">Notifs Sent (7d)</p>
+                <p class="text-2xl font-bold text-slate-800">{{ formatNumber(metricData.metrics.operational.notifications_sent_7d.value) }}</p>
+                <p class="text-[10px] text-slate-400">system-wide</p>
+              </div>
+
+              <div class="rounded-lg bg-slate-50 p-3">
+                <p class="mb-1 text-xs font-medium text-slate-500">Unread Notifications</p>
+                <p
+                  class="text-2xl font-bold"
+                  :class="metricData.metrics.operational.notifications_unread.value > 0 ? 'text-amber-600' : 'text-slate-800'"
+                >{{ formatNumber(metricData.metrics.operational.notifications_unread.value) }}</p>
+                <p class="text-[10px] text-slate-400">system-wide</p>
+              </div>
+            </div>
+
+            <!-- Stub metrics -->
+            <div class="mb-4 grid grid-cols-2 gap-3">
+              <div
+                v-for="(metric, mKey) in metricData.metrics.operational"
+                :key="mKey"
+                v-show="!metric.real"
+                class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3"
+              >
+                <p class="text-xs font-medium text-slate-400">{{ metric.label }}</p>
+                <p class="mt-1 text-xs text-slate-300 italic">{{ metric.stub_message }}</p>
+              </div>
+            </div>
+
+            <!-- Module Settings panel -->
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Module Settings</p>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-slate-600">Version</label>
+                  <input
+                    v-model="settingsForm.version"
+                    type="text"
+                    placeholder="1.0.0"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-slate-600">SLA Hours</label>
+                  <input
+                    v-model.number="settingsForm.sla_hours"
+                    type="number"
+                    min="1"
+                    max="8760"
+                    placeholder="e.g. 24"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-slate-600">Owner</label>
+                  <p class="rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-600">
+                    {{ metricData.settings?.owner?.name ?? 'Not assigned' }}
+                  </p>
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="mb-1 block text-xs font-medium text-slate-600">Notes</label>
+                <textarea
+                  v-model="settingsForm.notes"
+                  rows="2"
+                  placeholder="Admin notes about this module…"
+                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                />
+              </div>
+              <div class="mt-3 flex justify-end">
+                <button
+                  @click="saveSettings"
+                  :disabled="savingSettings"
+                  class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                >{{ savingSettings ? 'Saving…' : 'Save Settings' }}</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Tab 4: Maturity ───────────────────────────────────────────── -->
+          <div v-show="activeTab === 'maturity'">
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+              <!-- Radar chart + overall score -->
+              <div>
+                <div class="mb-2 flex items-center justify-between">
+                  <p class="text-xs font-semibold text-slate-600">Maturity Radar</p>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400">Overall score:</span>
+                    <span class="text-lg font-bold text-indigo-600">{{ metricData.maturity.overall }}%</span>
+                  </div>
+                </div>
+                <div v-if="radarChartData" class="h-56 w-full">
+                  <Radar :data="radarChartData" :options="radarChartOptions" />
+                </div>
+                <div v-else class="flex h-56 items-center justify-center rounded-lg bg-slate-50">
+                  <p class="text-sm text-slate-400">Score dimensions to see the radar chart</p>
+                </div>
+                <div class="mt-3 rounded-lg bg-slate-50 p-3">
+                  <p class="text-xs text-slate-500 leading-relaxed">
+                    Each dimension is scored by admin check-off (5 criteria per dimension).
+                    Weight: Functional 20% · Technical 15% · Security 20% · Governance 15% · AI/DQ/UX 10% each.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Dimension list + scorer -->
+              <div class="space-y-2">
+                <div
+                  v-for="(dim, dimKey) in metricData.dimensions"
+                  :key="dimKey"
+                  class="rounded-lg border border-slate-200 overflow-hidden"
+                >
+                  <!-- Dimension header -->
+                  <button
+                    @click="expandDimension(dimKey)"
+                    class="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="h-2.5 w-2.5 flex-shrink-0 rounded-full" :style="`background-color: ${dim.color}`" />
+                      <span class="text-sm font-medium text-slate-700 truncate">{{ dim.label }}</span>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+                      <div class="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          class="h-full rounded-full bg-indigo-500 transition-all"
+                          :style="`width: ${dimensionScore(dimKey)}%`"
+                        />
+                      </div>
+                      <span class="text-xs font-semibold text-slate-600 w-8 text-right">{{ dimensionScore(dimKey) }}%</span>
+                      <component
+                        :is="scoringDimension === dimKey ? ChevronUpIcon : ChevronDownIcon"
+                        class="h-3.5 w-3.5 text-slate-400"
+                      />
+                    </div>
+                  </button>
+
+                  <!-- Scoring form (expanded) -->
+                  <div v-show="scoringDimension === dimKey" class="border-t border-slate-100 bg-white px-3 pb-3 pt-2">
+                    <p class="mb-2 text-xs text-slate-500">{{ dim.description }}</p>
+                    <div class="space-y-1.5">
+                      <label
+                        v-for="(criterion, idx) in dim.criteria"
+                        :key="idx"
+                        class="flex cursor-pointer items-start gap-2.5"
+                      >
+                        <input
+                          type="checkbox"
+                          :checked="!!dimensionForm.criteria_checks[idx]"
+                          @change="dimensionForm.criteria_checks[idx] = $event.target.checked"
+                          class="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span class="text-xs text-slate-600 leading-snug">{{ criterion }}</span>
+                      </label>
+                    </div>
+                    <textarea
+                      v-model="dimensionForm.notes"
+                      rows="2"
+                      placeholder="Optional notes…"
+                      class="mt-2.5 w-full rounded border border-slate-200 px-2.5 py-1.5 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    />
+                    <div class="mt-2 flex items-center justify-between">
+                      <p v-if="dimensionScoredAt(dimKey)" class="text-[10px] text-slate-400">
+                        Last scored {{ dimensionScoredAt(dimKey) }}
+                        <template v-if="dimensionScoredBy(dimKey)">by {{ dimensionScoredBy(dimKey) }}</template>
+                      </p>
+                      <button
+                        @click="saveDimension(dimKey)"
+                        :disabled="savingDimension"
+                        class="ml-auto rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                      >{{ savingDimension ? 'Saving…' : 'Save Score' }}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </template>
       </template>
 
       <template #footer>
@@ -496,16 +890,13 @@ function closeDetail() {
           <button
             @click="closeDetail"
             class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Close
-          </button>
+          >Close</button>
           <a
             v-if="selectedModule?.route_name"
             :href="route(selectedModule.route_name)"
             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
-            Open Module
-            <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+            Open Module <ArrowTopRightOnSquareIcon class="h-4 w-4" />
           </a>
         </div>
       </template>
