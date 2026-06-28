@@ -213,7 +213,7 @@ return [
             'name'             => 'Gate Pass',
             'category'         => 'hr_personnel',
             'description'      => '3-stage gate pass issuance (Division Chief → HR → OCD), digital PIN signing, and automatic DTR deduction on approval.',
-            'route_name'       => 'gate-pass.index',
+            'route_name'       => 'gatepass.index',
             'primary_table'    => 'gatepass',
             'activity_col'     => 'created_at',
             'maturity'         => 3,
