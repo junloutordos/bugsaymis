@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\ResidenceHall\RhApplication;
+use App\Models\ResidenceHall\RhIntern;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -63,6 +64,13 @@ class DashboardController extends Controller
                 ->first(['id', 'status', 'preferred_hall', 'created_at'])
             : null;
 
+        $intern = ($sy && $student)
+            ? RhIntern::where('student_id', $student->id)
+                ->where('school_year_id', $sy->id)
+                ->where('status', 'active')
+                ->first(['id', 'bed_number'])
+            : null;
+
         return Inertia::render('StudentPortal/Dashboard', [
             'student'       => $student,
             'grade_level'   => $gradeLevel,
@@ -71,6 +79,7 @@ class DashboardController extends Controller
             'total_done'    => $totalDone,
             'total'         => count($sections),
             'rhApplication' => $rhApplication,
+            'intern'        => $intern,
         ]);
     }
 }
