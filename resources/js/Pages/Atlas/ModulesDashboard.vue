@@ -192,6 +192,11 @@ function integrationLabel(key) {
   return integrations.value.find(i => i.key === key)?.label ?? key
 }
 
+function safeRoute(routeName) {
+  if (!routeName) return null
+  try { return route(routeName) } catch { return null }
+}
+
 function statusDotClass(status) {
   return {
     ok:    'bg-emerald-500',
@@ -500,8 +505,8 @@ async function saveSettings() {
         <div class="flex items-center justify-between border-t border-slate-50 pt-3">
           <span class="text-xs text-slate-400">Click for details</span>
           <a
-            v-if="mod.route_name"
-            :href="route(mod.route_name)"
+            v-if="safeRoute(mod.route_name)"
+            :href="safeRoute(mod.route_name)"
             @click.stop
             class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
           >
@@ -892,8 +897,8 @@ async function saveSettings() {
             class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >Close</button>
           <a
-            v-if="selectedModule?.route_name"
-            :href="route(selectedModule.route_name)"
+            v-if="safeRoute(selectedModule?.route_name)"
+            :href="safeRoute(selectedModule.route_name)"
             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
             Open Module <ArrowTopRightOnSquareIcon class="h-4 w-4" />
