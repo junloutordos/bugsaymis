@@ -2128,6 +2128,9 @@ Route::prefix('student-portal')->name('student-portal.')->group(function () {
 
         Route::get('/rh-application',  [\App\Http\Controllers\StudentPortal\RhApplicationController::class, 'show'])->name('rh-application.show');
         Route::post('/rh-application', [\App\Http\Controllers\StudentPortal\RhApplicationController::class, 'store'])->name('rh-application.store');
+
+        Route::get('/leave-passes',  [\App\Http\Controllers\StudentPortal\RhLeavePassController::class, 'index'])->name('rh-leave-passes.index');
+        Route::post('/leave-passes', [\App\Http\Controllers\StudentPortal\RhLeavePassController::class, 'store'])->name('rh-leave-passes.store');
     });
 });
 
