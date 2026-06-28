@@ -2163,4 +2163,21 @@ require __DIR__.'/registrar.php';
 require __DIR__.'/cid.php';
 require __DIR__.'/discipline.php';
 require __DIR__.'/residence-hall.php';
+// ── Atlas Module Monitor ──────────────────────────────────────────────────────
+Route::middleware(['auth', 'permission:atlas.modules.view'])
+    ->prefix('atlas')
+    ->name('atlas.')
+    ->group(function () {
+        Route::get('/modules', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'index'])
+            ->name('modules.index');
+        Route::post('/modules/refresh', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'refresh'])
+            ->name('modules.refresh');
+        Route::get('/modules/{key}/metrics', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'moduleMetrics'])
+            ->name('modules.metrics');
+        Route::post('/modules/{key}/maturity', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'saveMaturity'])
+            ->name('modules.maturity.save');
+        Route::post('/modules/{key}/settings', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'saveSettings'])
+            ->name('modules.settings.save');
+    });
+
 require __DIR__.'/auth.php';
