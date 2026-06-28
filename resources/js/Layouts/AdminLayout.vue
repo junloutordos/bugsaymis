@@ -521,6 +521,13 @@ const menuItems = [
         permissions: ["it.equipment.view"],
       },
       {
+        label: "Module Monitor",
+        routeName: "atlas.modules.index",
+        href: route("atlas.modules.index"),
+        icon: CpuChipIcon,
+        permissions: ["atlas.modules.view"],
+      },
+      {
         label: "PMS",
         routeName: "ict-pms.index",
         href: route("ict-pms.index"),

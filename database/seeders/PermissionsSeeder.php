@@ -77,6 +77,9 @@ class PermissionsSeeder extends Seeder
             ['module' => 'IT',       'name' => 'it.equipment.view',  'description' => 'View ICT equipment'],
             ['module' => 'IT',       'name' => 'it.equipment.manage','description' => 'Manage ICT equipment & PMS'],
 
+            // ── Atlas Module Monitor ──────────────────────────────────────────
+            ['module' => 'Atlas',    'name' => 'atlas.modules.view', 'description' => 'View the Atlas Module Monitor dashboard (health, maturity, and ecosystem of all software modules)'],
+
             // ── Facilities & Services ─────────────────────────────────────────
             ['module' => 'Facilities','name' => 'facilities.view',       'description' => 'View facility requests'],
             ['module' => 'Facilities','name' => 'facilities.create',     'description' => 'Submit facility requests'],
