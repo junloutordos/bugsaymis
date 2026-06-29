@@ -17,6 +17,7 @@ import {
 
 const props = defineProps({
   equipment: Object,
+  latestAgentVersion: { type: String, default: null },
 })
 
 defineEmits(['close'])
@@ -82,6 +83,39 @@ function batteryWearPct(battery) {
 function securityRowClass(value) {
   return value === false ? 'text-red-600' : value === true ? 'text-emerald-600' : 'text-slate-400'
 }
+
+function truncateVersion(v) {
+  if (!v) return ''
+  return v.split('.').slice(0, 3).join('.')
+}
+
+function versionBadgeInfo(deviceVersion, lastUpdateResult, latestVersion) {
+  if (!latestVersion) return null
+  const dv = truncateVersion(deviceVersion ?? '')
+  const lv = truncateVersion(latestVersion)
+  if (!dv) return { label: 'Version unknown', cls: 'bg-slate-100 text-slate-500' }
+  if (dv === lv) return { label: `v${dv} · Up to date`, cls: 'bg-emerald-50 text-emerald-700' }
+  if (lastUpdateResult === 'failed' || lastUpdateResult === 'failed_service_down')
+    return { label: `v${dv} · Update failed → v${lv}`, cls: 'bg-red-50 text-red-700' }
+  return { label: `v${dv} · Update available → v${lv}`, cls: 'bg-amber-50 text-amber-700' }
+}
+
+function staleBadgeInfo(checkinAt) {
+  if (!checkinAt) return null
+  const age = Math.floor((Date.now() - new Date(checkinAt)) / 60000)
+  if (age > 120) return { label: 'Offline?', cls: 'bg-red-50 text-red-700' }
+  if (age > 40) return { label: 'Stale', cls: 'bg-amber-50 text-amber-700' }
+  return null
+}
+
+const agentVersionBadge = computed(() => {
+  const d = props.equipment?.agent_device
+  return versionBadgeInfo(d?.agent_version, d?.last_update_result, props.latestAgentVersion)
+})
+
+const checkinStaleBadge = computed(() => {
+  return staleBadgeInfo(props.equipment?.agent_device?.last_checkin_at)
+})
 </script>
 
 <template>
@@ -126,12 +160,18 @@ function securityRowClass(value) {
                 >Off Campus</span>
               </div>
             </div>
-            <div class="text-xs text-slate-500 mt-0.5">
-              {{ equipment.agent_device.os_version }}
-              &middot; Agent v{{ equipment.agent_device.agent_version }}
+            <div class="text-xs text-slate-500 mt-0.5 flex items-center flex-wrap gap-x-1.5 gap-y-1">
+              {{ equipment.agent_device.os_version }} &middot;
+              <span v-if="agentVersionBadge" :class="agentVersionBadge.cls" class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium">
+                {{ agentVersionBadge.label }}
+              </span>
+              <span v-else>Agent v{{ equipment.agent_device.agent_version }}</span>
             </div>
-            <div class="text-xs text-indigo-600 mt-1">
-              Last reported {{ formatDateTime(equipment.agent_device.health_snapshot.recorded_at) }}
+            <div class="text-xs mt-1 flex items-center gap-1.5">
+              <span class="text-indigo-600">Last reported {{ formatDateTime(equipment.agent_device.health_snapshot.recorded_at) }}</span>
+              <span v-if="checkinStaleBadge" :class="checkinStaleBadge.cls" class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium">
+                {{ checkinStaleBadge.label }}
+              </span>
             </div>
           </div>
 

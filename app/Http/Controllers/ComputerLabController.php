@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AtlasSentinelRelease;
 use App\Models\ICTEquipment;
 use App\Models\Room;
 use Illuminate\Http\Request;
@@ -61,10 +62,11 @@ class ComputerLabController extends Controller
             ->get();
 
         return Inertia::render('ITJobRequests/ComputerLabs/Show', [
-            'room' => $room,
-            'equipments' => $equipments,
-            'rows' => self::LAB_ROWS,
-            'cols' => self::LAB_COLS,
+            'room'               => $room,
+            'equipments'         => $equipments,
+            'rows'               => self::LAB_ROWS,
+            'cols'               => self::LAB_COLS,
+            'latestAgentVersion' => AtlasSentinelRelease::latestRelease()?->version,
         ]);
     }
 
