@@ -33,34 +33,40 @@ class EnrollmentApplicationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $emailOrNa = fn ($attribute, $value, $fail) => (
+            strtolower(trim($value)) !== 'n/a' && ! filter_var($value, FILTER_VALIDATE_EMAIL)
+                ? $fail("The {$attribute} must be a valid email address or N/A.")
+                : null
+        );
+
         $data = $request->validate([
             'grade_level'             => 'required|integer|between:7,12',
             'lastname'                => 'required|string|max:100',
             'firstname'               => 'required|string|max:100',
-            'middlename'              => 'nullable|string|max:100',
-            'birthday'                => 'nullable|string|max:20',
-            'sex'                     => 'nullable|in:Male,Female',
-            'birth_place'             => 'nullable|string|max:200',
-            'lrn'                     => 'nullable|string|max:30',
-            'address'                 => 'nullable|string|max:500',
-            'contact_no'              => 'nullable|string|max:20',
-            'email'                   => 'nullable|email|max:150',
-            'father_name'             => 'nullable|string|max:200',
-            'father_occupation'       => 'nullable|string|max:150',
-            'father_contact'          => 'nullable|string|max:20',
-            'father_email'            => 'nullable|email|max:150',
-            'mother_name'             => 'nullable|string|max:200',
-            'mother_occupation'       => 'nullable|string|max:150',
-            'mother_contact'          => 'nullable|string|max:20',
-            'mother_email'            => 'nullable|email|max:150',
-            'guardian_name'           => 'nullable|string|max:200',
-            'guardian_relationship'   => 'nullable|string|max:100',
-            'guardian_contact'        => 'nullable|string|max:20',
-            'guardian_email'          => 'nullable|email|max:150',
-            'previous_school'         => 'nullable|string|max:300',
-            'previous_school_address' => 'nullable|string|max:300',
-            'grade_level_completed'   => 'nullable|string|max:50',
-            'school_year_completed'   => 'nullable|string|max:30',
+            'middlename'              => 'required|string|max:100',
+            'birthday'                => 'required|date|before:today',
+            'sex'                     => 'required|in:Male,Female',
+            'birth_place'             => 'required|string|max:200',
+            'lrn'                     => 'required|string|max:30',
+            'address'                 => 'required|string|max:500',
+            'contact_no'              => 'required|string|max:20',
+            'email'                   => ['required', 'string', 'max:150', $emailOrNa],
+            'father_name'             => 'required|string|max:200',
+            'father_occupation'       => 'required|string|max:150',
+            'father_contact'          => 'required|string|max:20',
+            'father_email'            => ['required', 'string', 'max:150', $emailOrNa],
+            'mother_name'             => 'required|string|max:200',
+            'mother_occupation'       => 'required|string|max:150',
+            'mother_contact'          => 'required|string|max:20',
+            'mother_email'            => ['required', 'string', 'max:150', $emailOrNa],
+            'guardian_name'           => 'required|string|max:200',
+            'guardian_relationship'   => 'required|string|max:100',
+            'guardian_contact'        => 'required|string|max:20',
+            'guardian_email'          => ['required', 'string', 'max:150', $emailOrNa],
+            'previous_school'         => 'required|string|max:300',
+            'previous_school_address' => 'required|string|max:300',
+            'grade_level_completed'   => 'required|string|max:50',
+            'school_year_completed'   => 'required|string|max:30',
         ]);
 
         $currentSyId = SchoolYear::where('is_current', true)->value('id');

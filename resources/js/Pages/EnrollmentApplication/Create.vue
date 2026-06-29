@@ -17,6 +17,7 @@ const STEPS = [
 ]
 
 const step = ref(0)
+const stepErrors = ref({})
 
 const form = useForm({
   grade_level:             7,
@@ -48,8 +49,38 @@ const form = useForm({
   email:                   '',
 })
 
-function next() { if (step.value < STEPS.length - 1) step.value++ }
-function prev() { if (step.value > 0) step.value-- }
+// Fields required per step (step 0 is always valid — grade has a default)
+const stepFields = {
+  1: ['lastname', 'firstname', 'middlename', 'birthday', 'sex', 'birth_place', 'lrn'],
+  2: ['previous_school', 'previous_school_address', 'grade_level_completed', 'school_year_completed'],
+  3: [
+    'father_name', 'father_occupation', 'father_contact', 'father_email',
+    'mother_name', 'mother_occupation', 'mother_contact', 'mother_email',
+    'guardian_name', 'guardian_relationship', 'guardian_contact', 'guardian_email',
+  ],
+  4: ['address', 'contact_no', 'email'],
+}
+
+function validateStep(s) {
+  const fields = stepFields[s] ?? []
+  const errors = {}
+  for (const f of fields) {
+    const val = String(form[f] ?? '').trim()
+    if (!val) errors[f] = 'This field is required. Enter N/A if not applicable.'
+    else if (f === 'birthday' && isNaN(Date.parse(val))) errors[f] = 'Please enter a valid date.'
+  }
+  stepErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
+function next() {
+  if (validateStep(step.value) && step.value < STEPS.length - 1) step.value++
+}
+
+function prev() {
+  stepErrors.value = {}
+  if (step.value > 0) step.value--
+}
 
 function submit() {
   form.post(route('enrollment-application.store'))
@@ -57,6 +88,10 @@ function submit() {
 
 const inputCls = 'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full'
 const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
+
+function err(field) {
+  return stepErrors.value[field] || form.errors[field]
+}
 </script>
 
 <template>
@@ -99,11 +134,17 @@ const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
       <!-- Card -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8">
 
+        <!-- N/A notice (shown on all steps except grade and review) -->
+        <div v-if="step > 0 && step < 5"
+             class="mb-5 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-xs text-amber-800">
+          <strong>All fields are required.</strong> Enter <strong>N/A</strong> for any field that does not apply to you.
+        </div>
+
         <!-- Step 0: Grade & Year -->
         <div v-show="step === 0">
           <h2 class="text-base font-semibold text-slate-800 mb-5">Grade Level & School Year</h2>
           <div class="mb-4">
-            <label :class="labelCls">Grade Level Applying For</label>
+            <label :class="labelCls">Grade Level Applying For <span class="text-red-500">*</span></label>
             <select v-model="form.grade_level" :class="inputCls">
               <option :value="7">Grade 7 (New Student)</option>
               <option :value="8">Grade 8 (Transferee)</option>
@@ -126,37 +167,42 @@ const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
               <div>
                 <label :class="labelCls">Last Name <span class="text-red-500">*</span></label>
                 <input v-model="form.lastname" :class="inputCls" placeholder="Dela Cruz" />
-                <p v-if="form.errors.lastname" class="text-xs text-red-500 mt-1">{{ form.errors.lastname }}</p>
+                <p v-if="err('lastname')" class="text-xs text-red-500 mt-1">{{ err('lastname') }}</p>
               </div>
               <div>
                 <label :class="labelCls">First Name <span class="text-red-500">*</span></label>
                 <input v-model="form.firstname" :class="inputCls" placeholder="Juan" />
-                <p v-if="form.errors.firstname" class="text-xs text-red-500 mt-1">{{ form.errors.firstname }}</p>
+                <p v-if="err('firstname')" class="text-xs text-red-500 mt-1">{{ err('firstname') }}</p>
               </div>
               <div>
-                <label :class="labelCls">Middle Name</label>
-                <input v-model="form.middlename" :class="inputCls" placeholder="Santos" />
+                <label :class="labelCls">Middle Name <span class="text-red-500">*</span></label>
+                <input v-model="form.middlename" :class="inputCls" placeholder="Santos or N/A" />
+                <p v-if="err('middlename')" class="text-xs text-red-500 mt-1">{{ err('middlename') }}</p>
               </div>
             </div>
             <div>
-              <label :class="labelCls">Birthday</label>
+              <label :class="labelCls">Birthday <span class="text-red-500">*</span></label>
               <input v-model="form.birthday" type="date" :class="inputCls" />
+              <p v-if="err('birthday')" class="text-xs text-red-500 mt-1">{{ err('birthday') }}</p>
             </div>
             <div>
-              <label :class="labelCls">Sex</label>
+              <label :class="labelCls">Sex <span class="text-red-500">*</span></label>
               <select v-model="form.sex" :class="inputCls">
                 <option value="">— Select —</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
               </select>
+              <p v-if="err('sex')" class="text-xs text-red-500 mt-1">{{ err('sex') }}</p>
             </div>
             <div class="sm:col-span-2">
-              <label :class="labelCls">Place of Birth</label>
+              <label :class="labelCls">Place of Birth <span class="text-red-500">*</span></label>
               <input v-model="form.birth_place" :class="inputCls" placeholder="City/Municipality, Province" />
+              <p v-if="err('birth_place')" class="text-xs text-red-500 mt-1">{{ err('birth_place') }}</p>
             </div>
-            <div>
-              <label :class="labelCls">LRN (Learner Reference Number)</label>
-              <input v-model="form.lrn" :class="inputCls" placeholder="12-digit LRN" maxlength="12" />
+            <div class="sm:col-span-2">
+              <label :class="labelCls">LRN (Learner Reference Number) <span class="text-red-500">*</span></label>
+              <input v-model="form.lrn" :class="inputCls" placeholder="12-digit LRN or N/A" maxlength="30" />
+              <p v-if="err('lrn')" class="text-xs text-red-500 mt-1">{{ err('lrn') }}</p>
             </div>
           </div>
         </div>
@@ -166,21 +212,25 @@ const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
           <h2 class="text-base font-semibold text-slate-800 mb-5">Previous School Information</h2>
           <div class="grid grid-cols-1 gap-4">
             <div>
-              <label :class="labelCls">Previous School Name</label>
+              <label :class="labelCls">Previous School Name <span class="text-red-500">*</span></label>
               <input v-model="form.previous_school" :class="inputCls" placeholder="School name" />
+              <p v-if="err('previous_school')" class="text-xs text-red-500 mt-1">{{ err('previous_school') }}</p>
             </div>
             <div>
-              <label :class="labelCls">School Address</label>
-              <input v-model="form.previous_school_address" :class="inputCls" placeholder="City/Municipality" />
+              <label :class="labelCls">School Address <span class="text-red-500">*</span></label>
+              <input v-model="form.previous_school_address" :class="inputCls" placeholder="City/Municipality or N/A" />
+              <p v-if="err('previous_school_address')" class="text-xs text-red-500 mt-1">{{ err('previous_school_address') }}</p>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label :class="labelCls">Grade Level Completed</label>
+                <label :class="labelCls">Grade Level Completed <span class="text-red-500">*</span></label>
                 <input v-model="form.grade_level_completed" :class="inputCls" placeholder="Grade 6" />
+                <p v-if="err('grade_level_completed')" class="text-xs text-red-500 mt-1">{{ err('grade_level_completed') }}</p>
               </div>
               <div>
-                <label :class="labelCls">School Year Completed</label>
+                <label :class="labelCls">School Year Completed <span class="text-red-500">*</span></label>
                 <input v-model="form.school_year_completed" :class="inputCls" placeholder="2025-2026" />
+                <p v-if="err('school_year_completed')" class="text-xs text-red-500 mt-1">{{ err('school_year_completed') }}</p>
               </div>
             </div>
           </div>
@@ -193,28 +243,64 @@ const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
             <div>
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Father</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input v-model="form.father_name" :class="inputCls" placeholder="Full name" />
-                <input v-model="form.father_occupation" :class="inputCls" placeholder="Occupation" />
-                <input v-model="form.father_contact" :class="inputCls" placeholder="Contact number" />
-                <input v-model="form.father_email" :class="inputCls" placeholder="Email address" type="email" />
+                <div>
+                  <input v-model="form.father_name" :class="inputCls" placeholder="Full name or N/A *" />
+                  <p v-if="err('father_name')" class="text-xs text-red-500 mt-1">{{ err('father_name') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.father_occupation" :class="inputCls" placeholder="Occupation or N/A *" />
+                  <p v-if="err('father_occupation')" class="text-xs text-red-500 mt-1">{{ err('father_occupation') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.father_contact" :class="inputCls" placeholder="Contact number or N/A *" />
+                  <p v-if="err('father_contact')" class="text-xs text-red-500 mt-1">{{ err('father_contact') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.father_email" :class="inputCls" placeholder="Email address or N/A *" />
+                  <p v-if="err('father_email')" class="text-xs text-red-500 mt-1">{{ err('father_email') }}</p>
+                </div>
               </div>
             </div>
             <div>
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Mother</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input v-model="form.mother_name" :class="inputCls" placeholder="Full name" />
-                <input v-model="form.mother_occupation" :class="inputCls" placeholder="Occupation" />
-                <input v-model="form.mother_contact" :class="inputCls" placeholder="Contact number" />
-                <input v-model="form.mother_email" :class="inputCls" placeholder="Email address" type="email" />
+                <div>
+                  <input v-model="form.mother_name" :class="inputCls" placeholder="Full name or N/A *" />
+                  <p v-if="err('mother_name')" class="text-xs text-red-500 mt-1">{{ err('mother_name') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.mother_occupation" :class="inputCls" placeholder="Occupation or N/A *" />
+                  <p v-if="err('mother_occupation')" class="text-xs text-red-500 mt-1">{{ err('mother_occupation') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.mother_contact" :class="inputCls" placeholder="Contact number or N/A *" />
+                  <p v-if="err('mother_contact')" class="text-xs text-red-500 mt-1">{{ err('mother_contact') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.mother_email" :class="inputCls" placeholder="Email address or N/A *" />
+                  <p v-if="err('mother_email')" class="text-xs text-red-500 mt-1">{{ err('mother_email') }}</p>
+                </div>
               </div>
             </div>
             <div>
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Guardian <span class="font-normal text-slate-400">(if different from parents)</span></p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input v-model="form.guardian_name" :class="inputCls" placeholder="Full name" />
-                <input v-model="form.guardian_relationship" :class="inputCls" placeholder="Relationship (e.g., Aunt)" />
-                <input v-model="form.guardian_contact" :class="inputCls" placeholder="Contact number" />
-                <input v-model="form.guardian_email" :class="inputCls" placeholder="Email address" type="email" />
+                <div>
+                  <input v-model="form.guardian_name" :class="inputCls" placeholder="Full name or N/A *" />
+                  <p v-if="err('guardian_name')" class="text-xs text-red-500 mt-1">{{ err('guardian_name') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.guardian_relationship" :class="inputCls" placeholder="Relationship or N/A *" />
+                  <p v-if="err('guardian_relationship')" class="text-xs text-red-500 mt-1">{{ err('guardian_relationship') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.guardian_contact" :class="inputCls" placeholder="Contact number or N/A *" />
+                  <p v-if="err('guardian_contact')" class="text-xs text-red-500 mt-1">{{ err('guardian_contact') }}</p>
+                </div>
+                <div>
+                  <input v-model="form.guardian_email" :class="inputCls" placeholder="Email address or N/A *" />
+                  <p v-if="err('guardian_email')" class="text-xs text-red-500 mt-1">{{ err('guardian_email') }}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -225,18 +311,20 @@ const labelCls = 'block text-xs font-medium text-slate-600 mb-1'
           <h2 class="text-base font-semibold text-slate-800 mb-5">Contact & Address</h2>
           <div class="space-y-4">
             <div>
-              <label :class="labelCls">Home Address</label>
+              <label :class="labelCls">Home Address <span class="text-red-500">*</span></label>
               <textarea v-model="form.address" :class="inputCls" rows="3" placeholder="House No., Street, Barangay, City/Municipality, Province" />
+              <p v-if="err('address')" class="text-xs text-red-500 mt-1">{{ err('address') }}</p>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label :class="labelCls">Student Contact No.</label>
-                <input v-model="form.contact_no" :class="inputCls" placeholder="09XXXXXXXXX" />
+                <label :class="labelCls">Student Contact No. <span class="text-red-500">*</span></label>
+                <input v-model="form.contact_no" :class="inputCls" placeholder="09XXXXXXXXX or N/A" />
+                <p v-if="err('contact_no')" class="text-xs text-red-500 mt-1">{{ err('contact_no') }}</p>
               </div>
               <div>
-                <label :class="labelCls">Email Address <span class="font-normal text-slate-400">(for notifications)</span></label>
-                <input v-model="form.email" :class="inputCls" type="email" placeholder="email@example.com" />
-                <p v-if="form.errors.email" class="text-xs text-red-500 mt-1">{{ form.errors.email }}</p>
+                <label :class="labelCls">Email Address <span class="text-red-500">*</span> <span class="font-normal text-slate-400">(for notifications)</span></label>
+                <input v-model="form.email" :class="inputCls" placeholder="email@example.com or N/A" />
+                <p v-if="err('email')" class="text-xs text-red-500 mt-1">{{ err('email') }}</p>
               </div>
             </div>
           </div>
