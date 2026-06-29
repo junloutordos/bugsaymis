@@ -92,6 +92,16 @@ class LoadAssignmentController extends Controller
             ->orderBy('sectionname')
             ->get(['id', 'sectionname', 'levelid']);
 
+        $sectionMap = $sections->pluck('sectionname', 'id')->all();
+
+        $byFaculty = $byFaculty->map(function ($entry) use ($sectionMap) {
+            $entry['assignments'] = array_map(
+                fn ($a) => $this->injectSectionName($a, $sectionMap),
+                $entry['assignments']
+            );
+            return $entry;
+        })->values();
+
         return Inertia::render('FacultyLoading/Assignments/Index', [
             'facultyLoads' => $byFaculty,
             'terms'        => $terms,
@@ -210,6 +220,21 @@ class LoadAssignmentController extends Controller
         return back()->with('success', 'Load assignment removed.');
     }
 
+    // ── Sync all loads for a term ─────────────────────────────────────────────
+
+    public function syncAllLoads(Request $request): RedirectResponse
+    {
+        $this->authorize('faculty_loading.manage');
+
+        $currentTerm = AcademicTerm::where('is_current', true)->first();
+        $termId      = (int) $request->input('term_id', $currentTerm?->id);
+
+        FacultyLoad::where('academic_term_id', $termId)
+            ->each(fn ($fl) => $this->loads->syncLoad($fl));
+
+        return back()->with('success', 'All faculty load totals re-synced.');
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private function mapAssignment(LoadAssignment $a): array
@@ -222,9 +247,16 @@ class LoadAssignmentController extends Controller
             'description'     => $a->description,
             'display_label'   => $a->display_label,
             'section_id'      => $a->section_id,
+            'section_name'    => null,
             'faculty'         => $a->faculty ? ['id' => $a->faculty->id, 'name' => $a->faculty->name] : null,
             'subject'         => $a->subject ? ['id' => $a->subject->id, 'code' => $a->subject->code, 'name' => $a->subject->name] : null,
             'term'            => $a->academicTerm ? ['id' => $a->academicTerm->id, 'label' => $a->academicTerm->full_label] : null,
         ];
+    }
+
+    private function injectSectionName(array $a, array $sectionMap): array
+    {
+        $a['section_name'] = $a['section_id'] ? ($sectionMap[$a['section_id']] ?? null) : null;
+        return $a;
     }
 }

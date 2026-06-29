@@ -112,6 +112,7 @@ Route::middleware(['web', 'auth', 'verified'])
                 Route::prefix('assignments')->name('assignments.')->group(function () {
                     Route::get('/',                         [LoadAssignmentController::class, 'index'])->name('index');
                     Route::post('/',                        [LoadAssignmentController::class, 'store'])->name('store');
+                    Route::post('/sync-loads',              [LoadAssignmentController::class, 'syncAllLoads'])->name('sync-loads');
                     Route::put('/{loadAssignment}',         [LoadAssignmentController::class, 'update'])->name('update');
                     Route::delete('/{loadAssignment}',      [LoadAssignmentController::class, 'destroy'])->name('destroy');
                 });
