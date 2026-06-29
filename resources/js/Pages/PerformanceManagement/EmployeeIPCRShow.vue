@@ -18,6 +18,7 @@ const props = defineProps({
   workPlans:        { type: Array,   default: () => [] },
   isFaculty:        { type: Boolean, default: false },
   suggestedPlanIds: { type: Array,   default: () => [] },
+  isOwner:          { type: Boolean, default: false },
 });
 
 const { isSubmitting, submit } = useSubmit();
@@ -123,7 +124,7 @@ const form = ref({
   timeliness: null,
 });
 
-const canEditGlobally = computed(() => props.ipcr?.status === "Targets Approved");
+const canEditGlobally = computed(() => props.isOwner && props.ipcr?.status === "Targets Approved");
 const liveAverage = computed(() =>
   computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness)
 );
@@ -608,7 +609,7 @@ const pullFLAccomplishments = () => {
           <h2 class="text-base font-semibold text-slate-800">IPCR Details</h2>
           <div class="flex flex-wrap items-center gap-2 no-print">
             <button
-              v-if="ipcr.status === 'New Target'"
+              v-if="isOwner && ipcr.status === 'New Target'"
               @click="submitForReview"
               :disabled="isSubmitting"
               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -620,7 +621,7 @@ const pullFLAccomplishments = () => {
             </button>
 
             <button
-              v-if="ipcr.status === 'Targets Approved'"
+              v-if="isOwner && ipcr.status === 'Targets Approved'"
               @click="submitForRating"
               :disabled="isSubmitting"
               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -646,7 +647,7 @@ const pullFLAccomplishments = () => {
             </button>
 
             <button
-              v-if="ipcr.status === 'Returned for Revision'"
+              v-if="isOwner && ipcr.status === 'Returned for Revision'"
               @click="showAddPlansModal = true"
               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
@@ -657,7 +658,7 @@ const pullFLAccomplishments = () => {
             </button>
 
             <button
-              v-if="ipcr.status === 'Returned for Revision'"
+              v-if="isOwner && ipcr.status === 'Returned for Revision'"
               @click="resubmit"
               :disabled="isSubmitting"
               class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -890,7 +891,7 @@ const pullFLAccomplishments = () => {
                           <div class="flex items-start gap-2">
                             <span class="flex-1">{{ piPlans[0].pivot?.remarks || "—" }}</span>
                             <button
-                              v-if="ipcr.status === 'Returned for Revision'"
+                              v-if="isOwner && ipcr.status === 'Returned for Revision'"
                               @click="removePlan(piPlans[0])"
                               class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
                               title="Remove plan"
@@ -978,7 +979,7 @@ const pullFLAccomplishments = () => {
                           <div class="flex items-start gap-2">
                             <span class="flex-1">{{ plan.pivot?.remarks || "—" }}</span>
                             <button
-                              v-if="ipcr.status === 'Returned for Revision'"
+                              v-if="isOwner && ipcr.status === 'Returned for Revision'"
                               @click="removePlan(plan)"
                               class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
                               title="Remove plan"
