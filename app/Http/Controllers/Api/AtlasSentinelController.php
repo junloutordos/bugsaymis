@@ -104,6 +104,23 @@ class AtlasSentinelController extends Controller
         if (! $equipment && $mac) {
             $deviceByMac = IctEquipmentDevice::where('mac_address', $mac)->first();
             if ($deviceByMac) {
+                // Guard against a cloned machine stealing the original's slot.
+                // If the existing device checked in within the last hour under a
+                // different hostname, this is almost certainly a MAC-identical clone
+                // (VM copy, duplicate NIC config) rather than a legitimate reinstall.
+                $newHostname = $validated['hostname'] ?? null;
+                $isActivelyInUse = $deviceByMac->last_checkin_at
+                    && $deviceByMac->last_checkin_at->gt(now()->subMinutes(60));
+                $hostnameDiffers = $newHostname
+                    && $deviceByMac->hostname
+                    && $deviceByMac->hostname !== $newHostname;
+
+                if ($isActivelyInUse && $hostnameDiffers) {
+                    return response()->json([
+                        'message' => "MAC address {$mac} is already active on '{$deviceByMac->hostname}' (last seen within the past hour). If this is a reinstall on the same machine, wait until the original device has been inactive for over an hour and retry. If this is a different machine sharing the same MAC (e.g. a cloned VM), contact MIS to resolve the conflict.",
+                    ], 409);
+                }
+
                 $equipment = ICTEquipment::find($deviceByMac->equipment_id);
                 $matchedByMac = true;
             }
@@ -121,7 +138,7 @@ class AtlasSentinelController extends Controller
                 'category'    => 'Other',
                 'serial_no'   => $serial,
                 'description' => $description,
-                'status'      => null,
+                'status'      => 'Pending Setup',
             ]);
         }
 

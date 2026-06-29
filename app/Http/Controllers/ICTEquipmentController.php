@@ -71,10 +71,11 @@ class ICTEquipmentController extends Controller
         $rooms = Room::orderBy('name')->get();
 
         return Inertia::render('ITJobRequests/ICTEquipments', [
-            'equipments' => $equipments,
-            'users'      => $users,
-            'rooms'      => $rooms,
-            'filters'    => $request->only('search', 'category', 'status', 'per_page'),
+            'equipments'        => $equipments,
+            'users'             => $users,
+            'rooms'             => $rooms,
+            'filters'           => $request->only('search', 'category', 'status', 'per_page'),
+            'pendingSetupCount' => ICTEquipment::where('status', 'Pending Setup')->count(),
         ]);
     }
 
