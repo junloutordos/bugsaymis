@@ -6,6 +6,7 @@ use App\Models\Atlas\AtlasModuleSetting;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 class AtlasMetricsService
 {
@@ -110,20 +111,7 @@ class AtlasMetricsService
         $sevenDaysAgo  = now()->subDays(7)->timestamp;
         $thirtyDaysAgo = now()->subDays(30)->timestamp;
 
-        $dau = DB::table('sessions')
-            ->where('last_activity', '>=', $todayStart)
-            ->whereNotNull('user_id')
-            ->distinct('user_id')->count('user_id');
-
-        $wau = DB::table('sessions')
-            ->where('last_activity', '>=', $sevenDaysAgo)
-            ->whereNotNull('user_id')
-            ->distinct('user_id')->count('user_id');
-
-        $mau = DB::table('sessions')
-            ->where('last_activity', '>=', $thirtyDaysAgo)
-            ->whereNotNull('user_id')
-            ->distinct('user_id')->count('user_id');
+        [$dau, $wau, $mau] = $this->countActiveUsersByPeriod($todayStart, $sevenDaysAgo, $thirtyDaysAgo);
 
         $peakHours = null;
         if ($table !== null && $col !== null) {
@@ -411,11 +399,11 @@ class AtlasMetricsService
                 ->distinct($safeCol)
                 ->count($safeCol);
 
-            $totalActiveUsers = DB::table('sessions')
-                ->where('last_activity', '>=', now()->subDays(30)->timestamp)
-                ->whereNotNull('user_id')
-                ->distinct('user_id')
-                ->count('user_id');
+            [, , $totalActiveUsers] = $this->countActiveUsersByPeriod(
+                today('Asia/Manila')->startOfDay()->timestamp,
+                now()->subDays(7)->timestamp,
+                now()->subDays(30)->timestamp
+            );
 
             if ($totalActiveUsers === 0) {
                 return [
@@ -660,13 +648,43 @@ class AtlasMetricsService
     private function countActiveSessions(): int
     {
         try {
-            return DB::table('sessions')
-                ->where('last_activity', '>=', now()->subMinutes(30)->timestamp)
-                ->whereNotNull('user_id')
-                ->distinct('user_id')
-                ->count('user_id');
+            return (int) Redis::zcount('atlas:active_users', now()->subMinutes(30)->timestamp, '+inf');
         } catch (\Throwable) {
-            return 0;
+            // Fallback for environments without Redis (local dev with database sessions)
+            try {
+                return DB::table('sessions')
+                    ->where('last_activity', '>=', now()->subMinutes(30)->timestamp)
+                    ->whereNotNull('user_id')
+                    ->distinct('user_id')
+                    ->count('user_id');
+            } catch (\Throwable) {
+                return 0;
+            }
+        }
+    }
+
+    /**
+     * Returns [dau, wau, mau] from the Redis heartbeat sorted set.
+     * Each score is the user's most-recent activity Unix timestamp, so a
+     * ZCOUNT range gives "distinct users whose last visit was within N days."
+     * Falls back to the sessions DB table when Redis is unavailable.
+     */
+    private function countActiveUsersByPeriod(int $todayStart, int $sevenDaysAgo, int $thirtyDaysAgo): array
+    {
+        try {
+            $dau = (int) Redis::zcount('atlas:active_users', $todayStart, '+inf');
+            $wau = (int) Redis::zcount('atlas:active_users', $sevenDaysAgo, '+inf');
+            $mau = (int) Redis::zcount('atlas:active_users', $thirtyDaysAgo, '+inf');
+            return [$dau, $wau, $mau];
+        } catch (\Throwable) {
+            try {
+                $dau = DB::table('sessions')->where('last_activity', '>=', $todayStart)->whereNotNull('user_id')->distinct('user_id')->count('user_id');
+                $wau = DB::table('sessions')->where('last_activity', '>=', $sevenDaysAgo)->whereNotNull('user_id')->distinct('user_id')->count('user_id');
+                $mau = DB::table('sessions')->where('last_activity', '>=', $thirtyDaysAgo)->whereNotNull('user_id')->distinct('user_id')->count('user_id');
+                return [$dau, $wau, $mau];
+            } catch (\Throwable) {
+                return [0, 0, 0];
+            }
         }
     }
 

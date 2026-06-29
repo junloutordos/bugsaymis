@@ -11,6 +11,7 @@ use App\Services\Atlas\AtlasModuleHealthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Inertia\Inertia;
 
 class AtlasModuleController extends Controller
@@ -154,39 +155,72 @@ class AtlasModuleController extends Controller
             $thirtyMinAgo = now()->subMinutes(30)->timestamp;
             $todayStart   = today('Asia/Manila')->startOfDay()->timestamp;
 
-            $sessions = DB::table('sessions')
-                ->join('users', 'sessions.user_id', '=', 'users.id')
-                ->where('sessions.last_activity', '>=', $thirtyMinAgo)
-                ->whereNotNull('sessions.user_id')
-                ->where('users.status', '<>', 'inactive')
-                ->orderByDesc('sessions.last_activity')
-                ->get([
-                    'users.id',
-                    'users.name',
-                    'sessions.ip_address',
-                    'sessions.user_agent',
-                    'sessions.last_activity',
-                ]);
+            try {
+                // Redis sorted set: member=user_id, score=last_activity unix timestamp.
+                // Sessions table is not used here because prod runs SESSION_DRIVER=redis.
+                $recentIds = Redis::zrangebyscore('atlas:active_users', $thirtyMinAgo, '+inf');
+                $todayIds  = Redis::zrangebyscore('atlas:active_users', $todayStart, '+inf');
 
-            // One row per user — take their most recent session
-            $users = $sessions->unique('id')->map(fn ($s) => [
-                'id'           => $s->id,
-                'name'         => $s->name,
-                'initials'     => $this->initials($s->name),
-                'last_activity' => $s->last_activity,
-                'last_seen_at' => date('Y-m-d\TH:i:s\Z', $s->last_activity),
-                'ip_address'   => $s->ip_address,
-                'browser'      => $this->parseBrowser($s->user_agent ?? ''),
-                'is_online'    => $s->last_activity >= $fiveMinAgo,
-            ])->values()->toArray();
+                $users = [];
+                if (! empty($recentIds)) {
+                    $userRows = User::whereIn('id', $recentIds)
+                        ->where('status', '<>', 'inactive')
+                        ->get(['id', 'name'])
+                        ->keyBy('id');
 
-            $dailyTotal = DB::table('sessions')
-                ->where('last_activity', '>=', $todayStart)
-                ->whereNotNull('user_id')
-                ->distinct('user_id')
-                ->count('user_id');
+                    foreach ($recentIds as $userId) {
+                        if (! isset($userRows[$userId])) {
+                            continue;
+                        }
+                        $meta         = Redis::hgetall("atlas:user_meta:{$userId}");
+                        $lastActivity = (int) ($meta['last_activity'] ?? 0);
+                        $user         = $userRows[$userId];
+                        $users[]      = [
+                            'id'            => $user->id,
+                            'name'          => $user->name,
+                            'initials'      => $this->initials($user->name),
+                            'last_activity' => $lastActivity,
+                            'last_seen_at'  => $lastActivity ? date('Y-m-d\TH:i:s\Z', $lastActivity) : null,
+                            'ip_address'    => $meta['ip_address'] ?? null,
+                            'browser'       => $this->parseBrowser($meta['user_agent'] ?? ''),
+                            'is_online'     => $lastActivity >= $fiveMinAgo,
+                        ];
+                    }
 
-            $onlineNow = collect($users)->where('is_online', true)->count();
+                    usort($users, fn ($a, $b) => $b['last_activity'] <=> $a['last_activity']);
+                }
+
+                $onlineNow  = collect($users)->where('is_online', true)->count();
+                $dailyTotal = count(array_unique($todayIds));
+
+            } catch (\Throwable) {
+                // Fallback to sessions table (works in dev with database session driver)
+                $sessions = DB::table('sessions')
+                    ->join('users', 'sessions.user_id', '=', 'users.id')
+                    ->where('sessions.last_activity', '>=', $thirtyMinAgo)
+                    ->whereNotNull('sessions.user_id')
+                    ->where('users.status', '<>', 'inactive')
+                    ->orderByDesc('sessions.last_activity')
+                    ->get(['users.id', 'users.name', 'sessions.ip_address', 'sessions.user_agent', 'sessions.last_activity']);
+
+                $users = $sessions->unique('id')->map(fn ($s) => [
+                    'id'            => $s->id,
+                    'name'          => $s->name,
+                    'initials'      => $this->initials($s->name),
+                    'last_activity' => $s->last_activity,
+                    'last_seen_at'  => date('Y-m-d\TH:i:s\Z', $s->last_activity),
+                    'ip_address'    => $s->ip_address,
+                    'browser'       => $this->parseBrowser($s->user_agent ?? ''),
+                    'is_online'     => $s->last_activity >= $fiveMinAgo,
+                ])->values()->toArray();
+
+                $onlineNow  = collect($users)->where('is_online', true)->count();
+                $dailyTotal = DB::table('sessions')
+                    ->where('last_activity', '>=', $todayStart)
+                    ->whereNotNull('user_id')
+                    ->distinct('user_id')
+                    ->count('user_id');
+            }
 
             return [
                 'users'        => $users,

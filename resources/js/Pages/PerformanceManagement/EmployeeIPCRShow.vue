@@ -18,6 +18,7 @@ const props = defineProps({
   workPlans:        { type: Array,   default: () => [] },
   isFaculty:        { type: Boolean, default: false },
   suggestedPlanIds: { type: Array,   default: () => [] },
+  isOwner:          { type: Boolean, default: false },
 });
 
 const { isSubmitting, submit } = useSubmit();
@@ -105,11 +106,70 @@ function openAccViewer(plan) {
 }
 function closeAccViewer() {
   accViewerPlan.value = null;
+  accEditId.value = null;
 }
 
 function formatAccDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
+// ---------- Accomplishment inline edit/delete ----------
+const accEditId   = ref(null);
+const accEditForm = ref({ accomplishment_date: "", description: "" });
+
+function startAccEdit(acc) {
+  accEditId.value   = acc.id;
+  accEditForm.value = {
+    accomplishment_date: acc.accomplishment_date?.slice(0, 10) ?? "",
+    description:         acc.description ?? "",
+  };
+}
+function cancelAccEdit() {
+  accEditId.value = null;
+}
+function saveAccEdit(acc) {
+  submit(
+    (o) => router.put(
+      route("my-accomplishments.update", acc.id),
+      {
+        ipcr_plan_id:        acc.ipcr_plan_id,
+        accomplishment_date: accEditForm.value.accomplishment_date,
+        description:         accEditForm.value.description,
+      },
+      { ...o, preserveScroll: true }
+    ),
+    {
+      onSuccess: () => {
+        acc.accomplishment_date = accEditForm.value.accomplishment_date;
+        acc.description         = accEditForm.value.description;
+        accEditId.value         = null;
+      },
+      onError: () => Swal.fire({ icon: "error", title: "Error", text: "Failed to save. Please check your input." }),
+    }
+  );
+}
+function deleteAcc(acc) {
+  Swal.fire({
+    title: "Delete accomplishment?",
+    text:  "This cannot be undone.",
+    icon:  "warning",
+    showCancelButton:    true,
+    confirmButtonColor:  "#dc2626",
+    confirmButtonText:   "Delete",
+  }).then((r) => {
+    if (!r.isConfirmed) return;
+    submit(
+      (o) => router.delete(route("my-accomplishments.destroy", acc.id), { ...o, preserveScroll: true }),
+      {
+        onSuccess: () => {
+          accViewerPlan.value.accomplishments = accViewerPlan.value.accomplishments.filter(a => a.id !== acc.id);
+          accViewerPlan.value.accomplishments_count = Math.max(0, (accViewerPlan.value.accomplishments_count ?? 1) - 1);
+        },
+        onError: () => Swal.fire({ icon: "error", title: "Error", text: "Failed to delete accomplishment." }),
+      }
+    );
+  });
 }
 
 // ---------- Modal / Form State ----------
@@ -123,7 +183,7 @@ const form = ref({
   timeliness: null,
 });
 
-const canEditGlobally = computed(() => props.ipcr?.status === "Targets Approved");
+const canEditGlobally = computed(() => props.isOwner && props.ipcr?.status === "Targets Approved");
 const liveAverage = computed(() =>
   computeAverage(form.value.quality, form.value.efficiency, form.value.timeliness)
 );
@@ -608,7 +668,7 @@ const pullFLAccomplishments = () => {
           <h2 class="text-base font-semibold text-slate-800">IPCR Details</h2>
           <div class="flex flex-wrap items-center gap-2 no-print">
             <button
-              v-if="ipcr.status === 'New Target'"
+              v-if="isOwner && ipcr.status === 'New Target'"
               @click="submitForReview"
               :disabled="isSubmitting"
               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -620,7 +680,7 @@ const pullFLAccomplishments = () => {
             </button>
 
             <button
-              v-if="ipcr.status === 'Targets Approved'"
+              v-if="isOwner && ipcr.status === 'Targets Approved'"
               @click="submitForRating"
               :disabled="isSubmitting"
               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -646,7 +706,7 @@ const pullFLAccomplishments = () => {
             </button>
 
             <button
-              v-if="ipcr.status === 'Returned for Revision'"
+              v-if="isOwner && ipcr.status === 'Returned for Revision'"
               @click="showAddPlansModal = true"
               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
@@ -657,7 +717,7 @@ const pullFLAccomplishments = () => {
             </button>
 
             <button
-              v-if="ipcr.status === 'Returned for Revision'"
+              v-if="isOwner && ipcr.status === 'Returned for Revision'"
               @click="resubmit"
               :disabled="isSubmitting"
               class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -890,7 +950,7 @@ const pullFLAccomplishments = () => {
                           <div class="flex items-start gap-2">
                             <span class="flex-1">{{ piPlans[0].pivot?.remarks || "—" }}</span>
                             <button
-                              v-if="ipcr.status === 'Returned for Revision'"
+                              v-if="isOwner && ipcr.status === 'Returned for Revision'"
                               @click="removePlan(piPlans[0])"
                               class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
                               title="Remove plan"
@@ -978,7 +1038,7 @@ const pullFLAccomplishments = () => {
                           <div class="flex items-start gap-2">
                             <span class="flex-1">{{ plan.pivot?.remarks || "—" }}</span>
                             <button
-                              v-if="ipcr.status === 'Returned for Revision'"
+                              v-if="isOwner && ipcr.status === 'Returned for Revision'"
                               @click="removePlan(plan)"
                               class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
                               title="Remove plan"
@@ -1262,19 +1322,62 @@ const pullFLAccomplishments = () => {
 
           <div v-for="acc in accViewerPlan.accomplishments" :key="acc.id"
             class="mb-4 pb-4 border-b border-slate-100 last:border-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700">
-                {{ formatAccDate(acc.accomplishment_date) }}
-              </span>
-            </div>
-            <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
-            <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
-              <a v-for="photo in acc.photos" :key="photo.id"
-                :href="photo.google_drive_link" target="_blank"
-                class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
-                {{ photo.file_name || 'Photo' }}
-              </a>
-            </div>
+
+            <!-- Edit mode -->
+            <template v-if="accEditId === acc.id">
+              <div class="space-y-2">
+                <input
+                  type="date"
+                  v-model="accEditForm.accomplishment_date"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+                />
+                <textarea
+                  v-model="accEditForm.description"
+                  rows="3"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full resize-none"
+                  placeholder="Description"
+                />
+                <div class="flex gap-2">
+                  <button
+                    @click="saveAccEdit(acc)"
+                    :disabled="isSubmitting"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-50"
+                  >{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
+                  <button
+                    @click="cancelAccEdit"
+                    class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium"
+                  >Cancel</button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Read mode -->
+            <template v-else>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700">
+                  {{ formatAccDate(acc.accomplishment_date) }}
+                </span>
+                <template v-if="canEditGlobally">
+                  <button
+                    @click="startAccEdit(acc)"
+                    class="text-[11px] text-indigo-600 hover:underline no-print"
+                  >Edit</button>
+                  <button
+                    @click="deleteAcc(acc)"
+                    class="text-[11px] text-red-500 hover:underline no-print"
+                  >Delete</button>
+                </template>
+              </div>
+              <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ acc.description }}</p>
+              <div v-if="acc.photos?.length" class="mt-1.5 flex flex-wrap gap-2">
+                <a v-for="photo in acc.photos" :key="photo.id"
+                  :href="photo.google_drive_link" target="_blank"
+                  class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                  {{ photo.file_name || 'Photo' }}
+                </a>
+              </div>
+            </template>
+
           </div>
         </div>
 

@@ -225,6 +225,7 @@ class EmployeeIPCRController extends Controller
             'workPlans'        => $workPlans,
             'isFaculty'        => $isFaculty,
             'suggestedPlanIds' => $suggestedPlanIds,
+            'isOwner'          => $ipcr->user_id === auth()->id(),
         ]);
     }
 
@@ -235,9 +236,12 @@ class EmployeeIPCRController extends Controller
      */
     public function updateSelfRating(Request $request, EmployeeIPCR $ipcr, $planId)
     {
+        abort_if($ipcr->user_id !== auth()->id(), 403);
+        abort_if($ipcr->status !== 'Targets Approved', 403, 'Self-rating is only allowed when targets are approved.');
+
         $request->validate([
             'accomplishment'  => 'nullable|string|max:255',
-            'mov_link'        => 'nullable|url|max:255',
+            'mov_link'        => 'nullable|string|max:500',
             'self_quality'    => 'nullable|numeric|min:0|max:100',
             'self_efficiency' => 'nullable|numeric|min:0|max:100',
             'self_timeliness' => 'nullable|numeric|min:0|max:100',
@@ -336,6 +340,8 @@ class EmployeeIPCRController extends Controller
 
     public function submitForReview(EmployeeIPCR $employeeIPCR)
     {
+        abort_if($employeeIPCR->user_id !== auth()->id(), 403);
+
         $employeeIPCR->update([
             'status' => 'For Review',
             'submitted_for_review_at' => now(),
@@ -360,6 +366,8 @@ class EmployeeIPCRController extends Controller
 
     public function submitForRating(EmployeeIPCR $employeeIPCR)
     {
+        abort_if($employeeIPCR->user_id !== auth()->id(), 403);
+
         $employeeIPCR->update([
             'status' => 'Submitted for Rating',
             'submitted_for_rating_at' => now(),

@@ -8,6 +8,7 @@ use Illuminate\Cache\Events\CacheMissed;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Redis;
 use Symfony\Component\HttpFoundation\Response;
 
 class AtlasRequestStatsMiddleware
@@ -55,6 +56,9 @@ class AtlasRequestStatsMiddleware
                     self::$cacheMisses++;
                 }
             });
+
+            // Redis heartbeat — works regardless of SESSION_DRIVER
+            $this->recordActivityHeartbeat($request);
 
             // Set session started_at once per new session (1 UPDATE, then never again)
             $this->initSessionStart($request);
@@ -107,6 +111,37 @@ class AtlasRequestStatsMiddleware
             }
         } catch (\Throwable) {
             // Never let monitoring break the app
+        }
+    }
+
+    private function recordActivityHeartbeat(Request $request): void
+    {
+        try {
+            $userId = $request->user()->id;
+            $now    = time();
+
+            // Sorted set: member=user_id, score=unix timestamp of last activity.
+            // ZADD overwrites the score if the member already exists, so there is
+            // always exactly one entry per user with their most-recent timestamp.
+            Redis::zadd('atlas:active_users', $now, $userId);
+
+            // Per-user metadata hash for the active-users panel (ip, browser, etc.)
+            Redis::pipeline(function ($pipe) use ($userId, $now, $request) {
+                $pipe->hset(
+                    "atlas:user_meta:{$userId}",
+                    'last_activity', $now,
+                    'ip_address',    $request->ip(),
+                    'user_agent',    $request->userAgent() ?? ''
+                );
+                $pipe->expire("atlas:user_meta:{$userId}", 1800); // 30 min TTL
+            });
+
+            // Prune entries older than 30 days on ~1% of requests
+            if (random_int(1, 100) === 1) {
+                Redis::zremrangebyscore('atlas:active_users', '-inf', now()->subDays(30)->timestamp);
+            }
+        } catch (\Throwable) {
+            // Never let monitoring break the app — Redis may be unreachable
         }
     }
 
