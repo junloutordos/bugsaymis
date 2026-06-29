@@ -1,8 +1,8 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
-import { EyeIcon } from "@heroicons/vue/24/outline"
+import { ref, onMounted, computed, nextTick } from 'vue'
+import { EyeIcon, PencilSquareIcon } from "@heroicons/vue/24/outline"
 import { storageUrl } from "@/Composables/useStorage.js"
 
 const props = defineProps({
@@ -27,13 +27,24 @@ const searchQuery = ref(page.props.q ?? '')
 // Server-driven list; filteredStudents reflects server paginator data
 const filteredStudents = computed(() => students.value)
 
-let searchTimer = null
-watch(searchQuery, (val) => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    router.get(route('students.index'), { q: val }, { replace: true, preserveState: false })
-  }, 400)
-})
+const performSearch = () => {
+  router.get(route('students.index'), { q: searchQuery.value }, { replace: true, preserveState: false })
+}
+
+const EXCLUDED_FROM_EDIT = ['id', 'img', 'created_at', 'updated_at', 'pisaysystemid', 'pisaysystemID', 'pisay_system_id', 'pisay_id', 'pisayid']
+const editableColumns = computed(() => columns.value.filter(c => {
+  const field = c.Field ?? c.field ?? c.name
+  return field && !EXCLUDED_FROM_EDIT.includes(field)
+}))
+
+const isSaving = ref(false)
+const submitEdit = () => {
+  isSaving.value = true
+  router.put(route('students.update', editing.value), form.value, {
+    onFinish: () => { isSaving.value = false },
+    onSuccess: () => { showModal.value = false },
+  })
+}
 
 onMounted(() => {
   if (!csrfToken.value && typeof document !== 'undefined') {
@@ -277,8 +288,10 @@ const confirmCrop = async () => {
           v-model="searchQuery"
           type="text"
           placeholder="Search students..."
+          @keydown.enter="performSearch"
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64"
         />
+        <button @click="performSearch" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Search</button>
       </div>
 
       <!-- Table card -->
@@ -306,9 +319,14 @@ const confirmCrop = async () => {
                   </span>
                 </td>
                 <td class="px-4 py-3">
-                  <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
-                    <EyeIcon class="w-4 h-4" />
-                  </button>
+                  <div class="flex items-center gap-1">
+                    <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                      <EyeIcon class="w-4 h-4" />
+                    </button>
+                    <button v-if="can_manage_students" @click="openEdit(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      <PencilSquareIcon class="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
               <tr v-if="filteredStudents.length === 0">
@@ -328,9 +346,14 @@ const confirmCrop = async () => {
                 <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ getFieldValue(student, ['pisaysystemid','pisaysystemID','pisaysystem_id','pisay_system_id','pisay_id']) }}</div>
                 <div class="text-xs text-slate-500">Age: {{ getAge(student, ['birthday','birthdate','dob']) }} · Sex: {{ getFieldValue(student, ['sex','gender']) }}</div>
               </div>
-              <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
-                <EyeIcon class="w-4 h-4" />
-              </button>
+              <div class="flex items-center gap-1">
+                <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                  <EyeIcon class="w-4 h-4" />
+                </button>
+                <button v-if="can_manage_students" @click="openEdit(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                  <PencilSquareIcon class="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
           <div v-if="filteredStudents.length === 0" class="py-16 text-center text-slate-400 text-sm">No students found.</div>
@@ -346,33 +369,31 @@ const confirmCrop = async () => {
         </div>
       </div>
 
-      <!-- Edit/Create Modal -->
+      <!-- Edit Modal -->
       <div v-if="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50 overflow-auto">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto">
           <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">{{ editing ? 'Edit Student' : 'New Student' }}</h3>
+            <h3 class="text-base font-semibold text-slate-800">Edit Student</h3>
             <button @click="showModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
             </button>
           </div>
-          <form :action="editing ? route('students.update', editing) : route('students.store')" method="POST" class="px-6 py-5">
-            <input type="hidden" name="_method" :value="editing ? 'PUT' : 'POST'" />
-            <input type="hidden" name="_token" :value="csrfToken" />
-
+          <div class="px-6 py-5">
             <div class="max-h-[55vh] overflow-auto pr-1">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div v-for="col in columns" :key="col.Field">
+                <div v-for="col in editableColumns" :key="col.Field">
                   <label class="block text-xs font-medium text-slate-600 mb-1">{{ col.Field }}</label>
-                  <input :name="col.Field" v-model="form[col.Field]" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
+                  <input v-model="form[col.Field]" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
                 </div>
               </div>
             </div>
-
             <div class="flex justify-end mt-6 gap-2">
-              <button type="button" @click="showModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-              <button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Save</button>
+              <button @click="showModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
+              <button @click="submitEdit" :disabled="isSaving" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                {{ isSaving ? 'Saving…' : 'Save Changes' }}
+              </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
 
@@ -412,6 +433,9 @@ const confirmCrop = async () => {
           </div>
 
           <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+            <button v-if="can_manage_students && viewStudent" @click="openEdit(viewStudent); closeView()" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              <PencilSquareIcon class="w-4 h-4" /> Edit
+            </button>
             <a v-if="viewStudent" :href="route('students.id-card', viewStudent.id)" target="_blank" @click="closeView" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Print ID Card</a>
             <button @click="closeView" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
           </div>
