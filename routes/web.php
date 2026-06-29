@@ -2178,6 +2178,8 @@ Route::middleware(['auth', 'permission:atlas.modules.view'])
             ->name('modules.maturity.save');
         Route::post('/modules/{key}/settings', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'saveSettings'])
             ->name('modules.settings.save');
+        Route::get('/active-users', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'activeUsers'])
+            ->name('active-users');
     });
 
 require __DIR__.'/auth.php';

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppCard from '@/Components/AppCard.vue'
@@ -17,6 +17,8 @@ import {
   LinkIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  UsersIcon,
+  ArrowRightIcon,
 } from '@heroicons/vue/24/outline'
 import { StarIcon as StarSolid } from '@heroicons/vue/24/solid'
 import { StarIcon as StarOutline } from '@heroicons/vue/24/outline'
@@ -70,13 +72,51 @@ const filterMaturity = ref('all')
 const scoringDimension = ref(null)
 const dimensionForm    = ref({ criteria_checks: [], notes: '' })
 const savingDimension  = ref(false)
-const settingsForm     = ref({ version: '1.0.0', sla_hours: null, notes: '' })
+const settingsForm     = ref({ version: '1.0.0', sla_hours: null, notes: '', owner_id: null })
 const savingSettings   = ref(false)
+
+// ── Active Users Monitor ──────────────────────────────────────────────────────
+const activeUsersData     = ref(null)
+const activeUsersLoading  = ref(false)
+const activeUsersExpanded = ref(true)
+let   activeUsersPoll     = null
+
+async function fetchActiveUsers() {
+  activeUsersLoading.value = true
+  try {
+    const res = await window.axios.get(route('atlas.active-users'))
+    activeUsersData.value = res.data
+  } catch {
+    // silently skip — non-critical panel
+  } finally {
+    activeUsersLoading.value = false
+  }
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return ''
+  const secs = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000)
+  if (secs < 60) return `${secs}s ago`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
+onMounted(() => {
+  fetchActiveUsers()
+  activeUsersPoll = setInterval(fetchActiveUsers, 60_000)
+})
+
+onUnmounted(() => {
+  clearInterval(activeUsersPoll)
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const healthConfig = {
   healthy:  { label: 'Healthy',  badgeColor: 'green', icon: CheckCircleIcon,        iconClass: 'text-emerald-500' },
   idle:     { label: 'Idle',     badgeColor: 'slate', icon: ClockIcon,              iconClass: 'text-slate-400'   },
-  degraded: { label: 'Degraded', badgeColor: 'amber', icon: ExclamationTriangleIcon, iconClass: 'text-amber-500'   },
+  degraded: { label: 'Degraded', badgeColor: 'amber', icon: ExclamationTriangleIcon, iconClass: 'text-amber-500'  },
   critical: { label: 'Critical', badgeColor: 'red',   icon: XCircleIcon,            iconClass: 'text-red-500'     },
   info:     { label: 'Info',     badgeColor: 'slate', icon: InformationCircleIcon,  iconClass: 'text-slate-400'   },
 }
@@ -206,6 +246,20 @@ function statusDotClass(status) {
   }[status] ?? 'bg-slate-300'
 }
 
+function pingDotClass(status) {
+  return {
+    healthy:  'bg-emerald-500',
+    degraded: 'bg-amber-400',
+    critical: 'bg-red-500',
+    idle:     'bg-slate-300',
+    info:     'bg-sky-400',
+  }[status] ?? 'bg-slate-200'
+}
+
+function browserIcon(browser) {
+  return { Chrome: '🌐', Firefox: '🦊', Safari: '🧭', Edge: '🔷', Other: '💻' }[browser] ?? '💻'
+}
+
 function dimensionScore(dimKey) {
   return metricData.value?.maturity?.scores?.[dimKey]?.score ?? 0
 }
@@ -248,6 +302,7 @@ async function openDetail(mod) {
       version:   s.version   ?? '1.0.0',
       sla_hours: s.sla_hours ?? null,
       notes:     s.notes     ?? '',
+      owner_id:  s.owner_id  ?? null,
     }
   } catch {
     // silently leave metricData null — tabs will show an error state
@@ -370,6 +425,98 @@ async function saveSettings() {
       </div>
     </AppCard>
 
+    <!-- ── Active Users Monitor ──────────────────────────────────────────── -->
+    <AppCard :padded="false" class="mb-6">
+      <div class="flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-2">
+          <UsersIcon class="h-4 w-4 text-slate-500" />
+          <h2 class="text-sm font-semibold text-slate-700">Active Users</h2>
+          <span v-if="activeUsersData" class="text-xs text-slate-400">
+            · {{ timeAgo(activeUsersData.refreshed_at) }}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            @click="fetchActiveUsers"
+            :disabled="activeUsersLoading"
+            class="rounded-md p-1 text-slate-400 hover:text-slate-600 disabled:opacity-40"
+            title="Refresh"
+          >
+            <ArrowPathIcon :class="['h-3.5 w-3.5', activeUsersLoading && 'animate-spin']" />
+          </button>
+          <button
+            @click="activeUsersExpanded = !activeUsersExpanded"
+            class="rounded-md p-1 text-slate-400 hover:text-slate-600"
+          >
+            <ChevronUpIcon v-if="activeUsersExpanded" class="h-4 w-4" />
+            <ChevronDownIcon v-else class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div v-show="activeUsersExpanded" class="border-t border-slate-100">
+        <!-- Loading skeleton -->
+        <div v-if="!activeUsersData && activeUsersLoading" class="flex items-center gap-4 px-4 py-4">
+          <div v-for="i in 3" :key="i" class="h-14 w-28 animate-pulse rounded-lg bg-slate-100" />
+        </div>
+
+        <template v-else-if="activeUsersData">
+          <div class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start">
+            <!-- Stat tiles -->
+            <div class="flex shrink-0 gap-3">
+              <div class="rounded-lg bg-emerald-50 px-4 py-3 text-center">
+                <p class="text-[10px] font-medium text-emerald-500 uppercase tracking-wide">Online Now</p>
+                <p class="text-2xl font-bold text-emerald-700">{{ activeUsersData.counts.now }}</p>
+                <p class="text-[10px] text-emerald-400">&lt; 5 min</p>
+              </div>
+              <div class="rounded-lg bg-indigo-50 px-4 py-3 text-center">
+                <p class="text-[10px] font-medium text-indigo-500 uppercase tracking-wide">Recently Active</p>
+                <p class="text-2xl font-bold text-indigo-700">{{ activeUsersData.counts.recent }}</p>
+                <p class="text-[10px] text-indigo-400">last 30 min</p>
+              </div>
+              <div class="rounded-lg bg-slate-50 px-4 py-3 text-center">
+                <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Today</p>
+                <p class="text-2xl font-bold text-slate-700">{{ activeUsersData.counts.today }}</p>
+                <p class="text-[10px] text-slate-400">unique users</p>
+              </div>
+            </div>
+
+            <!-- User list -->
+            <div class="min-w-0 flex-1">
+              <div v-if="activeUsersData.users.length" class="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                <div
+                  v-for="user in activeUsersData.users"
+                  :key="user.id"
+                  class="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-3 py-2"
+                >
+                  <!-- Avatar -->
+                  <div
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                    :class="user.is_online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                  >{{ user.initials }}</div>
+                  <!-- Info -->
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-medium text-slate-800">{{ user.name }}</p>
+                    <p class="text-[10px] text-slate-400">
+                      {{ timeAgo(user.last_seen_at) }}
+                      <span class="ml-1">{{ browserIcon(user.browser) }}</span>
+                    </p>
+                  </div>
+                  <!-- Online indicator -->
+                  <span
+                    v-if="user.is_online"
+                    class="h-2 w-2 shrink-0 rounded-full bg-emerald-400"
+                    title="Online now"
+                  />
+                </div>
+              </div>
+              <p v-else class="py-2 text-sm text-slate-400">No users active in the last 30 minutes.</p>
+            </div>
+          </div>
+        </template>
+      </div>
+    </AppCard>
+
     <!-- ── External Integrations Panel ──────────────────────────────────── -->
     <AppCard :padded="true" class="mb-6">
       <template #header>
@@ -460,7 +607,7 @@ async function saveSettings() {
         </div>
 
         <!-- Maturity stars + overall % from DB scoring -->
-        <div class="mb-3 flex items-center gap-0.5">
+        <div class="mb-2 flex items-center gap-0.5">
           <StarSolid v-for="i in mod.maturity" :key="'f' + i" class="h-4 w-4 text-amber-400" />
           <StarOutline v-for="i in (5 - mod.maturity)" :key="'e' + i" class="h-4 w-4 text-slate-200" />
           <span class="ml-1.5 text-xs text-slate-500">
@@ -469,6 +616,17 @@ async function saveSettings() {
           <span v-if="mod.maturity_overall !== null" class="ml-auto rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">
             {{ mod.maturity_overall }}% scored
           </span>
+        </div>
+
+        <!-- Ping sparkline (last 7 health checks) -->
+        <div v-if="mod.recent_pings?.length" class="mb-3 flex items-center gap-1">
+          <span class="text-[10px] text-slate-400 mr-0.5">7d:</span>
+          <span
+            v-for="(ping, i) in mod.recent_pings"
+            :key="i"
+            :class="['h-2 w-2 rounded-full flex-shrink-0', pingDotClass(ping)]"
+            :title="ping"
+          />
         </div>
 
         <!-- Activity stats -->
@@ -690,12 +848,24 @@ async function saveSettings() {
                   class="text-2xl font-bold"
                   :class="metricData.metrics.operational.pending_approvals.value > 0 ? 'text-amber-600' : 'text-slate-800'"
                 >{{ formatNumber(metricData.metrics.operational.pending_approvals.value) }}</p>
-                <div v-if="metricData.metrics.operational.pending_approvals.details?.length" class="mt-1 space-y-0.5">
-                  <p
+                <!-- Per-type drill-through links -->
+                <div v-if="metricData.metrics.operational.pending_approvals.details?.length" class="mt-1 space-y-1">
+                  <div
                     v-for="cfg in metricData.metrics.operational.pending_approvals.details"
                     :key="cfg.label"
-                    class="text-[10px] text-slate-400"
-                  >{{ cfg.label }}</p>
+                    class="flex items-center justify-between gap-1"
+                  >
+                    <p class="text-[10px] text-slate-400 truncate">{{ cfg.label }}</p>
+                    <a
+                      v-if="cfg.route_name && safeRoute(cfg.route_name)"
+                      :href="safeRoute(cfg.route_name)"
+                      target="_blank"
+                      @click.stop
+                      class="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-medium text-indigo-500 hover:text-indigo-700"
+                    >
+                      View <ArrowRightIcon class="h-2.5 w-2.5" />
+                    </a>
+                  </div>
                 </div>
               </div>
 
@@ -724,7 +894,36 @@ async function saveSettings() {
               </div>
             </div>
 
-            <!-- Stub metrics -->
+            <!-- SLA Compliance (real when sla_hours configured) -->
+            <div
+              v-if="metricData.metrics.operational.sla_compliance.real"
+              class="mb-4 rounded-lg border border-slate-200 bg-white p-3"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-xs font-medium text-slate-600">SLA Compliance</p>
+                <div class="flex items-center gap-1.5">
+                  <span
+                    class="h-2 w-2 rounded-full"
+                    :class="statusDotClass(metricData.metrics.operational.sla_compliance.status)"
+                  />
+                  <span
+                    class="text-lg font-bold"
+                    :class="{
+                      'text-emerald-600': metricData.metrics.operational.sla_compliance.status === 'ok',
+                      'text-amber-600':   metricData.metrics.operational.sla_compliance.status === 'warn',
+                      'text-red-600':     metricData.metrics.operational.sla_compliance.status === 'error',
+                      'text-slate-700':   !['ok','warn','error'].includes(metricData.metrics.operational.sla_compliance.status),
+                    }"
+                  >{{ metricData.metrics.operational.sla_compliance.value !== null ? metricData.metrics.operational.sla_compliance.value + '%' : '—' }}</span>
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-400">{{ metricData.metrics.operational.sla_compliance.unit }}</p>
+              <p v-if="metricData.metrics.operational.sla_compliance.note" class="mt-0.5 text-[10px] text-slate-500">
+                {{ metricData.metrics.operational.sla_compliance.note }}
+              </p>
+            </div>
+
+            <!-- Stub metrics (excludes real ones) -->
             <div class="mb-4 grid grid-cols-2 gap-3">
               <div
                 v-for="(metric, mKey) in metricData.metrics.operational"
@@ -763,9 +962,17 @@ async function saveSettings() {
                 </div>
                 <div>
                   <label class="mb-1 block text-xs font-medium text-slate-600">Owner</label>
-                  <p class="rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-600">
-                    {{ metricData.settings?.owner?.name ?? 'Not assigned' }}
-                  </p>
+                  <select
+                    v-model="settingsForm.owner_id"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option :value="null">Not assigned</option>
+                    <option
+                      v-for="u in (metricData.users ?? [])"
+                      :key="u.id"
+                      :value="u.id"
+                    >{{ u.name }}</option>
+                  </select>
                 </div>
               </div>
               <div class="mt-3">

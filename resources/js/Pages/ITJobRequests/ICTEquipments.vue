@@ -36,6 +36,7 @@ const props = defineProps({
   users: Array,
   rooms: Array,
   filters: Object,
+  pendingSetupCount: { type: Number, default: 0 },
 })
 
 const {
@@ -537,7 +538,17 @@ const showAllChecked    = computed({
             <option value="Good Working">Good Working</option>
             <option value="For Repair">For Repair</option>
             <option value="Disposed">Disposed</option>
+            <option value="Pending Setup">Pending Setup</option>
           </select>
+          <button
+            v-if="props.pendingSetupCount > 0"
+            @click="filterStatus = 'Pending Setup'"
+            class="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+            title="Show devices that enrolled automatically and need to be completed"
+          >
+            <ExclamationTriangleIcon class="w-3.5 h-3.5" />
+            Needs Setup ({{ props.pendingSetupCount }})
+          </button>
         </div>
         <div class="flex gap-2 items-center">
           <label class="flex items-center gap-1 text-sm text-slate-600">
@@ -552,6 +563,26 @@ const showAllChecked    = computed({
             <PrinterIcon class="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      <!-- Pending Setup banner -->
+      <div
+        v-if="props.pendingSetupCount > 0 && filterStatus !== 'Pending Setup'"
+        class="flex items-center justify-between gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 text-sm"
+      >
+        <div class="flex items-center gap-2 text-orange-700">
+          <ExclamationTriangleIcon class="w-4 h-4 flex-shrink-0" />
+          <span>
+            <strong>{{ props.pendingSetupCount }} device{{ props.pendingSetupCount === 1 ? '' : 's' }}</strong>
+            enrolled via Atlas Sentinel but {{ props.pendingSetupCount === 1 ? 'has' : 'have' }} no owner, room, or status assigned yet.
+          </span>
+        </div>
+        <button
+          @click="filterStatus = 'Pending Setup'"
+          class="flex-shrink-0 text-orange-700 underline hover:no-underline font-medium"
+        >
+          Review now
+        </button>
       </div>
 
       <!-- Table card -->
@@ -597,9 +628,10 @@ const showAllChecked    = computed({
                       'bg-emerald-50 text-emerald-700': eq.status === 'Good Working',
                       'bg-amber-50 text-amber-700': eq.status === 'For Repair',
                       'bg-red-50 text-red-600': eq.status === 'Disposed',
-                      'bg-slate-100 text-slate-600': !['Good Working','For Repair','Disposed'].includes(eq.status)
+                      'bg-orange-50 text-orange-600': eq.status === 'Pending Setup',
+                      'bg-slate-100 text-slate-600': !['Good Working','For Repair','Disposed','Pending Setup'].includes(eq.status)
                     }"
-                  >{{ eq.status }}</span>
+                  >{{ eq.status ?? '—' }}</span>
                 </td>
                 <td class="px-4 py-3 text-xs">
                   <div class="flex items-center gap-2">
@@ -711,6 +743,20 @@ const showAllChecked    = computed({
 
             <!-- CREATE / EDIT FORM -->
             <form v-else @submit.prevent="submitEquipment" class="grid grid-cols-2 gap-4">
+              <!-- Pending Setup notice: auto-enrolled device needs owner/room/status -->
+              <div
+                v-if="modalMode === 'edit' && selectedEquipment?.status === 'Pending Setup'"
+                class="col-span-2 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-700"
+              >
+                <p class="font-semibold mb-1">Auto-enrolled device — complete setup below</p>
+                <p class="text-orange-600">Atlas Sentinel enrolled this device automatically. Assign an owner, room, and status to register it properly.</p>
+                <div v-if="selectedEquipment?.agent_device" class="mt-2 grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs text-orange-700 font-mono">
+                  <span v-if="selectedEquipment.agent_device.hostname"><strong>Hostname:</strong> {{ selectedEquipment.agent_device.hostname }}</span>
+                  <span v-if="selectedEquipment.agent_device.mac_address"><strong>MAC:</strong> {{ selectedEquipment.agent_device.mac_address }}</span>
+                  <span v-if="selectedEquipment.agent_device.os_version"><strong>OS:</strong> {{ selectedEquipment.agent_device.os_version }}</span>
+                  <span v-if="selectedEquipment.agent_device.agent_version"><strong>Agent:</strong> v{{ selectedEquipment.agent_device.agent_version }}</span>
+                </div>
+              </div>
               <!-- Equipment Category -->
               <div class="col-span-2">
                 <label class="block text-xs font-medium text-slate-600 mb-1">Equipment Category <span class="text-red-500">*</span></label>
