@@ -134,9 +134,6 @@ const brandPillars = [
           <a href="#modules"    class="nav-link">Modules</a>
           <a href="#hero-login" class="nav-link">Access</a>
         </nav>
-        <button @click="googleLogin" :disabled="isLoading" class="nav-cta">
-          Sign In <ArrowRightIcon class="nav-cta-icon" />
-        </button>
       </div>
     </header>
 
@@ -444,9 +441,10 @@ const brandPillars = [
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(10, 42, 94, 0.97);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(1,159,230,.15);
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 8px rgba(0,0,0,.06);
 }
 .nav-inner {
   max-width: 1200px;
@@ -463,10 +461,10 @@ const brandPillars = [
 .nav-links { display: flex; gap: 4px; margin-left: auto; }
 .nav-link  {
   padding: 7px 16px; font-size: .82rem; font-weight: 500;
-  color: var(--cyan-pale); text-decoration: none; border-radius: 8px;
+  color: #475569; text-decoration: none; border-radius: 8px;
   transition: color .15s, background .15s;
 }
-.nav-link:hover { color: #fff; background: rgba(255,255,255,.09); }
+.nav-link:hover { color: var(--navy); background: rgba(10,42,94,.05); }
 
 .nav-cta {
   display: flex; align-items: center; gap: 6px;
@@ -617,19 +615,14 @@ const brandPillars = [
 /* Login card */
 .login-card {
   position: relative; overflow: hidden;
-  background: var(--navy);
-  border: 1px solid rgba(255,255,255,.08);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-top: 3px solid var(--blue);
   border-radius: 20px; padding: 32px; width: 100%;
-  box-shadow: 0 28px 64px rgba(10,42,94,.28), inset 0 1px 0 rgba(255,255,255,.05);
+  box-shadow: 0 8px 40px rgba(10,42,94,.10);
 }
 .lc-content { position: relative; z-index: 1; }
-
-/* Soft blue→cyan glow tying the card back to the headline accent */
-.lc-glow {
-  position: absolute; inset: -60px;
-  background: radial-gradient(circle at 50% 40%, rgba(1,159,230,.18) 0%, transparent 70%);
-  pointer-events: none; z-index: 0;
-}
+.lc-glow { display: none; }
 
 .lc-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .lc-icon-wrap {
@@ -639,22 +632,23 @@ const brandPillars = [
   box-shadow: 0 4px 14px rgba(251,144,2,.35);
 }
 .lc-icon  { width: 22px; height: 22px; color: #fff; }
-.lc-title { font-size: .95rem; font-weight: 700; color: #f0f9ff; }
-.lc-sub   { font-size: .74rem; color: var(--cyan-lt); margin-top: 3px; }
+.lc-title { font-size: .95rem; font-weight: 700; color: #0a1040; }
+.lc-sub   { font-size: .74rem; color: #64748b; margin-top: 3px; }
 
-.lc-divider { height: 1px; background: rgba(255,255,255,.1); margin-bottom: 22px; }
+.lc-divider { height: 1px; background: #e2e8f0; margin-bottom: 22px; }
 
 .gbtn {
   display: flex; align-items: center; gap: 12px; width: 100%;
-  padding: 14px 18px; background: #fff; border: none;
+  padding: 14px 18px; background: #fff; border: 1px solid #e2e8f0;
   border-radius: 14px; font-size: .875rem; font-weight: 600;
   color: #1e293b; cursor: pointer;
-  box-shadow: 0 2px 12px rgba(0,0,0,.18);
-  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  transition: transform .2s, box-shadow .2s, border-color .2s;
 }
 .gbtn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(1,159,230,.28);
+  border-color: var(--cyan-lt);
+  box-shadow: 0 8px 28px rgba(8,103,219,.15);
 }
 .gbtn:active:not(:disabled) { transform: translateY(0); }
 .gbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
@@ -671,12 +665,12 @@ const brandPillars = [
 
 .lc-notice {
   display: flex; align-items: flex-start; gap: 8px;
-  background: rgba(1,159,230,.1); border: 1px solid rgba(1,159,230,.22);
+  background: #f0f9ff; border: 1px solid #dbeafe;
   border-radius: 12px; padding: 10px 12px;
-  font-size: .72rem; color: var(--cyan-lt); margin-top: 18px; line-height: 1.5;
+  font-size: .72rem; color: #0369a1; margin-top: 18px; line-height: 1.5;
 }
 .lc-notice strong { white-space: nowrap; }
-.notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--cyan); }
+.notice-icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--blue); }
 
 .dev-link {
   font-size: .64rem; color: #4a5568;
