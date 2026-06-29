@@ -12,6 +12,7 @@ const props = defineProps({
   equipments: Array,
   rows: Number,
   cols: Number,
+  latestAgentVersion: { type: String, default: null },
 })
 
 const equipmentList = ref(props.equipments.map(eq => ({ ...eq })))
@@ -190,6 +191,7 @@ function openSpecs(eq) {
     <AgentSpecsModal
       v-if="showSpecsModal"
       :equipment="selectedEquipment"
+      :latestAgentVersion="latestAgentVersion"
       @close="showSpecsModal = false"
     />
   </AdminLayout>

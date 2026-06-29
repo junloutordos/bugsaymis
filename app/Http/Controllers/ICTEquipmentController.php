@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AtlasSentinelRelease;
 use App\Models\ICTEquipment;
 use App\Models\IctEquipmentAssignmentHistory;
 use App\Models\IctEquipmentDevice;
@@ -74,8 +75,9 @@ class ICTEquipmentController extends Controller
             'equipments'        => $equipments,
             'users'             => $users,
             'rooms'             => $rooms,
-            'filters'           => $request->only('search', 'category', 'status', 'per_page'),
-            'pendingSetupCount' => ICTEquipment::where('status', 'Pending Setup')->count(),
+            'filters'            => $request->only('search', 'category', 'status', 'per_page'),
+            'pendingSetupCount'  => ICTEquipment::where('status', 'Pending Setup')->count(),
+            'latestAgentVersion' => AtlasSentinelRelease::latestRelease()?->version,
         ]);
     }
 
