@@ -208,7 +208,7 @@ class StudentController extends Controller
             ->first();
 
         $middle   = $student->middlename ? ' ' . mb_strtoupper(mb_substr($student->middlename, 0, 1)) . '.' : '';
-        $fullName = trim("{$student->lastname}, {$student->firstname}{$middle}");
+        $fullName = mb_strtoupper(trim("{$student->lastname}, {$student->firstname}{$middle}"));
 
         $barcodeSvg = $student->pisaysystemID
             ? (new BarcodeGeneratorSVG())->getBarcode($student->pisaysystemID, BarcodeGeneratorSVG::TYPE_CODE_128, 2, 40)
