@@ -120,7 +120,7 @@ class StudentController extends Controller
         'student_id', 'lrn', 'first_name', 'last_name', 'middle_name', 'suffix',
         'firstname', 'lastname', 'middlename', 'fname', 'lname', 'mname',
         'given_name', 'surname', 'name', 'full_name',
-        'sex', 'gender', 'birthdate', 'birth_date', 'age',
+        'sex', 'gender', 'birthday', 'birthdate', 'birth_date', 'age',
         'grade_level', 'grade', 'year_level', 'strand', 'track', 'section', 'section_id',
         'address', 'barangay', 'city', 'municipality', 'province', 'zip',
         'contact_no', 'phone', 'mobile', 'email',
@@ -181,7 +181,7 @@ class StudentController extends Controller
             }
         }
 
-        DB::table('students')->where('id', $id)->update($data + ['updated_at' => now()]);
+        DB::table('students')->where('id', $id)->update($data);
 
         return redirect()->route('students.index')->with('success', 'Student updated.');
     }
