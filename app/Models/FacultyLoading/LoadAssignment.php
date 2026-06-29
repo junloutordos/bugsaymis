@@ -107,7 +107,7 @@ class LoadAssignment extends Model
     public function getDisplayLabelAttribute(): string
     {
         if ($this->isTeaching() && $this->subject) {
-            return $this->subject->name . ' (Section ' . $this->section_id . ')';
+            return $this->subject->name;
         }
         return $this->description ?? ucfirst($this->assignment_type);
     }

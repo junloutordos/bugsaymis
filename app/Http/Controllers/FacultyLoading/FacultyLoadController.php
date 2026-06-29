@@ -75,7 +75,8 @@ class FacultyLoadController extends Controller
                 'is_current' => $t->is_current,
             ]);
 
-        $loadData = $load ? $this->mapLoad($load, true) : null;
+        $sectionMap = DB::table('sections')->pluck('sectionname', 'id')->all();
+        $loadData   = $load ? $this->mapLoad($load, true, $sectionMap) : null;
 
         return Inertia::render('FacultyLoading/MyLoad', [
             'load'        => $loadData,
@@ -250,7 +251,7 @@ class FacultyLoadController extends Controller
         ];
     }
 
-    private function mapLoad(FacultyLoad $l, bool $withAssignments = false): array
+    private function mapLoad(FacultyLoad $l, bool $withAssignments = false, array $sectionMap = []): array
     {
         $base = [
             'id'                 => $l->id,
@@ -285,6 +286,8 @@ class FacultyLoadController extends Controller
                 'load_units'      => (float) $a->load_units,
                 'description'     => $a->description,
                 'display_label'   => $a->display_label,
+                'section_id'      => $a->section_id,
+                'section_name'    => $a->section_id ? ($sectionMap[$a->section_id] ?? null) : null,
                 'subject'         => $a->subject ? [
                     'id'   => $a->subject->id,
                     'code' => $a->subject->code,

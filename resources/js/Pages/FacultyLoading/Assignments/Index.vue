@@ -10,6 +10,10 @@
           <p class="text-sm text-slate-500 mt-0.5">Assign teaching, research, admin and co-curricular loads to faculty</p>
         </div>
         <div class="flex gap-2">
+          <button @click="syncLoads"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg font-medium transition-colors shrink-0">
+            <ArrowPathIcon class="h-4 w-4" /> Re-sync Loads
+          </button>
           <button @click="openAutoAssign()"
             class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg font-medium transition-colors shrink-0">
             <SparklesIcon class="h-4 w-4" /> Auto-Assign
@@ -126,7 +130,7 @@
           <div v-for="a in detail.faculty?.assignments" :key="a.id"
             class="px-6 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/60">
             <div class="min-w-0">
-              <p class="text-sm font-medium text-slate-800 truncate">{{ a.display_label }}</p>
+              <p class="text-sm font-medium text-slate-800 truncate">{{ assignmentLabel(a) }}</p>
               <div class="flex items-center gap-2 mt-0.5">
                 <span :class="typeBadge(a.assignment_type)"
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium">
@@ -678,8 +682,21 @@ function save() {
   }
 }
 
+function assignmentLabel(a) {
+  if (a.assignment_type === 'teaching' && a.subject) {
+    return a.section_name ? `${a.subject.name} (${a.section_name})` : a.subject.name
+  }
+  return a.display_label
+}
+
+function syncLoads() {
+  useForm({ term_id: filters.term_id }).post(route('faculty-loading.assignments.sync-loads'), {
+    onSuccess: () => router.reload({ only: ['facultyLoads'] }),
+  })
+}
+
 function remove(a) {
-  if (!confirm(`Remove "${a.display_label}" assignment?`)) return
+  if (!confirm(`Remove "${assignmentLabel(a)}" assignment?`)) return
   useForm({}).delete(route('faculty-loading.assignments.destroy', a.id), {
     onSuccess: () => router.reload({ only: ['assignments'] }),
   })

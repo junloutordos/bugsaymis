@@ -82,7 +82,7 @@
             </thead>
             <tbody class="divide-y divide-slate-50">
               <tr v-for="a in load.assignments" :key="a.id" class="hover:bg-slate-50/50">
-                <td class="px-4 py-3 text-slate-800">{{ a.display_label }}</td>
+                <td class="px-4 py-3 text-slate-800">{{ assignmentLabel(a) }}</td>
                 <td class="px-4 py-3">
                   <span :class="typeBadge(a.assignment_type)"
                     class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
@@ -200,6 +200,13 @@ function ocStatusClass(s) {
     rejected:     'bg-red-50 text-red-600',
     pending:      'bg-slate-50 text-slate-600',
   }[s] ?? 'bg-slate-50 text-slate-600'
+}
+
+function assignmentLabel(a) {
+  if (a.assignment_type === 'teaching' && a.subject) {
+    return a.section_name ? `${a.subject.name} (${a.section_name})` : a.subject.name
+  }
+  return a.display_label
 }
 
 function typeBadge(type) {
