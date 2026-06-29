@@ -12,12 +12,22 @@ class AtlasModuleHealthService
 
     public function getAllModuleHealth(): array
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function () {
-            return collect(config('atlas-modules.modules', []))
-                ->map(fn ($m) => $this->checkModule($m))
-                ->values()
-                ->all();
-        });
+        $cached = Cache::get(self::CACHE_KEY);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $modules = collect(config('atlas-modules.modules', []))
+            ->map(fn ($m) => $this->checkModule($m))
+            ->values()
+            ->all();
+
+        $modules = $this->mergeRecentPings($modules);
+
+        Cache::put(self::CACHE_KEY, $modules, self::CACHE_TTL);
+        $this->logPings($modules);
+
+        return $modules;
     }
 
     public function clearCache(): void
@@ -52,6 +62,51 @@ class AtlasModuleHealthService
             ->all();
     }
 
+    public function logPings(array $modules): void
+    {
+        try {
+            $now  = now();
+            $rows = array_map(fn ($m) => [
+                'module_key'    => $m['key'],
+                'health_status' => $m['health_status'],
+                'checked_at'    => $now,
+            ], $modules);
+
+            DB::table('atlas_health_pings')->insert($rows);
+
+            // Prune pings older than 30 days to keep the table small
+            DB::table('atlas_health_pings')
+                ->where('checked_at', '<', now()->subDays(30))
+                ->delete();
+        } catch (\Throwable) {
+            // Table may not exist yet (before migration)
+        }
+    }
+
+    private function mergeRecentPings(array $modules): array
+    {
+        try {
+            $keys = array_column($modules, 'key');
+
+            $pings = DB::table('atlas_health_pings')
+                ->whereIn('module_key', $keys)
+                ->where('checked_at', '>=', now()->subDays(7))
+                ->orderBy('module_key')
+                ->orderBy('checked_at')
+                ->get(['module_key', 'health_status'])
+                ->groupBy('module_key')
+                ->map(fn ($rows) => $rows->pluck('health_status')->slice(-7)->values()->toArray())
+                ->toArray();
+
+            return array_map(function ($m) use ($pings) {
+                $m['recent_pings'] = $pings[$m['key']] ?? [];
+                return $m;
+            }, $modules);
+        } catch (\Throwable) {
+            return array_map(fn ($m) => array_merge($m, ['recent_pings' => []]), $modules);
+        }
+    }
+
     private function checkModule(array $module): array
     {
         $table = $module['primary_table'] ?? null;
@@ -71,13 +126,9 @@ class AtlasModuleHealthService
             ]);
         }
 
-        // Check failed jobs before the table query so we still get the count
-        // even if the module table itself throws.
         $failedJobs = $this->countFailedJobs($module['queue_names'] ?? []);
 
         try {
-            // Null activity_col means the table has no timestamp column (e.g. EGCU static data).
-            // Fall back to a plain row count: any rows → healthy, zero rows → idle.
             if ($col === null) {
                 $totalRows    = DB::table($table)->count();
                 $activity30d  = null;
@@ -101,7 +152,6 @@ class AtlasModuleHealthService
                 };
             }
         } catch (\Throwable) {
-            // Table missing, wrong column, or connection error → surface as critical
             $status       = 'critical';
             $activity30d  = null;
             $activity7d   = null;
