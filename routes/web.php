@@ -2019,6 +2019,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/class-records',      [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'index'])->name('class-records.page.index');
     Route::get('/class-records/{classRecord}', [\App\Http\Controllers\ClassRecord\ClassRecordPageController::class, 'show'])->name('class-records.page.show');
 });
+// ── PSGC Address Lookup (public geographic data, no auth required) ────────────
+Route::prefix('api/psgc')->name('psgc.')->controller(\App\Http\Controllers\PSGCController::class)->group(function () {
+    Route::get('regions',   'regions');
+    Route::get('provinces', 'provinces');
+    Route::get('cities',    'cities');
+    Route::get('barangays', 'barangays');
+});
+
 Route::middleware(['auth'])->prefix('api/v1')->group(function () {
     // Reference data — grading options
     Route::get('/grading-options',                            [\App\Http\Controllers\ClassRecord\GradingOptionController::class, 'index'])->name('grading-options.index');
