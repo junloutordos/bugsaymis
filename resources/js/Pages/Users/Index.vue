@@ -14,6 +14,16 @@ import { useUsers } from "@/Composables/useUsers.js"
 import { storageUrl } from "@/Composables/useStorage.js"
 import { ref, watch, computed } from "vue"
 import { useSubmit } from "@/Composables/useSubmit"
+import AppButton from "@/Components/AppButton.vue"
+import AppCard from "@/Components/AppCard.vue"
+import AppFilterBar from "@/Components/AppFilterBar.vue"
+import AppIconButton from "@/Components/AppIconButton.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppModal from "@/Components/AppModal.vue"
+import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppSelect from "@/Components/AppSelect.vue"
+import PaginationControl from "@/Components/PaginationControl.vue"
+import { TH, TH_C, TD, TD_MONO, TD_END, TR } from "@/Composables/useTableClasses.js"
 
 const props = defineProps({
   users:        Array,
@@ -222,84 +232,52 @@ function formatSg(user) {
   <AdminLayout :title="props.pageTitle || 'Users'">
     <div>
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800 truncate">{{ props.headerTitle || 'Users List' }}</h1>
-        <button
-          v-if="!isInactivePage"
-          @click="openModal('create')"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm shrink-0"
-        >
-          <PlusIcon class="w-4 h-4" />
-          <span class="hidden sm:inline">{{ isEmployeesPage ? 'New Employee' : 'New User' }}</span>
-          <span class="sm:hidden">New</span>
-        </button>
-      </div>
+      <AppPageHeader :title="props.headerTitle || 'Users List'">
+        <template #actions>
+          <AppButton v-if="!isInactivePage" @click="openModal('create')">
+            <PlusIcon class="h-4 w-4" />
+            <span class="hidden sm:inline">{{ isEmployeesPage ? 'New Employee' : 'New User' }}</span>
+            <span class="sm:hidden">New</span>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-      <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4">
-        <div class="flex flex-wrap items-end gap-3">
-          <!-- Search -->
-          <div class="flex-1 min-w-[160px]">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Search</label>
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Name, position, email…"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-            />
-          </div>
+      <AppFilterBar :result-label="`${allFiltered.length} employee${allFiltered.length !== 1 ? 's' : ''}`">
+        <AppInput
+          v-model="searchQuery"
+          label="Search"
+          placeholder="Name, position, email..."
+          class="min-w-[180px] flex-1"
+        />
 
-          <!-- Division filter -->
-          <div class="min-w-[170px]">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Division</label>
-            <select v-model="filterDivision"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-              <option value="">All Divisions</option>
-              <option v-for="d in divisionsList" :key="d.id" :value="d.id">{{ d.division_name }}</option>
-            </select>
-          </div>
+        <AppSelect v-model="filterDivision" label="Division" placeholder="All Divisions" class="min-w-[170px]">
+          <option v-for="d in divisionsList" :key="d.id" :value="d.id">{{ d.division_name }}</option>
+        </AppSelect>
 
-          <!-- Employee Category filter -->
-          <div class="min-w-[170px]">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Category</label>
-            <select v-model="filterCategory"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-              <option value="">All Categories</option>
-              <option v-for="cat in EMP_CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
-            </select>
-          </div>
+        <AppSelect v-model="filterCategory" label="Category" placeholder="All Categories" class="min-w-[170px]">
+          <option v-for="cat in EMP_CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
+        </AppSelect>
 
-          <!-- Sex filter -->
-          <div class="min-w-[120px]">
-            <label class="block text-xs font-medium text-slate-500 mb-1">Sex</label>
-            <select v-model="filterSex"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-              <option value="">All</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-            </select>
-          </div>
+        <AppSelect v-model="filterSex" label="Sex" placeholder="All" class="min-w-[120px]">
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </AppSelect>
 
-          <!-- Clear filters -->
-          <button
+        <template #actions>
+          <AppButton
             v-if="filterDivision || filterCategory || filterSex || searchQuery"
+            variant="secondary"
+            size="sm"
             @click="filterDivision = ''; filterCategory = ''; filterSex = ''; searchQuery = ''"
-            class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
           >
-            <XMarkIcon class="w-3.5 h-3.5" />
+            <XMarkIcon class="h-3.5 w-3.5" />
             Clear
-          </button>
-
-          <!-- Result count -->
-          <span class="ml-auto text-xs text-slate-400 self-end pb-0.5">
-            {{ allFiltered.length }} employee{{ allFiltered.length !== 1 ? 's' : '' }}
-          </span>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Main card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
 
         <!-- Mobile Cards -->
         <div class="sm:hidden p-4 space-y-3">
@@ -310,21 +288,21 @@ function formatSg(user) {
                 <p class="text-xs text-slate-500 truncate">{{ user.position ?? user.email }}</p>
               </div>
               <div class="flex gap-1 shrink-0">
-                <button @click="viewUser(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                <AppIconButton label="View" @click="viewUser(user)">
                   <EyeIcon class="w-4 h-4" />
-                </button>
-                <button v-if="!isInactivePage" @click="openModal('edit', user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                </AppIconButton>
+                <AppIconButton v-if="!isInactivePage" label="Edit" @click="openModal('edit', user)">
                   <PencilSquareIcon class="w-4 h-4" />
-                </button>
-                <button v-if="isEmployeesPage && !isInactivePage" @click="openSgModal(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Assign Salary Grade">
+                </AppIconButton>
+                <AppIconButton v-if="isEmployeesPage && !isInactivePage" label="Assign Salary Grade" variant="success" @click="openSgModal(user)">
                   <BanknotesIcon class="w-4 h-4" />
-                </button>
-                <button v-if="isInactivePage" @click="activateUser(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Activate">
+                </AppIconButton>
+                <AppIconButton v-if="isInactivePage" label="Activate" variant="success" @click="activateUser(user)">
                   <PlusIcon class="w-4 h-4" />
-                </button>
-                <button v-else @click="deleteUser(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors">
+                </AppIconButton>
+                <AppIconButton v-else label="Deactivate" variant="danger" @click="deleteUser(user)">
                   <TrashIcon class="w-4 h-4" />
-                </button>
+                </AppIconButton>
               </div>
             </div>
             <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
@@ -341,25 +319,25 @@ function formatSg(user) {
           <table class="min-w-full divide-y divide-slate-100 text-sm">
             <thead class="bg-slate-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sex</th>
-                <th v-if="!isEmployeesPage" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
-                <th v-if="isEmployeesPage" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Emp. No.</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Position</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Division</th>
-                <th v-if="isEmployeesPage" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
-                <th v-if="isEmployeesPage" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Salary Grade</th>
-                <th v-if="!isEmployeesPage" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Office</th>
-                <th v-if="!isEmployeesPage" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created At</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+                <th :class="TH">#</th>
+                <th :class="TH">Name</th>
+                <th :class="TH">Sex</th>
+                <th v-if="!isEmployeesPage" :class="TH">Email</th>
+                <th v-if="isEmployeesPage" :class="TH">Emp. No.</th>
+                <th :class="TH">Position</th>
+                <th :class="TH">Division</th>
+                <th v-if="isEmployeesPage" :class="TH">Category</th>
+                <th v-if="isEmployeesPage" :class="TH">Salary Grade</th>
+                <th v-if="!isEmployeesPage" :class="TH">Office</th>
+                <th v-if="!isEmployeesPage" :class="TH">Created At</th>
+                <th :class="TH_C">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              <tr v-for="user in displayedUsers" :key="user.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-slate-700">{{ user.id }}</td>
+              <tr v-for="user in displayedUsers" :key="user.id" :class="TR">
+                <td :class="TD">{{ user.id }}</td>
                 <td class="px-4 py-3 font-medium text-slate-800">{{ user.name }}</td>
-                <td class="px-4 py-3">
+                <td :class="TD">
                   <div class="flex items-center gap-1.5">
                     <svg v-if="user.sex === 'Male'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" stroke-width="5">
                       <circle cx="26" cy="38" r="14" /><line x1="36" y1="28" x2="54" y2="10" /><line x1="42" y1="10" x2="54" y2="10" /><line x1="54" y1="10" x2="54" y2="22" />
@@ -370,58 +348,56 @@ function formatSg(user) {
                     <span class="text-xs text-slate-500">{{ user.sex ?? '—' }}</span>
                   </div>
                 </td>
-                <td v-if="!isEmployeesPage" class="px-4 py-3 text-slate-700">{{ user.email }}</td>
-                <td v-if="isEmployeesPage" class="px-4 py-3 font-mono text-xs text-slate-600">{{ user.employee_no ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-700">{{ user.position ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-700 text-xs">{{ user.division?.division_name ?? '—' }}</td>
-                <td v-if="isEmployeesPage" class="px-4 py-3">
+                <td v-if="!isEmployeesPage" :class="TD">{{ user.email }}</td>
+                <td v-if="isEmployeesPage" :class="TD_MONO">{{ user.employee_no ?? '—' }}</td>
+                <td :class="TD">{{ user.position ?? '—' }}</td>
+                <td class="px-4 py-3 text-xs text-slate-700">{{ user.division?.division_name ?? '—' }}</td>
+                <td v-if="isEmployeesPage" :class="TD">
                   <span v-if="user.emp_category" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
                     :class="user.emp_category?.includes('Teaching') && !user.emp_category?.includes('Non') ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'">
                     {{ user.emp_category }}
                   </span>
                   <span v-else class="text-slate-400">—</span>
                 </td>
-                <td v-if="isEmployeesPage" class="px-4 py-3">
+                <td v-if="isEmployeesPage" :class="TD">
                   <span v-if="user.salary_grade" class="text-xs font-semibold text-emerald-700">
                     SG {{ user.salary_grade }}
                     <span class="font-normal text-slate-400"> / Step {{ user.salary_step ?? 1 }}</span>
                   </span>
                   <span v-else class="text-slate-400 text-xs">Not set</span>
                 </td>
-                <td v-if="!isEmployeesPage" class="px-4 py-3 text-slate-700">{{ user.office?.name ?? user.office ?? '—' }}</td>
-                <td v-if="!isEmployeesPage" class="px-4 py-3 text-slate-700">{{ new Date(user.created_at).toLocaleDateString() }}</td>
-                <td class="px-4 py-3 text-center">
+                <td v-if="!isEmployeesPage" :class="TD">{{ user.office?.name ?? user.office ?? '—' }}</td>
+                <td v-if="!isEmployeesPage" :class="TD">{{ new Date(user.created_at).toLocaleDateString() }}</td>
+                <td :class="TD_END">
                   <div class="flex justify-center gap-1 items-center">
                     <template v-if="!isInactivePage">
-                      <button @click="viewUser(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                      <AppIconButton label="View" @click="viewUser(user)">
                         <EyeIcon class="w-4 h-4" />
-                      </button>
-                      <button @click="openModal('edit', user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                      </AppIconButton>
+                      <AppIconButton label="Edit" @click="openModal('edit', user)">
                         <PencilSquareIcon class="w-4 h-4" />
-                      </button>
+                      </AppIconButton>
                       <!-- Salary grade (employees page only) -->
-                      <button v-if="isEmployeesPage" @click="openSgModal(user)"
-                        class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Assign / Update Salary Grade">
+                      <AppIconButton v-if="isEmployeesPage" label="Assign / Update Salary Grade" variant="success" @click="openSgModal(user)">
                         <BanknotesIcon class="w-4 h-4" />
-                      </button>
+                      </AppIconButton>
                       <!-- Signature upload -->
                       <div class="relative">
                         <input :id="'sig-input-' + user.id" type="file" accept=".png,image/png" class="hidden" @change="(e) => handleUpload(user, e)" />
-                        <button @click.prevent="openSignaturePicker(user)" :disabled="isUploading" title="Upload signature (PNG)"
-                          class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50">
+                        <AppIconButton label="Upload signature (PNG)" :disabled="isUploading" @click.prevent="openSignaturePicker(user)">
                           <ArrowUpOnSquareIcon class="w-4 h-4" />
-                        </button>
+                        </AppIconButton>
                       </div>
                     </template>
                     <template v-if="isInactivePage">
-                      <button @click="activateUser(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-emerald-600 transition-colors" title="Activate user">
+                      <AppIconButton label="Activate user" variant="success" @click="activateUser(user)">
                         <PlusIcon class="w-4 h-4" />
-                      </button>
+                      </AppIconButton>
                     </template>
                     <template v-else>
-                      <button @click="deleteUser(user)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors" title="Deactivate">
+                      <AppIconButton label="Deactivate" variant="danger" @click="deleteUser(user)">
                         <TrashIcon class="w-4 h-4" />
-                      </button>
+                      </AppIconButton>
                     </template>
                   </div>
                 </td>
@@ -436,30 +412,22 @@ function formatSg(user) {
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click="currentPage--" :disabled="currentPage === 1"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">
-            Prev
-          </button>
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="currentPage++" :disabled="currentPage === totalPages"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">
-            Next
-          </button>
-        </div>
-      </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="allFiltered.length"
+          @prev="currentPage--"
+          @next="currentPage++"
+        />
+      </AppCard>
 
       <!-- ── Edit / Create Modal ───────────────────────────────────────────── -->
-      <div v-if="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center bg-slate-900/50 z-50 p-4 sm:p-0">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl sm:max-w-md relative max-h-[90vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">
-              {{ modalMode === 'create' ? (isEmployeesPage ? 'New Employee' : 'New User') : modalMode === 'edit' ? 'Edit User' : 'View User' }}
-            </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" @click="closeModal"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-          </div>
-
-          <div class="px-6 py-5">
+      <AppModal
+        :show="showModal"
+        :title="modalMode === 'create' ? (isEmployeesPage ? 'New Employee' : 'New User') : modalMode === 'edit' ? 'Edit User' : 'View User'"
+        size="3xl"
+        @close="closeModal"
+      >
             <!-- VIEW MODE -->
             <div v-if="modalMode === 'view' && selectedUser" class="space-y-2">
               <div class="flex items-center gap-4">
@@ -599,34 +567,25 @@ function formatSg(user) {
               </div>
 
               <div class="flex justify-end gap-2 pt-4 sm:col-span-2">
-                <button type="button" @click="closeModal"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                <AppButton type="button" variant="secondary" @click="closeModal">
                   Cancel
-                </button>
-                <button type="submit"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                </AppButton>
+                <AppButton type="submit">
                   Save
-                </button>
+                </AppButton>
               </div>
             </form>
-          </div>
-        </div>
-      </div>
+      </AppModal>
 
       <!-- ── Salary Grade Modal ────────────────────────────────────────────── -->
-      <div v-if="showSgModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm relative">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-semibold text-slate-800">Assign Salary Grade</h2>
-              <p class="text-xs text-slate-500 mt-0.5 truncate">{{ sgTarget?.name }}</p>
-            </div>
-            <button @click="closeSgModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
-          </div>
-
-          <div class="px-6 py-5 space-y-4">
+      <AppModal
+        :show="showSgModal"
+        title="Assign Salary Grade"
+        :subtitle="sgTarget?.name"
+        size="sm"
+        @close="closeSgModal"
+      >
+          <div class="space-y-4">
             <!-- Grade select -->
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Salary Grade <span class="text-red-500">*</span></label>
@@ -653,18 +612,15 @@ function formatSg(user) {
             </div>
 
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" @click="closeSgModal"
-                class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+              <AppButton type="button" variant="secondary" @click="closeSgModal">
                 Cancel
-              </button>
-              <button @click="saveSalaryGrade" :disabled="!sgForm.salary_grade || sgSaving"
-                class="px-5 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg transition-colors">
+              </AppButton>
+              <AppButton variant="success" :disabled="!sgForm.salary_grade || sgSaving" @click="saveSalaryGrade">
                 {{ sgSaving ? 'Saving…' : 'Save' }}
-              </button>
+              </AppButton>
             </div>
           </div>
-        </div>
-      </div>
+      </AppModal>
 
     </div>
   </AdminLayout>
