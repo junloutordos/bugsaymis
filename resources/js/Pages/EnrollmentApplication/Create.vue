@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import { CheckCircleIcon, ChevronRightIcon, ChevronLeftIcon } from '@heroicons/vue/24/outline'
+import AddressPicker from '@/Components/AddressPicker.vue'
 
 const props = defineProps({
   schoolYear: Object,
@@ -44,9 +45,45 @@ const form = useForm({
   guardian_relationship:   '',
   guardian_contact:        '',
   guardian_email:          '',
-  address:                 '',
+  address:              '',
+  address_house:        '',
+  address_street:       '',
+  address_subdivision:  '',
+  address_barangay:     '',
+  address_city:         '',
+  address_province:     '',
+  address_region:       '',
+  address_zip:          '',
   contact_no:              '',
   email:                   '',
+})
+
+const addressModel = computed({
+  get: () => ({
+    house:       form.address_house,
+    street:      form.address_street,
+    subdivision: form.address_subdivision,
+    barangay:    form.address_barangay,
+    city:        form.address_city,
+    province:    form.address_province,
+    region:      form.address_region,
+    zip:         form.address_zip,
+  }),
+  set: (val) => {
+    form.address_house       = val.house        ?? ''
+    form.address_street      = val.street       ?? ''
+    form.address_subdivision = val.subdivision  ?? ''
+    form.address_barangay    = val.barangay     ?? ''
+    form.address_city        = val.city         ?? ''
+    form.address_province    = val.province     ?? ''
+    form.address_region      = val.region       ?? ''
+    form.address_zip         = val.zip          ?? ''
+    form.address = [
+      val.house, val.street, val.subdivision,
+      val.barangay ? 'Brgy. ' + val.barangay : '',
+      val.city, val.province,
+    ].filter(Boolean).join(', ')
+  },
 })
 
 // Fields required per step (step 0 is always valid — grade has a default)
@@ -58,7 +95,12 @@ const stepFields = {
     'mother_name', 'mother_occupation', 'mother_contact', 'mother_email',
     'guardian_name', 'guardian_relationship', 'guardian_contact', 'guardian_email',
   ],
-  4: ['address', 'contact_no', 'email'],
+  4: ['address_city', 'address_region', 'contact_no', 'email'],
+}
+
+const addressFieldMessages = {
+  address_region: 'Please select a region.',
+  address_city:   'Please select a city/municipality.',
 }
 
 function validateStep(s) {
@@ -66,7 +108,7 @@ function validateStep(s) {
   const errors = {}
   for (const f of fields) {
     const val = String(form[f] ?? '').trim()
-    if (!val) errors[f] = 'This field is required. Enter N/A if not applicable.'
+    if (!val) errors[f] = addressFieldMessages[f] ?? 'This field is required. Enter N/A if not applicable.'
     else if (f === 'birthday' && isNaN(Date.parse(val))) errors[f] = 'Please enter a valid date.'
   }
   stepErrors.value = errors
@@ -312,8 +354,9 @@ function err(field) {
           <div class="space-y-4">
             <div>
               <label :class="labelCls">Home Address <span class="text-red-500">*</span></label>
-              <textarea v-model="form.address" :class="inputCls" rows="3" placeholder="House No., Street, Barangay, City/Municipality, Province" />
-              <p v-if="err('address')" class="text-xs text-red-500 mt-1">{{ err('address') }}</p>
+              <AddressPicker v-model="addressModel" />
+              <p v-if="err('address_region')" class="text-xs text-red-500 mt-1">{{ err('address_region') }}</p>
+              <p v-if="err('address_city')" class="text-xs text-red-500 mt-1">{{ err('address_city') }}</p>
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>

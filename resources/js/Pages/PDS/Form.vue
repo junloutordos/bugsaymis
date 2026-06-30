@@ -13,6 +13,7 @@ import {
 } from '@heroicons/vue/24/solid'
 import { ref, watch, computed } from 'vue'
 import Swal from 'sweetalert2'
+import AddressPicker from '@/Components/AddressPicker.vue'
 
 const passportPhotoUploading = ref(false)
 const passportPhotoError = ref(null)
@@ -268,6 +269,50 @@ watch(
   ],
   () => { if (sameAsResidential.value) copyResidentialToPermanent() }
 )
+
+const residentialAddress = computed({
+  get: () => ({
+    house:       form.personal_info.residential_house       ?? '',
+    street:      form.personal_info.residential_street      ?? '',
+    subdivision: form.personal_info.residential_subdivision ?? '',
+    barangay:    form.personal_info.residential_barangay    ?? '',
+    city:        form.personal_info.residential_city        ?? '',
+    province:    form.personal_info.residential_province    ?? '',
+    region:      '',
+    zip:         form.personal_info.residential_zip_code    ?? '',
+  }),
+  set: (val) => {
+    form.personal_info.residential_house       = val.house        ?? ''
+    form.personal_info.residential_street      = val.street       ?? ''
+    form.personal_info.residential_subdivision = val.subdivision  ?? ''
+    form.personal_info.residential_barangay    = val.barangay     ?? ''
+    form.personal_info.residential_city        = val.city         ?? ''
+    form.personal_info.residential_province    = val.province     ?? ''
+    form.personal_info.residential_zip_code    = val.zip          ?? ''
+  },
+})
+
+const permanentAddress = computed({
+  get: () => ({
+    house:       form.personal_info.permanent_house       ?? '',
+    street:      form.personal_info.permanent_street      ?? '',
+    subdivision: form.personal_info.permanent_subdivision ?? '',
+    barangay:    form.personal_info.permanent_barangay    ?? '',
+    city:        form.personal_info.permanent_city        ?? '',
+    province:    form.personal_info.permanent_province    ?? '',
+    region:      '',
+    zip:         form.personal_info.permanent_zip_code    ?? '',
+  }),
+  set: (val) => {
+    form.personal_info.permanent_house       = val.house        ?? ''
+    form.personal_info.permanent_street      = val.street       ?? ''
+    form.personal_info.permanent_subdivision = val.subdivision  ?? ''
+    form.personal_info.permanent_barangay    = val.barangay     ?? ''
+    form.personal_info.permanent_city        = val.city         ?? ''
+    form.personal_info.permanent_province    = val.province     ?? ''
+    form.personal_info.permanent_zip_code    = val.zip          ?? ''
+  },
+})
 
 /* =========================
    SUBMIT WITH VALIDATION
@@ -635,40 +680,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
 
   <!-- Residential Address -->
   <h4 class="font-semibold text-lg mt-4 mb-2">Residential Address</h4>
-  <div class="grid grid-cols-3 gap-4">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">House/Block/Lot No.</label>
-      <input v-model="form.personal_info.residential_house" class="input w-full" :readonly="!editMode" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
-      <input v-model="form.personal_info.residential_street" class="input w-full" :readonly="!editMode" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Subdivision/Village</label>
-      <input v-model="form.personal_info.residential_subdivision" class="input w-full" :readonly="!editMode" />
-    </div>
-  </div>
-  <div class="grid grid-cols-3 gap-4 mt-2">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
-      <input v-model="form.personal_info.residential_barangay" class="input w-full" :readonly="!editMode" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">City/Municipality</label>
-      <input v-model="form.personal_info.residential_city" class="input w-full" :readonly="!editMode" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
-      <input v-model="form.personal_info.residential_province" class="input w-full" :readonly="!editMode" />
-    </div>
-  </div>
-  <div class="grid grid-cols-4 gap-4 mt-2">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Zip Code</label>
-      <input v-model="form.personal_info.residential_zip_code" class="input w-full" :readonly="!editMode" />
-    </div>
-  </div>
+  <AddressPicker v-model="residentialAddress" :readonly="!editMode" />
 
   <!-- Permanent Address -->
   <div class="flex items-center gap-2 mt-4">
@@ -677,40 +689,7 @@ const exportPDS = (id) => { window.location.href = `/pds/${id}/export` }
   </div>
 
   <h4 class="font-semibold text-lg mt-2 mb-2">Permanent Address</h4>
-  <div class="grid grid-cols-3 gap-4">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">House/Block/Lot No.</label>
-      <input v-model="form.personal_info.permanent_house" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Street</label>
-      <input v-model="form.personal_info.permanent_street" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Subdivision/Village</label>
-      <input v-model="form.personal_info.permanent_subdivision" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-  </div>
-  <div class="grid grid-cols-3 gap-4 mt-2">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Barangay</label>
-      <input v-model="form.personal_info.permanent_barangay" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">City/Municipality</label>
-      <input v-model="form.personal_info.permanent_city" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Province</label>
-      <input v-model="form.personal_info.permanent_province" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-  </div>
-  <div class="grid grid-cols-4 gap-4 mt-2">
-    <div>
-      <label class="block text-xs font-medium text-slate-500 mb-1">Zip Code</label>
-      <input v-model="form.personal_info.permanent_zip_code" class="input w-full" :readonly="!editMode || sameAsResidential" />
-    </div>
-  </div>
+  <AddressPicker v-model="permanentAddress" :readonly="!editMode || sameAsResidential" />
 </section>
         <br>
         <!-- II. Family Background -->

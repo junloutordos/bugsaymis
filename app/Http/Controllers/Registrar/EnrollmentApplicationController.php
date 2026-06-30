@@ -48,7 +48,15 @@ class EnrollmentApplicationController extends Controller
             'sex'                     => 'required|in:Male,Female',
             'birth_place'             => 'required|string|max:200',
             'lrn'                     => 'required|string|max:30',
-            'address'                 => 'required|string|max:500',
+            'address'             => 'nullable|string|max:600',
+            'address_house'       => 'nullable|string|max:200',
+            'address_street'      => 'nullable|string|max:200',
+            'address_subdivision' => 'nullable|string|max:200',
+            'address_barangay'    => 'required|string|max:100',
+            'address_city'        => 'required|string|max:100',
+            'address_province'    => 'nullable|string|max:100',
+            'address_region'      => 'required|string|max:100',
+            'address_zip'         => 'nullable|string|max:10',
             'contact_no'              => 'required|string|max:20',
             'email'                   => ['required', 'string', 'max:150', $emailOrNa],
             'father_name'             => 'required|string|max:200',
@@ -68,6 +76,18 @@ class EnrollmentApplicationController extends Controller
             'grade_level_completed'   => 'required|string|max:50',
             'school_year_completed'   => 'required|string|max:30',
         ]);
+
+        // Compose full address string server-side if not sent from frontend
+        if (empty($data['address'])) {
+            $data['address'] = implode(', ', array_filter([
+                $data['address_house'] ?? '',
+                $data['address_street'] ?? '',
+                $data['address_subdivision'] ?? '',
+                !empty($data['address_barangay']) ? 'Brgy. ' . $data['address_barangay'] : '',
+                $data['address_city'] ?? '',
+                $data['address_province'] ?? '',
+            ]));
+        }
 
         $currentSyId = SchoolYear::where('is_current', true)->value('id');
         abort_unless($currentSyId, 422, 'No active school year configured.');
@@ -188,7 +208,16 @@ class EnrollmentApplicationController extends Controller
                 'lrn'             => $enrollmentApplication->lrn ?? '',
                 'student_email'   => $enrollmentApplication->email ?? '',
                 'studentcontact'  => $enrollmentApplication->contact_no ?? '',
-                'province'        => '',
+                'province'        => $enrollmentApplication->address_province ?? '',
+                'municipal'       => $enrollmentApplication->address_city ?? '',
+                'barangay'        => $enrollmentApplication->address_barangay ?? '',
+                'region'          => $enrollmentApplication->address_region ?? '',
+                'zipcode'         => $enrollmentApplication->address_zip ?? '',
+                'houseno'         => implode(', ', array_filter([
+                                         $enrollmentApplication->address_house ?? '',
+                                         $enrollmentApplication->address_street ?? '',
+                                         $enrollmentApplication->address_subdivision ?? '',
+                                     ])),
                 'father_name'     => $enrollmentApplication->father_name ?? '',
                 'mother_name'     => $enrollmentApplication->mother_name ?? '',
                 'foccupation'     => $enrollmentApplication->father_occupation ?? '',
