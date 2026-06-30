@@ -510,6 +510,19 @@ const menuItems = [
         permissions: ["it.requests.manage"],
       },
       {
+        label: "Error Reports",
+        routeName: "error-reports.index",
+        href: route("error-reports.index"),
+        icon: BugAntIcon,
+        permissions: ["error-reports.manage"],
+      },
+      {
+        label: "My Error Reports",
+        routeName: "error-reports.my",
+        href: route("error-reports.my"),
+        icon: BugAntIcon,
+      },
+      {
         label: "IT Job Requests",
         routeName: "jobrequests.index",
         href: route("jobrequests.index"),
