@@ -147,6 +147,11 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\FacultyLoading\AcademicUnit::class, 'academic_unit_id');
     }
 
+    public function loadAssignments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\FacultyLoading\LoadAssignment::class, 'user_id');
+    }
+
     // ─── Permission cache (per-request, cleared on role change) ──────────────
 
     /** @var array<string,bool>|null */
