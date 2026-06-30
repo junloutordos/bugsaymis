@@ -10,6 +10,7 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Subject;
 use App\Models\User;
 use App\Services\FacultyLoading\LoadComputationService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -146,18 +147,22 @@ class LoadAssignmentController extends Controller
             return back()->withErrors(['faculty_load_id' => 'This faculty load record is locked and cannot be modified.']);
         }
 
-        $assignment = LoadAssignment::create([
-            'faculty_load_id'  => $load->id,
-            'user_id'          => $data['user_id'],
-            'school_year_id'   => $data['school_year_id'],
-            'academic_term_id' => $data['academic_term_id'],
-            'assignment_type'  => $data['assignment_type'],
-            'subject_id'       => $data['subject_id'] ?? null,
-            'section_id'       => $data['section_id'] ?? null,
-            'load_units'       => $data['load_units'],
-            'description'      => $data['description'] ?? null,
-            'created_by'       => Auth::id(),
-        ]);
+        try {
+            $assignment = LoadAssignment::create([
+                'faculty_load_id'  => $load->id,
+                'user_id'          => $data['user_id'],
+                'school_year_id'   => $data['school_year_id'],
+                'academic_term_id' => $data['academic_term_id'],
+                'assignment_type'  => $data['assignment_type'],
+                'subject_id'       => $data['subject_id'] ?? null,
+                'section_id'       => $data['section_id'] ?? null,
+                'load_units'       => $data['load_units'],
+                'description'      => $data['description'] ?? null,
+                'created_by'       => Auth::id(),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            return back()->withErrors(['subject_id' => 'This subject is already assigned to this section for the selected term.']);
+        }
 
         $this->loads->syncLoad($load);
 

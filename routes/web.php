@@ -1234,8 +1234,8 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         // ── Performance Indicators ──────────────────────────────────────────
         Route::get('/performance-indicators', [PerformanceIndicatorController::class, 'index'])->name('performanceindicator.index');
         Route::post('performance-indicators', [PerformanceIndicatorController::class, 'store'])->name('performanceindicator.store');
-        Route::put('performance-indicators/{id}', [PerformanceIndicatorController::class, 'update'])->name('performanceindicator.update');
-        Route::delete('performance-indicators/{id}', [PerformanceIndicatorController::class, 'destroy'])->name('performanceindicator.destroy');
+        Route::put('performance-indicators/{performanceIndicator}', [PerformanceIndicatorController::class, 'update'])->name('performanceindicator.update');
+        Route::delete('performance-indicators/{performanceIndicator}', [PerformanceIndicatorController::class, 'destroy'])->name('performanceindicator.destroy');
 
         // ── Work Distribution Plans ─────────────────────────────────────────
         Route::get('/work-distributions', [WorkDistributionPlanController::class, 'index'])->name('workdistribution.index');
@@ -2181,5 +2181,16 @@ Route::middleware(['auth', 'permission:atlas.modules.view'])
         Route::get('/active-users', [\App\Http\Controllers\Atlas\AtlasModuleController::class, 'activeUsers'])
             ->name('active-users');
     });
+
+// ── Error Reports ─────────────────────────────────────────────────────────────
+Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->group(function () {
+    Route::post('/',              [\App\Http\Controllers\ErrorReportController::class, 'store'])      ->name('store');
+    Route::get('/my',            [\App\Http\Controllers\ErrorReportController::class, 'myReports'])  ->name('my');
+    Route::get('/{errorReport}/screenshot', [\App\Http\Controllers\ErrorReportController::class, 'screenshot'])->name('screenshot');
+    Route::middleware('permission:error-reports.manage')->group(function () {
+        Route::get('/',              [\App\Http\Controllers\ErrorReportController::class, 'index'])  ->name('index');
+        Route::put('/{errorReport}', [\App\Http\Controllers\ErrorReportController::class, 'update'])->name('update');
+    });
+});
 
 require __DIR__.'/auth.php';
