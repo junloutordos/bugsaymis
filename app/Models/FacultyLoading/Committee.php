@@ -27,6 +27,7 @@ class Committee extends Model
         'committee_type',
         'description',
         'head_id',
+        'parent_committee_id',
         'max_members',
         'chairperson_title',
         'chairperson_load_units',
@@ -67,6 +68,16 @@ class Committee extends Model
         return $this->belongsToMany(WorkDistributionPlan::class, 'committee_work_distribution_plan');
     }
 
+    public function parentCommittee(): BelongsTo
+    {
+        return $this->belongsTo(Committee::class, 'parent_committee_id');
+    }
+
+    public function subCommittees(): HasMany
+    {
+        return $this->hasMany(Committee::class, 'parent_committee_id');
+    }
+
     // ── Scopes ─────────────────────────────────────────────────────────────────
 
     public function scopeActive($query)
@@ -80,6 +91,27 @@ class Committee extends Model
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    public function isSubCommittee(): bool
+    {
+        return $this->parent_committee_id !== null;
+    }
+
+    public function isMain(): bool
+    {
+        return $this->parent_committee_id === null
+            && ($this->relationLoaded('subCommittees')
+                ? $this->subCommittees->isNotEmpty()
+                : $this->subCommittees()->exists());
+    }
+
+    public function isSimple(): bool
+    {
+        return $this->parent_committee_id === null
+            && ($this->relationLoaded('subCommittees')
+                ? $this->subCommittees->isEmpty()
+                : ! $this->subCommittees()->exists());
+    }
 
     /** Load units for a given role in this committee. */
     public function loadUnitsFor(string $role): float
