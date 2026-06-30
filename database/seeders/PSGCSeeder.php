@@ -74,10 +74,8 @@ class PSGCSeeder extends Seeder
         DB::table('psgc_barangays')->truncate();
 
         $barangayRows = collect($barangays)->map(function ($b) {
-            $cityCode = $b['cityMunicipalityCode']
-                     ?? $b['cityCode']
-                     ?? $b['municipalityCode']
-                     ?? '';
+            // API returns false (not null) for empty codes — use ?: not ?? to coalesce falsy values
+            $cityCode = $b['cityCode'] ?: ($b['municipalityCode'] ?: '');
             if (empty($cityCode)) return null;
             return ['code' => $b['code'], 'name' => $b['name'], 'city_code' => $cityCode];
         })->filter()->values()->toArray();
