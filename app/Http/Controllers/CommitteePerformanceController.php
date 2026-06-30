@@ -15,17 +15,47 @@ class CommitteePerformanceController extends Controller
     {
         $user = auth()->user();
 
-        $query = Committee::with(['head', 'members', 'workDistributionPlans']);
+        $query = Committee::with(['head', 'members', 'workDistributionPlans', 'subCommittees.head', 'subCommittees.members'])
+            ->whereNull('parent_committee_id');
 
         if (!$user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) {
             $query->where(function ($q) use ($user) {
                 $q->where('head_id', $user->id)
-                  ->orWhereHas('members', fn($mq) => $mq->where('users.id', $user->id));
+                  ->orWhereHas('members', fn($mq) => $mq->where('users.id', $user->id))
+                  ->orWhereHas('subCommittees', function ($sq) use ($user) {
+                      $sq->where('head_id', $user->id)
+                         ->orWhereHas('members', fn($mq) => $mq->where('users.id', $user->id));
+                  });
             });
         }
 
+        $committees = $query->orderBy('name')->get()->map(fn($c) => [
+            'id'                      => $c->id,
+            'name'                    => $c->name,
+            'head_id'                 => $c->head_id,
+            'head'                    => $c->head?->only('id', 'name'),
+            'description'             => $c->description,
+            'members'                 => $c->members->map(fn($m) => [
+                'id'    => $m->id,
+                'name'  => $m->name,
+                'pivot' => ['task' => $m->pivot->task],
+            ]),
+            'work_distribution_plans' => $c->workDistributionPlans->map(fn($p) => ['id' => $p->id])->values(),
+            'sub_committees'          => $c->subCommittees->map(fn($sub) => [
+                'id'      => $sub->id,
+                'name'    => $sub->name,
+                'head_id' => $sub->head_id,
+                'head'    => $sub->head?->only('id', 'name'),
+                'members' => $sub->members->map(fn($m) => [
+                    'id'    => $m->id,
+                    'name'  => $m->name,
+                    'pivot' => ['task' => $m->pivot->task],
+                ]),
+            ])->values(),
+        ]);
+
         return Inertia::render('PerformanceManagement/Committees/Index', [
-            'committees' => $query->orderBy('name')->get(),
+            'committees' => $committees,
             'users'      => User::select('id', 'name', 'position')->orderBy('name')->get(),
             'plans'      => WorkDistributionPlan::select('id', 'success_indicator', 'rated_by')
                                ->orderBy('success_indicator')->get(),
@@ -39,14 +69,21 @@ class CommitteePerformanceController extends Controller
         if (!$user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) abort(403);
 
         $validated = $request->validate([
-            'name'         => 'required|string|max:255',
-            'head_id'      => 'nullable|exists:users,id',
-            'description'  => 'nullable|string',
-            'member_ids'   => 'nullable|array',
-            'member_ids.*' => 'exists:users,id',
-            'member_tasks' => 'nullable|array',
-            'plan_ids'     => 'nullable|array',
-            'plan_ids.*'   => 'exists:work_distribution_plans,id',
+            'name'                          => 'required|string|max:255',
+            'head_id'                       => 'nullable|exists:users,id',
+            'description'                   => 'nullable|string',
+            'has_subcommittees'             => 'boolean',
+            'member_ids'                    => 'nullable|array',
+            'member_ids.*'                  => 'exists:users,id',
+            'member_tasks'                  => 'nullable|array',
+            'plan_ids'                      => 'nullable|array',
+            'plan_ids.*'                    => 'exists:work_distribution_plans,id',
+            'sub_committees'                => 'nullable|array',
+            'sub_committees.*.name'         => 'required_with:sub_committees|string|max:255',
+            'sub_committees.*.head_id'      => 'nullable|exists:users,id',
+            'sub_committees.*.member_ids'   => 'nullable|array',
+            'sub_committees.*.member_ids.*' => 'exists:users,id',
+            'sub_committees.*.member_tasks' => 'nullable|array',
         ]);
 
         $committee = Committee::create([
@@ -55,8 +92,20 @@ class CommitteePerformanceController extends Controller
             'description' => $validated['description'] ?? null,
         ]);
 
-        $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
         $committee->workDistributionPlans()->sync($validated['plan_ids'] ?? []);
+
+        if (!empty($validated['has_subcommittees'])) {
+            foreach ($validated['sub_committees'] ?? [] as $subData) {
+                $sub = Committee::create([
+                    'name'                => $subData['name'],
+                    'head_id'             => $subData['head_id'] ?? null,
+                    'parent_committee_id' => $committee->id,
+                ]);
+                $this->syncMembers($sub, $subData['member_ids'] ?? [], $subData['member_tasks'] ?? []);
+            }
+        } else {
+            $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
+        }
 
         return redirect()->back()->with('success', 'Committee created.');
     }
@@ -67,14 +116,22 @@ class CommitteePerformanceController extends Controller
         if (!$user->hasAnyRole(['Administrator', 'DivisionChief', 'OCD', 'HR'])) abort(403);
 
         $validated = $request->validate([
-            'name'         => 'required|string|max:255',
-            'head_id'      => 'nullable|exists:users,id',
-            'description'  => 'nullable|string',
-            'member_ids'   => 'nullable|array',
-            'member_ids.*' => 'exists:users,id',
-            'member_tasks' => 'nullable|array',
-            'plan_ids'     => 'nullable|array',
-            'plan_ids.*'   => 'exists:work_distribution_plans,id',
+            'name'                          => 'required|string|max:255',
+            'head_id'                       => 'nullable|exists:users,id',
+            'description'                   => 'nullable|string',
+            'has_subcommittees'             => 'boolean',
+            'member_ids'                    => 'nullable|array',
+            'member_ids.*'                  => 'exists:users,id',
+            'member_tasks'                  => 'nullable|array',
+            'plan_ids'                      => 'nullable|array',
+            'plan_ids.*'                    => 'exists:work_distribution_plans,id',
+            'sub_committees'                => 'nullable|array',
+            'sub_committees.*.id'           => 'nullable|exists:committees,id',
+            'sub_committees.*.name'         => 'required_with:sub_committees|string|max:255',
+            'sub_committees.*.head_id'      => 'nullable|exists:users,id',
+            'sub_committees.*.member_ids'   => 'nullable|array',
+            'sub_committees.*.member_ids.*' => 'exists:users,id',
+            'sub_committees.*.member_tasks' => 'nullable|array',
         ]);
 
         $committee->update([
@@ -83,8 +140,28 @@ class CommitteePerformanceController extends Controller
             'description' => $validated['description'] ?? null,
         ]);
 
-        $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
         $committee->workDistributionPlans()->sync($validated['plan_ids'] ?? []);
+
+        if (!empty($validated['has_subcommittees'])) {
+            foreach ($validated['sub_committees'] ?? [] as $subData) {
+                if (!empty($subData['id'])) {
+                    $sub = Committee::find($subData['id']);
+                    if ($sub && $sub->parent_committee_id === $committee->id) {
+                        $sub->update(['name' => $subData['name'], 'head_id' => $subData['head_id'] ?? null]);
+                        $this->syncMembers($sub, $subData['member_ids'] ?? [], $subData['member_tasks'] ?? []);
+                    }
+                } else {
+                    $sub = Committee::create([
+                        'name'                => $subData['name'],
+                        'head_id'             => $subData['head_id'] ?? null,
+                        'parent_committee_id' => $committee->id,
+                    ]);
+                    $this->syncMembers($sub, $subData['member_ids'] ?? [], $subData['member_tasks'] ?? []);
+                }
+            }
+        } else {
+            $this->syncMembers($committee, $validated['member_ids'] ?? [], $request->input('member_tasks', []));
+        }
 
         return redirect()->back()->with('success', 'Committee updated.');
     }
