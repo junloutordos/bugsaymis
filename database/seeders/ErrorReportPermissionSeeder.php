@@ -10,7 +10,10 @@ class ErrorReportPermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        Permission::firstOrCreate(['name' => 'error-reports.manage']);
+        Permission::firstOrCreate(
+            ['name' => 'error-reports.manage'],
+            ['module' => 'MIS'],
+        );
 
         $mis = Role::where('name', 'MIS')->first();
         if ($mis) {
