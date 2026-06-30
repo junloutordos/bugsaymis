@@ -905,8 +905,8 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         $scope    = $request->input('scope', 'mine');
 
         $query = ITJobRequest::with(['user', 'assignedTo'])
-            ->whereIn('status', ['Acted by MIS', 'Request Completed'])
-            ->orderBy('created_at');
+            ->whereIn('status', ['Acted by MIS', 'Request Completed', 'Rated'])
+            ->orderBy('updated_at');
 
         // Non-admin users see only requests they personally attended (attendedby name match).
         // Admin/MIS with scope=all see everything.
@@ -915,10 +915,10 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         }
 
         if ($dateFrom) {
-            $query->whereDate('created_at', '>=', $dateFrom);
+            $query->whereDate('updated_at', '>=', $dateFrom);
         }
         if ($dateTo) {
-            $query->whereDate('created_at', '<=', $dateTo);
+            $query->whereDate('updated_at', '<=', $dateTo);
         }
         if ($category) {
             $query->where('category', $category);
