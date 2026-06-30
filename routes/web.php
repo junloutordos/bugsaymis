@@ -1234,8 +1234,8 @@ Route::middleware('auth')->get('/library/statistics/report', [\App\Http\Controll
         // ── Performance Indicators ──────────────────────────────────────────
         Route::get('/performance-indicators', [PerformanceIndicatorController::class, 'index'])->name('performanceindicator.index');
         Route::post('performance-indicators', [PerformanceIndicatorController::class, 'store'])->name('performanceindicator.store');
-        Route::put('performance-indicators/{id}', [PerformanceIndicatorController::class, 'update'])->name('performanceindicator.update');
-        Route::delete('performance-indicators/{id}', [PerformanceIndicatorController::class, 'destroy'])->name('performanceindicator.destroy');
+        Route::put('performance-indicators/{performanceIndicator}', [PerformanceIndicatorController::class, 'update'])->name('performanceindicator.update');
+        Route::delete('performance-indicators/{performanceIndicator}', [PerformanceIndicatorController::class, 'destroy'])->name('performanceindicator.destroy');
 
         // ── Work Distribution Plans ─────────────────────────────────────────
         Route::get('/work-distributions', [WorkDistributionPlanController::class, 'index'])->name('workdistribution.index');
