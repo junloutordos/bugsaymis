@@ -57,7 +57,8 @@ import {
   BugAntIcon,
 
 } from "@heroicons/vue/24/outline";
-import ErrorReportModal from '@/Components/ErrorReportModal.vue';
+import ErrorReportModal from '@/Components/ErrorReportModal.vue'
+import PageSkeleton from '@/Components/PageSkeleton.vue';
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
 // --- State ---
@@ -134,10 +135,21 @@ watch(() => route().current('chat.index'), (onChat) => {
   if (onChat) chatUnreadCount.value = 0;
 });
 
+// ─── Skeleton loading ─────────────────────────────────────────────────────────
+const isNavigating = ref(false);
+let navTimer = null;
+
 // Close mobile sidebar on Inertia navigation
 let removeNavListener;
+let removeStartListener;
 onMounted(() => {
+  removeStartListener = router.on('start', () => {
+    navTimer = setTimeout(() => { isNavigating.value = true; }, 150);
+  });
+
   removeNavListener = router.on('navigate', () => {
+    clearTimeout(navTimer);
+    isNavigating.value = false;
     mobileOpen.value = false;
     // Reset badge when navigating to Chat page
     if (route().current('chat.index')) chatUnreadCount.value = 0;
@@ -152,7 +164,9 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  if (removeStartListener) removeStartListener();
   if (removeNavListener) removeNavListener();
+  clearTimeout(navTimer);
   if (chatEchoChannel) {
     window.Echo?.leave(`user.${user?.id}`);
     chatEchoChannel = null;
@@ -2432,7 +2446,10 @@ filteredMenu.value.forEach((item) => {
 
       <!-- Page Content -->
       <main class="p-4 md:p-6 flex-1 min-w-0">
-        <slot />
+        <Transition name="page-fade" mode="out-in">
+          <PageSkeleton v-if="isNavigating" key="skeleton" />
+          <slot v-else key="content" />
+        </Transition>
       </main>
     </div>
   <ProfileEditModal :show="showProfileModal" @close="showProfileModal = false" />
@@ -2575,7 +2592,14 @@ filteredMenu.value.forEach((item) => {
 
 </template>
 
-
-
-
+<style scoped>
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 120ms ease;
+}
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+</style>
 
