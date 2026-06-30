@@ -218,6 +218,7 @@ class StudentController extends Controller
 
         $address = implode(', ', array_filter([
             $student->houseno,
+            filled($student->barangay ?? '') ? 'Brgy. ' . $student->barangay : null,
             $student->municipal,
             $student->province,
         ], fn ($v) => filled($v)));
