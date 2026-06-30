@@ -1,16 +1,22 @@
 <script setup>
 defineProps({
-  variant: { type: String, default: 'primary' }, // primary | secondary | danger | ghost
+  variant: { type: String, default: 'primary' }, // primary | secondary | danger | success | warning | ghost
   size:    { type: String, default: 'md' },        // sm | md | lg
   type:    { type: String, default: 'button' },
   disabled:{ type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  block:   { type: Boolean, default: false },
+  as:      { type: String, default: 'button' },
+  href:    { type: String, default: null },
+  target:  { type: String, default: null },
 })
 
 const variantMap = {
   primary:   'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm',
   secondary: 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm',
   danger:    'bg-red-600 hover:bg-red-700 text-white shadow-sm',
+  success:   'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm',
+  warning:   'bg-amber-500 hover:bg-amber-600 text-white shadow-sm',
   ghost:     'text-slate-600 hover:bg-slate-100',
 }
 const sizeMap = {
@@ -21,13 +27,20 @@ const sizeMap = {
 </script>
 
 <template>
-  <button
-    :type="type"
-    :disabled="disabled || loading"
+  <component
+    :is="as === 'a' ? 'a' : 'button'"
+    :type="as === 'a' ? null : type"
+    :href="as === 'a' ? href : null"
+    :target="target"
+    :rel="target === '_blank' ? 'noopener noreferrer' : null"
+    :disabled="as === 'a' ? null : disabled || loading"
+    :aria-disabled="disabled || loading ? 'true' : null"
     :class="[
       'inline-flex items-center font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed',
       variantMap[variant] ?? variantMap.primary,
       sizeMap[size] ?? sizeMap.md,
+      block ? 'w-full justify-center' : '',
+      disabled || loading ? 'pointer-events-none opacity-50' : '',
     ]"
   >
     <svg v-if="loading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -35,5 +48,5 @@ const sizeMap = {
       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
     </svg>
     <slot />
-  </button>
+  </component>
 </template>

@@ -13,7 +13,7 @@ defineEmits(['update:modelValue'])
 
 <template>
   <div>
-    <label v-if="label" class="block text-xs font-medium text-slateate-600 mb-1">
+    <label v-if="label" class="block text-xs font-medium text-slate-600 mb-1">
       {{ label }} <span v-if="required" class="text-red-500">*</span>
     </label>
     <select

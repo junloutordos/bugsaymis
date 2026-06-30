@@ -17,6 +17,12 @@ import {
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import MISAssessmentModal from '@/Components/MISAssessmentModal.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import { useJobRequests } from "@/Composables/useJobRequests.js"
 
 // Props from backend — requests is now a paginator object
@@ -245,72 +251,48 @@ function handleSigCancel() {
   <Head title="IT Job Requests" />
   <AdminLayout title="IT Job Requests">
     <div>
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">IT Job Requests</h1>
-        <div class="flex items-center gap-2">
-          <a
+      <AppPageHeader title="IT Job Requests">
+        <template #actions>
+          <AppButton
             v-if="props.isAdmin"
+            as="a"
+            variant="secondary"
             :href="route('jobrequests.queue')"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             <QueueListIcon class="w-4 h-4 text-indigo-500" />
             Queue
-          </a>
-          <button
-            @click="handleNewRequest"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
+          </AppButton>
+          <AppButton @click="handleNewRequest">
             + New Request
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4">
-        <div class="flex flex-wrap justify-between items-center gap-3">
-          <div class="flex items-center gap-2 flex-1 min-w-0">
-            <div class="relative flex-1 sm:w-64 sm:flex-none">
-              <input
-                v-model="search"
-                type="text"
-                placeholder="Search requests..."
-                @keydown.enter.prevent="applyFilters(true)"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
-              />
-              <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
-                <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-              </span>
-            </div>
-            <button
-              @click="applyFilters(true)"
-              :disabled="isLoading"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-            >
-              Search
-            </button>
-            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap text-sm text-slate-600">
-              <input type="checkbox" v-model="showAllChecked" class="h-4 w-4 rounded border-slate-300 text-indigo-600" />
-              Show All
-            </label>
-          </div>
-          <!-- Dropdown Filters -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <select
-              v-model="filterCategory"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-            >
-              <option value="">All Categories</option>
-              <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
-            </select>
-            <select
-              v-model="filterStatus"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-            >
-              <option value="">All Statuses</option>
+      <AppFilterBar>
+        <div class="relative min-w-[220px] flex-1 sm:flex-none">
+          <AppInput
+            v-model="search"
+            placeholder="Search requests..."
+            @keydown.enter.prevent="applyFilters(true)"
+          />
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
+            <svg class="h-4 w-4 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          </span>
+        </div>
+        <AppButton :disabled="isLoading" @click="applyFilters(true)">Search</AppButton>
+        <label class="inline-flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-sm text-slate-600">
+          <input type="checkbox" v-model="showAllChecked" class="h-4 w-4 rounded border-slate-300 text-indigo-600" />
+          Show All
+        </label>
+
+        <AppSelect v-model="filterCategory" placeholder="All Categories" class="min-w-[180px]">
+          <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
+        </AppSelect>
+        <AppSelect v-model="filterStatus" placeholder="All Statuses" class="min-w-[180px]">
               <option value="Pending Division Chief Approval">Pending DC Approval</option>
               <option value="Pending OCD Approval">Pending OCD Approval</option>
               <option value="In Progress">In Progress</option>
@@ -319,19 +301,14 @@ function handleSigCancel() {
               <option value="Request Completed">Completed</option>
               <option value="Rejected by Division Chief">Rejected by DC</option>
               <option value="Rejected by OCD">Rejected by OCD</option>
-            </select>
-          </div>
-          <div class="flex gap-2">
-            
-            <button @click="openExportModal"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shadow-sm"
-              title="Generate PDF report">
+        </AppSelect>
+
+        <template #actions>
+            <AppIconButton label="Generate PDF report" variant="success" @click="openExportModal">
               <DocumentChartBarIcon class="w-4 h-4" />
-              
-            </button>
-          </div>
-        </div>
-      </div>
+            </AppIconButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Main card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">

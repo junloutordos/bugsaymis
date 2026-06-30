@@ -6,6 +6,11 @@ import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass } fro
 import FlashMessage from '@/Components/FlashMessage.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import {
   PlusIcon, ArrowUpTrayIcon, Cog6ToothIcon, MagnifyingGlassIcon,
   LockClosedIcon, ExclamationTriangleIcon,
@@ -164,27 +169,30 @@ const needsManualReceiver = computed(() =>
   <Head title="Document Tracking" />
   <AdminLayout title="Document Tracking">
 
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-      <div>
-        <h2 class="text-xl font-semibold text-slate-800">Document Tracking System</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Track internal and external document routing across all offices</p>
-      </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <a v-if="isAdmin" :href="route('document-tracking.types.index')"
-          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
-          <Cog6ToothIcon class="h-4 w-4" /> Document Types
-        </a>
-        <button @click="openModal('internal')"
-          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">
-          <PlusIcon class="h-4 w-4" /> Internal
-        </button>
-        <button v-if="canLogExternal" @click="openModal('external')"
-          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">
-          <ArrowUpTrayIcon class="h-4 w-4" /> Log External
-        </button>
-      </div>
-    </div>
+    <AppPageHeader
+      title="Document Tracking System"
+      subtitle="Track internal and external document routing across all offices"
+    >
+      <template #actions>
+        <AppButton
+          v-if="isAdmin"
+          as="a"
+          variant="secondary"
+          :href="route('document-tracking.types.index')"
+        >
+          <Cog6ToothIcon class="h-4 w-4" />
+          Document Types
+        </AppButton>
+        <AppButton @click="openModal('internal')">
+          <PlusIcon class="h-4 w-4" />
+          Internal
+        </AppButton>
+        <AppButton v-if="canLogExternal" variant="success" @click="openModal('external')">
+          <ArrowUpTrayIcon class="h-4 w-4" />
+          Log External
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <!-- Tabs -->
     <div class="flex gap-0 border-b border-slate-200 mb-4 overflow-x-auto">
@@ -200,23 +208,22 @@ const needsManualReceiver = computed(() =>
     </div>
 
     <!-- Filters -->
-    <div class="flex flex-col sm:flex-row gap-2 mb-4">
-      <div class="relative flex-1">
+    <AppFilterBar>
+      <div class="relative min-w-[220px] flex-1">
         <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <input v-model="search" type="text" placeholder="Tracking no., subject, source office, sender…"
-          class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <AppInput
+          v-model="search"
+          placeholder="Tracking no., subject, source office, sender..."
+          class="[&_input]:pl-9"
+        />
       </div>
-      <select v-model="filterTypeId"
-        class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">All Types</option>
+      <AppSelect v-model="filterTypeId" placeholder="All Types" class="min-w-[160px]">
         <option v-for="t in availableTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
-      </select>
-      <select v-model="filterPriority"
-        class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">All Priorities</option>
+      </AppSelect>
+      <AppSelect v-model="filterPriority" placeholder="All Priorities" class="min-w-[150px]">
         <option>Normal</option><option>Urgent</option><option>Rush</option>
-      </select>
-    </div>
+      </AppSelect>
+    </AppFilterBar>
 
     <!-- Table -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

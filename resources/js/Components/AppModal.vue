@@ -1,8 +1,15 @@
 <script setup>
+import { XMarkIcon } from '@heroicons/vue/24/outline'
+
 defineProps({
-  show:  { type: Boolean, default: false },
-  title: { type: String,  default: '' },
-  size:  { type: String,  default: 'md' }, // sm | md | lg | xl | 2xl
+  show:               { type: Boolean, default: false },
+  title:              { type: String,  default: '' },
+  subtitle:           { type: String,  default: null },
+  size:               { type: String,  default: 'md' }, // sm | md | lg | xl | 2xl
+  closeOnBackdrop:    { type: Boolean, default: true },
+  showCloseButton:    { type: Boolean, default: true },
+  bodyClass:          { type: String,  default: 'px-6 py-5' },
+  panelClass:         { type: String,  default: '' },
 })
 defineEmits(['close'])
 
@@ -30,25 +37,35 @@ const sizeMap = {
     >
       <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="$emit('close')" />
+        <div
+          class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+          @click="closeOnBackdrop && $emit('close')"
+        />
 
         <!-- Panel -->
         <div
-          :class="['relative w-full bg-white rounded-2xl shadow-xl z-10 flex flex-col max-h-[90vh]', sizeMap[size] ?? sizeMap.md]"
+          :class="['relative w-full bg-white rounded-2xl shadow-xl z-10 flex flex-col max-h-[90vh]', sizeMap[size] ?? sizeMap.md, panelClass]"
         >
           <!-- Header -->
-          <div v-if="title || $slots.header" class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-            <h2 class="text-base font-semibold text-slate-800">{{ title }}</h2>
+          <div v-if="title || subtitle || $slots.header || showCloseButton" class="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
+            <div class="min-w-0">
+              <h2 v-if="title" class="text-base font-semibold text-slate-800">{{ title }}</h2>
+              <p v-if="subtitle" class="mt-0.5 text-sm text-slate-500">{{ subtitle }}</p>
+            </div>
             <slot name="header" />
-            <button @click="$emit('close')" class="ml-4 p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button
+              v-if="showCloseButton"
+              type="button"
+              @click="$emit('close')"
+              class="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Close"
+            >
+              <XMarkIcon class="h-5 w-5" />
             </button>
           </div>
 
           <!-- Body -->
-          <div class="overflow-y-auto flex-1 px-6 py-5">
+          <div :class="['overflow-y-auto flex-1', bodyClass]">
             <slot />
           </div>
 

@@ -1,0 +1,120 @@
+<script setup>
+import { storageUrl } from '@/Composables/useStorage.js'
+import NotificationBell from '@/Components/NotificationBell.vue'
+import {
+  Bars3Icon,
+  BookOpenIcon,
+  BugAntIcon,
+  ChatBubbleLeftRightIcon,
+  QuestionMarkCircleIcon,
+  ShieldCheckIcon,
+} from '@heroicons/vue/24/outline'
+
+defineProps({
+  title:           { type: String, default: '' },
+  user:            { type: Object, required: true },
+  roleName:        { type: String, default: 'Guest' },
+  chatUnreadCount: { type: Number, default: 0 },
+})
+
+const emit = defineEmits(['toggle-mobile', 'toggle-collapse', 'report-error', 'open-profile'])
+</script>
+
+<template>
+  <header class="h-14 border-b border-slate-100 bg-white px-4 md:px-6">
+    <div class="flex h-full items-center justify-between gap-3">
+      <div class="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          class="rounded-md p-1.5 transition-colors hover:bg-slate-100 md:hidden"
+          aria-label="Open sidebar"
+          @click="emit('toggle-mobile')"
+        >
+          <Bars3Icon class="h-5 w-5 text-slate-500" />
+        </button>
+        <button
+          type="button"
+          class="hidden rounded-md p-1.5 transition-colors hover:bg-slate-100 md:block"
+          aria-label="Toggle sidebar"
+          @click="emit('toggle-collapse')"
+        >
+          <Bars3Icon class="h-5 w-5 text-slate-500" />
+        </button>
+        <span v-if="title" class="hidden truncate text-sm font-medium text-slate-700 md:block">{{ title }}</span>
+      </div>
+
+      <div class="flex min-w-0 items-center gap-2">
+        <a
+          :href="route('privacy.index')"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 lg:inline-flex"
+          aria-label="Data Privacy Policy"
+        >
+          <ShieldCheckIcon class="h-4 w-4" />
+          Privacy Policy
+        </a>
+
+        <a
+          href="https://drive.google.com/drive/folders/16XAkvSwQCPquxuMtgFmEOWEMAeUfOqwL"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 xl:inline-flex"
+          aria-label="QMS Manuals"
+        >
+          <BookOpenIcon class="h-4 w-4" />
+          QMS Manuals
+        </a>
+
+        <a
+          :href="route('docs.index')"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 lg:inline-flex"
+          aria-label="Help Documentation"
+        >
+          <QuestionMarkCircleIcon class="h-4 w-4" />
+          Need Help?
+        </a>
+
+        <button
+          type="button"
+          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:inline-flex"
+          aria-label="Report an Error"
+          @click="emit('report-error')"
+        >
+          <BugAntIcon class="h-4 w-4" />
+          Report Error
+        </button>
+
+        <NotificationBell v-if="user?.id" :user-id="user.id" />
+
+        <a :href="route('chat.index')" class="relative rounded-lg p-1.5 transition-colors hover:bg-slate-100" aria-label="Messenger">
+          <ChatBubbleLeftRightIcon class="h-5 w-5 text-slate-500" />
+          <span
+            v-if="chatUnreadCount > 0"
+            class="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
+          >
+            {{ chatUnreadCount > 99 ? '99+' : chatUnreadCount }}
+          </span>
+        </a>
+
+        <button
+          type="button"
+          class="flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-slate-50"
+          @click="emit('open-profile')"
+        >
+          <img
+            :src="storageUrl(user.profile_picture) ?? 'https://i.pravatar.cc/40'"
+            alt="User Avatar"
+            class="h-7 w-7 shrink-0 rounded-full object-cover ring-2 ring-slate-200"
+          />
+          <div class="hidden min-w-0 text-left md:block">
+            <p class="truncate text-sm font-medium leading-none text-slate-800">{{ user.name }}</p>
+            <p class="mt-0.5 truncate text-[11px] leading-none text-slate-500">{{ roleName }}</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  </header>
+</template>
