@@ -2182,4 +2182,15 @@ Route::middleware(['auth', 'permission:atlas.modules.view'])
             ->name('active-users');
     });
 
+// ── Error Reports ─────────────────────────────────────────────────────────────
+Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->group(function () {
+    Route::post('/',              [\App\Http\Controllers\ErrorReportController::class, 'store'])      ->name('store');
+    Route::get('/my',            [\App\Http\Controllers\ErrorReportController::class, 'myReports'])  ->name('my');
+    Route::get('/{errorReport}/screenshot', [\App\Http\Controllers\ErrorReportController::class, 'screenshot'])->name('screenshot');
+    Route::middleware('permission:error-reports.manage')->group(function () {
+        Route::get('/',              [\App\Http\Controllers\ErrorReportController::class, 'index'])  ->name('index');
+        Route::put('/{errorReport}', [\App\Http\Controllers\ErrorReportController::class, 'update'])->name('update');
+    });
+});
+
 require __DIR__.'/auth.php';

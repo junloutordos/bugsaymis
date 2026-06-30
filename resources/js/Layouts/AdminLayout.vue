@@ -54,8 +54,10 @@ import {
   InboxIcon,
   QuestionMarkCircleIcon,
   ArrowUpCircleIcon,
+  BugAntIcon,
 
 } from "@heroicons/vue/24/outline";
+import ErrorReportModal from '@/Components/ErrorReportModal.vue';
 
 // (menu insertion removed here; menu items are defined later in `menuItems`)
 // --- State ---
@@ -65,6 +67,7 @@ const mobileOpen = ref(false);
 const expanded = ref({});
 const showVersionModal = ref(false);
 const showAddVersionModal = ref(false);
+const showErrorReportModal = ref(false);
 const versionForm = useForm({
   version:    '',
   date:       new Date().toISOString().slice(0, 10),
@@ -2382,6 +2385,16 @@ filteredMenu.value.forEach((item) => {
           Need Help?
         </a>
 
+        <!-- Report an Error -->
+        <button
+          @click="showErrorReportModal = true"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors border border-slate-200 hover:border-red-200"
+          aria-label="Report an Error"
+        >
+          <BugAntIcon class="h-4 w-4" />
+          Report Error
+        </button>
+
         <!-- Notification Bell -->
         <NotificationBell v-if="user?.id" :user-id="user.id" />
 
@@ -2423,6 +2436,7 @@ filteredMenu.value.forEach((item) => {
       </main>
     </div>
   <ProfileEditModal :show="showProfileModal" @close="showProfileModal = false" />
+  <ErrorReportModal :open="showErrorReportModal" @close="showErrorReportModal = false" />
   <!-- Consultation Log Date Range Modal -->
   <div v-if="showConsultationLogModal" class="fixed inset-0 z-50 flex items-center justify-center">
     <div class="fixed inset-0 bg-black opacity-30 z-40" @click="closeConsultationLogModal"></div>
