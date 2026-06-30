@@ -2461,7 +2461,7 @@ filteredMenu.value.forEach((item) => {
       <main class="p-4 md:p-6 flex-1 min-w-0">
         <Transition name="page-fade" mode="out-in">
           <PageSkeleton v-if="isNavigating" key="skeleton" />
-          <slot v-else key="content" />
+          <div v-else key="content"><slot /></div>
         </Transition>
       </main>
     </div>
