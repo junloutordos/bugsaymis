@@ -142,14 +142,22 @@ let navTimer = null;
 // Close mobile sidebar on Inertia navigation
 let removeNavListener;
 let removeStartListener;
+let removeFinishListener;
 onMounted(() => {
-  removeStartListener = router.on('start', () => {
-    navTimer = setTimeout(() => { isNavigating.value = true; }, 150);
+  // Only show skeleton for GET navigations (page changes), not POST/PUT/PATCH/DELETE (saves)
+  removeStartListener = router.on('start', (event) => {
+    if (event.detail.visit.method === 'get') {
+      navTimer = setTimeout(() => { isNavigating.value = true; }, 150);
+    }
+  });
+
+  // 'finish' fires for EVERY request (success, error, cancel) — definitive reset
+  removeFinishListener = router.on('finish', () => {
+    clearTimeout(navTimer);
+    isNavigating.value = false;
   });
 
   removeNavListener = router.on('navigate', () => {
-    clearTimeout(navTimer);
-    isNavigating.value = false;
     mobileOpen.value = false;
     // Reset badge when navigating to Chat page
     if (route().current('chat.index')) chatUnreadCount.value = 0;
@@ -165,6 +173,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   if (removeStartListener) removeStartListener();
+  if (removeFinishListener) removeFinishListener();
   if (removeNavListener) removeNavListener();
   clearTimeout(navTimer);
   if (chatEchoChannel) {

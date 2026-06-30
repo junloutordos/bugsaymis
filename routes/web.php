@@ -91,6 +91,7 @@ Route::middleware(['auth','permission:roles.assign'])->group(function(){
     Route::post('/data-management/committees', [App\Http\Controllers\CommitteeController::class, 'store'])->name('committees.store');
     Route::put('/data-management/committees/{committee}', [App\Http\Controllers\CommitteeController::class, 'update'])->name('committees.update');
     Route::delete('/data-management/committees/{committee}', [App\Http\Controllers\CommitteeController::class, 'destroy'])->name('committees.destroy');
+    Route::post('/data-management/committees/{committee}/sync-to-term', [App\Http\Controllers\CommitteeController::class, 'syncToTerm'])->name('committees.sync-to-term');
     // Special Assignments
     Route::get('/data-management/special-assignments', [App\Http\Controllers\SpecialAssignmentController::class, 'index'])->name('special-assignments.index');
     Route::post('/data-management/special-assignments', [App\Http\Controllers\SpecialAssignmentController::class, 'store'])->name('special-assignments.store');

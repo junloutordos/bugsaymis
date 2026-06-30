@@ -66,6 +66,9 @@
             <tr v-for="a in displayed" :key="a.id" class="hover:bg-slate-50/50">
               <td class="px-4 py-3 font-medium text-slate-800">{{ a.faculty?.name ?? '—' }}</td>
               <td class="px-4 py-3">
+                <p v-if="getParentName(a)" class="text-xs text-indigo-500 font-medium">
+                  {{ getParentName(a) }} ›
+                </p>
                 <p class="text-slate-800">{{ a.committee_name }}</p>
                 <p v-if="a.committee?.code" class="text-xs text-slate-400 font-mono">{{ a.committee.code }}</p>
               </td>
@@ -148,13 +151,25 @@
             </div>
           </template>
 
-          <!-- Committee -->
+          <!-- Level 1: Top-level committee picker -->
           <div class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Committee</label>
-            <select v-model="form.committee_id" @change="onCommitteeChange"
+            <select v-model="selectedParentId" @change="onParentCommitteeChange"
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               <option :value="null">— Custom / not in catalog —</option>
-              <option v-for="c in committees" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code }})</option>
+              <option v-for="c in committees" :key="c.id" :value="c.id">
+                {{ c.name }}{{ c.sub_committees?.length ? ' (Main)' : '' }}{{ c.code ? ' (' + c.code + ')' : '' }}
+              </option>
+            </select>
+          </div>
+
+          <!-- Level 2: Sub-committee picker (only when parent has sub-committees) -->
+          <div v-if="selectedParent?.sub_committees?.length" class="col-span-2">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Sub-committee *</label>
+            <select v-model="form.committee_id" @change="onSubCommitteeChange"
+              class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <option :value="null">— Select sub-committee —</option>
+              <option v-for="s in selectedParent.sub_committees" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
           </div>
 
@@ -192,18 +207,22 @@
               class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none" />
           </div>
 
-          <!-- Tagged WDP Plans -->
+          <!-- Tagged WDP Plans with search -->
           <div class="col-span-2">
             <label class="block text-xs font-medium text-slate-600 mb-1">Tagged Work Distribution Plans</label>
+            <input v-model="planSearch" type="text" placeholder="Search plans..."
+              class="w-full mb-2 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
             <div class="border border-slate-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 text-sm">
-              <label v-for="p in plans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
+              <label v-for="p in filteredPlans" :key="p.id" class="flex items-start gap-2 cursor-pointer hover:bg-slate-50 px-1 py-0.5 rounded">
                 <input type="checkbox" :checked="form.plan_ids.includes(p.id)" @change="togglePlan(p.id)"
                   class="mt-0.5 rounded border-slate-300 text-indigo-600" />
                 <span class="text-slate-700 leading-snug">{{ p.success_indicator }}
                   <span v-if="p.rated_by" class="text-slate-400 text-xs">({{ p.rated_by }})</span>
                 </span>
               </label>
-              <p v-if="!plans.length" class="text-slate-400 text-xs px-1">No plans available.</p>
+              <p v-if="!filteredPlans.length" class="text-slate-400 text-xs px-1">
+                {{ planSearch ? 'No plans match your search.' : 'No plans available.' }}
+              </p>
             </div>
             <p class="text-xs text-slate-400 mt-1">{{ form.plan_ids.length }} plan(s) selected</p>
           </div>
@@ -279,6 +298,38 @@ const displayed  = computed(() => {
   return filtered.value.slice(s, s + PER_PAGE)
 })
 
+// ── Parent name helper for hierarchy display ───────────────────────────────
+function getParentName(assignment) {
+  const parentId = assignment.committee?.parent_committee_id
+  if (!parentId) return null
+  return props.committees.find(c => c.id === parentId)?.name ?? null
+}
+
+// ── WDP plan search ────────────────────────────────────────────────────────
+const planSearch = ref('')
+const filteredPlans = computed(() => {
+  if (!planSearch.value) return props.plans
+  const q = planSearch.value.toLowerCase()
+  return props.plans.filter(p => p.success_indicator.toLowerCase().includes(q))
+})
+
+// ── Committee cascading picker ─────────────────────────────────────────────
+const selectedParentId = ref(null)
+const selectedParent = computed(() => props.committees.find(c => c.id === selectedParentId.value) ?? null)
+
+function findCommitteeById(id) {
+  if (!id) return null
+  // Top-level committees
+  const top = props.committees.find(c => c.id === id)
+  if (top) return top
+  // Sub-committees
+  for (const parent of props.committees) {
+    const sub = parent.sub_committees?.find(s => s.id === id)
+    if (sub) return sub
+  }
+  return null
+}
+
 // ── Modal form ─────────────────────────────────────────────────────────────
 const modal = ref(false)
 const form  = useForm({
@@ -288,8 +339,12 @@ const form  = useForm({
 })
 
 function openForm(a = null) {
+  planSearch.value = ''
   if (a) {
-    const committee = props.committees.find(c => c.id === a.committee_id)
+    const parentId = a.committee?.parent_committee_id ?? a.committee?.id ?? null
+    selectedParentId.value = parentId
+
+    const committee = findCommitteeById(a.committee_id)
     Object.assign(form, {
       id: a.id, user_id: null, school_year_id: null, academic_term_id: null,
       committee_id: a.committee_id, committee_name: a.committee_name,
@@ -297,6 +352,7 @@ function openForm(a = null) {
       remarks: a.remarks ?? '', plan_ids: committee?.plan_ids ? [...committee.plan_ids] : [],
     })
   } else {
+    selectedParentId.value = null
     form.reset()
     form.id = null
     form.role = 'member'
@@ -308,17 +364,39 @@ function openForm(a = null) {
   modal.value = true
 }
 
-function onCommitteeChange() {
-  const c = props.committees.find(c => c.id === form.committee_id)
-  if (c) {
-    form.committee_name = c.name
-    form.plan_ids = [...(c.plan_ids ?? [])]
+function onParentCommitteeChange() {
+  const parent = selectedParent.value
+  if (!parent) {
+    form.committee_id   = null
+    form.committee_name = ''
+    form.plan_ids       = []
+    return
+  }
+  if (!parent.sub_committees?.length) {
+    // Simple committee — assign directly
+    form.committee_id   = parent.id
+    form.committee_name = parent.name
+    form.plan_ids       = [...(parent.plan_ids ?? [])]
+    onRoleChange()
+  } else {
+    // Main committee — reset until sub-committee is selected
+    form.committee_id   = null
+    form.committee_name = ''
+    form.plan_ids       = []
+  }
+}
+
+function onSubCommitteeChange() {
+  const sub = selectedParent.value?.sub_committees?.find(s => s.id === form.committee_id)
+  if (sub) {
+    form.committee_name = sub.name
+    form.plan_ids       = []
     onRoleChange()
   }
 }
 
 function onRoleChange() {
-  const c = props.committees.find(c => c.id === form.committee_id)
+  const c = findCommitteeById(form.committee_id)
   if (!c) return
   const isChair = ['chairperson', 'co_chair'].includes(form.role)
   form.load_units = isChair ? c.chairperson_load_units : c.member_load_units

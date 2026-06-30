@@ -1,30 +1,43 @@
 import { ref, computed } from "vue"
 import { router } from "@inertiajs/vue3"
-import Swal from "sweetalert2"
 
 export function useCommittees(props) {
-  const committeesList = ref(props.committees || [])
-  const showModal = ref(false)
-  const modalMode = ref("create")
+  const showModal  = ref(false)
+  const modalMode  = ref("create")
   const selectedCommittee = ref(null)
 
   const searchQuery = ref("")
   const currentPage = ref(1)
   const perPage = 10
 
+  const memberSearch = ref("")
+
+  const emptySubCommittee = () => ({
+    id: null,
+    name: "",
+    head_id: "",
+    member_ids: [],
+    member_tasks: {},
+    memberSearch: "",
+  })
+
   const emptyForm = () => ({
     id: null,
     name: "",
     head_id: "",
     description: "",
+    has_subcommittees: false,
     member_ids: [],
     member_tasks: {},
+    sub_committees: [],
   })
 
   const form = ref(emptyForm())
 
+  const committees = computed(() => props.committees || [])
+
   const filteredCommittees = computed(() => {
-    const results = committeesList.value.filter((c) =>
+    const results = committees.value.filter((c) =>
       c?.name?.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
     const start = (currentPage.value - 1) * perPage
@@ -32,24 +45,55 @@ export function useCommittees(props) {
   })
 
   const totalPages = computed(() =>
-    Math.max(1, Math.ceil(committeesList.value.length / perPage))
+    Math.max(1, Math.ceil(committees.value.length / perPage))
   )
+
+  const filteredUsers = computed(() => {
+    if (!memberSearch.value) return props.users || []
+    const q = memberSearch.value.toLowerCase()
+    return (props.users || []).filter(u => u.name.toLowerCase().includes(q))
+  })
+
+  function filteredSubUsers(sub) {
+    if (!sub.memberSearch) return props.users || []
+    const q = sub.memberSearch.toLowerCase()
+    return (props.users || []).filter(u => u.name.toLowerCase().includes(q))
+  }
 
   const openModal = (mode, committee = null) => {
     modalMode.value = mode
     showModal.value = true
+    memberSearch.value = ""
 
     if ((mode === "edit" || mode === "view") && committee) {
       selectedCommittee.value = committee
+      const hasSubCommittees = (committee.sub_committees?.length ?? 0) > 0
+
       const memberTasks = {}
       committee.members?.forEach(m => { memberTasks[m.id] = m.pivot?.task ?? "" })
+
+      const subCommittees = (committee.sub_committees ?? []).map(sub => {
+        const subTasks = {}
+        sub.members?.forEach(m => { subTasks[m.id] = m.pivot?.task ?? "" })
+        return {
+          id: sub.id,
+          name: sub.name ?? "",
+          head_id: sub.head_id ?? "",
+          member_ids: sub.members?.map(m => m.id) ?? [],
+          member_tasks: subTasks,
+          memberSearch: "",
+        }
+      })
+
       form.value = {
         id: committee.id,
         name: committee.name ?? "",
         head_id: committee.head_id ?? "",
         description: committee.description ?? "",
+        has_subcommittees: hasSubCommittees,
         member_ids: committee.members?.map(m => m.id) ?? [],
         member_tasks: memberTasks,
+        sub_committees: subCommittees,
       }
     } else {
       form.value = emptyForm()
@@ -60,6 +104,7 @@ export function useCommittees(props) {
   const closeModal = () => {
     showModal.value = false
     selectedCommittee.value = null
+    memberSearch.value = ""
   }
 
   const toggleMember = (userId) => {
@@ -72,55 +117,74 @@ export function useCommittees(props) {
     }
   }
 
+  const addSubCommittee = () => {
+    form.value.sub_committees.push(emptySubCommittee())
+  }
+
+  const removeSubCommittee = (idx) => {
+    form.value.sub_committees.splice(idx, 1)
+  }
+
+  const toggleSubMember = (subIdx, userId) => {
+    const sub = form.value.sub_committees[subIdx]
+    const pos = sub.member_ids.indexOf(userId)
+    if (pos === -1) {
+      sub.member_ids.push(userId)
+    } else {
+      sub.member_ids.splice(pos, 1)
+      delete sub.member_tasks[userId]
+    }
+  }
+
   const submitCommittee = () => {
-    const payload = { ...form.value }
-    const onError = (errors) => {
-      Swal.fire("Error", Object.values(errors).flat().join("\n") || "Something went wrong.", "error")
+    const payload = {
+      name: form.value.name,
+      head_id: form.value.head_id || null,
+      description: form.value.description,
+      has_subcommittees: form.value.has_subcommittees,
+      ...(form.value.has_subcommittees
+        ? {
+            sub_committees: form.value.sub_committees.map(s => ({
+              id: s.id,
+              name: s.name,
+              head_id: s.head_id || null,
+              member_ids: s.member_ids,
+              member_tasks: s.member_tasks,
+            })),
+          }
+        : {
+            member_ids: form.value.member_ids,
+            member_tasks: form.value.member_tasks,
+          }),
+    }
+
+    const options = {
+      onSuccess: () => {
+        closeModal()
+        router.reload({ only: ['committees'] })
+      },
     }
 
     if (modalMode.value === "create") {
-      router.post(route("committees.store"), payload, {
-        onSuccess: async () => {
-          closeModal()
-          await Swal.fire("Created", "Committee created successfully.", "success")
-          window.location.reload()
-        },
-        onError,
-      })
+      router.post(route("committees.store"), payload, options)
     } else {
-      router.put(route("committees.update", form.value.id), payload, {
-        onSuccess: async () => {
-          closeModal()
-          await Swal.fire("Updated", "Committee updated successfully.", "success")
-          window.location.reload()
-        },
-        onError,
-      })
+      router.put(route("committees.update", form.value.id), payload, options)
     }
   }
 
-  const deleteCommittee = async (committee) => {
-    const result = await Swal.fire({
-      title: "Delete Committee?",
-      text: "This action cannot be undone.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Delete",
+  const deleteCommittee = (committee) => {
+    if (!confirm(`Delete "${committee.name}"? This action cannot be undone.`)) return
+    router.delete(route("committees.destroy", committee.id), {
+      onSuccess: () => router.reload({ only: ['committees'] }),
     })
-    if (result.isConfirmed) {
-      router.delete(route("committees.destroy", committee.id), {
-        onSuccess: async () => {
-          committeesList.value = committeesList.value.filter(c => c.id !== committee.id)
-          await Swal.fire("Deleted", "Committee deleted.", "success")
-          window.location.reload()
-        },
-      })
-    }
   }
 
   return {
-    committeesList, form, showModal, modalMode, selectedCommittee,
+    form, showModal, modalMode, selectedCommittee,
     searchQuery, currentPage, totalPages, filteredCommittees,
-    openModal, closeModal, toggleMember, submitCommittee, deleteCommittee,
+    memberSearch, filteredUsers, filteredSubUsers,
+    openModal, closeModal,
+    toggleMember, addSubCommittee, removeSubCommittee, toggleSubMember,
+    submitCommittee, deleteCommittee,
   }
 }

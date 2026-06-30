@@ -35,7 +35,7 @@ class CommitteeAssignmentController extends Controller
         $termId      = $request->input('term_id', $currentTerm?->id);
         $facultyId   = $request->input('faculty_id');
 
-        $assignments = FacultyCommitteeAssignment::with(['faculty:id,name', 'committee:id,name,code', 'academicTerm.schoolYear'])
+        $assignments = FacultyCommitteeAssignment::with(['faculty:id,name', 'committee:id,name,code,parent_committee_id', 'academicTerm.schoolYear'])
             ->when($termId,    fn ($q) => $q->where('academic_term_id', $termId))
             ->when($facultyId, fn ($q) => $q->where('user_id', $facultyId))
             ->orderBy('user_id')
@@ -48,8 +48,11 @@ class CommitteeAssignmentController extends Controller
         $faculty = User::whereHas('roles', fn ($q) => $q->where('roles.name', 'Faculty'))
             ->orderBy('name')->get(['id', 'name', 'position']);
 
-        $committees = Committee::active()->with('workDistributionPlans:id')->orderBy('name')
-            ->get(['id', 'name', 'code', 'committee_type', 'chairperson_load_units', 'member_load_units'])
+        $committees = Committee::active()
+            ->with(['workDistributionPlans:id', 'subCommittees:id,name,code,chairperson_load_units,member_load_units,parent_committee_id,is_active'])
+            ->whereNull('parent_committee_id')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'committee_type', 'chairperson_load_units', 'member_load_units', 'parent_committee_id'])
             ->map(fn ($c) => [
                 'id'                     => $c->id,
                 'name'                   => $c->name,
@@ -58,6 +61,15 @@ class CommitteeAssignmentController extends Controller
                 'chairperson_load_units' => (float) $c->chairperson_load_units,
                 'member_load_units'      => (float) $c->member_load_units,
                 'plan_ids'               => $c->workDistributionPlans->pluck('id')->toArray(),
+                'sub_committees'         => $c->subCommittees
+                    ->where('is_active', true)
+                    ->map(fn ($s) => [
+                        'id'                     => $s->id,
+                        'name'                   => $s->name,
+                        'code'                   => $s->code,
+                        'chairperson_load_units' => (float) $s->chairperson_load_units,
+                        'member_load_units'      => (float) $s->member_load_units,
+                    ])->values(),
             ]);
 
         $plans = WorkDistributionPlan::orderBy('success_indicator')
@@ -97,12 +109,24 @@ class CommitteeAssignmentController extends Controller
             ->where('status', 'active')
             ->get();
 
-        $authUser      = auth()->user();
+        $authUser  = auth()->user();
+        $canManage = $authUser->hasPermission('faculty_loading.manage');
+
+        // Own assignments for this committee
         $isChairperson = $assignments
             ->where('user_id', $authUser->id)
             ->whereIn('role', ['chairperson', 'co_chair'])
             ->isNotEmpty();
-        $canManage = $authUser->hasPermission('faculty_loading.manage');
+
+        // Main committee chairperson can also view/rate their sub-committees
+        if (! $isChairperson && $committee->parent_committee_id) {
+            $isChairperson = FacultyCommitteeAssignment::where('committee_id', $committee->parent_committee_id)
+                ->where('academic_term_id', $termId)
+                ->where('user_id', $authUser->id)
+                ->whereIn('role', ['chairperson', 'co_chair'])
+                ->where('status', 'active')
+                ->exists();
+        }
 
         $planMemberData = $committee->workDistributionPlans->map(function ($plan) use ($assignments) {
             $members = $assignments->map(function ($a) use ($plan) {
@@ -351,18 +375,31 @@ class CommitteeAssignmentController extends Controller
     {
         $user = auth()->user();
 
-        $isChairperson = FacultyCommitteeAssignment::where('committee_id', $committeeAssignment->committee_id)
-            ->where('academic_term_id', $committeeAssignment->academic_term_id)
-            ->where('user_id', $user->id)
-            ->whereIn('role', ['chairperson', 'co_chair'])
-            ->where('status', 'active')
-            ->exists();
+        if (! $user->hasPermission('faculty_loading.manage')) {
+            $targetCommittee   = Committee::find($committeeAssignment->committee_id);
+            $isSubCommittee    = $targetCommittee && $targetCommittee->parent_committee_id !== null;
+            $targetIsChairRole = in_array($committeeAssignment->role, ['chairperson', 'co_chair']);
 
-        abort_if(
-            ! $isChairperson && ! $user->hasPermission('faculty_loading.manage'),
-            403,
-            'Only the committee chairperson or an administrator can rate members.'
-        );
+            if ($isSubCommittee && $targetIsChairRole) {
+                // Rating a sub-committee chair → must be the main committee's chairperson
+                $isChairperson = FacultyCommitteeAssignment::where('committee_id', $targetCommittee->parent_committee_id)
+                    ->where('academic_term_id', $committeeAssignment->academic_term_id)
+                    ->where('user_id', $user->id)
+                    ->whereIn('role', ['chairperson', 'co_chair'])
+                    ->where('status', 'active')
+                    ->exists();
+            } else {
+                // Rating a member of the same committee (simple, main, or sub-committee member)
+                $isChairperson = FacultyCommitteeAssignment::where('committee_id', $committeeAssignment->committee_id)
+                    ->where('academic_term_id', $committeeAssignment->academic_term_id)
+                    ->where('user_id', $user->id)
+                    ->whereIn('role', ['chairperson', 'co_chair'])
+                    ->where('status', 'active')
+                    ->exists();
+            }
+
+            abort_if(! $isChairperson, 403, 'Only the committee chairperson or an administrator can rate members.');
+        }
 
         $data = $request->validate([
             'work_distribution_plan_id' => 'required|exists:work_distribution_plans,id',
@@ -434,7 +471,7 @@ class CommitteeAssignmentController extends Controller
             'remarks'        => $a->remarks,
             'is_chairperson' => $a->isChairperson(),
             'faculty'        => $a->faculty ? $a->faculty->only('id', 'name') : null,
-            'committee'      => $a->committee ? ['id' => $a->committee->id, 'name' => $a->committee->name, 'code' => $a->committee->code] : null,
+            'committee'      => $a->committee ? ['id' => $a->committee->id, 'name' => $a->committee->name, 'code' => $a->committee->code, 'parent_committee_id' => $a->committee->parent_committee_id] : null,
             'term'           => $a->academicTerm ? ['id' => $a->academicTerm->id, 'label' => $a->academicTerm->full_label] : null,
         ];
     }
