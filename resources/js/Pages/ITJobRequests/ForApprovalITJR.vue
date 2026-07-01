@@ -37,7 +37,7 @@ const buildParams = (page = undefined) => ({
 
 const applyFilters = () => {
     isLoading.value = true
-    router.get(route('job-requests.for-approval'), buildParams(), {
+    router.get(route('job-requests.for-approval'), buildParams(1), {
       preserveState: true,
       replace: true,
       only: ['requests', 'filters'],
@@ -59,8 +59,11 @@ const clearFilters = () => {
 
 
 const goToPage = (pageNum) => {
+  const page = Math.min(totalPages.value, Math.max(1, Number.parseInt(pageNum, 10) || 1))
+  if (page === currentPage.value) return
+
   isLoading.value = true
-  router.get(route('job-requests.for-approval'), buildParams(pageNum), {
+  router.get(route('job-requests.for-approval'), buildParams(page), {
     preserveState: true,
     replace: true,
     only: ['requests', 'filters'],
@@ -239,6 +242,7 @@ const closeModal = () => {
 
         <!-- Pagination -->
         <PaginationControl
+          :links="props.requests?.links"
           :current-page="currentPage"
           :total-pages="totalPages"
           :total="props.requests?.total ?? 0"

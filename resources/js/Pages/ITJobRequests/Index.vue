@@ -83,7 +83,7 @@ const buildParams = (page = undefined) => ({
 
 const applyFilters = () => {
     isLoading.value = true
-    router.get(route('jobrequests.index'), buildParams(), {
+    router.get(route('jobrequests.index'), buildParams(1), {
       preserveState: true,
       replace: true,
       only: ['requests', 'filters'],
@@ -106,8 +106,11 @@ const clearFilters = () => {
 
 
 const goToPage = (pageNum) => {
+  const page = Math.min(totalPages.value, Math.max(1, Number.parseInt(pageNum, 10) || 1))
+  if (page === currentPage.value) return
+
   isLoading.value = true
-  router.get(route('jobrequests.index'), buildParams(pageNum), {
+  router.get(route('jobrequests.index'), buildParams(page), {
     preserveState: true,
     replace: true,
     only: ['requests', 'filters'],
@@ -119,7 +122,7 @@ const showAllChecked = ref((props.filters?.per_page ?? 15) >= 1000)
 
 watch(showAllChecked, (val) => {
   perPage.value = val ? 1000 : 15
-  applyFilters(true)
+  applyFilters()
 })
 
 // Current page data from paginator
@@ -481,6 +484,7 @@ function handleSigCancel() {
 
         <!-- Pagination -->
         <PaginationControl
+          :links="props.requests?.links"
           :current-page="currentPage"
           :total-pages="totalPages"
           :total="props.requests?.total ?? 0"
