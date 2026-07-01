@@ -1,7 +1,7 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
-import { ref, computed, watch } from "vue"
+import { ref, computed } from "vue"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
 
@@ -184,7 +184,6 @@ const search          = ref(props.filters?.search    ?? '')
 const filterStatus    = ref(props.filters?.status    ?? '')
 const filterFrequency = ref(props.filters?.frequency ?? '')
 const isLoading       = ref(false)
-let debounceTimer     = null
 
 const buildParams = (page = undefined) => ({
   search:    search.value          || undefined,
@@ -193,9 +192,7 @@ const buildParams = (page = undefined) => ({
   page:      page                  || undefined,
 })
 
-const applyFilters = (immediate = true) => {
-  clearTimeout(debounceTimer)
-  const go = () => {
+const applyFilters = () => {
     isLoading.value = true
     router.get(route('ict-pms.index'), buildParams(), {
       preserveState: true,
@@ -203,14 +200,20 @@ const applyFilters = (immediate = true) => {
       only: ['pmsSchedules', 'filters'],
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else debounceTimer = setTimeout(go, 400)
 }
 
-watch(search,          () => applyFilters(false))
-watch(filterStatus,    () => applyFilters(true))
-watch(filterFrequency, () => applyFilters(true))
+const clearFilters = () => {
+  search.value = ''
+  filterStatus.value = ''
+  filterFrequency.value = ''
+  isLoading.value = true
+  router.get(route('ict-pms.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['pmsSchedules', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
 
 const goToPage = (pageNum) => {
   isLoading.value = true
@@ -249,7 +252,7 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
         <div class="relative flex-1 min-w-[200px]">
           <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input v-model="search" type="text" placeholder="Search schedules…"
-            @keydown.enter.prevent="applyFilters(true)"
+            @keydown.enter.prevent="applyFilters"
             class="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
           <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
             <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -273,6 +276,14 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
           <option value="Bi-Annual">Bi-Annual</option>
           <option value="Annually">Annually</option>
         </select>
+        <button @click="applyFilters" :disabled="isLoading"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Search
+        </button>
+        <button v-if="search || filterStatus || filterFrequency" @click="clearFilters" :disabled="isLoading"
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Clear
+        </button>
       </div>
 
       <!-- Table Card -->

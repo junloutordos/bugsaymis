@@ -14,20 +14,25 @@ const props = defineProps({
 
 const search    = ref(props.filters?.search ?? '')
 const isLoading = ref(false)
-let debounce    = null
 
 // ── Search ────────────────────────────────────────────────────────────────────
-const applySearch = (immediate = false) => {
-  clearTimeout(debounce)
-  const go = () => {
-    isLoading.value = true
-    router.get(route('hr.leave-credits.initialize'), { search: search.value || undefined }, {
-      preserveState: true, replace: true,
-      only: ['employees', 'filters', 'specialChiefIds'],
-      onFinish: () => { isLoading.value = false },
-    })
-  }
-  immediate ? go() : (debounce = setTimeout(go, 400))
+const applySearch = () => {
+  isLoading.value = true
+  router.get(route('hr.leave-credits.initialize'), { search: search.value || undefined }, {
+    preserveState: true, replace: true,
+    only: ['employees', 'filters', 'specialChiefIds'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const clearSearch = () => {
+  search.value = ''
+  isLoading.value = true
+  router.get(route('hr.leave-credits.initialize'), {}, {
+    preserveState: true, replace: true,
+    only: ['employees', 'filters', 'specialChiefIds'],
+    onFinish: () => { isLoading.value = false },
+  })
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
@@ -173,13 +178,16 @@ const categoryBadge = (cat) => {
         <div class="relative flex-1">
           <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input v-model="search" type="text" placeholder="Search by name or employee ID…"
-                 @keydown.enter.prevent="applySearch(true)"
-                 @input="applySearch(false)"
+                 @keydown.enter.prevent="applySearch"
                  class="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
-        <button @click="applySearch(true)" :disabled="isLoading"
+        <button @click="applySearch" :disabled="isLoading"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
           Search
+        </button>
+        <button v-if="search" @click="clearSearch" :disabled="isLoading"
+                class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+          Clear
         </button>
       </div>
 

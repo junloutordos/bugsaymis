@@ -35,10 +35,31 @@ class MessengerialController extends Controller
         $user = $request->user();
         $canViewAll = $user->hasPermission('messengerial.manage');
 
-        $requests = MessengerialRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email))
-            ->latest()
-            ->get()
-            ->map(function ($r) use ($canViewAll) {
+        $query = MessengerialRequest::when(!$canViewAll, fn($q) => $q->where('email', $user->email));
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+
+            $query->where(function ($q) use ($search) {
+                $q->where('purpose', 'like', "%{$search}%")
+                    ->orWhere('requestor', 'like', "%{$search}%")
+                    ->orWhere('reference_no', 'like', "%{$search}%")
+                    ->orWhere('destination', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('consignee_name', 'like', "%{$search}%")
+                    ->orWhere('consignee_contact', 'like', "%{$search}%")
+                    ->orWhere('unit', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $requests = $query->latest()
+            ->paginate(15)
+            ->withQueryString()
+            ->through(function ($r) use ($canViewAll) {
                 // Flag missing files so the UI can show re-upload button
                 $r->proof_missing = $canViewAll
                     && $r->proof_of_delivery
@@ -52,6 +73,7 @@ class MessengerialController extends Controller
 
         return Inertia::render('Messengerial/Index', [
             'requests'      => $requests,
+            'filters'       => $request->only('search', 'status'),
             'hasPendingCsm' => $hasPendingCsm,
             'hasPin'        => ! empty($user->signature_pin),
             'signatureUri'  => $this->sigService->getSignatureDataUri($user),

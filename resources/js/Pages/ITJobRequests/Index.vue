@@ -72,7 +72,6 @@ const filterCategory = ref(props.filters?.category ?? '')
 const filterStatus   = ref(props.filters?.status   ?? '')
 const perPage        = ref(props.filters?.per_page ?? 15) // Default to 15 items per page
 const isLoading      = ref(false)
-let debounceTimer    = null
 
 const buildParams = (page = undefined) => ({
   search:   search.value   || undefined,
@@ -82,9 +81,7 @@ const buildParams = (page = undefined) => ({
   page:     page            || undefined,
 })
 
-const applyFilters = (immediate = true) => {
-  clearTimeout(debounceTimer)
-  const go = () => {
+const applyFilters = () => {
     isLoading.value = true
     router.get(route('jobrequests.index'), buildParams(), {
       preserveState: true,
@@ -92,15 +89,21 @@ const applyFilters = (immediate = true) => {
       only: ['requests', 'filters'],
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else debounceTimer = setTimeout(go, 400)
 }
 
-// Auto-search while typing (debounced); dropdowns fire immediately
-watch(search, () => applyFilters(false))
-watch(filterCategory, () => applyFilters(true))
-watch(filterStatus,   () => applyFilters(true))
+const clearFilters = () => {
+  search.value = ''
+  filterCategory.value = ''
+  filterStatus.value = ''
+  isLoading.value = true
+  router.get(route('jobrequests.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
 
 const goToPage = (pageNum) => {
   isLoading.value = true
@@ -275,7 +278,7 @@ function handleSigCancel() {
           <AppInput
             v-model="search"
             placeholder="Search requests..."
-            @keydown.enter.prevent="applyFilters(true)"
+            @keydown.enter.prevent="applyFilters"
           />
           <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
             <svg class="h-4 w-4 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -284,7 +287,8 @@ function handleSigCancel() {
             </svg>
           </span>
         </div>
-        <AppButton :disabled="isLoading" @click="applyFilters(true)">Search</AppButton>
+        <AppButton :disabled="isLoading" @click="applyFilters">Search</AppButton>
+        <AppButton v-if="search || filterCategory || filterStatus" variant="secondary" :disabled="isLoading" @click="clearFilters">Clear</AppButton>
         <label class="inline-flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap text-sm text-slate-600">
           <input type="checkbox" v-model="showAllChecked" class="h-4 w-4 rounded border-slate-300 text-indigo-600" />
           Show All

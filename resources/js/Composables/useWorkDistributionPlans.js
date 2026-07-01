@@ -9,6 +9,7 @@ export function useWorkDistributionPlans(props) {
   const selectedPlan = ref(null)
 
   const searchQuery = ref("")
+  const appliedSearchQuery = ref("")
   const currentPage = ref(1)
   const perPage = 10
 
@@ -26,16 +27,30 @@ export function useWorkDistributionPlans(props) {
   const tagSearch = ref("")
 
   const filteredPlans = computed(() => {
+    const q = appliedSearchQuery.value.toLowerCase()
     const results = plansList.value.filter((p) =>
-      p?.success_indicator?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      p?.success_indicator?.toLowerCase().includes(q)
     )
     const start = (currentPage.value - 1) * perPage
     return results.slice(start, start + perPage)
   })
 
   const totalPages = computed(() =>
-    Math.max(1, Math.ceil(plansList.value.length / perPage))
+    Math.max(1, Math.ceil(plansList.value.filter((p) =>
+      p?.success_indicator?.toLowerCase().includes(appliedSearchQuery.value.toLowerCase())
+    ).length / perPage))
   )
+
+  const applyFilters = () => {
+    appliedSearchQuery.value = searchQuery.value
+    currentPage.value = 1
+  }
+
+  const clearFilters = () => {
+    searchQuery.value = ""
+    appliedSearchQuery.value = ""
+    currentPage.value = 1
+  }
 
   // Rebuild tags from a saved plan for edit mode
   const buildInvolvedFromPlan = (plan) => {
@@ -181,6 +196,7 @@ export function useWorkDistributionPlans(props) {
   return {
     plansList, form, showModal, modalMode, selectedPlan,
     searchQuery, currentPage, totalPages, filteredPlans,
+    applyFilters, clearFilters,
     tagSearch,
     openModal, closeModal,
     addTag, removeTag, addFreeTextTag,

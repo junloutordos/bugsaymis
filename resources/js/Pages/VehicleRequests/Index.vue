@@ -47,7 +47,6 @@ const {
 
 const searchQuery = ref(props.filters?.search ?? '')
 const isLoading = ref(false)
-let searchTimer = null
 
 const buildParams = (pageNum = undefined) => ({
   search: searchQuery.value || undefined,
@@ -55,9 +54,7 @@ const buildParams = (pageNum = undefined) => ({
   page: pageNum || undefined,
 })
 
-function applyFilters(immediate = false) {
-  clearTimeout(searchTimer)
-  const go = () => {
+function applyFilters() {
     isLoading.value = true
     router.get(route('vehicle-requests.index'), buildParams(), {
       preserveState: true,
@@ -65,9 +62,17 @@ function applyFilters(immediate = false) {
       only: ['requests', 'filters', 'hasPendingCsm'],
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else searchTimer = setTimeout(go, 400)
+}
+
+function clearFilters() {
+  searchQuery.value = ''
+  isLoading.value = true
+  router.get(route('vehicle-requests.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters', 'hasPendingCsm'],
+    onFinish: () => { isLoading.value = false },
+  })
 }
 
 function goToPage(pageNum) {
@@ -84,7 +89,6 @@ const filteredRequests = computed(() => props.requests?.data ?? [])
 const currentPage = computed(() => props.requests?.current_page ?? 1)
 const totalPages = computed(() => props.requests?.last_page ?? 1)
 
-watch(searchQuery, () => applyFilters(false))
 
 // Dynamically add pin field to composable form
 form.pin = null
@@ -184,8 +188,16 @@ async function handleNewRequest() {
       <!-- Filter bar -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
         <input v-model="searchQuery" type="text" placeholder="Search vehicle requests..."
-               @keydown.enter.prevent="applyFilters(true)"
+               @keydown.enter.prevent="applyFilters"
                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
+        <button @click="applyFilters" :disabled="isLoading"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Search
+        </button>
+        <button v-if="searchQuery" @click="clearFilters" :disabled="isLoading"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Clear
+        </button>
         <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
       </div>
 

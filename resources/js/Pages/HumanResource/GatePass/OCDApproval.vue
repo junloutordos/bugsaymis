@@ -12,7 +12,16 @@
       <!-- Search -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
         <input v-model="search" type="text" placeholder="Search by employee name or purpose…"
+               @keydown.enter.prevent="applyFilters"
                class="w-full sm:w-80 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <button @click="applyFilters" :disabled="isLoading"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Search
+        </button>
+        <button v-if="search" @click="clearFilters" :disabled="isLoading"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          Clear
+        </button>
         <span v-if="isLoading" class="text-xs text-slate-400">Searching…</span>
       </div>
 
@@ -191,7 +200,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from "vue"
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { EyeIcon } from '@heroicons/vue/24/outline'
@@ -209,19 +218,25 @@ const props = defineProps({
 const search      = ref(props.filters?.search ?? '')
 const isLoading   = ref(false)
 const isSubmitting = ref(false)
-let debounceTimer  = null
 
-watch(search, () => {
-  clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    isLoading.value = true
-    router.get(route('gatepass.ocd-approval'), { search: search.value || undefined }, {
-      preserveState: true, replace: true,
-      only: ['requests', 'filters'],
-      onFinish: () => { isLoading.value = false },
-    })
-  }, 400)
-})
+function applyFilters() {
+  isLoading.value = true
+  router.get(route('gatepass.ocd-approval'), { search: search.value || undefined }, {
+    preserveState: true, replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+function clearFilters() {
+  search.value = ''
+  isLoading.value = true
+  router.get(route('gatepass.ocd-approval'), {}, {
+    preserveState: true, replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
 
 function goToPage(pageNum) {
   isLoading.value = true

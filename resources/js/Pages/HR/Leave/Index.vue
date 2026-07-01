@@ -21,29 +21,31 @@
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-col gap-3">
-        <div class="relative max-w-xl">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="relative w-full sm:w-96">
           <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             v-model="search"
             type="text"
             placeholder="Search control no., employee, leave type, status, or date..."
+            @keydown.enter.prevent="applyFilters"
             class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <div class="flex flex-wrap gap-2">
-          <button v-for="s in statusOptions" :key="s.value"
-                  @click="setFilter(s.value)"
-                  :class="[
-                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                    activeStatus === s.value
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  ]">
-            {{ s.label }}
-          </button>
-        </div>
+        <select v-model="activeStatus"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+        </select>
+
+        <button @click="applyFilters"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Search
+        </button>
+        <button v-if="search || activeStatus" @click="clearFilters"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Clear
+        </button>
       </div>
 
       <!-- Table -->
@@ -112,7 +114,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ref, watch } from 'vue'
+import { ref } from "vue"
 
 const props = defineProps({
   applications: Object,
@@ -126,7 +128,6 @@ const canApprove = page.props.auth?.user?.permissions?.includes('hr.leave.approv
 const canFile = page.props.auth?.user?.permissions?.includes('hr.leave.file')
 const search = ref(props.filters?.search ?? '')
 const activeStatus = ref(props.filters?.status ?? '')
-let searchTimer = null
 
 const statusOptions = [
   { value: '',            label: 'All' },
@@ -138,11 +139,6 @@ const statusOptions = [
   { value: 'cancelled',   label: 'Cancelled' },
 ]
 
-function setFilter(status) {
-  activeStatus.value = status
-  applyFilters()
-}
-
 function applyFilters() {
   router.get(route('hr.leave.index'), {
     search: search.value || undefined,
@@ -153,10 +149,14 @@ function applyFilters() {
   })
 }
 
-watch(search, () => {
-  clearTimeout(searchTimer)
-  searchTimer = setTimeout(applyFilters, 300)
-})
+function clearFilters() {
+  search.value = ''
+  activeStatus.value = ''
+  router.get(route('hr.leave.index'), {}, {
+    preserveState: true,
+    replace: true,
+  })
+}
 
 function statusClass(s) {
   const map = {

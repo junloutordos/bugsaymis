@@ -12,6 +12,7 @@ const props = defineProps({
 const {
   assignmentsList, form, showModal, modalMode, selectedAssignment,
   searchQuery, currentPage, totalPages, filteredAssignments,
+  applyFilters, clearFilters,
   openModal, closeModal, toggleMember, submitAssignment, deleteAssignment,
 } = useSpecialAssignments(props)
 </script>
@@ -35,9 +36,18 @@ const {
       <!-- Table Card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100">
+        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <input v-model="searchQuery" type="text" placeholder="Search assignments..."
+            @keydown.enter.prevent="applyFilters"
             class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <button @click="applyFilters"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Search
+          </button>
+          <button v-if="searchQuery" @click="clearFilters"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Clear
+          </button>
         </div>
 
         <div class="overflow-x-auto">

@@ -20,11 +20,19 @@
       <!-- Table card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100">
+        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <input v-model="searchQuery" type="text" placeholder="Search work requests…"
-                 @keydown.enter.prevent="applyFilters(true)"
+                 @keydown.enter.prevent="applyFilters"
                  class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-          <span v-if="isLoading" class="mt-2 block text-xs text-slate-400">Searching...</span>
+          <button @click="applyFilters" :disabled="isLoading"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+            Search
+          </button>
+          <button v-if="searchQuery" @click="clearFilters" :disabled="isLoading"
+                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+            Clear
+          </button>
+          <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
         </div>
 
         <!-- Desktop table -->
@@ -344,7 +352,6 @@ async function handleNewRequest() {
 
 const searchQuery = ref(props.filters?.search ?? '')
 const isLoading = ref(false)
-let searchTimer = null
 
 const buildParams = (pageNum = undefined) => ({
   search: searchQuery.value || undefined,
@@ -352,9 +359,7 @@ const buildParams = (pageNum = undefined) => ({
   page: pageNum || undefined,
 })
 
-function applyFilters(immediate = false) {
-  clearTimeout(searchTimer)
-  const go = () => {
+function applyFilters() {
     isLoading.value = true
     router.get(route('work-requests.index'), buildParams(), {
       preserveState: true,
@@ -362,9 +367,17 @@ function applyFilters(immediate = false) {
       only: ['workRequests', 'filters', 'hasPendingCsm'],
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else searchTimer = setTimeout(go, 400)
+}
+
+function clearFilters() {
+  searchQuery.value = ''
+  isLoading.value = true
+  router.get(route('work-requests.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['workRequests', 'filters', 'hasPendingCsm'],
+    onFinish: () => { isLoading.value = false },
+  })
 }
 
 function goToPage(pageNum) {
@@ -389,7 +402,6 @@ const handleResize = () => { windowWidth.value = window.innerWidth }
 onMounted(() => { window.addEventListener('resize', handleResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
-watch(searchQuery, () => applyFilters(false))
 
 const page = usePage();
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');

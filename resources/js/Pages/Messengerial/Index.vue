@@ -1,6 +1,6 @@
 <script setup>
 import { Head, usePage, useForm, router } from "@inertiajs/vue3";
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { PencilSquareIcon, TrashIcon, ArrowUpTrayIcon, EyeIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import Swal from 'sweetalert2'
@@ -10,42 +10,62 @@ import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 
 const props = defineProps({
-  requests: Array,
+  requests: Object,
+  filters: { type: Object, default: () => ({}) },
   hasPendingCsm: { type: Boolean, default: false },
   hasPin: { type: Boolean, default: false },
   signatureUri: { type: String, default: null },
 });
 const page = usePage();
 
-// client-side search & pagination
-const requestsList = computed(() => props.requests || [])
-const searchQuery = ref('')
-const currentPage = ref(1)
-const perPage = 10
+const searchQuery = ref(props.filters?.search ?? '')
+const filterStatus = ref(props.filters?.status ?? '')
+const filteredRequests = computed(() => props.requests?.data ?? [])
+const currentPage = computed(() => props.requests?.current_page ?? 1)
+const totalPages = computed(() => props.requests?.last_page ?? 1)
 
-const filteredRequestsAll = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return requestsList.value.filter(r =>
-    (r.purpose || '').toString().toLowerCase().includes(q) ||
-    (r.requestor || '').toString().toLowerCase().includes(q) ||
-    (r.reference_no || '').toString().toLowerCase().includes(q) ||
-    (r.destination || '').toString().toLowerCase().includes(q) ||
-    (r.status || '').toString().toLowerCase().includes(q) ||
-    (r.consignee_name || '').toString().toLowerCase().includes(q) ||
-    (r.consignee_contact || '').toString().toLowerCase().includes(q) ||
-    (r.unit || '').toString().toLowerCase().includes(q) ||
-    (r.id || '').toString().includes(q)
-  )
-})
+const statusOptions = [
+  { value: '', label: 'All Statuses' },
+  { value: 'Pending Division Chief Approval', label: 'Pending DC Approval' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Completed', label: 'Completed' },
+  { value: 'Declined', label: 'Declined' },
+]
 
-const filteredRequests = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filteredRequestsAll.value.slice(start, start + perPage)
-})
+function buildParams(page = undefined) {
+  return {
+    search: searchQuery.value || undefined,
+    status: filterStatus.value || undefined,
+    page: page || undefined,
+  }
+}
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
+function applyFilters() {
+  router.get(route('messengerial.index'), buildParams(), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+  })
+}
 
-watch(searchQuery, () => { currentPage.value = 1 })
+function clearFilters() {
+  searchQuery.value = ''
+  filterStatus.value = ''
+  router.get(route('messengerial.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+  })
+}
+
+function goToPage(page) {
+  router.get(route('messengerial.index'), buildParams(page), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+  })
+}
+
 const userRole = page.props.auth?.user?.role?.name ?? null;
 const userEmail = page.props.auth?.user?.email ?? null;
 
@@ -204,13 +224,26 @@ const submitProof = () => {
       <!-- Table card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100">
+        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Search requests…"
+            @keydown.enter.prevent="applyFilters"
             class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
+          <select v-model="filterStatus"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option v-for="status in statusOptions" :key="status.value" :value="status.value">{{ status.label }}</option>
+          </select>
+          <button @click="applyFilters"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Search
+          </button>
+          <button v-if="searchQuery || filterStatus" @click="clearFilters"
+                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Clear
+          </button>
         </div>
 
         <!-- Desktop table -->
@@ -319,12 +352,13 @@ const submitProof = () => {
         </div>
 
         <!-- Pagination -->
-                <PaginationControl
+        <PaginationControl
           :current-page="currentPage"
           :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
+          :total="props.requests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
         />
       </div>
 

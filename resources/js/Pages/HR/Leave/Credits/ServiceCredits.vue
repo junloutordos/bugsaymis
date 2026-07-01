@@ -14,7 +14,6 @@ const search       = ref(props.filters?.search ?? '')
 const status       = ref(props.filters?.status ?? 'pending')
 const isLoading    = ref(false)
 const isSubmitting = ref(false)
-let debounce       = null
 
 // ── Reject modal ──────────────────────────────────────────────────────────────
 const showRejectModal = ref(false)
@@ -29,23 +28,28 @@ const statusOptions = [
   { label: 'Consumed', value: 'consumed' },
 ]
 
-const applyFilters = (immediate = false) => {
-  clearTimeout(debounce)
-  const go = () => {
-    isLoading.value = true
-    router.get(route('hr.leave-credits.service-credits'), {
-      search: search.value || undefined,
-      status: status.value || undefined,
-    }, {
-      preserveState: true, replace: true,
-      only: ['records', 'filters'],
-      onFinish: () => { isLoading.value = false },
-    })
-  }
-  immediate ? go() : (debounce = setTimeout(go, 400))
+const applyFilters = () => {
+  isLoading.value = true
+  router.get(route('hr.leave-credits.service-credits'), {
+    search: search.value || undefined,
+    status: status.value || undefined,
+  }, {
+    preserveState: true, replace: true,
+    only: ['records', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
 }
 
-const setStatus = (s) => { status.value = s; applyFilters(true) }
+const clearFilters = () => {
+  search.value = ''
+  status.value = 'pending'
+  isLoading.value = true
+  router.get(route('hr.leave-credits.service-credits'), { status: status.value }, {
+    preserveState: true, replace: true,
+    only: ['records', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
 
 // ── Approve ───────────────────────────────────────────────────────────────────
 const approve = async (record) => {
@@ -137,24 +141,20 @@ const fmtDate = (d) => {
       <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">{{ $page.props.flash.success }}</div>
       <div v-if="$page.props.flash?.error"   class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{{ $page.props.flash.error }}</div>
 
-      <!-- Status filter tabs + Search -->
+      <!-- Filters -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
-        <div class="flex flex-wrap gap-2 flex-1">
-          <button v-for="s in statusOptions" :key="s.value"
-                  @click="setStatus(s.value)"
-                  :class="['px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                    status === s.value
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50']">
-            {{ s.label }}
-          </button>
-        </div>
-        <div class="flex gap-2">
+        <select v-model="status"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+        </select>
+        <div class="flex flex-wrap gap-2">
           <input v-model="search" type="text" placeholder="Search employee…"
-                 @input="applyFilters(false)" @keydown.enter.prevent="applyFilters(true)"
+                 @keydown.enter.prevent="applyFilters"
                  class="px-3 py-2 text-sm border border-slate-200 rounded-lg w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          <button @click="applyFilters(true)" :disabled="isLoading"
+          <button @click="applyFilters" :disabled="isLoading"
                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Search</button>
+          <button v-if="search || status !== 'pending'" @click="clearFilters" :disabled="isLoading"
+                  class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Clear</button>
         </div>
       </div>
 

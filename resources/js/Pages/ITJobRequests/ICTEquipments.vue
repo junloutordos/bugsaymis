@@ -447,7 +447,6 @@ const filterCategory = ref(props.filters?.category ?? '')
 const filterStatus   = ref(props.filters?.status   ?? '')
 const perPage        = ref(props.filters?.per_page ?? 15) // Default to 15 items per page
 const isLoading      = ref(false)
-let debounceTimer    = null
 
 const buildParams = (page = undefined) => ({
   search:   search.value         || undefined,
@@ -457,9 +456,7 @@ const buildParams = (page = undefined) => ({
   page:     page                 || undefined,
 })
 
-const applyFilters = (immediate = true) => {
-  clearTimeout(debounceTimer)
-  const go = () => {
+const applyFilters = () => {
     isLoading.value = true
     router.get(route('ict-equipments.index'), buildParams(), {
       preserveState: true,
@@ -467,14 +464,21 @@ const applyFilters = (immediate = true) => {
       only: ['equipments', 'filters'],
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else debounceTimer = setTimeout(go, 400)
 }
 
-watch(search, () => applyFilters(false))
-watch(filterCategory, () => applyFilters(true))
-watch(filterStatus,   () => applyFilters(true))
+const clearFilters = () => {
+  search.value = ''
+  filterCategory.value = ''
+  filterStatus.value = ''
+  isLoading.value = true
+  router.get(route('ict-equipments.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['equipments', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
 watch(perPage, () => applyFilters(true))
 
 const goToPage = (pageNum) => {
@@ -534,7 +538,7 @@ const showAllChecked    = computed({
               v-model="search"
               type="text"
               placeholder="Search equipment..."
-              @keydown.enter.prevent="applyFilters(true)"
+              @keydown.enter.prevent="applyFilters"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-64"
             />
             <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -544,8 +548,11 @@ const showAllChecked    = computed({
               </svg>
             </span>
           </div>
-          <button @click="applyFilters(true)" :disabled="isLoading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+          <button @click="applyFilters" :disabled="isLoading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
             Search
+          </button>
+          <button v-if="search || filterCategory || filterStatus" @click="clearFilters" :disabled="isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
+            Clear
           </button>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
