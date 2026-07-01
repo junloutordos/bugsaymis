@@ -8,6 +8,9 @@ env:
   AWS_REGION: ap-southeast-1
   ECR: 971422671747.dkr.ecr.ap-southeast-1.amazonaws.com
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # OTel boots during composer's post-autoload-dump artisan calls on this
+  # runner too (no ADOT sidecar here) — keep it quiet outside the container.
+  OTEL_SDK_DISABLED: true
 
 jobs:
   deploy:
