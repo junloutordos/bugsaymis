@@ -104,6 +104,24 @@ class EmployeeSchedule extends Model
     }
 
     /**
+     * Get the scheduled lunch_start for a specific date, or null if not configured.
+     */
+    public function getLunchStart(string $date): ?string
+    {
+        $dow = \Carbon\Carbon::parse($date)->format('D');
+        return $this->daily_schedules[$dow]['lunch_start'] ?? null;
+    }
+
+    /**
+     * Get the scheduled lunch_end for a specific date, or null if not configured.
+     */
+    public function getLunchEnd(string $date): ?string
+    {
+        $dow = \Carbon\Carbon::parse($date)->format('D');
+        return $this->daily_schedules[$dow]['lunch_end'] ?? null;
+    }
+
+    /**
      * Returns true if the schedule for the given date crosses midnight
      * (i.e. time_out < time_in, e.g. 22:00 → 06:00).
      */

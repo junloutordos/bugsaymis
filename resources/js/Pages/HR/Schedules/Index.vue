@@ -264,11 +264,11 @@
                   class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Copy Mon to all active days</button>
               </div>
               <div class="border border-slate-200 rounded-lg overflow-hidden">
-                <div class="grid grid-cols-[80px_1fr_1fr_40px] bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                  <span>Day</span><span>Time In</span><span>Time Out</span><span></span>
+                <div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_40px] bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                  <span>Day</span><span>Time In</span><span>Time Out</span><span>Lunch Start</span><span>Lunch End</span><span></span>
                 </div>
                 <div v-for="d in allDays" :key="d"
-                  class="grid grid-cols-[80px_1fr_1fr_40px] items-center px-3 py-2 border-t border-slate-100"
+                  class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_40px] items-center px-3 py-2 border-t border-slate-100"
                   :class="presetForm.daily_schedules[d] ? 'bg-white' : 'bg-slate-50/60 opacity-60'">
                   <label class="flex items-center gap-2 cursor-pointer select-none">
                     <input type="checkbox" :checked="!!presetForm.daily_schedules[d]"
@@ -279,11 +279,23 @@
                   <input v-if="presetForm.daily_schedules[d]"
                     v-model="presetForm.daily_schedules[d].time_in"
                     type="time"
-                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-2 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                  <span v-else class="text-xs text-slate-400 italic mr-2">Rest day</span>
+                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <span v-else class="text-xs text-slate-400 italic mr-1">Rest day</span>
                   <input v-if="presetForm.daily_schedules[d]"
                     v-model="presetForm.daily_schedules[d].time_out"
                     type="time"
+                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <span v-else></span>
+                  <input v-if="presetForm.daily_schedules[d]"
+                    v-model="presetForm.daily_schedules[d].lunch_start"
+                    type="time"
+                    placeholder="12:00"
+                    class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  <span v-else></span>
+                  <input v-if="presetForm.daily_schedules[d]"
+                    v-model="presetForm.daily_schedules[d].lunch_end"
+                    type="time"
+                    placeholder="13:00"
                     class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                   <span v-else></span>
                   <span></span>
@@ -402,11 +414,11 @@ function submitReject() {
 const presetModal = reactive({ open: false, mode: 'add', id: null })
 
 const defaultDailySchedules = () => ({
-  Mon: { time_in: '08:00', time_out: '17:00' },
-  Tue: { time_in: '08:00', time_out: '17:00' },
-  Wed: { time_in: '08:00', time_out: '17:00' },
-  Thu: { time_in: '08:00', time_out: '17:00' },
-  Fri: { time_in: '08:00', time_out: '17:00' },
+  Mon: { time_in: '08:00', time_out: '17:00', lunch_start: '12:00', lunch_end: '13:00' },
+  Tue: { time_in: '08:00', time_out: '17:00', lunch_start: '12:00', lunch_end: '13:00' },
+  Wed: { time_in: '08:00', time_out: '17:00', lunch_start: '12:00', lunch_end: '13:00' },
+  Thu: { time_in: '08:00', time_out: '17:00', lunch_start: '12:00', lunch_end: '13:00' },
+  Fri: { time_in: '08:00', time_out: '17:00', lunch_start: '12:00', lunch_end: '13:00' },
 })
 
 const presetForm = useForm({
@@ -428,7 +440,12 @@ function toggleDay(day) {
     const firstActive = Object.values(presetForm.daily_schedules)[0]
     presetForm.daily_schedules = {
       ...presetForm.daily_schedules,
-      [day]: { time_in: firstActive?.time_in ?? '08:00', time_out: firstActive?.time_out ?? '17:00' },
+      [day]: {
+        time_in: firstActive?.time_in ?? '08:00',
+        time_out: firstActive?.time_out ?? '17:00',
+        lunch_start: firstActive?.lunch_start ?? '12:00',
+        lunch_end: firstActive?.lunch_end ?? '13:00',
+      },
     }
   }
 }
@@ -441,7 +458,7 @@ function copyFirstToAll() {
   const updated = {}
   for (const d of allDays) {
     if (presetForm.daily_schedules[d]) {
-      updated[d] = { ...first }
+      updated[d] = { time_in: first.time_in, time_out: first.time_out, lunch_start: first.lunch_start, lunch_end: first.lunch_end }
     }
   }
   presetForm.daily_schedules = updated
