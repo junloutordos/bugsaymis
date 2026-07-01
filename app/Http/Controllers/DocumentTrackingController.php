@@ -448,6 +448,46 @@ class DocumentTrackingController extends Controller
         ]);
     }
 
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    public function update(Request $request, Document $document)
+    {
+        $user    = Auth::user();
+        $isAdmin = $user->hasPermission('documents.approve');
+
+        abort_if(
+            ! $isAdmin && $document->created_by !== $user->id,
+            403,
+            'You can only edit documents you created.'
+        );
+        abort_if(
+            $document->overall_status === 'Completed',
+            422,
+            'Cannot edit a completed document.'
+        );
+
+        $isExternal = $document->origin_type === 'external';
+
+        $data = $request->validate([
+            'subject'          => 'required|string|max:500',
+            'description'      => 'nullable|string|max:5000',
+            'priority'         => 'required|in:Normal,Urgent,Rush',
+            'urgency'          => 'required|in:Normal,Urgent,Very Urgent',
+            'is_confidential'  => 'nullable|boolean',
+            'deadline_at'      => 'nullable|date',
+            // External-only
+            'source_office'    => $isExternal ? 'required|string|max:255' : 'nullable|string|max:255',
+            'sender_name'      => 'nullable|string|max:255',
+            'date_of_document' => 'nullable|date',
+            'date_received'    => 'nullable|date',
+            'document_number'  => 'nullable|string|max:100',
+        ]);
+
+        $document->update($data);
+
+        return back()->with('success', 'Document details updated.');
+    }
+
     // ── Review (unified: return / forward / complete) ──────────────────────────
 
     public function review(Request $request, DocumentRouting $routing)

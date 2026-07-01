@@ -785,6 +785,7 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
 
         // Wildcard /{document} LAST — after all static segments
         Route::get('/{document}',                   [\App\Http\Controllers\DocumentTrackingController::class, 'show'])->name('show');
+        Route::put('/{document}',                   [\App\Http\Controllers\DocumentTrackingController::class, 'update'])->name('update');
         Route::post('/{document}/complete',          [\App\Http\Controllers\DocumentTrackingController::class, 'complete'])->name('complete');
         Route::post('/{document}/annotate',          [\App\Http\Controllers\DocumentTrackingController::class, 'annotate'])->name('annotate');
         Route::get('/{document}/scan/{attachment}',  [\App\Http\Controllers\DocumentTrackingController::class, 'viewScan'])->name('scan');
