@@ -36,6 +36,47 @@ const myActiveRouting = computed(() =>
 const isCompleted   = computed(() => props.document.overall_status === 'Completed')
 const isPending     = computed(() => myActiveRouting.value?.status === 'Pending')
 
+// ── Edit document details ─────────────────────────────────────────────────
+const canEdit = computed(() =>
+  !isCompleted.value &&
+  (props.isAdmin || props.document.creator?.id === uid.value)
+)
+
+const editOpen      = ref(false)
+const editSubmitting = ref(false)
+const editErrors    = ref({})
+const editForm      = ref({})
+
+function openEditModal() {
+  const d = props.document
+  editForm.value = {
+    subject:          d.subject ?? '',
+    description:      d.description ?? '',
+    priority:         d.priority ?? 'Normal',
+    urgency:          d.urgency ?? 'Normal',
+    is_confidential:  d.is_confidential ?? false,
+    deadline_at:      d.deadline_at ? d.deadline_at.slice(0, 16) : '',
+    source_office:    d.source_office ?? '',
+    sender_name:      d.sender_name ?? '',
+    date_of_document: d.date_of_document ?? '',
+    date_received:    d.date_received ?? '',
+    document_number:  d.document_number ?? '',
+  }
+  editErrors.value = {}
+  editOpen.value   = true
+}
+
+function submitEdit() {
+  editSubmitting.value = true
+  editErrors.value     = {}
+  router.put(route('document-tracking.update', props.document.id), { ...editForm.value }, {
+    onSuccess: () => { editOpen.value = false },
+    onError:   e  => { editErrors.value = e },
+    onFinish:  () => { editSubmitting.value = false },
+    preserveScroll: true,
+  })
+}
+
 // ── Review & Process modal ────────────────────────────────────────────────
 const reviewOpen       = ref(false)
 const reviewTab        = ref('forward')  // 'forward' | 'return' | 'complete'
@@ -275,6 +316,10 @@ const overallBadgeCls = computed(() => {
             <div>Filed: <strong>{{ fmtDate(document.created_at) }}</strong></div>
             <div>By: <strong class="text-slate-700">{{ document.creator?.name }}</strong></div>
             <div v-if="document.completed_at">Completed: <strong>{{ fmtDate(document.completed_at) }}</strong></div>
+            <button v-if="canEdit" @click="openEditModal()"
+              class="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+              <PencilSquareIcon class="h-3.5 w-3.5" /> Edit Details
+            </button>
           </div>
         </div>
 
@@ -731,6 +776,129 @@ const overallBadgeCls = computed(() => {
               :src="previewUrl" class="w-full h-[75vh] rounded-lg border border-slate-100" />
             <img v-else-if="previewUrl"
               :src="previewUrl" class="max-w-full mx-auto rounded-lg" alt="Document scan" />
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── Edit Document Details Modal ─────────────────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="editOpen" class="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div class="fixed inset-0 bg-black/40" @click="editOpen = false" />
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+
+          <!-- Header -->
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
+            <div>
+              <h3 class="font-bold text-slate-800">Edit Document Details</h3>
+              <p class="text-xs text-slate-500 mt-0.5">{{ document.tracking_no }}</p>
+            </div>
+            <button @click="editOpen = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <!-- Body -->
+          <form @submit.prevent="submitEdit" class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+
+            <!-- Subject -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Subject <span class="text-red-500">*</span></label>
+              <input v-model="editForm.subject" type="text" required
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <p v-if="editErrors.subject" class="text-xs text-red-500 mt-1">{{ editErrors.subject }}</p>
+            </div>
+
+            <!-- Description -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <textarea v-model="editForm.description" rows="2"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Additional details…" />
+              <p v-if="editErrors.description" class="text-xs text-red-500 mt-1">{{ editErrors.description }}</p>
+            </div>
+
+            <!-- Priority / Urgency -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Priority</label>
+                <select v-model="editForm.priority"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option>Normal</option><option>Urgent</option><option>Rush</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Urgency</label>
+                <select v-model="editForm.urgency"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option>Normal</option><option>Urgent</option><option>Very Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Deadline -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
+              <input v-model="editForm.deadline_at" type="datetime-local"
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+
+            <!-- Confidential -->
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" v-model="editForm.is_confidential" class="rounded border-slate-300 text-indigo-600" />
+              <span class="text-sm text-slate-700 flex items-center gap-1">
+                <LockClosedIcon class="h-3.5 w-3.5 text-purple-500" /> Mark as confidential
+              </span>
+            </label>
+
+            <!-- External-only fields -->
+            <template v-if="document.origin_type === 'external'">
+              <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+                <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">External Document Details</p>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Source Office <span class="text-red-500">*</span></label>
+                    <input v-model="editForm.source_office" type="text" required
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Sender Name</label>
+                    <input v-model="editForm.sender_name" type="text"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Doc Date</label>
+                    <input v-model="editForm.date_of_document" type="date"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Date Received</label>
+                    <input v-model="editForm.date_received" type="date"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Ref. No.</label>
+                    <input v-model="editForm.document_number" type="text"
+                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+          </form>
+
+          <!-- Footer -->
+          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 rounded-b-2xl bg-white">
+            <button type="button" @click="editOpen = false"
+              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+              Cancel
+            </button>
+            <button @click="submitEdit" :disabled="editSubmitting"
+              class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
+              {{ editSubmitting ? 'Saving…' : 'Save Changes' }}
+            </button>
           </div>
         </div>
       </div>

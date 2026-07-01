@@ -46,10 +46,30 @@ class LeaveApplicationController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+
+            $query->where(function ($q) use ($search) {
+                $q->where('control_no', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('date_from', 'like', "%{$search}%")
+                    ->orWhere('date_to', 'like', "%{$search}%")
+                    ->orWhere('filed_at', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('leaveType', function ($typeQuery) use ($search) {
+                        $typeQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+            });
+        }
+
         return Inertia::render('HR/Leave/Index', [
             'applications' => $query->paginate(20)->withQueryString(),
             'leaveTypes'   => LeaveType::where('is_active', true)->orderBy('sort_order')->get(),
-            'filters'      => $request->only('status'),
+            'filters'      => $request->only('status', 'search'),
         ]);
     }
 

@@ -372,7 +372,7 @@
                     <!-- Edit button -->
                     <button v-else-if="hasMissingSlots(r) || r.is_travel"
                       @click="openEdit(r)"
-                      class="text-slate-300 hover:text-indigo-600 transition-colors"
+                      class="text-slate-400 hover:text-indigo-600 transition-colors"
                       title="Submit penned entry">
                       <PencilSquareIcon class="h-4 w-4" />
                     </button>

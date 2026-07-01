@@ -20,18 +20,30 @@
         {{ $page.props.flash.success }}
       </div>
 
-      <!-- Status Filters -->
-      <div class="flex flex-wrap gap-2">
-        <button v-for="s in statusOptions" :key="s.value"
-                @click="setFilter(s.value)"
-                :class="[
-                  'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                  filters.status === s.value
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                ]">
-          {{ s.label }}
-        </button>
+      <!-- Filters -->
+      <div class="flex flex-col gap-3">
+        <div class="relative max-w-xl">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search control no., employee, leave type, status, or date..."
+            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button v-for="s in statusOptions" :key="s.value"
+                  @click="setFilter(s.value)"
+                  :class="[
+                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                    activeStatus === s.value
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  ]">
+            {{ s.label }}
+          </button>
+        </div>
       </div>
 
       <!-- Table -->
@@ -84,16 +96,12 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ applications.current_page }} of {{ applications.last_page }} &bull; {{ applications.total }} total</span>
-          <div class="flex gap-2">
-            <button @click="goTo(applications.prev_page_url)" :disabled="!applications.prev_page_url"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Prev</button>
-            <button @click="goTo(applications.next_page_url)" :disabled="!applications.next_page_url"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :links="applications.links"
+          :current-page="applications.current_page"
+          :total-pages="applications.last_page"
+          :total="applications.total"
+        />
       </div>
 
     </div>
@@ -102,7 +110,9 @@
 
 <script setup>
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
+import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   applications: Object,
@@ -114,6 +124,9 @@ const page = usePage()
 const canApprove = page.props.auth?.user?.permissions?.includes('hr.leave.approve')
   || page.props.auth?.user?.permissions?.includes('hr.employee.manage')
 const canFile = page.props.auth?.user?.permissions?.includes('hr.leave.file')
+const search = ref(props.filters?.search ?? '')
+const activeStatus = ref(props.filters?.status ?? '')
+let searchTimer = null
 
 const statusOptions = [
   { value: '',            label: 'All' },
@@ -126,12 +139,24 @@ const statusOptions = [
 ]
 
 function setFilter(status) {
-  router.get(route('hr.leave.index'), { status: status || undefined }, { preserveState: true, replace: true })
+  activeStatus.value = status
+  applyFilters()
 }
 
-function goTo(url) {
-  if (url) router.visit(url, { preserveState: true })
+function applyFilters() {
+  router.get(route('hr.leave.index'), {
+    search: search.value || undefined,
+    status: activeStatus.value || undefined,
+  }, {
+    preserveState: true,
+    replace: true,
+  })
 }
+
+watch(search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(applyFilters, 300)
+})
 
 function statusClass(s) {
   const map = {
