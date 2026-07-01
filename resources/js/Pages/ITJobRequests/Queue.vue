@@ -67,7 +67,7 @@ function positionBadgeClass(pos) {
 }
 
 function statusChipClass(status) {
-  if (status === 'In Progress') return 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200'
+  if (status === 'In Progress') return 'bg-orange-100 text-orange-700 ring-1 ring-orange-200'
   return 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'
 }
 

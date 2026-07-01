@@ -498,6 +498,7 @@ const destroy = (wr) => {
 const statusClass = (s) => {
   if (!s) return 'bg-slate-100 text-slate-600'
   const st = String(s).toLowerCase()
+  if (st.includes('in progress')) return 'bg-orange-50 text-orange-700'
   if (st.includes('approve')) return 'bg-emerald-50 text-emerald-700'
   if (st.includes('declin')) return 'bg-red-50 text-red-600'
   if (st.includes('completed')) return 'bg-blue-50 text-blue-700'
