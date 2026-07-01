@@ -22,7 +22,9 @@
         <!-- Search -->
         <div class="px-5 py-4 border-b border-slate-100">
           <input v-model="searchQuery" type="text" placeholder="Search work requests…"
+                 @keydown.enter.prevent="applyFilters(true)"
                  class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <span v-if="isLoading" class="mt-2 block text-xs text-slate-400">Searching...</span>
         </div>
 
         <!-- Desktop table -->
@@ -156,13 +158,14 @@
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage === totalPages" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="props.workRequests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
       </div>
 
       <!-- Create / Edit Modal -->
@@ -301,13 +304,15 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Swal from 'sweetalert2'
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   divisions: Array,
   offices: Array,
   users: Array,
   skilledUsers: Array,
-  workRequests: Array,
+  workRequests: Object,
+  filters: { type: Object, default: () => ({}) },
   hasPendingCsm: { type: Boolean, default: false },
   hasPin: { type: Boolean, default: false },
   signatureUri: { type: String, default: null },
@@ -337,11 +342,45 @@ async function handleNewRequest() {
   openModal()
 }
 
-// client-side search + pagination for work requests
-const workRequestsList = computed(() => props.workRequests || [])
-const searchQuery = ref('')
-const currentPage = ref(1)
-const perPage = 10
+const searchQuery = ref(props.filters?.search ?? '')
+const isLoading = ref(false)
+let searchTimer = null
+
+const buildParams = (pageNum = undefined) => ({
+  search: searchQuery.value || undefined,
+  per_page: props.filters?.per_page || undefined,
+  page: pageNum || undefined,
+})
+
+function applyFilters(immediate = false) {
+  clearTimeout(searchTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('work-requests.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['workRequests', 'filters', 'hasPendingCsm'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else searchTimer = setTimeout(go, 400)
+}
+
+function goToPage(pageNum) {
+  isLoading.value = true
+  router.get(route('work-requests.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['workRequests', 'filters', 'hasPendingCsm'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const workRequestsList = computed(() => props.workRequests?.data ?? [])
+const filteredWorkRequests = computed(() => props.workRequests?.data ?? [])
+const currentPage = computed(() => props.workRequests?.current_page ?? 1)
+const totalPages = computed(() => props.workRequests?.last_page ?? 1)
 
 // responsive: track window width to toggle between table and card layouts
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -350,29 +389,7 @@ const handleResize = () => { windowWidth.value = window.innerWidth }
 onMounted(() => { window.addEventListener('resize', handleResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
-const filteredWorkRequestsAll = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return (workRequestsList.value || []).filter(wr =>
-    (wr.issue || '').toString().toLowerCase().includes(q) ||
-    (wr.description || '').toString().toLowerCase().includes(q) ||
-    (wr.id || '').toString().includes(q) ||
-    (wr.status || '').toString().toLowerCase().includes(q) ||
-    (wr.requester?.name || '').toString().toLowerCase().includes(q) ||
-    (wr.assigned_user?.name || '').toString().toLowerCase().includes(q) ||
-    (wr.actedBy?.name || '').toString().toLowerCase().includes(q) ||
-    (wr.action_taken || '').toString().toLowerCase().includes(q) ||
-    (wr.priority || '').toString().toLowerCase().includes(q)
-  )
-})
-
-const filteredWorkRequests = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filteredWorkRequestsAll.value.slice(start, start + perPage)
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredWorkRequestsAll.value.length / perPage)))
-
-watch(searchQuery, () => { currentPage.value = 1 })
+watch(searchQuery, () => applyFilters(false))
 
 const page = usePage();
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');

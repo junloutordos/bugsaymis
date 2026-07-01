@@ -263,15 +263,14 @@ const purposeLabel = (p) => ({
             </tr>
           </tbody>
         </table>
-        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-          <p class="text-xs text-slate-500">Page {{ currentPage }} of {{ totalPages }}</p>
-          <div class="flex gap-2">
-            <button @click="currentPage--" :disabled="currentPage <= 1"
-                    class="px-3 py-1.5 rounded-lg text-xs border border-slate-200 text-slate-600 disabled:opacity-40 hover:bg-slate-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage >= totalPages"
-                    class="px-3 py-1.5 rounded-lg text-xs border border-slate-200 text-slate-600 disabled:opacity-40 hover:bg-slate-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          v-if="totalPages > 1"
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
       </div>
 
     </div>

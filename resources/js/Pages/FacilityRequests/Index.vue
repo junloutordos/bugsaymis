@@ -1,5 +1,5 @@
 <script setup>
-import { Head, usePage, useForm } from "@inertiajs/vue3";
+import { Head, usePage, useForm, router } from "@inertiajs/vue3";
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { ref, reactive, computed, watch } from "vue";
 import axios from "axios";
@@ -8,11 +8,13 @@ import CsmForm from '@/Components/CsmForm.vue'
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
-  requests:     Array,
+  requests:     Object,
   facilities:   Array,
   misUsers:     Array,
+  filters:      { type: Object, default: () => ({}) },
   hasPin:       { type: Boolean, default: false },
   signatureUri: { type: String,  default: null },
 });
@@ -24,41 +26,46 @@ const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r));
 
 const usersList = ref(props.misUsers || [])
 
-// client-side search + pagination
-const requestsList = ref(props.requests || [])
-const searchQuery = ref('')
-const currentPage = ref(1)
-const perPage = 10
+const searchQuery = ref(props.filters?.search ?? '')
+const isLoading = ref(false)
+let searchTimer = null
 
-const filteredRequestsAll = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return (requestsList.value || []).filter(req => {
-    const venue = Array.isArray(req.venue)
-      ? req.venue.map(v => facilityMap[v] ?? v).join(' ')
-      : (facilityMap[req.venue] ?? req.venue ?? '')
-    return (
-      (req.activity || '').toString().toLowerCase().includes(q) ||
-      ((req.requester?.name ?? req.requestor) || '').toString().toLowerCase().includes(q) ||
-      (req.unit || req.requester?.division?.division_name || '').toString().toLowerCase().includes(q) ||
-      (req.status || '').toString().toLowerCase().includes(q) ||
-      (req.purpose || '').toString().toLowerCase().includes(q) ||
-      (req.nature || '').toString().toLowerCase().includes(q) ||
-      (req.participants || '').toString().toLowerCase().includes(q) ||
-      venue.toLowerCase().includes(q) ||
-      (req.date_start || '').toString().includes(q) ||
-      (req.id || '').toString().includes(q)
-    )
+const buildParams = (pageNum = undefined) => ({
+  search: searchQuery.value || undefined,
+  per_page: props.filters?.per_page || undefined,
+  page: pageNum || undefined,
+})
+
+function applyFilters(immediate = false) {
+  clearTimeout(searchTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('facility-requests.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['requests', 'filters'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else searchTimer = setTimeout(go, 400)
+}
+
+function goToPage(pageNum) {
+  isLoading.value = true
+  router.get(route('facility-requests.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
   })
-})
+}
 
-const filteredRequests = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filteredRequestsAll.value.slice(start, start + perPage)
-})
+const filteredRequests = computed(() => props.requests?.data ?? [])
+const currentPage = computed(() => props.requests?.current_page ?? 1)
+const totalPages = computed(() => props.requests?.last_page ?? 1)
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
-
-watch(searchQuery, () => { currentPage.value = 1 })
+watch(searchQuery, () => applyFilters(false))
 
 const showModal = ref(false);
 const editingRequest = ref(null);
@@ -484,8 +491,10 @@ const bookingsForDate = (dt) => {
             v-model="searchQuery"
             type="text"
             placeholder="Search facility requests…"
+            @keydown.enter.prevent="applyFilters(true)"
             class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
+          <span v-if="isLoading" class="mt-2 block text-xs text-slate-400">Searching...</span>
         </div>
 
         <!-- Desktop table -->
@@ -601,15 +610,14 @@ const bookingsForDate = (dt) => {
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage === totalPages"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="props.requests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
       </div>
 
       <!-- Calendar Modal -->

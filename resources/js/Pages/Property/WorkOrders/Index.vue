@@ -92,10 +92,14 @@ async function updateStatus(id, status) {
           </tr>
         </tbody>
       </table>
-      <div v-if="totalPages>1" class="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-600">
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <div class="flex gap-2"><button @click="currentPage--" :disabled="currentPage<=1" class="px-3 py-1 rounded border border-slate-200 disabled:opacity-40">Prev</button><button @click="currentPage++" :disabled="currentPage>=totalPages" class="px-3 py-1 rounded border border-slate-200 disabled:opacity-40">Next</button></div>
-      </div>
+      <PaginationControl
+        v-if="totalPages > 1"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @prev="currentPage--"
+        @next="currentPage++"
+        @page="currentPage = $event"
+      />
     </div>
 
     <!-- New Work Order Modal -->

@@ -8,9 +8,11 @@ import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/
 import { useSubmit } from "@/Composables/useSubmit";
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   requests:        Object,
+  filters:         { type: Object, default: () => ({}) },
   isDivisionChief: { type: Boolean, default: false },
   canViewAll:      { type: Boolean, default: false },
   hasPin:          { type: Boolean, default: false },
@@ -41,10 +43,45 @@ async function handleNewRequest() {
   openModal()
 }
 
-const requestsList = ref(Array.isArray(props.requests) ? props.requests : (props.requests?.data ?? []))
-const searchQuery = ref('')
-const currentPage = ref(1)
-const perPage = 10
+const searchQuery = ref(props.filters?.search ?? '')
+const isLoading = ref(false)
+let searchTimer = null
+
+const buildParams = (pageNum = undefined) => ({
+  search: searchQuery.value || undefined,
+  per_page: props.filters?.per_page || undefined,
+  page: pageNum || undefined,
+})
+
+function applyFilters(immediate = false) {
+  clearTimeout(searchTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('service-requests.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['requests', 'filters'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else searchTimer = setTimeout(go, 400)
+}
+
+function goToPage(pageNum) {
+  isLoading.value = true
+  router.get(route('service-requests.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const requestsList = computed(() => props.requests?.data ?? [])
+const filteredRequests = computed(() => props.requests?.data ?? [])
+const currentPage = computed(() => props.requests?.current_page ?? 1)
+const totalPages = computed(() => props.requests?.last_page ?? 1)
 
 // responsive: track window width to toggle between table and card layouts
 const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
@@ -53,27 +90,7 @@ const handleResize = () => { windowWidth.value = window.innerWidth }
 onMounted(() => { window.addEventListener('resize', handleResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
-const filteredRequestsAll = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  return (requestsList.value || []).filter(r =>
-    (r.service_type || '').toString().toLowerCase().includes(q) ||
-    (r.purposes || '').toString().toLowerCase().includes(q) ||
-    (r.id || '').toString().includes(q) ||
-    (r.status || '').toString().toLowerCase().includes(q) ||
-    (r.requester?.name || r.requestor || '').toString().toLowerCase().includes(q) ||
-    (r.date_needed || '').toString().includes(q) ||
-    (r.details || '').toString().toLowerCase().includes(q)
-  )
-})
-
-const filteredRequests = computed(() => {
-  const start = (currentPage.value - 1) * perPage
-  return filteredRequestsAll.value.slice(start, start + perPage)
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredRequestsAll.value.length / perPage)))
-
-watch(searchQuery, () => { currentPage.value = 1 })
+watch(searchQuery, () => applyFilters(false))
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
 const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
 const hasRole = (role) => roleNames.value.includes(role);
@@ -226,7 +243,9 @@ const canPrint = (r) => {
         <!-- Search -->
         <div class="px-5 py-4 border-b border-slate-100">
           <input v-model="searchQuery" type="text" placeholder="Search requests…"
+                 @keydown.enter.prevent="applyFilters(true)"
                  class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <span v-if="isLoading" class="mt-2 block text-xs text-slate-400">Searching...</span>
         </div>
 
         <!-- Mobile cards -->
@@ -312,15 +331,14 @@ const canPrint = (r) => {
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage === totalPages"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="props.requests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
       </div>
 
       <!-- Modal -->

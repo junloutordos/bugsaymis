@@ -310,16 +310,13 @@ const removeItem = async (item, idx) => {
                 </table>
             </div>
 
-            <!-- Pagination -->
-            <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-                <span>Page {{ currentPage }} of {{ totalPages }}</span>
-                <div class="flex gap-2">
-                    <button @click="currentPage = Math.max(1, currentPage - 1)" :disabled="currentPage === 1"
-                        class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
-                    <button @click="currentPage = Math.min(totalPages, currentPage + 1)" :disabled="currentPage === totalPages"
-                        class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
-                </div>
-            </div>
+            <PaginationControl
+                :current-page="currentPage"
+                :total-pages="totalPages"
+                @prev="currentPage = Math.max(1, currentPage - 1)"
+                @next="currentPage = Math.min(totalPages, currentPage + 1)"
+                @page="currentPage = $event"
+            />
         </div>
 
         <!-- Create/Edit Modal -->

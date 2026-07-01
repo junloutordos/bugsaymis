@@ -26,9 +26,11 @@ class ServiceRequestController extends Controller
         private SnapshotService         $snapshots,
         private DigitalSignatureService $sigService,
     ) {}
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
+        $search = trim($request->input('search', ''));
+        $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
         // eager-load requester so frontend can display requester name
         $query = ServiceRequest::with('requester')->latest();
 
@@ -39,7 +41,17 @@ class ServiceRequestController extends Controller
             $query->where('requestor_id', $user->id);
         }
 
-        $requests = $query->get();
+        $query->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+            $inner->where('id', 'like', "%{$search}%")
+                ->orWhere('service_type', 'like', "%{$search}%")
+                ->orWhere('purposes', 'like', "%{$search}%")
+                ->orWhere('details', 'like', "%{$search}%")
+                ->orWhere('status', 'like', "%{$search}%")
+                ->orWhereDate('date_needed', $search)
+                ->orWhereHas('requester', fn ($rq) => $rq->where('name', 'like', "%{$search}%"));
+        }));
+
+        $requests = $query->paginate($perPage)->withQueryString();
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
@@ -47,6 +59,7 @@ class ServiceRequestController extends Controller
             'requests'        => $requests,
             'isDivisionChief' => $isDivisionChief,
             'canViewAll'      => $canViewAll,
+            'filters'         => ['search' => $search, 'per_page' => $perPage],
             'hasPin'          => ! empty($user->signature_pin),
             'signatureUri'    => $this->sigService->getSignatureDataUri($user),
         ]);

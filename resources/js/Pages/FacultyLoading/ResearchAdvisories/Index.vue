@@ -286,13 +286,13 @@ const statusBadge = {
         </div>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="mt-4 flex items-center justify-between text-sm text-slate-600">
-            <span>Page {{ currentPage }} of {{ totalPages }}</span>
-            <div class="flex gap-2">
-                <button @click="currentPage--" :disabled="currentPage === 1"          class="rounded px-3 py-1 border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Prev</button>
-                <button @click="currentPage++" :disabled="currentPage === totalPages" class="rounded px-3 py-1 border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Next</button>
-            </div>
-        </div>
+                <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
 
         <!-- Create / Edit Modal -->
         <Teleport to="body">

@@ -72,15 +72,14 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }} &bull; {{ props.requests?.total ?? 0 }} total</span>
-          <div class="flex gap-2">
-            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Prev</button>
-            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="props.requests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
       </div>
 
     </div>
@@ -198,6 +197,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { EyeIcon } from '@heroicons/vue/24/outline'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   requests:      Object,

@@ -168,28 +168,13 @@ const formatDate = (val) => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-        <span>Page {{ currentPage }} of {{ totalPages }} ({{ filtered.length }} records)</span>
-        <div class="flex gap-1">
-          <button
-            @click="goToPage(currentPage - 1)"
-            :disabled="currentPage === 1"
-            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 text-sm"
-          >&laquo;</button>
-          <button
-            v-for="p in totalPages"
-            :key="p"
-            @click="goToPage(p)"
-            :class="p === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:bg-slate-50 border-slate-200'"
-            class="px-3 py-1.5 border rounded-lg text-sm"
-          >{{ p }}</button>
-          <button
-            @click="goToPage(currentPage + 1)"
-            :disabled="currentPage === totalPages"
-            class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 text-sm"
-          >&raquo;</button>
-        </div>
-      </div>
+            <PaginationControl
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @prev="goToPage(currentPage - 1)"
+        @next="goToPage(currentPage + 1)"
+        @page="goToPage"
+      />
 
     </div>
   </AdminLayout>

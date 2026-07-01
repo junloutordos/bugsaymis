@@ -113,13 +113,13 @@ const displayed = computed(() => {
             </div>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 1" class="flex items-center justify-between text-sm text-slate-500">
-                <span>Page {{ currentPage }} of {{ totalPages }}</span>
-                <div class="flex gap-2">
-                    <button :disabled="currentPage === 1" @click="currentPage--" class="px-3 py-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Previous</button>
-                    <button :disabled="currentPage === totalPages" @click="currentPage++" class="px-3 py-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Next</button>
-                </div>
-            </div>
+                        <PaginationControl
+              :current-page="currentPage"
+              :total-pages="totalPages"
+              @prev="currentPage--"
+              @next="currentPage++"
+              @page="currentPage = $event"
+            />
         </div>
     </AdminLayout>
 </template>

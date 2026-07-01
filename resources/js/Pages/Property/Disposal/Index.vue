@@ -186,10 +186,14 @@ async function completeDisposal(id) {
     </template>
 
     <!-- Pagination -->
-    <div v-if="totalPages>1" class="mt-3 flex items-center justify-between text-sm text-slate-600">
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <div class="flex gap-2"><button @click="currentPage--" :disabled="currentPage<=1" class="px-3 py-1 rounded border border-slate-200 disabled:opacity-40">Prev</button><button @click="currentPage++" :disabled="currentPage>=totalPages" class="px-3 py-1 rounded border border-slate-200 disabled:opacity-40">Next</button></div>
-    </div>
+    <PaginationControl
+      v-if="totalPages > 1"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      @prev="currentPage--"
+      @next="currentPage++"
+      @page="currentPage = $event"
+    />
 
     <!-- BSR Modal -->
     <div v-if="showBsrModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-auto">

@@ -31,7 +31,7 @@ class WorkRequestController extends Controller
         private SnapshotService         $snapshots,
         private DigitalSignatureService $sigService,
     ) {}
-    public function index()
+    public function index(Request $request)
     {
         $divisions = Building::select('id', 'name')->get();
         $offices = Room::select('id', 'name', 'building_id')->get();
@@ -44,6 +44,8 @@ class WorkRequestController extends Controller
         $skilledUsers = $users;
 
         $user = Auth::user();
+        $search = trim($request->input('search', ''));
+        $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
         $query = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->orderByDesc('created_at');
 
         $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief'])
@@ -53,7 +55,21 @@ class WorkRequestController extends Controller
             $query->where('requester_id', $user->id);
         }
 
-        $workRequests = $query->get();
+        $query->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+            $inner->where('id', 'like', "%{$search}%")
+                ->orWhere('issue', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('status', 'like', "%{$search}%")
+                ->orWhere('action_taken', 'like', "%{$search}%")
+                ->orWhere('priority', 'like', "%{$search}%")
+                ->orWhereDate('expected_completion_date', $search)
+                ->orWhereDate('date_completed', $search)
+                ->orWhereHas('requester', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('assignedUser', fn ($aq) => $aq->where('name', 'like', "%{$search}%"))
+                ->orWhereHas('actedBy', fn ($uq) => $uq->where('name', 'like', "%{$search}%"));
+        }));
+
+        $workRequests = $query->paginate($perPage)->withQueryString();
 
         $isDivisionChief = $user->hasRole('DivisionChief');
 
@@ -68,6 +84,7 @@ class WorkRequestController extends Controller
             'users'           => $users,
             'skilledUsers'    => $skilledUsers,
             'workRequests'    => $workRequests,
+            'filters'         => ['search' => $search, 'per_page' => $perPage],
             'isDivisionChief' => $isDivisionChief,
             'hasPendingCsm'   => $hasPendingCsm,
             'hasPin'          => ! empty($user->signature_pin),

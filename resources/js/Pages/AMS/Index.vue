@@ -160,21 +160,13 @@ function confirmDelete(activity) {
     </div>
 
     <!-- Pagination -->
-    <div v-if="totalPages > 1" class="flex items-center justify-between mt-4 text-sm text-slate-600">
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <div class="flex gap-2">
-        <button
-          @click="currentPage--"
-          :disabled="currentPage === 1"
-          class="px-3 py-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-        >Prev</button>
-        <button
-          @click="currentPage++"
-          :disabled="currentPage === totalPages"
-          class="px-3 py-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-        >Next</button>
-      </div>
-    </div>
+        <PaginationControl
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      @prev="currentPage--"
+      @next="currentPage++"
+      @page="currentPage = $event"
+    />
 
   </AdminLayout>
 </template>

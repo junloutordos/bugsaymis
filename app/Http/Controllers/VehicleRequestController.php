@@ -34,6 +34,8 @@ class VehicleRequestController extends Controller
 
         $user = $request->user();
         $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'OCD']);
+        $search = trim($request->input('search', ''));
+        $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         $requests = VehicleRequest::with(['requester:id,name', 'driver:id,name'])->latest();
 
@@ -48,7 +50,20 @@ class VehicleRequestController extends Controller
             }
         }
 
-        $requests = $requests->get();
+        $requests
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('id', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhere('destination', 'like', "%{$search}%")
+                    ->orWhere('vehicle_type', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhere('driver_name', 'like', "%{$search}%")
+                    ->orWhereDate('date_needed', $search)
+                    ->orWhereHas('requester', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('driver', fn ($dq) => $dq->where('name', 'like', "%{$search}%"));
+            }));
+
+        $requests = $requests->paginate($perPage)->withQueryString();
 
         // also fetch vehicles for dropdown (only available vehicles)
         $vehicles = \App\Models\Vehicle::where('status','!=','Under Repair')->orderBy('name')->get();
@@ -69,6 +84,7 @@ class VehicleRequestController extends Controller
             'requests'        => $requests,
             'vehicles'        => $vehicles,
             'divisionChiefs'  => $divisionChiefs,
+            'filters'         => ['search' => $search, 'per_page' => $perPage],
             'isDivisionChief' => $isDivisionChief,
             'hasPendingCsm'   => $hasPendingCsm,
             'hasPin'          => ! empty($user->signature_pin),
