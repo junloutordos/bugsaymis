@@ -281,9 +281,10 @@ class AtlasSentinelController extends Controller
         $networkLocation = $this->networkLocationResolver->resolve($validated['wifi_ssid'] ?? null, $request->ip());
 
         $deviceUpdate = [
-            'last_checkin_at' => now(),
-            'os_version'      => $validated['os_version'] ?? $device->os_version,
-            'agent_version'   => $validated['agent_version'] ?? $device->agent_version,
+            'last_checkin_at'   => now(),
+            'stale_notified_at' => null,
+            'os_version'        => $validated['os_version'] ?? $device->os_version,
+            'agent_version'     => $validated['agent_version'] ?? $device->agent_version,
         ];
 
         if ($networkLocation !== $device->network_location) {

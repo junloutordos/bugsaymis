@@ -18,6 +18,7 @@ class IctEquipmentDevice extends Model
         'os_version',
         'agent_version',
         'last_checkin_at',
+        'stale_notified_at',
         'network_location',
         'network_location_changed_at',
         'last_update_attempted_at',
@@ -32,6 +33,7 @@ class IctEquipmentDevice extends Model
 
     protected $casts = [
         'last_checkin_at' => 'datetime',
+        'stale_notified_at' => 'datetime',
         'network_location_changed_at' => 'datetime',
         'last_update_attempted_at' => 'datetime',
         'last_full_inventory_at' => 'datetime',
