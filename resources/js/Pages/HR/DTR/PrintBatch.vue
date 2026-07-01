@@ -134,7 +134,7 @@ const allDates = computed(() => {
   const dates = []
   const end   = new Date(props.date_to   + 'T00:00:00')
   for (let d = new Date(props.date_from  + 'T00:00:00'); d <= end; d.setDate(d.getDate() + 1)) {
-    dates.push(d.toISOString().slice(0, 10))
+    dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`)
   }
   return dates
 })
