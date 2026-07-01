@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Atlas;
 
 use App\Http\Controllers\Controller;
+use App\Services\Atlas\AtlasWatchTowerInfraService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -13,6 +14,10 @@ class AtlasWatchTowerController extends Controller
      */
     private const WINDOW_SECONDS = 24 * 60 * 60;
 
+    public function __construct(
+        private readonly AtlasWatchTowerInfraService $infra,
+    ) {}
+
     public function index()
     {
         $since = now()->subSeconds(self::WINDOW_SECONDS)->getTimestamp();
@@ -20,6 +25,7 @@ class AtlasWatchTowerController extends Controller
         return Inertia::render('Atlas/WatchTower', [
             'enabled' => config('pulse.enabled'),
             'windowHours' => 24,
+            'infra' => $this->infra->getInfraSummary(),
             'slowRequests' => $this->recentEntries('slow_request', $since, function (array $key, int $value) {
                 [$method, $path, $via] = array_pad($key, 3, null);
 
