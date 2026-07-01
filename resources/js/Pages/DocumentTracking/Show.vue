@@ -14,6 +14,7 @@ import {
 const props = defineProps({
   document:              Object,
   users:                 Array,
+  documentTypes:         Array,
   isAdmin:               Boolean,
   currentUserId:         Number,
   routingChain:          Array,
@@ -50,6 +51,7 @@ const editForm      = ref({})
 function openEditModal() {
   const d = props.document
   editForm.value = {
+    document_type_id: d.document_type?.id ?? '',
     subject:          d.subject ?? '',
     description:      d.description ?? '',
     priority:         d.priority ?? 'Normal',
@@ -65,6 +67,12 @@ function openEditModal() {
   editErrors.value = {}
   editOpen.value   = true
 }
+
+const availableEditTypes = computed(() =>
+  (props.documentTypes ?? []).filter(t =>
+    t.applicable_to === props.document.origin_type || t.applicable_to === 'both'
+  )
+)
 
 function submitEdit() {
   editSubmitting.value = true
@@ -800,6 +808,17 @@ const overallBadgeCls = computed(() => {
 
           <!-- Body -->
           <form @submit.prevent="submitEdit" class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+
+            <!-- Document Type -->
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1">Document Type <span class="text-red-500">*</span></label>
+              <select v-model="editForm.document_type_id" required
+                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">Select type…</option>
+                <option v-for="t in availableEditTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
+              </select>
+              <p v-if="editErrors.document_type_id" class="text-xs text-red-500 mt-1">{{ editErrors.document_type_id }}</p>
+            </div>
 
             <!-- Subject -->
             <div>

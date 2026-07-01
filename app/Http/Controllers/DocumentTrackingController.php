@@ -439,6 +439,7 @@ class DocumentTrackingController extends Controller
             'document'              => $this->formatDoc($document),
             'users'                 => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
             'offices'               => \App\Models\Office::orderBy('name')->get(['id', 'name']),
+            'documentTypes'         => DocumentType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'applicable_to']),
             'isAdmin'               => $isAdmin,
             'currentUserId'         => $user->id,
             'routingChain'          => $routingChain,
@@ -469,6 +470,7 @@ class DocumentTrackingController extends Controller
         $isExternal = $document->origin_type === 'external';
 
         $data = $request->validate([
+            'document_type_id' => 'required|exists:document_types,id',
             'subject'          => 'required|string|max:500',
             'description'      => 'nullable|string|max:5000',
             'priority'         => 'required|in:Normal,Urgent,Rush',
