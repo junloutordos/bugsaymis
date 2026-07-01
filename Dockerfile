@@ -21,6 +21,13 @@ WORKDIR /var/www
 
 COPY . .
 
+# OpenTelemetry boots and its shutdown handler tries to export even during
+# build-time artisan calls (composer's post-autoload-dump package:discover).
+# No ADOT sidecar exists during the build, and the failed export crashes the
+# step with a non-zero exit — not just a logged warning. ECS's runtime env
+# vars (from SSM) override this default once the container actually starts.
+ENV OTEL_SDK_DISABLED=true
+
 RUN COMPOSER_AUTH='{}' composer install --no-dev --optimize-autoloader
 
 # Build frontend assets with production VITE env vars injected as build args.
