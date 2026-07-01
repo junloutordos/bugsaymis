@@ -103,13 +103,16 @@ export function useUsers(props) {
         id: null,
         name: "",
         email: "",
+        sex: "",
         badge_id: "",
+        employee_no: "",
         role_id: [],
         position: "",
         specialization: "",
         division_id: "",
         office_id: "",
         emp_category: '',
+        status: 'active',
       }
     }
     selectedUser.value = user

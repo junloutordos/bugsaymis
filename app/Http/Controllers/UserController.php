@@ -18,7 +18,7 @@ class UserController extends Controller
     {
         // Exclude users explicitly marked as 'inactive'
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'created_at')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'status', 'emp_category', 'created_at')
             ->where('status', '<>', 'inactive')
             ->get();
 
@@ -94,7 +94,7 @@ class UserController extends Controller
     public function inactiveIndex()
     {
         $users = User::with(['role', 'division.divisionchief', 'office'])
-            ->select('id', 'name','sex', 'email', 'badge_id', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status')
+            ->select('id', 'name','sex', 'email', 'badge_id', 'employee_no', 'role_id', 'position', 'specialization', 'division_id', 'office_id', 'profile_picture', 'electronic_signature', 'created_at', 'status', 'emp_category')
             ->where('status', 'inactive')
             ->get();
 
