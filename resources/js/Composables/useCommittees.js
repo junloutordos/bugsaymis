@@ -7,6 +7,7 @@ export function useCommittees(props) {
   const selectedCommittee = ref(null)
 
   const searchQuery = ref("")
+  const appliedSearchQuery = ref("")
   const currentPage = ref(1)
   const perPage = 10
 
@@ -37,16 +38,30 @@ export function useCommittees(props) {
   const committees = computed(() => props.committees || [])
 
   const filteredCommittees = computed(() => {
+    const q = appliedSearchQuery.value.toLowerCase()
     const results = committees.value.filter((c) =>
-      c?.name?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      c?.name?.toLowerCase().includes(q)
     )
     const start = (currentPage.value - 1) * perPage
     return results.slice(start, start + perPage)
   })
 
   const totalPages = computed(() =>
-    Math.max(1, Math.ceil(committees.value.length / perPage))
+    Math.max(1, Math.ceil(committees.value.filter((c) =>
+      c?.name?.toLowerCase().includes(appliedSearchQuery.value.toLowerCase())
+    ).length / perPage))
   )
+
+  const applyFilters = () => {
+    appliedSearchQuery.value = searchQuery.value
+    currentPage.value = 1
+  }
+
+  const clearFilters = () => {
+    searchQuery.value = ""
+    appliedSearchQuery.value = ""
+    currentPage.value = 1
+  }
 
   const filteredUsers = computed(() => {
     if (!memberSearch.value) return props.users || []
@@ -182,6 +197,7 @@ export function useCommittees(props) {
   return {
     form, showModal, modalMode, selectedCommittee,
     searchQuery, currentPage, totalPages, filteredCommittees,
+    applyFilters, clearFilters,
     memberSearch, filteredUsers, filteredSubUsers,
     openModal, closeModal,
     toggleMember, addSubCommittee, removeSubCommittee, toggleSubMember,

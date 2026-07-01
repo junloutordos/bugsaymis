@@ -12,7 +12,7 @@
  *                      @page="goToPage" />
  *   (links is the `data.links` array from a Laravel paginate() response)
  */
-import { computed, ref, useAttrs, watch } from 'vue'
+import { computed, getCurrentInstance, ref, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
 
 const props = defineProps({
@@ -30,7 +30,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['prev', 'next', 'page'])
-const attrs = useAttrs()
+const instance = getCurrentInstance()
 
 const jumpPage = ref('')
 
@@ -54,6 +54,19 @@ const canJump = computed(() => Number(normalizedTotalPages.value) > 1)
 /** Strip HTML from "Previous" / "Next" labels, keep &laquo;/&raquo; readable */
 const isNavLink = (label) => label.includes('&laquo;') || label.includes('&raquo;')
 const stripHtml = (label) => String(label ?? '').replace(/<[^>]*>/g, '').replace(/&laquo;|&raquo;/g, '').trim()
+const hasPageListener = () => Boolean(instance?.vnode?.props?.onPage)
+
+function pageUrlFromLinks(page) {
+  const target = props.links?.find((link) => stripHtml(link.label) === String(page))
+  if (target?.url) return target.url
+
+  const sample = props.links?.find((link) => link.url)?.url
+  if (!sample) return null
+
+  const url = new URL(sample, window.location.origin)
+  url.searchParams.set('page', String(page))
+  return `${url.pathname}${url.search}${url.hash}`
+}
 
 function submitJump() {
   const totalPages = Number(normalizedTotalPages.value)
@@ -69,13 +82,18 @@ function submitJump() {
   jumpPage.value = String(page)
   if (page === normalizedCurrentPage.value) return
 
-  if (attrs.onPage) {
+  if (!props.links || hasPageListener()) {
     emit('page', page)
     return
   }
 
-  const target = props.links?.find((link) => stripHtml(link.label) === String(page))
-  if (target?.url) router.visit(target.url, { preserveState: true, replace: true })
+  const targetUrl = pageUrlFromLinks(page)
+  if (targetUrl) {
+    router.visit(targetUrl, { preserveState: true, replace: true })
+    return
+  }
+
+  emit('page', page)
 }
 
 watch(normalizedCurrentPage, (page) => {

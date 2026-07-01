@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Head, usePage, useForm, router } from '@inertiajs/vue3'
 import Swal from 'sweetalert2'
 import { PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/vue/24/outline";
@@ -11,22 +11,32 @@ const page = usePage()
 // reactive list + pagination
 const vehiclesList = ref(props.vehicles || [])
 const searchQuery = ref('')
+const appliedSearchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
 
 const filteredVehicles = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = appliedSearchQuery.value.trim().toLowerCase()
   const results = vehiclesList.value.filter(v => (v.name || '').toLowerCase().includes(q) || (v.plate_number || '').toLowerCase().includes(q))
   const start = (currentPage.value - 1) * perPage
   return results.slice(start, start + perPage)
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(vehiclesList.value.filter(v => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = appliedSearchQuery.value.trim().toLowerCase()
   return (v.name || '').toLowerCase().includes(q) || (v.plate_number || '').toLowerCase().includes(q)
 }).length / perPage)))
 
-watch(searchQuery, () => { currentPage.value = 1 })
+function applyFilters() {
+  appliedSearchQuery.value = searchQuery.value
+  currentPage.value = 1
+}
+
+function clearFilters() {
+  searchQuery.value = ''
+  appliedSearchQuery.value = ''
+  currentPage.value = 1
+}
 
 const showModal = ref(false)
 const editing = ref(null)
@@ -112,13 +122,22 @@ const destroy = (id) => {
       <!-- Table card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100">
+        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Search vehicles…"
+            @keydown.enter.prevent="applyFilters"
             class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
+          <button @click="applyFilters"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Search
+          </button>
+          <button v-if="searchQuery" @click="clearFilters"
+                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Clear
+          </button>
         </div>
 
         <!-- Desktop table -->

@@ -9,6 +9,7 @@ export function useSpecialAssignments(props) {
   const selectedAssignment = ref(null)
 
   const searchQuery = ref("")
+  const appliedSearchQuery = ref("")
   const currentPage = ref(1)
   const perPage = 10
 
@@ -24,16 +25,30 @@ export function useSpecialAssignments(props) {
   const form = ref(emptyForm())
 
   const filteredAssignments = computed(() => {
+    const q = appliedSearchQuery.value.toLowerCase()
     const results = assignmentsList.value.filter((a) =>
-      a?.name?.toLowerCase().includes(searchQuery.value.toLowerCase())
+      a?.name?.toLowerCase().includes(q)
     )
     const start = (currentPage.value - 1) * perPage
     return results.slice(start, start + perPage)
   })
 
   const totalPages = computed(() =>
-    Math.max(1, Math.ceil(assignmentsList.value.length / perPage))
+    Math.max(1, Math.ceil(assignmentsList.value.filter((a) =>
+      a?.name?.toLowerCase().includes(appliedSearchQuery.value.toLowerCase())
+    ).length / perPage))
   )
+
+  const applyFilters = () => {
+    appliedSearchQuery.value = searchQuery.value
+    currentPage.value = 1
+  }
+
+  const clearFilters = () => {
+    searchQuery.value = ""
+    appliedSearchQuery.value = ""
+    currentPage.value = 1
+  }
 
   const openModal = (mode, assignment = null) => {
     modalMode.value = mode
@@ -121,6 +136,7 @@ export function useSpecialAssignments(props) {
   return {
     assignmentsList, form, showModal, modalMode, selectedAssignment,
     searchQuery, currentPage, totalPages, filteredAssignments,
+    applyFilters, clearFilters,
     openModal, closeModal, toggleMember, submitAssignment, deleteAssignment,
   }
 }

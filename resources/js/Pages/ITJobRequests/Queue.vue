@@ -18,11 +18,8 @@ const props = defineProps({
 const search         = ref(props.filters?.search   ?? '')
 const filterCategory = ref(props.filters?.category ?? '')
 const isLoading      = ref(false)
-let debounceTimer    = null
 
-const applyFilters = (immediate = true) => {
-  clearTimeout(debounceTimer)
-  const go = () => {
+const applyFilters = () => {
     isLoading.value = true
     router.get(route('jobrequests.queue'), {
       search:   search.value   || undefined,
@@ -32,13 +29,19 @@ const applyFilters = (immediate = true) => {
       replace: true,
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else debounceTimer = setTimeout(go, 400)
 }
 
-watch(search, () => applyFilters(false))
-watch(filterCategory, () => applyFilters(true))
+const clearFilters = () => {
+  search.value = ''
+  filterCategory.value = ''
+  isLoading.value = true
+  router.get(route('jobrequests.queue'), {}, {
+    preserveState: true,
+    replace: true,
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
 
 // ── Priority helpers ──────────────────────────────────────────────────────────
 const PRIORITY_LABELS = {
@@ -174,7 +177,7 @@ const stats = computed(() => {
               v-model="search"
               type="text"
               placeholder="Search queue..."
-              @keydown.enter.prevent="applyFilters(true)"
+              @keydown.enter.prevent="applyFilters"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
             />
             <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -192,12 +195,20 @@ const stats = computed(() => {
             <option v-for="cat in props.categories" :key="cat.id" :value="cat.name">{{ cat.name }}</option>
           </select>
           <button
-            @click="applyFilters(true)"
+            @click="applyFilters"
             :disabled="isLoading"
             class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
           >
             <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
-            Refresh
+            Search
+          </button>
+          <button
+            v-if="search || filterCategory"
+            @click="clearFilters"
+            :disabled="isLoading"
+            class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+          >
+            Clear
           </button>
         </div>
       </div>

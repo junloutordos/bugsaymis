@@ -1,6 +1,6 @@
 <script setup>
 import { Head, useForm } from "@inertiajs/vue3";
-import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline';
@@ -13,6 +13,7 @@ const showModal = ref(false);
 
 // Search & pagination (client-side, mirror Users template)
 const searchQuery = ref('')
+const appliedSearchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
 
@@ -25,7 +26,7 @@ onMounted(() => { window.addEventListener('resize', handleResize) })
 onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredOffices = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = appliedSearchQuery.value.trim().toLowerCase()
   let results = officesList.value.filter(o =>
     o.name?.toLowerCase().includes(q) ||
     (o.division?.division_name || '').toLowerCase().includes(q)
@@ -35,12 +36,20 @@ const filteredOffices = computed(() => {
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil((officesList.value.filter(o => {
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = appliedSearchQuery.value.trim().toLowerCase()
   return o.name?.toLowerCase().includes(q) || (o.division?.division_name || '').toLowerCase().includes(q)
 }).length) / perPage)))
 
-// Reset page when search changes
-watch(searchQuery, () => { currentPage.value = 1 })
+function applyFilters() {
+  appliedSearchQuery.value = searchQuery.value
+  currentPage.value = 1
+}
+
+function clearFilters() {
+  searchQuery.value = ''
+  appliedSearchQuery.value = ''
+  currentPage.value = 1
+}
 
 const openModal = (office = null) => {
   if (office) {
@@ -108,9 +117,18 @@ const remove = (office) => {
       <!-- Table Card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100">
+        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
           <input v-model="searchQuery" type="text" placeholder="Search offices..."
+            @keydown.enter.prevent="applyFilters"
             class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <button @click="applyFilters"
+            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Search
+          </button>
+          <button v-if="searchQuery" @click="clearFilters"
+            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            Clear
+          </button>
         </div>
 
         <div class="overflow-x-auto" v-if="!isMobile">

@@ -12,7 +12,6 @@ const props = defineProps({
 
 const search       = ref(props.filters?.search ?? '')
 const selected     = ref(null)
-let debounce       = null
 
 const form = useForm({
   user_id:        null,
@@ -27,14 +26,20 @@ const form = useForm({
 // ── Employee search ─────────────────────────────────────────────────────────
 
 const applySearch = () => {
-  clearTimeout(debounce)
-  debounce = setTimeout(() => {
-    router.get(route('hr.leave.legacy-import.index'), { search: search.value || undefined }, {
-      preserveState: true,
-      replace: true,
-      only: ['employees', 'filters'],
-    })
-  }, 350)
+  router.get(route('hr.leave.legacy-import.index'), { search: search.value || undefined }, {
+    preserveState: true,
+    replace: true,
+    only: ['employees', 'filters'],
+  })
+}
+
+const clearSearch = () => {
+  search.value = ''
+  router.get(route('hr.leave.legacy-import.index'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['employees', 'filters'],
+  })
 }
 
 const selectEmployee = (emp) => {
@@ -110,11 +115,17 @@ const submit = () => {
             <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               v-model="search"
-              @input="applySearch"
+              @keydown.enter.prevent="applySearch"
               type="text"
               placeholder="Search by name or badge ID…"
               class="rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
             />
+          </div>
+          <div class="flex gap-2">
+            <button @click="applySearch" type="button"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Search</button>
+            <button v-if="search" @click="clearSearch" type="button"
+                    class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Clear</button>
           </div>
 
           <!-- Employee list -->

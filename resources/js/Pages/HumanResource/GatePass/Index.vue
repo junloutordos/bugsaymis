@@ -19,25 +19,25 @@
         </button>
       </div>
 
-      <!-- Status filter tabs -->
-      <div class="flex flex-wrap gap-2">
-        <button v-for="s in statusOptions" :key="s.value"
-                @click="activeStatus = s.value; currentPage = 1"
-                :class="[
-                  'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                  activeStatus === s.value
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                ]">
-          {{ s.label }}
-          <span v-if="s.value !== ''" class="ml-1 opacity-70">({{ countByStatus(s.value) }})</span>
-        </button>
-      </div>
-
       <!-- Search -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3">
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
         <input v-model="searchQuery" placeholder="Search by name, control no, destination, purpose…"
+               @keydown.enter.prevent="applyFilters"
                class="w-full sm:w-80 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <select v-model="activeStatus"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option v-for="s in statusOptions" :key="s.value" :value="s.value">
+            {{ s.label }}{{ s.value ? ` (${countByStatus(s.value)})` : '' }}
+          </option>
+        </select>
+        <button @click="applyFilters"
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Search
+        </button>
+        <button v-if="searchQuery || activeStatus" @click="clearFilters"
+                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          Clear
+        </button>
       </div>
 
       <!-- Table -->
@@ -131,9 +131,9 @@
           :current-page="currentPage"
           :total-pages="totalPages"
           :total="filtered.length"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
         />
       </div>
 
@@ -362,7 +362,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, usePage, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon, ClockIcon } from '@heroicons/vue/24/outline'
@@ -391,6 +391,8 @@ const statusOptions = [
 ]
 const activeStatus = ref('')
 const searchQuery  = ref('')
+const appliedStatus = ref('')
+const appliedSearch = ref('')
 const currentPage  = ref(1)
 const perPage      = 10
 
@@ -400,8 +402,8 @@ function countByStatus(status) {
 
 const filtered = computed(() => {
   let list = rows.value
-  if (activeStatus.value) list = list.filter(r => r.status === activeStatus.value)
-  const q = searchQuery.value.trim().toLowerCase()
+  if (appliedStatus.value) list = list.filter(r => r.status === appliedStatus.value)
+  const q = appliedSearch.value.trim().toLowerCase()
   if (q) {
     list = list.filter(r =>
       [r.controlno, r.name, r.gatepass_type, r.destination, r.purpose, r.status]
@@ -416,7 +418,24 @@ const paginated  = computed(() => {
   const start = (currentPage.value - 1) * perPage
   return filtered.value.slice(start, start + perPage)
 })
-watch([searchQuery, activeStatus], () => { currentPage.value = 1 })
+
+function applyFilters() {
+  appliedSearch.value = searchQuery.value
+  appliedStatus.value = activeStatus.value
+  currentPage.value = 1
+}
+
+function clearFilters() {
+  searchQuery.value = ''
+  activeStatus.value = ''
+  appliedSearch.value = ''
+  appliedStatus.value = ''
+  currentPage.value = 1
+}
+
+function goToPage(page) {
+  currentPage.value = Math.min(Math.max(Number(page) || 1, 1), totalPages.value)
+}
 
 // ── Add / Edit form ───────────────────────────────────────────────────────────
 const formModal = ref(false)

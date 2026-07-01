@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue"
+import { ref, computed } from "vue"
 import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { CheckCircleIcon, XCircleIcon, EyeIcon, FunnelIcon } from "@heroicons/vue/24/outline"
@@ -28,7 +28,6 @@ const pendingApproveId = ref(null)
 const search         = ref(props.filters?.search   ?? '')
 const filterCategory = ref(props.filters?.category ?? '')
 const isLoading      = ref(false)
-let debounceTimer    = null
 
 const buildParams = (page = undefined) => ({
   search:   search.value         || undefined,
@@ -36,9 +35,7 @@ const buildParams = (page = undefined) => ({
   page:     page                 || undefined,
 })
 
-const applyFilters = (immediate = true) => {
-  clearTimeout(debounceTimer)
-  const go = () => {
+const applyFilters = () => {
     isLoading.value = true
     router.get(route('job-requests.for-approval'), buildParams(), {
       preserveState: true,
@@ -46,13 +43,20 @@ const applyFilters = (immediate = true) => {
       only: ['requests', 'filters'],
       onFinish: () => { isLoading.value = false },
     })
-  }
-  if (immediate) go()
-  else debounceTimer = setTimeout(go, 400)
 }
 
-watch(search,         () => applyFilters(false))
-watch(filterCategory, () => applyFilters(true))
+const clearFilters = () => {
+  search.value = ''
+  filterCategory.value = ''
+  isLoading.value = true
+  router.get(route('job-requests.for-approval'), {}, {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
 
 const goToPage = (pageNum) => {
   isLoading.value = true
@@ -137,17 +141,25 @@ const closeModal = () => {
             v-model="search"
             type="text"
             placeholder="Search requests..."
-            @keydown.enter.prevent="applyFilters(true)"
+            @keydown.enter.prevent="applyFilters"
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
           />
           <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">⏳</span>
         </div>
         <button
-          @click="applyFilters(true)"
+          @click="applyFilters"
           :disabled="isLoading"
           class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
         >
           Search
+        </button>
+        <button
+          v-if="search || filterCategory"
+          @click="clearFilters"
+          :disabled="isLoading"
+          class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+        >
+          Clear
         </button>
         <select
           v-model="filterCategory"

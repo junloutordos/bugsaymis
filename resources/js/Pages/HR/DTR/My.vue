@@ -42,20 +42,24 @@
               <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
               {{ advanceGenerating ? 'Generating…' : 'Generate Advance Entry' }}
             </button>
-            <!-- COS: date range pickers for checklist -->
-            <template v-if="isCos">
-              <input v-model="cosDateFrom" type="date"
-                class="ml-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                title="Checklist date from" />
-              <span class="text-slate-400 text-sm">–</span>
-              <input v-model="cosDateTo" type="date"
-                class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                title="Checklist date to" />
-            </template>
-            <a :href="cosChecklistUrl()" target="_blank"
+            <div v-if="isCos" class="flex flex-wrap items-end gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-amber-700">Checklist from</label>
+                <input v-model="cosDateFrom" type="date"
+                  class="mt-1 border border-amber-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                  title="Checklist date from" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-semibold uppercase tracking-wide text-amber-700">Checklist to</label>
+                <input v-model="cosDateTo" type="date"
+                  class="mt-1 border border-amber-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                  title="Checklist date to" />
+              </div>
+            </div>
+            <button @click="printChecklist"
                class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
               <PrinterIcon class="h-4 w-4" />Print Checklist
-            </a>
+            </button>
           </div>
         </div>
       </div>
@@ -484,15 +488,49 @@ const isCos = computed(() =>
 )
 
 // ── COS checklist date range ───────────────────────────────────────────────
-const cosDateFrom = ref('')
-const cosDateTo   = ref('')
+function monthStart(month) {
+  return `${month}-01`
+}
+
+function monthEnd(month) {
+  const [y, m] = month.split('-').map(Number)
+  return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`
+}
+
+function defaultChecklistDateTo(month) {
+  const end = monthEnd(month)
+  const advanceDate = toDateStr(props.advanceRecord?.work_date)
+  return advanceDate && advanceDate > end ? advanceDate : end
+}
+
+const cosDateFrom = ref(monthStart(props.month))
+const cosDateTo   = ref(defaultChecklistDateTo(props.month))
 
 function cosChecklistUrl() {
   const base = route('hr.my-dtr.checklist')
-  if (isCos.value && cosDateFrom.value && cosDateTo.value) {
-    return `${base}?date_from=${cosDateFrom.value}&date_to=${cosDateTo.value}`
+  if (isCos.value) {
+    const params = new URLSearchParams({
+      date_from: cosDateFrom.value,
+      date_to: cosDateTo.value,
+    })
+    return `${base}?${params.toString()}`
   }
   return `${base}?month=${currentMonth.value}`
+}
+
+async function printChecklist() {
+  if (isCos.value) {
+    if (!cosDateFrom.value || !cosDateTo.value) {
+      await Swal.fire('Checklist period required', 'Please select both date from and date to before printing.', 'warning')
+      return
+    }
+    if (cosDateFrom.value > cosDateTo.value) {
+      await Swal.fire('Invalid checklist period', 'Date from must be earlier than or equal to date to.', 'warning')
+      return
+    }
+  }
+
+  window.open(cosChecklistUrl(), '_blank', 'noopener')
 }
 
 const advanceInCurrentMonth = computed(() =>
