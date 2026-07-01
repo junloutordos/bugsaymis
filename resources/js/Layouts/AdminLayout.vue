@@ -57,6 +57,7 @@ import {
   QuestionMarkCircleIcon,
   ArrowUpCircleIcon,
   BugAntIcon,
+  SignalIcon,
 
 } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
@@ -497,6 +498,13 @@ const menuItems = [
         href: route("atlas.modules.index"),
         icon: CpuChipIcon,
         permissions: ["atlas.modules.view"],
+      },
+      {
+        label: "App Monitoring",
+        href: "http://3.0.12.30",
+        target: "_blank",
+        icon: SignalIcon,
+        permissions: ["it.requests.manage"],
       },
       {
         label: "PMS",
