@@ -41,3 +41,7 @@ Schedule::command('backup:verify')->dailyAt('06:30')->withoutOverlapping();
 //    no result reported (device went offline/crashed mid-flight) ─────────
 Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinutes()->withoutOverlapping();
 
+// ── Atlas Sentinel: proactively notify IT staff when a device stops
+//    checking in, instead of relying on someone noticing the dashboard badge
+Schedule::command('atlas-sentinel:notify-stale-devices')->everyFifteenMinutes()->withoutOverlapping();
+
