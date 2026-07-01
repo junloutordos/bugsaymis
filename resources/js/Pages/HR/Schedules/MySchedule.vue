@@ -121,7 +121,7 @@
             </div>
             <div class="border border-slate-200 rounded-lg overflow-hidden">
               <div class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_72px] bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
-                <span>Day</span><span>Time In</span><span>Time Out</span><span>Lunch Start</span><span>Lunch End</span><span class="text-center">WFH</span>
+                <span>Day</span><span>Time In</span><span>Lunch Start</span><span>Lunch End</span><span>Time Out</span><span class="text-center">WFH</span>
               </div>
               <div v-for="d in allDays" :key="d"
                 class="grid grid-cols-[80px_1fr_1fr_1fr_1fr_72px] items-center px-3 py-2 border-t border-slate-100"
@@ -138,11 +138,6 @@
                   class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                 <span v-else class="text-xs text-slate-400 italic mr-1">Rest day</span>
                 <input v-if="submitForm.daily_schedules[d]"
-                  v-model="submitForm.daily_schedules[d].time_out"
-                  type="time"
-                  class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                <span v-else></span>
-                <input v-if="submitForm.daily_schedules[d]"
                   v-model="submitForm.daily_schedules[d].lunch_start"
                   type="time"
                   placeholder="12:00"
@@ -152,6 +147,11 @@
                   v-model="submitForm.daily_schedules[d].lunch_end"
                   type="time"
                   placeholder="13:00"
+                  class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <span v-else></span>
+                <input v-if="submitForm.daily_schedules[d]"
+                  v-model="submitForm.daily_schedules[d].time_out"
+                  type="time"
                   class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-mono mr-1 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                 <span v-else></span>
                 <div class="flex justify-center">
