@@ -166,7 +166,8 @@ class DTRService
 
             // Compute metrics
             $isOvernight      = $schedule && $schedule->isOvernightShift($dateStr);
-            $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight);
+            $lunchDuration    = $this->getLunchDurationMinutes($dateStr, $schedule);
+            $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight, $lunchDuration);
             $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $dateStr, $schedule);
             $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $dateStr, $schedule);
             $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $dateStr, $schedule);
@@ -361,7 +362,8 @@ class DTRService
         $timeOutPm = $record->time_out_pm ?? $record->penned_time_out_pm;
 
         $isOvernight      = $schedule && $schedule->isOvernightShift($date);
-        $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight);
+        $lunchDuration    = $this->getLunchDurationMinutes($date, $schedule);
+        $hoursWorked      = $this->computeHoursWorked($timeInAm, $timeOutAm, $timeInPm, $timeOutPm, $isOvernight, $lunchDuration);
         $lateMinutes      = $this->computeLateMinutes($timeInAm, $timeInPm, $date, $schedule);
         $undertimeMinutes = $this->computeUndertimeMinutes($timeOutAm, $timeOutPm, $date, $schedule);
         $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
@@ -726,6 +728,16 @@ class DTRService
         }
 
         if ($schedule) {
+            // If explicit lunch times are configured, return their midpoint
+            $lunchStart = $schedule->getLunchStart($dateStr);
+            $lunchEnd   = $schedule->getLunchEnd($dateStr);
+            if ($lunchStart && $lunchEnd) {
+                return intdiv(
+                    $this->timeStrToMinutes($lunchStart) + $this->timeStrToMinutes($lunchEnd),
+                    2
+                );
+            }
+
             $timeIn  = $schedule->getTimeIn($dateStr);
             $timeOut = $schedule->getTimeOut($dateStr);
             if ($timeIn && $timeOut) {
@@ -738,6 +750,28 @@ class DTRService
         }
 
         return 750; // 12:30 — midpoint of standard PH noon break
+    }
+
+    /**
+     * Return the configured lunch duration in minutes for a given date.
+     * If lunch_start and lunch_end are configured, computes the difference;
+     * otherwise defaults to 60 minutes.
+     */
+    private function getLunchDurationMinutes(string $dateStr, ?EmployeeSchedule $schedule): int
+    {
+        if (! $schedule || $schedule->isOvernightShift($dateStr)) {
+            return 60;
+        }
+
+        $lunchStart = $schedule->getLunchStart($dateStr);
+        $lunchEnd   = $schedule->getLunchEnd($dateStr);
+
+        if ($lunchStart && $lunchEnd) {
+            $duration = $this->timeStrToMinutes($lunchEnd) - $this->timeStrToMinutes($lunchStart);
+            return max(0, $duration);
+        }
+
+        return 60;
     }
 
     private function logMinutes(\App\Models\HR\BiometricLog $log): int
@@ -769,7 +803,8 @@ class DTRService
         ?string $timeOutAm,
         ?string $timeInPm,
         ?string $timeOutPm,
-        bool $isOvernight = false
+        bool $isOvernight = false,
+        int $lunchDurationMinutes = 60
     ): float {
         $inAm  = $this->floorToMinute($timeInAm);
         $outAm = $this->floorToMinute($timeOutAm);
@@ -785,10 +820,10 @@ class DTRService
         }
 
         // ── AM in + AM out + PM out, no PM in ─────────────────────────────────
-        // AM session is known; estimate PM start as AM out + 60 min lunch.
+        // AM session is known; estimate PM start as AM out + configured lunch duration.
         if ($inAm && $outAm && ! $inPm && $outPm) {
             $amMinutes    = Carbon::parse($inAm)->diffInMinutes(Carbon::parse($outAm));
-            $pmStart      = Carbon::parse($outAm)->addMinutes(60);
+            $pmStart      = Carbon::parse($outAm)->addMinutes($lunchDurationMinutes);
             $pmMinutes    = max(0, $pmStart->diffInMinutes(Carbon::parse($outPm), false));
             return ($amMinutes + $pmMinutes) / 60;
         }
@@ -804,7 +839,7 @@ class DTRService
             }
             $total = $inCarbon->diffInMinutes($outCarbon);
             // No lunch deduction for overnight shifts (no break midpoint)
-            return $isOvernight ? $total / 60 : max(0, $total - 60) / 60;
+            return $isOvernight ? $total / 60 : max(0, $total - $lunchDurationMinutes) / 60;
         }
 
         // ── AM session only ───────────────────────────────────────────────────
@@ -856,10 +891,14 @@ class DTRService
 
         // ── PM in late (returned late from lunch) ─────────────────────────────
         // No grace period: any minute past the expected return time is counted.
-        // Expected PM start = break midpoint + 30 min (e.g. 12:30+30 = 13:00).
+        // If lunch_end is configured in the schedule, use it directly;
+        // otherwise fall back to break midpoint + 30 min (e.g. 12:30+30 = 13:00).
         // Skip for overnight shifts — they have no lunch break.
         if ($timeInPm && (! $schedule || ! $schedule->isOvernightShift($dateStr))) {
-            $lunchEnd    = Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes + 30);
+            $configuredLunchEnd = $schedule->getLunchEnd($dateStr);
+            $lunchEnd = $configuredLunchEnd
+                ? Carbon::parse($dateStr . ' ' . $configuredLunchEnd)
+                : Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes + 30);
             $actualInPm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeInPm));
 
             if ($actualInPm->gt($lunchEnd)) {
@@ -889,10 +928,14 @@ class DTRService
         $undertime    = 0.0;
 
         // ── AM out undertime (left before lunch started) ──────────────────────
-        // Expected AM end = break midpoint − 30 min (e.g. 12:30−30 = 12:00).
+        // If lunch_start is configured in the schedule, use it directly;
+        // otherwise fall back to break midpoint − 30 min (e.g. 12:30−30 = 12:00).
         // Skip for overnight shifts — they have no lunch break.
         if ($timeOutAm && (! $schedule || ! $schedule->isOvernightShift($dateStr))) {
-            $lunchStart   = Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes - 30);
+            $configuredLunchStart = $schedule->getLunchStart($dateStr);
+            $lunchStart = $configuredLunchStart
+                ? Carbon::parse($dateStr . ' ' . $configuredLunchStart)
+                : Carbon::parse($dateStr)->startOfDay()->addMinutes($breakMinutes - 30);
             $actualOutAm  = Carbon::parse($dateStr . ' ' . $this->floorToMinute($timeOutAm));
 
             if ($actualOutAm->lt($lunchStart)) {

@@ -42,4 +42,16 @@ class SchedulePreset extends Model
     {
         return $this->daily_schedules[$day]['time_out'] ?? null;
     }
+
+    /** Return lunch_start for a given day abbreviation, or null. */
+    public function getLunchStart(string $day): ?string
+    {
+        return $this->daily_schedules[$day]['lunch_start'] ?? null;
+    }
+
+    /** Return lunch_end for a given day abbreviation, or null. */
+    public function getLunchEnd(string $day): ?string
+    {
+        return $this->daily_schedules[$day]['lunch_end'] ?? null;
+    }
 }
