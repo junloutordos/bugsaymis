@@ -698,6 +698,19 @@ class DTRService
             }
         }
 
+        // If the last punch is still inside the PM-in window, it is not a
+        // credible end-of-day departure. Treat it as the return from lunch
+        // and leave PM-out empty until a later biometric/penned punch exists.
+        if ($timeOutAm && ! $timeInPm && $timeOutPm) {
+            $amOutMin = $this->timeStrToMinutes(substr($timeOutAm, 0, 5));
+            $pmOutMin = $this->timeStrToMinutes(substr($timeOutPm, 0, 5));
+
+            if ($pmOutMin > $amOutMin && $pmOutMin <= $pmInCutoffMin) {
+                $timeInPm  = $timeOutPm;
+                $timeOutPm = null;
+            }
+        }
+
         // ── Sanity-check ordering ─────────────────────────────────────────────
         if ($timeInAm && $timeOutAm && $timeOutAm <= $timeInAm) {
             $timeOutAm = null;
