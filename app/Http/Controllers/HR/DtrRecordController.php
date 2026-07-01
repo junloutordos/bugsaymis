@@ -577,13 +577,17 @@ class DtrRecordController extends Controller
     /**
      * Resolve the DTR "Verified" signatory for a user: their division chief,
      * falling back to the Office of the Campus Director head if the user has
-     * no division or no chief assigned.
+     * no division or no chief assigned. Division chiefs are verified by OCD.
      */
     private function resolveSupervisor(User $user): ?array
     {
         if ($user->division_id) {
             $division = DB::table('divisions')->where('id', $user->division_id)->first();
             if ($division?->division_chief_id) {
+                if ((int) $division->division_chief_id === (int) $user->id) {
+                    return $this->resolveOcdSignatory();
+                }
+
                 $chief = User::find($division->division_chief_id);
                 if ($chief) {
                     return ['name' => $chief->name, 'position' => $chief->position ?? 'Division Chief'];
@@ -591,6 +595,11 @@ class DtrRecordController extends Controller
             }
         }
 
+        return $this->resolveOcdSignatory();
+    }
+
+    private function resolveOcdSignatory(): ?array
+    {
         $ocdDiv = DB::table('divisions')->where('division_name', 'Office of the Campus Director')->first();
         if ($ocdDiv?->division_chief_id) {
             $d = User::find($ocdDiv->division_chief_id);
