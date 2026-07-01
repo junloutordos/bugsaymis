@@ -32,6 +32,7 @@ class RolePermissionSeeder extends Seeder
             'it.requests.view', 'it.requests.manage',
             'it.equipment.view', 'it.equipment.manage',
             'atlas.modules.view',
+            'atlas.watchtower.view', 'atlas.watchtower.manage',
             'facilities.view', 'facilities.manage',
             'vehicles.view', 'vehicles.manage',
             'documents.view',

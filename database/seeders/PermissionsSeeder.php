@@ -80,6 +80,10 @@ class PermissionsSeeder extends Seeder
             // ── Atlas Module Monitor ──────────────────────────────────────────
             ['module' => 'Atlas',    'name' => 'atlas.modules.view', 'description' => 'View the Atlas Module Monitor dashboard (health, maturity, and ecosystem of all software modules)'],
 
+            // ── Atlas WatchTower (app telemetry monitoring) ───────────────────
+            ['module' => 'Atlas',    'name' => 'atlas.watchtower.view',   'description' => 'View the Atlas WatchTower telemetry dashboard (requests, slow queries, jobs, exceptions)'],
+            ['module' => 'Atlas',    'name' => 'atlas.watchtower.manage', 'description' => 'Manage Atlas WatchTower settings (sampling, thresholds, ignored routes)'],
+
             // ── Facilities & Services ─────────────────────────────────────────
             ['module' => 'Facilities','name' => 'facilities.view',       'description' => 'View facility requests'],
             ['module' => 'Facilities','name' => 'facilities.create',     'description' => 'Submit facility requests'],

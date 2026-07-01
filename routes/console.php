@@ -45,3 +45,6 @@ Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinut
 //    checking in, instead of relying on someone noticing the dashboard badge
 Schedule::command('atlas-sentinel:notify-stale-devices')->everyFifteenMinutes()->withoutOverlapping();
 
+// ── Atlas WatchTower (Laravel Pulse): trim old entries per pulse.storage.trim.keep
+Schedule::command('pulse:trim')->hourly()->withoutOverlapping();
+

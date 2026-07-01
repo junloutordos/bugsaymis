@@ -57,6 +57,7 @@ import {
   QuestionMarkCircleIcon,
   ArrowUpCircleIcon,
   BugAntIcon,
+  EyeIcon,
 
 } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
@@ -497,6 +498,13 @@ const menuItems = [
         href: route("atlas.modules.index"),
         icon: CpuChipIcon,
         permissions: ["atlas.modules.view"],
+      },
+      {
+        label: "Atlas WatchTower",
+        routeName: "atlas.watchtower.index",
+        href: route("atlas.watchtower.index"),
+        icon: EyeIcon,
+        permissions: ["atlas.watchtower.view"],
       },
       {
         label: "PMS",

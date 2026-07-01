@@ -2197,6 +2197,15 @@ Route::middleware(['auth', 'permission:atlas.modules.view'])
             ->name('active-users');
     });
 
+// ── Atlas WatchTower (app telemetry monitoring) ───────────────────────────────
+Route::middleware(['auth', 'permission:atlas.watchtower.view'])
+    ->prefix('atlas/watchtower')
+    ->name('atlas.watchtower.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Atlas\AtlasWatchTowerController::class, 'index'])
+            ->name('index');
+    });
+
 // ── Error Reports ─────────────────────────────────────────────────────────────
 Route::middleware('auth')->prefix('error-reports')->name('error-reports.')->group(function () {
     Route::post('/',              [\App\Http\Controllers\ErrorReportController::class, 'store'])      ->name('store');
