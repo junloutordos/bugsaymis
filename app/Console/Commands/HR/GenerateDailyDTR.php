@@ -23,7 +23,6 @@ class GenerateDailyDTR extends Command
             : Carbon::yesterday()->toDateString();
 
         $users = User::where('status', 'active')
-            ->whereHas('employeeProfile')
             ->pluck('id');
 
         if ($users->isEmpty()) {

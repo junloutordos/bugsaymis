@@ -701,7 +701,7 @@ const calendarCells = computed(() => {
 })
 
 function cellBg(cell) {
-  if (cell.wfhByDate && !cell.record) return 'bg-rose-50/60 border-rose-100'
+  if ((cell.wfhIn || cell.wfhOut) && !cell.record) return 'bg-rose-50/60 border-rose-100'
   if (!cell.record) {
     if (!cell.isWorkDay) return 'bg-slate-50 border-slate-100'
     return 'bg-red-50/30 border-red-100'
