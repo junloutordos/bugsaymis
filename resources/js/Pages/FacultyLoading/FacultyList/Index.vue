@@ -118,22 +118,15 @@
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50">
-          <p class="text-xs text-slate-500">
-            Showing {{ (currentPage - 1) * perPage + 1 }}–{{ Math.min(currentPage * perPage, faculty.length) }} of {{ faculty.length }}
-          </p>
-          <div class="flex gap-1">
-            <button :disabled="currentPage === 1" @click="currentPage--"
-              class="px-2.5 py-1 text-xs rounded border border-slate-200 text-slate-600 disabled:opacity-40 hover:bg-slate-100 transition-colors">Prev</button>
-            <button
-              v-for="p in pageRange" :key="p" @click="currentPage = p"
-              :class="p === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'border-slate-200 text-slate-600 hover:bg-slate-100'"
-              class="px-2.5 py-1 text-xs rounded border transition-colors">{{ p }}</button>
-            <button :disabled="currentPage === totalPages" @click="currentPage++"
-              class="px-2.5 py-1 text-xs rounded border border-slate-200 text-slate-600 disabled:opacity-40 hover:bg-slate-100 transition-colors">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          v-if="totalPages > 1"
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="faculty.length"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
       </div>
 
     </div>

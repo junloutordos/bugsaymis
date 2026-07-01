@@ -33,6 +33,8 @@ class FacilityRequestController extends Controller
         $user = $request->user();
         $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief', 'OCD'])
             || str_contains($user->position ?? '', 'FAD');
+        $search = trim($request->input('search', ''));
+        $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
 
         $requestsQuery = FacilityRequest::latest();
 
@@ -41,12 +43,28 @@ class FacilityRequestController extends Controller
         }
 
         // eager-load requester and its division so frontend can display requestor name/unit
-        $requests = $requestsQuery->with('requester.division')->get();
+        $requestsQuery
+            ->with('requester.division')
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+                $inner->where('id', 'like', "%{$search}%")
+                    ->orWhere('activity', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhere('nature', 'like', "%{$search}%")
+                    ->orWhere('participants', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%")
+                    ->orWhereDate('date_start', $search)
+                    ->orWhereDate('date_end', $search)
+                    ->orWhereHas('requester', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('requester.division', fn ($dq) => $dq->where('division_name', 'like', "%{$search}%"));
+            }));
 
         // also provide facilities list for venue selection
         $facilities = \App\Models\Facility::orderBy('name')->get(['id','name']);
         $facilityMap = $facilities->pluck('name', 'id')->toArray();
-        $requests = $requests->map(function ($r) use ($facilityMap) {
+        $requests = $requestsQuery
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(function ($r) use ($facilityMap) {
             $arr = $r->venue ?? [];
             if (!is_array($arr)) {
                 $arr = $arr ? [$arr] : [];
@@ -67,6 +85,7 @@ class FacilityRequestController extends Controller
             'requests'     => $requests,
             'facilities'   => $facilities,
             'misUsers'     => $misUsers,
+            'filters'      => ['search' => $search, 'per_page' => $perPage],
             'isDivisionChief' => $isDivisionChief,
             'hasPin'       => ! empty($user->signature_pin),
             'signatureUri' => $this->sigService->getSignatureDataUri($user),

@@ -1684,6 +1684,12 @@ Route::middleware(['auth', 'verified'])->prefix('hr')->name('hr.')->group(functi
     Route::get('/leave/{leaveApplication}/print', [\App\Http\Controllers\HR\LeaveApplicationController::class, 'printForm'])
         ->name('leave.print');
 
+    // ── Legacy Leave Import (HR only) ────────────────────────────────────────
+    Route::get('/leave/legacy-import', [\App\Http\Controllers\HR\LegacyLeaveImportController::class, 'index'])
+        ->name('leave.legacy-import.index');
+    Route::post('/leave/legacy-import', [\App\Http\Controllers\HR\LegacyLeaveImportController::class, 'store'])
+        ->name('leave.legacy-import.store');
+
     // ── Leave Credit Administration (HR only) ─────────────────────────────────
     Route::get('/leave-credits/initialize', [\App\Http\Controllers\HR\LeaveCreditAdminController::class, 'initializeIndex'])
         ->name('leave-credits.initialize');

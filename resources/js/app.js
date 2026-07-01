@@ -7,6 +7,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+import PaginationControl from './Components/PaginationControl.vue';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Atlas';
 const appUrl   = import.meta.env.VITE_APP_URL;
@@ -40,7 +41,11 @@ createInertiaApp({
             import.meta.glob('./Pages/**/*.vue'),
         ),
     setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
+        const vueApp = createApp({ render: () => h(App, props) });
+
+        vueApp.component('PaginationControl', PaginationControl);
+
+        return vueApp
             .use(plugin)
             .use(ZiggyVue)
             .mount(el);

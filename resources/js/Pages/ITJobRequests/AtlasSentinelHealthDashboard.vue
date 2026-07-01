@@ -267,11 +267,13 @@ function offlineAfterFailedUpdate(device) {
           No enrolled devices yet.
         </div>
 
-        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-200">
-          <button :disabled="currentPage === 1" @click="currentPage--" class="text-sm text-slate-500 disabled:opacity-40">Previous</button>
-          <span class="text-sm text-slate-500">Page {{ currentPage }} of {{ totalPages }}</span>
-          <button :disabled="currentPage === totalPages" @click="currentPage++" class="text-sm text-slate-500 disabled:opacity-40">Next</button>
-        </div>
+                <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
       </div>
     </div>
   </AdminLayout>

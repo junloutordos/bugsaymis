@@ -127,15 +127,14 @@
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }} &bull; {{ filtered.length }} total</span>
-          <div class="flex gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage >= totalPages"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="filtered.length"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
       </div>
 
     </div>
@@ -369,6 +368,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { PlusIcon, PencilSquareIcon, TrashIcon, PrinterIcon, EyeIcon, ClockIcon } from '@heroicons/vue/24/outline'
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const page        = usePage()
 const rows        = computed(() => page.props.rows ?? [])

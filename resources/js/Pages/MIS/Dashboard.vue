@@ -119,7 +119,7 @@ const cardColors = {
 const statusColors = {
   'Pending Division Chief Approval': '#94a3b8',
   'Pending OCD Approval':            '#64748b',
-  'In Progress':                     '#3b82f6',
+  'In Progress':                     '#f97316',
   'MIS Assessed the Request':        '#8b5cf6',
   'Acted by MIS':                    '#f59e0b',
   'Request Completed':               '#10b981',
@@ -244,7 +244,7 @@ function statusBadge(status) {
   const map = {
     'Request Completed':               'bg-emerald-100 text-emerald-700',
     'Acted by MIS':                    'bg-amber-100 text-amber-700',
-    'In Progress':                     'bg-blue-100 text-blue-700',
+    'In Progress':                     'bg-orange-100 text-orange-700',
     'MIS Assessed the Request':        'bg-violet-100 text-violet-700',
     'Pending Division Chief Approval': 'bg-slate-100 text-slate-600',
     'Pending OCD Approval':            'bg-slate-100 text-slate-600',

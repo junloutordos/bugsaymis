@@ -13,6 +13,8 @@
 export function statusBadgeClass(status) {
   const s = (status ?? '').toString().toLowerCase().trim()
 
+  if (s === 'in progress') return 'bg-orange-100 text-orange-700'
+
   if ([
     'approved', 'active', 'completed', 'request completed', 'ocd approved',
     'division approved', 'approved by pmt', 'awarded', 'screened', 'qualified',
@@ -25,7 +27,7 @@ export function statusBadgeClass(status) {
     'acted by mis', 'mis assessed the request',
     'submitted', 'submitted for rating', 'submitted to pmt',
     'evaluated', 'nominated', 'for review', 'under review',
-    'scheduled', 'satisfactory', 'walk-in', 'in-transit', 'in progress',
+    'scheduled', 'satisfactory', 'walk-in', 'in-transit',
   ].includes(s)) return 'bg-blue-100 text-blue-700'
 
   if ([

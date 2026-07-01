@@ -167,15 +167,13 @@ function submitCreate() {
         </table>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex justify-between items-center px-4 py-3 border-t border-slate-100 text-sm text-slate-500">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1"
-              class="px-3 py-1 rounded text-sm bg-slate-100 hover:bg-slate-200 disabled:opacity-40">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage === totalPages"
-              class="px-3 py-1 rounded text-sm bg-slate-100 hover:bg-slate-200 disabled:opacity-40">Next</button>
-          </div>
-        </div>
+                <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
       </div>
 
     </div>

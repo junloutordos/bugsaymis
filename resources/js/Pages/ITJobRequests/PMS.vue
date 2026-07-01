@@ -345,20 +345,13 @@ const totalPages       = computed(() => props.pmsSchedules?.last_page ?? 1)
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              Prev
-            </button>
-            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              Next
-            </button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
       </div>
 
       <!-- ── Create / Edit Modal ───────────────────────────────────────────── -->

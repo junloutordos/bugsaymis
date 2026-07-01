@@ -177,8 +177,15 @@ class DTRService
             // Online Punch days are treated like ordinary presence — the
             // employee was physically present and verified via face match,
             // so the normal present/half_day/absent logic applies.
+            // Official-travel days (is_travel, set via penned entry) with no
+            // actual punches stay neutral pending the employee's penned entry
+            // instead of being marked absent — is_travel survives across
+            // updateOrCreate() below since it is never in the update payload.
+            $hasAnyTimeData = $timeInAm || $timeOutAm || $timeInPm || $timeOutPm;
             if ($usedWfh && ! $leave) {
                 $attendanceStatus = 'wfh';
+            } elseif ($existing?->is_travel && ! $leave && ! $hasAnyTimeData) {
+                $attendanceStatus = 'on_official_business';
             } else {
                 $presenceLogs     = $logsForDay->isNotEmpty() ? $logsForDay : $onlineForDay;
                 $attendanceStatus = $this->getAttendanceStatus(
@@ -360,11 +367,17 @@ class DTRService
         $overtimeMinutes  = $this->computeOvertimeMinutes($timeOutPm, $date, $schedule);
 
         // Re-derive attendance status unless it is a protected status that was
-        // set during generation (on_leave, holiday, on_official_business, wfh).
-        $protectedStatuses = ['on_leave', 'holiday', 'on_official_business', 'wfh'];
+        // set during generation from a data source recompute() doesn't reload
+        // (leave, holiday, wfh). on_official_business is intentionally NOT
+        // protected — it must re-derive every call so that filling in a penned
+        // entry on a travel day flips it to present/half_day once real times
+        // exist, instead of staying frozen empty forever.
+        $protectedStatuses = ['on_leave', 'holiday', 'wfh'];
         if (! in_array($record->attendance_status, $protectedStatuses)) {
             $hasAnyPunch = $timeInAm || $timeOutAm || $timeInPm || $timeOutPm;
-            if (! $hasAnyPunch) {
+            if (! $hasAnyPunch && $record->is_travel) {
+                $attendanceStatus = 'on_official_business';
+            } elseif (! $hasAnyPunch) {
                 $attendanceStatus = 'absent';
             } elseif ($timeInAm && $timeOutPm) {
                 // CSC rule: AM arrival + PM departure = full day present

@@ -1,6 +1,6 @@
 <script setup>
 import { Head, usePage, router } from "@inertiajs/vue3";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import axios from "axios";
 import { PencilSquareIcon, TrashIcon, UserIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
@@ -8,11 +8,13 @@ import { useVehicleRequests } from "@/Composables/useVehicleRequests";
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
-  requests:       Array,
+  requests:       Object,
   vehicles:       Array,
   divisionChiefs: Array,
+  filters:        { type: Object, default: () => ({}) },
   hasPendingCsm:  { type: Boolean, default: false },
   hasPin:         { type: Boolean, default: false },
   signatureUri:   { type: String, default: null },
@@ -25,8 +27,6 @@ const hasRole    = (role)     => roleNames.value.includes(role)
 const hasAnyRole = (...roles) => roles.some(r => roleNames.value.includes(r))
 
 const {
-  // list
-  searchQuery, currentPage, filteredRequests, totalPages,
   // banner
   banner,
   // assign driver
@@ -43,7 +43,48 @@ const {
   openModal, closeModal, submit,
   // actions
   destroy, openPrint,
-} = useVehicleRequests(props.requests || [], props.vehicles || [])
+} = useVehicleRequests(props.requests?.data ?? [], props.vehicles || [])
+
+const searchQuery = ref(props.filters?.search ?? '')
+const isLoading = ref(false)
+let searchTimer = null
+
+const buildParams = (pageNum = undefined) => ({
+  search: searchQuery.value || undefined,
+  per_page: props.filters?.per_page || undefined,
+  page: pageNum || undefined,
+})
+
+function applyFilters(immediate = false) {
+  clearTimeout(searchTimer)
+  const go = () => {
+    isLoading.value = true
+    router.get(route('vehicle-requests.index'), buildParams(), {
+      preserveState: true,
+      replace: true,
+      only: ['requests', 'filters', 'hasPendingCsm'],
+      onFinish: () => { isLoading.value = false },
+    })
+  }
+  if (immediate) go()
+  else searchTimer = setTimeout(go, 400)
+}
+
+function goToPage(pageNum) {
+  isLoading.value = true
+  router.get(route('vehicle-requests.index'), buildParams(pageNum), {
+    preserveState: true,
+    replace: true,
+    only: ['requests', 'filters', 'hasPendingCsm'],
+    onFinish: () => { isLoading.value = false },
+  })
+}
+
+const filteredRequests = computed(() => props.requests?.data ?? [])
+const currentPage = computed(() => props.requests?.current_page ?? 1)
+const totalPages = computed(() => props.requests?.last_page ?? 1)
+
+watch(searchQuery, () => applyFilters(false))
 
 // Dynamically add pin field to composable form
 form.pin = null
@@ -143,7 +184,9 @@ async function handleNewRequest() {
       <!-- Filter bar -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
         <input v-model="searchQuery" type="text" placeholder="Search vehicle requests..."
+               @keydown.enter.prevent="applyFilters(true)"
                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
+        <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
       </div>
 
       <!-- Table card -->
@@ -201,13 +244,14 @@ async function handleNewRequest() {
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex gap-2">
-            <button @click="currentPage--" :disabled="currentPage === 1" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage === totalPages" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
-          </div>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="props.requests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
 
         <!-- Mobile cards -->
         <div class="sm:hidden space-y-3 p-4">

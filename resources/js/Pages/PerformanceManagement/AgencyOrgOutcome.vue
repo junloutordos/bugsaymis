@@ -94,13 +94,13 @@ const outcomeTypes = ["Strategic Functions", "Core Functions", "Support Function
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <div class="flex items-center gap-1">
-            <button @click="currentPage--" :disabled="currentPage===1" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Prev</button>
-            <button @click="currentPage++" :disabled="currentPage===totalPages" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next</button>
-          </div>
-        </div>
+                <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @prev="currentPage--"
+          @next="currentPage++"
+          @page="currentPage = $event"
+        />
       </div>
 
       <!-- Modal -->

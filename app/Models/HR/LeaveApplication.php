@@ -44,6 +44,7 @@ class LeaveApplication extends Model
         'approval_remarks',
         'days_deducted',
         'is_without_pay',
+        'source',
     ];
 
     protected $casts = [

@@ -7,6 +7,7 @@ import Swal from "sweetalert2"
 import "sweetalert2/dist/sweetalert2.min.css"
 import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 // Props
 const props = defineProps({
@@ -233,11 +234,14 @@ const rejectRequest = async (id) => {
         </div>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1 || isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Prev</button>
-          <span>Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages || isLoading" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Next</button>
-        </div>
+        <PaginationControl
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total="props.requests?.total ?? 0"
+          @prev="goToPage(currentPage - 1)"
+          @next="goToPage(currentPage + 1)"
+          @page="goToPage"
+        />
       </div>
 
       <!-- Modal -->
