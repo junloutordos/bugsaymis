@@ -40,7 +40,7 @@ ECR repo:      971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app
 App URL:       https://mis.crc.pshs.edu.ph
 Cloudflare:    Proxied (orange-cloud) — WAF active
 ALB:           crcmis-alb (HTTPS only, TLS 1.3)
-RDS:           crcmis-db-encrypted.c5i2kaqa8hyl.ap-southeast-1.rds.amazonaws.com (encrypted, Multi-AZ)
+RDS:           crcmis-db-encrypted.c5i2kaqa8hyl.ap-southeast-1.rds.amazonaws.com (encrypted, single-AZ)
 Redis:         crcmis-redis.d8qigv.0001.apse1.cache.amazonaws.com:6379
 S3 bucket:     crcmis-mis-storage (ap-southeast-1, Block Public Access ON)
 ```
@@ -330,7 +330,7 @@ const displayed = computed(() => {
 | nginx rate limiting | Login: 10 req/min; PHP: 60 req/min |
 | PHP hardening | max_execution_time=120, allow_url_fopen=Off, open_basedir, disable_functions |
 | Queue worker | Runs as `www-data` (not root) |
-| RDS | Encrypted at rest (KMS), Multi-AZ, deletion protection ON |
+| RDS | Encrypted at rest (KMS), single-AZ, deletion protection ON |
 | Mail | Configured — Gmail SMTP via SSM-stored app password |
 
 ---
