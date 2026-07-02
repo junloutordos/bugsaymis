@@ -109,8 +109,10 @@ class ScanController extends Controller
         ]);
 
         // ── 6. Broadcast for real-time gate monitor ───────────────────────────
+        // Scan is already saved — a Soketi outage must not fail the scan or
+        // block the SMS dispatch below.
         $payload = $this->buildPayload($student, $type, $log->scan_time, false);
-        event(new AttendanceScanEvent($payload));
+        rescue(fn () => event(new AttendanceScanEvent($payload)));
 
         // ── 7. Queue SMS notification to linked parents ───────────────────────
         SendAttendanceSmsJob::dispatch(
