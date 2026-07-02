@@ -31,8 +31,14 @@ fi
 # ── Export env vars for cron (restricted to non-secret vars) ──────────────────
 # Exclude secrets — DB_PASSWORD, APP_KEY, SOKETI secret are injected by ECS
 # at runtime and available to processes; cron reads /etc/environment on start.
+# Values must be shell-quoted: this file is sourced by bash in the cron line,
+# and unquoted values with spaces (e.g. MAIL_FROM_NAME="PSHS-CRC MIS") abort
+# the source mid-file, dropping every var after the bad line.
 printenv | grep -vE "^(no_proxy|GOOGLE_DRIVE_CREDENTIALS_JSON|LS_COLORS|GPG_KEYS|PHP_(ASC|SHA|CFLAGS|CPPFLAGS|LDFLAGS|URL|INI|VERSION)|PHPIZE_DEPS)" \
-  > /etc/environment
+  | while IFS='=' read -r key value; do
+      case "$key" in ''|*[!A-Za-z0-9_]*) continue ;; esac
+      printf "%s='%s'\n" "$key" "$(printf '%s' "$value" | sed "s/'/'\\\\''/g")"
+    done > /etc/environment
 chmod 600 /etc/environment
 
 # ── Ensure writable directories are owned by www-data ─────────────────────────
