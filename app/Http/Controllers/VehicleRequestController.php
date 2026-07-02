@@ -50,15 +50,25 @@ class VehicleRequestController extends Controller
             }
         }
 
+        // MySQL strict mode rejects DATE(date_needed) = '<non-date text>' with a
+        // QueryException, so the date clause may only be added for date-shaped terms.
+        $searchDate = null;
+        foreach (['Y-m-d', 'm/d/Y', 'n/j/Y'] as $format) {
+            if ($search !== '' && \Carbon\Carbon::hasFormat($search, $format)) {
+                $searchDate = \Carbon\Carbon::createFromFormat($format, $search)->format('Y-m-d');
+                break;
+            }
+        }
+
         $requests
-            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
+            ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search, $searchDate) {
                 $inner->where('id', 'like', "%{$search}%")
                     ->orWhere('purpose', 'like', "%{$search}%")
                     ->orWhere('destination', 'like', "%{$search}%")
                     ->orWhere('vehicle_type', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%")
                     ->orWhere('driver_name', 'like', "%{$search}%")
-                    ->orWhereDate('date_needed', $search)
+                    ->when($searchDate, fn ($q2) => $q2->orWhereDate('date_needed', $searchDate))
                     ->orWhereHas('requester', fn ($rq) => $rq->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('driver', fn ($dq) => $dq->where('name', 'like', "%{$search}%"));
             }));
