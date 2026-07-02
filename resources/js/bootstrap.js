@@ -19,8 +19,10 @@ window.Echo = new Echo({
     httpPort:          Number(import.meta.env.VITE_PUSHER_PORT ?? 9601),
     cluster:           import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1',
     forceTLS:          (import.meta.env.VITE_PUSHER_SCHEME ?? 'http') === 'https',
-    // Try WebSocket first; fall back to HTTP polling if WebSocket is blocked (e.g. Cloudflare WAF)
-    enabledTransports: ['ws', 'wss', 'xhr_streaming', 'xhr_polling'],
+    // WebSocket only — Soketi does not implement the Pusher HTTP fallback
+    // transports (xhr_streaming/xhr_polling); enabling them makes clients that
+    // fail the ws upgrade loop forever on /pusher/* endpoints that 502.
+    enabledTransports: ['ws', 'wss'],
     disableStats:      true,
 });
 
