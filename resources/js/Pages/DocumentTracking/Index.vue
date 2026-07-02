@@ -11,6 +11,7 @@ import AppFilterBar from '@/Components/AppFilterBar.vue'
 import AppInput from '@/Components/AppInput.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppSelect from '@/Components/AppSelect.vue'
+import { userDisplayName } from '@/Utils/userDisplay.js'
 import {
   PlusIcon, ArrowUpTrayIcon, Cog6ToothIcon, MagnifyingGlassIcon,
   LockClosedIcon, ExclamationTriangleIcon,
@@ -402,7 +403,7 @@ const needsManualReceiver = computed(() =>
               <select v-model="form.receiver_id"
                 class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">Select recipient…</option>
-                <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+                <option v-for="u in users" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
               </select>
             </div>
 

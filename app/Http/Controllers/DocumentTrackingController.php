@@ -117,6 +117,26 @@ class DocumentTrackingController extends Controller
         try { NotificationService::notifyUser($user, $subject, $refNo, $status, $url); } catch (\Throwable) {}
     }
 
+    private function canCompleteAndFile(Document $document, User $user): bool
+    {
+        if ($document->overall_status === 'Completed') {
+            return false;
+        }
+
+        if ($user->hasAnyPermission(['documents.approve', 'documents.update'])) {
+            return true;
+        }
+
+        if ($document->created_by === $user->id) {
+            return true;
+        }
+
+        return $document->routings()
+            ->where('receiver_id', $user->id)
+            ->whereIn('status', ['Pending', 'Received', 'Action Taken'])
+            ->exists();
+    }
+
     private function dtsFolder(): string
     {
         return config('services.google_drive.dts_folder_id');
@@ -166,7 +186,7 @@ class DocumentTrackingController extends Controller
             'documentTypes'   => DocumentType::where('is_active', true)->orderBy('name')
                                     ->with(['routingSteps.office', 'routingSteps.assignedUser'])
                                     ->get(['id', 'name', 'code', 'routing_type', 'applicable_to', 'lead_time_hours']),
-            'users'           => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
+            'users'           => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'email', 'office_id']),
             'offices'         => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'canLogExternal'  => $isAdmin || $isRecords,
             'canSeeExternal'  => $isAdmin || $isRecords,
@@ -437,7 +457,7 @@ class DocumentTrackingController extends Controller
 
         return Inertia::render('DocumentTracking/Show', [
             'document'              => $this->formatDoc($document),
-            'users'                 => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'office_id']),
+            'users'                 => User::where('status', '<>', 'inactive')->orderBy('name')->get(['id', 'name', 'email', 'office_id']),
             'offices'               => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'documentTypes'         => DocumentType::where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'applicable_to']),
             'isAdmin'               => $isAdmin,
@@ -446,6 +466,7 @@ class DocumentTrackingController extends Controller
             'originalSender'        => $originalSender,
             'latestActionTaker'     => $latestActionTaker,
             'canCompleteAsReceiver' => $canCompleteAsReceiver,
+            'canCompleteAndFile'    => $this->canCompleteAndFile($document, $user),
         ]);
     }
 
@@ -846,9 +867,7 @@ class DocumentTrackingController extends Controller
     public function complete(Request $request, Document $document)
     {
         $user      = Auth::user();
-        $canClose  = $user->hasAnyPermission(['documents.approve', 'documents.update'])
-            || $document->routings()->where('receiver_id', $user->id)->whereIn('status', ['Received', 'Action Taken'])->exists();
-        abort_if(! $canClose, 403);
+        abort_if(! $this->canCompleteAndFile($document, $user), 403);
 
         $data = $request->validate(['action_taken' => 'nullable|string|max:2000']);
 

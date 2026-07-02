@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
+import Swal from 'sweetalert2'
+import { userDisplayName } from '@/Utils/userDisplay.js'
 import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass, routingStatusBadgeClass } from '@/Composables/useStatusBadge.js'
 import {
   ChevronLeftIcon, LockClosedIcon, ExclamationTriangleIcon,
@@ -21,6 +23,7 @@ const props = defineProps({
   originalSender:        Object,
   latestActionTaker:     Object,
   canCompleteAsReceiver: Boolean,
+  canCompleteAndFile:    Boolean,
 })
 
 const page = usePage()
@@ -105,7 +108,10 @@ const reviewForm       = ref({
 const forwardSearch = ref('')
 const filteredUsers = computed(() => {
   const q = forwardSearch.value.toLowerCase()
-  return (props.users ?? []).filter(u => u.id !== uid.value && (!q || u.name.toLowerCase().includes(q)))
+  return (props.users ?? []).filter(u => {
+    const displayName = userDisplayName(u, props.users).toLowerCase()
+    return u.id !== uid.value && (!q || displayName.includes(q) || u.name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q))
+  })
 })
 
 function openReviewModal() {
@@ -127,7 +133,24 @@ function openReviewModal() {
 
 function closeReviewModal() { reviewOpen.value = false }
 
-function doReview() {
+async function confirmCompleteAndFile() {
+  const result = await Swal.fire({
+    title: 'Mark complete and file?',
+    text: 'This will close the document process and mark the document as filed.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#059669',
+    cancelButtonColor: '#64748b',
+    confirmButtonText: 'Yes, complete and file',
+    cancelButtonText: 'Cancel',
+  })
+
+  return result.isConfirmed
+}
+
+async function doReview() {
+  if (reviewTab.value === 'complete' && !await confirmCompleteAndFile()) return
+
   reviewSubmitting.value = true
   reviewErrors.value     = {}
 
@@ -228,7 +251,11 @@ function submit(routeKey, params, body) {
 }
 
 function doAnnotate() { submit('document-tracking.annotate', props.document.id, { remarks: modalForm.value.remarks }) }
-function doComplete() { submit('document-tracking.complete', props.document.id, { action_taken: modalForm.value.action_taken }) }
+async function doComplete() {
+  if (!await confirmCompleteAndFile()) return
+
+  submit('document-tracking.complete', props.document.id, { action_taken: modalForm.value.action_taken })
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmtDt(iso) {
@@ -414,7 +441,7 @@ const overallBadgeCls = computed(() => {
         </div>
 
         <!-- Mark Complete & File — admin or terminal/manual receiver -->
-        <div v-if="!isCompleted && (isAdmin || canCompleteAsReceiver)" class="mt-3 flex justify-end">
+        <div v-if="canCompleteAndFile" class="mt-3 flex justify-end">
           <button @click="openModal('complete')"
             class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
             <CheckCircleIcon class="h-4 w-4 text-emerald-500" /> Mark Complete & File
@@ -672,7 +699,7 @@ const overallBadgeCls = computed(() => {
                 </div>
                 <select v-model="reviewForm.forward_to" required size="5"
                   class="w-full rounded-lg border border-slate-200 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option v-for="u in filteredUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+                  <option v-for="u in filteredUsers" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
                 </select>
                 <p v-if="reviewErrors.forward_to" class="text-xs text-red-500 mt-1">{{ reviewErrors.forward_to }}</p>
               </div>
