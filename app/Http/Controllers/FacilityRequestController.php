@@ -298,7 +298,7 @@ class FacilityRequestController extends Controller
                             try {
                                 $approveUrl = \Illuminate\Support\Facades\URL::signedRoute('it-job-requests.dc.approve', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
                                 $declineUrl = \Illuminate\Support\Facades\URL::signedRoute('it-job-requests.dc.decline', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
-                                \Illuminate\Support\Facades\Mail::to($chief->email)->send(new \App\Mail\DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
+                                \Illuminate\Support\Facades\Mail::to($chief->email)->queue(new \App\Mail\DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
                             } catch (\Throwable $e) {
                                 logger()->error('Failed to send auto-created ITJR Division Chief email', ['error' => $e->getMessage()]);
                             }
@@ -339,7 +339,7 @@ class FacilityRequestController extends Controller
                 // create signed approve/decline links (valid 7 days)
                 $approveUrl = $chiefUser ? URL::signedRoute('facility-requests.approve', ['facilityRequest' => $fr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : route('facility-requests.index');
                 $declineUrl = $chiefUser ? URL::signedRoute('facility-requests.decline', ['facilityRequest' => $fr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : null;
-                Mail::to($chiefEmail)->send(new FacilityRequestCreatedMail($fr, $approveUrl, $declineUrl));
+                Mail::to($chiefEmail)->queue(new FacilityRequestCreatedMail($fr, $approveUrl, $declineUrl));
             } catch (\Throwable $e) {
                 logger()->error('Failed to send facility request email', ['error' => $e->getMessage()]);
             }
@@ -408,7 +408,7 @@ class FacilityRequestController extends Controller
                 try {
                     $approveUrl = URL::signedRoute('facility-requests.fad.approve', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('facility-requests.fad.decline', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                    \Mail::to($fad->email)->send(new \App\Mail\FacilityRequestFADMail($facilityRequest, $approveUrl, $declineUrl));
+                    \Mail::to($fad->email)->queue(new \App\Mail\FacilityRequestFADMail($facilityRequest, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send facility request FAD notification', ['error' => $e->getMessage(), 'email' => $fad->email]);
                 }
@@ -478,7 +478,7 @@ class FacilityRequestController extends Controller
                 try {
                     $approveUrl = URL::signedRoute('facility-requests.fad.approve', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('facility-requests.fad.decline', ['facilityRequest' => $facilityRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                    \Mail::to($fad->email)->send(new \App\Mail\FacilityRequestFADMail($facilityRequest, $approveUrl, $declineUrl));
+                    \Mail::to($fad->email)->queue(new \App\Mail\FacilityRequestFADMail($facilityRequest, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send facility request FAD notification (in-app)', ['error' => $e->getMessage(), 'email' => $fad->email]);
                 }
@@ -534,7 +534,7 @@ class FacilityRequestController extends Controller
             $requesterEmail = $facilityRequest->requester?->email ?? null;
             $approverName = $user->name ?? null;
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request declined notification', ['error' => $e->getMessage()]);
@@ -594,7 +594,7 @@ class FacilityRequestController extends Controller
             }
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request declined notification', ['error' => $e->getMessage()]);
@@ -620,7 +620,7 @@ class FacilityRequestController extends Controller
             $approverName   = $gsu ? (\App\Models\User::find($gsu)?->name ?? 'GSU Head') : 'GSU Head';
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request GSU approved notification', ['error' => $e->getMessage()]);
@@ -669,7 +669,7 @@ class FacilityRequestController extends Controller
             }
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request GSU declined notification', ['error' => $e->getMessage()]);
@@ -713,7 +713,7 @@ class FacilityRequestController extends Controller
             $approverName = $chiefUser?->name ?? 'FAD Chief';
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request FAD approved notification', ['error' => $e->getMessage()]);
@@ -761,7 +761,7 @@ class FacilityRequestController extends Controller
             }
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send facility request FAD declined notification', ['error' => $e->getMessage()]);
@@ -1005,7 +1005,7 @@ class FacilityRequestController extends Controller
             try {
                 $requesterEmail = $facilityRequest->requester?->email ?? null;
                 if ($requesterEmail) {
-                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $user->name));
+                    \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Approved', null, $user->name));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Facility FAD approved email failed', ['error' => $e->getMessage()]);
@@ -1017,7 +1017,7 @@ class FacilityRequestController extends Controller
             try {
                 $requesterEmail = $facilityRequest->requester?->email ?? null;
                 if ($requesterEmail) {
-                    \Mail::to($requesterEmail)->send(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason, $user->name));
+                    \Mail::to($requesterEmail)->queue(new \App\Mail\FacilityRequestStatusMail($facilityRequest, 'Declined', $facilityRequest->decline_reason, $user->name));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Facility FAD declined email failed', ['error' => $e->getMessage()]);

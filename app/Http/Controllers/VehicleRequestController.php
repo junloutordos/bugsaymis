@@ -191,7 +191,7 @@ class VehicleRequestController extends Controller
                 $approveUrl = URL::signedRoute('vehicle-requests.approve', ['vehicleRequest' => $vr->id, 'chief' => $chief->id], now()->addDays(7));
                 $declineUrl = URL::signedRoute('vehicle-requests.decline', ['vehicleRequest' => $vr->id, 'chief' => $chief->id], now()->addDays(7));
                 try {
-                    Mail::to($chief->email)->send(new VehicleRequestCreatedMail($vr, $approveUrl, $declineUrl));
+                    Mail::to($chief->email)->queue(new VehicleRequestCreatedMail($vr, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     // log but don't fail the request creation
                     logger()->error('Failed to send vehicle request email', ['error' => $e->getMessage()]);
@@ -267,7 +267,7 @@ class VehicleRequestController extends Controller
                 try {
                     $approveUrl = URL::signedRoute('vehicle-requests.fad.approve', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('vehicle-requests.fad.decline', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
-                    Mail::to($fad->email)->send(new \App\Mail\VehicleRequestFADMail($vehicleRequest, $approveUrl, $declineUrl));
+                    Mail::to($fad->email)->queue(new \App\Mail\VehicleRequestFADMail($vehicleRequest, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send FAD vehicle request notification', ['error' => $e->getMessage(), 'fad_id' => $fad->id]);
                 }
@@ -329,7 +329,7 @@ class VehicleRequestController extends Controller
                 $requester = $vehicleRequest->requester;
             $requesterEmail = $requester?->email ?? null;
             if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason ?? null));
+                Mail::to($requesterEmail)->queue(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason ?? null));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
@@ -383,7 +383,7 @@ class VehicleRequestController extends Controller
             try {
                 $approveUrl = URL::signedRoute('vehicle-requests.fad.approve', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
                 $declineUrl = URL::signedRoute('vehicle-requests.fad.decline', ['vehicleRequest' => $vehicleRequest->id, 'fad' => $fad->id], now()->addDays(7));
-                \Mail::to($fad->email)->send(new \App\Mail\VehicleRequestFADMail($vehicleRequest, $approveUrl, $declineUrl));
+                \Mail::to($fad->email)->queue(new \App\Mail\VehicleRequestFADMail($vehicleRequest, $approveUrl, $declineUrl));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send FAD vehicle request notification', ['error' => $e->getMessage()]);
             }
@@ -432,7 +432,7 @@ class VehicleRequestController extends Controller
         $requester = $vehicleRequest->requester;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, 'Office of the Campus Director'));
+                \Mail::to($requester->email)->queue(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, 'Office of the Campus Director'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request OCD approved notification', ['error' => $e->getMessage()]);
             }
@@ -475,7 +475,7 @@ class VehicleRequestController extends Controller
         $requester = $vehicleRequest->requester;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Office of the Campus Director'));
+                \Mail::to($requester->email)->queue(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Office of the Campus Director'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
             }
@@ -514,7 +514,7 @@ class VehicleRequestController extends Controller
         $requester = $vehicleRequest->requester;
         if ($requester && $requester->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Division Chief'));
+                \Mail::to($requester->email)->queue(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', $vehicleRequest->decline_reason, 'Division Chief'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle request declined notification', ['error' => $e->getMessage()]);
             }
@@ -818,7 +818,7 @@ class VehicleRequestController extends Controller
                 foreach ($gsuHeads as $gsuHead) {
                     if ($gsuHead->email) {
                         try {
-                            Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
+                            Mail::to($gsuHead->email)->queue(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
                         } catch (\Throwable $e) {
                             logger()->error('Failed to send GSU Head notification after FAD approval', ['error' => $e->getMessage()]);
                         }
@@ -841,7 +841,7 @@ class VehicleRequestController extends Controller
 
             try {
                 if ($vehicleRequest->requester?->email) {
-                    Mail::to($vehicleRequest->requester->email)->send(
+                    Mail::to($vehicleRequest->requester->email)->queue(
                         new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by FAD.', $user->name)
                     );
                 }
@@ -873,7 +873,7 @@ class VehicleRequestController extends Controller
         foreach ($gsuHeads as $gsuHead) {
             if ($gsuHead->email) {
                 try {
-                    \Mail::to($gsuHead->email)->send(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
+                    \Mail::to($gsuHead->email)->queue(new \App\Mail\VehicleRequestGSUHeadMail($vehicleRequest));
                 } catch (\Throwable $e) {
                     \Log::error('Failed to send GSU Head notification after FAD email approval', ['error' => $e->getMessage()]);
                 }
@@ -899,7 +899,7 @@ class VehicleRequestController extends Controller
         $requester = $vehicleRequest->requester;
         if ($requester?->email) {
             try {
-                \Mail::to($requester->email)->send(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by FAD.', 'FAD Chief'));
+                \Mail::to($requester->email)->queue(new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by FAD.', 'FAD Chief'));
             } catch (\Throwable $e) {
                 \Log::error('Failed to send vehicle declined notification after FAD email decline', ['error' => $e->getMessage()]);
             }
@@ -964,7 +964,7 @@ class VehicleRequestController extends Controller
             try {
                 $requester = $vehicleRequest->requester;
                 if ($requester?->email) {
-                    \Mail::to($requester->email)->send(
+                    \Mail::to($requester->email)->queue(
                         new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'OCD Approved', null, $request->user()->name)
                     );
                 }
@@ -986,7 +986,7 @@ class VehicleRequestController extends Controller
             try {
                 $requester = $vehicleRequest->requester;
                 if ($requester?->email) {
-                    \Mail::to($requester->email)->send(
+                    \Mail::to($requester->email)->queue(
                         new \App\Mail\VehicleRequestStatusMail($vehicleRequest, 'Declined', 'Declined by OCD.', $request->user()->name)
                     );
                 }
