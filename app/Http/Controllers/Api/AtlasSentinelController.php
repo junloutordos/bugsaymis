@@ -35,7 +35,9 @@ class AtlasSentinelController extends Controller
     private const UNRELIABLE_SERIALS = [
         '', 'unknown-serial', 'to be filled by o.e.m.', 'system serial number',
         'default string', 'none', 'not specified', '0123456789', '1234567890',
-        'serial number', 'n/a',
+        'serial number', 'n/a', 'na', 'o.e.m.', 'oem', 'not available',
+        'not applicable', 'invalid', 'unknown', 'chassis serial number',
+        'base board serial number', 'mainboard serial number',
     ];
 
     public function __construct(
@@ -84,74 +86,70 @@ class AtlasSentinelController extends Controller
             ], 422);
         }
 
-        $serial = $validated['serial_no'];
-        $mac = $validated['mac_address'] ?? null;
-        $matchedByMac = false;
+        $serial = trim($validated['serial_no']);
+        $hostname = $validated['hostname'] ?? null;
+        $mac = $this->normalizeMac($validated['mac_address'] ?? null);
+        $matchSource = null;
+        $cloneCollision = false;
 
         $equipment = $this->isUnreliableSerial($serial) ? null : ICTEquipment::where('serial_no', $serial)->first();
 
         if ($equipment) {
-            $existingDevice = IctEquipmentDevice::where('equipment_id', $equipment->id)->first();
-            // Same serial, different MAC than what's already on file for it —
-            // a second machine sharing a non-unique/placeholder serial with
-            // one already enrolled. Don't let it steal that device's row;
-            // fall through to MAC-based matching/creation instead.
-            if ($existingDevice && $mac && $existingDevice->mac_address && $existingDevice->mac_address !== $mac) {
+            $matchSource = 'serial';
+            $existingDevice = IctEquipmentDevice::where('equipment_id', $equipment->id)->latest('id')->first();
+
+            if ($this->isIdentityConflict($existingDevice, $hostname, $mac)) {
+                $cloneCollision = true;
+                logger()->warning('Atlas Sentinel: serial match looked like a cloned/generic desktop; creating Pending Setup equipment instead of reclaiming existing row.', [
+                    'matched_equipment_id' => $equipment->id,
+                    'matched_device_id' => $existingDevice?->id,
+                    'previous_hostname' => $existingDevice?->hostname,
+                    'new_hostname' => $hostname,
+                    'serial_no' => $serial,
+                    'mac_address' => $mac,
+                ]);
                 $equipment = null;
+                $matchSource = null;
             }
         }
 
-        if (! $equipment && $mac) {
-            $deviceByMac = IctEquipmentDevice::where('mac_address', $mac)->first();
+        if (! $equipment && $mac && ! $cloneCollision) {
+            $deviceByMac = IctEquipmentDevice::where('mac_address', $mac)->latest('id')->first();
             if ($deviceByMac) {
-                // Guard against a cloned machine stealing the original's slot.
-                // If the existing device checked in within the last hour under a
-                // different hostname, this is almost certainly a MAC-identical clone
-                // (VM copy, duplicate NIC config) rather than a legitimate reinstall.
-                $newHostname = $validated['hostname'] ?? null;
-                $isActivelyInUse = $deviceByMac->last_checkin_at
-                    && $deviceByMac->last_checkin_at->gt(now()->subMinutes(60));
-                $hostnameDiffers = $newHostname
-                    && $deviceByMac->hostname
-                    && $deviceByMac->hostname !== $newHostname;
-
-                if ($isActivelyInUse && $hostnameDiffers) {
-                    return response()->json([
-                        'message' => "MAC address {$mac} is already active on '{$deviceByMac->hostname}' (last seen within the past hour). If this is a reinstall on the same machine, wait until the original device has been inactive for over an hour and retry. If this is a different machine sharing the same MAC (e.g. a cloned VM), contact MIS to resolve the conflict.",
-                    ], 409);
+                if ($this->isIdentityConflict($deviceByMac, $hostname, $mac)) {
+                    $cloneCollision = true;
+                    logger()->warning('Atlas Sentinel: MAC match looked like a cloned desktop; creating Pending Setup equipment instead of reclaiming existing row.', [
+                        'matched_equipment_id' => $deviceByMac->equipment_id,
+                        'matched_device_id' => $deviceByMac->id,
+                        'previous_hostname' => $deviceByMac->hostname,
+                        'new_hostname' => $hostname,
+                        'serial_no' => $serial,
+                        'mac_address' => $mac,
+                    ]);
+                } else {
+                    $equipment = ICTEquipment::find($deviceByMac->equipment_id);
+                    $matchSource = 'mac';
                 }
-
-                $equipment = ICTEquipment::find($deviceByMac->equipment_id);
-                $matchedByMac = true;
             }
         }
 
         $linked = (bool) $equipment;
 
         if (! $equipment) {
-            $description = $validated['model'] ?? ('Auto-detected device — ' . ($validated['hostname'] ?? 'unknown host'));
-            if (($matchedByMac || $this->isUnreliableSerial($serial)) && $mac) {
-                $description .= " (MAC {$mac})";
-            }
-
-            $equipment = ICTEquipment::create([
-                'category'    => 'Other',
-                'serial_no'   => $serial,
-                'description' => $description,
-                'status'      => 'Pending Setup',
-            ]);
+            $equipment = $this->createPendingEquipment($validated, $serial, $mac, $cloneCollision);
+            $matchSource = $cloneCollision ? 'clone_collision_pending_setup' : 'pending_setup';
         }
 
         // Re-running install.ps1 on a machine already matched to this
         // equipment (re-enrollment, reinstall) reuses its device row instead
         // of leaving the old one stale forever with a dead token.
-        $device = IctEquipmentDevice::where('equipment_id', $equipment->id)->first();
+        $device = IctEquipmentDevice::where('equipment_id', $equipment->id)->latest('id')->first();
 
-        if ($device && $device->hostname && ($validated['hostname'] ?? null) && $device->hostname !== $validated['hostname']) {
+        if ($device && $device->hostname && $hostname && $device->hostname !== $hostname) {
             logger()->warning('Atlas Sentinel: device row reclaimed under a different hostname — possible serial/MAC collision or legitimate reinstall.', [
                 'equipment_id' => $equipment->id,
                 'previous_hostname' => $device->hostname,
-                'new_hostname' => $validated['hostname'],
+                'new_hostname' => $hostname,
                 'serial_no' => $serial,
                 'mac_address' => $mac,
             ]);
@@ -159,7 +157,7 @@ class AtlasSentinelController extends Controller
 
         $deviceAttributes = [
             'equipment_id'     => $equipment->id,
-            'hostname'         => $validated['hostname'] ?? null,
+            'hostname'         => $hostname,
             'mac_address'      => $mac,
             'os_version'       => $validated['os_version'] ?? null,
             'agent_version'    => $validated['agent_version'] ?? null,
@@ -184,7 +182,54 @@ class AtlasSentinelController extends Controller
             'device_token' => $deviceToken,
             'equipment_id' => $equipment->id,
             'linked'       => $linked,
+            'match_source' => $matchSource,
         ], 201);
+    }
+
+    private function createPendingEquipment(array $validated, string $serial, ?string $mac, bool $cloneCollision): ICTEquipment
+    {
+        $hostname = $validated['hostname'] ?? 'unknown host';
+        $description = $validated['model'] ?? "Auto-detected device — {$hostname}";
+
+        if ($mac) {
+            $description .= " (MAC {$mac})";
+        }
+
+        return ICTEquipment::create([
+            'category'    => 'Other',
+            'serial_no'   => $serial,
+            'description' => $description,
+            'status'      => 'Pending Setup',
+            'remarks'     => $cloneCollision
+                ? 'Atlas Sentinel detected a cloned or duplicate hardware identity during enrollment. Review before merging with an existing equipment record.'
+                : null,
+        ]);
+    }
+
+    private function isIdentityConflict(?IctEquipmentDevice $existingDevice, ?string $newHostname, ?string $newMac): bool
+    {
+        if (! $existingDevice) {
+            return false;
+        }
+
+        $existingHostname = trim((string) $existingDevice->hostname);
+        $hostnameDiffers = $newHostname
+            && $existingHostname !== ''
+            && strcasecmp($existingHostname, $newHostname) !== 0;
+
+        $existingMac = $this->normalizeMac($existingDevice->mac_address);
+        $macDiffers = $newMac
+            && $existingMac
+            && $existingMac !== $newMac;
+
+        return $hostnameDiffers || $macDiffers;
+    }
+
+    private function normalizeMac(?string $mac): ?string
+    {
+        $mac = strtolower(trim((string) $mac));
+
+        return $mac !== '' ? $mac : null;
     }
 
     private function isUnreliableSerial(?string $serial): bool
