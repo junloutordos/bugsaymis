@@ -4,6 +4,7 @@ import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
+import ActiveUsersCard from '@/Components/Atlas/ActiveUsersCard.vue'
 import {
   ClockIcon,
   ExclamationTriangleIcon,
@@ -111,6 +112,9 @@ const traces = computed(() => props.infra?.traces ?? null)
       <div v-if="!enabled" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         Atlas WatchTower is currently disabled (<code>PULSE_ENABLED=false</code>). No new telemetry is being recorded.
       </div>
+
+      <!-- Active users -->
+      <ActiveUsersCard />
 
       <!-- Queue throughput -->
       <AppCard>

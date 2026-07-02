@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppCard from '@/Components/AppCard.vue'
@@ -17,7 +17,6 @@ import {
   LinkIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  UsersIcon,
   ArrowRightIcon,
 } from '@heroicons/vue/24/outline'
 import { StarIcon as StarSolid } from '@heroicons/vue/24/solid'
@@ -74,44 +73,6 @@ const dimensionForm    = ref({ criteria_checks: [], notes: '' })
 const savingDimension  = ref(false)
 const settingsForm     = ref({ version: '1.0.0', sla_hours: null, notes: '', owner_id: null })
 const savingSettings   = ref(false)
-
-// ── Active Users Monitor ──────────────────────────────────────────────────────
-const activeUsersData     = ref(null)
-const activeUsersLoading  = ref(false)
-const activeUsersExpanded = ref(true)
-let   activeUsersPoll     = null
-
-async function fetchActiveUsers() {
-  activeUsersLoading.value = true
-  try {
-    const res = await window.axios.get(route('atlas.active-users'))
-    activeUsersData.value = res.data
-  } catch {
-    // silently skip — non-critical panel
-  } finally {
-    activeUsersLoading.value = false
-  }
-}
-
-function timeAgo(isoStr) {
-  if (!isoStr) return ''
-  const secs = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000)
-  if (secs < 60) return `${secs}s ago`
-  const mins = Math.floor(secs / 60)
-  if (mins < 60) return `${mins}m ago`
-  return `${Math.floor(mins / 60)}h ago`
-}
-
-onMounted(() => {
-  fetchActiveUsers()
-  activeUsersPoll = setInterval(fetchActiveUsers, 60_000)
-})
-
-onUnmounted(() => {
-  clearInterval(activeUsersPoll)
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 const healthConfig = {
   healthy:  { label: 'Healthy',  badgeColor: 'green', icon: CheckCircleIcon,        iconClass: 'text-emerald-500' },
@@ -254,10 +215,6 @@ function pingDotClass(status) {
     idle:     'bg-slate-300',
     info:     'bg-sky-400',
   }[status] ?? 'bg-slate-200'
-}
-
-function browserIcon(browser) {
-  return { Chrome: '🌐', Firefox: '🦊', Safari: '🧭', Edge: '🔷', Other: '💻' }[browser] ?? '💻'
 }
 
 function dimensionScore(dimKey) {
@@ -425,97 +382,6 @@ async function saveSettings() {
       </div>
     </AppCard>
 
-    <!-- ── Active Users Monitor ──────────────────────────────────────────── -->
-    <AppCard :padded="false" class="mb-6">
-      <div class="flex items-center justify-between px-4 py-3">
-        <div class="flex items-center gap-2">
-          <UsersIcon class="h-4 w-4 text-slate-500" />
-          <h2 class="text-sm font-semibold text-slate-700">Active Users</h2>
-          <span v-if="activeUsersData" class="text-xs text-slate-400">
-            · {{ timeAgo(activeUsersData.refreshed_at) }}
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            @click="fetchActiveUsers"
-            :disabled="activeUsersLoading"
-            class="rounded-md p-1 text-slate-400 hover:text-slate-600 disabled:opacity-40"
-            title="Refresh"
-          >
-            <ArrowPathIcon :class="['h-3.5 w-3.5', activeUsersLoading && 'animate-spin']" />
-          </button>
-          <button
-            @click="activeUsersExpanded = !activeUsersExpanded"
-            class="rounded-md p-1 text-slate-400 hover:text-slate-600"
-          >
-            <ChevronUpIcon v-if="activeUsersExpanded" class="h-4 w-4" />
-            <ChevronDownIcon v-else class="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div v-show="activeUsersExpanded" class="border-t border-slate-100">
-        <!-- Loading skeleton -->
-        <div v-if="!activeUsersData && activeUsersLoading" class="flex items-center gap-4 px-4 py-4">
-          <div v-for="i in 3" :key="i" class="h-14 w-28 animate-pulse rounded-lg bg-slate-100" />
-        </div>
-
-        <template v-else-if="activeUsersData">
-          <div class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start">
-            <!-- Stat tiles -->
-            <div class="flex shrink-0 gap-3">
-              <div class="rounded-lg bg-emerald-50 px-4 py-3 text-center">
-                <p class="text-[10px] font-medium text-emerald-500 uppercase tracking-wide">Online Now</p>
-                <p class="text-2xl font-bold text-emerald-700">{{ activeUsersData.counts.now }}</p>
-                <p class="text-[10px] text-emerald-400">&lt; 5 min</p>
-              </div>
-              <div class="rounded-lg bg-indigo-50 px-4 py-3 text-center">
-                <p class="text-[10px] font-medium text-indigo-500 uppercase tracking-wide">Recently Active</p>
-                <p class="text-2xl font-bold text-indigo-700">{{ activeUsersData.counts.recent }}</p>
-                <p class="text-[10px] text-indigo-400">last 30 min</p>
-              </div>
-              <div class="rounded-lg bg-slate-50 px-4 py-3 text-center">
-                <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Today</p>
-                <p class="text-2xl font-bold text-slate-700">{{ activeUsersData.counts.today }}</p>
-                <p class="text-[10px] text-slate-400">unique users</p>
-              </div>
-            </div>
-
-            <!-- User list -->
-            <div class="min-w-0 flex-1">
-              <div v-if="activeUsersData.users.length" class="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                <div
-                  v-for="user in activeUsersData.users"
-                  :key="user.id"
-                  class="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-3 py-2"
-                >
-                  <!-- Avatar -->
-                  <div
-                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                    :class="user.is_online ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
-                  >{{ user.initials }}</div>
-                  <!-- Info -->
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-medium text-slate-800">{{ user.name }}</p>
-                    <p class="text-[10px] text-slate-400">
-                      {{ timeAgo(user.last_seen_at) }}
-                      <span class="ml-1">{{ browserIcon(user.browser) }}</span>
-                    </p>
-                  </div>
-                  <!-- Online indicator -->
-                  <span
-                    v-if="user.is_online"
-                    class="h-2 w-2 shrink-0 rounded-full bg-emerald-400"
-                    title="Online now"
-                  />
-                </div>
-              </div>
-              <p v-else class="py-2 text-sm text-slate-400">No users active in the last 30 minutes.</p>
-            </div>
-          </div>
-        </template>
-      </div>
-    </AppCard>
 
     <!-- ── External Integrations Panel ──────────────────────────────────── -->
     <AppCard :padded="true" class="mb-6">
