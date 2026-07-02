@@ -286,7 +286,7 @@ const needsManualReceiver = computed(() =>
 
       <PaginationControl
         :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
-        @prev="currentPage--" @next="currentPage++" />
+        @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
     </div>
 
     <!-- Log / Create Modal -->

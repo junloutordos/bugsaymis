@@ -207,7 +207,7 @@ const showSettings = ref(false)
 
       <PaginationControl
         :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
-        @prev="currentPage--" @next="currentPage++" />
+        @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
     </div>
 
     <IssuanceSettingsModal :show="showSettings" @close="showSettings = false" />

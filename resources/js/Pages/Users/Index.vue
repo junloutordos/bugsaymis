@@ -418,6 +418,7 @@ function formatSg(user) {
           :total="allFiltered.length"
           @prev="currentPage--"
           @next="currentPage++"
+          @page="currentPage = $event"
         />
       </AppCard>
 
