@@ -298,17 +298,18 @@ class ChatController extends Controller
         $conversation->loadMissing('participants');
         $payload = $this->serializeMessage($message, $userId, $conversation);
 
-        broadcast(new MessageSent($conversation, $payload))->toOthers();
+        // Message is already persisted — a Soketi outage must not fail the send.
+        rescue(fn () => broadcast(new MessageSent($conversation, $payload))->toOthers());
 
         $conversation->participants()
             ->where('users.id', '!=', $userId)
             ->whereNull('conversation_user.left_at')
             ->get()
             ->each(function (User $recipient) use ($conversation, $payload) {
-                broadcast(new NewMessageNotification($recipient->id, [
+                rescue(fn () => broadcast(new NewMessageNotification($recipient->id, [
                     'conversation_id' => $conversation->id,
                     'message'         => $payload,
-                ]));
+                ])));
             });
 
         return response()->json(['message' => $payload], 201);
@@ -336,7 +337,7 @@ class ChatController extends Controller
                 Message::whereIn('id', $updated->pluck('id'))
                     ->update(['read_at' => now()]);
 
-                broadcast(new MessageRead($conversation, $userId, $updated->pluck('id')->all()))->toOthers();
+                rescue(fn () => broadcast(new MessageRead($conversation, $userId, $updated->pluck('id')->all()))->toOthers());
             }
         }
 
@@ -371,7 +372,7 @@ class ChatController extends Controller
 
         $message->delete();
 
-        broadcast(new MessageDeleted($conversation->id, $message->id))->toOthers();
+        rescue(fn () => broadcast(new MessageDeleted($conversation->id, $message->id))->toOthers());
 
         return response()->json(['deleted' => true]);
     }
