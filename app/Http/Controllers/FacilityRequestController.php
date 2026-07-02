@@ -359,7 +359,27 @@ class FacilityRequestController extends Controller
         $isAdmin = $request->user()->isSuperAdmin();
         if (! $isAdmin) abort(403);
 
-        $facilityRequest->update($request->all());
+        $data = $request->validate([
+            'activity'     => 'nullable|string|max:100',
+            'purpose'      => 'nullable|string|max:255',
+            'nature'       => 'nullable|string|max:255',
+            'participants' => 'nullable|string|max:255',
+            'male'         => 'nullable|integer|min:0',
+            'female'       => 'nullable|integer|min:0',
+            'venue'        => 'nullable|array',
+            'venue.*'      => 'exists:facilities,id',
+            'date_start'   => 'nullable|date',
+            'date_end'     => 'nullable|date|after_or_equal:date_start',
+            'time_start'   => 'nullable|date_format:H:i',
+            'time_end'     => 'nullable|date_format:H:i',
+            'equipment'    => 'nullable|array',
+            'equipment_quantities' => 'nullable|array',
+            'others'       => 'nullable|string|max:255',
+            'remarks'      => 'nullable|string|max:1000',
+            'status'       => 'nullable|string|max:50',
+        ]);
+
+        $facilityRequest->update($data);
         return redirect()->route('facility-requests.index');
     }
 

@@ -423,6 +423,10 @@ class LibraryBorrowingsController extends Controller
      */
     public function borrowerHistory($borrowerType, $borrowerId)
     {
+        if (! $this->checkAccess()) {
+            abort(403);
+        }
+
         $borrowings = Borrowing::with('collection')
             ->where('borrower_type', $borrowerType)
             ->where('borrower_id', $borrowerId)
