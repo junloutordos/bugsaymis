@@ -333,7 +333,7 @@ async function saveSettings() {
       <div>
         <h1 class="text-xl font-bold text-slate-800">Atlas Module Monitor</h1>
         <p class="mt-0.5 text-sm text-slate-500">
-          Health, maturity, and ecosystem status of all BugSayMis software modules
+          Atlas health, maturity, and ecosystem status of all software modules
         </p>
       </div>
       <div class="flex items-center gap-3">
