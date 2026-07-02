@@ -144,7 +144,7 @@ onUnmounted(() => {
         </div>
 
         <!-- User list -->
-        <div v-if="data.users.length" class="divide-y divide-slate-50 border-t border-slate-100">
+        <div v-if="data.users.length" class="max-h-[28rem] divide-y divide-slate-50 overflow-y-auto border-t border-slate-100">
           <div v-for="user in data.users" :key="user.id">
             <button
               @click="toggleUser(user)"

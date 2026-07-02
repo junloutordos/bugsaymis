@@ -10,6 +10,7 @@ import AdminTopbar from '@/Components/Layout/AdminTopbar.vue';
 import ReportDateRangeModal from '@/Components/Layout/ReportDateRangeModal.vue';
 import SessionExpiredOverlay from '@/Components/Layout/SessionExpiredOverlay.vue';
 import VersionHistoryModal from '@/Components/Layout/VersionHistoryModal.vue';
+import LighthouseIcon from '@/Components/Icons/LighthouseIcon.vue';
 import {
   HomeIcon,
   UsersIcon,
@@ -57,7 +58,6 @@ import {
   QuestionMarkCircleIcon,
   ArrowUpCircleIcon,
   BugAntIcon,
-  EyeIcon,
 
 } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
@@ -486,7 +486,7 @@ const menuItems = [
         permissions: ["it.equipment.view"],
       },
       {
-        label: "Atlas Sentinel Health Dashboard",
+        label: "Sentinel",
         routeName: "atlas-sentinel.health-dashboard",
         href: route("atlas-sentinel.health-dashboard"),
         icon: ChartBarIcon,
@@ -500,10 +500,10 @@ const menuItems = [
         permissions: ["atlas.modules.view"],
       },
       {
-        label: "Atlas WatchTower",
+        label: "WatchTower",
         routeName: "atlas.watchtower.index",
         href: route("atlas.watchtower.index"),
-        icon: EyeIcon,
+        icon: LighthouseIcon,
         permissions: ["atlas.watchtower.view"],
       },
       {
