@@ -18,6 +18,7 @@ import {
   UsersIcon,
   AcademicCapIcon,
   DocumentCheckIcon,
+  ClockIcon,
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(
@@ -183,7 +184,7 @@ const requestOverviewData = computed(() => ({
     {
       label: 'Completed',
       data: props.requestOverview.map(r => r.completed ?? 0),
-      backgroundColor: '#1447C0cc',
+      backgroundColor: sem.completed + 'cc',
       borderRadius: 4,
     },
   ],
@@ -320,8 +321,6 @@ onMounted(() => {
            HERO BANNER
       ══════════════════════════════════════════════════════════ -->
       <div class="hero-banner">
-        <!-- Decorative grid overlay -->
-        <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-inner">
           <div class="hero-left">
             <div class="hero-avatar">
@@ -329,7 +328,7 @@ onMounted(() => {
             </div>
             <div>
               <h1 class="hero-greeting">
-                {{ greeting }}, {{ authUser?.name?.split(' ')[0] ?? 'Admin' }} 👋
+                {{ greeting }}, {{ authUser?.name?.split(' ')[0] ?? 'Admin' }}
               </h1>
               <p class="hero-date">{{ today }}</p>
             </div>
@@ -368,7 +367,7 @@ onMounted(() => {
           v-for="card in kpiCards"
           :key="card.label"
           class="kpi-card"
-          style="border-left-color: #1447C0"
+          style="border-left-color: #2563eb"
         >
           <!-- Floating icon -->
           <component :is="card.icon" :class="[card.text, 'kpi-icon-float']" />
@@ -568,7 +567,7 @@ onMounted(() => {
               <span class="gad-chip">Sex-Disaggregated</span>
             </div>
             <div class="overflow-x-auto">
-              <table class="w-full text-xs">
+              <table class="w-full min-w-[680px] text-xs">
                 <thead>
                   <tr class="border-b border-slate-100 bg-slate-50/70">
                     <th class="px-4 py-2.5 text-left font-semibold text-slate-500">Indicator</th>
@@ -751,7 +750,10 @@ export default { components: { EmptyState } }
 .dash-root {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .dash-root { gap: 1.25rem; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -760,84 +762,94 @@ export default { components: { EmptyState } }
 .hero-banner {
   position: relative;
   overflow: hidden;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, #060e50 0%, #1447c0 65%, #0093b8 100%);
-  padding: 1.5rem 1.75rem;
-  box-shadow: 0 4px 24px rgba(6,14,80,.35);
-}
-
-.hero-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
-  background-size: 32px 32px;
-  pointer-events: none;
+  border-radius: .875rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
 }
 
 .hero-inner {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
-.hero-left { display: flex; align-items: center; gap: 1rem; }
+.hero-left {
+  display: flex;
+  align-items: center;
+  gap: .875rem;
+  min-width: 0;
+}
 
 .hero-avatar {
-  height: 3.5rem;
-  width: 3.5rem;
+  height: 3rem;
+  width: 3rem;
   border-radius: 99px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,.15);
-  border: 2px solid rgba(255,255,255,.3);
-  box-shadow: 0 0 0 3px rgba(0,200,232,.25), 0 4px 16px rgba(0,0,0,.2);
-  font-size: 1.1rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  font-size: .95rem;
   font-weight: 800;
-  color: white;
+  color: #1d4ed8;
   letter-spacing: .02em;
-  backdrop-filter: blur(6px);
 }
 
 .hero-greeting {
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -.02em;
+  color: #0f172a;
+  letter-spacing: 0;
   line-height: 1.2;
 }
 
 .hero-date {
   font-size: .75rem;
-  color: rgba(255,255,255,.6);
+  color: #64748b;
   margin-top: .2rem;
 }
 
-.hero-right { text-align: right; }
+.hero-right {
+  width: 100%;
+  text-align: left;
+}
 
 .hero-pending-badge {
   display: inline-flex;
   align-items: center;
   gap: .4rem;
-  background: rgba(0,200,232,.18);
-  border: 1px solid rgba(0,200,232,.35);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
   border-radius: 99px;
   padding: .35rem .85rem;
   font-size: .8rem;
-  color: #7eeeff;
-  backdrop-filter: blur(4px);
+  color: #92400e;
 }
 
 .hero-pending-sub {
   font-size: .7rem;
-  color: rgba(255,255,255,.4);
+  color: #94a3b8;
   margin-top: .3rem;
+}
+
+@media (min-width: 640px) {
+  .hero-banner { padding: 1.25rem 1.5rem; }
+  .hero-avatar {
+    height: 3.25rem;
+    width: 3.25rem;
+    font-size: 1.05rem;
+  }
+  .hero-greeting { font-size: 1.25rem; }
+  .hero-right {
+    width: auto;
+    text-align: right;
+  }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -846,17 +858,19 @@ export default { components: { EmptyState } }
 .gad-banner {
   display: flex;
   align-items: center;
-  gap: .75rem;
+  flex-wrap: wrap;
+  gap: .5rem .75rem;
   border-radius: .875rem;
-  background: linear-gradient(90deg, #eff6ff 0%, #fff 50%, #fdf2f8 100%);
-  border: 1px solid #e0e7ff;
-  padding: .65rem 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #2563eb;
+  padding: .75rem 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
 }
 
 .gad-icon { font-size: 1.1rem; color: #7c3aed; flex-shrink: 0; }
 
-.gad-text { font-size: .75rem; color: #475569; flex: 1; }
+.gad-text { font-size: .75rem; color: #475569; flex: 1 1 16rem; }
 
 .gad-bold { font-weight: 700; color: #4c1d95; }
 
@@ -864,7 +878,7 @@ export default { components: { EmptyState } }
   display: flex;
   align-items: center;
   gap: .35rem;
-  flex-shrink: 0;
+  flex: 1 1 100%;
   font-size: .7rem;
   font-weight: 600;
 }
@@ -873,32 +887,41 @@ export default { components: { EmptyState } }
 .gad-dot-m { background: #3b82f6; }
 .gad-dot-f { background: #ec4899; }
 .gad-legend-label { color: #64748b; }
+@media (min-width: 640px) {
+  .gad-banner { flex-wrap: nowrap; }
+  .gad-legend { flex: 0 0 auto; }
+}
 
 /* ════════════════════════════════════════════════════════════
    KPI GRID
 ════════════════════════════════════════════════════════════ */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: .875rem;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: .75rem;
 }
-@media (min-width: 640px)  { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 640px)  { .kpi-grid { gap: .875rem; } }
 @media (min-width: 1280px) { .kpi-grid { grid-template-columns: repeat(5, 1fr); } }
 
 .kpi-card {
   position: relative;
   background: #ffffff;
-  border-radius: 1rem;
-  border: 1px solid rgba(0,0,0,.06);
+  border-radius: .875rem;
+  border: 1px solid #e2e8f0;
   border-left-width: 4px;
-  padding: 1.25rem 1.125rem 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.03);
+  padding: 1rem .875rem .875rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   transition: transform .18s, box-shadow .18s;
   overflow: hidden;
 }
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.05);
+@media (hover: hover) {
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, .08), 0 1px 3px rgba(15, 23, 42, .05);
+  }
+}
+@media (min-width: 640px) {
+  .kpi-card { padding: 1.25rem 1.125rem 1rem; }
 }
 
 .kpi-icon-float {
@@ -911,12 +934,15 @@ export default { components: { EmptyState } }
 }
 
 .kpi-value {
-  font-size: 2rem;
+  font-size: 1.65rem;
   font-weight: 900;
   color: #0f172a;
-  letter-spacing: -.045em;
+  letter-spacing: 0;
   line-height: 1;
   margin-top: .375rem;
+}
+@media (min-width: 640px) {
+  .kpi-value { font-size: 2rem; }
 }
 
 .kpi-label {
@@ -957,14 +983,20 @@ export default { components: { EmptyState } }
 .main-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 @media (min-width: 1024px) {
-  .main-grid { grid-template-columns: 1fr 280px; }
+  .main-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 1.25rem;
+  }
 }
 
-.main-left  { display: flex; flex-direction: column; gap: 1.25rem; }
+.main-left  { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .main-right { display: flex; flex-direction: column; gap: 1rem; }
+@media (min-width: 640px) {
+  .main-left { gap: 1.25rem; }
+}
 
 /* ════════════════════════════════════════════════════════════
    CARDS
@@ -972,13 +1004,18 @@ export default { components: { EmptyState } }
 .card {
   background: #ffffff;
   border-radius: .875rem;
-  border: 1px solid rgba(0,0,0,.055);
-  padding: 1.125rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.03);
+  border: 1px solid #e2e8f0;
+  padding: .875rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   transition: box-shadow .2s;
 }
-.card:hover {
-  box-shadow: 0 4px 20px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.04);
+@media (min-width: 640px) {
+  .card { padding: 1.125rem; }
+}
+@media (hover: hover) {
+  .card:hover {
+    box-shadow: 0 8px 22px rgba(15, 23, 42, .07), 0 1px 3px rgba(15, 23, 42, .04);
+  }
 }
 
 .card-header {
@@ -991,8 +1028,8 @@ export default { components: { EmptyState } }
 .card-title {
   font-size: .8125rem;
   font-weight: 700;
-  color: #0d1f8a;
-  letter-spacing: -.01em;
+  color: #1e293b;
+  letter-spacing: 0;
 }
 
 .card-sub {
@@ -1011,10 +1048,10 @@ export default { components: { EmptyState } }
   font-size: .7rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: .1em;
-  color: #0d1f8a;
+  letter-spacing: .08em;
+  color: #475569;
   padding-left: .625rem;
-  border-left: 3px solid #1447c0;
+  border-left: 3px solid #2563eb;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1093,13 +1130,14 @@ export default { components: { EmptyState } }
   height: 1.75rem;
   width: 1.75rem;
   border-radius: 99px;
-  background: linear-gradient(135deg, #1447c0, #00c8e8);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: .55rem;
   font-weight: 800;
-  color: white;
+  color: #1d4ed8;
   flex-shrink: 0;
   letter-spacing: .02em;
 }
@@ -1121,8 +1159,11 @@ export default { components: { EmptyState } }
 ════════════════════════════════════════════════════════════ */
 .hr-stat-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .5rem;
+}
+@media (min-width: 640px) {
+  .hr-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 .hr-stat {
@@ -1144,5 +1185,50 @@ export default { components: { EmptyState } }
   font-size: .6rem;
   color: #94a3b8;
   margin-top: .1rem;
+}
+
+@media (max-width: 640px) {
+  .dash-root .card-header {
+    gap: .75rem;
+    margin-bottom: .75rem;
+  }
+
+  .dash-root .min-h-\[260px\] { min-height: 220px; }
+  .dash-root .min-h-\[240px\] { min-height: 215px; }
+  .dash-root .min-h-\[220px\] { min-height: 200px; }
+  .dash-root .min-h-\[200px\] { min-height: 190px; }
+  .dash-root .min-h-\[180px\] { min-height: 175px; }
+
+  .dash-root .fc .fc-toolbar {
+    gap: .5rem;
+    padding: .6rem .7rem;
+  }
+
+  .dash-root .fc .fc-toolbar-title {
+    font-size: .85rem;
+  }
+
+  .dash-root .fc .fc-button {
+    font-size: 1rem;
+    padding: .15rem .25rem !important;
+  }
+
+  .dash-root .fc .fc-col-header-cell {
+    padding: .35rem 0;
+    font-size: .68rem;
+  }
+
+  .dash-root .fc .fc-daygrid-day {
+    padding: .1rem;
+  }
+
+  .dash-root .fc .fc-daygrid-day-number {
+    font-size: .72rem;
+    padding: .15rem;
+  }
+
+  .dash-root .fc .fc-daygrid-day-frame {
+    min-height: 2.25rem;
+  }
 }
 </style>

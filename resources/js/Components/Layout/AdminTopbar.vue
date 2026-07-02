@@ -43,48 +43,52 @@ const emit = defineEmits(['toggle-mobile', 'toggle-collapse', 'report-error', 'o
         <span v-if="title" class="hidden truncate text-sm font-medium text-slate-700 md:block">{{ title }}</span>
       </div>
 
-      <div class="flex min-w-0 items-center gap-2">
+      <div class="flex min-w-0 items-center gap-1 sm:gap-2">
         <a
           :href="route('privacy.index')"
           target="_blank"
           rel="noopener noreferrer"
-          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 lg:inline-flex"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 lg:h-auto lg:w-auto lg:gap-1.5 lg:px-3 lg:py-1.5 lg:text-xs lg:font-medium"
           aria-label="Data Privacy Policy"
+          title="Data Privacy Policy"
         >
           <ShieldCheckIcon class="h-4 w-4" />
-          Privacy Policy
+          <span class="hidden lg:inline">Privacy Policy</span>
         </a>
 
         <a
           href="https://drive.google.com/drive/folders/16XAkvSwQCPquxuMtgFmEOWEMAeUfOqwL"
           target="_blank"
           rel="noopener noreferrer"
-          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 xl:inline-flex"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 xl:h-auto xl:w-auto xl:gap-1.5 xl:px-3 xl:py-1.5 xl:text-xs xl:font-medium"
           aria-label="QMS Manuals"
+          title="QMS Manuals"
         >
           <BookOpenIcon class="h-4 w-4" />
-          QMS Manuals
+          <span class="hidden xl:inline">QMS Manuals</span>
         </a>
 
         <a
           :href="route('docs.index')"
           target="_blank"
           rel="noopener noreferrer"
-          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 lg:inline-flex"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600 lg:h-auto lg:w-auto lg:gap-1.5 lg:px-3 lg:py-1.5 lg:text-xs lg:font-medium"
           aria-label="Help Documentation"
+          title="Help Documentation"
         >
           <QuestionMarkCircleIcon class="h-4 w-4" />
-          Need Help?
+          <span class="hidden lg:inline">Need Help?</span>
         </a>
 
         <button
           type="button"
-          class="hidden items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:inline-flex"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs sm:font-medium"
           aria-label="Report an Error"
+          title="Report an Error"
           @click="emit('report-error')"
         >
           <BugAntIcon class="h-4 w-4" />
-          Report Error
+          <span class="hidden sm:inline">Report Error</span>
         </button>
 
         <NotificationBell v-if="user?.id" :user-id="user.id" />
