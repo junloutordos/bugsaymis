@@ -227,7 +227,7 @@ class MessengerialController extends Controller
             try {
                 $approveUrl = $chiefUser ? URL::signedRoute('messengerial.approve', ['messengerialRequest' => $mr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : route('messengerial.index');
                 $declineUrl = $chiefUser ? URL::signedRoute('messengerial.decline', ['messengerialRequest' => $mr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : null;
-                Mail::to($chiefEmail)->send(new MessengerialRequestCreatedMail($mr, $approveUrl, $declineUrl));
+                Mail::to($chiefEmail)->queue(new MessengerialRequestCreatedMail($mr, $approveUrl, $declineUrl));
             } catch (\Throwable $e) {
                 logger()->error('Failed to send messengerial request email', ['error' => $e->getMessage()]);
             }
@@ -274,7 +274,7 @@ class MessengerialController extends Controller
         // Notify requester
         try {
             if ($messengerialRequest->email) {
-                Mail::to($messengerialRequest->email)->send(
+                Mail::to($messengerialRequest->email)->queue(
                     new MessengerialRequestStatusMail($messengerialRequest, 'Approved', null, $approver?->name)
                 );
             }
@@ -289,7 +289,7 @@ class MessengerialController extends Controller
             foreach ($recordsUsers as $rUser) {
                 if ($rUser->email) {
                     try {
-                        Mail::to($rUser->email)->send(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
+                        Mail::to($rUser->email)->queue(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
                     } catch (\Throwable $ee) {
                         logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage()]);
                     }
@@ -362,7 +362,7 @@ class MessengerialController extends Controller
             }
 
             if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new MessengerialRequestStatusMail($messengerialRequest, 'Declined', $messengerialRequest->decline_reason ?? null, $approverName));
+                Mail::to($requesterEmail)->queue(new MessengerialRequestStatusMail($messengerialRequest, 'Declined', $messengerialRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send messengerial request declined notification', ['error' => $e->getMessage()]);
@@ -443,7 +443,7 @@ class MessengerialController extends Controller
             // Notify requester
             try {
                 if ($messengerialRequest->email) {
-                    Mail::to($messengerialRequest->email)->send(
+                    Mail::to($messengerialRequest->email)->queue(
                         new MessengerialRequestStatusMail($messengerialRequest, 'Approved', null, $user->name)
                     );
                 }
@@ -458,7 +458,7 @@ class MessengerialController extends Controller
                 foreach ($recordsUsers as $rUser) {
                     if ($rUser->email) {
                         try {
-                            Mail::to($rUser->email)->send(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
+                            Mail::to($rUser->email)->queue(new MessengerialRequestRecordsMail($messengerialRequest, $processUrl));
                         } catch (\Throwable $ee) {
                             logger()->error('Failed to send messengerial records notification', ['error' => $ee->getMessage()]);
                         }
@@ -477,7 +477,7 @@ class MessengerialController extends Controller
 
             try {
                 if ($messengerialRequest->email) {
-                    Mail::to($messengerialRequest->email)->send(
+                    Mail::to($messengerialRequest->email)->queue(
                         new MessengerialRequestStatusMail($messengerialRequest, 'Declined', $messengerialRequest->decline_reason, $user->name)
                     );
                 }
@@ -664,7 +664,7 @@ class MessengerialController extends Controller
         try {
             $requesterEmail = $messengerialRequest->email ?? null;
             if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new MessengerialRequestStatusMail($messengerialRequest, 'Completed', null, $user->name ?? null));
+                Mail::to($requesterEmail)->queue(new MessengerialRequestStatusMail($messengerialRequest, 'Completed', null, $user->name ?? null));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send messengerial completed notification', ['error' => $e->getMessage()]);

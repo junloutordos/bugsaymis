@@ -374,7 +374,7 @@ class DocumentTrackingController extends Controller
             foreach ($pendingRoutings as $routing) {
                 $recv = $routing->receiver;
                 if (! $recv) continue;
-                $this->sendMail(fn() => Mail::to($recv->email)->send(new DocumentCreatedMail($document, $recv->name)));
+                $this->sendMail(fn() => Mail::to($recv->email)->queue(new DocumentCreatedMail($document, $recv->name)));
                 $this->notify($recv, 'Document Tracking', $document->tracking_no, 'External document routed to you for review', $url);
             }
         } else {
@@ -384,7 +384,7 @@ class DocumentTrackingController extends Controller
             foreach ($firstRoutings as $routing) {
                 $recv = $routing->receiver;
                 if (! $recv) continue;
-                $this->sendMail(fn() => Mail::to($recv->email)->send(new DocumentCreatedMail($document, $recv->name)));
+                $this->sendMail(fn() => Mail::to($recv->email)->queue(new DocumentCreatedMail($document, $recv->name)));
                 $this->notify($recv, 'Document Tracking', $document->tracking_no, 'New document requires your review', $url);
             }
         }
@@ -592,7 +592,7 @@ class DocumentTrackingController extends Controller
         $newRouting->load(['sender', 'receiver', 'document']);
         $target = User::find($targetId);
         if ($target) {
-            $this->sendMail(fn() => Mail::to($target->email)->send(new DocumentReturnedMail($newRouting)));
+            $this->sendMail(fn() => Mail::to($target->email)->queue(new DocumentReturnedMail($newRouting)));
             $this->notify($target, 'Document Tracking', $doc->tracking_no, "Document returned to you by {$user->name}", route('document-tracking.show', $doc->id));
         }
     }
@@ -626,7 +626,7 @@ class DocumentTrackingController extends Controller
 
         $newRouting->load(['document.documentType', 'sender', 'receiver']);
         if ($newRouting->receiver) {
-            $this->sendMail(fn() => Mail::to($newRouting->receiver->email)->send(new DocumentRoutedMail($newRouting, 'forwarded')));
+            $this->sendMail(fn() => Mail::to($newRouting->receiver->email)->queue(new DocumentRoutedMail($newRouting, 'forwarded')));
             $this->notify($newRouting->receiver, 'Document Tracking', $doc->tracking_no, 'Document forwarded to you', route('document-tracking.show', $doc->id));
         }
     }
@@ -660,11 +660,11 @@ class DocumentTrackingController extends Controller
         $url     = route('document-tracking.show', $doc->id);
         $creator = $doc->creator;
         if ($creator && $creator->id !== $user->id) {
-            $this->sendMail(fn() => Mail::to($creator->email)->send(new DocumentCompletedMail($doc, $creator->name, $user->name)));
+            $this->sendMail(fn() => Mail::to($creator->email)->queue(new DocumentCompletedMail($doc, $creator->name, $user->name)));
             $this->notify($creator, 'Document Tracking', $doc->tracking_no, 'Document completed and filed', $url);
         }
         foreach (User::havingRole('OCD')->where('id', '<>', $user->id)->get() as $ocd) {
-            $this->sendMail(fn() => Mail::to($ocd->email)->send(new DocumentCompletedMail($doc, $ocd->name, $user->name)));
+            $this->sendMail(fn() => Mail::to($ocd->email)->queue(new DocumentCompletedMail($doc, $ocd->name, $user->name)));
             $this->notify($ocd, 'Document Tracking', $doc->tracking_no, 'Document completed and filed', $url);
         }
     }
@@ -695,7 +695,7 @@ class DocumentTrackingController extends Controller
 
         $routing->load(['document', 'sender', 'receiver']);
         if ($routing->sender) {
-            $this->sendMail(fn() => Mail::to($routing->sender->email)->send(new DocumentReceivedMail($routing)));
+            $this->sendMail(fn() => Mail::to($routing->sender->email)->queue(new DocumentReceivedMail($routing)));
             $this->notify($routing->sender, 'Document Tracking', $routing->document->tracking_no, "Acknowledged by {$routing->receiver->name}", route('document-tracking.show', $routing->document_id));
         }
 
@@ -763,7 +763,7 @@ class DocumentTrackingController extends Controller
                 ]);
                 $doc->update(['current_holder_id' => $next->receiver_id]);
                 if ($next->receiver) {
-                    $this->sendMail(fn() => Mail::to($next->receiver->email)->send(new DocumentRoutedMail($next, 'forwarded')));
+                    $this->sendMail(fn() => Mail::to($next->receiver->email)->queue(new DocumentRoutedMail($next, 'forwarded')));
                     $this->notify($next->receiver, 'Document Tracking', $doc->tracking_no, 'Document routed to you for action', route('document-tracking.show', $doc->id));
                 }
             }
@@ -773,7 +773,7 @@ class DocumentTrackingController extends Controller
         $routing->load(['document.creator', 'receiver']);
         $creator = $routing->document->creator;
         if ($creator && $creator->id !== $routing->receiver_id) {
-            $this->sendMail(fn() => Mail::to($creator->email)->send(
+            $this->sendMail(fn() => Mail::to($creator->email)->queue(
                 new \App\Mail\DocumentCompletedMail($routing->document, $creator->name, $routing->receiver->name ?? 'Staff')
             ));
             $this->notify($creator, 'Document Tracking', $routing->document->tracking_no, "Action recorded by {$routing->receiver->name}", route('document-tracking.show', $routing->document_id));
@@ -824,7 +824,7 @@ class DocumentTrackingController extends Controller
 
         $newRouting->load(['document.documentType', 'sender', 'receiver']);
         if ($newRouting->receiver) {
-            $this->sendMail(fn() => Mail::to($newRouting->receiver->email)->send(new DocumentRoutedMail($newRouting, 'forwarded')));
+            $this->sendMail(fn() => Mail::to($newRouting->receiver->email)->queue(new DocumentRoutedMail($newRouting, 'forwarded')));
             $this->notify($newRouting->receiver, 'Document Tracking', $doc->tracking_no, 'Document forwarded to you', route('document-tracking.show', $doc->id));
         }
 
@@ -855,7 +855,7 @@ class DocumentTrackingController extends Controller
 
         $routing->load(['sender', 'receiver', 'document']);
         if ($routing->sender) {
-            $this->sendMail(fn() => Mail::to($routing->sender->email)->send(new DocumentReturnedMail($routing)));
+            $this->sendMail(fn() => Mail::to($routing->sender->email)->queue(new DocumentReturnedMail($routing)));
             $this->notify($routing->sender, 'Document Tracking', $doc->tracking_no, "Document returned by {$routing->receiver->name}", route('document-tracking.show', $doc->id));
         }
 
@@ -890,13 +890,13 @@ class DocumentTrackingController extends Controller
 
         $creator = $document->creator;
         if ($creator && $creator->id !== $user->id) {
-            $this->sendMail(fn() => Mail::to($creator->email)->send(new DocumentCompletedMail($document, $creator->name, $completedBy)));
+            $this->sendMail(fn() => Mail::to($creator->email)->queue(new DocumentCompletedMail($document, $creator->name, $completedBy)));
             $this->notify($creator, 'Document Tracking', $document->tracking_no, 'Document completed and filed', $url);
         }
 
         $ocdUsers = User::havingRole('OCD')->where('id', '<>', $user->id)->get();
         foreach ($ocdUsers as $ocd) {
-            $this->sendMail(fn() => Mail::to($ocd->email)->send(new DocumentCompletedMail($document, $ocd->name, $completedBy)));
+            $this->sendMail(fn() => Mail::to($ocd->email)->queue(new DocumentCompletedMail($document, $ocd->name, $completedBy)));
             $this->notify($ocd, 'Document Tracking', $document->tracking_no, 'Document completed and filed', $url);
         }
 

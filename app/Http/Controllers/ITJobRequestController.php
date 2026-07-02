@@ -248,7 +248,7 @@ public function index(Request $request)
                     $approveUrl = URL::signedRoute('it-job-requests.dc.approve', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('it-job-requests.dc.decline', ['jobRequest' => $jobRequest->id, 'chief' => $chief->id], now()->addDays(7));
                     try {
-                        Mail::to($chief->email)->send(new DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
+                        Mail::to($chief->email)->queue(new DivisionChiefITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
                     } catch (\Throwable $e) {
                         logger()->error('Failed to send Division Chief ITJR email', ['error' => $e->getMessage()]);
                     }
@@ -263,7 +263,7 @@ public function index(Request $request)
             if ($admin) {
                 if ($admin->email) {
                     try {
-                        Mail::to($admin->email)->send(new ITJRStatusMail($jobRequest, 'New Request Assigned', 'You have been assigned to this request.', 'Administrator'));
+                        Mail::to($admin->email)->queue(new ITJRStatusMail($jobRequest, 'New Request Assigned', 'You have been assigned to this request.', 'Administrator'));
                     } catch (\Throwable $e) {
                         logger()->error('Failed to send Administrator ITJR email', ['error' => $e->getMessage()]);
                     }
@@ -298,7 +298,7 @@ public function index(Request $request)
         // Notify requester
         if ($jobRequest->user && $jobRequest->user->email) {
             Mail::to($jobRequest->user->email)
-                ->send(new ITJRStatusMail($jobRequest, 'Division Chief Approved', null, 'Division Chief'));
+                ->queue(new ITJRStatusMail($jobRequest, 'Division Chief Approved', null, 'Division Chief'));
         }
         if ($jobRequest->user) {
             NotificationService::notifyUser(
@@ -316,7 +316,7 @@ public function index(Request $request)
             if ($ocd->email) {
                 $approveUrl = URL::signedRoute('it-job-requests.ocd.approve', ['jobRequest'=>$jobRequest->id,'ocd'=>$ocd->id], now()->addDays(7));
                 $declineUrl = URL::signedRoute('it-job-requests.ocd.decline', ['jobRequest'=>$jobRequest->id,'ocd'=>$ocd->id], now()->addDays(7));
-                Mail::to($ocd->email)->send(new OCDITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
+                Mail::to($ocd->email)->queue(new OCDITJRApprovalMail($jobRequest, $approveUrl, $declineUrl));
             }
         }
         // Notify Assigned Administrator
@@ -324,7 +324,7 @@ public function index(Request $request)
             $admin = User::find($jobRequest->assignedto);
             if ($admin && $admin->email) {
                 Mail::to($admin->email)
-                    ->send(new ITJRStatusMail($jobRequest, 'Division Chief Approved', 'The request you are assigned to has been approved by Division Chief.', 'Administrator'));
+                    ->queue(new ITJRStatusMail($jobRequest, 'Division Chief Approved', 'The request you are assigned to has been approved by Division Chief.', 'Administrator'));
             }
         }
         return view('emails.itjr.approved', compact('jobRequest'));
@@ -377,7 +377,7 @@ public function index(Request $request)
         // Notify the requester
         if ($jobRequest->user && $jobRequest->user->email) {
             Mail::to($jobRequest->user->email)
-                ->send(new ITJRStatusMail(
+                ->queue(new ITJRStatusMail(
                     $jobRequest,
                     'Rejected by Division Chief',
                     $validated['reason'],
@@ -428,7 +428,7 @@ public function index(Request $request)
     if ($jobRequest->user && $jobRequest->user->email) {
         try {
             Mail::to($jobRequest->user->email)
-                ->send(new ITJRStatusMail($jobRequest, 'OCD Approved', null, 'OCD'));
+                ->queue(new ITJRStatusMail($jobRequest, 'OCD Approved', null, 'OCD'));
         } catch (\Throwable $e) {
             logger()->error('Failed to send OCD approval email', [
                 'job_request_id' => $jobRequest->id,
@@ -449,7 +449,7 @@ public function index(Request $request)
         $admin = User::find($jobRequest->assignedto);
         if ($admin && $admin->email) {
             Mail::to($admin->email)
-                ->send(new ITJRStatusMail($jobRequest, 'OCD Approved', 'The request you are assigned to has been approved by OCD.', 'Administrator'));
+                ->queue(new ITJRStatusMail($jobRequest, 'OCD Approved', 'The request you are assigned to has been approved by OCD.', 'Administrator'));
         }
     }
 
@@ -505,7 +505,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
         // Notify requester
         if ($jobRequest->user && $jobRequest->user->email) {
             Mail::to($jobRequest->user->email)
-                ->send(new ITJRStatusMail(
+                ->queue(new ITJRStatusMail(
                     $jobRequest,
                     'Rejected by OCD',
                     $validated['reason'],
@@ -575,7 +575,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
     // 📧 NOTIFY REQUESTER (outside transaction — email failures must not roll back DB changes)
     if ($jobRequest->user && $jobRequest->user->email) {
         try {
-            Mail::to($jobRequest->user->email)->send(
+            Mail::to($jobRequest->user->email)->queue(
                 new ITJRStatusMail(
                     $jobRequest,
                     $isActedByMIS ? 'MIS Action Completed' : 'MIS Assessment Update',
@@ -1033,7 +1033,7 @@ public function showOCDDeclineForm(ITJobRequest $jobRequest, $ocd)
 
         if ($wasEscalated && $jobRequest->user && $jobRequest->user->email) {
             try {
-                Mail::to($jobRequest->user->email)->send(
+                Mail::to($jobRequest->user->email)->queue(
                     new ITJRStatusMail(
                         $jobRequest,
                         'Request Priority Updated',

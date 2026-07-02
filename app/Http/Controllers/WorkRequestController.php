@@ -137,7 +137,7 @@ class WorkRequestController extends Controller
                 if (! $gsu->email) continue;
                 $approveUrl = URL::signedRoute('work-requests.gsu.approve', ['workRequest' => $wr->id, 'gsu' => $gsu->id], now()->addDays(7));
                 $declineUrl = URL::signedRoute('work-requests.gsu.decline', ['workRequest' => $wr->id, 'gsu' => $gsu->id], now()->addDays(7));
-                Mail::to($gsu->email)->send(new \App\Mail\WorkRequestCreatedMail($wr, $approveUrl, $declineUrl, $gsu->id));
+                Mail::to($gsu->email)->queue(new \App\Mail\WorkRequestCreatedMail($wr, $approveUrl, $declineUrl, $gsu->id));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send GSU Head work request email', ['error' => $e->getMessage(), 'work_request_id' => $wr->id]);
@@ -175,7 +175,7 @@ class WorkRequestController extends Controller
                 : collect();
             foreach ($gsuHeads as $gsu) {
                 if ($gsu->email) {
-                    Mail::to($gsu->email)->send(new WorkRequestForAssignmentMail($workRequest, $chief));
+                    Mail::to($gsu->email)->queue(new WorkRequestForAssignmentMail($workRequest, $chief));
                 }
             }
         } catch (\Throwable $e) {
@@ -213,7 +213,7 @@ class WorkRequestController extends Controller
                 : collect();
             foreach ($gsuHeads as $gsu) {
                 if ($gsu->email) {
-                    Mail::to($gsu->email)->send(new WorkRequestForAssignmentMail($workRequest, $user->id));
+                    Mail::to($gsu->email)->queue(new WorkRequestForAssignmentMail($workRequest, $user->id));
                 }
             }
         } catch (\Throwable $e) {
@@ -255,7 +255,7 @@ class WorkRequestController extends Controller
         try {
             $requester = $workRequest->requester;
             if ($requester && $requester->email) {
-                Mail::to($requester->email)->send(new WorkRequestStatusMail($workRequest, 'Declined'));
+                Mail::to($requester->email)->queue(new WorkRequestStatusMail($workRequest, 'Declined'));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send work request declined notification', ['error' => $e->getMessage()]);
@@ -307,7 +307,7 @@ class WorkRequestController extends Controller
                 if (! $fad->email) continue;
                 $approveUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
                 $declineUrl = URL::signedRoute('work-requests.fad.decline', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                Mail::to($fad->email)->send(new \App\Mail\WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
+                Mail::to($fad->email)->queue(new \App\Mail\WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to notify FAD Chiefs after GSU approval', ['error' => $e->getMessage(), 'work_request_id' => $workRequest->id]);
@@ -362,7 +362,7 @@ class WorkRequestController extends Controller
                 $approverName = $u?->name ?? null;
             }
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new \App\Mail\WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new \App\Mail\WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to notify requester after GSU decline', ['error' => $e->getMessage(), 'work_request_id' => $workRequest->id]);
@@ -402,14 +402,14 @@ class WorkRequestController extends Controller
                 $approverName = $u?->name ?? null;
             }
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $approverName));
+                \Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $approverName));
             }
 
             // Also notify the GSU Head who acted earlier (if any)
             if (! empty($workRequest->acted_by_id)) {
                 $gsu = \App\Models\User::find($workRequest->acted_by_id);
                 if ($gsu && $gsu->email) {
-                    \Mail::to($gsu->email)->send(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $approverName));
+                    \Mail::to($gsu->email)->queue(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $approverName));
                 }
             }
         } catch (\Throwable $e) {
@@ -454,14 +454,14 @@ class WorkRequestController extends Controller
             }
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
             }
 
             // Also notify the GSU Head who acted earlier (if any)
             if (! empty($workRequest->acted_by_id)) {
                 $gsu = \App\Models\User::find($workRequest->acted_by_id);
                 if ($gsu && $gsu->email) {
-                    \Mail::to($gsu->email)->send(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+                    \Mail::to($gsu->email)->queue(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
                 }
             }
         } catch (\Throwable $e) {
@@ -520,7 +520,7 @@ class WorkRequestController extends Controller
             }
 
             if ($requesterEmail) {
-                \Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
+                \Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'Declined', $workRequest->decline_reason ?? null, $approverName));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send work request declined notification', ['error' => $e->getMessage()]);
@@ -615,7 +615,7 @@ class WorkRequestController extends Controller
             try {
                 $requesterEmail = $workRequest->requester?->email ?? null;
                 if ($requesterEmail) {
-                    Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $user->name));
+                    Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'FAD Approved', null, $user->name));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Work request FAD approved email failed', ['error' => $e->getMessage()]);
@@ -625,7 +625,7 @@ class WorkRequestController extends Controller
             try {
                 $requesterEmail = $workRequest->requester?->email ?? null;
                 if ($requesterEmail) {
-                    Mail::to($requesterEmail)->send(new WorkRequestStatusMail($workRequest, 'Declined', 'Declined by FAD Chief.', $user->name));
+                    Mail::to($requesterEmail)->queue(new WorkRequestStatusMail($workRequest, 'Declined', 'Declined by FAD Chief.', $user->name));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Work request FAD declined email failed', ['error' => $e->getMessage()]);
@@ -664,7 +664,7 @@ class WorkRequestController extends Controller
                 // notify assigned staff
                 $assigned = \App\Models\User::find($workRequest->assigned_user_id);
                 if ($assigned && $assigned->email) {
-                    Mail::to($assigned->email)->send(new WorkRequestAssignedMail($workRequest));
+                    Mail::to($assigned->email)->queue(new WorkRequestAssignedMail($workRequest));
                 }
 
                 // set status to pending FAD approval
@@ -679,7 +679,7 @@ class WorkRequestController extends Controller
                     if (! $fad->email) continue;
                     $approveUrl = URL::signedRoute('work-requests.fad.approve', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('work-requests.fad.decline', ['workRequest' => $workRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                    Mail::to($fad->email)->send(new WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
+                    Mail::to($fad->email)->queue(new WorkRequestFADApprovalMail($workRequest, $approveUrl, $declineUrl, $fad));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Failed during post-assignment notifications', ['error' => $e->getMessage()]);
@@ -718,7 +718,7 @@ class WorkRequestController extends Controller
         try {
             $requesterEmail = $workRequest->requester?->email ?? null;
             if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new WorkRequestCompletedMail($workRequest));
+                Mail::to($requesterEmail)->queue(new WorkRequestCompletedMail($workRequest));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send work request completion email', ['error' => $e->getMessage()]);

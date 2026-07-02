@@ -74,7 +74,10 @@ return [
             // "MaxAttemptsExceededException" after the first attempt finished).
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 900),
             'block_for' => null,
-            'after_commit' => false,
+            // Queued mail is dispatched from inside DB::transaction blocks in the
+            // request controllers; without this the worker can pick the job up
+            // before the transaction commits and fail to deserialize the model.
+            'after_commit' => true,
         ],
 
     ],

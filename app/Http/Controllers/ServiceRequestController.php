@@ -121,7 +121,7 @@ class ServiceRequestController extends Controller
             try {
                 $approveUrl = $chiefUser ? URL::signedRoute('service-requests.approve', ['serviceRequest' => $sr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : route('service-requests.index');
                 $declineUrl = $chiefUser ? URL::signedRoute('service-requests.decline', ['serviceRequest' => $sr->id, 'chief' => $chiefUser->id], now()->addDays(7)) : null;
-                Mail::to($chiefEmail)->send(new ServiceRequestCreatedMail($sr, $approveUrl, $declineUrl, $requestorName, $requestorEmail));
+                Mail::to($chiefEmail)->queue(new ServiceRequestCreatedMail($sr, $approveUrl, $declineUrl, $requestorName, $requestorEmail));
             } catch (\Throwable $e) {
                 logger()->error('Failed to send service request email', ['error' => $e->getMessage()]);
             }
@@ -195,7 +195,7 @@ class ServiceRequestController extends Controller
             if ($requesterEmail) {
                 $reqName = $requester?->name ?? null;
                 $reqEmail = $requester?->email ?? null;
-                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Approved', null, $approverName, $reqName, $reqEmail));
+                Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'Approved', null, $approverName, $reqName, $reqEmail));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send service request approved notification', ['error' => $e->getMessage()]);
@@ -213,7 +213,7 @@ class ServiceRequestController extends Controller
                         $reqUser = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
                         $reqName = $reqUser?->name ?? null;
                         $reqEmail = $reqUser?->email ?? null;
-                        Mail::to($gsuUser->email)->send(new ServiceRequestCreatedMail($serviceRequest, $approveUrl, $declineUrl, $reqName, $reqEmail));
+                        Mail::to($gsuUser->email)->queue(new ServiceRequestCreatedMail($serviceRequest, $approveUrl, $declineUrl, $reqName, $reqEmail));
                     } catch (\Throwable $e) {
                         logger()->error('Failed to send service request GSU notification', ['error' => $e->getMessage(), 'email' => $gsuUser->email]);
                     }
@@ -233,7 +233,7 @@ class ServiceRequestController extends Controller
                 try {
                     $approveUrl = URL::signedRoute('service-requests.fad.approve', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('service-requests.fad.decline', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                    Mail::to($fad->email)->send(new \App\Mail\ServiceRequestFADMail($serviceRequest, $approveUrl, $declineUrl));
+                    Mail::to($fad->email)->queue(new \App\Mail\ServiceRequestFADMail($serviceRequest, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send service request FAD notification', ['error' => $e->getMessage(), 'email' => $fad->email]);
                 }
@@ -277,7 +277,7 @@ class ServiceRequestController extends Controller
             $requesterEmail = $requester?->email ?? null;
             $approverName = $user->name ?? null;
             if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Approved', null, $approverName, $requester?->name ?? null, $requesterEmail));
+                Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'Approved', null, $approverName, $requester?->name ?? null, $requesterEmail));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send service request approved notification', ['error' => $e->getMessage()]);
@@ -293,7 +293,7 @@ class ServiceRequestController extends Controller
                 try {
                     $approveUrl = URL::signedRoute('service-requests.fad.approve', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
                     $declineUrl = URL::signedRoute('service-requests.fad.decline', ['serviceRequest' => $serviceRequest->id, 'chief' => $fad->id], now()->addDays(7));
-                    Mail::to($fad->email)->send(new \App\Mail\ServiceRequestFADMail($serviceRequest, $approveUrl, $declineUrl));
+                    Mail::to($fad->email)->queue(new \App\Mail\ServiceRequestFADMail($serviceRequest, $approveUrl, $declineUrl));
                 } catch (\Throwable $e) {
                     logger()->error('Failed to send service request FAD notification (in-app)', ['error' => $e->getMessage(), 'email' => $fad->email]);
                 }
@@ -344,7 +344,7 @@ class ServiceRequestController extends Controller
             $requesterEmail = $requester?->email ?? null;
             $approverName = $user->name ?? null;
             if ($requesterEmail) {
-                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName, $requester?->name ?? null, $requesterEmail));
+                Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName, $requester?->name ?? null, $requesterEmail));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send service request declined notification', ['error' => $e->getMessage()]);
@@ -407,7 +407,7 @@ class ServiceRequestController extends Controller
             if ($requesterEmail) {
                 $reqName = $requester?->name ?? null;
                 $reqEmail = $requester?->email ?? null;
-                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName, $reqName, $reqEmail));
+                Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName, $reqName, $reqEmail));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send service request declined notification', ['error' => $e->getMessage()]);
@@ -440,7 +440,7 @@ class ServiceRequestController extends Controller
                 }
 
                 if ($requesterEmail) {
-                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'FAD Approved', null, $approverName));
+                    Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'FAD Approved', null, $approverName));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Failed to send service request FAD approved notification', ['error' => $e->getMessage()]);
@@ -488,7 +488,7 @@ class ServiceRequestController extends Controller
                 }
 
                 if ($requesterEmail) {
-                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName));
+                    Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'Declined', $serviceRequest->decline_reason ?? null, $approverName));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Failed to send service request FAD declined notification', ['error' => $e->getMessage()]);
@@ -521,7 +521,7 @@ class ServiceRequestController extends Controller
             if ($requesterEmail) {
                 $reqName = $requester?->name ?? null;
                 $reqEmail = $requester?->email ?? null;
-                Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'GSU Approved', null, $approverName, $reqName, $reqEmail));
+                Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'GSU Approved', null, $approverName, $reqName, $reqEmail));
             }
         } catch (\Throwable $e) {
             logger()->error('Failed to send service request GSU approved notification', ['error' => $e->getMessage()]);
@@ -614,7 +614,7 @@ class ServiceRequestController extends Controller
                 $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
                 $requesterEmail = $requester?->email ?? null;
                 if ($requesterEmail) {
-                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'FAD Approved', null, $user->name, $requester?->name, $requesterEmail));
+                    Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'FAD Approved', null, $user->name, $requester?->name, $requesterEmail));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Service request FAD approved email failed', ['error' => $e->getMessage()]);
@@ -626,7 +626,7 @@ class ServiceRequestController extends Controller
                 $requester = $serviceRequest->requestor_id ? User::find($serviceRequest->requestor_id) : null;
                 $requesterEmail = $requester?->email ?? null;
                 if ($requesterEmail) {
-                    Mail::to($requesterEmail)->send(new ServiceRequestStatusMail($serviceRequest, 'FAD Declined', 'Declined by FAD Chief.', $user->name, $requester?->name, $requesterEmail));
+                    Mail::to($requesterEmail)->queue(new ServiceRequestStatusMail($serviceRequest, 'FAD Declined', 'Declined by FAD Chief.', $user->name, $requester?->name, $requesterEmail));
                 }
             } catch (\Throwable $e) {
                 logger()->error('Service request FAD declined email failed', ['error' => $e->getMessage()]);
