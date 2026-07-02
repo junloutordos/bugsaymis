@@ -87,8 +87,12 @@ RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/security.ini \
     && echo "post_max_size = 25M" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "max_execution_time = 120" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "allow_url_fopen = Off" >> /usr/local/etc/php/conf.d/security.ini \
-    && echo "disable_functions = system,shell_exec,passthru,proc_open,popen,pcntl_exec" >> /usr/local/etc/php/conf.d/security.ini \
     && echo "open_basedir = /var/www:/tmp:/usr/local/etc/php:/dev/stdin:/dev/stdout:/dev/stderr" >> /usr/local/etc/php/conf.d/security.ini
+
+# disable_functions is FPM-only: the Laravel scheduler (cron -> schedule:run) spawns
+# every task through Symfony Process, which needs proc_open in the CLI SAPI.
+RUN echo "[www]" > /usr/local/etc/php-fpm.d/zz-security.conf \
+    && echo "php_admin_value[disable_functions] = system,shell_exec,passthru,proc_open,popen,pcntl_exec" >> /usr/local/etc/php-fpm.d/zz-security.conf
 
 RUN echo "* * * * * root . /etc/environment; cd /var/www && php artisan schedule:run >> /var/log/cron.log 2>&1" > /etc/cron.d/laravel-scheduler \
     && chmod 0644 /etc/cron.d/laravel-scheduler

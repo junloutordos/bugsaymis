@@ -2,11 +2,17 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\HasApiTokens;
 
-class IctEquipmentDevice extends Model
+// Sanctum resolves this model as the request user on agent routes; anything that
+// type-hints the Authenticatable contract (e.g. OpenTelemetry user context) needs
+// the contract actually implemented, not just token capability.
+class IctEquipmentDevice extends Model implements AuthenticatableContract
 {
+    use Authenticatable;
     use HasApiTokens;
 
     protected $table = 'ict_equipment_devices';
