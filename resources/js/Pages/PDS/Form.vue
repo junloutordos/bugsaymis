@@ -418,10 +418,19 @@ const handleTrainingCSV = (event) => {
   csvFile.value = event.target.files[0] || null
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = e => resolve(e.target.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 /* =========================
    UPLOAD TO SERVER
 ========================= */
-const uploadTrainingCSV = () => {
+const uploadTrainingCSV = async () => {
   if (!csvFile.value) {
     Swal.fire('No file selected', 'Please choose a CSV file.', 'warning')
     return
@@ -432,11 +441,19 @@ const uploadTrainingCSV = () => {
     return
   }
 
-  const formData = new FormData()
-  formData.append('file', csvFile.value)
+  let csvBase64 = null
+  try {
+    csvBase64 = await readFileAsDataUrl(csvFile.value)
+  } catch {
+    Swal.fire('Upload failed', 'Could not read the selected CSV file.', 'error')
+    return
+  }
 
-  submitUpload.post(route('pds.trainings.upload-csv', props.pds.id), formData, {
-    forceFormData: true,
+  submitUpload.post(route('pds.trainings.upload-csv', props.pds.id), {
+    csv_base64: csvBase64,
+    csv_filename: csvFile.value.name,
+    csv_mime: csvFile.value.type || 'text/csv',
+  }, {
     preserveScroll: true,
     onSuccess: (page) => {
       // Show success message from flash

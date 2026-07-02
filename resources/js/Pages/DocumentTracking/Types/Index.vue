@@ -5,6 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import axios from 'axios'
 import AppInput from '@/Components/AppInput.vue'
 import AppSelect from '@/Components/AppSelect.vue'
+import { userDisplayName } from '@/Utils/userDisplay.js'
 import {
   PlusIcon, PencilSquareIcon, TrashIcon, ChevronLeftIcon,
   ChevronUpIcon, ChevronDownIcon, Cog6ToothIcon,
@@ -232,7 +233,7 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
                     {{ step.office_name }}
                   </span>
                   <span v-if="step.assigned_user" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                    → {{ step.assigned_user.name }}
+                    → {{ userDisplayName(step.assigned_user, users) }}
                   </span>
                   <span v-if="!step.is_required" class="text-xs text-slate-400">(optional)</span>
                 </div>
@@ -351,7 +352,7 @@ function onStepOfficeChange() { stepForm.value.assigned_user_id = '' }
               <select v-model="stepForm.assigned_user_id"
                 class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="">Select person…</option>
-                <option v-for="u in stepOfficeUsers" :key="u.id" :value="u.id">{{ u.name }}</option>
+                <option v-for="u in stepOfficeUsers" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
               </select>
               <p v-if="!stepForm.office_id" class="text-xs text-slate-400 mt-1">Select an office first to filter personnel.</p>
               <p v-else-if="stepOfficeUsers.length === 0" class="text-xs text-amber-600 mt-1">No active users found in this office.</p>

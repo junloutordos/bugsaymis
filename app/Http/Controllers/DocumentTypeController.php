@@ -29,7 +29,7 @@ class DocumentTypeController extends Controller
                     'office_id'        => $s->office_id,
                     'office_name'      => $s->office?->name,
                     'assigned_user_id' => $s->assigned_user_id,
-                    'assigned_user'    => $s->assignedUser?->only('id', 'name'),
+                    'assigned_user'    => $s->assignedUser?->only('id', 'name', 'email'),
                     'action_required'  => $s->action_required,
                     'lead_time_hours'  => $s->lead_time_hours,
                     'is_required'      => $s->is_required,
@@ -41,7 +41,7 @@ class DocumentTypeController extends Controller
             'offices'       => \App\Models\Office::orderBy('name')->get(['id', 'name']),
             'users'         => \App\Models\User::where('status', '<>', 'inactive')
                                 ->orderBy('name')
-                                ->get(['id', 'name', 'office_id']),
+                                ->get(['id', 'name', 'email', 'office_id']),
         ]);
     }
 

@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace App\Http\Controllers;
 
@@ -8,63 +8,95 @@ use App\Models\Pds;
 class PDSTrainingController extends Controller
 {
     public function uploadCSV(Request $request, PDS $pds)
-{
-    $request->validate([
-        'file' => 'required|file|mimes:csv,txt',
-    ]);
-
-    $file = $request->file('file');
-    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $csvData = array_map('str_getcsv', $lines);
-
-    if (empty($csvData)) {
-        return back()->with('error', 'CSV file is empty.');
-    }
-
-    $header = array_shift($csvData);
-    $count = 0;
-
-    foreach ($csvData as $row) {
-        if (count($row) !== count($header)) continue;
-
-        $data = array_combine($header, $row);
-
-        $pds->trainings()->create([
-            'training_title' => $data['training_title'] ?? null,
-            'date_from' => !empty($data['date_from']) ? $data['date_from'] : null,
-            'date_to' => !empty($data['date_to']) ? $data['date_to'] : null,
-            'hours' => isset($data['hours']) && $data['hours'] !== '' ? $data['hours'] : null,
-            'training_type' => $data['training_type'] ?? null,
-            'conducted_by' => $data['conducted_by'] ?? null,
+    {
+        $data = $request->validate([
+            'csv_base64'   => 'nullable|string',
+            'csv_filename' => 'nullable|string|max:255',
+            'csv_mime'     => 'nullable|string|max:100',
+            'file'         => 'nullable|file|mimes:csv,txt',
         ]);
 
-        $count++;
+        if (empty($data['csv_base64']) && ! $request->hasFile('file')) {
+            return back()->withErrors(['file' => 'Please choose a CSV file.']);
+        }
+
+        $contents = $this->csvContents($request, $data);
+        if (trim($contents) === '') {
+            return back()->withErrors(['file' => 'CSV file is empty.']);
+        }
+
+        $handle = fopen('php://temp', 'r+');
+        fwrite($handle, $contents);
+        rewind($handle);
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            fclose($handle);
+            return back()->withErrors(['file' => 'CSV file is empty.']);
+        }
+
+        $header = array_map(fn ($value) => trim((string) $value), $header);
+        $count = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            if (count(array_filter($row, fn ($value) => trim((string) $value) !== '')) === 0) {
+                continue;
+            }
+            if (count($row) !== count($header)) {
+                continue;
+            }
+
+            $rowData = array_combine($header, $row);
+
+            $pds->trainings()->create([
+                'training_title' => $rowData['training_title'] ?? null,
+                'date_from'      => ! empty($rowData['date_from']) ? $rowData['date_from'] : null,
+                'date_to'        => ! empty($rowData['date_to']) ? $rowData['date_to'] : null,
+                'hours'          => isset($rowData['hours']) && $rowData['hours'] !== '' ? $rowData['hours'] : null,
+                'training_type'  => $rowData['training_type'] ?? null,
+                'conducted_by'   => $rowData['conducted_by'] ?? null,
+            ]);
+
+            $count++;
+        }
+
+        fclose($handle);
+
+        if ($count === 0) {
+            return back()->withErrors(['file' => 'No valid trainings found in CSV.']);
+        }
+
+        return back()->with('success', "{$count} training(s) successfully uploaded!");
     }
 
-    if ($count === 0) {
-        return back()->with('error', 'No valid trainings found in CSV.');
+    private function csvContents(Request $request, array $data): string
+    {
+        if (! empty($data['csv_base64'])) {
+            $encoded = preg_replace('/^data:[^;]+;base64,/', '', $data['csv_base64']);
+            $decoded = base64_decode($encoded, true);
+            abort_if($decoded === false, 422, 'Invalid CSV file data.');
+
+            return $decoded;
+        }
+
+        return file_get_contents($request->file('file')->getRealPath()) ?: '';
     }
 
-    return back()->with('success', "$count training(s) successfully uploaded!");
-}
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="pds_training_template.csv"',
+        ];
 
-public function downloadTemplate()
-{
-    $headers = [
-        'Content-Type' => 'text/csv',
-        'Content-Disposition' => 'attachment; filename="pds_training_template.csv"',
-    ];
+        $columns = ['training_title', 'date_from', 'date_to', 'hours', 'training_type', 'conducted_by'];
 
-    $columns = ['training_title', 'date_from', 'date_to', 'hours', 'training_type', 'conducted_by'];
+        $callback = function () use ($columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            fclose($file);
+        };
 
-    $callback = function () use ($columns) {
-        $file = fopen('php://output', 'w');
-        fputcsv($file, $columns); // Add header row
-        fclose($file);
-    };
-
-    return response()->stream($callback, 200, $headers);
-}
-
-
+        return response()->stream($callback, 200, $headers);
+    }
 }
