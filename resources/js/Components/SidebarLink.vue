@@ -27,8 +27,8 @@ const badgeLabel = computed(() => badgeCount.value > 0 ? String(badgeCount.value
     class="group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
     :class="[
       active
-        ? 'bg-[#00c8e8]/10 text-white border-l-2 border-[#00c8e8] pl-[10px]'
-        : 'text-blue-200/75 hover:bg-white/10 hover:text-white border-l-2 border-transparent pl-[10px]'
+        ? 'bg-blue-50 text-slate-900 border-l-2 border-blue-600 pl-[10px]'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-l-2 border-transparent pl-[10px]'
     ]"
   >
     <component
@@ -37,7 +37,7 @@ const badgeLabel = computed(() => badgeCount.value > 0 ? String(badgeCount.value
       class="h-4 w-4 shrink-0 transition-colors"
       :class="[
         collapsed ? 'mx-auto' : 'mr-2.5',
-        active ? 'text-[#00c8e8]' : 'text-blue-200/50 group-hover:text-white'
+        active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'
       ]"
     />
     <span v-if="!collapsed" class="flex flex-1 items-center min-w-0">
