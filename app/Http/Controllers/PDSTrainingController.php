@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Models\Pds;
 
@@ -37,6 +38,7 @@ class PDSTrainingController extends Controller
 
         $header = array_map(fn ($value) => trim((string) $value), $header);
         $count = 0;
+        $skipped = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             if (count(array_filter($row, fn ($value) => trim((string) $value) !== '')) === 0) {
@@ -48,10 +50,17 @@ class PDSTrainingController extends Controller
 
             $rowData = array_combine($header, $row);
 
+            $dateFrom = $this->parseCsvDate($rowData['date_from'] ?? null);
+            $dateTo   = $this->parseCsvDate($rowData['date_to'] ?? null);
+            if ($dateFrom === false || $dateTo === false) {
+                $skipped++;
+                continue;
+            }
+
             $pds->trainings()->create([
                 'training_title' => $rowData['training_title'] ?? null,
-                'date_from'      => ! empty($rowData['date_from']) ? $rowData['date_from'] : null,
-                'date_to'        => ! empty($rowData['date_to']) ? $rowData['date_to'] : null,
+                'date_from'      => $dateFrom,
+                'date_to'        => $dateTo,
                 'hours'          => isset($rowData['hours']) && $rowData['hours'] !== '' ? $rowData['hours'] : null,
                 'training_type'  => $rowData['training_type'] ?? null,
                 'conducted_by'   => $rowData['conducted_by'] ?? null,
@@ -63,10 +72,37 @@ class PDSTrainingController extends Controller
         fclose($handle);
 
         if ($count === 0) {
-            return back()->withErrors(['file' => 'No valid trainings found in CSV.']);
+            return back()->withErrors(['file' => $skipped > 0
+                ? "No trainings uploaded — {$skipped} row(s) have unrecognized dates. Use YYYY-MM-DD (e.g. 2026-06-08)."
+                : 'No valid trainings found in CSV.']);
         }
 
-        return back()->with('success', "{$count} training(s) successfully uploaded!");
+        $message = "{$count} training(s) successfully uploaded!";
+        if ($skipped > 0) {
+            $message .= " {$skipped} row(s) skipped due to unrecognized dates — use YYYY-MM-DD.";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Normalize a CSV date to Y-m-d. Returns null for blank values and
+     * false when the value can't be parsed (row should be skipped).
+     */
+    private function parseCsvDate(mixed $value): string|false|null
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        foreach (['Y-m-d', 'm/d/Y', 'n/j/Y', 'm-d-Y', 'n-j-Y'] as $format) {
+            if (Carbon::hasFormat($value, $format)) {
+                return Carbon::createFromFormat($format, $value)->format('Y-m-d');
+            }
+        }
+
+        return false;
     }
 
     private function csvContents(Request $request, array $data): string
