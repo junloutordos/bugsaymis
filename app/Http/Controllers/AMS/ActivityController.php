@@ -144,8 +144,9 @@ class ActivityController extends Controller
             'evaluations'  => $this->buildEvaluationSummary($activity),
             'quizzes'      => \App\Models\Quiz\Quiz::where('source_type', 'activity')
                 ->where('source_id', $activity->id)
-                ->get(['id', 'title', 'status'])
-                ->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'status' => $q->status]),
+                ->withCount('questions')
+                ->get()
+                ->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'status' => $q->status, 'question_count' => $q->questions_count]),
         ]);
     }
 

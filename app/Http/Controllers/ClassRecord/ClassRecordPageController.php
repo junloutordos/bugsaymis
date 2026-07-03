@@ -82,8 +82,9 @@ class ClassRecordPageController extends Controller
             'sameSubjectRecords' => $sameSubjectRecords,
             'quizzes'            => \App\Models\Quiz\Quiz::where('source_type', 'class_record')
                 ->where('source_id', $classRecord->id)
-                ->get(['id', 'title', 'status'])
-                ->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'status' => $q->status]),
+                ->withCount('questions')
+                ->get()
+                ->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'status' => $q->status, 'question_count' => $q->questions_count]),
         ]);
     }
 }

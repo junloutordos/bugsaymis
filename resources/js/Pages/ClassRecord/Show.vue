@@ -40,6 +40,14 @@ function statusBadge(status) {
   }[status] ?? 'bg-slate-100 text-slate-600'
 }
 
+function hostQuiz(quiz) {
+  if (quiz.question_count === 0) {
+    alert('Add at least one question before hosting a session.')
+    return
+  }
+  router.post(route('quiz.sessions.store', quiz.id))
+}
+
 // ── Quarter tabs ──────────────────────────────────────────────────────────────
 const activeQuarter = ref(1)
 const activeSubTab  = ref('setup')  // 'setup' | 'scores' | 'attendance'
@@ -445,9 +453,12 @@ async function checkRecord() {
               <div v-for="q in quizzes" :key="q.id" class="flex items-center justify-between px-4 py-3">
                 <div>
                   <p class="text-sm font-medium text-slate-700">{{ q.title }}</p>
-                  <span class="text-xs text-slate-400 capitalize">{{ q.status }}</span>
+                  <span class="text-xs text-slate-400 capitalize">{{ q.status }} · {{ q.question_count }} question{{ q.question_count === 1 ? '' : 's' }}</span>
                 </div>
-                <a :href="route('quiz.edit', q.id)" class="text-sm text-indigo-600 hover:underline">Manage</a>
+                <div class="flex items-center gap-3">
+                  <button type="button" class="text-sm text-emerald-600 hover:underline" @click="hostQuiz(q)">Host</button>
+                  <a :href="route('quiz.edit', q.id)" class="text-sm text-indigo-600 hover:underline">Manage</a>
+                </div>
               </div>
             </div>
           </template>

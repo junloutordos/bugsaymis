@@ -59,6 +59,7 @@ import {
   QuestionMarkCircleIcon,
   ArrowUpCircleIcon,
   BugAntIcon,
+  PuzzlePieceIcon,
 
 } from "@heroicons/vue/24/outline";
 import ErrorReportModal from '@/Components/ErrorReportModal.vue'
@@ -1343,6 +1344,21 @@ const menuItems = [
         href: route("ams.monitor.index"),
         icon: ChartBarIcon,
         permissions: ["activities.monitor"],
+      },
+    ],
+  },
+  {
+    label: "Quiz",
+    icon: PuzzlePieceIcon,
+    roles: ["Administrator", "Faculty", "Staff", "MIS", "HR"],
+    children: [
+      {
+        label: "Quizzes",
+        routeName: "quiz.index",
+        href: route("quiz.index"),
+        icon: PuzzlePieceIcon,
+        roles: [],
+        permissions: ["quiz.manage", "quiz.view_all"],
       },
     ],
   },
