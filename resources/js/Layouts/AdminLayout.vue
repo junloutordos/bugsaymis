@@ -20,6 +20,7 @@ import {
   ClipboardDocumentListIcon,
   UserGroupIcon,
   ChartBarIcon,
+  CloudArrowUpIcon,
   ServerStackIcon,
   QueueListIcon,
   ComputerDesktopIcon,
@@ -490,6 +491,13 @@ const menuItems = [
         routeName: "atlas-sentinel.health-dashboard",
         href: route("atlas-sentinel.health-dashboard"),
         icon: ChartBarIcon,
+        permissions: ["it.equipment.view"],
+      },
+      {
+        label: "Device Backups",
+        routeName: "atlas-sentinel.backups.index",
+        href: route("atlas-sentinel.backups.index"),
+        icon: CloudArrowUpIcon,
         permissions: ["it.equipment.view"],
       },
       {

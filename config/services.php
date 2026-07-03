@@ -46,6 +46,8 @@ return [
         'folder_id'    => env('GOOGLE_DRIVE_FOLDER_ID'),
         // DTS documents folder — falls back to the backup folder until a dedicated one is configured
         'dts_folder_id' => env('GOOGLE_DRIVE_DTS_FOLDER_ID', env('GOOGLE_DRIVE_FOLDER_ID')),
+        // Atlas Sentinel device document backups — same fallback pattern
+        'ict_backup_folder_id' => env('GOOGLE_DRIVE_ICT_BACKUP_FOLDER_ID', env('GOOGLE_DRIVE_FOLDER_ID')),
     ],
 
     'firebase' => [

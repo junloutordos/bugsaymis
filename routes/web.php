@@ -853,6 +853,23 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/atlas-sentinel/health-dashboard/{device}/history', [ICTEquipmentController::class, 'healthHistory'])
         ->middleware('permission:it.equipment.view')
         ->name('atlas-sentinel.health-dashboard.history');
+
+    // Atlas Sentinel document backups — schedule management + status
+    Route::get('/atlas-sentinel/backups', [\App\Http\Controllers\AtlasSentinelBackupController::class, 'index'])
+        ->middleware('permission:it.equipment.view')
+        ->name('atlas-sentinel.backups.index');
+    Route::post('/atlas-sentinel/backups', [\App\Http\Controllers\AtlasSentinelBackupController::class, 'store'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('atlas-sentinel.backups.store');
+    Route::put('/atlas-sentinel/backups/{schedule}', [\App\Http\Controllers\AtlasSentinelBackupController::class, 'update'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('atlas-sentinel.backups.update');
+    Route::delete('/atlas-sentinel/backups/{schedule}', [\App\Http\Controllers\AtlasSentinelBackupController::class, 'destroy'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('atlas-sentinel.backups.destroy');
+    Route::post('/atlas-sentinel/backups/{schedule}/run-now', [\App\Http\Controllers\AtlasSentinelBackupController::class, 'runNow'])
+        ->middleware('permission:it.equipment.manage')
+        ->name('atlas-sentinel.backups.run-now');
     Route::post('/ict-equipments', [ICTEquipmentController::class, 'store'])->name('ict-equipments.store');
     Route::put('/ict-equipments/{ictEquipment}', [ICTEquipmentController::class, 'update'])
     ->name('ict-equipments.update');

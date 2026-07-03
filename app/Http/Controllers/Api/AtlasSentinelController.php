@@ -15,7 +15,9 @@ use App\Models\IctEquipmentHealthHistory;
 use App\Models\IctEquipmentHealthSnapshot;
 use App\Models\IctEquipmentSecurityStatus;
 use App\Models\IctEquipmentSoftwareInventory;
+use App\Models\IctBackupRun;
 use App\Models\User;
+use App\Services\AtlasSentinelBackupService;
 use App\Services\AtlasSentinelDiagnosticsService;
 use App\Services\AtlasSentinelHealthEvaluator;
 use App\Services\AtlasSentinelNetworkLocationResolver;
@@ -48,6 +50,7 @@ class AtlasSentinelController extends Controller
         private AtlasSentinelDiagnosticsService $diagnosticsService,
         private AtlasSentinelSecurityEvaluator $securityEvaluator,
         private AtlasSentinelRemediationDispatcher $remediationDispatcher,
+        private AtlasSentinelBackupService $backupService,
     ) {
     }
 
@@ -360,6 +363,19 @@ class AtlasSentinelController extends Controller
             $response['remediations'] = $pendingRemediations;
         }
 
+        // A backup hiccup must never take health monitoring down with it.
+        try {
+            $backup = $this->backupService->pendingBackup($device);
+            if ($backup) {
+                $response['backup'] = $backup;
+            }
+        } catch (\Throwable $e) {
+            logger()->error('Atlas Sentinel: backup dispatch failed during checkin', [
+                'device_id' => $device->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         $latestRelease = AtlasSentinelRelease::latestRelease();
         // version_compare alone isn't enough — it does NOT treat "1.0.3" and
         // "1.0.3.0" as equal (verified: returns -1), so a device freshly
@@ -639,5 +655,118 @@ class AtlasSentinelController extends Controller
             'itjr_no' => $jobRequest->itjr_no,
             'job_request_id' => $jobRequest->id,
         ]);
+    }
+
+    /**
+     * POST /api/ict-agent/backup/{run}/manifest
+     *
+     * Batched scan manifest from the agent. Returns which of these files
+     * still need uploading (new, or content hash changed since last backup).
+     */
+    public function backupManifest(Request $request, IctBackupRun $run): JsonResponse
+    {
+        $this->assertOwnedActiveRun($request, $run);
+
+        $validated = $request->validate([
+            // 'present' not 'required': an empty manifest (device with zero
+            // documents) is legitimate and still needs to start the run.
+            'files'                   => ['present', 'array', 'max:500'],
+            'files.*.relative_path'   => ['required', 'string', 'max:2000'],
+            'files.*.size_bytes'      => ['required', 'integer', 'min:0'],
+            'files.*.sha256'          => ['required', 'string', 'regex:/^[0-9a-fA-F]{64}$/'],
+            'files.*.mtime'           => ['nullable', 'string', 'max:40'],
+        ]);
+
+        return response()->json([
+            'needed' => $this->backupService->recordManifest($run, $validated['files']),
+        ]);
+    }
+
+    /**
+     * POST /api/ict-agent/backup/{run}/upload-session
+     *
+     * Issues a Google Drive resumable-session URI for one file. The agent
+     * PUTs the bytes directly to googleapis.com — they never pass through
+     * this server, and Drive credentials never reach the device.
+     */
+    public function backupUploadSession(Request $request, IctBackupRun $run): JsonResponse
+    {
+        $this->assertOwnedActiveRun($request, $run);
+
+        $validated = $request->validate([
+            'relative_path' => ['required', 'string', 'max:2000'],
+            'size_bytes'    => ['required', 'integer', 'min:0', 'max:2147483648'],
+            'sha256'        => ['required', 'string', 'regex:/^[0-9a-fA-F]{64}$/'],
+            'mime_type'     => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $sessionUrl = $this->backupService->createUploadSession($run, [
+            'relative_path' => $validated['relative_path'],
+            'size_bytes'    => $validated['size_bytes'],
+            'mime_type'     => $validated['mime_type'] ?? null,
+        ]);
+
+        return response()->json(['session_url' => $sessionUrl]);
+    }
+
+    /**
+     * POST /api/ict-agent/backup/{run}/file-complete
+     *
+     * The agent finished one direct-to-Drive upload; record the file's new
+     * state so future manifest diffs skip it.
+     */
+    public function backupFileComplete(Request $request, IctBackupRun $run): JsonResponse
+    {
+        $this->assertOwnedActiveRun($request, $run);
+
+        $validated = $request->validate([
+            'relative_path' => ['required', 'string', 'max:2000'],
+            'size_bytes'    => ['required', 'integer', 'min:0'],
+            'sha256'        => ['required', 'string', 'regex:/^[0-9a-fA-F]{64}$/'],
+            'mtime'         => ['nullable', 'string', 'max:40'],
+            'drive_file_id' => ['required', 'string', 'max:200'],
+        ]);
+
+        $this->backupService->recordFileUploaded($run, $validated);
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * POST /api/ict-agent/backup/{run}/complete
+     *
+     * Final stats for the run — closes it out with whatever outcome the
+     * agent reports.
+     */
+    public function backupComplete(Request $request, IctBackupRun $run): JsonResponse
+    {
+        $this->assertOwnedActiveRun($request, $run);
+
+        $validated = $request->validate([
+            'status'        => ['required', 'string', 'in:completed,completed_with_errors,failed'],
+            'files_scanned' => ['nullable', 'integer', 'min:0'],
+            'files_skipped' => ['nullable', 'integer', 'min:0'],
+            'errors'        => ['nullable', 'array', 'max:100'],
+            'errors.*'      => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->backupService->completeRun($run, $validated);
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Backup runs are device-scoped exactly like alerts: a device token can
+     * only ever touch its own runs, and only while the run is still active.
+     */
+    private function assertOwnedActiveRun(Request $request, IctBackupRun $run): void
+    {
+        if ($run->device_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        if (! in_array($run->status, ['dispatched', 'running'], true)) {
+            abort(422, 'This backup run is no longer active.');
+        }
     }
 }
