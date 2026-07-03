@@ -7,6 +7,8 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\FacultyLoading\Section;
 use App\Models\Registrar\StudentEnrollment;
 use App\Models\Student;
+use App\Models\StudentClearance\StudentClearance;
+use App\Models\StudentClearance\StudentClearancePeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,6 +95,19 @@ class EnrollmentController extends Controller
             ->get(['id', 'firstname', 'lastname', 'middlename', 'pisaysystemID', 'lrn', 'sex'])
             ->keyBy('id');
 
+        $clearancePeriod = StudentClearancePeriod::where('school_year_id', $schoolYearId)
+            ->orderByRaw("FIELD(status, 'open', 'draft', 'closed', 'archived')")
+            ->latest('id')
+            ->first();
+
+        $clearances = $clearancePeriod
+            ? StudentClearance::where('student_clearance_period_id', $clearancePeriod->id)
+                ->whereIn('student_id', $studentIds)
+                ->with('items:id,student_clearance_id,status')
+                ->get()
+                ->keyBy('student_id')
+            : collect();
+
         $result = $enrollments->map(fn ($e) => [
             'id'              => $e->id,
             'student_id'      => $e->student_id,
@@ -105,6 +120,11 @@ class EnrollmentController extends Controller
             'enrollment_date' => $e->enrollment_date?->format('Y-m-d'),
             'notes'           => $e->notes,
             'encoded_by_name' => $e->encodedBy?->name,
+            'clearance_status' => $clearances->get($e->student_id)?->status,
+            'clearance_progress' => $clearances->get($e->student_id) ? [
+                'done'  => $clearances->get($e->student_id)->items->whereIn('status', ['cleared', 'waived', 'not_applicable'])->count(),
+                'total' => $clearances->get($e->student_id)->items->count(),
+            ] : null,
         ]);
 
         return response()->json($result);

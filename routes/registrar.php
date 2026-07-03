@@ -207,6 +207,18 @@ Route::middleware(['auth'])->group(function () {
         ->name('student-clearance.periods.generate')
         ->middleware('permission:students.clearance.manage');
 
+    Route::get('/student-clearance/periods/{period}/report', [ClearanceController::class, 'report'])
+        ->name('student-clearance.report')
+        ->middleware('permission:students.clearance.report|students.clearance.view|students.clearance.manage|students.clearance.registrar');
+
+    Route::get('/student-clearance/periods/{period}/export', [ClearanceController::class, 'export'])
+        ->name('student-clearance.export')
+        ->middleware('permission:students.clearance.report|students.clearance.view|students.clearance.manage|students.clearance.registrar');
+
+    Route::put('/student-clearance/settings/{setting}', [ClearanceController::class, 'updateRequirementSetting'])
+        ->name('student-clearance.settings.update')
+        ->middleware('permission:students.clearance.manage');
+
     Route::get('/student-clearance/signatory-queue', [SignatoryQueueController::class, 'index'])
         ->name('student-clearance.queue')
         ->middleware('permission:students.clearance.sign|students.clearance.subject-sign|students.clearance.manage|students.clearance.registrar|class-records.view');

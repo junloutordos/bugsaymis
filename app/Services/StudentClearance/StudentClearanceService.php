@@ -5,6 +5,7 @@ namespace App\Services\StudentClearance;
 use App\Models\Borrowing;
 use App\Models\ClassRecord\ClassRecord;
 use App\Models\Discipline\DisciplineCase;
+use App\Models\Discipline\DisciplineConfiscatedItem;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Registrar\StudentAcademicStanding;
@@ -17,7 +18,9 @@ use App\Models\StudentClearance\StudentClearance;
 use App\Models\StudentClearance\StudentClearanceActivityLog;
 use App\Models\StudentClearance\StudentClearanceItem;
 use App\Models\StudentClearance\StudentClearancePeriod;
+use App\Models\StudentClearance\StudentClearanceRequirementSetting;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -158,6 +161,7 @@ class StudentClearanceService
 
             if ($model->wasRecentlyCreated) {
                 $created++;
+                $this->notifyAssignedUser($model, $student);
             } else {
                 $model->fill([
                     'requirement_label'   => $item['requirement_label'],
@@ -412,6 +416,18 @@ class StudentClearanceService
             ];
         }
 
+        $heldConfiscatedItems = DisciplineConfiscatedItem::where('student_id', $student->id)
+            ->where('status', 'held')
+            ->count();
+
+        if ($heldConfiscatedItems > 0) {
+            $blockers['office:discipline'][] = [
+                'source'  => 'discipline_confiscated_items',
+                'count'   => $heldConfiscatedItems,
+                'summary' => "{$heldConfiscatedItems} held confiscated item(s) pending claim or disposition.",
+            ];
+        }
+
         $rhIntern = RhIntern::where('student_id', $student->id)
             ->where('school_year_id', $enrollment->school_year_id)
             ->whereIn('status', ['active', 'suspended'])
@@ -499,56 +515,56 @@ class StudentClearanceService
             ->whereIn('status', ['active', 'checked_in'])
             ->exists();
 
-        $items = [
-            ['code' => 'bio_lab', 'label' => 'Biology Laboratory', 'group' => 'laboratory', 'permission' => 'students.clearance.sign'],
-            ['code' => 'chem_lab', 'label' => 'Chemistry Laboratory', 'group' => 'laboratory', 'permission' => 'students.clearance.sign'],
-            ['code' => 'physics_lab', 'label' => 'Physics Laboratory', 'group' => 'laboratory', 'permission' => 'students.clearance.sign'],
-            ['code' => 'computer_lab', 'label' => 'Computer Laboratory', 'group' => 'laboratory', 'permission' => 'students.clearance.sign'],
-            ['code' => 'dental', 'label' => 'Dental', 'group' => 'administrative', 'permission' => 'health.manage'],
-            ['code' => 'medical', 'label' => 'Medical', 'group' => 'administrative', 'permission' => 'health.manage'],
-            ['code' => 'guidance', 'label' => 'Guidance', 'group' => 'administrative', 'permission' => 'guidance.manage'],
-            ['code' => 'library', 'label' => 'Library', 'group' => 'administrative', 'permission' => 'library.manage'],
-            ['code' => 'canteen', 'label' => 'Canteen', 'group' => 'administrative', 'permission' => 'students.clearance.sign'],
-            ['code' => 'supply_books', 'label' => 'Supply & Property - Books', 'group' => 'administrative', 'permission' => 'supply.manage'],
-            ['code' => 'supply_locker', 'label' => 'Supply & Property - Locker', 'group' => 'administrative', 'permission' => 'property.manage'],
-            ['code' => 'cashier', 'label' => 'Cashier', 'group' => 'administrative', 'permission' => 'students.clearance.sign'],
-            ['code' => 'discipline', 'label' => 'Discipline Officer', 'group' => 'administrative', 'permission' => 'discipline.manage'],
-            ['code' => 'ala_club', 'label' => 'ALA / Club Adviser', 'group' => 'administrative', 'permission' => 'students.clearance.sign'],
-            ['code' => 'sg_adviser', 'label' => 'SG Adviser', 'group' => 'administrative', 'permission' => 'students.clearance.sign'],
-        ];
+        return StudentClearanceRequirementSetting::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('requirement_label')
+            ->get()
+            ->filter(function (StudentClearanceRequirementSetting $setting) use ($grade, $isIntern) {
+                if ($setting->intern_only && ! $isIntern) {
+                    return false;
+                }
 
-        if ($isIntern) {
-            $items[] = ['code' => 'residence_hall', 'label' => 'Residence Hall', 'group' => 'administrative', 'permission' => 'rh.interns.manage'];
+                $gradeLevels = $setting->applies_grade_levels ?: [];
+                return $gradeLevels === [] || in_array($grade, array_map('intval', $gradeLevels), true);
+            })
+            ->values()
+            ->map(function (StudentClearanceRequirementSetting $setting) use ($enrollment) {
+                $assignedUserId = $setting->requirement_type === 'section_adviser'
+                    ? $enrollment->section?->adviser
+                    : $setting->assigned_user_id;
+
+                return [
+                    'requirement_code'    => $setting->requirement_code,
+                    'requirement_label'   => $setting->requirement_label,
+                    'requirement_type'    => $setting->requirement_type,
+                    'requirement_group'   => $setting->requirement_group,
+                    'assigned_user_id'    => $assignedUserId,
+                    'assigned_permission' => $setting->assigned_permission,
+                    'sort_order'          => $setting->sort_order,
+                ];
+            });
+    }
+
+    private function notifyAssignedUser(StudentClearanceItem $item, Student $student): void
+    {
+        if (! $item->assigned_user_id) {
+            return;
         }
 
-        if ($grade >= 11) {
-            $items[] = ['code' => 'scale_adviser', 'label' => 'SCALE Adviser', 'group' => 'administrative', 'permission' => 'students.clearance.sign'];
+        $user = User::whereKey($item->assigned_user_id)->first();
+
+        if (! $user) {
+            return;
         }
 
-        if ($grade === 12) {
-            $items[] = ['code' => 'research_teacher', 'label' => 'Research Teacher', 'group' => 'subject', 'permission' => 'students.clearance.subject-sign'];
-            $items[] = ['code' => 'cid_chief', 'label' => 'Chief, Curriculum & Instruction Division', 'group' => 'final', 'permission' => 'students.clearance.sign'];
-            $items[] = ['code' => 'ssd_chief', 'label' => 'Chief, Student Services Division', 'group' => 'final', 'permission' => 'students.clearance.sign'];
-            $items[] = ['code' => 'campus_director', 'label' => 'Campus Director', 'group' => 'final', 'permission' => 'students.clearance.admin'];
-        }
-
-        $items[] = [
-            'code'       => 'section_adviser',
-            'label'      => 'Section / Homeroom Adviser',
-            'group'      => 'final',
-            'permission' => null,
-            'user_id'    => $enrollment->section?->adviser,
-        ];
-        $items[] = ['code' => 'registrar', 'label' => 'Registrar', 'group' => 'final', 'permission' => 'students.clearance.registrar'];
-
-        return collect($items)->map(fn (array $item, int $index) => [
-            'requirement_code'    => 'office:'.$item['code'],
-            'requirement_label'   => $item['label'],
-            'requirement_type'    => in_array($item['code'], ['section_adviser', 'registrar'], true) ? $item['code'] : 'office',
-            'requirement_group'   => $item['group'],
-            'assigned_user_id'    => $item['user_id'] ?? null,
-            'assigned_permission' => $item['permission'] ?? null,
-            'sort_order'          => 500 + $index,
-        ]);
+        NotificationService::notifyUser(
+            $user,
+            'Student Clearance',
+            $student->full_name,
+            'Signature requested',
+            route('student-clearance.queue'),
+            $item->requirement_label
+        );
     }
 }

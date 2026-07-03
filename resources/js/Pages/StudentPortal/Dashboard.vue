@@ -16,11 +16,16 @@ const props = defineProps({
     completion:      Array,
     rhApplication:   Object,
     intern:          Object,
+    clearanceStatus: Object,
     total_done:  Number,
     total:       Number,
 })
 
 const pct = computed(() => Math.round((props.total_done / props.total) * 100))
+const clearancePct = computed(() => {
+    if (!props.clearanceStatus?.total) return 0
+    return Math.round((props.clearanceStatus.done / props.clearanceStatus.total) * 100)
+})
 
 const iconMap = {
     academic:       AcademicCapIcon,
@@ -46,6 +51,10 @@ function goTo(section) {
 function fmtDate(d) {
     if (!d) return null
     return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function clearanceLabel(status) {
+    return status ? String(status).replaceAll('_', ' ') : 'No clearance period'
 }
 </script>
 
@@ -83,6 +92,44 @@ function fmtDate(d) {
                 <CheckCircleIcon class="w-6 h-6 text-emerald-500 shrink-0" />
                 <p class="text-sm text-emerald-800 font-medium">All sections complete for S.Y. {{ school_year }}. Thank you!</p>
             </div>
+
+            <!-- Year-End Clearance -->
+            <a v-if="clearanceStatus" :href="route('student-portal.clearance')"
+               class="block bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:border-indigo-300 hover:shadow-md transition-all">
+                <div class="flex flex-wrap items-start gap-4">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                         :class="clearanceStatus.status === 'cleared' ? 'bg-emerald-100' : clearanceStatus.holds > 0 ? 'bg-amber-100' : 'bg-indigo-100'">
+                        <ClipboardDocumentListIcon class="w-5 h-5"
+                            :class="clearanceStatus.status === 'cleared' ? 'text-emerald-600' : clearanceStatus.holds > 0 ? 'text-amber-600' : 'text-indigo-600'" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-sm font-semibold text-slate-800">Year-End Clearance</p>
+                            <span class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+                                  :class="clearanceStatus.status === 'cleared' ? 'bg-emerald-100 text-emerald-700' : clearanceStatus.holds > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'">
+                                {{ clearanceLabel(clearanceStatus.status) }}
+                            </span>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">{{ clearanceStatus.period_title }}</p>
+                        <div v-if="clearanceStatus.total > 0" class="mt-3">
+                            <div class="h-2 rounded-full bg-slate-100">
+                                <div class="h-2 rounded-full" :class="clearanceStatus.status === 'cleared' ? 'bg-emerald-500' : 'bg-indigo-500'" :style="{ width: clearancePct + '%' }"></div>
+                            </div>
+                            <p class="mt-2 text-xs text-slate-500">{{ clearanceStatus.done }} of {{ clearanceStatus.total }} requirements signed</p>
+                        </div>
+                        <p v-if="clearanceStatus.holds > 0" class="mt-2 text-xs font-medium text-amber-700">
+                            {{ clearanceStatus.holds }} item(s) need action or signatory review.
+                        </p>
+                        <p v-else-if="clearanceStatus.blockers > 0" class="mt-2 text-xs font-medium text-amber-700">
+                            {{ clearanceStatus.blockers }} system advisory blocker(s) detected.
+                        </p>
+                        <p v-else-if="clearanceStatus.status === 'not_generated'" class="mt-2 text-xs text-slate-500">
+                            Your clearance record has not been generated yet.
+                        </p>
+                    </div>
+                    <ArrowRightIcon class="w-5 h-5 text-slate-300 shrink-0 mt-1" />
+                </div>
+            </a>
 
             <!-- Guidance Profile sections -->
             <section>

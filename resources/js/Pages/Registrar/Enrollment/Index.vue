@@ -344,6 +344,22 @@ function statusLabel(status) {
   }
   return map[status] ?? status
 }
+
+function clearanceBadge(status) {
+  const map = {
+    cleared:             'bg-emerald-100 text-emerald-700',
+    ready_for_adviser:   'bg-indigo-100 text-indigo-700',
+    pending_registrar:   'bg-blue-100 text-blue-700',
+    with_accountability: 'bg-amber-100 text-amber-700',
+    in_progress:         'bg-slate-100 text-slate-600',
+    open:                'bg-slate-100 text-slate-600',
+  }
+  return map[status] ?? 'bg-slate-100 text-slate-500'
+}
+
+function clearanceLabel(status) {
+  return status ? String(status).replaceAll('_', ' ') : 'Not generated'
+}
 </script>
 
 <template>
@@ -539,6 +555,7 @@ function statusLabel(status) {
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">PISAY ID</th>
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Clearance</th>
                   <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -556,6 +573,14 @@ function statusLabel(status) {
                     <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', statusBadge(s.status)]">
                       {{ statusLabel(s.status) }}
                     </span>
+                  </td>
+                  <td class="px-4 py-2">
+                    <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', clearanceBadge(s.clearance_status)]">
+                      {{ clearanceLabel(s.clearance_status) }}
+                    </span>
+                    <p v-if="s.clearance_progress" class="mt-1 text-[11px] text-slate-400">
+                      {{ s.clearance_progress.done }}/{{ s.clearance_progress.total }} signed
+                    </p>
                   </td>
                   <td class="px-4 py-2">
                     <button

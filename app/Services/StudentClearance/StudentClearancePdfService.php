@@ -2,6 +2,7 @@
 
 namespace App\Services\StudentClearance;
 
+use App\Models\ResidenceHall\RhIntern;
 use App\Models\Student;
 use App\Models\StudentClearance\StudentClearance;
 use App\Models\StudentClearance\StudentClearanceItem;
@@ -54,6 +55,10 @@ class StudentClearancePdfService
         $academicRows = $this->rows($academicItems, 16);
         $adminRows = $this->rows($adminItems, 18);
         $logoPath = public_path('images/pshs_logo.png');
+        $residenceStatus = RhIntern::where('student_id', $student->id)
+            ->where('school_year_id', $clearance->school_year_id)
+            ->whereIn('status', ['active', 'checked_in'])
+            ->exists() ? 'Intern' : 'Extern';
 
         return "
         <html>
@@ -110,6 +115,14 @@ class StudentClearancePdfService
                     <td>".$this->h($student->contactno ?? $student->contact_number ?? '')."</td>
                     <td class='label'>Scholarship Category</td>
                     <td>".$this->h($student->scholarship_category ?? $student->category ?? '')."</td>
+                </tr>
+                <tr>
+                    <td class='label'>Residence Status</td>
+                    <td>".$this->h($residenceStatus)."</td>
+                    <td class='label'>PISAY ID</td>
+                    <td>".$this->h($student->pisaysystemID ?? $clearance->pisaysystem_id)."</td>
+                    <td class='label'>Date Finalized</td>
+                    <td>".$this->h($clearance->finalized_at?->format('F d, Y') ?? '')."</td>
                 </tr>
             </table>
 
