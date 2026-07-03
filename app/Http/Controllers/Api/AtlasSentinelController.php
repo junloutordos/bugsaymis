@@ -306,7 +306,7 @@ class AtlasSentinelController extends Controller
             'wifi_bssid'    => ['nullable', 'string', 'max:50'],
             'update_result' => ['nullable', 'array'],
             'update_result.version' => ['nullable', 'string', 'max:20'],
-            'update_result.result'  => ['nullable', 'string', 'in:success,failed,failed_service_down'],
+            'update_result.result'  => ['nullable', 'string', 'in:success,failed,failed_service_down,vanished'],
             'update_result.details' => ['nullable', 'string', 'max:2000'],
             'remediation_results'   => ['nullable', 'array'],
             'remediation_results.*.action'       => ['nullable', 'string', 'max:50'],
