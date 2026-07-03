@@ -80,6 +80,10 @@ class ClassRecordPageController extends Controller
             'isCurrentSY'        => $isCurrentSY,
             'currentSYName'      => $currentSY?->name,
             'sameSubjectRecords' => $sameSubjectRecords,
+            'quizzes'            => \App\Models\Quiz\Quiz::where('source_type', 'class_record')
+                ->where('source_id', $classRecord->id)
+                ->get(['id', 'title', 'status'])
+                ->map(fn ($q) => ['id' => $q->id, 'title' => $q->title, 'status' => $q->status]),
         ]);
     }
 }

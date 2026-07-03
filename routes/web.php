@@ -2231,6 +2231,7 @@ require __DIR__.'/chat.php';
 require __DIR__.'/saln.php';
 require __DIR__.'/faculty-loading.php';
 require __DIR__.'/ams.php';
+require __DIR__.'/quiz.php';
 require __DIR__.'/ppmp.php';
 require __DIR__.'/procurement.php';
 require __DIR__.'/supply.php';
