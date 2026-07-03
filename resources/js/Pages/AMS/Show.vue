@@ -2,6 +2,7 @@
 import { ref, computed, reactive, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import EvaluationSummaryBlock from '@/Components/AMS/EvaluationSummaryBlock.vue'
 import Swal from 'sweetalert2'
 import {
   ArrowLeftIcon,
@@ -25,6 +26,8 @@ import {
   ClipboardDocumentCheckIcon,
   ChartBarIcon,
   EnvelopeIcon,
+  AcademicCapIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -40,6 +43,14 @@ const props = defineProps({
 const page       = usePage()
 const csrfToken  = computed(() => document.querySelector('meta[name="csrf-token"]')?.content ?? '')
 const activeTab  = ref('details')
+
+const isTws = computed(() => props.activity.activity_type === 'training_workshop_seminar')
+
+function formatMealDay(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', {
+    weekday: 'short', month: 'short', day: 'numeric',
+  })
+}
 
 const generatingCerts  = ref(false)
 const sendingEvalLinks = ref(false)
@@ -452,6 +463,13 @@ async function removeCoPro(cp) {
           </div>
 
           <div class="p-5">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                  :class="isTws ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'">
+              <component :is="isTws ? AcademicCapIcon : BuildingOffice2Icon" class="w-3.5 h-3.5" />
+              {{ isTws ? 'Training / Workshop / Seminar' : 'In-house Activity' }}
+            </span>
+          </div>
           <h1 class="text-xl font-bold text-slate-800 mb-4">{{ activity.title }}</h1>
           <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div class="flex items-start gap-2">
@@ -504,6 +522,66 @@ async function removeCoPro(cp) {
               </div>
             </div>
           </dl>
+
+          <!-- What to Bring -->
+          <div v-if="activity.what_to_bring" class="mt-4 pt-4 border-t border-slate-100">
+            <p class="text-xs text-slate-400 uppercase tracking-wide mb-1">What to Bring</p>
+            <p class="text-sm text-slate-700 whitespace-pre-line">{{ activity.what_to_bring }}</p>
+          </div>
+
+          <!-- Speakers (Training/Workshop/Seminar only) -->
+          <div v-if="isTws && activity.speakers.length" class="mt-4 pt-4 border-t border-slate-100">
+            <p class="text-xs text-slate-400 uppercase tracking-wide mb-2">Speakers</p>
+            <div class="space-y-2">
+              <div v-for="s in activity.speakers" :key="s.id" class="flex items-start gap-2 text-sm">
+                <UserIcon class="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                <div>
+                  <span class="font-medium text-slate-700">{{ s.name }}</span>
+                  <span v-if="s.designation" class="text-slate-400"> — {{ s.designation }}</span>
+                  <p v-if="s.topic" class="text-xs text-slate-500">{{ s.topic }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Meal Plan -->
+          <div v-if="activity.meal_plans.length" class="mt-4 pt-4 border-t border-slate-100">
+            <p class="text-xs text-slate-400 uppercase tracking-wide mb-2">Free Meals &amp; Snacks</p>
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-xs">
+                <thead>
+                  <tr class="text-left text-slate-400 uppercase tracking-wide">
+                    <th class="py-1 pr-4">Day</th>
+                    <th class="py-1 px-2 text-center">AM Snacks</th>
+                    <th class="py-1 px-2 text-center">Lunch</th>
+                    <th class="py-1 px-2 text-center">PM Snacks</th>
+                    <th class="py-1 px-2 text-center">Dinner</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                  <tr v-for="mp in activity.meal_plans" :key="mp.id">
+                    <td class="py-1.5 pr-4 text-slate-700">{{ formatMealDay(mp.date) }}</td>
+                    <td class="py-1.5 px-2 text-center">
+                      <CheckCircleIcon v-if="mp.am_snacks" class="w-4 h-4 text-green-500 inline" />
+                      <span v-else class="text-slate-300">—</span>
+                    </td>
+                    <td class="py-1.5 px-2 text-center">
+                      <CheckCircleIcon v-if="mp.lunch" class="w-4 h-4 text-green-500 inline" />
+                      <span v-else class="text-slate-300">—</span>
+                    </td>
+                    <td class="py-1.5 px-2 text-center">
+                      <CheckCircleIcon v-if="mp.pm_snacks" class="w-4 h-4 text-green-500 inline" />
+                      <span v-else class="text-slate-300">—</span>
+                    </td>
+                    <td class="py-1.5 px-2 text-center">
+                      <CheckCircleIcon v-if="mp.dinner" class="w-4 h-4 text-green-500 inline" />
+                      <span v-else class="text-slate-300">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
           </div><!-- end p-5 -->
         </div>
       </div>
@@ -889,95 +967,42 @@ async function removeCoPro(cp) {
 
       <template v-else>
 
-        <!-- Summary cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="bg-white rounded-xl border border-slate-200 p-4 text-center">
-            <p class="text-2xl font-bold text-indigo-600">{{ evaluations.count }}</p>
-            <p class="text-xs text-slate-500 mt-1 uppercase tracking-wide">Responses</p>
-          </div>
-          <div v-for="sec in evaluations.sections" :key="sec.key"
-               class="bg-white rounded-xl border border-slate-200 p-4 text-center">
-            <p class="text-2xl font-bold text-indigo-600">
-              {{ sec.avg !== null ? sec.avg.toFixed(2) : '—' }}
-            </p>
-            <p class="text-xs text-slate-500 mt-1 uppercase tracking-wide">Section {{ sec.key }} — {{ sec.label }}</p>
-          </div>
-        </div>
+        <!-- In-house: single 13-question survey -->
+        <EvaluationSummaryBlock
+          v-if="evaluations.type === 'in_house'"
+          :count="evaluations.count"
+          :sections="evaluations.sections"
+          :responses="evaluations.responses"
+        />
 
-        <!-- Per-section question breakdown -->
-        <div v-for="sec in evaluations.sections" :key="sec.key"
-             class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div class="bg-indigo-50 border-b border-indigo-100 px-5 py-3 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-indigo-700 uppercase tracking-wide">
-              Section {{ sec.key }} — {{ sec.label }}
-            </h3>
-            <span class="text-sm font-bold text-indigo-600">
-              Avg: {{ sec.avg !== null ? sec.avg.toFixed(2) : '—' }} / 5
-            </span>
-          </div>
-          <div class="divide-y divide-slate-50">
-            <div v-for="(q, qi) in sec.questions" :key="q.field" class="px-5 py-4">
-              <div class="flex items-start justify-between gap-4 mb-2">
-                <p class="text-sm text-slate-700">
-                  <span class="font-semibold text-slate-400 mr-1.5">{{ qi + 1 }}.</span>{{ q.label }}
-                </p>
-                <span class="text-sm font-bold text-slate-700 shrink-0">
-                  {{ q.avg !== null ? q.avg.toFixed(2) : '—' }}
-                </span>
-              </div>
-              <!-- Score bar -->
-              <div class="w-full bg-slate-100 rounded-full h-2 mb-3">
-                <div class="bg-indigo-500 h-2 rounded-full transition-all"
-                     :style="{ width: q.avg !== null ? ((q.avg / 5) * 100) + '%' : '0%' }" />
-              </div>
-              <!-- Distribution pills -->
-              <div class="flex flex-wrap gap-1.5">
-                <template v-for="opt in ['strongly_agree','agree','neutral','disagree','strongly_disagree','not_applicable']" :key="opt">
-                  <span v-if="q.dist[opt]"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border"
-                        :class="{
-                          'bg-green-50 text-green-700 border-green-200':   opt === 'strongly_agree',
-                          'bg-emerald-50 text-emerald-700 border-emerald-200': opt === 'agree',
-                          'bg-slate-50 text-slate-600 border-slate-200':   opt === 'neutral',
-                          'bg-orange-50 text-orange-700 border-orange-200': opt === 'disagree',
-                          'bg-red-50 text-red-700 border-red-200':         opt === 'strongly_disagree',
-                          'bg-gray-50 text-gray-500 border-gray-200':      opt === 'not_applicable',
-                        }">
-                    {{ opt.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }}
-                    <span class="font-semibold">{{ q.dist[opt] }}</span>
-                  </span>
-                </template>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Training/Workshop/Seminar: overall survey + one block per speaker -->
+        <template v-else>
+          <EvaluationSummaryBlock
+            title="Training/Workshop/Activity Evaluation"
+            :count="evaluations.count"
+            :sections="evaluations.sections"
+            :responses="evaluations.responses"
+            :extra-text-fields="[
+              { key: 'position_function', label: 'Function/Position' },
+              { key: 'suggestions', label: 'Suggestions' },
+              { key: 'other_comments', label: 'Comments' },
+            ]"
+          />
 
-        <!-- Individual responses -->
-        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div class="px-5 py-3 bg-slate-50 border-b border-slate-100">
-            <h3 class="text-sm font-semibold text-slate-700">Individual Responses ({{ evaluations.count }})</h3>
+          <div v-for="s in evaluations.speakers" :key="s.speaker.id" class="pt-4 border-t border-slate-200">
+            <EvaluationSummaryBlock
+              :title="`Speaker/Topic Evaluation — ${s.speaker.name}${s.speaker.topic ? ' (' + s.speaker.topic + ')' : ''}`"
+              :count="s.count"
+              :sections="s.sections"
+              :responses="s.responses"
+              :extra-text-fields="[
+                { key: 'effectiveness_reason', label: 'Effectiveness' },
+                { key: 'improvement_suggestions', label: 'Suggestions' },
+                { key: 'other_topics_wanted', label: 'Other Topics Wanted' },
+              ]"
+            />
           </div>
-          <div class="divide-y divide-slate-100">
-            <div v-for="r in evaluations.responses" :key="r.id" class="px-5 py-4 space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium text-slate-700">{{ r.evaluator_name }}</span>
-                <div class="flex items-center gap-2">
-                  <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
-                        :class="r.participant_type === 'employee' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'">
-                    {{ r.participant_type === 'employee' ? 'Employee' : 'Student' }}
-                  </span>
-                  <span class="text-xs text-slate-400">{{ new Date(r.submitted_at).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) }}</span>
-                </div>
-              </div>
-              <p v-if="r.suggestions" class="text-xs text-slate-600">
-                <span class="font-medium text-slate-500">Suggestions:</span> {{ r.suggestions }}
-              </p>
-              <p v-if="r.other_comments" class="text-xs text-slate-600">
-                <span class="font-medium text-slate-500">Comments:</span> {{ r.other_comments }}
-              </p>
-            </div>
-          </div>
-        </div>
+        </template>
 
       </template>
     </div>

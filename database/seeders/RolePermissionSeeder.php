@@ -394,6 +394,8 @@ class RolePermissionSeeder extends Seeder
         }
         // HR sees all activities (read-only) and can also create their own
         $assign('HR', ['activities.manage', 'activities.view_all']);
+        // HR also monitors the evaluation analytics dashboard (Administrator bypasses via isSuperAdmin())
+        $assign('HR', ['activities.monitor']);
 
         // ── Student / Parent — very limited read-only ─────────────────────────
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);

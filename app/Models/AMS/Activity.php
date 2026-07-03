@@ -14,6 +14,7 @@ class Activity extends Model
     protected $fillable = [
         'user_id',
         'title',
+        'activity_type',
         'start_date',
         'start_time',
         'end_date',
@@ -21,6 +22,7 @@ class Activity extends Model
         'total_hours',
         'venue',
         'resource_person',
+        'what_to_bring',
         'banner',
         'special_order',
         'activity_report',
@@ -31,6 +33,9 @@ class Activity extends Model
         'start_date' => 'date:Y-m-d',
         'end_date'   => 'date:Y-m-d',
     ];
+
+    public const TYPE_IN_HOUSE = 'in_house';
+    public const TYPE_TRAINING_WORKSHOP_SEMINAR = 'training_workshop_seminar';
 
     public function creator(): BelongsTo
     {
@@ -50,5 +55,25 @@ class Activity extends Model
     public function studentAttendance(): HasMany
     {
         return $this->hasMany(ActivityStudentAttendance::class, 'activity_id');
+    }
+
+    public function mealPlans(): HasMany
+    {
+        return $this->hasMany(ActivityMealPlan::class, 'activity_id')->orderBy('date');
+    }
+
+    public function speakers(): HasMany
+    {
+        return $this->hasMany(ActivitySpeaker::class, 'activity_id')->orderBy('sort_order');
+    }
+
+    public function twsEvaluations(): HasMany
+    {
+        return $this->hasMany(ActivityTwsEvaluation::class, 'activity_id');
+    }
+
+    public function isTrainingWorkshopSeminar(): bool
+    {
+        return $this->activity_type === self::TYPE_TRAINING_WORKSHOP_SEMINAR;
     }
 }
