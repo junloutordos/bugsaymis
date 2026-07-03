@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
-import { AcademicCapIcon, ArrowRightStartOnRectangleIcon, HeartIcon, UserIcon } from '@heroicons/vue/24/outline'
+import { AcademicCapIcon, ArrowRightStartOnRectangleIcon } from '@heroicons/vue/24/outline'
 
 defineProps({
     title: String,
@@ -48,6 +48,10 @@ function logout() {
                         :href="route('student-portal.grades')"
                         class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors hidden sm:inline"
                     >Grades</a>
+                    <a
+                        :href="route('student-portal.clearance')"
+                        class="text-sm text-slate-600 hover:text-indigo-700 px-2 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >Clearance</a>
                     <button
                         @click="logout"
                         class="flex items-center gap-1 text-sm text-slate-400 hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"

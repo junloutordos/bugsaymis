@@ -297,6 +297,8 @@ class RolePermissionSeeder extends Seeder
         $assign('Registrar', [
             'hr.pds.view',
             'documents.view', 'documents.create', 'documents.update',
+            'students.clearance.view', 'students.clearance.manage',
+            'students.clearance.registrar', 'students.clearance.report',
             'reports.view',
             'chat.access',
         ]);
@@ -313,6 +315,7 @@ class RolePermissionSeeder extends Seeder
         // ── Librarian ─────────────────────────────────────────────────────────
         $assign('Librarian', [
             'library.view', 'library.manage',
+            'students.clearance.sign',
             'reports.view',
             'chat.access',
         ]);
@@ -321,6 +324,7 @@ class RolePermissionSeeder extends Seeder
         $assign('Nurse', [
             'health.view', 'health.manage',
             'students.health.view', 'students.health.manage',
+            'students.clearance.sign',
             'reports.view',
             'chat.access',
         ]);
@@ -330,6 +334,7 @@ class RolePermissionSeeder extends Seeder
             'guidance.view', 'guidance.refer', 'guidance.manage',
             'guidance.cumulative.view', 'guidance.cumulative.manage',
             'students.health.view', 'students.health.manage',
+            'students.clearance.sign',
             'reports.view',
             'chat.access',
         ]);
@@ -339,6 +344,7 @@ class RolePermissionSeeder extends Seeder
         $assign('Student Discipline Officer', [
             'discipline.file', 'discipline.view', 'discipline.manage', 'discipline.report',
             'students.enrollment.view',
+            'students.clearance.sign',
             'reports.view',
             'chat.access',
         ]);
@@ -403,8 +409,9 @@ class RolePermissionSeeder extends Seeder
 
         // ── Class Records ─────────────────────────────────────────────────────
         $assign('CID Chief', ['class-records.view', 'class-records.manage', 'class-records.admin']);
-        $assign('Faculty',   ['class-records.view', 'class-records.manage']);
-        $assign('Staff',     ['class-records.view']);
+        $assign('Faculty',   ['class-records.view', 'class-records.manage', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
+        $assign('Staff',     ['class-records.view', 'students.clearance.sign']);
+        $assign('CID Chief', ['students.clearance.view', 'students.clearance.sign', 'students.clearance.subject-sign', 'students.clearance.adviser-review']);
 
         // ── Teacher Class Attendance (NFC Tap-In) ─────────────────────────────
         // AUH scoping is handled at runtime by checking academic_units.head_user_id

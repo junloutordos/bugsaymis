@@ -9,6 +9,9 @@ use App\Http\Controllers\Registrar\ReportCardController;
 use App\Http\Controllers\Registrar\RetentionPolicyController;
 use App\Http\Controllers\Registrar\StudentDocumentController;
 use App\Http\Controllers\Registrar\TranscriptController;
+use App\Http\Controllers\StudentClearance\ClearanceController;
+use App\Http\Controllers\StudentClearance\SignatoryQueueController;
+use App\Http\Controllers\StudentPortal\ClearanceController as StudentPortalClearanceController;
 use App\Http\Controllers\StudentPortal\GradesController;
 use Illuminate\Support\Facades\Route;
 
@@ -189,10 +192,45 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/registrar/analytics', [AnalyticsController::class, 'index'])
         ->name('registrar.analytics.index')
         ->middleware('permission:students.analytics.view');
+
+    // ── Student Year-End Clearance ───────────────────────────────────────────
+
+    Route::get('/student-clearance', [ClearanceController::class, 'index'])
+        ->name('student-clearance.index')
+        ->middleware('permission:students.clearance.view|students.clearance.manage|students.clearance.registrar');
+
+    Route::post('/student-clearance/periods', [ClearanceController::class, 'storePeriod'])
+        ->name('student-clearance.periods.store')
+        ->middleware('permission:students.clearance.manage');
+
+    Route::post('/student-clearance/periods/{period}/generate', [ClearanceController::class, 'generate'])
+        ->name('student-clearance.periods.generate')
+        ->middleware('permission:students.clearance.manage');
+
+    Route::get('/student-clearance/signatory-queue', [SignatoryQueueController::class, 'index'])
+        ->name('student-clearance.queue')
+        ->middleware('permission:students.clearance.sign|students.clearance.subject-sign|students.clearance.manage|students.clearance.registrar|class-records.view');
+
+    Route::put('/student-clearance/items/{item}', [SignatoryQueueController::class, 'update'])
+        ->name('student-clearance.items.update')
+        ->middleware('permission:students.clearance.sign|students.clearance.subject-sign|students.clearance.manage|students.clearance.registrar|class-records.view');
+
+    Route::get('/student-clearance/{clearance}', [ClearanceController::class, 'show'])
+        ->name('student-clearance.show')
+        ->middleware('permission:students.clearance.view|students.clearance.sign|students.clearance.subject-sign|students.clearance.manage|students.clearance.registrar|class-records.view');
+
+    Route::post('/student-clearance/{clearance}/adviser-review', [ClearanceController::class, 'adviserReview'])
+        ->name('student-clearance.adviser-review')
+        ->middleware('permission:students.clearance.adviser-review|students.clearance.manage|students.clearance.registrar|class-records.view');
+
+    Route::post('/student-clearance/{clearance}/finalize', [ClearanceController::class, 'finalize'])
+        ->name('student-clearance.finalize')
+        ->middleware('permission:students.clearance.registrar|students.clearance.manage');
 });
 
 // ── Student Portal — Grades (uses student.portal middleware, not auth) ────────
 
 Route::prefix('student-portal')->name('student-portal.')->middleware('student.portal')->group(function () {
     Route::get('/grades', [GradesController::class, 'index'])->name('grades');
+    Route::get('/clearance', [StudentPortalClearanceController::class, 'show'])->name('clearance');
 });
