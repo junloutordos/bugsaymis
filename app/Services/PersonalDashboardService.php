@@ -58,7 +58,7 @@ class PersonalDashboardService
             'myRequests' => $requests,
             'notifications' => $notifications,
             'calendarEvents' => $calendarEvents,
-            'quickLinks' => $this->quickLinks($user, $approvalCount),
+            'quickLinks' => $this->rescue('quick links', fn () => $this->quickLinks($user, $approvalCount), []),
         ];
     }
 
@@ -333,7 +333,7 @@ class PersonalDashboardService
                 $request->control_no ?? "#{$request->id}",
                 $request->status,
                 $request->updated_at,
-                route('leave.show', $request->id)
+                route('hr.leave.show', $request->id)
             ))
             ->all(), []);
     }
@@ -425,7 +425,7 @@ class PersonalDashboardService
                 $leave->date_from,
                 $leave->date_to?->copy()->addDay(),
                 'leave',
-                route('leave.show', $leave->id)
+                route('hr.leave.show', $leave->id)
             ))
             ->all(), []);
     }
@@ -558,7 +558,7 @@ class PersonalDashboardService
     private function quickLinks(User $user, int $approvalCount): array
     {
         $links = [
-            ['label' => 'My Leave', 'description' => 'Leave applications and credits', 'url' => route('leave.index'), 'tone' => 'indigo'],
+            ['label' => 'My Leave', 'description' => 'Leave applications and credits', 'url' => route('hr.leave.index'), 'tone' => 'indigo'],
             ['label' => 'My Requests', 'description' => 'IT and service request status', 'url' => route('jobrequests.index'), 'tone' => 'sky'],
             ['label' => 'Document Tracking', 'description' => 'Routed documents and files', 'url' => route('document-tracking.index'), 'tone' => 'amber'],
             ['label' => 'My Activities', 'description' => 'Activities, evaluations, certificates', 'url' => route('ams.my-activities.index'), 'tone' => 'emerald'],
