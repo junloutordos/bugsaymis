@@ -291,6 +291,15 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Knowledge Management', 'name' => 'km.view',   'description' => 'View and download OED issuances knowledge base'],
             ['module' => 'Knowledge Management', 'name' => 'km.manage', 'description' => 'Upload, edit, and manage OED issuances in the knowledge base'],
 
+            // ── Travel ───────────────────────────────────────────────────────
+            ['module' => 'Travel', 'name' => 'travel.view',             'description' => 'View own travel records and assigned travel actions'],
+            ['module' => 'Travel', 'name' => 'travel.create',           'description' => 'Create travel requests and proposed itineraries'],
+            ['module' => 'Travel', 'name' => 'travel.approve.division', 'description' => 'Division Chief: approve or return travel requests'],
+            ['module' => 'Travel', 'name' => 'travel.review.fad',       'description' => 'FAD: review travel funding, documents, and transport readiness'],
+            ['module' => 'Travel', 'name' => 'travel.approve.ocd',      'description' => 'OCD: approve campus-initiated travel and issue/confirm travel orders'],
+            ['module' => 'Travel', 'name' => 'travel.finance',          'description' => 'Finance: monitor cash advance, ORS, DV, and liquidation processing'],
+            ['module' => 'Travel', 'name' => 'travel.manage',           'description' => 'Manage all travel records and settings'],
+
             // ── PPMP ──────────────────────────────────────────────────────────
             ['module' => 'PPMP', 'name' => 'ppmp.create',      'description' => 'Create and edit own unit PPMP'],
             ['module' => 'PPMP', 'name' => 'ppmp.submit',      'description' => 'Submit PPMP for review'],

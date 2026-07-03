@@ -355,6 +355,30 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::get('/{oedIssuance}/download',     [\App\Http\Controllers\KnowledgeManagementController::class, 'download'])->name('download');
     });
 
+    // ── Travel ───────────────────────────────────────────────────────────────
+    Route::prefix('travel')->name('travel.')->middleware('permission:travel.view')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\TravelController::class, 'dashboard'])->name('dashboard');
+        Route::get('/', [\App\Http\Controllers\TravelController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\TravelController::class, 'store'])->name('store')->middleware('permission:travel.create');
+        Route::get('/{travel}', [\App\Http\Controllers\TravelController::class, 'show'])->name('show');
+        Route::put('/{travel}', [\App\Http\Controllers\TravelController::class, 'update'])->name('update');
+        Route::post('/{travel}/submit', [\App\Http\Controllers\TravelController::class, 'submit'])->name('submit');
+        Route::post('/{travel}/division-approve', [\App\Http\Controllers\TravelController::class, 'divisionApprove'])->name('division-approve')->middleware('permission:travel.approve.division');
+        Route::post('/{travel}/fad-review', [\App\Http\Controllers\TravelController::class, 'fadReview'])->name('fad-review')->middleware('permission:travel.review.fad');
+        Route::post('/{travel}/ocd-approve', [\App\Http\Controllers\TravelController::class, 'ocdApprove'])->name('ocd-approve')->middleware('permission:travel.approve.ocd');
+        Route::post('/{travel}/return', [\App\Http\Controllers\TravelController::class, 'returnForRevision'])->name('return');
+        Route::post('/{travel}/complete', [\App\Http\Controllers\TravelController::class, 'complete'])->name('complete')->middleware('permission:travel.review.fad|travel.finance');
+        Route::post('/{travel}/liquidate', [\App\Http\Controllers\TravelController::class, 'liquidate'])->name('liquidate')->middleware('permission:travel.finance');
+        Route::post('/{travel}/itinerary', [\App\Http\Controllers\TravelController::class, 'saveItinerary'])->name('itinerary.save');
+        Route::post('/{travel}/links', [\App\Http\Controllers\TravelController::class, 'saveLinks'])->name('links.save');
+        Route::post('/{travel}/flight-authority', [\App\Http\Controllers\TravelController::class, 'saveFlightAuthority'])->name('flight-authority.save');
+        Route::post('/{travel}/flight-authority/approve', [\App\Http\Controllers\TravelController::class, 'approveFlightAuthority'])->name('flight-authority.approve')->middleware('permission:travel.review.fad');
+        Route::post('/{travel}/attachments', [\App\Http\Controllers\TravelController::class, 'uploadAttachment'])->name('attachments.store');
+        Route::get('/{travel}/attachments/{attachment}', [\App\Http\Controllers\TravelController::class, 'downloadAttachment'])->name('attachments.download');
+        Route::delete('/{travel}/attachments/{attachment}', [\App\Http\Controllers\TravelController::class, 'deleteAttachment'])->name('attachments.destroy');
+        Route::get('/{travel}/iot/print', [\App\Http\Controllers\TravelController::class, 'printIot'])->name('iot.print');
+    });
+
 
     // ── Data Privacy Policy ───────────────────────────────────────────────────
     Route::get('/privacy', fn () => inertia('Privacy/Index'))->name('privacy.index');

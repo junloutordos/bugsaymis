@@ -474,6 +474,23 @@ class RolePermissionSeeder extends Seeder
             $assign($roleName, ['km.view']);
         }
 
+        // ── Travel ────────────────────────────────────────────────────────────
+        $travelUserRoles = [
+            'DivisionChief', 'Faculty', 'Staff', 'CID Chief', 'FAD Chief',
+            'GSU Head', 'HR', 'HRMPSB', 'MIS', 'Registrar', 'Librarian', 'Nurse',
+            'Guidance', 'InformationOfficer', 'Recruitment Officer', 'Payroll Officer',
+            'Cashier', 'PMT', 'Dorm Manager', 'Records',
+        ];
+        foreach ($travelUserRoles as $roleName) {
+            $assign($roleName, ['travel.view', 'travel.create']);
+        }
+        $assign('DivisionChief', ['travel.approve.division']);
+        $assign('FAD Chief', ['travel.review.fad', 'travel.finance']);
+        $assign('OCD', ['travel.view', 'travel.create', 'travel.approve.ocd', 'travel.manage']);
+        foreach (['Budget Officer', 'Bookkeeper', 'Accountant', 'Cashier'] as $roleName) {
+            $assign($roleName, ['travel.view', 'travel.finance']);
+        }
+
         // ── Purchase Requests (PR) ────────────────────────────────────────────
         $prBasic = ['procurement.view', 'procurement.create', 'procurement.pr.view', 'procurement.pr.create'];
         foreach (['Faculty', 'Staff', 'DivisionChief', 'OCD', 'HR', 'MIS',

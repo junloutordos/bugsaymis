@@ -46,6 +46,8 @@ class DatabaseSeeder extends Seeder
         $this->call(DocumentTypeSeeder::class);
         // Seed IPCR rating periods
         $this->call(IPCRRatingPeriodSeeder::class);
+        // Seed travel policy references
+        $this->call(TravelPolicyRuleSeeder::class);
 
         // Recruitment & Selection Module
         $this->call(RecruitmentTypeSeeder::class);
