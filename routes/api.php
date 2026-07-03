@@ -115,6 +115,10 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
         Route::post('/inventory-checkin', [AtlasSentinelController::class, 'inventoryCheckin'])->name('inventory-checkin');
         Route::get('/alerts', [AtlasSentinelController::class, 'alerts'])->name('alerts');
         Route::post('/alerts/{alert}/escalate', [AtlasSentinelController::class, 'escalate'])->name('alerts.escalate');
+        Route::get('/device-summary', [AtlasSentinelController::class, 'deviceSummary'])->name('device-summary');
+        Route::post('/report-problem', [AtlasSentinelController::class, 'reportProblem'])
+            ->name('report-problem')
+            ->middleware('throttle:6,1');
         Route::get('/releases/{encodedKey}', [AtlasSentinelController::class, 'releaseDownload'])->name('releases.show');
 
         // Document backup — run dispatched via the checkin response; file

@@ -16,6 +16,8 @@ use App\Models\IctEquipmentHealthSnapshot;
 use App\Models\IctEquipmentSecurityStatus;
 use App\Models\IctEquipmentSoftwareInventory;
 use App\Models\IctBackupRun;
+use App\Models\IctEquipmentRemediationLog;
+use App\Models\ITJobCategory;
 use App\Models\User;
 use App\Services\AtlasSentinelBackupService;
 use App\Services\AtlasSentinelDiagnosticsService;
@@ -27,6 +29,7 @@ use App\Services\AtlasSentinelSecurityEvaluator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class AtlasSentinelController extends Controller
 {
@@ -650,6 +653,101 @@ class AtlasSentinelController extends Controller
         }
 
         $alert->update(['status' => 'escalated', 'it_job_request_id' => $jobRequest->id]);
+
+        return response()->json([
+            'itjr_no' => $jobRequest->itjr_no,
+            'job_request_id' => $jobRequest->id,
+        ]);
+    }
+
+    /**
+     * GET /api/ict-agent/device-summary
+     *
+     * Everything the tray dashboard shows beyond live local metrics:
+     * equipment identity, health score, resolved-alert history, last backup
+     * run, recent auto-remediations, and the ITJR category list for the
+     * "Report a problem" form. Read-only and scoped to the authenticated
+     * device — same isolation as alerts().
+     */
+    public function deviceSummary(Request $request): JsonResponse
+    {
+        $device = $request->user();
+        $equipment = ICTEquipment::find($device->equipment_id);
+        $owner = $equipment?->owner_id ? User::find($equipment->owner_id) : null;
+
+        $alertHistory = IctEquipmentAlert::where('device_id', $device->id)
+            ->where('status', '<>', 'open')
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get(['issue', 'severity', 'status', 'created_at']);
+
+        $lastBackup = IctBackupRun::where('device_id', $device->id)
+            ->orderByDesc('id')
+            ->first(['status', 'finished_at', 'files_uploaded', 'bytes_uploaded']);
+
+        $recentRemediations = IctEquipmentRemediationLog::where('device_id', $device->id)
+            ->orderByDesc('executed_at')
+            ->limit(5)
+            ->get(['action', 'target', 'result', 'executed_at']);
+
+        return response()->json([
+            'device' => [
+                'hostname'         => $device->hostname,
+                'agent_version'    => $device->agent_version,
+                'last_checkin_at'  => $device->last_checkin_at,
+                'health_score'     => $device->health_score,
+                'risk_tier'        => $device->risk_tier,
+                'network_location' => $device->network_location,
+            ],
+            'equipment' => $equipment ? [
+                'property_no' => $equipment->property_no,
+                'description' => $equipment->description,
+                'category'    => $equipment->category,
+                'owner_name'  => $owner?->name,
+            ] : null,
+            'alert_history'       => $alertHistory,
+            'last_backup'         => $lastBackup,
+            'recent_remediations' => $recentRemediations,
+            'report_categories'   => ITJobCategory::orderBy('name')->pluck('name'),
+        ]);
+    }
+
+    /**
+     * POST /api/ict-agent/report-problem
+     *
+     * User-initiated "Report a problem" from the tray dashboard. Mirrors
+     * escalate(): filed as the equipment's assigned owner so it rides the
+     * normal Division Chief → OCD approval chain, and refuses rather than
+     * fabricating a submitter when no owner is assigned.
+     */
+    public function reportProblem(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'category'    => ['required', 'string', 'max:100', Rule::exists(ITJobCategory::class, 'name')],
+            'description' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
+        $device = $request->user();
+        $equipment = ICTEquipment::find($device->equipment_id);
+        $owner = $equipment?->owner_id ? User::find($equipment->owner_id) : null;
+
+        if (! $owner) {
+            return response()->json([
+                'message' => 'This equipment has no assigned owner yet. Ask MIS to assign one in the ICT Equipments page before filing a ticket.',
+            ], 422);
+        }
+
+        try {
+            $jobRequest = $this->jobRequests->createJobRequest([
+                'category'    => $validated['category'],
+                'title'       => 'User-reported issue: ' . ($equipment->description ?? 'ICT equipment'),
+                'description' => $validated['description'] . " (reported via Atlas Sentinel on {$device->hostname})",
+                'priority'    => 'normal',
+                'ict_equipment_id' => $equipment->id,
+            ], $owner);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'itjr_no' => $jobRequest->itjr_no,
