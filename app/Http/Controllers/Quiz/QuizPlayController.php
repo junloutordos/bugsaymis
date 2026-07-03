@@ -138,8 +138,10 @@ class QuizPlayController extends Controller
         abort_unless($question, 404);
 
         // Server-authoritative — never trust a client-reported elapsed time.
+        // absolute: true — diffInMilliseconds() returns a signed value by default
+        // in this Carbon version; an unsigned negative would fail the DB insert.
         $responseTimeMs = $session->question_started_at
-            ? now()->diffInMilliseconds($session->question_started_at)
+            ? (int) now()->diffInMilliseconds($session->question_started_at, true)
             : 0;
 
         $answer = $this->scoringService->submitAnswer(

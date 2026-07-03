@@ -49,7 +49,7 @@ class QuizSessionController extends Controller
                 ]),
             ],
             'join_url' => route('quiz.join.pin', $session->game_pin),
-            'qr_svg' => QrCode::format('svg')->size(220)->margin(1)->generate(route('quiz.join.pin', $session->game_pin)),
+            'qr_svg' => (string) QrCode::format('svg')->size(220)->margin(1)->generate(route('quiz.join.pin', $session->game_pin)),
         ]);
     }
 
