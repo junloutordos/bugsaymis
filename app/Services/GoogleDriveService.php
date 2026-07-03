@@ -30,6 +30,7 @@ use Illuminate\Http\UploadedFile;
 class GoogleDriveService
 {
     private ?Drive $drive = null;
+    private ?Client $client = null;
     private ?string $folderId;
 
     public function __construct()
@@ -46,6 +47,7 @@ class GoogleDriveService
             $client->setAuthConfig($credentials);
             // Full Drive scope needed for Shared Drive membership
             $client->addScope(Drive::DRIVE);
+            $this->client = $client;
             $this->drive = new Drive($client);
         } catch (\Throwable $e) {
             logger()->warning('GoogleDriveService: failed to initialize client', [
@@ -163,4 +165,117 @@ class GoogleDriveService
             // Silently ignore if already removed
         }
     }
+
+    /**
+     * Find a child folder by name under a parent, creating it if missing.
+     * Returns the folder ID. Used by device backups to mirror local paths —
+     * no public permission is ever added to these folders.
+     */
+    public function ensureFolder(string $name, string $parentId): string
+    {
+        $escaped = addcslashes($name, "\\'");
+
+        $existing = $this->getDrive()->files->listFiles([
+            'q' => "name = '{$escaped}' and '{$parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+            'supportsAllDrives' => true,
+            'includeItemsFromAllDrives' => true,
+            'pageSize' => 1,
+            'fields' => 'files(id)',
+        ]);
+
+        if (count($existing->getFiles()) > 0) {
+            return $existing->getFiles()[0]->getId();
+        }
+
+        $folder = $this->getDrive()->files->create(new DriveFile([
+            'name' => $name,
+            'mimeType' => 'application/vnd.google-apps.folder',
+            'parents' => [$parentId],
+        ]), [
+            'supportsAllDrives' => true,
+            'fields' => 'id',
+        ]);
+
+        return $folder->id;
+    }
+
+    /**
+     * Start a resumable upload session for a NEW file and return the session
+     * URI. The caller (an enrolled Sentinel device) PUTs the bytes straight
+     * to googleapis.com — file content never transits this server, and the
+     * service-account credentials never leave it. No public permission is
+     * added: backup files stay private to Shared Drive members.
+     */
+    public function createResumableSession(string $fileName, string $mimeType, int $sizeBytes, string $parentId): string
+    {
+        return $this->requestSessionUri(
+            'POST',
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+            ['name' => $fileName, 'parents' => [$parentId]],
+            $mimeType,
+            $sizeBytes,
+        );
+    }
+
+    /**
+     * Start a resumable upload session that replaces the content of an
+     * EXISTING file (Drive keeps the old content as a revision).
+     */
+    public function createResumableUpdateSession(string $fileId, string $mimeType, int $sizeBytes): string
+    {
+        return $this->requestSessionUri(
+            'PATCH',
+            "https://www.googleapis.com/upload/drive/v3/files/{$fileId}?uploadType=resumable&supportsAllDrives=true",
+            [],
+            $mimeType,
+            $sizeBytes,
+        );
+    }
+
+    private function requestSessionUri(string $method, string $url, array $metadata, string $mimeType, int $sizeBytes): string
+    {
+        $response = \Illuminate\Support\Facades\Http::withToken($this->accessToken())
+            ->withHeaders([
+                'X-Upload-Content-Type' => $mimeType,
+                'X-Upload-Content-Length' => (string) $sizeBytes,
+            ])
+            ->send($method, $url, ['json' => $metadata ?: (object) []]);
+
+        if ($response->status() === 404) {
+            throw new DriveFileGoneException('Drive file no longer exists.');
+        }
+
+        $response->throw();
+
+        $sessionUri = $response->header('Location');
+        if (! $sessionUri) {
+            throw new \RuntimeException('Drive did not return a resumable session URI.');
+        }
+
+        return $sessionUri;
+    }
+
+    private function accessToken(): string
+    {
+        $this->getDrive(); // throws if credentials are not configured
+
+        if (! $this->client->getAccessToken() || $this->client->isAccessTokenExpired()) {
+            $this->client->fetchAccessTokenWithAssertion();
+        }
+
+        $token = $this->client->getAccessToken()['access_token'] ?? null;
+        if (! $token) {
+            throw new \RuntimeException('Could not obtain a Google Drive access token.');
+        }
+
+        return $token;
+    }
+}
+
+/**
+ * The Drive file backing a resumable update session has been deleted —
+ * callers should fall back to creating the file fresh.
+ */
+class DriveFileGoneException extends \RuntimeException
+{
 }

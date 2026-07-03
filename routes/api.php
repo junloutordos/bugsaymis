@@ -116,5 +116,13 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
         Route::get('/alerts', [AtlasSentinelController::class, 'alerts'])->name('alerts');
         Route::post('/alerts/{alert}/escalate', [AtlasSentinelController::class, 'escalate'])->name('alerts.escalate');
         Route::get('/releases/{encodedKey}', [AtlasSentinelController::class, 'releaseDownload'])->name('releases.show');
+
+        // Document backup — run dispatched via the checkin response; file
+        // bytes go straight to Google Drive via server-issued resumable
+        // sessions, never through these endpoints.
+        Route::post('/backup/{run}/manifest', [AtlasSentinelController::class, 'backupManifest'])->name('backup.manifest');
+        Route::post('/backup/{run}/upload-session', [AtlasSentinelController::class, 'backupUploadSession'])->name('backup.upload-session');
+        Route::post('/backup/{run}/file-complete', [AtlasSentinelController::class, 'backupFileComplete'])->name('backup.file-complete');
+        Route::post('/backup/{run}/complete', [AtlasSentinelController::class, 'backupComplete'])->name('backup.complete');
     });
 });
