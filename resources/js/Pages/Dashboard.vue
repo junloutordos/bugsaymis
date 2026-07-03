@@ -1,1234 +1,571 @@
 <script setup>
+import { computed } from 'vue'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import {
-  Chart as ChartJS,
-  Title, Tooltip, Legend,
-  ArcElement,
-  CategoryScale, LinearScale,
-  PointElement, LineElement, BarElement,
-  Filler,
-} from 'chart.js'
-import { Line, Bar, Doughnut } from 'vue-chartjs'
-import { computed, ref, onMounted } from 'vue'
-import { usePage } from '@inertiajs/vue3'
-import axios from 'axios'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import {
-  UsersIcon,
-  AcademicCapIcon,
-  DocumentCheckIcon,
+  BellAlertIcon,
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  ChevronRightIcon,
+  ClipboardDocumentCheckIcon,
   ClockIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  InboxStackIcon,
+  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 
-ChartJS.register(
-  Title, Tooltip, Legend,
-  ArcElement,
-  CategoryScale, LinearScale,
-  PointElement, LineElement, BarElement,
-  Filler,
-)
+const props = defineProps({
+  profile: { type: Object, default: () => ({}) },
+  summary: { type: Object, default: () => ({}) },
+  approvalTabs: { type: Array, default: () => [] },
+  documentsForAction: { type: Array, default: () => [] },
+  acknowledgments: { type: Array, default: () => [] },
+  activityEvaluations: { type: Array, default: () => [] },
+  myRequests: { type: Array, default: () => [] },
+  notifications: { type: Array, default: () => [] },
+  calendarEvents: { type: Array, default: () => [] },
+  quickLinks: { type: Array, default: () => [] },
+})
 
 const page = usePage()
 const authUser = computed(() => page.props.auth?.user)
+
 const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
   return 'Good evening'
 })
+
 const today = computed(() =>
-  new Date().toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  new Date().toLocaleDateString('en-PH', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 )
 
-const props = defineProps({
-  totalEmployees:      { type: Number, default: 0 },
-  facultyCount:        { type: Number, default: 0 },
-  staffCount:          { type: Number, default: 0 },
-  employeeMaleCount:   { type: Number, default: 0 },
-  employeeFemaleCount: { type: Number, default: 0 },
-  facultyMaleCount:    { type: Number, default: 0 },
-  facultyFemaleCount:  { type: Number, default: 0 },
-  staffMaleCount:      { type: Number, default: 0 },
-  staffFemaleCount:    { type: Number, default: 0 },
-  activeDivisions:     { type: Number, default: 0 },
-  employeesByDivision: { type: Array,  default: () => [] },
-  scholarsCount:       { type: Number, default: 0 },
-  maleCount:           { type: Number, default: 0 },
-  femaleCount:         { type: Number, default: 0 },
-  libraryAttendanceByGrade:       { type: Array, default: () => [0,0,0,0,0,0] },
-  libraryAttendanceMaleByGrade:   { type: Array, default: () => [0,0,0,0,0,0] },
-  libraryAttendanceFemaleByGrade: { type: Array, default: () => [0,0,0,0,0,0] },
-  ipcrByStatus:  { type: Array,  default: () => [] },
-  ipcrForReview: { type: Number, default: 0 },
-  recentIPCRs:   { type: Array,  default: () => [] },
-  itjrByCategory:       { type: Array, default: () => [] },
-  requestOverview:      { type: Array,  default: () => [] },
-  totalPendingRequests: { type: Number, default: 0 },
-  monthlyTrends: { type: Object, default: () => ({ labels: [], datasets: [] }) },
-  lndStats:     { type: Object, default: () => ({ programs: 0, sessions: 0, tna_pending: 0, idp_pending: 0 }) },
-  rewardsStats: { type: Object, default: () => ({ total: 0, pending: 0, approved: 0, awarded_this_year: 0 }) },
-  ipcrBySex:    { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
-  tnaBySex:     { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
-  idpBySex:     { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
-  rewardsBySex: { type: Object, default: () => ({ male: 0, female: 0, unspecified: 0 }) },
-  employeesByDivisionWithSex: { type: Array, default: () => [] },
+const initials = computed(() => {
+  const name = props.profile?.name || authUser.value?.name || '?'
+  return name.split(' ').filter(Boolean).slice(0, 2).map(word => word[0].toUpperCase()).join('')
 })
 
-// ── Colour system ─────────────────────────────────────────────────────────────
-// Semantic — always the same meaning across every chart
-const sem = {
-  male:      '#3B82F6', // blue-500
-  female:    '#EC4899', // pink-500
-  pending:   '#F59E0B', // amber-400
-  completed: '#10B981', // emerald-500
-}
-
-// Brand-derived categorical palette — 6 harmonious, brand-anchored colours
-// Used for multi-category charts (trends, IPCR status, IT categories, general services)
-const brandPalette = [
-  '#1447C0', // brand primary blue
-  '#0891B2', // cyan-blue (brand family)
-  '#7C3AED', // violet (contrast)
-  '#059669', // emerald (positive)
-  '#D97706', // amber (attention)
-  '#64748B', // slate (neutral / other)
-]
-
-
-
-
-// ── Chart base options ────────────────────────────────────────────────────────
-const base = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'bottom',
-      labels: { usePointStyle: true, pointStyleWidth: 8, padding: 12, font: { size: 10 } },
-    },
-    tooltip: { mode: 'index', intersect: false },
-  },
-}
-
-const lineOptions = {
-  ...base,
-  interaction: { mode: 'index', intersect: false },
-  scales: {
-    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
-  },
-}
-
-const hBarOptions = {
-  ...base,
-  indexAxis: 'y',
-  plugins: { ...base.plugins, legend: { display: false } },
-  scales: {
-    x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
-    y: { grid: { display: false }, ticks: { font: { size: 10 } } },
-  },
-}
-
-const barOptions = {
-  ...base,
-  scales: {
-    x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-    y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
-  },
-}
-
-const stackedHBarOptions = {
-  ...base,
-  indexAxis: 'y',
-  scales: {
-    x: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } },
-    y: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-  },
-}
-
-const doughnutOptions = {
-  ...base,
-  cutout: '68%',
-  plugins: {
-    ...base.plugins,
-    legend: { position: 'bottom', labels: { usePointStyle: true, pointStyleWidth: 8, padding: 10, font: { size: 10 } } },
-  },
-}
-
-// ── Chart data ────────────────────────────────────────────────────────────────
-const monthlyTrendsData = computed(() => ({
-  labels: props.monthlyTrends.labels ?? [],
-  datasets: (props.monthlyTrends.datasets ?? []).map((d, i) => ({
-    label: d.label,
-    data: d.data,
-    borderColor: brandPalette[i % brandPalette.length],
-    backgroundColor: brandPalette[i % brandPalette.length] + '18',
-    tension: 0.4,
-    fill: false,
-    pointRadius: 3,
-    pointHoverRadius: 5,
-    borderWidth: 2,
-  })),
-}))
-
-const requestOverviewData = computed(() => ({
-  labels: props.requestOverview.map(r => r.label),
-  datasets: [
-    {
-      label: 'Pending',
-      data: props.requestOverview.map(r => r.pending),
-      backgroundColor: sem.pending + 'cc',
-      borderRadius: 4,
-    },
-    {
-      label: 'Completed',
-      data: props.requestOverview.map(r => r.completed ?? 0),
-      backgroundColor: sem.completed + 'cc',
-      borderRadius: 4,
-    },
-  ],
-}))
-
-const ipcrStatusData = computed(() => ({
-  labels: props.ipcrByStatus.map(r => r.status),
-  datasets: [{ data: props.ipcrByStatus.map(r => r.total), backgroundColor: brandPalette, borderWidth: 0 }],
-}))
-
-const itjrCategoryData = computed(() => ({
-  labels: props.itjrByCategory.map(r => r.category),
-  datasets: [{ data: props.itjrByCategory.map(r => r.total), backgroundColor: brandPalette, borderWidth: 0 }],
-}))
-
-const gsModules = ['Vehicle Requests', 'Facility Requests', 'Service Requests', 'Work Requests']
-const generalServicesData = computed(() => {
-  const rows = props.requestOverview.filter(r => gsModules.includes(r.label))
-  return {
-    labels: rows.map(r => r.label),
-    datasets: [{ data: rows.map(r => r.total), backgroundColor: brandPalette.slice(0, 4), borderWidth: 0 }],
-  }
+const profileLine = computed(() => {
+  const pieces = [props.profile?.position, props.profile?.division, props.profile?.office].filter(Boolean)
+  return pieces.length ? pieces.join(' · ') : 'Personal workspace'
 })
 
-const divisionSexData = computed(() => ({
-  labels: props.employeesByDivisionWithSex.map(d => d.name),
-  datasets: [
-    { label: 'Male',   data: props.employeesByDivisionWithSex.map(d => d.male),   backgroundColor: sem.male   + 'cc', borderRadius: 4 },
-    { label: 'Female', data: props.employeesByDivisionWithSex.map(d => d.female), backgroundColor: sem.female + 'cc', borderRadius: 4 },
-  ],
-}))
+const flattenedActions = computed(() => {
+  const approvals = (props.approvalTabs || []).flatMap(tab =>
+    (tab.items || []).slice(0, 4).map(item => ({
+      id: `approval-${tab.type}-${item.id}`,
+      label: tab.label,
+      title: item.summary || item.reference_no || 'Approval item',
+      meta: `${item.requester_name || 'Requester'} · ${item.status || 'Pending'}`,
+      date: item.filed_at,
+      tone: 'rose',
+      url: route('approvals.inbox'),
+    }))
+  )
 
-const pct = (n, t) => t > 0 ? Math.round(n / t * 100) : 0
+  const documents = (props.documentsForAction || []).map(item => ({
+    id: `document-${item.id}`,
+    label: item.is_overdue ? 'Overdue Document' : 'Document Routing',
+    title: item.title,
+    meta: [item.reference, item.status, item.due_at ? `Due ${formatDate(item.due_at)}` : null].filter(Boolean).join(' · '),
+    date: item.due_at,
+    tone: item.is_overdue ? 'red' : 'amber',
+    url: item.url,
+  }))
 
-const gadSummaryRows = computed(() => {
-  const libM = props.libraryAttendanceMaleByGrade.reduce((a, b) => a + b, 0)
-  const libF = props.libraryAttendanceFemaleByGrade.reduce((a, b) => a + b, 0)
-  const libT = libM + libF
-  const iT = (props.ipcrBySex.male + props.ipcrBySex.female + props.ipcrBySex.unspecified) || 0
-  const tT = (props.tnaBySex.male  + props.tnaBySex.female  + props.tnaBySex.unspecified)  || 0
-  const dT = (props.idpBySex.male  + props.idpBySex.female  + props.idpBySex.unspecified)  || 0
-  const rT = props.rewardsStats.total || 0
-  return [
-    { label: 'Employees',          total: props.totalEmployees,  male: props.employeeMaleCount,  female: props.employeeFemaleCount,  pctM: pct(props.employeeMaleCount,  props.totalEmployees), pctF: pct(props.employeeFemaleCount,  props.totalEmployees) },
-    { label: 'Students (Enrolled)', total: props.maleCount + props.femaleCount, male: props.maleCount, female: props.femaleCount, pctM: pct(props.maleCount, props.maleCount + props.femaleCount), pctF: pct(props.femaleCount, props.maleCount + props.femaleCount) },
-    { label: 'Library Attendance',  total: libT, male: libM, female: libF, pctM: pct(libM, libT), pctF: pct(libF, libT) },
-    { label: 'IPCR Submissions',    total: iT, male: props.ipcrBySex.male, female: props.ipcrBySex.female, pctM: pct(props.ipcrBySex.male, iT), pctF: pct(props.ipcrBySex.female, iT) },
-    { label: 'TNA Submissions',     total: tT, male: props.tnaBySex.male,  female: props.tnaBySex.female,  pctM: pct(props.tnaBySex.male,  tT), pctF: pct(props.tnaBySex.female,  tT) },
-    { label: 'IDP Submissions',     total: dT, male: props.idpBySex.male,  female: props.idpBySex.female,  pctM: pct(props.idpBySex.male,  dT), pctF: pct(props.idpBySex.female,  dT) },
-    { label: 'Reward Nominations',  total: rT, male: props.rewardsBySex.male, female: props.rewardsBySex.female, pctM: pct(props.rewardsBySex.male, rT), pctF: pct(props.rewardsBySex.female, rT) },
-  ]
+  const acknowledgments = (props.acknowledgments || []).map(item => ({
+    id: `ack-${item.id}`,
+    label: 'Acknowledgment',
+    title: item.title,
+    meta: [item.kind, item.reference].filter(Boolean).join(' · '),
+    date: item.date,
+    tone: 'indigo',
+    url: item.url,
+  }))
+
+  const evaluations = (props.activityEvaluations || []).map(item => ({
+    id: `eval-${item.id}`,
+    label: 'Activity Evaluation',
+    title: item.title,
+    meta: item.reference,
+    date: item.date,
+    tone: 'emerald',
+    url: item.url,
+  }))
+
+  return [...documents, ...approvals, ...acknowledgments, ...evaluations]
+    .sort((a, b) => scoreDate(a.date) - scoreDate(b.date))
+    .slice(0, 10)
 })
 
-const employeeGenderData = computed(() => ({
-  labels: ['Male', 'Female'],
-  datasets: [{ data: [props.employeeMaleCount, props.employeeFemaleCount], backgroundColor: [sem.male, sem.female], borderWidth: 0 }],
-}))
+const nextEvents = computed(() =>
+  (props.calendarEvents || [])
+    .filter(event => new Date(event.start) >= startOfToday())
+    .sort((a, b) => new Date(a.start) - new Date(b.start))
+    .slice(0, 5)
+)
 
-const studentGenderData = computed(() => ({
-  labels: ['Male', 'Female'],
-  datasets: [{ data: [props.maleCount, props.femaleCount], backgroundColor: [sem.male, sem.female], borderWidth: 0 }],
-}))
-
-const libraryAttendanceData = computed(() => ({
-  labels: ['G7', 'G8', 'G9', 'G10', 'G11', 'G12'],
-  datasets: [
-    { label: 'Male',   data: props.libraryAttendanceMaleByGrade,   backgroundColor: sem.male   + 'cc', borderRadius: 4 },
-    { label: 'Female', data: props.libraryAttendanceFemaleByGrade, backgroundColor: sem.female + 'cc', borderRadius: 4 },
-  ],
-}))
-
-// ── KPI Cards ─────────────────────────────────────────────────────────────────
-const kpiCards = computed(() => [
-  { label: 'Total Employees', value: props.totalEmployees, male: props.employeeMaleCount, female: props.employeeFemaleCount, sub: `${props.activeDivisions} divisions`, icon: UsersIcon,          color: 'bg-blue-500',    text: 'text-blue-600',   bg: 'bg-blue-50'   },
-  { label: 'Faculty',         value: props.facultyCount,   male: props.facultyMaleCount,  female: props.facultyFemaleCount,  sub: 'Teaching staff', icon: AcademicCapIcon, color: 'bg-indigo-500',  text: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { label: 'Staff',           value: props.staffCount,     male: props.staffMaleCount,    female: props.staffFemaleCount,    sub: 'Non-teaching',   icon: UsersIcon,       color: 'bg-violet-500',  text: 'text-violet-600', bg: 'bg-violet-50' },
-  { label: 'Students',        value: props.maleCount + props.femaleCount, male: props.maleCount, female: props.femaleCount, sub: `${props.scholarsCount} scholars`, icon: AcademicCapIcon, color: 'bg-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { label: 'IPCR For Review', value: props.ipcrForReview,  male: props.ipcrBySex.male, female: props.ipcrBySex.female, sub: 'Awaiting review', icon: DocumentCheckIcon,   color: 'bg-rose-500',    text: 'text-rose-600',   bg: 'bg-rose-50'   },
-])
-
-// ── Calendar ──────────────────────────────────────────────────────────────────
-const calendarOptions = {
+const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin],
   initialView: 'dayGridMonth',
   height: 'auto',
   fixedWeekCount: false,
   headerToolbar: { left: 'prev,next', center: 'title', right: '' },
+  dayMaxEventRows: 3,
   eventDisplay: 'block',
-  dayMaxEventRows: 2,
-  events: [],
+  events: props.calendarEvents || [],
+  eventClick(info) {
+    if (info.event.url) {
+      info.jsEvent.preventDefault()
+      window.location.href = info.event.url
+    }
+  },
+}))
+
+const summaryCards = computed(() => [
+  {
+    label: 'Needs Action',
+    value: props.summary?.needs_action ?? 0,
+    sub: `${props.summary?.approval_items ?? 0} approval item(s)`,
+    icon: InboxStackIcon,
+    tone: 'rose',
+  },
+  {
+    label: 'Documents Due',
+    value: props.summary?.documents_due ?? 0,
+    sub: `${props.summary?.overdue_documents ?? 0} overdue`,
+    icon: DocumentTextIcon,
+    tone: (props.summary?.overdue_documents ?? 0) > 0 ? 'red' : 'amber',
+  },
+  {
+    label: 'Unread Alerts',
+    value: props.summary?.unread_notifications ?? 0,
+    sub: 'Notifications for you',
+    icon: BellAlertIcon,
+    tone: 'indigo',
+  },
+  {
+    label: 'Active Requests',
+    value: props.summary?.active_requests ?? 0,
+    sub: 'Recent personal requests',
+    icon: ClipboardDocumentCheckIcon,
+    tone: 'sky',
+  },
+  {
+    label: 'Upcoming',
+    value: props.summary?.upcoming_events ?? 0,
+    sub: 'Calendar items',
+    icon: CalendarDaysIcon,
+    tone: 'emerald',
+  },
+])
+
+function startOfToday() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  return date
 }
 
-const showDateModal = ref(false)
-const selectedDate = ref('')
-const dateBookings = ref([])
-const loadingBookings = ref(false)
-const bookingsError = ref(null)
-const calendarContainer = ref(null)
-
-async function openDateModal(dateStr) {
-  selectedDate.value = dateStr
-  showDateModal.value = true
-  loadingBookings.value = true
-  bookingsError.value = null
-  try {
-    const res = await axios.get(route('facility-requests.byDate'), { params: { date: dateStr } })
-    dateBookings.value = res.data || []
-  } catch (e) {
-    bookingsError.value = 'Failed to load bookings'
-    dateBookings.value = []
-  } finally {
-    loadingBookings.value = false
-  }
+function scoreDate(value) {
+  if (!value) return Number.MAX_SAFE_INTEGER
+  return Math.abs(new Date(value).getTime() - Date.now())
 }
 
-onMounted(() => {
-  if (calendarContainer.value) {
-    calendarContainer.value.addEventListener('click', (ev) => {
-      let el = ev.target
-      while (el && el !== calendarContainer.value) {
-        if (el.dataset?.date) { openDateModal(el.dataset.date); return }
-        el = el.parentElement
-      }
-    })
+function formatDate(value) {
+  if (!value) return 'No date'
+  return new Date(value).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function timeAgo(value) {
+  if (!value) return ''
+  const diff = Math.floor((Date.now() - new Date(value).getTime()) / 1000)
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+function toneClass(tone, variant = 'soft') {
+  const classes = {
+    rose: {
+      soft: 'bg-rose-50 text-rose-700 border-rose-100',
+      icon: 'bg-rose-100 text-rose-700',
+      dot: 'bg-rose-500',
+    },
+    red: {
+      soft: 'bg-red-50 text-red-700 border-red-100',
+      icon: 'bg-red-100 text-red-700',
+      dot: 'bg-red-500',
+    },
+    amber: {
+      soft: 'bg-amber-50 text-amber-700 border-amber-100',
+      icon: 'bg-amber-100 text-amber-700',
+      dot: 'bg-amber-500',
+    },
+    indigo: {
+      soft: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+      icon: 'bg-indigo-100 text-indigo-700',
+      dot: 'bg-indigo-500',
+    },
+    sky: {
+      soft: 'bg-sky-50 text-sky-700 border-sky-100',
+      icon: 'bg-sky-100 text-sky-700',
+      dot: 'bg-sky-500',
+    },
+    emerald: {
+      soft: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      icon: 'bg-emerald-100 text-emerald-700',
+      dot: 'bg-emerald-500',
+    },
+    violet: {
+      soft: 'bg-violet-50 text-violet-700 border-violet-100',
+      icon: 'bg-violet-100 text-violet-700',
+      dot: 'bg-violet-500',
+    },
   }
-})
+  return classes[tone]?.[variant] || classes.indigo[variant]
+}
+
+function statusClass(status) {
+  const value = String(status || '').toLowerCase()
+  if (value.includes('approved') || value.includes('completed') || value.includes('released')) {
+    return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+  }
+  if (value.includes('declined') || value.includes('rejected') || value.includes('returned') || value.includes('cancelled')) {
+    return 'bg-red-50 text-red-700 border-red-100'
+  }
+  if (value.includes('pending') || value.includes('review') || value.includes('forwarded')) {
+    return 'bg-amber-50 text-amber-700 border-amber-100'
+  }
+  return 'bg-slate-50 text-slate-600 border-slate-100'
+}
 </script>
 
 <template>
+  <Head title="Dashboard" />
+
   <AdminLayout title="Dashboard">
-    <div class="dash-root">
-
-      <!-- ══════════════════════════════════════════════════════════
-           HERO BANNER
-      ══════════════════════════════════════════════════════════ -->
-      <div class="hero-banner">
-        <div class="hero-inner">
-          <div class="hero-left">
-            <div class="hero-avatar">
-              {{ (authUser?.name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') }}
+    <div class="space-y-5">
+      <section class="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex min-w-0 items-center gap-3">
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-indigo-100 bg-indigo-50 text-sm font-bold text-indigo-700">
+              {{ initials }}
             </div>
-            <div>
-              <h1 class="hero-greeting">
-                {{ greeting }}, {{ authUser?.name?.split(' ')[0] ?? 'Admin' }}
+            <div class="min-w-0">
+              <p class="text-sm text-slate-500">{{ today }}</p>
+              <h1 class="mt-0.5 truncate text-lg font-semibold text-slate-900 sm:text-xl">
+                {{ greeting }}, {{ (profile.name || authUser?.name || 'there').split(' ')[0] }}
               </h1>
-              <p class="hero-date">{{ today }}</p>
+              <p class="mt-1 truncate text-sm text-slate-500">{{ profileLine }}</p>
             </div>
           </div>
-          <div class="hero-right">
-            <div class="hero-pending-badge">
-              <ClockIcon class="h-3.5 w-3.5 shrink-0" />
-              <span class="font-bold">{{ totalPendingRequests }}</span>
-              <span class="opacity-80">pending items</span>
-            </div>
-            <p class="hero-pending-sub">across all modules</p>
+
+          <div class="flex flex-wrap gap-2">
+            <Link
+              v-for="link in quickLinks.slice(0, 3)"
+              :key="link.label"
+              :href="link.url"
+              class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition hover:-translate-y-0.5 hover:shadow-sm"
+              :class="toneClass(link.tone)"
+            >
+              {{ link.label }}
+              <ChevronRightIcon class="h-4 w-4" />
+            </Link>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- ══════════════════════════════════════════════════════════
-           GAD BANNER
-      ══════════════════════════════════════════════════════════ -->
-      <div class="gad-banner">
-        <span class="gad-icon">⚧</span>
-        <p class="gad-text">
-          <span class="gad-bold">Gender and Development Data Ready</span>
-          — Sex-disaggregated data in compliance with the Magna Carta of Women and DOST/PSHSS GAD requirements.
-        </p>
-        <div class="gad-legend">
-          <span class="gad-dot gad-dot-m"></span><span class="gad-legend-label">Male</span>
-          <span class="gad-dot gad-dot-f ml-3"></span><span class="gad-legend-label">Female</span>
-        </div>
-      </div>
-
-      <!-- ══════════════════════════════════════════════════════════
-           KPI STRIP
-      ══════════════════════════════════════════════════════════ -->
-      <div class="kpi-grid">
+      <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div
-          v-for="card in kpiCards"
+          v-for="card in summaryCards"
           :key="card.label"
-          class="kpi-card"
-          style="border-left-color: #2563eb"
+          class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
         >
-          <!-- Floating icon -->
-          <component :is="card.icon" :class="[card.text, 'kpi-icon-float']" />
-
-          <!-- Value -->
-          <p class="kpi-value">{{ card.value.toLocaleString() }}</p>
-          <p class="kpi-label">{{ card.label }}</p>
-
-          <!-- Sex bar -->
-          <template v-if="card.male !== undefined && card.female !== undefined">
-            <div class="kpi-sex-bar mt-2">
-              <div
-                class="kpi-sex-male"
-                :style="{ width: (card.male + card.female) > 0 ? `${Math.round(card.male / (card.male + card.female) * 100)}%` : '50%' }"
-              ></div>
-              <div class="kpi-sex-female flex-1"></div>
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase text-slate-500">{{ card.label }}</p>
+              <p class="mt-2 text-3xl font-bold tracking-normal text-slate-900">{{ Number(card.value).toLocaleString() }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ card.sub }}</p>
             </div>
-            <div class="kpi-sex-labels">
-              <span class="kpi-sex-m">{{ card.male.toLocaleString() }} M</span>
-              <span class="kpi-sex-f">F {{ card.female.toLocaleString() }}</span>
+            <div class="rounded-lg p-2" :class="toneClass(card.tone, 'icon')">
+              <component :is="card.icon" class="h-5 w-5" />
             </div>
-          </template>
-          <p v-else class="kpi-sub">{{ card.sub }}</p>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <!-- ══════════════════════════════════════════════════════════
-           MAIN 3-COL GRID
-      ══════════════════════════════════════════════════════════ -->
-      <div class="main-grid">
-
-        <!-- LEFT — 3 columns wide -->
-        <div class="main-left">
-
-          <!-- Monthly Trends -->
-          <div class="card">
-            <div class="card-header">
+      <section class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
+        <div class="space-y-5">
+          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div>
-                <p class="card-title">Monthly Request Trends</p>
-                <p class="card-sub">Submissions over the last 6 months</p>
+                <h2 class="text-sm font-semibold text-slate-900">Needs Action</h2>
+                <p class="text-xs text-slate-500">Approvals, routed documents, acknowledgments, and evaluations assigned to you</p>
               </div>
+              <Link v-if="approvalTabs.length" :href="route('approvals.inbox')" class="hidden text-sm font-medium text-indigo-600 hover:text-indigo-800 sm:inline">
+                Open Inbox
+              </Link>
             </div>
-            <div class="min-h-[260px]">
-              <Line v-if="monthlyTrends.labels?.length" :data="monthlyTrendsData" :options="lineOptions" />
-              <EmptyState v-else text="No trend data" />
+
+            <div v-if="flattenedActions.length" class="divide-y divide-slate-100">
+              <Link
+                v-for="item in flattenedActions"
+                :key="item.id"
+                :href="item.url"
+                class="flex gap-3 px-4 py-3 transition hover:bg-slate-50"
+              >
+                <span class="mt-2 h-2.5 w-2.5 shrink-0 rounded-full" :class="toneClass(item.tone, 'dot')" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="truncate text-sm font-semibold text-slate-900">{{ item.title }}</p>
+                    <span class="shrink-0 text-xs text-slate-400">{{ item.date ? formatDate(item.date) : '' }}</span>
+                  </div>
+                  <p class="mt-0.5 text-xs font-medium uppercase text-slate-500">{{ item.label }}</p>
+                  <p class="mt-1 truncate text-sm text-slate-500">{{ item.meta }}</p>
+                </div>
+                <ChevronRightIcon class="mt-3 h-4 w-4 shrink-0 text-slate-300" />
+              </Link>
+            </div>
+
+            <div v-else class="flex flex-col items-center justify-center px-4 py-14 text-center">
+              <CheckCircleIcon class="h-10 w-10 text-emerald-500" />
+              <p class="mt-3 text-sm font-semibold text-slate-800">Nothing needs your action right now.</p>
+              <p class="mt-1 max-w-md text-sm text-slate-500">New approvals, routed documents, acknowledgments, and activity evaluations will appear here.</p>
             </div>
           </div>
 
-          <!-- Request Overview + IPCR -->
-          <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
-            <div class="card md:col-span-2">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">Request Overview</p>
-                  <p class="card-sub">Pending vs completed per module</p>
-                </div>
-              </div>
-              <div class="min-h-[240px]">
-                <Bar v-if="requestOverview.length" :data="requestOverviewData" :options="hBarOptions" />
-                <EmptyState v-else text="No request data" />
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">IPCR Status</p>
-                  <p class="card-sub">By review stage</p>
-                </div>
-              </div>
-              <div class="min-h-[240px]">
-                <Doughnut v-if="ipcrByStatus.length" :data="ipcrStatusData" :options="doughnutOptions" />
-                <EmptyState v-else text="No IPCR data" />
-              </div>
-            </div>
-          </div>
-
-          <!-- IT + General Services -->
-          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">IT Job Requests</p>
-                  <p class="card-sub">Breakdown by category</p>
-                </div>
-              </div>
-              <div class="min-h-[220px]">
-                <Doughnut v-if="itjrByCategory.length" :data="itjrCategoryData" :options="doughnutOptions" />
-                <EmptyState v-else text="No data" />
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">General Services</p>
-                  <p class="card-sub">Vehicle · Facility · Service · Work</p>
-                </div>
-              </div>
-              <div class="min-h-[220px]">
-                <Doughnut
-                  v-if="generalServicesData.datasets[0].data.some(v => v > 0)"
-                  :data="generalServicesData"
-                  :options="doughnutOptions"
-                />
-                <EmptyState v-else text="No data" />
-              </div>
-            </div>
-          </div>
-
-          <!-- HR Analytics -->
-          <div class="section-head">HR Analytics</div>
-          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div class="card" v-if="employeesByDivisionWithSex.length">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">Employees by Division</p>
-                  <p class="card-sub">Top 10 — sex-disaggregated (M / F)</p>
-                </div>
-              </div>
-              <div class="min-h-[260px]">
-                <Bar :data="divisionSexData" :options="stackedHBarOptions" />
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">Employee Sex Breakdown</p>
-                  <p class="card-sub">{{ totalEmployees.toLocaleString() }} total employees</p>
-                </div>
-              </div>
-              <div class="min-h-[180px]">
-                <Doughnut
-                  v-if="employeeMaleCount + employeeFemaleCount > 0"
-                  :data="employeeGenderData"
-                  :options="doughnutOptions"
-                />
-                <EmptyState v-else text="No gender data" />
-              </div>
-              <div class="sex-pills mt-4">
-                <div class="sex-pill sex-pill-m">
-                  <p class="sex-pill-val">{{ employeeMaleCount.toLocaleString() }}</p>
-                  <p class="sex-pill-lbl">Male · {{ pct(employeeMaleCount, totalEmployees) }}%</p>
-                </div>
-                <div class="sex-pill sex-pill-f">
-                  <p class="sex-pill-val">{{ employeeFemaleCount.toLocaleString() }}</p>
-                  <p class="sex-pill-lbl">Female · {{ pct(employeeFemaleCount, totalEmployees) }}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Student Analytics -->
-          <div class="section-head">Student Analytics</div>
-          <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">Student Sex Breakdown</p>
-                  <p class="card-sub">{{ (maleCount + femaleCount).toLocaleString() }} enrolled</p>
-                </div>
-              </div>
-              <div class="min-h-[180px]">
-                <Doughnut v-if="maleCount + femaleCount > 0" :data="studentGenderData" :options="doughnutOptions" />
-                <EmptyState v-else text="No student data" />
-              </div>
-              <div class="sex-pills mt-4">
-                <div class="sex-pill sex-pill-m">
-                  <p class="sex-pill-val">{{ maleCount.toLocaleString() }}</p>
-                  <p class="sex-pill-lbl">Male · {{ pct(maleCount, maleCount + femaleCount) }}%</p>
-                </div>
-                <div class="sex-pill sex-pill-f">
-                  <p class="sex-pill-val">{{ femaleCount.toLocaleString() }}</p>
-                  <p class="sex-pill-lbl">Female · {{ pct(femaleCount, maleCount + femaleCount) }}%</p>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <p class="card-title">Library Traffic</p>
-                  <p class="card-sub">Current month by grade level</p>
-                </div>
-              </div>
-              <div class="min-h-[200px]">
-                <Bar :data="libraryAttendanceData" :options="barOptions" />
-              </div>
-            </div>
-          </div>
-
-          <!-- GAD Summary -->
-          <div class="section-head">GAD Summary — Sex-Disaggregated Data</div>
-          <div class="card overflow-hidden p-0">
-            <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div>
-                <p class="card-title">Institutional GAD Summary</p>
-                <p class="card-sub">RA 9710 — Magna Carta of Women compliance</p>
+                <h2 class="text-sm font-semibold text-slate-900">My Requests</h2>
+                <p class="text-xs text-slate-500">Recent requests you filed or own across modules</p>
               </div>
-              <span class="gad-chip">Sex-Disaggregated</span>
+              <ClockIcon class="h-5 w-5 text-slate-400" />
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full min-w-[680px] text-xs">
+
+            <div v-if="myRequests.length" class="overflow-x-auto">
+              <table class="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr class="border-b border-slate-100 bg-slate-50/70">
-                    <th class="px-4 py-2.5 text-left font-semibold text-slate-500">Indicator</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-slate-500">Total</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-blue-500">Male</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-blue-400">% M</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-pink-500">Female</th>
-                    <th class="px-3 py-2.5 text-right font-semibold text-pink-400">% F</th>
-                    <th class="px-4 py-2.5 text-left font-semibold text-slate-400">Distribution</th>
+                  <tr class="border-b border-slate-100 bg-slate-50/80 text-left text-xs font-semibold uppercase text-slate-500">
+                    <th class="px-4 py-3">Request</th>
+                    <th class="px-4 py-3">Module</th>
+                    <th class="px-4 py-3">Reference</th>
+                    <th class="px-4 py-3">Status</th>
+                    <th class="px-4 py-3 text-right">Updated</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr v-for="row in gadSummaryRows" :key="row.label"
-                    class="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                    <td class="px-4 py-2.5 font-medium text-slate-700">{{ row.label }}</td>
-                    <td class="px-3 py-2.5 text-right font-bold text-slate-800">{{ row.total.toLocaleString() }}</td>
-                    <td class="px-3 py-2.5 text-right text-blue-600">{{ row.male.toLocaleString() }}</td>
-                    <td class="px-3 py-2.5 text-right text-blue-400 font-medium">{{ row.pctM }}%</td>
-                    <td class="px-3 py-2.5 text-right text-pink-600">{{ row.female.toLocaleString() }}</td>
-                    <td class="px-3 py-2.5 text-right text-pink-400 font-medium">{{ row.pctF }}%</td>
-                    <td class="px-4 py-2.5">
-                      <div v-if="row.total > 0" class="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div class="h-full bg-blue-400 transition-all" :style="{ width: row.pctM + '%' }"></div>
-                        <div class="h-full bg-pink-400 transition-all" :style="{ width: row.pctF + '%' }"></div>
-                      </div>
-                      <span v-else class="text-slate-200">—</span>
+                <tbody class="divide-y divide-slate-100">
+                  <tr v-for="request in myRequests" :key="`${request.module}-${request.reference}`" class="hover:bg-slate-50">
+                    <td class="max-w-[280px] px-4 py-3">
+                      <Link :href="request.url" class="block truncate font-medium text-slate-900 hover:text-indigo-700">
+                        {{ request.title }}
+                      </Link>
                     </td>
+                    <td class="px-4 py-3 text-slate-500">{{ request.module }}</td>
+                    <td class="px-4 py-3 text-slate-500">{{ request.reference }}</td>
+                    <td class="px-4 py-3">
+                      <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium" :class="statusClass(request.status)">
+                        {{ request.status }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-right text-slate-400">{{ formatDateTime(request.updated_at) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </div>
 
-        </div><!-- /main-left -->
-
-        <!-- RIGHT SIDEBAR -->
-        <div class="main-right">
-
-          <!-- Facility Calendar -->
-          <div class="card overflow-hidden">
-            <p class="card-title mb-3">Facility Calendar</p>
-            <div class="rounded-xl overflow-hidden border border-slate-100 text-xs" ref="calendarContainer">
-              <FullCalendar :options="calendarOptions" />
+            <div v-else class="px-4 py-12 text-center text-sm text-slate-400">
+              No recent requests found.
             </div>
-          </div>
-
-          <!-- Pending Overview (merged Module Status + All Pending) -->
-          <div class="card">
-            <div class="flex items-center justify-between mb-3">
-              <p class="card-title">Pending Overview</p>
-              <span class="pending-total-badge">{{ totalPendingRequests }}</span>
-            </div>
-            <div class="space-y-1">
-              <div
-                v-for="item in requestOverview"
-                :key="item.label"
-                class="pending-row"
-              >
-                <span class="pending-row-label">{{ item.label }}</span>
-                <div class="flex items-center gap-2 shrink-0">
-                  <span v-if="item.pending > 0" class="pending-count">{{ item.pending }}</span>
-                  <span v-else class="text-xs text-slate-300">—</span>
-                  <span class="pending-total-small">/ {{ item.total }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent IPCR -->
-          <div class="card">
-            <p class="card-title mb-3">Recent IPCR</p>
-            <div v-if="recentIPCRs.length" class="space-y-3">
-              <div v-for="ipcr in recentIPCRs" :key="ipcr.id" class="ipcr-row">
-                <!-- Avatar initials -->
-                <div class="ipcr-avatar">
-                  {{ (ipcr.user ?? '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() }}
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="ipcr-name">{{ ipcr.user }}</p>
-                  <p class="ipcr-period">{{ ipcr.rating_period }}</p>
-                  <div class="flex items-center gap-2 mt-0.5">
-                    <span class="ipcr-status-chip">{{ ipcr.status }}</span>
-                    <span class="ipcr-date">{{ ipcr.updated_at }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p v-else class="text-xs text-slate-400">No recent submissions.</p>
-          </div>
-
-          <!-- HR Summary (compact stat grid) -->
-          <div class="card">
-            <p class="card-title mb-3">HR Summary</p>
-            <div class="hr-stat-grid">
-              <div class="hr-stat">
-                <p class="hr-stat-val">{{ totalEmployees.toLocaleString() }}</p>
-                <p class="hr-stat-lbl">Total Employees</p>
-              </div>
-              <div class="hr-stat">
-                <p class="hr-stat-val">{{ facultyCount.toLocaleString() }}</p>
-                <p class="hr-stat-lbl">Faculty</p>
-              </div>
-              <div class="hr-stat">
-                <p class="hr-stat-val">{{ staffCount.toLocaleString() }}</p>
-                <p class="hr-stat-lbl">Staff</p>
-              </div>
-              <div class="hr-stat">
-                <p class="hr-stat-val">{{ activeDivisions }}</p>
-                <p class="hr-stat-lbl">Divisions</p>
-              </div>
-              <div class="hr-stat hr-stat-male">
-                <p class="hr-stat-val text-blue-700">{{ employeeMaleCount.toLocaleString() }}</p>
-                <p class="hr-stat-lbl">Male</p>
-              </div>
-              <div class="hr-stat hr-stat-female">
-                <p class="hr-stat-val text-pink-700">{{ employeeFemaleCount.toLocaleString() }}</p>
-                <p class="hr-stat-lbl">Female</p>
-              </div>
-            </div>
-          </div>
-
-        </div><!-- /main-right -->
-      </div><!-- /main-grid -->
-    </div><!-- /dash-root -->
-
-    <!-- Facility Date Modal -->
-    <Teleport to="body">
-      <div v-if="showDateModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showDateModal = false" />
-        <div class="relative z-10 w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-          <div class="mb-4 flex items-center justify-between">
-            <h4 class="font-semibold text-slate-800">Facility Requests — {{ selectedDate }}</h4>
-            <button class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600" @click="showDateModal = false"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-          </div>
-          <div v-if="loadingBookings" class="py-8 text-center text-sm text-slate-400">Loading…</div>
-          <div v-else>
-            <p v-if="bookingsError" class="mb-3 text-sm text-red-500">{{ bookingsError }}</p>
-            <p v-if="!dateBookings.length" class="text-sm text-slate-400">No facility requests for this date.</p>
-            <ul v-else class="space-y-3 max-h-80 overflow-y-auto">
-              <li v-for="b in dateBookings" :key="b.id" class="rounded-xl border border-slate-100 p-4">
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <p class="text-sm font-semibold text-slate-800">{{ b.activity || '—' }}</p>
-                    <p class="text-xs text-slate-500 mt-0.5">{{ b.requester_name || '—' }} · {{ b.requester_unit || '' }}</p>
-                    <p class="text-xs text-slate-500">Venue: {{ (b.venue?.length ? b.venue.join(', ') : '—') }}</p>
-                    <p class="text-xs text-slate-500">{{ b.time_start || '—' }} — {{ b.time_end || '—' }}</p>
-                  </div>
-                  <div class="shrink-0 text-right space-y-1">
-                    <span :class="b.status?.includes('Approved') ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
-                      class="rounded-full px-2 py-0.5 text-xs font-medium">{{ b.status || '—' }}</span>
-                    <div>
-                      <span v-if="b.has_it_job" class="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
-                        IT: {{ b.it_job_status }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            </ul>
           </div>
         </div>
-      </div>
-    </Teleport>
+
+        <aside class="space-y-5">
+          <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-900">My Calendar</h2>
+                <p class="text-xs text-slate-500">Upcoming personal dates and due items</p>
+              </div>
+              <CalendarDaysIcon class="h-5 w-5 text-slate-400" />
+            </div>
+            <div class="dashboard-calendar rounded-lg border border-slate-100 text-xs">
+              <FullCalendar :options="calendarOptions" />
+            </div>
+
+            <div class="mt-4 space-y-2">
+              <p class="text-xs font-semibold uppercase text-slate-500">Next Up</p>
+              <Link
+                v-for="event in nextEvents"
+                :key="event.id"
+                :href="event.url"
+                class="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2 transition hover:bg-slate-50"
+              >
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="toneClass(event.type === 'overdue' ? 'red' : event.type === 'document' ? 'amber' : event.type === 'activity' ? 'emerald' : 'indigo', 'dot')" />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-slate-800">{{ event.title }}</p>
+                  <p class="text-xs text-slate-400">{{ formatDate(event.start) }}</p>
+                </div>
+              </Link>
+              <p v-if="!nextEvents.length" class="rounded-lg border border-slate-100 px-3 py-4 text-center text-sm text-slate-400">
+                No upcoming calendar items.
+              </p>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div>
+                <h2 class="text-sm font-semibold text-slate-900">Notifications</h2>
+                <p class="text-xs text-slate-500">Latest alerts addressed to you</p>
+              </div>
+              <BellAlertIcon class="h-5 w-5 text-slate-400" />
+            </div>
+
+            <div v-if="notifications.length" class="divide-y divide-slate-100">
+              <a
+                v-for="notification in notifications"
+                :key="notification.id"
+                :href="notification.url || '#'"
+                class="flex gap-3 px-4 py-3 transition hover:bg-slate-50"
+                :class="notification.read_at ? '' : 'bg-indigo-50/40'"
+              >
+                <span class="mt-2 h-2 w-2 shrink-0 rounded-full" :class="notification.read_at ? 'bg-slate-200' : 'bg-indigo-500'" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-3">
+                    <p class="truncate text-sm font-semibold text-slate-900">
+                      {{ notification.reference_no || notification.request_type }}
+                    </p>
+                    <span class="shrink-0 text-xs text-slate-400">{{ timeAgo(notification.created_at) }}</span>
+                  </div>
+                  <p class="mt-0.5 text-xs font-medium uppercase text-slate-500">{{ notification.request_type }}</p>
+                  <p class="mt-1 truncate text-sm text-indigo-700">{{ notification.status }}</p>
+                  <p v-if="notification.remarks" class="mt-0.5 truncate text-xs text-slate-500">{{ notification.remarks }}</p>
+                </div>
+              </a>
+            </div>
+
+            <div v-else class="px-4 py-10 text-center text-sm text-slate-400">
+              No notifications yet.
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-100 px-4 py-3">
+              <h2 class="text-sm font-semibold text-slate-900">Quick Links</h2>
+              <p class="text-xs text-slate-500">Common places based on your role and workload</p>
+            </div>
+            <div class="grid grid-cols-1 gap-2 p-4">
+              <Link
+                v-for="link in quickLinks"
+                :key="link.label"
+                :href="link.url"
+                class="group flex items-center gap-3 rounded-lg border p-3 transition hover:-translate-y-0.5 hover:shadow-sm"
+                :class="toneClass(link.tone)"
+              >
+                <UserCircleIcon class="h-5 w-5 shrink-0" />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-semibold">{{ link.label }}</p>
+                  <p class="truncate text-xs opacity-80">{{ link.description }}</p>
+                </div>
+                <ChevronRightIcon class="h-4 w-4 shrink-0 opacity-60 transition group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div
+            v-if="(summary.overdue_documents ?? 0) > 0"
+            class="rounded-lg border border-red-100 bg-red-50 p-4 text-red-800"
+          >
+            <div class="flex gap-3">
+              <ExclamationTriangleIcon class="h-5 w-5 shrink-0" />
+              <div>
+                <p class="text-sm font-semibold">You have overdue routed document(s).</p>
+                <p class="mt-1 text-sm text-red-700">Open the document from Needs Action and record the required action.</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+    </div>
   </AdminLayout>
 </template>
 
-<!-- Reusable local component -->
-<script>
-const EmptyState = {
-  props: ['text'],
-  template: `<div class="flex h-full min-h-[120px] items-center justify-center text-sm text-slate-300 gap-2"><span>—</span><span>{{ text }}</span></div>`,
-}
-export default { components: { EmptyState } }
-</script>
-
-<style>
-/* ════════════════════════════════════════════════════════════
-   ROOT
-════════════════════════════════════════════════════════════ */
-.dash-root {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-@media (min-width: 640px) {
-  .dash-root { gap: 1.25rem; }
+<style scoped>
+.dashboard-calendar :deep(.fc) {
+  --fc-border-color: #e2e8f0;
+  --fc-today-bg-color: #eef2ff;
+  font-family: inherit;
 }
 
-/* ════════════════════════════════════════════════════════════
-   HERO BANNER
-════════════════════════════════════════════════════════════ */
-.hero-banner {
-  position: relative;
-  overflow: hidden;
-  border-radius: .875rem;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  padding: 1rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-}
-
-.hero-inner {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.hero-left {
-  display: flex;
-  align-items: center;
-  gap: .875rem;
-  min-width: 0;
-}
-
-.hero-avatar {
-  height: 3rem;
-  width: 3rem;
-  border-radius: 99px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  font-size: .95rem;
-  font-weight: 800;
-  color: #1d4ed8;
-  letter-spacing: .02em;
-}
-
-.hero-greeting {
-  font-size: 1.05rem;
+.dashboard-calendar :deep(.fc-toolbar-title) {
+  font-size: .9rem;
   font-weight: 700;
   color: #0f172a;
-  letter-spacing: 0;
-  line-height: 1.2;
 }
 
-.hero-date {
-  font-size: .75rem;
-  color: #64748b;
-  margin-top: .2rem;
-}
-
-.hero-right {
-  width: 100%;
-  text-align: left;
-}
-
-.hero-pending-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: .4rem;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 99px;
-  padding: .35rem .85rem;
-  font-size: .8rem;
-  color: #92400e;
-}
-
-.hero-pending-sub {
-  font-size: .7rem;
-  color: #94a3b8;
-  margin-top: .3rem;
-}
-
-@media (min-width: 640px) {
-  .hero-banner { padding: 1.25rem 1.5rem; }
-  .hero-avatar {
-    height: 3.25rem;
-    width: 3.25rem;
-    font-size: 1.05rem;
-  }
-  .hero-greeting { font-size: 1.25rem; }
-  .hero-right {
-    width: auto;
-    text-align: right;
-  }
-}
-
-/* ════════════════════════════════════════════════════════════
-   GAD BANNER
-════════════════════════════════════════════════════════════ */
-.gad-banner {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: .5rem .75rem;
-  border-radius: .875rem;
-  background: #ffffff;
+.dashboard-calendar :deep(.fc-button) {
   border: 1px solid #e2e8f0;
-  border-left: 3px solid #2563eb;
-  padding: .75rem 1rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-}
-
-.gad-icon { font-size: 1.1rem; color: #7c3aed; flex-shrink: 0; }
-
-.gad-text { font-size: .75rem; color: #475569; flex: 1 1 16rem; }
-
-.gad-bold { font-weight: 700; color: #4c1d95; }
-
-.gad-legend {
-  display: flex;
-  align-items: center;
-  gap: .35rem;
-  flex: 1 1 100%;
-  font-size: .7rem;
-  font-weight: 600;
-}
-
-.gad-dot { display: inline-block; height: .55rem; width: .55rem; border-radius: 99px; flex-shrink: 0; }
-.gad-dot-m { background: #3b82f6; }
-.gad-dot-f { background: #ec4899; }
-.gad-legend-label { color: #64748b; }
-@media (min-width: 640px) {
-  .gad-banner { flex-wrap: nowrap; }
-  .gad-legend { flex: 0 0 auto; }
-}
-
-/* ════════════════════════════════════════════════════════════
-   KPI GRID
-════════════════════════════════════════════════════════════ */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-  gap: .75rem;
-}
-@media (min-width: 640px)  { .kpi-grid { gap: .875rem; } }
-@media (min-width: 1280px) { .kpi-grid { grid-template-columns: repeat(5, 1fr); } }
-
-.kpi-card {
-  position: relative;
-  background: #ffffff;
-  border-radius: .875rem;
-  border: 1px solid #e2e8f0;
-  border-left-width: 4px;
-  padding: 1rem .875rem .875rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-  transition: transform .18s, box-shadow .18s;
-  overflow: hidden;
-}
-@media (hover: hover) {
-  .kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(15, 23, 42, .08), 0 1px 3px rgba(15, 23, 42, .05);
-  }
-}
-@media (min-width: 640px) {
-  .kpi-card { padding: 1.25rem 1.125rem 1rem; }
-}
-
-.kpi-icon-float {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 1.35rem;
-  height: 1.35rem;
-  opacity: .4;
-}
-
-.kpi-value {
-  font-size: 1.65rem;
-  font-weight: 900;
-  color: #0f172a;
-  letter-spacing: 0;
-  line-height: 1;
-  margin-top: .375rem;
-}
-@media (min-width: 640px) {
-  .kpi-value { font-size: 2rem; }
-}
-
-.kpi-label {
-  font-size: .75rem;
-  font-weight: 600;
+  background: #fff;
   color: #475569;
-  margin-top: .375rem;
-  line-height: 1.3;
-}
-
-.kpi-sub {
-  font-size: .7rem;
-  color: #94a3b8;
-  margin-top: .3rem;
-}
-
-.kpi-sex-bar {
-  display: flex;
-  height: .25rem;
-  border-radius: 99px;
-  overflow: hidden;
-  background: #f1f5f9;
-}
-.kpi-sex-male  { background: #60a5fa; }
-.kpi-sex-female{ background: #f472b6; }
-
-.kpi-sex-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-top: .25rem;
-}
-.kpi-sex-m { font-size: .6rem; font-weight: 600; color: #3b82f6; }
-.kpi-sex-f { font-size: .6rem; font-weight: 600; color: #ec4899; }
-
-/* ════════════════════════════════════════════════════════════
-   MAIN LAYOUT
-════════════════════════════════════════════════════════════ */
-.main-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-@media (min-width: 1024px) {
-  .main-grid {
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 1.25rem;
-  }
-}
-
-.main-left  { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
-.main-right { display: flex; flex-direction: column; gap: 1rem; }
-@media (min-width: 640px) {
-  .main-left { gap: 1.25rem; }
-}
-
-/* ════════════════════════════════════════════════════════════
-   CARDS
-════════════════════════════════════════════════════════════ */
-.card {
-  background: #ffffff;
-  border-radius: .875rem;
-  border: 1px solid #e2e8f0;
-  padding: .875rem;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-  transition: box-shadow .2s;
-}
-@media (min-width: 640px) {
-  .card { padding: 1.125rem; }
-}
-@media (hover: hover) {
-  .card:hover {
-    box-shadow: 0 8px 22px rgba(15, 23, 42, .07), 0 1px 3px rgba(15, 23, 42, .04);
-  }
-}
-
-.card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: .875rem;
-}
-
-.card-title {
-  font-size: .8125rem;
-  font-weight: 700;
-  color: #1e293b;
-  letter-spacing: 0;
-}
-
-.card-sub {
-  font-size: .7rem;
-  color: #94a3b8;
-  margin-top: .125rem;
-}
-
-/* ════════════════════════════════════════════════════════════
-   SECTION HEADS
-════════════════════════════════════════════════════════════ */
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: .625rem;
-  font-size: .7rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: #475569;
-  padding-left: .625rem;
-  border-left: 3px solid #2563eb;
-}
-
-/* ════════════════════════════════════════════════════════════
-   SEX PILLS (employee / student breakdown)
-════════════════════════════════════════════════════════════ */
-.sex-pills { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-.sex-pill {
-  border-radius: .625rem;
-  padding: .5rem .625rem;
-  text-align: center;
-}
-.sex-pill-m { background: #eff6ff; }
-.sex-pill-f { background: #fdf2f8; }
-.sex-pill-val { font-size: 1rem; font-weight: 700; color: inherit; }
-.sex-pill-m .sex-pill-val { color: #1d4ed8; }
-.sex-pill-f .sex-pill-val { color: #be185d; }
-.sex-pill-lbl { font-size: .65rem; margin-top: .1rem; }
-.sex-pill-m .sex-pill-lbl { color: #60a5fa; }
-.sex-pill-f .sex-pill-lbl { color: #f472b6; }
-
-/* ════════════════════════════════════════════════════════════
-   GAD CHIP
-════════════════════════════════════════════════════════════ */
-.gad-chip {
-  border-radius: 99px;
-  background: #fdf2f8;
-  padding: .2rem .65rem;
-  font-size: .65rem;
-  font-weight: 700;
-  color: #be185d;
-  flex-shrink: 0;
-}
-
-/* ════════════════════════════════════════════════════════════
-   SIDEBAR — PENDING OVERVIEW
-════════════════════════════════════════════════════════════ */
-.pending-total-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #eef2ff;
-  color: #3730a3;
-  font-size: .7rem;
-  font-weight: 800;
-  padding: .1rem .55rem;
-  border-radius: 99px;
-  min-width: 1.75rem;
-}
-
-.pending-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: .35rem .5rem;
   border-radius: .5rem;
-  transition: background .12s;
-}
-.pending-row:hover { background: #f8fafc; }
-.pending-row-label { font-size: .7rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: .5rem; }
-.pending-count {
-  background: #fef3c7;
-  color: #92400e;
-  font-size: .65rem;
-  font-weight: 700;
-  padding: .1rem .4rem;
-  border-radius: 99px;
-}
-.pending-total-small { font-size: .6rem; color: #cbd5e1; }
-
-/* ════════════════════════════════════════════════════════════
-   SIDEBAR — RECENT IPCR
-════════════════════════════════════════════════════════════ */
-.ipcr-row { display: flex; align-items: flex-start; gap: .625rem; }
-
-.ipcr-avatar {
-  height: 1.75rem;
-  width: 1.75rem;
-  border-radius: 99px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: .55rem;
-  font-weight: 800;
-  color: #1d4ed8;
-  flex-shrink: 0;
-  letter-spacing: .02em;
+  padding: .25rem .45rem;
+  box-shadow: none;
 }
 
-.ipcr-name   { font-size: .75rem; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ipcr-period { font-size: .65rem; color: #94a3b8; }
-.ipcr-status-chip {
-  background: #eef2ff;
-  color: #4338ca;
-  font-size: .6rem;
-  font-weight: 600;
-  padding: .1rem .45rem;
-  border-radius: 99px;
-}
-.ipcr-date { font-size: .6rem; color: #cbd5e1; }
-
-/* ════════════════════════════════════════════════════════════
-   SIDEBAR — HR SUMMARY STAT GRID
-════════════════════════════════════════════════════════════ */
-.hr-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .5rem;
-}
-@media (min-width: 640px) {
-  .hr-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-.hr-stat {
+.dashboard-calendar :deep(.fc-button:hover),
+.dashboard-calendar :deep(.fc-button:focus) {
   background: #f8fafc;
-  border-radius: .5rem;
-  padding: .5rem .5rem .4rem;
-  text-align: center;
-}
-.hr-stat-male   { background: #eff6ff; }
-.hr-stat-female { background: #fdf2f8; }
-
-.hr-stat-val {
-  font-size: 1.05rem;
-  font-weight: 800;
   color: #0f172a;
-  letter-spacing: -.03em;
-}
-.hr-stat-lbl {
-  font-size: .6rem;
-  color: #94a3b8;
-  margin-top: .1rem;
 }
 
-@media (max-width: 640px) {
-  .dash-root .card-header {
-    gap: .75rem;
-    margin-bottom: .75rem;
-  }
-
-  .dash-root .min-h-\[260px\] { min-height: 220px; }
-  .dash-root .min-h-\[240px\] { min-height: 215px; }
-  .dash-root .min-h-\[220px\] { min-height: 200px; }
-  .dash-root .min-h-\[200px\] { min-height: 190px; }
-  .dash-root .min-h-\[180px\] { min-height: 175px; }
-
-  .dash-root .fc .fc-toolbar {
-    gap: .5rem;
-    padding: .6rem .7rem;
-  }
-
-  .dash-root .fc .fc-toolbar-title {
-    font-size: .85rem;
-  }
-
-  .dash-root .fc .fc-button {
-    font-size: 1rem;
-    padding: .15rem .25rem !important;
-  }
-
-  .dash-root .fc .fc-col-header-cell {
-    padding: .35rem 0;
-    font-size: .68rem;
-  }
-
-  .dash-root .fc .fc-daygrid-day {
-    padding: .1rem;
-  }
-
-  .dash-root .fc .fc-daygrid-day-number {
-    font-size: .72rem;
-    padding: .15rem;
-  }
-
-  .dash-root .fc .fc-daygrid-day-frame {
-    min-height: 2.25rem;
-  }
+.dashboard-calendar :deep(.fc-daygrid-day-number) {
+  color: #64748b;
+  font-size: .72rem;
+  padding: .25rem;
 }
+
+.dashboard-calendar :deep(.fc-col-header-cell-cushion) {
+  color: #475569;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dashboard-calendar :deep(.fc-event) {
+  border: 0;
+  border-radius: .35rem;
+  padding: .05rem .2rem;
+  font-size: .68rem;
+  font-weight: 600;
+}
+
+.dashboard-calendar :deep(.dash-calendar-leave) { background: #4f46e5; }
+.dashboard-calendar :deep(.dash-calendar-travel) { background: #0284c7; }
+.dashboard-calendar :deep(.dash-calendar-activity) { background: #059669; }
+.dashboard-calendar :deep(.dash-calendar-facility) { background: #7c3aed; }
+.dashboard-calendar :deep(.dash-calendar-vehicle) { background: #0f766e; }
+.dashboard-calendar :deep(.dash-calendar-service) { background: #d97706; }
+.dashboard-calendar :deep(.dash-calendar-document) { background: #f59e0b; color: #422006; }
+.dashboard-calendar :deep(.dash-calendar-overdue) { background: #dc2626; }
 </style>

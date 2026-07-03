@@ -26,6 +26,7 @@ const props = defineProps({
   isCurrentSY:        { type: Boolean, default: true },
   currentSYName:      { type: String, default: null },
   sameSubjectRecords: { type: Array, default: () => [] },
+  quizzes:            { type: Array, default: () => [] },
 })
 
 const page = usePage()
@@ -411,7 +412,7 @@ async function checkRecord() {
         <!-- Sub-tab bar -->
         <div class="flex gap-1 px-4 pt-1 border-b border-slate-50">
           <button
-            v-for="tab in ['setup', 'scores', 'attendance']" :key="tab"
+            v-for="tab in ['setup', 'scores', 'attendance', 'quiz']" :key="tab"
             @click="activeSubTab = tab"
             :class="[
               'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors',
@@ -419,8 +420,37 @@ async function checkRecord() {
                 ? 'bg-indigo-50 text-indigo-700'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50',
             ]">
-            {{ tab === 'setup' ? '⚙ Setup' : tab === 'scores' ? '📊 Scores & Grades' : '📋 Attendance' }}
+            {{ tab === 'setup' ? '⚙ Setup' : tab === 'scores' ? '📊 Scores & Grades' : tab === 'attendance' ? '📋 Attendance' : '🎮 Live Quiz' }}
           </button>
+        </div>
+
+        <!-- ── Live Quiz sub-tab ─────────────────────────────────────────── -->
+        <div v-if="activeSubTab === 'quiz'" class="p-5">
+          <div v-if="!isCurrentSY" class="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3 mb-4">
+            This class record is from a past school year — quizzes can't be hosted for locked records.
+          </div>
+          <template v-else>
+            <div class="flex justify-end mb-3">
+              <a
+                :href="route('quiz.create', { source_type: 'class_record', source_id: classRecord.id })"
+                class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+              >
+                <PlusIcon class="w-4 h-4" /> New Quiz
+              </a>
+            </div>
+            <div v-if="quizzes.length === 0" class="text-center py-10 text-sm text-slate-400">
+              No quizzes yet — create one to run a live review game with this class.
+            </div>
+            <div v-else class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+              <div v-for="q in quizzes" :key="q.id" class="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p class="text-sm font-medium text-slate-700">{{ q.title }}</p>
+                  <span class="text-xs text-slate-400 capitalize">{{ q.status }}</span>
+                </div>
+                <a :href="route('quiz.edit', q.id)" class="text-sm text-indigo-600 hover:underline">Manage</a>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- ── Setup sub-tab ─────────────────────────────────────────────── -->

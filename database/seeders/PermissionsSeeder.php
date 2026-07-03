@@ -139,6 +139,14 @@ class PermissionsSeeder extends Seeder
             ['module' => 'Registrar', 'name' => 'students.records.export',    'description' => 'Generate and download COE, Good Moral, and Clearance PDFs'],
             ['module' => 'Registrar', 'name' => 'students.promotion.process', 'description' => 'Run year-end promotion and advance students to next school year'],
             ['module' => 'Registrar', 'name' => 'students.analytics.view',    'description' => 'View enrollment analytics and performance dashboard'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.view',           'description' => 'View student year-end clearance records'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.manage',         'description' => 'Create clearance periods and generate student clearances'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.sign',           'description' => 'Sign office or administrative student clearance items'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.subject-sign',   'description' => 'Sign subject teacher clearance items'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.adviser-review', 'description' => 'Review class or section clearance completion as adviser'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.registrar',      'description' => 'Receive and finalize student year-end clearances'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.report',         'description' => 'Generate student clearance completion reports'],
+            ['module' => 'Student Clearance', 'name' => 'students.clearance.admin',          'description' => 'Administer all student clearance records and signatories'],
 
             // ── Student Health Records ────────────────────────────────────────
             ['module' => 'Student Health', 'name' => 'students.health.view',   'description' => 'View student medical records (allergies, immunizations, history, vitamins)'],

@@ -84,5 +84,8 @@ class DatabaseSeeder extends Seeder
 
         // ── Residence Hall (RHU) ────────────────────────────────────────────────
         $this->call(RhPermissionSeeder::class);
+
+        // ── Quiz (live interactive quiz/poll module) ────────────────────────────
+        $this->call(QuizPermissionSeeder::class);
     }
 }

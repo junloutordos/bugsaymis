@@ -38,6 +38,7 @@ const props = defineProps({
   canEdit:      Boolean,
   canManage:    Boolean,
   evaluations:  Object,
+  quizzes:      { type: Array, default: () => [] },
 })
 
 const page       = usePage()
@@ -433,6 +434,7 @@ async function removeCoPro(cp) {
           { key: 'participants', label: 'Participants', badge: participants.length },
           { key: 'coproponents', label: 'Co-Proponents', badge: activity.co_proponents.length },
           { key: 'evaluations',  label: 'Evaluations', badge: evaluations?.count ?? 0 },
+          { key: 'quizzes',      label: 'Quizzes', badge: quizzes.length },
         ]"
         :key="tab.key"
         @click="activeTab = tab.key"
@@ -1005,6 +1007,34 @@ async function removeCoPro(cp) {
         </template>
 
       </template>
+    </div>
+
+    <!-- ── QUIZZES TAB ─────────────────────────────────────────────────────── -->
+    <div v-if="activeTab === 'quizzes'" class="space-y-4">
+      <div v-if="canManage" class="flex justify-end">
+        <a
+          :href="route('quiz.create', { source_type: 'activity', source_id: activity.id })"
+          class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+        >
+          <PlusIcon class="w-4 h-4" /> New Quiz
+        </a>
+      </div>
+
+      <div v-if="quizzes.length === 0" class="bg-white rounded-xl border border-slate-200 py-16 text-center">
+        <ChartBarIcon class="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p class="text-sm text-slate-500">No quizzes attached to this activity yet.</p>
+        <p class="text-xs text-slate-400 mt-1">Run a live poll or review game during the session.</p>
+      </div>
+
+      <div v-else class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+        <div v-for="q in quizzes" :key="q.id" class="flex items-center justify-between px-4 py-3">
+          <div>
+            <p class="text-sm font-medium text-slate-700">{{ q.title }}</p>
+            <span class="text-xs text-slate-400 capitalize">{{ q.status }}</span>
+          </div>
+          <a :href="route('quiz.edit', q.id)" class="text-sm text-indigo-600 hover:underline">Manage</a>
+        </div>
+      </div>
     </div>
 
   </AdminLayout>
