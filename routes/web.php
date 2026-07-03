@@ -515,6 +515,21 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/work-requests/{workRequest}/complete', [WorkRequestController::class, 'complete'])
         ->name('work-requests.complete')
         ->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'save'])
+        ->name('work-requests.pre-repair-inspection.save')
+        ->middleware('permission:facilities.view');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection/submit', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'submit'])
+        ->name('work-requests.pre-repair-inspection.submit')
+        ->middleware('permission:facilities.view');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection/note', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'note'])
+        ->name('work-requests.pre-repair-inspection.note')
+        ->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection/return', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'returnForRevision'])
+        ->name('work-requests.pre-repair-inspection.return')
+        ->middleware('permission:facilities.manage');
+    Route::get('/work-requests/{workRequest}/pre-repair-inspection/print', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'print'])
+        ->name('work-requests.pre-repair-inspection.print')
+        ->middleware('permission:facilities.view');
 
     // Print view for a single work request (printable slip)
 

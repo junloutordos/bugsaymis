@@ -69,6 +69,32 @@
     <div class="section">
       <table>
         <tr>
+          <td class="label" style="width:30%">Pre-Repair Inspection</td>
+          <td class="box">
+            @if($inspection)
+              {{ ucfirst($inspection->status) }}
+              @if($inspection->inspector)
+                - Inspected by {{ $inspection->inspector->name }}
+              @endif
+              @if($inspection->inspected_at)
+                on {{ $inspection->inspected_at->format('F j, Y') }}
+              @endif
+            @else
+              {{ $workRequest->requires_pre_repair_inspection ? 'Required - pending' : 'Not required / legacy request' }}
+            @endif
+          </td>
+        </tr>
+        @if($inspection)
+        <tr>
+          <td class="label">Inspector Findings</td>
+          <td class="box">
+            <strong>Nature of Defect:</strong> {{ $inspection->nature_of_defect ?? '—' }}<br>
+            <strong>Cause of Defect:</strong> {{ $inspection->cause_of_defect ?? '—' }}<br>
+            <strong>Recommendations:</strong> {{ $inspection->recommendations ?? '—' }}
+          </td>
+        </tr>
+        @endif
+        <tr>
           <td class="label" style="width:30%">Assigned Personnel</td>
           <td class="box">{{ optional($workRequest->assignedUser)->name ?? '—' }}</td>
         </tr>
@@ -83,6 +109,32 @@
         <tr>
           <td class="label">Date Completed</td>
           <td class="box">{{ $workRequest->date_completed ? \Carbon\Carbon::parse($workRequest->date_completed)->format('F j, Y') : '—' }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <div class="label">Item C - To be filled-up and signed by FAD/PPF Representative/Inspector</div>
+      <table>
+        <tr>
+          <td class="label" style="width:20%">Acted by</td>
+          <td class="box">{{ optional($workRequest->actedBy)->name ?? optional($workRequest->assignedUser)->name ?? '—' }}</td>
+          <td class="label" style="width:20%">Inspected by</td>
+          <td class="box">{{ optional($inspection?->inspector)->name ?? '—' }}</td>
+        </tr>
+        <tr>
+          <td class="label">Remarks</td>
+          <td class="box" colspan="3">
+            @if($workRequest->status === 'Completed')
+              Tasks successfully completed and functional/working.
+            @elseif($inspection && str_contains(strtolower($inspection->recommendations ?? ''), 'replace'))
+              Task may require replacement or further action based on inspection recommendation.
+            @elseif($inspection)
+              {{ $inspection->recommendations ?? '—' }}
+            @else
+              —
+            @endif
+          </td>
         </tr>
       </table>
     </div>
