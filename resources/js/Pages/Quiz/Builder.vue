@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
@@ -9,6 +9,8 @@ import AppInput from '@/Components/AppInput.vue'
 import AppTextarea from '@/Components/AppTextarea.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AppModal from '@/Components/AppModal.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import FlashMessage from '@/Components/FlashMessage.vue'
 import {
   PlusIcon,
   TrashIcon,
@@ -25,6 +27,9 @@ const props = defineProps({
   source_type: { type: String, default: null },
   source_id: { type: [String, Number], default: null },
 })
+
+const page = usePage()
+const flash = computed(() => page.props.flash ?? {})
 
 // ── New quiz — title/description only, then hand off to the full builder ──
 const newQuizForm = reactive({ title: '', description: '' })
@@ -216,6 +221,7 @@ const showPreview = ref(false)
 <template>
   <Head :title="quiz ? quiz.title : 'Create Quiz'" />
   <AdminLayout title="Quiz Builder">
+    <FlashMessage :success="flash.success" :error="flash.error" />
 
     <!-- ── Step 1: no quiz yet — collect a title first ── -->
     <template v-if="!quiz">
@@ -235,6 +241,7 @@ const showPreview = ref(false)
     <template v-else>
       <AppPageHeader :title="quiz.title" subtitle="Build your quiz — changes save as you go">
         <template #actions>
+          <AppBadge :color="quiz.status === 'published' ? 'green' : 'slate'">{{ quiz.status }}</AppBadge>
           <AppButton variant="secondary" @click="showPreview = true"><EyeIcon class="h-4 w-4" /> Preview</AppButton>
           <AppButton :variant="quiz.status === 'published' ? 'secondary' : 'success'" @click="togglePublish">
             {{ quiz.status === 'published' ? 'Unpublish' : 'Publish' }}

@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
 import AppInput from '@/Components/AppInput.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import FlashMessage from '@/Components/FlashMessage.vue'
 import {
   PlusIcon,
   QuestionMarkCircleIcon,
@@ -20,6 +21,9 @@ import {
 const props = defineProps({
   quizzes: Array,
 })
+
+const page = usePage()
+const flash = computed(() => page.props.flash ?? {})
 
 const search = ref('')
 
@@ -62,6 +66,7 @@ function deleteQuiz(quiz) {
 <template>
   <Head title="Quizzes" />
   <AdminLayout title="Quizzes">
+    <FlashMessage :success="flash.success" :error="flash.error" />
     <AppPageHeader title="Quizzes" subtitle="Build and host live interactive quizzes for activities and classes">
       <template #actions>
         <AppButton variant="primary" @click="router.visit(route('quiz.create'))">
