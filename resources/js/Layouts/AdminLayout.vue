@@ -1337,6 +1337,13 @@ const menuItems = [
         href: route("ams.my-activities.index"),
         icon: UserCircleIcon,
       },
+      {
+        label: "Monitor",
+        routeName: "ams.monitor.index",
+        href: route("ams.monitor.index"),
+        icon: ChartBarIcon,
+        permissions: ["activities.monitor"],
+      },
     ],
   },
   // {
