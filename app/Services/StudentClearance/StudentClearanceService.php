@@ -2,10 +2,15 @@
 
 namespace App\Services\StudentClearance;
 
+use App\Models\Borrowing;
 use App\Models\ClassRecord\ClassRecord;
+use App\Models\Discipline\DisciplineCase;
 use App\Models\FacultyLoading\LoadAssignment;
 use App\Models\FacultyLoading\SchoolYear;
+use App\Models\Registrar\StudentAcademicStanding;
 use App\Models\Registrar\StudentEnrollment;
+use App\Models\ResidenceHall\RhFeeLedger;
+use App\Models\ResidenceHall\RhIncident;
 use App\Models\ResidenceHall\RhIntern;
 use App\Models\Student;
 use App\Models\StudentClearance\StudentClearance;
@@ -168,7 +173,56 @@ class StudentClearanceService
             }
         }
 
+        $this->applyAdvisoryBlockers($clearance, $enrollment, $student);
+        $this->refreshClearanceStatus($clearance);
+
         return $created;
+    }
+
+    public function applyAdvisoryBlockers(StudentClearance $clearance, StudentEnrollment $enrollment, Student $student): void
+    {
+        $blockers = $this->advisoryBlockers($enrollment, $student);
+
+        $clearance->items()->get()->each(function (StudentClearanceItem $item) use ($blockers) {
+            $itemBlockers = $blockers[$item->requirement_code] ?? [];
+
+            if ($itemBlockers === []) {
+                if ($item->blocker_metadata && $item->status === 'hold' && ! $item->signed_by) {
+                    $item->update([
+                        'status'             => 'pending',
+                        'accountability'     => null,
+                        'remarks'            => null,
+                        'blocker_summary'    => null,
+                        'blocker_metadata'   => null,
+                        'blocker_checked_at' => now(),
+                    ]);
+                } elseif ($item->blocker_metadata) {
+                    $item->update([
+                        'blocker_summary'    => null,
+                        'blocker_metadata'   => null,
+                        'blocker_checked_at' => now(),
+                    ]);
+                }
+
+                return;
+            }
+
+            $summary = collect($itemBlockers)->pluck('summary')->implode("\n");
+
+            $updates = [
+                'blocker_summary'    => $summary,
+                'blocker_metadata'   => $itemBlockers,
+                'blocker_checked_at' => now(),
+            ];
+
+            if (in_array($item->status, ['pending', 'hold'], true) && ! $item->signed_by) {
+                $updates['status'] = 'hold';
+                $updates['accountability'] = $summary;
+                $updates['remarks'] = 'Advisory blocker detected by system sync. The assigned signatory may clear, waive, or keep this on hold after review.';
+            }
+
+            $item->update($updates);
+        });
     }
 
     public function canActOnItem(User $user, StudentClearanceItem $item): bool
@@ -321,6 +375,120 @@ class StudentClearanceService
                 'assigned_user_id'    => $assignment->user_id,
                 'sort_order'          => 100 + $index,
             ]);
+    }
+
+    private function advisoryBlockers(StudentEnrollment $enrollment, Student $student): array
+    {
+        $blockers = [];
+
+        $openBorrowings = Borrowing::where(function ($query) {
+                $query->where('borrower_type', Student::class)
+                    ->orWhere('borrower_type', 'student')
+                    ->orWhere('borrower_type', 'Student');
+            })
+            ->where('borrower_id', $student->id)
+            ->whereNull('return_date')
+            ->where('status', 'Borrowed')
+            ->count();
+
+        if ($openBorrowings > 0) {
+            $blockers['office:library'][] = [
+                'source'  => 'library_borrowings',
+                'count'   => $openBorrowings,
+                'summary' => "{$openBorrowings} active library borrowing(s) with no return date.",
+            ];
+        }
+
+        $openDisciplineCases = DisciplineCase::where('student_id', $student->id)
+            ->where('school_year_id', $enrollment->school_year_id)
+            ->whereNotIn('status', ['resolved', 'dismissed', 'cancelled'])
+            ->count();
+
+        if ($openDisciplineCases > 0) {
+            $blockers['office:discipline'][] = [
+                'source'  => 'discipline_cases',
+                'count'   => $openDisciplineCases,
+                'summary' => "{$openDisciplineCases} open discipline case(s) for this school year.",
+            ];
+        }
+
+        $rhIntern = RhIntern::where('student_id', $student->id)
+            ->where('school_year_id', $enrollment->school_year_id)
+            ->whereIn('status', ['active', 'suspended'])
+            ->first();
+
+        if ($rhIntern) {
+            $unpaidFees = RhFeeLedger::where('rh_intern_id', $rhIntern->id)
+                ->where('is_paid', false)
+                ->count();
+            $openIncidents = RhIncident::where('rh_intern_id', $rhIntern->id)
+                ->where('status', 'open')
+                ->count();
+
+            if ($unpaidFees > 0 || $openIncidents > 0) {
+                $parts = [];
+                if ($unpaidFees > 0) {
+                    $parts[] = "{$unpaidFees} unpaid RH fee ledger item(s)";
+                }
+                if ($openIncidents > 0) {
+                    $parts[] = "{$openIncidents} open RH incident(s)";
+                }
+
+                $blockers['office:residence_hall'][] = [
+                    'source'  => 'residence_hall',
+                    'count'   => $unpaidFees + $openIncidents,
+                    'summary' => implode('; ', $parts).'.',
+                ];
+            }
+        }
+
+        $medicalSections = ['allergies', 'immunizations', 'medical_history', 'vitamins'];
+        $submittedMedical = DB::table('student_form_submissions')
+            ->where('pisaysystemID', $student->pisaysystemID)
+            ->where('school_year_id', $enrollment->school_year_id)
+            ->whereIn('section', $medicalSections)
+            ->pluck('section')
+            ->all();
+        $missingMedical = array_values(array_diff($medicalSections, $submittedMedical));
+
+        if ($missingMedical !== []) {
+            $blockers['office:medical'][] = [
+                'source'   => 'student_portal_medical',
+                'sections' => $missingMedical,
+                'summary'  => 'Missing student portal medical section(s): '.implode(', ', $missingMedical).'.',
+            ];
+        }
+
+        $profileSections = ['academic', 'activities', 'social', 'career', 'residence', 'health'];
+        $submittedProfile = DB::table('student_form_submissions')
+            ->where('pisaysystemID', $student->pisaysystemID)
+            ->where('school_year_id', $enrollment->school_year_id)
+            ->whereIn('section', $profileSections)
+            ->pluck('section')
+            ->all();
+        $missingProfile = array_values(array_diff($profileSections, $submittedProfile));
+
+        if ($missingProfile !== []) {
+            $blockers['office:registrar'][] = [
+                'source'   => 'student_portal_profile',
+                'sections' => $missingProfile,
+                'summary'  => 'Missing student portal profile section(s): '.implode(', ', $missingProfile).'.',
+            ];
+        }
+
+        $standing = StudentAcademicStanding::where('student_id', $student->id)
+            ->where('school_year_id', $enrollment->school_year_id)
+            ->first();
+
+        if ($standing && (float) $standing->gwa > 2.25) {
+            $blockers['office:guidance'][] = [
+                'source'  => 'academic_standing',
+                'gwa'     => (float) $standing->gwa,
+                'summary' => 'Guidance conference required because GWA is above 2.25: '.$standing->gwa.'.',
+            ];
+        }
+
+        return $blockers;
     }
 
     private function officeItems(StudentEnrollment $enrollment, Student $student): Collection

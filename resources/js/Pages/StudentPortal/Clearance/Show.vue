@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { Head } from '@inertiajs/vue3'
+import { Head, Link } from '@inertiajs/vue3'
 import StudentPortalLayout from '@/Layouts/StudentPortalLayout.vue'
 import { CheckCircleIcon, ClockIcon, ExclamationTriangleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 
@@ -74,9 +74,14 @@ function statusIcon(status) {
               {{ student.full_name }} <span v-if="clearance">/ Grade {{ clearance.grade_level }} {{ clearance.section_name }}</span>
             </p>
           </div>
-          <div v-if="clearance" class="rounded-lg border border-slate-200 px-4 py-3 text-right">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</p>
-            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ progress.done }}/{{ progress.total }}</p>
+          <div v-if="clearance" class="flex flex-col items-start gap-3 sm:items-end">
+            <div class="rounded-lg border border-slate-200 px-4 py-3 text-right">
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</p>
+              <p class="mt-1 text-2xl font-semibold text-slate-900">{{ progress.done }}/{{ progress.total }}</p>
+            </div>
+            <Link :href="route('student-portal.clearance.pdf')" target="_blank" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              Download PDF
+            </Link>
           </div>
         </div>
 
@@ -115,7 +120,8 @@ function statusIcon(status) {
                 <p class="text-sm font-medium text-slate-900">{{ item.requirement_label }}</p>
               </div>
               <p v-if="item.assigned_to" class="mt-1 text-xs text-slate-500">{{ item.assigned_to }}</p>
-              <p v-if="item.accountability" class="mt-2 text-sm text-amber-700">{{ item.accountability }}</p>
+              <p v-if="item.blocker_summary" class="mt-2 text-sm text-amber-700">{{ item.blocker_summary }}</p>
+              <p v-else-if="item.accountability" class="mt-2 text-sm text-amber-700">{{ item.accountability }}</p>
               <p v-if="item.remarks" class="mt-1 text-sm text-slate-500">{{ item.remarks }}</p>
             </div>
             <div class="sm:text-right">

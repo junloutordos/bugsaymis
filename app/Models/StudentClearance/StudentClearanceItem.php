@@ -25,6 +25,9 @@ class StudentClearanceItem extends Model
         'status',
         'remarks',
         'accountability',
+        'blocker_summary',
+        'blocker_metadata',
+        'blocker_checked_at',
         'signed_by',
         'signed_at',
         'sort_order',
@@ -37,6 +40,8 @@ class StudentClearanceItem extends Model
         'load_assignment_id'   => 'integer',
         'assigned_user_id'     => 'integer',
         'signed_by'            => 'integer',
+        'blocker_metadata'     => 'array',
+        'blocker_checked_at'   => 'datetime',
         'signed_at'            => 'datetime',
         'sort_order'           => 'integer',
     ];

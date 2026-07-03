@@ -219,6 +219,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('student-clearance.show')
         ->middleware('permission:students.clearance.view|students.clearance.sign|students.clearance.subject-sign|students.clearance.manage|students.clearance.registrar|class-records.view');
 
+    Route::get('/student-clearance/{clearance}/pdf', [ClearanceController::class, 'download'])
+        ->name('student-clearance.pdf')
+        ->middleware('permission:students.clearance.view|students.clearance.sign|students.clearance.subject-sign|students.clearance.manage|students.clearance.registrar|class-records.view');
+
     Route::post('/student-clearance/{clearance}/adviser-review', [ClearanceController::class, 'adviserReview'])
         ->name('student-clearance.adviser-review')
         ->middleware('permission:students.clearance.adviser-review|students.clearance.manage|students.clearance.registrar|class-records.view');
@@ -233,4 +237,5 @@ Route::middleware(['auth'])->group(function () {
 Route::prefix('student-portal')->name('student-portal.')->middleware('student.portal')->group(function () {
     Route::get('/grades', [GradesController::class, 'index'])->name('grades');
     Route::get('/clearance', [StudentPortalClearanceController::class, 'show'])->name('clearance');
+    Route::get('/clearance/pdf', [StudentPortalClearanceController::class, 'download'])->name('clearance.pdf');
 });

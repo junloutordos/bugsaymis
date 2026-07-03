@@ -87,6 +87,9 @@ function finalizeClearance() {
               <ClipboardDocumentCheckIcon class="h-4 w-4" />
               Adviser Review
             </button>
+            <a :href="route('student-clearance.pdf', clearance.id)" target="_blank" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              PDF
+            </a>
             <button @click="finalizeClearance" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
               <CheckCircleIcon class="h-4 w-4" />
               Finalize
@@ -121,7 +124,8 @@ function finalizeClearance() {
               <p class="mt-1 text-xs text-slate-500">
                 {{ item.assigned_to ?? item.assigned_permission ?? 'Unassigned' }}
               </p>
-              <p v-if="item.accountability" class="mt-2 text-sm text-amber-700">{{ item.accountability }}</p>
+              <p v-if="item.blocker_summary" class="mt-2 text-sm text-amber-700">{{ item.blocker_summary }}</p>
+              <p v-else-if="item.accountability" class="mt-2 text-sm text-amber-700">{{ item.accountability }}</p>
               <p v-if="item.remarks" class="mt-1 text-sm text-slate-500">{{ item.remarks }}</p>
             </div>
             <div class="lg:text-right">

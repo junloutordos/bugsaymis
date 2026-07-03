@@ -71,6 +71,7 @@ class SignatoryQueueController extends Controller
                     'status'            => $item->status,
                     'remarks'           => $item->remarks,
                     'accountability'    => $item->accountability,
+                    'blocker_summary'   => $item->blocker_summary,
                     'signed_by'         => $item->signer?->name,
                     'signed_at'         => $item->signed_at?->format('Y-m-d H:i'),
                 ];

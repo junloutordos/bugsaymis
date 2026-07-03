@@ -7,11 +7,13 @@ use App\Models\FacultyLoading\SchoolYear;
 use App\Models\Student;
 use App\Models\StudentClearance\StudentClearance;
 use App\Models\StudentClearance\StudentClearancePeriod;
+use App\Services\StudentClearance\StudentClearancePdfService;
 use App\Services\StudentClearance\StudentClearanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class ClearanceController extends Controller
 {
@@ -85,13 +87,7 @@ class ClearanceController extends Controller
 
     public function show(StudentClearance $clearance): Response
     {
-        $user = request()->user();
-        abort_unless(
-            $user->hasAnyPermission(['students.clearance.view', 'students.clearance.manage', 'students.clearance.registrar', 'students.clearance.admin'])
-            || $clearance->adviser_id === $user->id
-            || $clearance->items()->where('assigned_user_id', $user->id)->exists(),
-            403
-        );
+        $this->authorizeClearanceAccess($clearance);
 
         $clearance->load([
             'period.schoolYear:id,name,is_current',
@@ -106,6 +102,21 @@ class ClearanceController extends Controller
 
         return Inertia::render('StudentClearance/Show', [
             'clearance' => $this->serializeDetailClearance($clearance, $student),
+        ]);
+    }
+
+    public function download(StudentClearance $clearance, StudentClearancePdfService $pdfService): SymfonyResponse
+    {
+        $this->authorizeClearanceAccess($clearance);
+
+        $student = Student::where('id', $clearance->student_id)->firstOrFail();
+        $pdf = $pdfService->generate($clearance);
+        $filename = 'Year_End_Clearance_'.str_replace([',', ' '], ['', '_'], $student->full_name).'.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$filename}\"",
+            'Cache-Control'       => 'private, no-cache',
         ]);
     }
 
@@ -135,6 +146,25 @@ class ClearanceController extends Controller
             'closes_at'           => $period->closes_at?->format('Y-m-d'),
             'target_grade_levels' => $period->target_grade_levels ?: [],
         ];
+    }
+
+    private function authorizeClearanceAccess(StudentClearance $clearance): void
+    {
+        $user = request()->user();
+        $assignedPermissions = $clearance->items()
+            ->whereNotNull('assigned_permission')
+            ->pluck('assigned_permission')
+            ->unique()
+            ->values()
+            ->all();
+
+        abort_unless(
+            $user->hasAnyPermission(['students.clearance.view', 'students.clearance.manage', 'students.clearance.registrar', 'students.clearance.admin'])
+            || $clearance->adviser_id === $user->id
+            || $clearance->items()->where('assigned_user_id', $user->id)->exists()
+            || ($assignedPermissions !== [] && $user->hasAnyPermission($assignedPermissions)),
+            403
+        );
     }
 
     private function stats(StudentClearancePeriod $period): array
@@ -191,6 +221,7 @@ class ClearanceController extends Controller
                 'status'            => $item->status,
                 'remarks'           => $item->remarks,
                 'accountability'    => $item->accountability,
+                'blocker_summary'   => $item->blocker_summary,
                 'assigned_to'       => $item->assignedUser?->name,
                 'assigned_permission' => $item->assigned_permission,
                 'signed_by'         => $item->signer?->name,
