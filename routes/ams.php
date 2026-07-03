@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AMS\ActivityController;
+use App\Http\Controllers\AMS\ActivityFileController;
+use App\Http\Controllers\AMS\ActivityMonitorController;
 use App\Http\Controllers\AMS\CertificateController;
 use App\Http\Controllers\AMS\EvaluationController;
 use App\Http\Controllers\AMS\MyActivityController;
@@ -11,11 +13,14 @@ use Illuminate\Support\Facades\Route;
 | AMS — Activity Management System
 |--------------------------------------------------------------------------
 |
-| All routes require the activities.manage permission.
+| Manage/create routes require activities.manage; index/show are also
+| reachable by activities.view_all and activities.monitor (read-only —
+| ownership-based authorizeEdit()/authorizeManage() in the controller still
+| block mutation actions for non-owners).
 |
 */
 
-Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|activities.view_all'])
+Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|activities.view_all|activities.monitor'])
     ->prefix('ams/activities')
     ->name('ams.activities.')
     ->group(function () {
@@ -59,9 +64,22 @@ Route::middleware(['web', 'auth', 'verified', 'permission:activities.manage|acti
         Route::get('/{activity}/students/{attendance}/certificate',
             [CertificateController::class, 'downloadStudent'])->name('certificates.download.student');
 
+        // ── Attachment proxy (private S3, or legacy disk('public') redirect) ────
+        Route::get('/{activity}/file/{field}', [ActivityFileController::class, 'show'])
+            ->name('file')
+            ->where('field', '[a-z_]+');
+
         // ── Show (registered last so /{activity} never shadows specific routes)
         Route::get('/{activity}',   [ActivityController::class, 'show'])->name('show');
 
+    });
+
+// ── Monitoring dashboard (evaluation committee/management/administrator) ──────
+Route::middleware(['web', 'auth', 'verified', 'permission:activities.monitor'])
+    ->prefix('ams/monitor')
+    ->name('ams.monitor.')
+    ->group(function () {
+        Route::get('/', [ActivityMonitorController::class, 'index'])->name('index');
     });
 
 // ── My Activities (authenticated, any user) ───────────────────────────────────

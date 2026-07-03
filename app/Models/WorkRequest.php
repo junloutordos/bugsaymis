@@ -27,6 +27,11 @@ class WorkRequest extends Model
         'date_completed',
         'requester_id',
         'status',
+        'requires_pre_repair_inspection',
+    ];
+
+    protected $casts = [
+        'requires_pre_repair_inspection' => 'boolean',
     ];
 
     public function division()
@@ -57,5 +62,10 @@ class WorkRequest extends Model
     public function actedBy()
     {
         return $this->belongsTo(User::class, 'acted_by_id');
+    }
+
+    public function preRepairInspection()
+    {
+        return $this->hasOne(WorkRequestPreRepairInspection::class);
     }
 }

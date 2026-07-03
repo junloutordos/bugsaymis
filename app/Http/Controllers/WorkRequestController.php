@@ -46,7 +46,15 @@ class WorkRequestController extends Controller
         $user = Auth::user();
         $search = trim($request->input('search', ''));
         $perPage = min(max((int) $request->input('per_page', 15), 10), 100);
-        $query = WorkRequest::with(['division', 'office', 'assignedUser', 'requester', 'actedBy'])->orderByDesc('created_at');
+        $query = WorkRequest::with([
+            'division',
+            'office',
+            'assignedUser',
+            'requester',
+            'actedBy',
+            'preRepairInspection.inspector:id,name',
+            'preRepairInspection.notedBy:id,name',
+        ])->orderByDesc('created_at');
 
         $canViewAll = $user->hasAnyRole(['Administrator', 'GSU Head', 'DivisionChief'])
             || str_contains($user->position ?? '', 'FAD');
@@ -118,6 +126,7 @@ class WorkRequestController extends Controller
 
         $data['requester_id'] = $userId;
         $data['status'] = 'Pending';
+        $data['requires_pre_repair_inspection'] = true;
 
         $wr = WorkRequest::create($data);
 
@@ -278,6 +287,19 @@ class WorkRequestController extends Controller
         $assigned = $request->query('assigned_user_id');
         if ($assigned) {
             $workRequest->assigned_user_id = $assigned;
+        }
+
+        if ($workRequest->requires_pre_repair_inspection && $workRequest->assigned_user_id && ! $workRequest->preRepairInspection) {
+            \App\Models\WorkRequestPreRepairInspection::create([
+                'work_request_id' => $workRequest->id,
+                'inspector_id' => $workRequest->assigned_user_id,
+                'status' => 'draft',
+                'asset_type' => 'building_facility',
+                'building_facility' => $workRequest->division?->name,
+                'location' => collect([$workRequest->division?->name, $workRequest->office?->name])->filter()->implode(' / '),
+                'description' => $workRequest->description,
+                'location_of_defect' => collect([$workRequest->division?->name, $workRequest->office?->name])->filter()->implode(' / '),
+            ]);
         }
 
         // mark as GSU Approved
@@ -667,6 +689,19 @@ class WorkRequestController extends Controller
                     Mail::to($assigned->email)->queue(new WorkRequestAssignedMail($workRequest));
                 }
 
+                if ($workRequest->requires_pre_repair_inspection && ! $workRequest->preRepairInspection) {
+                    \App\Models\WorkRequestPreRepairInspection::create([
+                        'work_request_id' => $workRequest->id,
+                        'inspector_id' => $workRequest->assigned_user_id,
+                        'status' => 'draft',
+                        'asset_type' => 'building_facility',
+                        'building_facility' => $workRequest->division?->name,
+                        'location' => collect([$workRequest->division?->name, $workRequest->office?->name])->filter()->implode(' / '),
+                        'description' => $workRequest->description,
+                        'location_of_defect' => collect([$workRequest->division?->name, $workRequest->office?->name])->filter()->implode(' / '),
+                    ]);
+                }
+
                 // set status to pending FAD approval
                 $workRequest->status = 'Pending FAD Approval';
                 $workRequest->save();
@@ -701,6 +736,16 @@ class WorkRequestController extends Controller
     public function complete(Request $request, WorkRequest $workRequest)
     {
         // Authorization enforced by route middleware (role:Administrator|GSU Head)
+        $workRequest->loadMissing('preRepairInspection');
+
+        if (
+            $workRequest->requires_pre_repair_inspection
+            && $workRequest->preRepairInspection?->status !== 'noted'
+        ) {
+            return back()->withErrors([
+                'inspection' => 'A noted Pre-Repair Inspection Report is required before marking this work request completed.',
+            ]);
+        }
 
         $data = $request->validate([
             'acted_by_id' => 'nullable|exists:users,id',
@@ -732,7 +777,15 @@ class WorkRequestController extends Controller
      */
     public function print(WorkRequest $workRequest)
     {
-        $workRequest->load(['division', 'office', 'assignedUser', 'requester', 'actedBy']);
+        $workRequest->load([
+            'division',
+            'office',
+            'assignedUser',
+            'requester',
+            'actedBy',
+            'preRepairInspection.inspector',
+            'preRepairInspection.notedBy',
+        ]);
         $sigs = $this->loadSigsForPrint(WorkRequest::class, $workRequest->id);
 
         $verifyUrl = route('document.verify.doc', ['type' => 'work-request', 'id' => $workRequest->id]);
@@ -740,6 +793,7 @@ class WorkRequestController extends Controller
 
         return view('work_requests.print_ticket', [
             'workRequest' => $workRequest,
+            'inspection'  => $workRequest->preRepairInspection,
             'sigs'        => $sigs,
             'qrSvg'       => $qrSvg,
             'verifyUrl'   => $verifyUrl,

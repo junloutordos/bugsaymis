@@ -1095,10 +1095,38 @@ const menuItems = [
     ],
   },
   {
+    label: "Travel",
+    icon: CalendarDaysIcon,
+    roles: ["Administrator", "Faculty", "Staff", "DivisionChief", "OCD", "FAD Chief", "Budget Officer", "Bookkeeper", "Accountant", "Cashier"],
+    children: [
+      {
+        label: "Dashboard",
+        routeName: "travel.dashboard",
+        href: route("travel.dashboard"),
+        icon: ChartBarIcon,
+        permissions: ["travel.view"],
+      },
+      {
+        label: "Travel Requests",
+        routeName: "travel.index",
+        href: route("travel.index"),
+        icon: ClipboardDocumentListIcon,
+        permissions: ["travel.view"],
+      },
+    ],
+  },
+  {
     label: "General Services",
     icon: WrenchScrewdriverIcon,
-    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief","OCD"],
+    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD", "FAD Chief"],
     children: [
+      {
+        label: "Dashboard",
+        routeName: "general-services.dashboard",
+        href: route("general-services.dashboard"),
+        icon: ChartBarIcon,
+        roles: ["Administrator", "GSU Head", "DivisionChief", "OCD", "FAD Chief"],
+      },
       {
         label: "Vehicle Request",
         routeName: "vehicle-requests.index",

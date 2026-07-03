@@ -305,6 +305,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['verified'])
         ->name('dashboard');
 
+    Route::get('/general-services/dashboard', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'index'])
+        ->name('general-services.dashboard');
+    Route::get('/general-services/dashboard/events', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'events'])
+        ->name('general-services.dashboard.events');
+
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
@@ -348,6 +353,30 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         Route::post('/{oedIssuance}/acknowledge', [\App\Http\Controllers\KnowledgeManagementController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{oedIssuance}/file',         [\App\Http\Controllers\KnowledgeManagementController::class, 'viewFile'])->name('file');
         Route::get('/{oedIssuance}/download',     [\App\Http\Controllers\KnowledgeManagementController::class, 'download'])->name('download');
+    });
+
+    // ── Travel ───────────────────────────────────────────────────────────────
+    Route::prefix('travel')->name('travel.')->middleware('permission:travel.view')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\TravelController::class, 'dashboard'])->name('dashboard');
+        Route::get('/', [\App\Http\Controllers\TravelController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\TravelController::class, 'store'])->name('store')->middleware('permission:travel.create');
+        Route::get('/{travel}', [\App\Http\Controllers\TravelController::class, 'show'])->name('show');
+        Route::put('/{travel}', [\App\Http\Controllers\TravelController::class, 'update'])->name('update');
+        Route::post('/{travel}/submit', [\App\Http\Controllers\TravelController::class, 'submit'])->name('submit');
+        Route::post('/{travel}/division-approve', [\App\Http\Controllers\TravelController::class, 'divisionApprove'])->name('division-approve')->middleware('permission:travel.approve.division');
+        Route::post('/{travel}/fad-review', [\App\Http\Controllers\TravelController::class, 'fadReview'])->name('fad-review')->middleware('permission:travel.review.fad');
+        Route::post('/{travel}/ocd-approve', [\App\Http\Controllers\TravelController::class, 'ocdApprove'])->name('ocd-approve')->middleware('permission:travel.approve.ocd');
+        Route::post('/{travel}/return', [\App\Http\Controllers\TravelController::class, 'returnForRevision'])->name('return');
+        Route::post('/{travel}/complete', [\App\Http\Controllers\TravelController::class, 'complete'])->name('complete')->middleware('permission:travel.review.fad|travel.finance');
+        Route::post('/{travel}/liquidate', [\App\Http\Controllers\TravelController::class, 'liquidate'])->name('liquidate')->middleware('permission:travel.finance');
+        Route::post('/{travel}/itinerary', [\App\Http\Controllers\TravelController::class, 'saveItinerary'])->name('itinerary.save');
+        Route::post('/{travel}/links', [\App\Http\Controllers\TravelController::class, 'saveLinks'])->name('links.save');
+        Route::post('/{travel}/flight-authority', [\App\Http\Controllers\TravelController::class, 'saveFlightAuthority'])->name('flight-authority.save');
+        Route::post('/{travel}/flight-authority/approve', [\App\Http\Controllers\TravelController::class, 'approveFlightAuthority'])->name('flight-authority.approve')->middleware('permission:travel.review.fad');
+        Route::post('/{travel}/attachments', [\App\Http\Controllers\TravelController::class, 'uploadAttachment'])->name('attachments.store');
+        Route::get('/{travel}/attachments/{attachment}', [\App\Http\Controllers\TravelController::class, 'downloadAttachment'])->name('attachments.download');
+        Route::delete('/{travel}/attachments/{attachment}', [\App\Http\Controllers\TravelController::class, 'deleteAttachment'])->name('attachments.destroy');
+        Route::get('/{travel}/iot/print', [\App\Http\Controllers\TravelController::class, 'printIot'])->name('iot.print');
     });
 
 
@@ -510,6 +539,21 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::post('/work-requests/{workRequest}/complete', [WorkRequestController::class, 'complete'])
         ->name('work-requests.complete')
         ->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'save'])
+        ->name('work-requests.pre-repair-inspection.save')
+        ->middleware('permission:facilities.view');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection/submit', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'submit'])
+        ->name('work-requests.pre-repair-inspection.submit')
+        ->middleware('permission:facilities.view');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection/note', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'note'])
+        ->name('work-requests.pre-repair-inspection.note')
+        ->middleware('permission:facilities.manage');
+    Route::post('/work-requests/{workRequest}/pre-repair-inspection/return', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'returnForRevision'])
+        ->name('work-requests.pre-repair-inspection.return')
+        ->middleware('permission:facilities.manage');
+    Route::get('/work-requests/{workRequest}/pre-repair-inspection/print', [\App\Http\Controllers\WorkRequestPreRepairInspectionController::class, 'print'])
+        ->name('work-requests.pre-repair-inspection.print')
+        ->middleware('permission:facilities.view');
 
     // Print view for a single work request (printable slip)
 

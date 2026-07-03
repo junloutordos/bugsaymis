@@ -13,6 +13,8 @@ use App\Models\AMS\ActivityStudentAttendance;
 use App\Models\FacultyLoading\Section;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\AMS\ActivityEvaluationSummaryService;
+use App\Services\AMS\ActivityFileService;
 use App\Services\AMS\CertificateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,7 +25,13 @@ use Inertia\Inertia;
 
 class ActivityController extends Controller
 {
-    public function __construct(private CertificateService $certService) {}
+    private const FILE_FIELDS = ['banner', 'special_order', 'activity_report', 'official_documentation'];
+
+    public function __construct(
+        private CertificateService $certService,
+        private ActivityFileService $fileService,
+        private ActivityEvaluationSummaryService $evalSummaryService,
+    ) {}
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
@@ -32,7 +40,7 @@ class ActivityController extends Controller
         $user  = Auth::user();
         $query = Activity::with('creator')->orderByDesc('start_date');
 
-        if (!$user->isSuperAdmin() && !$user->hasPermission('activities.view_all')) {
+        if (!$user->isSuperAdmin() && !$user->hasAnyPermission(['activities.view_all', 'activities.monitor'])) {
             $coProponentIds = ActivityCoProponent::where('employee_id', $user->id)->pluck('activity_id');
             $query->where(function ($q) use ($user, $coProponentIds) {
                 $q->where('user_id', $user->id)->orWhereIn('id', $coProponentIds);
@@ -56,10 +64,24 @@ class ActivityController extends Controller
     public function store(Request $request)
     {
         $this->requireManage();
-        $data            = $this->validated($request);
+        $data      = $this->validated($request);
+        $mealPlans = $data['meal_plans'] ?? [];
+        $speakers  = $data['speakers'] ?? [];
+        unset($data['meal_plans'], $data['speakers']);
+        foreach (self::FILE_FIELDS as $field) {
+            unset($data[$field]);
+        }
         $data['user_id'] = Auth::id();
-        $data            = array_merge($data, $this->handleUploads($request));
-        Activity::create($data);
+
+        $activity = Activity::create($data);
+
+        $uploads = $this->handleUploads($request, $activity);
+        if ($uploads) {
+            $activity->update($uploads);
+        }
+
+        $this->syncMealPlans($activity, $mealPlans);
+        $this->syncSpeakers($activity, $speakers);
 
         return redirect()->route('ams.activities.index')->with('success', 'Activity created.');
     }
@@ -67,7 +89,7 @@ class ActivityController extends Controller
     public function show(Activity $activity)
     {
         $this->authorizeView($activity);
-        $activity->load(['creator', 'coProponents.employee', 'participants', 'studentAttendance']);
+        $activity->load(['creator', 'coProponents.employee', 'participants', 'studentAttendance', 'mealPlans', 'speakers']);
 
         $sectionIds  = $activity->participants->where('participant_type', 'section')->pluck('participant_id');
         $employeeIds = $activity->participants->where('participant_type', 'employee')->pluck('participant_id');
@@ -126,6 +148,7 @@ class ActivityController extends Controller
     public function edit(Activity $activity)
     {
         $this->authorizeEdit($activity);
+        $activity->load(['mealPlans', 'speakers']);
         return Inertia::render('AMS/Form', [
             'activity'  => $this->mapActivity($activity),
             'employees' => $this->employeeList(),
@@ -135,8 +158,19 @@ class ActivityController extends Controller
     public function update(Request $request, Activity $activity)
     {
         $this->authorizeEdit($activity);
-        $data = array_merge($this->validated($request), $this->handleUploads($request, $activity));
-        $activity->update($data);
+        $data      = $this->validated($request);
+        $mealPlans = $data['meal_plans'] ?? [];
+        $speakers  = $data['speakers'] ?? [];
+        unset($data['meal_plans'], $data['speakers']);
+        foreach (self::FILE_FIELDS as $field) {
+            unset($data[$field]);
+        }
+
+        $uploads = $this->handleUploads($request, $activity, $activity);
+        $activity->update(array_merge($data, $uploads));
+
+        $this->syncMealPlans($activity, $mealPlans);
+        $this->syncSpeakers($activity, $speakers);
 
         return redirect()->route('ams.activities.show', $activity)->with('success', 'Activity updated.');
     }
@@ -144,8 +178,8 @@ class ActivityController extends Controller
     public function destroy(Activity $activity)
     {
         $this->authorizeEdit($activity);
-        foreach (['banner', 'special_order', 'activity_report', 'official_documentation'] as $f) {
-            if ($activity->$f) Storage::disk('public')->delete($activity->$f);
+        foreach (self::FILE_FIELDS as $f) {
+            $this->fileService->delete($activity->$f);
         }
         $activity->delete();
 
@@ -447,7 +481,7 @@ class ActivityController extends Controller
     private function authorizeView(Activity $activity): void
     {
         $user = Auth::user();
-        if ($user->isSuperAdmin() || $user->hasPermission('activities.view_all')) return;
+        if ($user->isSuperAdmin() || $user->hasAnyPermission(['activities.view_all', 'activities.monitor'])) return;
 
         $isOwner = $activity->user_id === $user->id;
         $isCo    = ActivityCoProponent::where('activity_id', $activity->id)->where('employee_id', $user->id)->exists();
@@ -483,6 +517,7 @@ class ActivityController extends Controller
     {
         return $request->validate([
             'title'           => 'required|string|max:255',
+            'activity_type'   => 'required|in:in_house,training_workshop_seminar',
             'start_date'      => 'required|date',
             'start_time'      => 'nullable|date_format:H:i',
             'end_date'        => 'required|date|after_or_equal:start_date',
@@ -490,23 +525,102 @@ class ActivityController extends Controller
             'total_hours'     => 'nullable|string|max:25',
             'venue'           => 'nullable|string|max:255',
             'resource_person' => 'nullable|string|max:255',
-            'banner'          => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'special_order'   => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'activity_report' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
-            'official_documentation' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
+            'what_to_bring'   => 'nullable|string|max:5000',
+
+            'meal_plans'             => 'nullable|array',
+            'meal_plans.*.date'      => 'required|date',
+            'meal_plans.*.am_snacks' => 'nullable|boolean',
+            'meal_plans.*.lunch'     => 'nullable|boolean',
+            'meal_plans.*.pm_snacks' => 'nullable|boolean',
+            'meal_plans.*.dinner'    => 'nullable|boolean',
+
+            'speakers'               => 'required_if:activity_type,training_workshop_seminar|array|min:1',
+            'speakers.*.id'          => 'nullable|integer',
+            'speakers.*.name'        => 'required|string|max:255',
+            'speakers.*.designation' => 'nullable|string|max:255',
+            'speakers.*.topic'       => 'nullable|string|max:255',
+
+            // base64 data URIs — Cloudflare WAF blocks multipart/form-data uploads
+            'banner'                 => 'nullable|string|max:7000000',
+            'special_order'          => 'nullable|string|max:7000000',
+            'activity_report'        => 'nullable|string|max:14000000',
+            'official_documentation' => 'nullable|string|max:14000000',
         ]);
     }
 
-    private function handleUploads(Request $request, ?Activity $existing = null): array
+    private function syncMealPlans(Activity $activity, array $mealPlans): void
+    {
+        $activity->mealPlans()->delete();
+
+        foreach ($mealPlans as $mp) {
+            if (empty($mp['am_snacks']) && empty($mp['lunch']) && empty($mp['pm_snacks']) && empty($mp['dinner'])) {
+                continue;
+            }
+            $activity->mealPlans()->create([
+                'date'      => $mp['date'],
+                'am_snacks' => (bool) ($mp['am_snacks'] ?? false),
+                'lunch'     => (bool) ($mp['lunch'] ?? false),
+                'pm_snacks' => (bool) ($mp['pm_snacks'] ?? false),
+                'dinner'    => (bool) ($mp['dinner'] ?? false),
+            ]);
+        }
+    }
+
+    /**
+     * Updates/creates speakers by id where possible and only removes ones no
+     * longer present, so existing speaker evaluations aren't wiped out by an
+     * unrelated edit to the speaker list (removing a speaker cascades their
+     * evaluations, which is intentional).
+     */
+    private function syncSpeakers(Activity $activity, array $speakers): void
+    {
+        $keepIds = [];
+
+        foreach ($speakers as $i => $sp) {
+            if (empty($sp['name'])) continue;
+
+            $attrs = [
+                'name'        => $sp['name'],
+                'designation' => $sp['designation'] ?? null,
+                'topic'       => $sp['topic'] ?? null,
+                'sort_order'  => $i,
+            ];
+
+            $speaker = !empty($sp['id']) ? $activity->speakers()->find($sp['id']) : null;
+            if ($speaker) {
+                $speaker->update($attrs);
+            } else {
+                $speaker = $activity->speakers()->create($attrs);
+            }
+            $keepIds[] = $speaker->id;
+        }
+
+        $activity->speakers()->whereNotIn('id', $keepIds ?: [0])->delete();
+    }
+
+    private function handleUploads(Request $request, Activity $activity, ?Activity $existing = null): array
     {
         $paths = [];
-        foreach (['banner', 'special_order', 'activity_report', 'official_documentation'] as $field) {
-            if ($request->hasFile($field)) {
-                if ($existing && $existing->$field) Storage::disk('public')->delete($existing->$field);
-                $paths[$field] = $request->file($field)->store("ams/{$field}s", 'public');
+        foreach (self::FILE_FIELDS as $field) {
+            $dataUri = $request->input($field);
+            if ($dataUri && str_starts_with($dataUri, 'data:')) {
+                if ($existing && $existing->$field) {
+                    $this->fileService->delete($existing->$field);
+                }
+                $paths[$field] = $this->fileService->uploadBase64File($activity->id, $field, $dataUri);
             }
         }
         return $paths;
+    }
+
+    private function resolveFileUrl(?string $stored, Activity $activity, string $field): ?string
+    {
+        if (!$stored) return null;
+        if (str_starts_with($stored, 's3.')) {
+            return route('ams.activities.file', [$activity->id, $field]);
+        }
+        // Legacy pre-refactor uploads still on Storage::disk('public')
+        return Storage::disk('public')->url($stored);
     }
 
     private function mapActivity(Activity $a): array
@@ -514,6 +628,7 @@ class ActivityController extends Controller
         return [
             'id'                     => $a->id,
             'title'                  => $a->title,
+            'activity_type'          => $a->activity_type,
             'start_date'             => $a->start_date?->toDateString(),
             'start_time'             => $a->start_time,
             'end_date'               => $a->end_date?->toDateString(),
@@ -521,10 +636,11 @@ class ActivityController extends Controller
             'total_hours'            => $a->total_hours,
             'venue'                  => $a->venue,
             'resource_person'        => $a->resource_person,
-            'banner'                 => $a->banner ? Storage::disk('public')->url($a->banner) : null,
-            'special_order'          => $a->special_order ? Storage::disk('public')->url($a->special_order) : null,
-            'activity_report'        => $a->activity_report ? Storage::disk('public')->url($a->activity_report) : null,
-            'official_documentation' => $a->official_documentation ? Storage::disk('public')->url($a->official_documentation) : null,
+            'what_to_bring'          => $a->what_to_bring,
+            'banner'                 => $this->resolveFileUrl($a->banner, $a, 'banner'),
+            'special_order'          => $this->resolveFileUrl($a->special_order, $a, 'special_order'),
+            'activity_report'        => $this->resolveFileUrl($a->activity_report, $a, 'activity_report'),
+            'official_documentation' => $this->resolveFileUrl($a->official_documentation, $a, 'official_documentation'),
             'creator'                => $a->relationLoaded('creator') && $a->creator
                 ? ['id' => $a->creator->id, 'name' => $a->creator->name]
                 : null,
@@ -535,103 +651,30 @@ class ActivityController extends Controller
                     'name'        => $cp->employee?->name,
                 ])->values()->all()
                 : [],
+            'meal_plans'             => $a->relationLoaded('mealPlans')
+                ? $a->mealPlans->map(fn($mp) => [
+                    'id'        => $mp->id,
+                    'date'      => $mp->date->toDateString(),
+                    'am_snacks' => $mp->am_snacks,
+                    'lunch'     => $mp->lunch,
+                    'pm_snacks' => $mp->pm_snacks,
+                    'dinner'    => $mp->dinner,
+                ])->values()->all()
+                : [],
+            'speakers'               => $a->relationLoaded('speakers')
+                ? $a->speakers->map(fn($s) => [
+                    'id'          => $s->id,
+                    'name'        => $s->name,
+                    'designation' => $s->designation,
+                    'topic'       => $s->topic,
+                ])->values()->all()
+                : [],
         ];
     }
 
     private function buildEvaluationSummary(Activity $activity): array
     {
-        $rows = ActivityEvaluation::where('activity_id', $activity->id)
-            ->orderByDesc('created_at')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            return ['count' => 0, 'sections' => [], 'responses' => []];
-        }
-
-        $weights = ActivityEvaluation::WEIGHTS;
-
-        $sections = [
-            'A' => [
-                'label'     => 'Objectives',
-                'questions' => [
-                    'obj_1' => 'The activity was aligned with the school\'s vision and mission.',
-                    'obj_2' => 'The objectives were relevant to the needs of the participants.',
-                    'obj_3' => 'The activity contributed to the academic, personal, or social development of the participants.',
-                    'obj_4' => 'The objectives were achieved.',
-                ],
-            ],
-            'B' => [
-                'label'     => 'Management',
-                'questions' => [
-                    'mgmt_1' => 'Organizers and staff were visible and responsive.',
-                    'mgmt_2' => 'Coordination and flow of the program were clear.',
-                    'mgmt_3' => 'Time was managed effectively.',
-                    'mgmt_4' => 'Transitions between parts of the activity were smooth.',
-                    'mgmt_5' => 'The activity was well-organized.',
-                    'mgmt_6' => 'Participants were actively engaged.',
-                ],
-            ],
-            'C' => [
-                'label'     => 'Physical Arrangements',
-                'questions' => [
-                    'phys_1' => 'Venue and materials were ready and adequate.',
-                    'phys_2' => 'The sound system and equipment functioned properly.',
-                    'phys_3' => 'Participants were properly guided within the venue.',
-                ],
-            ],
-        ];
-
-        $allOptions = ['strongly_agree', 'agree', 'neutral', 'disagree', 'strongly_disagree', 'not_applicable'];
-
-        $builtSections = [];
-        foreach ($sections as $key => $section) {
-            $questions = [];
-            $sectionScores = [];
-
-            foreach ($section['questions'] as $field => $label) {
-                $dist = array_fill_keys($allOptions, 0);
-                $scores = [];
-
-                foreach ($rows as $row) {
-                    $val = $row->$field;
-                    if ($val) $dist[$val] = ($dist[$val] ?? 0) + 1;
-                    $w = $weights[$val] ?? null;
-                    if ($w !== null) $scores[] = $w;
-                }
-
-                $questions[] = [
-                    'field' => $field,
-                    'label' => $label,
-                    'avg'   => count($scores) ? round(array_sum($scores) / count($scores), 2) : null,
-                    'dist'  => $dist,
-                    'count' => count($scores),
-                ];
-
-                array_push($sectionScores, ...$scores);
-            }
-
-            $builtSections[] = [
-                'key'       => $key,
-                'label'     => $section['label'],
-                'avg'       => count($sectionScores) ? round(array_sum($sectionScores) / count($sectionScores), 2) : null,
-                'questions' => $questions,
-            ];
-        }
-
-        $responses = $rows->map(fn($r) => [
-            'id'             => $r->id,
-            'participant_type' => $r->participant_type,
-            'evaluator_name' => $r->evaluator_name ?? 'Anonymous',
-            'suggestions'    => $r->suggestions,
-            'other_comments' => $r->other_comments,
-            'submitted_at'   => $r->created_at->toDateTimeString(),
-        ])->values()->all();
-
-        return [
-            'count'     => $rows->count(),
-            'sections'  => $builtSections,
-            'responses' => $responses,
-        ];
+        return $this->evalSummaryService->build($activity);
     }
 
     private function employeeList(): array

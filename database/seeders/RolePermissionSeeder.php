@@ -394,6 +394,8 @@ class RolePermissionSeeder extends Seeder
         }
         // HR sees all activities (read-only) and can also create their own
         $assign('HR', ['activities.manage', 'activities.view_all']);
+        // HR also monitors the evaluation analytics dashboard (Administrator bypasses via isSuperAdmin())
+        $assign('HR', ['activities.monitor']);
 
         // ── Student / Parent — very limited read-only ─────────────────────────
         $assign('Student', ['library.view', 'messengerial.view', 'messengerial.create']);
@@ -472,6 +474,23 @@ class RolePermissionSeeder extends Seeder
         ];
         foreach ($kmViewRoles as $roleName) {
             $assign($roleName, ['km.view']);
+        }
+
+        // ── Travel ────────────────────────────────────────────────────────────
+        $travelUserRoles = [
+            'DivisionChief', 'Faculty', 'Staff', 'CID Chief', 'FAD Chief',
+            'GSU Head', 'HR', 'HRMPSB', 'MIS', 'Registrar', 'Librarian', 'Nurse',
+            'Guidance', 'InformationOfficer', 'Recruitment Officer', 'Payroll Officer',
+            'Cashier', 'PMT', 'Dorm Manager', 'Records',
+        ];
+        foreach ($travelUserRoles as $roleName) {
+            $assign($roleName, ['travel.view', 'travel.create']);
+        }
+        $assign('DivisionChief', ['travel.approve.division']);
+        $assign('FAD Chief', ['travel.review.fad', 'travel.finance']);
+        $assign('OCD', ['travel.view', 'travel.create', 'travel.approve.ocd', 'travel.manage']);
+        foreach (['Budget Officer', 'Bookkeeper', 'Accountant', 'Cashier'] as $roleName) {
+            $assign($roleName, ['travel.view', 'travel.finance']);
         }
 
         // ── Purchase Requests (PR) ────────────────────────────────────────────
