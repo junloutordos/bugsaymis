@@ -1089,8 +1089,15 @@ const menuItems = [
   {
     label: "General Services",
     icon: WrenchScrewdriverIcon,
-    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief","OCD"],
+    roles: ["Administrator", "Faculty", "Staff", "GSU Head", "DivisionChief", "OCD", "FAD Chief"],
     children: [
+      {
+        label: "Dashboard",
+        routeName: "general-services.dashboard",
+        href: route("general-services.dashboard"),
+        icon: ChartBarIcon,
+        roles: ["Administrator", "GSU Head", "DivisionChief", "OCD", "FAD Chief"],
+      },
       {
         label: "Vehicle Request",
         routeName: "vehicle-requests.index",

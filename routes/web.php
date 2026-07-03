@@ -305,6 +305,11 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware(['verified'])
         ->name('dashboard');
 
+    Route::get('/general-services/dashboard', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'index'])
+        ->name('general-services.dashboard');
+    Route::get('/general-services/dashboard/events', [\App\Http\Controllers\GeneralServicesDashboardController::class, 'events'])
+        ->name('general-services.dashboard.events');
+
     // ── Help Documentation ────────────────────────────────────────────────────
     Route::get('/docs', fn () => inertia('Docs/Index'))->name('docs.index');
 
