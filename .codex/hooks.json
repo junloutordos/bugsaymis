@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/junlou/bugsaymis-docker/src/bugsaymis/.codex/hooks/post-edit-php-lint.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}
