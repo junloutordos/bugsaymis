@@ -4,6 +4,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   BellAlertIcon,
   CalendarDaysIcon,
@@ -265,7 +266,7 @@ function statusClass(status) {
 
   <AdminLayout title="Dashboard">
     <div class="space-y-5">
-      <section class="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+      <section class="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex min-w-0 items-center gap-3">
             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-indigo-100 bg-indigo-50 text-sm font-bold text-indigo-700">
@@ -273,7 +274,7 @@ function statusClass(status) {
             </div>
             <div class="min-w-0">
               <p class="text-sm text-slate-500">{{ today }}</p>
-              <h1 class="mt-0.5 truncate text-lg font-semibold text-slate-900 sm:text-xl">
+              <h1 class="mt-0.5 truncate font-heading text-lg font-semibold text-slate-900 sm:text-xl">
                 {{ greeting }}, {{ (profile.name || authUser?.name || 'there').split(' ')[0] }}
               </h1>
               <p class="mt-1 truncate text-sm text-slate-500">{{ profileLine }}</p>
@@ -299,7 +300,7 @@ function statusClass(status) {
         <div
           v-for="card in summaryCards"
           :key="card.label"
-          class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+          class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
         >
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -316,7 +317,7 @@ function statusClass(status) {
 
       <section class="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,.65fr)]">
         <div class="space-y-5">
-          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div>
                 <h2 class="text-sm font-semibold text-slate-900">Needs Action</h2>
@@ -354,7 +355,7 @@ function statusClass(status) {
             </div>
           </div>
 
-          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div>
                 <h2 class="text-sm font-semibold text-slate-900">My Requests</h2>
@@ -394,14 +395,12 @@ function statusClass(status) {
               </table>
             </div>
 
-            <div v-else class="px-4 py-12 text-center text-sm text-slate-400">
-              No recent requests found.
-            </div>
+            <EmptyState v-else title="No recent requests found." />
           </div>
         </div>
 
         <aside class="space-y-5">
-          <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div class="mb-3 flex items-center justify-between">
               <div>
                 <h2 class="text-sm font-semibold text-slate-900">My Calendar</h2>
@@ -433,7 +432,7 @@ function statusClass(status) {
             </div>
           </div>
 
-          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div>
                 <h2 class="text-sm font-semibold text-slate-900">Notifications</h2>
@@ -465,12 +464,10 @@ function statusClass(status) {
               </a>
             </div>
 
-            <div v-else class="px-4 py-10 text-center text-sm text-slate-400">
-              No notifications yet.
-            </div>
+            <EmptyState v-else title="No notifications yet." />
           </div>
 
-          <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div class="border-b border-slate-100 px-4 py-3">
               <h2 class="text-sm font-semibold text-slate-900">Quick Links</h2>
               <p class="text-xs text-slate-500">Common places based on your role and workload</p>

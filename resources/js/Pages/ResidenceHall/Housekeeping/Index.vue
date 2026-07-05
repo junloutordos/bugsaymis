@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ClipboardDocumentCheckIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -78,23 +82,18 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Good Housekeeping</h1>
-          <p class="text-sm text-slate-500">F-RHU-05 — Daily room inspection checklist</p>
-        </div>
-        <div class="flex items-center gap-3">
+      <AppPageHeader title="Good Housekeeping" subtitle="F-RHU-05 — Daily room inspection checklist">
+        <template #actions>
           <input v-model="date" @change="applyDate" type="date"
                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <!-- Empty state -->
-      <div v-if="!rooms.length" class="bg-white rounded-xl border border-slate-100 shadow-sm p-12 text-center">
-        <ClipboardDocumentCheckIcon class="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p class="text-slate-500 font-medium">No active rooms configured.</p>
-        <p class="text-sm text-slate-400 mt-1">Set up rooms first before running inspections.</p>
-        <a href="/rh/rooms" class="mt-4 inline-block text-sm text-indigo-600 hover:underline font-medium">Go to Rooms →</a>
+      <div v-if="!rooms.length" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <EmptyState :icon="ClipboardDocumentCheckIcon" title="No active rooms configured" subtitle="Set up rooms first before running inspections.">
+          <a href="/rh/rooms" class="mt-4 inline-block text-sm text-indigo-600 hover:underline font-medium">Go to Rooms →</a>
+        </EmptyState>
       </div>
 
       <!-- Room Grid by Hall -->
@@ -132,9 +131,9 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
     </div>
 
     <!-- Checklist Modal -->
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
+    <AppModal :show="!!showModal" size="lg" @close="showModal = null">
+      <template v-if="showModal" #header>
+        <div class="flex items-center justify-between flex-1">
           <div>
             <h3 class="text-base font-semibold text-slate-800">
               Room {{ showModal.room_number }} — {{ showModal.residence_hall }}
@@ -142,11 +141,13 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
             <p class="text-xs text-slate-500">{{ date }}</p>
           </div>
           <div v-if="computedAvg > 0"
-               :class="['text-sm font-bold px-3 py-1 rounded-full', computedAvg >= 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700']">
+               :class="['text-sm font-bold px-3 py-1 rounded-full mr-3', computedAvg >= 3 ? 'bg-success-100 text-success-700' : 'bg-danger-100 text-danger-700']">
             Avg: {{ computedAvg.toFixed(2) }}
           </div>
         </div>
+      </template>
 
+      <template v-if="showModal">
         <!-- Score grid -->
         <div class="space-y-2 mb-4">
           <div v-for="(label, key) in items" :key="key"
@@ -174,27 +175,24 @@ const hallColor = (h) => h === 'BRH' ? 'indigo' : 'pink'
             <div v-for="dormer in roomInterns" :key="dormer.id" class="flex items-center justify-between">
               <span class="text-sm text-slate-700">{{ dormer.name }}</span>
               <span v-if="showModal.check.conforme_ids?.includes(dormer.id)"
-                    class="text-xs text-emerald-600 font-medium">Signed</span>
+                    class="text-xs text-success-600 font-medium">Signed</span>
               <button v-else @click="logConforme(showModal.check, dormer.id)"
                       class="text-xs text-indigo-600 hover:underline">Record Conforme</button>
             </div>
           </div>
           <p v-else class="text-xs text-slate-400">No active dormers in this room.</p>
         </div>
+      </template>
 
-        <div class="flex gap-3">
-          <button @click="showModal = null"
-                  class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">
-            Cancel
-          </button>
-          <button @click="submitCheck"
-                  :disabled="Object.values(scores).filter(Boolean).length < Object.keys(items).length"
-                  class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+      <template v-if="showModal" #footer>
+        <div class="flex gap-3 w-full">
+          <AppButton block variant="secondary" @click="showModal = null">Cancel</AppButton>
+          <AppButton block :disabled="Object.values(scores).filter(Boolean).length < Object.keys(items).length" @click="submitCheck">
             Save Check
-          </button>
+          </AppButton>
         </div>
-      </div>
-    </div>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

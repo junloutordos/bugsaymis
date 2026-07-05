@@ -1,25 +1,12 @@
 <template>
   <AdminLayout title="Approvals">
     <div class="space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Approval Panel</h1>
-        <div class="flex gap-2">
-          <button @click="setLevel('committee')"
-            :class="level === 'committee'
-              ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
-              : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            Committee
-          </button>
-          <button @click="setLevel('head_of_office')"
-            :class="level === 'head_of_office'
-              ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
-              : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'"
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            Head of Office
-          </button>
-        </div>
-      </div>
+      <AppPageHeader title="Approval Panel">
+        <template #actions>
+          <AppButton :variant="level === 'committee' ? 'primary' : 'secondary'" @click="setLevel('committee')">Committee</AppButton>
+          <AppButton :variant="level === 'head_of_office' ? 'primary' : 'secondary'" @click="setLevel('head_of_office')">Head of Office</AppButton>
+        </template>
+      </AppPageHeader>
 
       <div v-if="nominations.length" class="space-y-4">
         <div v-for="n in nominations" :key="n.id"
@@ -49,61 +36,40 @@
               <button @click="openDecide(n, true)"
                 class="mt-2 text-xs text-indigo-600 hover:text-indigo-700 underline">Change Decision</button>
             </div>
-            <button v-else @click="openDecide(n, false)"
-              class="mt-2 inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Make Decision
-            </button>
+            <AppButton v-else size="sm" class="mt-2" @click="openDecide(n, false)">Make Decision</AppButton>
           </div>
         </div>
       </div>
 
       <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <p class="py-16 text-center text-slate-400 text-sm">No nominations pending approval at this level.</p>
+        <EmptyState title="No nominations pending approval at this level" />
       </div>
     </div>
 
     <!-- Decision Modal -->
-    <Teleport to="body">
-      <div v-if="decideModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-semibold text-slate-800">
-                {{ level === 'committee' ? 'Committee' : 'Head of Office' }} Decision
-              </h2>
-              <p class="text-sm text-slate-500">{{ decideTarget?.nominee?.name }}</p>
-            </div>
-            <button type="button" @click="decideModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+    <AppModal :show="decideModal" :title="`${level === 'committee' ? 'Committee' : 'Head of Office'} Decision`" :subtitle="decideTarget?.nominee?.name" size="md" @close="decideModal = false">
+      <form @submit.prevent="submitDecide" id="decide-form">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Decision <span class="text-danger-500">*</span></label>
+            <select v-model="decideForm.decision" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" required>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="deferred">Deferred</option>
+            </select>
           </div>
-          <form @submit.prevent="submitDecide">
-            <div class="px-6 py-5 space-y-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Decision <span class="text-red-500">*</span></label>
-                <select v-model="decideForm.decision" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" required>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="deferred">Deferred</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-                <textarea v-model="decideForm.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="3" />
-              </div>
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-              <button type="button" @click="decideModal = false"
-                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-              <button type="submit" :disabled="decideForm.processing"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-                Submit
-              </button>
-            </div>
-          </form>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+            <textarea v-model="decideForm.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="3" />
+          </div>
         </div>
-      </div>
-    </Teleport>
+      </form>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="decideModal = false">Cancel</AppButton>
+        <AppButton type="submit" form="decide-form" :loading="decideForm.processing">Submit</AppButton>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -111,6 +77,10 @@
 import { ref } from 'vue'
 import { Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 
 const props = defineProps({
   nominations: Array,
@@ -146,9 +116,9 @@ function submitDecide() {
 
 function decisionColor(d) {
   return {
-    approved: 'text-emerald-700',
-    rejected: 'text-red-600',
-    deferred: 'text-amber-700',
+    approved: 'text-success-700',
+    rejected: 'text-danger-600',
+    deferred: 'text-warning-700',
   }[d] ?? 'text-slate-600'
 }
 </script>

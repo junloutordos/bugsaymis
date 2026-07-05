@@ -2,6 +2,15 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import {
   MagnifyingGlassIcon, PlusIcon, ClockIcon,
   CheckCircleIcon, XCircleIcon,
@@ -120,13 +129,15 @@ function submitApprove() {
 }
 
 // ── Guard actions ─────────────────────────────────────────────────────────────
-function logDepart(pass) {
-  if (!confirm(`Log departure for ${pass.student_name}?`)) return
+async function logDepart(pass) {
+  const confirmed = await confirmAction({ title: 'Log departure?', text: `Log departure for ${pass.student_name}?`, confirmText: 'Log Out' })
+  if (!confirmed) return
   router.post(route('rh.leave-passes.depart', pass.id), {}, { preserveScroll: true })
 }
 
-function logReturn(pass) {
-  if (!confirm(`Log return for ${pass.student_name}?`)) return
+async function logReturn(pass) {
+  const confirmed = await confirmAction({ title: 'Log return?', text: `Log return for ${pass.student_name}?`, confirmText: 'Log In' })
+  if (!confirmed) return
   router.post(route('rh.leave-passes.return', pass.id), {}, { preserveScroll: true })
 }
 
@@ -135,14 +146,14 @@ const fmtDate = (d) => d
   ? new Date(d).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   : '—'
 
-const statusClass = (s) => ({
-  pending:  'bg-amber-100 text-amber-700',
-  approved: 'bg-sky-100 text-sky-700',
-  rejected: 'bg-rose-100 text-rose-600',
-  departed: 'bg-indigo-100 text-indigo-700',
-  returned: 'bg-emerald-100 text-emerald-700',
-  overdue:  'bg-rose-100 text-rose-700',
-}[s] || 'bg-slate-100 text-slate-600')
+const statusColor = (s) => ({
+  pending:  'amber',
+  approved: 'blue',
+  rejected: 'red',
+  departed: 'indigo',
+  returned: 'green',
+  overdue:  'red',
+}[s] || 'slate')
 
 const purposeLabel = (p) => ({
   go_home:          'Go Home',
@@ -156,37 +167,31 @@ const purposeLabel = (p) => ({
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Leave Passes</h1>
-          <p class="text-sm text-slate-500">F-RHU-07 — Dormer leave pass management</p>
-        </div>
-        <button @click="showAdd = true"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <PlusIcon class="w-4 h-4" /> New Pass
-        </button>
-      </div>
+      <AppPageHeader title="Leave Passes" subtitle="F-RHU-07 — Dormer leave pass management">
+        <template #actions>
+          <AppButton @click="showAdd = true">
+            <PlusIcon class="w-4 h-4" /> New Pass
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Overdue Banner -->
-      <div v-if="overdue.length" class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+      <div v-if="overdue.length" class="bg-danger-50 border border-danger-100 rounded-xl p-4">
         <div class="flex items-center gap-2 mb-2">
-          <ClockIcon class="w-5 h-5 text-rose-600" />
-          <h3 class="text-sm font-semibold text-rose-800">{{ overdue.length }} Overdue Return{{ overdue.length > 1 ? 's' : '' }}</h3>
+          <ClockIcon class="w-5 h-5 text-danger-600" />
+          <h3 class="text-sm font-semibold text-danger-700">{{ overdue.length }} Overdue Return{{ overdue.length > 1 ? 's' : '' }}</h3>
         </div>
         <div class="space-y-1">
           <div v-for="p in overdue" :key="p.id" class="flex items-center justify-between text-sm">
-            <span class="text-rose-700 font-medium">{{ p.student_name }}</span>
-            <span class="text-rose-600 text-xs">Expected: {{ fmtDate(p.expected_return_at) }}</span>
-            <button @click="logReturn(p)"
-                    class="text-xs text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-md">
-              Log Return
-            </button>
+            <span class="text-danger-600 font-medium">{{ p.student_name }}</span>
+            <span class="text-danger-500 text-xs">Expected: {{ fmtDate(p.expected_return_at) }}</span>
+            <AppButton size="sm" variant="danger" @click="logReturn(p)">Log Return</AppButton>
           </div>
         </div>
       </div>
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
           <select v-model="statusF" @change="applyFilters"
@@ -207,78 +212,88 @@ const purposeLabel = (p) => ({
                    class="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
-      </div>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50">
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Hall</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Expected Return</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="p in displayed" :key="p.id"
-                :class="['hover:bg-slate-50 transition-colors', p.status === 'overdue' ? 'bg-rose-50' : '']">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ p.student_name }}</td>
-              <td class="px-4 py-3 hidden md:table-cell">
-                <span v-if="p.residence_hall"
-                      :class="['text-xs px-2 py-0.5 rounded-full font-medium', p.residence_hall === 'BRH' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700']">
-                  {{ p.residence_hall }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-600">{{ purposeLabel(p.purpose) }}</td>
-              <td class="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{{ fmtDate(p.expected_return_at) }}</td>
-              <td class="px-4 py-3">
-                <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', statusClass(p.status)]">
-                  {{ p.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-1">
-                  <!-- Approve/Reject if pending -->
-                  <template v-if="p.status === 'pending'">
-                    <button @click="openApprove(p, 'approve')"
-                            class="text-xs text-emerald-600 hover:underline font-medium">Approve</button>
-                    <span class="text-slate-300">·</span>
-                    <button @click="openApprove(p, 'reject')"
-                            class="text-xs text-rose-600 hover:underline font-medium">Reject</button>
-                  </template>
-                  <!-- Guard: log departure if approved -->
-                  <button v-if="p.status === 'approved'" @click="logDepart(p)"
-                          class="text-xs text-indigo-600 hover:underline font-medium">Log Out</button>
-                  <!-- Guard: log return if departed -->
-                  <button v-if="p.status === 'departed'" @click="logReturn(p)"
-                          class="text-xs text-emerald-600 hover:underline font-medium">Log In</button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!displayed.length">
-              <td colspan="6" class="text-center py-12 text-slate-400 text-sm">No leave passes found.</td>
-            </tr>
-          </tbody>
-        </table>
-        <PaginationControl
-          v-if="totalPages > 1"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+      <AppTable :is-empty="!displayed.length" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Hall</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Purpose</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Expected Return</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="p in displayed" :key="p.id"
+            :class="['hover:bg-slate-50 transition-colors', p.status === 'overdue' ? 'bg-danger-50' : '']">
+          <td class="px-4 py-3 font-medium text-slate-800">{{ p.student_name }}</td>
+          <td class="px-4 py-3 hidden md:table-cell">
+            <AppBadge v-if="p.residence_hall" :color="p.residence_hall === 'BRH' ? 'indigo' : 'purple'">{{ p.residence_hall }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-600">{{ purposeLabel(p.purpose) }}</td>
+          <td class="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">{{ fmtDate(p.expected_return_at) }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusColor(p.status)" class="capitalize">{{ p.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <!-- Approve/Reject if pending -->
+              <template v-if="p.status === 'pending'">
+                <AppButton size="sm" variant="success" @click="openApprove(p, 'approve')">Approve</AppButton>
+                <AppButton size="sm" variant="danger" @click="openApprove(p, 'reject')">Reject</AppButton>
+              </template>
+              <!-- Guard: log departure if approved -->
+              <AppButton v-if="p.status === 'approved'" size="sm" variant="ghost" @click="logDepart(p)">Log Out</AppButton>
+              <!-- Guard: log return if departed -->
+              <AppButton v-if="p.status === 'departed'" size="sm" variant="success" @click="logReturn(p)">Log In</AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="p in displayed" :key="p.id" class="p-4 space-y-2" :class="p.status === 'overdue' ? 'bg-danger-50' : ''">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ p.student_name }}</p>
+                <AppBadge v-if="p.residence_hall" :color="p.residence_hall === 'BRH' ? 'indigo' : 'purple'">{{ p.residence_hall }}</AppBadge>
+              </div>
+              <AppBadge :color="statusColor(p.status)" class="capitalize">{{ p.status }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-500">{{ purposeLabel(p.purpose) }} &middot; Expected {{ fmtDate(p.expected_return_at) }}</p>
+            <div class="flex items-center gap-2 pt-1 flex-wrap">
+              <template v-if="p.status === 'pending'">
+                <AppButton size="sm" variant="success" @click="openApprove(p, 'approve')">Approve</AppButton>
+                <AppButton size="sm" variant="danger" @click="openApprove(p, 'reject')">Reject</AppButton>
+              </template>
+              <AppButton v-if="p.status === 'approved'" size="sm" variant="ghost" @click="logDepart(p)">Log Out</AppButton>
+              <AppButton v-if="p.status === 'departed'" size="sm" variant="success" @click="logReturn(p)">Log In</AppButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No leave passes found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            v-if="totalPages > 1"
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
     </div>
 
     <!-- Add Pass Modal -->
-    <div v-if="showAdd" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h3 class="text-base font-semibold text-slate-800 mb-4">New Leave Pass</h3>
+    <AppModal :show="showAdd" title="New Leave Pass" size="lg" @close="showAdd = false; addForm.reset(); studentQuery = ''">
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Dormer ID</label>
@@ -329,42 +344,38 @@ const purposeLabel = (p) => ({
             </div>
           </div>
         </div>
-        <div class="flex gap-3 mt-5">
-          <button @click="showAdd = false; addForm.reset(); studentQuery = ''"
-                  class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">Cancel</button>
-          <button @click="submitAdd" :disabled="!addForm.rh_intern_id || !addForm.destination || addForm.processing"
-                  class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+
+      <template #footer>
+        <div class="flex gap-3 w-full">
+          <AppButton block variant="secondary" @click="showAdd = false; addForm.reset(); studentQuery = ''">Cancel</AppButton>
+          <AppButton block :disabled="!addForm.rh_intern_id || !addForm.destination" :loading="addForm.processing" @click="submitAdd">
             Issue Pass
-          </button>
+          </AppButton>
         </div>
-      </div>
-    </div>
+      </template>
+    </AppModal>
 
     <!-- Approve Modal -->
-    <div v-if="showApprove" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-        <h3 class="text-base font-semibold text-slate-800 mb-1">
-          {{ approveAction === 'approve' ? 'Approve' : 'Reject' }} Leave Pass
-        </h3>
-        <p class="text-sm text-slate-500 mb-4">{{ showApprove.student_name }} — {{ purposeLabel(showApprove.purpose) }}</p>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Remarks (optional)</label>
-          <textarea v-model="approveRemarks" rows="2"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-        </div>
-        <div class="flex gap-3 mt-4">
-          <button @click="showApprove = null"
-                  class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">Cancel</button>
-          <button @click="submitApprove"
-                  :class="['flex-1 text-white px-4 py-2 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-2',
-                    approveAction === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700']">
+    <AppModal :show="!!showApprove" :title="`${approveAction === 'approve' ? 'Approve' : 'Reject'} Leave Pass`"
+              :subtitle="showApprove ? `${showApprove.student_name} — ${purposeLabel(showApprove.purpose)}` : ''"
+              size="md" @close="showApprove = null">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Remarks (optional)</label>
+        <textarea v-model="approveRemarks" rows="2"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+      </div>
+
+      <template #footer>
+        <div class="flex gap-3 w-full">
+          <AppButton block variant="secondary" @click="showApprove = null">Cancel</AppButton>
+          <AppButton block :variant="approveAction === 'approve' ? 'success' : 'danger'" @click="submitApprove">
             <CheckCircleIcon v-if="approveAction === 'approve'" class="w-4 h-4" />
             <XCircleIcon v-else class="w-4 h-4" />
             {{ approveAction === 'approve' ? 'Approve' : 'Reject' }}
-          </button>
+          </AppButton>
         </div>
-      </div>
-    </div>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

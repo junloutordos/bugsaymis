@@ -2,8 +2,17 @@
 import { ref, watch } from 'vue'
 import { Head, router, usePage, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import { PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   applicants: { type: Object, required: true },
@@ -53,10 +62,10 @@ const goToPage = (p) => {
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 const statusColors = {
-  active:      'bg-green-100 text-green-700',
-  blacklisted: 'bg-red-100 text-red-600',
-  hired:       'bg-blue-100 text-blue-700',
-  withdrawn:   'bg-gray-100 text-gray-500',
+  active:      'green',
+  blacklisted: 'red',
+  hired:       'blue',
+  withdrawn:   'slate',
 }
 
 // ── Modal ──────────────────────────────────────────────────────────────────────
@@ -119,13 +128,13 @@ const submit = () => {
 
 // ── Delete ─────────────────────────────────────────────────────────────────────
 const deleteApplicant = async (applicant) => {
-  const result = await Swal.fire({
+  const confirmed = await confirmAction({
     title: `Remove ${applicant.last_name}, ${applicant.first_name}?`,
     text: 'This cannot be undone.',
-    icon: 'warning', showCancelButton: true,
-    confirmButtonColor: '#ef4444', confirmButtonText: 'Remove', reverseButtons: true,
+    confirmText: 'Remove',
+    icon: 'warning',
   })
-  if (!result.isConfirmed) return
+  if (!confirmed) return
 
   router.delete(route('recruitment.applicants.destroy', applicant.id), {
     onSuccess: () => Swal.fire({ icon: 'success', title: 'Removed!', timer: 1200, showConfirmButton: false }),
@@ -138,22 +147,19 @@ const deleteApplicant = async (applicant) => {
   <Head title="Applicant Pool — Recruitment" />
   <AdminLayout title="Applicant Pool">
     <div>
+      <AppPageHeader title="Applicant Pool">
+        <template #actions>
+          <AppButton @click="openModal()">+ Add Applicant</AppButton>
+        </template>
+      </AppPageHeader>
+
       <!-- Flash -->
-      <div v-if="page.props.flash?.success" class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">
+      <div v-if="page.props.flash?.success" class="mb-4 px-4 py-3 rounded-lg bg-success-50 border border-success-100 text-success-700 text-sm">
         {{ page.props.flash.success }}
       </div>
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Applicant Pool</h1>
-        <button @click="openModal()"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          + Add Applicant
-        </button>
-      </div>
-
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+      <AppFilterBar>
         <div class="relative flex-1 min-w-[180px] sm:max-w-xs">
           <input v-model="search" type="text" placeholder="Search name or email…"
                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
@@ -166,80 +172,89 @@ const deleteApplicant = async (applicant) => {
           <option value="blacklisted">Blacklisted</option>
           <option value="withdrawn">Withdrawn</option>
         </select>
-      </div>
+      </AppFilterBar>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="overflow-x-auto rounded-xl">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Eligibility</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PRC License</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Applications</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="applicant in applicants.data" :key="applicant.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <div class="font-medium text-slate-800">
-                    {{ applicant.last_name }}, {{ applicant.first_name }}
-                    <span v-if="applicant.suffix" class="text-slate-400 text-xs"> {{ applicant.suffix }}</span>
-                  </div>
-                  <div v-if="applicant.course" class="text-xs text-slate-400">{{ applicant.course }}</div>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.email }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.eligibility ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.prc_license_no ?? '—' }}</td>
-                <td class="px-4 py-3 text-center">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
-                    {{ applicant.applications_count ?? 0 }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="[badgeBase, statusBadgeClass(applicant.status)]">{{ applicant.status }}</span>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1 justify-center">
-                    <Link :href="route('recruitment.applicants.show', applicant.id)"
-                          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                      View
-                    </Link>
-                    <button @click="openModal(applicant)"
-                            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                      Edit
-                    </button>
-                    <button @click="deleteApplicant(applicant)"
-                            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                      Remove
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="applicants.data?.length === 0">
-                <td colspan="8" class="py-16 text-center text-slate-400 text-sm">No applicants found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table -->
+      <AppTable :is-empty="!applicants.data?.length" :skeleton-cols="8">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Email</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Eligibility</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PRC License</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Applications</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
 
-        <!-- Pagination -->
-        <div v-if="applicants.last_page > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click="goToPage(applicants.current_page - 1)"
-                  :disabled="applicants.current_page === 1 || isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Prev</button>
-          <span>Page {{ applicants.current_page }} of {{ applicants.last_page }}</span>
-          <button @click="goToPage(applicants.current_page + 1)"
-                  :disabled="applicants.current_page === applicants.last_page || isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Next</button>
-        </div>
-      </div>
+        <tr v-for="applicant in applicants.data" :key="applicant.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <div class="font-medium text-slate-800">
+              {{ applicant.last_name }}, {{ applicant.first_name }}
+              <span v-if="applicant.suffix" class="text-slate-400 text-xs"> {{ applicant.suffix }}</span>
+            </div>
+            <div v-if="applicant.course" class="text-xs text-slate-400">{{ applicant.course }}</div>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.email }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.eligibility ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ applicant.prc_license_no ?? '—' }}</td>
+          <td class="px-4 py-3 text-center">
+            <AppBadge color="slate">{{ applicant.applications_count ?? 0 }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusColors[applicant.status] ?? 'slate'">{{ applicant.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1 justify-center">
+              <AppButton as="link" size="sm" :href="route('recruitment.applicants.show', applicant.id)">View</AppButton>
+              <AppIconButton label="Edit" @click="openModal(applicant)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+              <AppIconButton label="Remove" variant="danger" @click="deleteApplicant(applicant)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="applicant in applicants.data" :key="applicant.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">
+                  {{ applicant.last_name }}, {{ applicant.first_name }}
+                  <span v-if="applicant.suffix" class="text-slate-400 text-xs"> {{ applicant.suffix }}</span>
+                </p>
+                <p class="text-xs text-slate-400">{{ applicant.email }}</p>
+                <p v-if="applicant.course" class="text-xs text-slate-400">{{ applicant.course }}</p>
+              </div>
+              <AppBadge :color="statusColors[applicant.status] ?? 'slate'">{{ applicant.status }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-500">
+              {{ applicant.eligibility ?? '—' }} &middot; {{ applicant.prc_license_no ?? '—' }} &middot; {{ applicant.applications_count ?? 0 }} application(s)
+            </p>
+            <div class="flex items-center gap-1 pt-1">
+              <AppButton as="link" size="sm" :href="route('recruitment.applicants.show', applicant.id)">View</AppButton>
+              <AppIconButton label="Edit" @click="openModal(applicant)"><PencilSquareIcon class="w-4 h-4" /></AppIconButton>
+              <AppIconButton label="Remove" variant="danger" @click="deleteApplicant(applicant)"><TrashIcon class="w-4 h-4" /></AppIconButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No applicants found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="applicants.current_page"
+            :total-pages="applicants.last_page"
+            :total="applicants.total"
+            @prev="goToPage(applicants.current_page - 1)"
+            @next="goToPage(applicants.current_page + 1)"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
     </div>
 
     <!-- ── Add / Edit Modal ──────────────────────────────────────────────────── -->
@@ -247,7 +262,7 @@ const deleteApplicant = async (applicant) => {
       <div class="bg-white rounded-2xl w-full max-w-2xl shadow-xl relative max-h-[90vh] overflow-y-auto">
         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-base font-semibold text-slate-800">{{ editingItem ? 'Edit Applicant' : 'Add Applicant' }}</h2>
-          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+          <AppIconButton label="Close" @click="closeModal"><XMarkIcon class="h-4 w-4" /></AppIconButton>
         </div>
 
         <form @submit.prevent="submit" class="px-6 py-5 space-y-4">
@@ -257,7 +272,7 @@ const deleteApplicant = async (applicant) => {
               <label class="block text-xs font-medium text-slate-600 mb-1">First Name *</label>
               <input v-model="form.first_name" type="text" required
                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              <p v-if="errors.first_name" class="text-red-500 text-xs mt-1">{{ errors.first_name }}</p>
+              <p v-if="errors.first_name" class="text-danger-500 text-xs mt-1">{{ errors.first_name }}</p>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Middle Name</label>
@@ -268,7 +283,7 @@ const deleteApplicant = async (applicant) => {
               <label class="block text-xs font-medium text-slate-600 mb-1">Last Name *</label>
               <input v-model="form.last_name" type="text" required
                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              <p v-if="errors.last_name" class="text-red-500 text-xs mt-1">{{ errors.last_name }}</p>
+              <p v-if="errors.last_name" class="text-danger-500 text-xs mt-1">{{ errors.last_name }}</p>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Suffix</label>
@@ -299,7 +314,7 @@ const deleteApplicant = async (applicant) => {
               <label class="block text-xs font-medium text-slate-600 mb-1">Email *</label>
               <input v-model="form.email" type="email" required
                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              <p v-if="errors.email" class="text-red-500 text-xs mt-1">{{ errors.email }}</p>
+              <p v-if="errors.email" class="text-danger-500 text-xs mt-1">{{ errors.email }}</p>
             </div>
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Contact Number</label>
@@ -348,14 +363,10 @@ const deleteApplicant = async (applicant) => {
           </div>
 
           <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
-            <button type="button" @click="closeModal"
-                    class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Cancel
-            </button>
-            <button type="submit" :disabled="isSubmitting"
-                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ isSubmitting ? 'Saving…' : (editingItem ? 'Update' : 'Add Applicant') }}
-            </button>
+            <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
+            <AppButton type="submit" :loading="isSubmitting">
+              {{ editingItem ? 'Update' : 'Add Applicant' }}
+            </AppButton>
           </div>
         </form>
       </div>

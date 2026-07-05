@@ -1,7 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmDelete as confirmDeleteDialog } from '@/Composables/useConfirm.js'
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -49,8 +57,8 @@ function formatDate(d) {
   })
 }
 
-function confirmDelete(activity) {
-  if (confirm(`Delete "${activity.title}"? This cannot be undone.`)) {
+async function confirmDelete(activity) {
+  if (await confirmDeleteDialog(`Delete "${activity.title}"? This cannot be undone.`)) {
     router.delete(route('ams.activities.destroy', activity.id), { preserveScroll: true })
   }
 }
@@ -59,114 +67,146 @@ function confirmDelete(activity) {
 <template>
   <Head title="Activities" />
   <AdminLayout title="Activity Management">
+    <div class="space-y-5">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-xl font-bold text-slate-800">School Activities</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Manage seminars, workshops, and campus events.</p>
-      </div>
-      <a
-        :href="route('ams.activities.create')"
-        class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-      >
-        <PlusIcon class="w-4 h-4" />
-        New Activity
-      </a>
-    </div>
+      <AppPageHeader title="School Activities" subtitle="Manage seminars, workshops, and campus events.">
+        <template #actions>
+          <AppButton as="link" :href="route('ams.activities.create')">
+            <PlusIcon class="w-4 h-4" />
+            New Activity
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-    <!-- Search -->
-    <div class="relative mb-4 max-w-sm">
-      <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-      <input
-        v-model="search"
-        @input="onSearch"
-        type="text"
-        placeholder="Search activities…"
-        class="pl-9 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-      />
-    </div>
+      <!-- Search -->
+      <AppFilterBar>
+        <div class="relative w-full sm:w-80">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            v-model="search"
+            @input="onSearch"
+            type="text"
+            placeholder="Search activities…"
+            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </AppFilterBar>
 
-    <!-- Table -->
-    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-slate-100 bg-slate-50">
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Date</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Venue</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Resource Person</th>
-            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Created By</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+      <!-- Table -->
+      <AppTable :is-empty="displayed.length === 0" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Activity</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Venue</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Resource Person</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Created By</th>
+            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
           </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <tr v-if="displayed.length === 0">
-            <td colspan="6" class="text-center py-12 text-slate-400 text-sm">No activities found.</td>
-          </tr>
-          <tr v-for="activity in displayed" :key="activity.id" class="hover:bg-slate-50">
-            <td class="px-4 py-3">
-              <a
+        </template>
+
+        <tr v-for="activity in displayed" :key="activity.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3">
+            <Link
+              :href="route('ams.activities.show', activity.id)"
+              class="font-medium text-indigo-600 hover:text-indigo-800 hover:underline block"
+            >{{ activity.title }}</Link>
+            <span class="text-xs text-slate-400 sm:hidden">{{ formatDate(activity.start_date) }}</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600 hidden sm:table-cell whitespace-nowrap">
+            {{ formatDate(activity.start_date) }}
+            <span v-if="activity.end_date && activity.end_date !== activity.start_date">
+              – {{ formatDate(activity.end_date) }}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-slate-600 hidden md:table-cell">
+            <span v-if="activity.venue" class="inline-flex items-center gap-1">
+              <MapPinIcon class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              {{ activity.venue }}
+            </span>
+            <span v-else class="text-slate-300">—</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600 hidden lg:table-cell">
+            <span v-if="activity.resource_person" class="inline-flex items-center gap-1">
+              <UserIcon class="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              {{ activity.resource_person }}
+            </span>
+            <span v-else class="text-slate-300">—</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600 hidden lg:table-cell text-xs">
+            {{ activity.creator?.name ?? '—' }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            <div class="inline-flex items-center gap-1">
+              <Link
                 :href="route('ams.activities.show', activity.id)"
-                class="font-medium text-indigo-600 hover:text-indigo-800 hover:underline block"
-              >{{ activity.title }}</a>
-              <span class="text-xs text-slate-400 sm:hidden">{{ formatDate(activity.start_date) }}</span>
-            </td>
-            <td class="px-4 py-3 text-slate-600 hidden sm:table-cell whitespace-nowrap">
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                title="View"
+              ><EyeIcon class="w-4 h-4" /></Link>
+              <Link
+                :href="route('ams.activities.edit', activity.id)"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-warning-600 hover:bg-warning-50 transition-colors"
+                title="Edit"
+              ><PencilSquareIcon class="w-4 h-4" /></Link>
+              <AppIconButton label="Delete activity" variant="danger" @click="confirmDelete(activity)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="activity in displayed" :key="activity.id" class="p-4 space-y-2">
+            <Link :href="route('ams.activities.show', activity.id)" class="font-medium text-indigo-600 hover:underline block">
+              {{ activity.title }}
+            </Link>
+            <p class="text-xs text-slate-400">
               {{ formatDate(activity.start_date) }}
-              <span v-if="activity.end_date && activity.end_date !== activity.start_date">
-                – {{ formatDate(activity.end_date) }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-slate-600 hidden md:table-cell">
-              <span v-if="activity.venue" class="inline-flex items-center gap-1">
-                <MapPinIcon class="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                {{ activity.venue }}
-              </span>
-              <span v-else class="text-slate-300">—</span>
-            </td>
-            <td class="px-4 py-3 text-slate-600 hidden lg:table-cell">
-              <span v-if="activity.resource_person" class="inline-flex items-center gap-1">
-                <UserIcon class="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                {{ activity.resource_person }}
-              </span>
-              <span v-else class="text-slate-300">—</span>
-            </td>
-            <td class="px-4 py-3 text-slate-600 hidden lg:table-cell text-xs">
-              {{ activity.creator?.name ?? '—' }}
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="inline-flex items-center gap-1">
-                <a
-                  :href="route('ams.activities.show', activity.id)"
-                  class="p-1.5 rounded hover:bg-indigo-50 text-indigo-600"
-                  title="View"
-                ><EyeIcon class="w-4 h-4" /></a>
-                <a
-                  :href="route('ams.activities.edit', activity.id)"
-                  class="p-1.5 rounded hover:bg-amber-50 text-amber-600"
-                  title="Edit"
-                ><PencilSquareIcon class="w-4 h-4" /></a>
-                <button
-                  @click="confirmDelete(activity)"
-                  class="p-1.5 rounded hover:bg-red-50 text-red-500"
-                  title="Delete"
-                ><TrashIcon class="w-4 h-4" /></button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <span v-if="activity.end_date && activity.end_date !== activity.start_date"> – {{ formatDate(activity.end_date) }}</span>
+            </p>
+            <div class="text-xs text-slate-500 space-y-1">
+              <p v-if="activity.venue" class="inline-flex items-center gap-1">
+                <MapPinIcon class="w-3.5 h-3.5 text-slate-400 shrink-0" />{{ activity.venue }}
+              </p>
+              <p v-if="activity.resource_person" class="inline-flex items-center gap-1">
+                <UserIcon class="w-3.5 h-3.5 text-slate-400 shrink-0" />{{ activity.resource_person }}
+              </p>
+              <p>Created by {{ activity.creator?.name ?? '—' }}</p>
+            </div>
+            <div class="flex items-center gap-1 pt-1">
+              <Link
+                :href="route('ams.activities.show', activity.id)"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                title="View"
+              ><EyeIcon class="w-4 h-4" /></Link>
+              <Link
+                :href="route('ams.activities.edit', activity.id)"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-warning-600 hover:bg-warning-50 transition-colors"
+                title="Edit"
+              ><PencilSquareIcon class="w-4 h-4" /></Link>
+              <AppIconButton label="Delete activity" variant="danger" @click="confirmDelete(activity)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No activities found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total="filtered.length"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
+
     </div>
-
-    <!-- Pagination -->
-        <PaginationControl
-      :current-page="currentPage"
-      :total-pages="totalPages"
-      @prev="currentPage--"
-      @next="currentPage++"
-      @page="currentPage = $event"
-    />
-
   </AdminLayout>
 </template>

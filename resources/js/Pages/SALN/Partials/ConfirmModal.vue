@@ -8,10 +8,10 @@
       <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
         <div class="flex items-start gap-3">
           <div class="shrink-0 flex items-center justify-center w-10 h-10 rounded-full"
-            :class="variant === 'danger' ? 'bg-red-100' : 'bg-indigo-100'">
+            :class="variant === 'danger' ? 'bg-danger-100' : 'bg-indigo-100'">
             <component :is="icon ?? (variant === 'danger' ? ExclamationTriangleIcon : QuestionMarkCircleIcon)"
               class="h-5 w-5"
-              :class="variant === 'danger' ? 'text-red-600' : 'text-indigo-600'" />
+              :class="variant === 'danger' ? 'text-danger-600' : 'text-indigo-600'" />
           </div>
           <div>
             <h3 class="text-base font-semibold text-slate-800">{{ title }}</h3>
@@ -23,7 +23,7 @@
         <!-- Remarks slot (optional) -->
         <div v-if="showRemarks" class="pt-1">
           <label class="block text-xs font-medium text-slate-600 mb-1">
-            Remarks <span v-if="remarksRequired" class="text-red-500">*</span>
+            Remarks <span v-if="remarksRequired" class="text-danger-500">*</span>
           </label>
           <textarea v-model="localRemarks" rows="3"
             :placeholder="remarksPlaceholder ?? 'Enter remarks…'"
@@ -37,7 +37,7 @@
           </button>
           <button type="button" @click="handleConfirm" :disabled="processing"
             class="px-4 py-2 text-sm text-white rounded-lg font-medium disabled:opacity-50 transition-colors"
-            :class="variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700'">
+            :class="variant === 'danger' ? 'bg-danger-600 hover:bg-danger-700' : 'bg-indigo-600 hover:bg-indigo-700'">
             {{ processing ? 'Processing…' : (confirmLabel ?? 'Confirm') }}
           </button>
         </div>

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
 import {
     UserIcon, ArrowLeftIcon, ExclamationTriangleIcon,
     ShieldCheckIcon, ClipboardDocumentListIcon, BeakerIcon,
@@ -39,31 +40,33 @@ function fmtDate(d) {
             </button>
 
             <!-- Student Card -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5 flex flex-wrap items-center gap-6">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
-                        <UserIcon class="w-6 h-6 text-rose-500" />
+            <AppCard>
+                <div class="flex flex-wrap items-center gap-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-danger-50 flex items-center justify-center">
+                            <UserIcon class="w-6 h-6 text-danger-600" />
+                        </div>
+                        <div>
+                            <p class="font-semibold text-slate-800 text-base">{{ studentName }}</p>
+                            <p class="text-sm text-slate-500">{{ student.pisaysystemID || 'No barcode' }}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p class="font-semibold text-slate-800 text-base">{{ studentName }}</p>
-                        <p class="text-sm text-slate-500">{{ student.pisaysystemID || 'No barcode' }}</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-1 text-sm">
+                        <div><span class="text-slate-400">Batch</span><p class="font-medium text-slate-700">{{ student.batch || '—' }}</p></div>
+                        <div><span class="text-slate-400">Status</span><p class="font-medium text-slate-700">{{ student.status || '—' }}</p></div>
+                        <div><span class="text-slate-400">Sex</span><p class="font-medium text-slate-700">{{ student.sex || '—' }}</p></div>
                     </div>
+                    <a
+                        :href="route('guidance.cumulative.show', student.pisaysystemID)"
+                        class="ml-auto text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                        Cumulative Profile →
+                    </a>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-1 text-sm">
-                    <div><span class="text-slate-400">Batch</span><p class="font-medium text-slate-700">{{ student.batch || '—' }}</p></div>
-                    <div><span class="text-slate-400">Status</span><p class="font-medium text-slate-700">{{ student.status || '—' }}</p></div>
-                    <div><span class="text-slate-400">Sex</span><p class="font-medium text-slate-700">{{ student.sex || '—' }}</p></div>
-                </div>
-                <a
-                    :href="route('guidance.cumulative.show', student.pisaysystemID)"
-                    class="ml-auto text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                    Cumulative Profile →
-                </a>
-            </div>
+            </AppCard>
 
             <!-- Tabs -->
-            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <AppCard :padded="false">
                 <div class="flex overflow-x-auto border-b border-slate-200">
                     <button
                         v-for="tab in tabs"
@@ -71,7 +74,7 @@ function fmtDate(d) {
                         @click="activeTab = tab.key"
                         class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
                         :class="activeTab === tab.key
-                            ? 'border-rose-500 text-rose-600 bg-rose-50'
+                            ? 'border-danger-500 text-danger-600 bg-danger-50'
                             : 'border-transparent text-slate-500 hover:text-slate-700'"
                     >
                         <component :is="tab.icon" class="w-4 h-4" />
@@ -79,7 +82,7 @@ function fmtDate(d) {
                         <span
                             v-if="health[tab.key]?.length"
                             class="ml-1 px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                            :class="activeTab === tab.key ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'"
+                            :class="activeTab === tab.key ? 'bg-danger-100 text-danger-700' : 'bg-slate-100 text-slate-500'"
                         >{{ health[tab.key].length }}</span>
                     </button>
                 </div>
@@ -94,7 +97,7 @@ function fmtDate(d) {
                                 v-for="r in health.allergies"
                                 :key="r.id"
                                 class="flex flex-wrap items-start gap-4 bg-slate-50 rounded-lg p-4 text-sm"
-                                :class="r.allergy === 'yes' ? 'border-l-4 border-rose-400' : ''"
+                                :class="r.allergy === 'yes' ? 'border-l-4 border-danger-500' : ''"
                             >
                                 <div class="min-w-0 flex-1">
                                     <p class="font-medium text-slate-800">
@@ -140,8 +143,8 @@ function fmtDate(d) {
                                     <p class="text-xs text-slate-400">{{ fmtDate(r.date_sustained) }}</p>
                                 </div>
                                 <div class="mt-1 flex gap-4 text-xs text-slate-500">
-                                    <span v-if="r.opd" class="text-amber-600 font-medium">OPD</span>
-                                    <span v-if="r.hospital_confinement" class="text-rose-600 font-medium">Hospital confinement</span>
+                                    <span v-if="r.opd" class="text-warning-600 font-medium">OPD</span>
+                                    <span v-if="r.hospital_confinement" class="text-danger-600 font-medium">Hospital confinement</span>
                                 </div>
                             </div>
                         </div>
@@ -167,7 +170,7 @@ function fmtDate(d) {
                     </template>
 
                 </div>
-            </div>
+            </AppCard>
         </div>
     </AdminLayout>
 </template>

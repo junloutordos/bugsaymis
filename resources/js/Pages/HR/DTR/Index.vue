@@ -4,34 +4,24 @@
     <div class="space-y-5">
 
       <!-- ── Page Header ────────────────────────────────────────────── -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Daily Time Records</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Monthly attendance summary per employee.</p>
-        </div>
-        <div class="flex gap-2">
-          <button
-            @click="batchPrintModal = true"
-            class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
-          >
+      <AppPageHeader title="Daily Time Records" subtitle="Monthly attendance summary per employee.">
+        <template #actions>
+          <AppButton variant="secondary" @click="batchPrintModal = true">
             <PrinterIcon class="h-4 w-4" />
             Batch Print
-          </button>
-          <button
-            @click="openGenerateModal"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
-          >
+          </AppButton>
+          <AppButton @click="openGenerateModal">
             <Cog6ToothIcon class="h-4 w-4" />
             Generate DTR
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- ── Flash ──────────────────────────────────────────────────── -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <XCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
       </div>
 
@@ -40,7 +30,7 @@
         <div class="flex items-center gap-2 mb-3">
           <InboxArrowDownIcon class="h-4 w-4 text-amber-600" />
           <h3 class="text-sm font-semibold text-amber-800">Penned Entries Awaiting Review</h3>
-          <span class="ml-auto text-xs font-semibold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">{{ pennedSubmissions.length }}</span>
+          <AppBadge color="amber" class="ml-auto">{{ pennedSubmissions.length }}</AppBadge>
         </div>
         <div class="divide-y divide-amber-100">
           <div v-for="sub in pennedSubmissions" :key="sub.id" class="py-2 flex items-center justify-between gap-3">
@@ -60,17 +50,15 @@
       </div>
 
       <!-- ── Controls: Month + Search ──────────────────────────────── -->
-      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-        <div class="flex gap-3 items-end">
-          <div>
-            <label class="block text-xs font-medium text-slate-500 mb-1">Month</label>
-            <input
-              v-model="filterMonth"
-              type="month"
-              @change="applyMonth"
-              class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-            />
-          </div>
+      <AppFilterBar :result-label="`${filteredSummaries.length} result(s) — ${monthLabel}`">
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1">Month</label>
+          <input
+            v-model="filterMonth"
+            type="month"
+            @change="applyMonth"
+            class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+          />
         </div>
         <div class="flex-1 sm:max-w-xs">
           <label class="block text-xs font-medium text-slate-500 mb-1">Search employee</label>
@@ -84,10 +72,7 @@
             />
           </div>
         </div>
-        <div class="text-xs text-slate-400 pb-2">
-          {{ filteredSummaries.length }} result(s) — {{ monthLabel }}
-        </div>
-      </div>
+      </AppFilterBar>
 
       <!-- ── Category Tabs + Table ──────────────────────────────────── -->
       <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -116,34 +101,24 @@
         </div>
 
         <!-- Table -->
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50/70">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wide whitespace-nowrap">Present</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-red-500 uppercase tracking-wide whitespace-nowrap">Absent</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-amber-600 uppercase tracking-wide whitespace-nowrap">Half Day</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wide whitespace-nowrap">Leave</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-purple-600 uppercase tracking-wide whitespace-nowrap">Holiday</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Hrs Worked</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-amber-600 uppercase tracking-wide whitespace-nowrap">Late</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-orange-600 uppercase tracking-wide whitespace-nowrap">Undertime</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wide whitespace-nowrap">Overtime</th>
-                <th class="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="!filteredSummaries.length">
-                <td colspan="12" class="px-4 py-14 text-center">
-                  <div class="flex flex-col items-center gap-2 text-slate-400">
-                    <ClipboardDocumentListIcon class="h-8 w-8" />
-                    <p class="text-sm">No DTR records found for this period.</p>
-                    <p class="text-xs">Use <strong class="text-slate-500">Generate DTR</strong> to process biometric logs.</p>
-                  </div>
-                </td>
-              </tr>
+        <AppTable :card="false" :is-empty="!filteredSummaries.length" :skeleton-cols="12">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-emerald-600 uppercase tracking-wide whitespace-nowrap">Present</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-red-500 uppercase tracking-wide whitespace-nowrap">Absent</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-amber-600 uppercase tracking-wide whitespace-nowrap">Half Day</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-blue-600 uppercase tracking-wide whitespace-nowrap">Leave</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-purple-600 uppercase tracking-wide whitespace-nowrap">Holiday</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Hrs Worked</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-amber-600 uppercase tracking-wide whitespace-nowrap">Late</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-orange-600 uppercase tracking-wide whitespace-nowrap">Undertime</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-emerald-600 uppercase tracking-wide whitespace-nowrap">Overtime</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </template>
+
               <tr
                 v-for="(s, idx) in filteredSummaries"
                 :key="s.user_id"
@@ -156,9 +131,9 @@
                   <div class="font-medium text-slate-800 leading-tight">{{ s.user?.name }}</div>
                   <div class="flex items-center gap-1.5 mt-0.5">
                     <span class="text-xs text-slate-400">{{ s.user?.badge_id }}</span>
-                    <span v-if="s.user?.emp_category" :class="categoryBadgeClass(s.user.emp_category)" class="text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                    <AppBadge v-if="s.user?.emp_category" :color="categoryBadgeClass(s.user.emp_category)">
                       {{ s.user.emp_category }}
-                    </span>
+                    </AppBadge>
                   </div>
                 </td>
 
@@ -210,11 +185,8 @@
                   </div>
                 </td>
               </tr>
-            </tbody>
 
-            <!-- Totals footer row -->
-            <tfoot v-if="filteredSummaries.length" class="bg-slate-50 border-t-2 border-slate-200">
-              <tr>
+              <tr v-if="filteredSummaries.length" class="bg-slate-50 border-t-2 border-slate-200">
                 <td colspan="2" class="px-4 py-2 text-xs font-semibold text-slate-500 uppercase">Totals</td>
                 <td class="px-4 py-2 text-center text-xs font-bold text-emerald-700">{{ sumCol('present_count') }}</td>
                 <td class="px-4 py-2 text-center text-xs font-bold text-red-600">{{ sumCol('absent_count') }}</td>
@@ -227,26 +199,47 @@
                 <td class="px-4 py-2 text-right text-xs font-bold text-emerald-600">{{ sumCol('total_ot') > 0 ? fmtMin(sumCol('total_ot')) : '—' }}</td>
                 <td></td>
               </tr>
-            </tfoot>
-          </table>
-        </div>
+
+          <template #mobileCard>
+            <div v-for="s in filteredSummaries" :key="s.user_id" class="p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-slate-800">{{ s.user?.name }}</p>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="text-xs text-slate-400">{{ s.user?.badge_id }}</span>
+                    <AppBadge v-if="s.user?.emp_category" :color="categoryBadgeClass(s.user.emp_category)">{{ s.user.emp_category }}</AppBadge>
+                  </div>
+                </div>
+                <span class="text-xs font-medium text-slate-700 tabular-nums">{{ s.total_hours ?? '—' }} hrs</span>
+              </div>
+              <div class="flex flex-wrap gap-2 text-xs">
+                <span class="text-emerald-700">Present {{ s.present_count }}</span>
+                <span class="text-red-500">Absent {{ s.absent_count }}</span>
+                <span class="text-amber-600">Half {{ s.half_day_count }}</span>
+                <span class="text-blue-600">Leave {{ s.on_leave_count }}</span>
+                <span class="text-purple-600">Holiday {{ s.holiday_count }}</span>
+              </div>
+              <div class="flex items-center gap-3 pt-1">
+                <Link :href="route('hr.dtr.show', s.user_id) + '?month=' + filterMonth" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">View</Link>
+                <a :href="route('hr.dtr.print', s.user_id) + '?month=' + filterMonth" target="_blank" class="text-xs text-slate-500 hover:text-slate-700 font-medium">Print</a>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState
+              :icon="ClipboardDocumentListIcon"
+              title="No DTR records found for this period."
+              subtitle="Use Generate DTR to process biometric logs."
+            />
+          </template>
+        </AppTable>
       </div>
     </div>
 
     <!-- ── Batch Print Modal ──────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="batchPrintModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-          <div class="px-6 pt-6 pb-2 flex items-start justify-between">
-            <div>
-              <h3 class="text-base font-semibold text-slate-800">Batch Print DTR</h3>
-              <p class="text-xs text-slate-400 mt-0.5">CS Form 48 — two copies per employee, A4 landscape.</p>
-            </div>
-            <button @click="batchPrintModal = false" class="text-slate-400 hover:text-slate-600 mt-0.5">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
-          </div>
-          <div class="px-6 py-4 space-y-4 border-t border-slate-100">
+    <AppModal :show="batchPrintModal" title="Batch Print DTR" subtitle="CS Form 48 — two copies per employee, A4 landscape." @close="batchPrintModal = false">
+          <div class="space-y-4">
             <!-- Category -->
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">Category <span class="font-normal text-slate-400">(leave blank for all)</span></label>
@@ -293,32 +286,17 @@
               </select>
             </div>
           </div>
-          <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-100">
-            <button @click="batchPrintModal = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="openBatchPrint" :disabled="isBatchNonPlantilla ? (!batchForm.date_from || !batchForm.date_to) : !batchForm.month"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg transition-colors">
-              <PrinterIcon class="h-4 w-4" />Open Print
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      <template #footer>
+        <AppButton variant="secondary" @click="batchPrintModal = false">Cancel</AppButton>
+        <AppButton @click="openBatchPrint" :disabled="isBatchNonPlantilla ? (!batchForm.date_from || !batchForm.date_to) : !batchForm.month">
+          <PrinterIcon class="h-4 w-4" />Open Print
+        </AppButton>
+      </template>
+    </AppModal>
 
     <!-- ── Generate DTR Modal ─────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="generateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-          <div class="px-6 pt-6 pb-2 flex items-start justify-between">
-            <div>
-              <h3 class="text-base font-semibold text-slate-800">Generate DTR Records</h3>
-              <p class="text-xs text-slate-400 mt-0.5">Processes biometric logs into daily DTR entries.</p>
-            </div>
-            <button @click="generateModal = false" class="text-slate-400 hover:text-slate-600 mt-0.5">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
-          </div>
-
-          <div class="px-6 py-4 space-y-4 border-t border-slate-100">
+    <AppModal :show="generateModal" title="Generate DTR Records" subtitle="Processes biometric logs into daily DTR entries." @close="generateModal = false">
+          <div class="space-y-4">
             <!-- Category selector -->
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-2">Employee Category</label>
@@ -382,22 +360,18 @@
               <p class="text-xs text-amber-600">For COS payroll cut-off, set Date To to tomorrow to generate an advance entry.</p>
             </template>
           </div>
-
-          <div class="flex gap-3 justify-end px-6 py-4 border-t border-slate-100">
-            <button @click="generateModal = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button
-              @click="submitGenerate"
-              :disabled="genForm.processing || !genForm.date_from || !genForm.date_to || (genCategory === 'single' && !genForm.user_id)"
-              class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors"
-            >
-              <Cog6ToothIcon v-if="!genForm.processing" class="h-4 w-4" />
-              <span v-if="genForm.processing" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              {{ genForm.processing ? 'Generating…' : 'Generate' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      <template #footer>
+        <AppButton variant="secondary" @click="generateModal = false">Cancel</AppButton>
+        <AppButton
+          @click="submitGenerate"
+          :loading="genForm.processing"
+          :disabled="genForm.processing || !genForm.date_from || !genForm.date_to || (genCategory === 'single' && !genForm.user_id)"
+        >
+          <Cog6ToothIcon v-if="!genForm.processing" class="h-4 w-4" />
+          {{ genForm.processing ? 'Generating…' : 'Generate' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -406,6 +380,13 @@
 import { ref, reactive, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   EyeIcon,
   Cog6ToothIcon,
@@ -413,7 +394,6 @@ import {
   XCircleIcon,
   PrinterIcon,
   MagnifyingGlassIcon,
-  XMarkIcon,
   CalendarDaysIcon,
   ClipboardDocumentListIcon,
   InboxArrowDownIcon,
@@ -493,16 +473,16 @@ function fmtMin (mins) {
   return `${r}m`
 }
 
-// ── Category badge colour ───────────────────────────────────────────────────
+// ── Category badge colour (AppBadge color key) ───────────────────────────────
 function categoryBadgeClass (cat) {
-  if (!cat) return ''
+  if (!cat) return 'slate'
   const map = {
-    'Plantilla Teaching':     'bg-indigo-50 text-indigo-700',
-    'Plantilla Non-Teaching': 'bg-violet-50 text-violet-700',
-    'COS Teaching':           'bg-teal-50 text-teal-700',
-    'COS Non Teaching':       'bg-cyan-50 text-cyan-700',
+    'Plantilla Teaching':     'indigo',
+    'Plantilla Non-Teaching': 'purple',
+    'COS Teaching':           'blue',
+    'COS Non Teaching':       'orange',
   }
-  return map[cat] ?? 'bg-slate-100 text-slate-600'
+  return map[cat] ?? 'slate'
 }
 
 // ── Batch Print ─────────────────────────────────────────────────────────────

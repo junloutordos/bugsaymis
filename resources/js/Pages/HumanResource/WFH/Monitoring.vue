@@ -3,245 +3,275 @@
   <AdminLayout title="WFH Monitoring">
     <div class="space-y-5">
 
+      <AppPageHeader title="WFH Monitoring" subtitle="Review employee work-from-home time logs and accomplishments." />
+
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
-        <!-- Month picker -->
+      <AppFilterBar>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
           <input
             v-model="filterMonth"
             type="month"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <!-- Name search -->
         <div class="flex-1 min-w-[160px]">
           <label class="block text-xs font-medium text-slate-600 mb-1">Search Employee</label>
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Name…"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
           />
         </div>
 
-        <button
-          @click="load"
-          :disabled="loading"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          {{ loading ? 'Loading…' : 'Apply' }}
-        </button>
-      </div>
+        <template #actions>
+          <AppButton :loading="loading" @click="load()">Apply</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Summary strip -->
       <div class="grid grid-cols-3 gap-4">
-        <SummaryCard label="Total WFH Days" :value="summary.total" color="indigo" />
-        <SummaryCard label="Completed (In + Out)" :value="summary.completed" color="green" />
-        <SummaryCard label="Incomplete (No Time-Out)" :value="summary.incomplete" color="yellow" />
+        <AppCard class="text-center">
+          <p class="text-xs text-slate-500 mb-1">Total WFH Days</p>
+          <p class="text-2xl font-bold text-indigo-600">{{ summary.total }}</p>
+        </AppCard>
+        <AppCard class="text-center">
+          <p class="text-xs text-slate-500 mb-1">Completed (In + Out)</p>
+          <p class="text-2xl font-bold text-success-700">{{ summary.completed }}</p>
+        </AppCard>
+        <AppCard class="text-center">
+          <p class="text-xs text-slate-500 mb-1">Incomplete (No Time-Out)</p>
+          <p class="text-2xl font-bold text-warning-700">{{ summary.incomplete }}</p>
+        </AppCard>
       </div>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div v-if="!filteredRows.length && !loading" class="py-16 text-center text-slate-400 text-sm">
-          No WFH records found.
-        </div>
+      <!-- Table -->
+      <AppTable :loading="loading" :is-empty="!filteredRows.length" :skeleton-cols="10">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap w-6"></th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time In</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Out</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Duration</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accomplishments</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Photos</th>
+          </tr>
+        </template>
 
-        <div v-else class="overflow-x-auto rounded-xl border border-slate-100">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap w-6"></th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Out</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Duration</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Accomplishments</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Photos</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <template v-for="row in filteredRows" :key="row.id">
-                <!-- Main row -->
-                <tr
-                  class="hover:bg-slate-50/60 cursor-pointer transition"
-                  :class="{ 'bg-indigo-50': expanded === row.id }"
-                  @click="toggleExpand(row.id)"
+        <template v-for="row in filteredRows" :key="row.id">
+          <!-- Main row -->
+          <tr
+            class="hover:bg-slate-50/60 cursor-pointer transition"
+            :class="{ 'bg-indigo-50': expanded === row.id }"
+            @click="toggleExpand(row.id)"
+          >
+            <!-- Expand chevron -->
+            <td class="px-4 py-3 text-slate-400">
+              <ChevronRightIcon
+                class="w-4 h-4 transition-transform"
+                :class="{ 'rotate-90': expanded === row.id }"
+              />
+            </td>
+
+            <td class="px-4 py-3 text-sm text-slate-700 font-medium">
+              {{ row.user?.name ?? '—' }}
+              <div class="text-xs text-slate-400 font-normal">{{ row.user?.position ?? '' }}</div>
+            </td>
+
+            <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(row.date) }}</td>
+            <td class="px-4 py-3 text-sm text-emerald-600 font-medium">{{ formatTime(row.time_in) }}</td>
+            <td class="px-4 py-3 text-sm text-blue-600 font-medium">{{ formatTime(row.time_out) }}</td>
+            <td class="px-4 py-3 text-sm text-slate-700">{{ calcDuration(row.time_in, row.time_out) }}</td>
+
+            <td class="px-4 py-3 text-center">
+              <AppBadge :color="row.accomplishments?.length ? 'indigo' : 'slate'">
+                {{ row.accomplishments?.length ?? 0 }}
+              </AppBadge>
+            </td>
+
+            <td class="px-4 py-3 text-center">
+              <AppBadge :color="statusColor(row)">{{ statusLabel(row) }}</AppBadge>
+            </td>
+
+            <!-- Location -->
+            <td class="px-4 py-3 text-center">
+              <a v-if="row.latitude && row.longitude"
+                 :href="`https://www.google.com/maps?q=${row.latitude},${row.longitude}`"
+                 target="_blank"
+                 @click.stop
+                 title="View on Google Maps"
+                 class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium">
+                📍 View
+              </a>
+              <span v-else class="text-slate-300 text-xs">—</span>
+            </td>
+
+            <!-- Time-in / time-out photo thumbnails -->
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-center gap-2">
+                <a v-if="row.time_in_photo_link"
+                   :href="row.time_in_photo_link" target="_blank"
+                   @click.stop title="Time-in photo">
+                  <img :src="driveThumb(row.time_in_photo_link)"
+                       class="w-10 h-10 rounded-lg object-cover border-2 border-emerald-300"
+                       alt="In" />
+                </a>
+                <a v-if="row.time_out_photo_link"
+                   :href="row.time_out_photo_link" target="_blank"
+                   @click.stop title="Time-out photo">
+                  <img :src="driveThumb(row.time_out_photo_link)"
+                       class="w-10 h-10 rounded-lg object-cover border-2 border-blue-300"
+                       alt="Out" />
+                </a>
+                <span v-if="!row.time_in_photo_link && !row.time_out_photo_link"
+                      class="text-slate-300 text-xs">—</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Expanded accomplishments row -->
+          <tr v-if="expanded === row.id" class="bg-indigo-50">
+            <td colspan="10" class="px-8 pb-4 pt-2">
+              <p class="text-xs font-semibold text-indigo-700 mb-2 uppercase tracking-wide">
+                Accomplishments for {{ row.user?.name }}
+              </p>
+
+              <div v-if="!row.accomplishments?.length" class="text-sm text-slate-400">
+                No accomplishments recorded.
+              </div>
+
+              <ul v-else class="space-y-2">
+                <li
+                  v-for="acc in row.accomplishments"
+                  :key="acc.id"
+                  class="bg-white rounded-lg border border-indigo-100 px-4 py-3 flex items-start justify-between gap-4"
                 >
-                  <!-- Expand chevron -->
-                  <td class="px-4 py-3 text-slate-400">
-                    <svg
-                      class="w-4 h-4 transition-transform"
-                      :class="{ 'rotate-90': expanded === row.id }"
-                      xmlns="http://www.w3.org/2000/svg" fill="none"
-                      viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-                    >
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </td>
-
-                  <td class="px-4 py-3 text-sm text-slate-700 font-medium">
-                    {{ row.user?.name ?? '—' }}
-                    <div class="text-xs text-slate-400 font-normal">{{ row.user?.position ?? '' }}</div>
-                  </td>
-
-                  <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(row.date) }}</td>
-                  <td class="px-4 py-3 text-sm text-emerald-600 font-medium">{{ formatTime(row.time_in) }}</td>
-                  <td class="px-4 py-3 text-sm text-blue-600 font-medium">{{ formatTime(row.time_out) }}</td>
-                  <td class="px-4 py-3 text-sm text-slate-700">{{ calcDuration(row.time_in, row.time_out) }}</td>
-
-                  <td class="px-4 py-3 text-center">
-                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
-                          :class="row.accomplishments?.length ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'">
-                      {{ row.accomplishments?.length ?? 0 }}
-                    </span>
-                  </td>
-
-                  <td class="px-4 py-3 text-center">
-                    <span
-                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                      :class="row.time_out
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-blue-50 text-blue-700'"
-                    >
-                      {{ row.time_out ? 'Complete' : 'In Progress' }}
-                    </span>
-                  </td>
-
-                  <!-- Location -->
-                  <td class="px-4 py-3 text-center">
-                    <a v-if="row.latitude && row.longitude"
-                       :href="`https://www.google.com/maps?q=${row.latitude},${row.longitude}`"
-                       target="_blank"
-                       @click.stop
-                       title="View on Google Maps"
-                       class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-medium">
-                      📍 View
-                    </a>
-                    <span v-else class="text-slate-300 text-xs">—</span>
-                  </td>
-
-                  <!-- Time-in / time-out photo thumbnails -->
-                  <td class="px-4 py-3">
-                    <div class="flex items-center justify-center gap-2">
-                      <a v-if="row.time_in_photo_link"
-                         :href="row.time_in_photo_link" target="_blank"
-                         @click.stop title="Time-in photo">
-                        <img :src="driveThumb(row.time_in_photo_link)"
-                             class="w-10 h-10 rounded-lg object-cover border-2 border-emerald-300"
-                             alt="In" />
-                      </a>
-                      <a v-if="row.time_out_photo_link"
-                         :href="row.time_out_photo_link" target="_blank"
-                         @click.stop title="Time-out photo">
-                        <img :src="driveThumb(row.time_out_photo_link)"
-                             class="w-10 h-10 rounded-lg object-cover border-2 border-blue-300"
-                             alt="Out" />
-                      </a>
-                      <span v-if="!row.time_in_photo_link && !row.time_out_photo_link"
-                            class="text-slate-300 text-xs">—</span>
-                    </div>
-                  </td>
-                </tr>
-
-                <!-- Expanded accomplishments row -->
-                <tr v-if="expanded === row.id" class="bg-indigo-50">
-                  <td colspan="10" class="px-8 pb-4 pt-2">
-                    <p class="text-xs font-semibold text-indigo-700 mb-2 uppercase tracking-wide">
-                      Accomplishments for {{ row.user?.name }}
+                  <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-slate-800 text-sm">{{ acc.title }}</p>
+                    <p v-if="acc.description" class="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                      {{ acc.description }}
                     </p>
+                  </div>
 
-                    <div v-if="!row.accomplishments?.length" class="text-sm text-slate-400">
-                      No accomplishments recorded.
-                    </div>
+                  <!-- Proof -->
+                  <div class="flex-shrink-0">
+                    <a
+                      v-if="acc.proof_type === 'photo' && acc.google_drive_link"
+                      :href="acc.google_drive_link"
+                      target="_blank"
+                      class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
+                    >
+                      📷 {{ acc.file_name ?? 'Photo' }}
+                    </a>
+                    <a
+                      v-else-if="acc.proof_type === 'link' && acc.proof_link"
+                      :href="acc.proof_link"
+                      target="_blank"
+                      class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
+                    >
+                      🔗 View Link
+                    </a>
+                    <span v-else class="text-xs text-slate-300">No proof</span>
+                  </div>
+                </li>
+              </ul>
+            </td>
+          </tr>
+        </template>
 
-                    <ul v-else class="space-y-2">
-                      <li
-                        v-for="acc in row.accomplishments"
-                        :key="acc.id"
-                        class="bg-white rounded-lg border border-indigo-100 px-4 py-3 flex items-start justify-between gap-4"
-                      >
-                        <div class="flex-1 min-w-0">
-                          <p class="font-semibold text-slate-800 text-sm">{{ acc.title }}</p>
-                          <p v-if="acc.description" class="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                            {{ acc.description }}
-                          </p>
-                        </div>
+        <template #mobileCard>
+          <div v-for="row in filteredRows" :key="row.id" class="p-4 space-y-2">
+            <button class="w-full text-left" @click="toggleExpand(row.id)">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-slate-800 text-sm">{{ row.user?.name ?? '—' }}</p>
+                  <p class="text-xs text-slate-400">{{ row.user?.position ?? '' }}</p>
+                </div>
+                <AppBadge :color="statusColor(row)">{{ statusLabel(row) }}</AppBadge>
+              </div>
+              <div class="flex justify-between text-xs text-slate-500 mt-2">
+                <span>{{ formatDate(row.date) }}</span>
+                <span>{{ calcDuration(row.time_in, row.time_out) }}</span>
+              </div>
+              <div class="flex justify-between text-xs mt-1">
+                <span class="text-emerald-600 font-medium">In {{ formatTime(row.time_in) }}</span>
+                <span class="text-blue-600 font-medium">Out {{ formatTime(row.time_out) }}</span>
+              </div>
+              <div class="flex items-center justify-between mt-2">
+                <AppBadge :color="row.accomplishments?.length ? 'indigo' : 'slate'">
+                  📝 {{ row.accomplishments?.length ?? 0 }}
+                </AppBadge>
+                <a v-if="row.latitude && row.longitude"
+                   :href="`https://www.google.com/maps?q=${row.latitude},${row.longitude}`"
+                   target="_blank"
+                   @click.stop
+                   class="text-xs text-indigo-600 hover:underline font-medium">
+                  📍 Location
+                </a>
+              </div>
+            </button>
 
-                        <!-- Proof -->
-                        <div class="flex-shrink-0">
-                          <a
-                            v-if="acc.proof_type === 'photo' && acc.google_drive_link"
-                            :href="acc.google_drive_link"
-                            target="_blank"
-                            class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
-                          >
-                            📷 {{ acc.file_name ?? 'Photo' }}
-                          </a>
-                          <a
-                            v-else-if="acc.proof_type === 'link' && acc.proof_link"
-                            :href="acc.proof_link"
-                            target="_blank"
-                            class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline"
-                          >
-                            🔗 View Link
-                          </a>
-                          <span v-else class="text-xs text-slate-300">No proof</span>
-                        </div>
-                      </li>
-                    </ul>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <div v-if="meta.last_page > 1"
-             class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-          <div class="flex gap-2">
-            <button
-              @click="changePage(meta.current_page - 1)"
-              :disabled="meta.current_page <= 1"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-            >Prev</button>
-            <button
-              @click="changePage(meta.current_page + 1)"
-              :disabled="meta.current_page >= meta.last_page"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-            >Next</button>
+            <div v-if="expanded === row.id" class="pt-2 border-t border-slate-100 space-y-2">
+              <p class="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Accomplishments</p>
+              <div v-if="!row.accomplishments?.length" class="text-sm text-slate-400">
+                No accomplishments recorded.
+              </div>
+              <ul v-else class="space-y-2">
+                <li
+                  v-for="acc in row.accomplishments"
+                  :key="acc.id"
+                  class="bg-slate-50 rounded-lg border border-slate-100 px-3 py-2"
+                >
+                  <p class="font-semibold text-slate-800 text-sm">{{ acc.title }}</p>
+                  <p v-if="acc.description" class="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                    {{ acc.description }}
+                  </p>
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No WFH records found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="meta.current_page"
+            :total-pages="meta.last_page"
+            @prev="changePage(meta.current_page - 1)"
+            @next="changePage(meta.current_page + 1)"
+            @page="changePage"
+          />
+        </template>
+      </AppTable>
 
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 import Swal from 'sweetalert2'
-
-// ── Inline sub-component (render fn — no runtime compiler needed) ─────────────
-const colorMap = { indigo: 'text-indigo-600', green: 'text-emerald-600', yellow: 'text-amber-600' }
-const SummaryCard = {
-  props: { label: String, value: [Number, String], color: String },
-  setup(props) {
-    return () => h('div', { class: 'bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-1' }, [
-      h('p', { class: 'text-xs font-medium text-slate-500' }, props.label),
-      h('p', { class: `text-2xl font-bold ${colorMap[props.color] ?? 'text-slate-800'}` }, String(props.value)),
-    ])
-  },
-}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const rows        = ref([])
@@ -260,6 +290,15 @@ const summary = computed(() => ({
 
 // Rows is already the server-filtered result; template iterates it directly.
 const filteredRows = computed(() => rows.value)
+
+// ── Badge helpers ─────────────────────────────────────────────────────────────
+function statusColor(row) {
+  return row.time_out ? 'green' : 'blue'
+}
+
+function statusLabel(row) {
+  return row.time_out ? 'Complete' : 'In Progress'
+}
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load(page = 1) {

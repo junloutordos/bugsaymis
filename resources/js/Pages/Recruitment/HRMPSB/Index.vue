@@ -2,6 +2,11 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
@@ -35,16 +40,13 @@ const assign = (user) => {
 
 // ── Remove ─────────────────────────────────────────────────────────────────
 const removeMember = async (user) => {
-  const { isConfirmed } = await Swal.fire({
+  const confirmed = await confirmAction({
     title: `Remove ${user.name}?`,
     text:  'They will lose HRMPSB access immediately.',
-    icon:  'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#ef4444',
-    confirmButtonText: 'Remove',
-    reverseButtons: true,
+    confirmText: 'Remove',
+    icon: 'warning',
   })
-  if (!isConfirmed) return
+  if (!confirmed) return
 
   router.delete(route('recruitment.hrmpsb.remove', user.id), {
     onSuccess: () => Swal.fire({ icon: 'success', title: 'Member removed.', timer: 1500, showConfirmButton: false }),
@@ -59,8 +61,10 @@ const successMsg = computed(() => page.props.flash?.success)
   <AdminLayout title="HRMPSB — Selection Board Members">
     <div class="max-w-4xl mx-auto space-y-6">
 
+      <AppPageHeader title="HRMPSB — Selection Board Members" />
+
       <!-- Flash -->
-      <div v-if="successMsg" class="px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">
+      <div v-if="successMsg" class="px-4 py-3 rounded-lg bg-success-50 border border-success-100 text-success-700 text-sm">
         {{ successMsg }}
       </div>
 
@@ -75,9 +79,7 @@ const successMsg = computed(() => page.props.flash?.success)
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 class="text-sm font-semibold text-slate-700">Current HRMPSB Members</h3>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
-            {{ members.length }} member{{ members.length !== 1 ? 's' : '' }}
-          </span>
+          <AppBadge color="slate">{{ members.length }} member{{ members.length !== 1 ? 's' : '' }}</AppBadge>
         </div>
 
         <div class="p-5">
@@ -94,15 +96,10 @@ const successMsg = computed(() => page.props.flash?.success)
                   <p v-if="m.position" class="text-xs text-slate-500">{{ m.position }}</p>
                 </div>
               </div>
-              <button @click="removeMember(m)"
-                      class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                Remove
-              </button>
+              <AppButton size="sm" variant="danger" @click="removeMember(m)">Remove</AppButton>
             </div>
           </div>
-          <div v-else class="py-16 text-center text-slate-400 text-sm">
-            No HRMPSB members assigned yet.
-          </div>
+          <EmptyState v-else title="No HRMPSB members assigned yet" />
         </div>
       </div>
 
@@ -116,10 +113,7 @@ const successMsg = computed(() => page.props.flash?.success)
             <input v-model="searchQuery" @keyup.enter="doSearch"
                    type="text" placeholder="Search by name, email, or badge ID…"
                    class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            <button @click="doSearch"
-                    class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              Search
-            </button>
+            <AppButton @click="doSearch">Search</AppButton>
           </div>
 
           <div v-if="results.length" class="mt-4 divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
@@ -137,16 +131,11 @@ const successMsg = computed(() => page.props.flash?.success)
                   </p>
                 </div>
               </div>
-              <button @click="assign(u)" :disabled="assignForm.processing"
-                      class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50">
-                + Add
-              </button>
+              <AppButton size="sm" :disabled="assignForm.processing" @click="assign(u)">+ Add</AppButton>
             </div>
           </div>
 
-          <div v-else-if="search && !results.length" class="mt-4 py-16 text-center text-slate-400 text-sm">
-            No matching users found outside the current HRMPSB membership.
-          </div>
+          <EmptyState v-else-if="search && !results.length" class="mt-4" title="No matching users found outside the current HRMPSB membership" />
         </div>
       </div>
 
@@ -154,12 +143,12 @@ const successMsg = computed(() => page.props.flash?.success)
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
         <h3 class="text-sm font-semibold text-slate-700 mb-3">HRMPSB Access Summary</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-600">
-          <div class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✓</span> View all job vacancies and applicant profiles</div>
-          <div class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✓</span> Score applicants on evaluation criteria</div>
-          <div class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✓</span> Participate as panel member in interviews</div>
-          <div class="flex items-center gap-2"><span class="text-emerald-600 font-bold">✓</span> View and contribute to ranking computations</div>
-          <div class="flex items-center gap-2"><span class="text-red-400 font-bold">✗</span> Publish or manage job items</div>
-          <div class="flex items-center gap-2"><span class="text-red-400 font-bold">✗</span> Approve placements or access HR records</div>
+          <div class="flex items-center gap-2"><span class="text-success-600 font-bold">✓</span> View all job vacancies and applicant profiles</div>
+          <div class="flex items-center gap-2"><span class="text-success-600 font-bold">✓</span> Score applicants on evaluation criteria</div>
+          <div class="flex items-center gap-2"><span class="text-success-600 font-bold">✓</span> Participate as panel member in interviews</div>
+          <div class="flex items-center gap-2"><span class="text-success-600 font-bold">✓</span> View and contribute to ranking computations</div>
+          <div class="flex items-center gap-2"><span class="text-danger-500 font-bold">✗</span> Publish or manage job items</div>
+          <div class="flex items-center gap-2"><span class="text-danger-500 font-bold">✗</span> Approve placements or access HR records</div>
         </div>
       </div>
 

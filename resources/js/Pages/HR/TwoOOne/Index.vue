@@ -3,23 +3,23 @@
   <AdminLayout title="201 Files">
     <div class="space-y-5">
 
-      <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Employee 201 Files</h1>
-          <p class="text-sm text-slate-500 mt-0.5">CSC PRIME-HRM — {{ employees.length }} employee{{ employees.length !== 1 ? 's' : '' }}</p>
-        </div>
-        <!-- Search -->
+      <AppPageHeader
+        title="Employee 201 Files"
+        :subtitle="`CSC PRIME-HRM — ${employees.length} employee${employees.length !== 1 ? 's' : ''}`"
+      />
+
+      <!-- Search -->
+      <AppFilterBar>
         <div class="relative w-full sm:w-72">
           <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
           <input
             v-model="search"
             type="text"
             placeholder="Search employee…"
-            class="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            class="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
-      </div>
+      </AppFilterBar>
 
       <!-- Legend -->
       <div class="flex flex-wrap gap-4 text-xs text-slate-500">
@@ -29,91 +29,120 @@
       </div>
 
       <!-- Employee Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                <th class="px-4 py-3 text-left">Employee</th>
-                <th class="px-4 py-3 text-left hidden md:table-cell">Position / Division</th>
-                <th class="px-4 py-3 text-center">Completeness</th>
-                <th class="px-4 py-3 text-center hidden lg:table-cell" v-for="cat in requiredCategories" :key="cat.value" :title="cat.label">
-                  Folder {{ cat.folder }}
-                </th>
-                <th class="px-4 py-3 text-center">Total Docs</th>
-                <th class="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              <tr v-if="filtered.length === 0">
-                <td :colspan="5 + requiredCategories.length" class="py-16 text-center text-slate-400 text-sm">
-                  <UserCircleIcon class="mx-auto h-10 w-10 text-slate-200 mb-2" />
-                  No employees found.
-                </td>
-              </tr>
-              <tr v-for="emp in filtered" :key="emp.id" class="hover:bg-slate-50/60 transition-colors">
-                <!-- Employee Name -->
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2.5">
-                    <span :class="statusDot(emp)" class="shrink-0 w-2.5 h-2.5 rounded-full"></span>
-                    <div>
-                      <p class="font-medium text-slate-800">{{ emp.name }}</p>
-                      <p v-if="emp.employee_no" class="text-xs text-slate-400">EMP# {{ emp.employee_no }}</p>
-                    </div>
-                  </div>
-                </td>
-                <!-- Position -->
-                <td class="px-4 py-3 hidden md:table-cell">
-                  <p class="text-slate-700">{{ emp.position || '—' }}</p>
+      <AppTable :is-empty="filtered.length === 0" :skeleton-cols="5 + requiredCategories.length">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Position / Division</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Completeness</th>
+            <th
+              v-for="cat in requiredCategories"
+              :key="cat.value"
+              class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell"
+              :title="cat.label"
+            >
+              Folder {{ cat.folder }}
+            </th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Docs</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="emp in filtered" :key="emp.id" class="hover:bg-slate-50/60 transition-colors">
+          <!-- Employee Name -->
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2.5">
+              <span :class="statusDot(emp)" class="shrink-0 w-2.5 h-2.5 rounded-full"></span>
+              <div>
+                <p class="font-medium text-slate-800">{{ emp.name }}</p>
+                <p v-if="emp.employee_no" class="text-xs text-slate-400">EMP# {{ emp.employee_no }}</p>
+              </div>
+            </div>
+          </td>
+          <!-- Position -->
+          <td class="px-4 py-3 hidden md:table-cell">
+            <p class="text-slate-700">{{ emp.position || '—' }}</p>
+            <p v-if="emp.division" class="text-xs text-slate-400">{{ emp.division }}</p>
+          </td>
+          <!-- Completeness bar -->
+          <td class="px-4 py-3 text-center">
+            <div class="flex flex-col items-center gap-1">
+              <span :class="completenessColor(emp.completeness)" class="text-xs font-semibold tabular-nums">
+                {{ emp.completeness }}%
+              </span>
+              <div class="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  :class="completenessBarColor(emp.completeness)"
+                  class="h-full rounded-full transition-all"
+                  :style="{ width: emp.completeness + '%' }"
+                ></div>
+              </div>
+              <span class="text-[10px] text-slate-400">{{ emp.completed_required }}/{{ emp.total_required }} req.</span>
+            </div>
+          </td>
+          <!-- Per-required-folder indicator -->
+          <td v-for="cat in requiredCategories" :key="cat.value" class="px-4 py-3 text-center hidden lg:table-cell">
+            <span
+              :title="cat.label + ': ' + (emp.counts[cat.value] ?? 0) + ' doc(s)'"
+              :class="emp.counts[cat.value] ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-400'"
+              class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
+            >
+              {{ emp.counts[cat.value] ?? 0 }}
+            </span>
+          </td>
+          <!-- Total docs -->
+          <td class="px-4 py-3 text-center">
+            <AppBadge color="slate">{{ emp.total_docs }}</AppBadge>
+          </td>
+          <!-- Action -->
+          <td class="px-4 py-3 text-right">
+            <AppButton as="link" :href="route('hr.employees.documents.index', emp.id)" variant="secondary" size="sm">
+              <FolderOpenIcon class="h-3.5 w-3.5" />
+              Open 201
+            </AppButton>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="emp in filtered" :key="emp.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <span :class="statusDot(emp)" class="shrink-0 w-2.5 h-2.5 rounded-full"></span>
+                <div>
+                  <p class="font-medium text-slate-800">{{ emp.name }}</p>
+                  <p v-if="emp.employee_no" class="text-xs text-slate-400">EMP# {{ emp.employee_no }}</p>
+                  <p v-if="emp.position" class="text-xs text-slate-500">{{ emp.position }}</p>
                   <p v-if="emp.division" class="text-xs text-slate-400">{{ emp.division }}</p>
-                </td>
-                <!-- Completeness bar -->
-                <td class="px-4 py-3 text-center">
-                  <div class="flex flex-col items-center gap-1">
-                    <span :class="completenessColor(emp.completeness)" class="text-xs font-semibold tabular-nums">
-                      {{ emp.completeness }}%
-                    </span>
-                    <div class="w-20 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        :class="completenessBarColor(emp.completeness)"
-                        class="h-full rounded-full transition-all"
-                        :style="{ width: emp.completeness + '%' }"
-                      ></div>
-                    </div>
-                    <span class="text-[10px] text-slate-400">{{ emp.completed_required }}/{{ emp.total_required }} req.</span>
-                  </div>
-                </td>
-                <!-- Per-required-folder indicator -->
-                <td v-for="cat in requiredCategories" :key="cat.value" class="px-4 py-3 text-center hidden lg:table-cell">
-                  <span
-                    :title="cat.label + ': ' + (emp.counts[cat.value] ?? 0) + ' doc(s)'"
-                    :class="emp.counts[cat.value] ? 'bg-emerald-100 text-emerald-700' : 'bg-red-50 text-red-400'"
-                    class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold"
-                  >
-                    {{ emp.counts[cat.value] ?? 0 }}
-                  </span>
-                </td>
-                <!-- Total docs -->
-                <td class="px-4 py-3 text-center">
-                  <span class="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                    {{ emp.total_docs }}
-                  </span>
-                </td>
-                <!-- Action -->
-                <td class="px-4 py-3 text-right">
-                  <a
-                    :href="route('hr.employees.documents.index', emp.id)"
-                    class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 rounded-lg px-2.5 py-1.5 transition-colors whitespace-nowrap"
-                  >
-                    <FolderOpenIcon class="h-3.5 w-3.5" />
-                    Open 201
-                  </a>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </div>
+              </div>
+              <AppBadge color="slate">{{ emp.total_docs }} docs</AppBadge>
+            </div>
+            <div class="flex items-center gap-3">
+              <span :class="completenessColor(emp.completeness)" class="text-xs font-semibold tabular-nums">
+                {{ emp.completeness }}%
+              </span>
+              <div class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  :class="completenessBarColor(emp.completeness)"
+                  class="h-full rounded-full transition-all"
+                  :style="{ width: emp.completeness + '%' }"
+                ></div>
+              </div>
+              <span class="text-[10px] text-slate-400 whitespace-nowrap">{{ emp.completed_required }}/{{ emp.total_required }} req.</span>
+            </div>
+            <div class="pt-1">
+              <AppButton as="link" :href="route('hr.employees.documents.index', emp.id)" variant="secondary" size="sm" block>
+                <FolderOpenIcon class="h-3.5 w-3.5" />
+                Open 201
+              </AppButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No employees found" :icon="UserCircleIcon" />
+        </template>
+      </AppTable>
 
       <!-- CSC PRIME-HRM Folder Reference -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
@@ -153,6 +182,12 @@
 import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   MagnifyingGlassIcon,
   FolderOpenIcon,

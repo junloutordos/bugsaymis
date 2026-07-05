@@ -1,118 +1,128 @@
 <template>
   <Head title="Collection Categories" />
   <AdminLayout title="Collection Categories">
-    <div>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Collection Categories</h1>
-        <button @click="openCreate" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">New Category</button>
-      </div>
+    <div class="space-y-5">
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <input v-model="q" @keydown.enter="search" type="text" placeholder="Search categories..." class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64" />
+      <AppPageHeader title="Collection Categories" subtitle="Manage library collection categories and borrowing day limits.">
+        <template #actions>
+          <AppButton @click="openCreate">
+            <PlusIcon class="h-4 w-4" />
+            New Category
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="relative w-full sm:w-64">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            v-model="q"
+            @keydown.enter.prevent="search"
+            type="text"
+            placeholder="Search categories..."
+            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
         </div>
 
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Student Days</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee Days</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="c in categories.data" :key="c.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ c.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ c.name }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ c.student_borrowing_days ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ c.employee_borrowing_days ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <div class="flex items-center gap-1">
-                    <button @click="openEdit(c)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit" aria-label="Edit category">
-                      <PencilSquareIcon class="w-5 h-5" />
-                    </button>
-                    <button @click="confirmDelete(c)" :disabled="isSubmitting" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" aria-label="Delete category">
-                      <TrashIcon class="w-5 h-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="(categories.data || []).length === 0"><td :colspan="5" class="py-16 text-center text-slate-400 text-sm">No categories</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <template #actions>
+          <AppButton size="sm" @click="search">Search</AppButton>
+        </template>
+      </AppFilterBar>
 
-        <!-- Mobile cards -->
-        <div v-else class="space-y-3 p-4 sm:hidden">
-          <div v-for="c in categories.data" :key="c.id" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
-            <div class="flex items-start justify-between">
+      <!-- Table -->
+      <AppTable :is-empty="!categories.data?.length" :skeleton-cols="5">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Student Days</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee Days</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
+
+        <tr v-for="c in categories.data" :key="c.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ c.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-800 font-medium">{{ c.name }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ c.student_borrowing_days ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ c.employee_borrowing_days ?? '—' }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <AppIconButton label="Edit category" @click="openEdit(c)">
+                <PencilSquareIcon class="w-5 h-5" />
+              </AppIconButton>
+              <AppIconButton label="Delete category" variant="danger" :disabled="isSubmitting" @click="confirmDelete(c)">
+                <TrashIcon class="w-5 h-5" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="c in categories.data" :key="c.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
               <div>
-                <div class="text-xs text-slate-500">#{{ c.id }}</div>
-                <div class="font-semibold text-slate-800">{{ c.name }}</div>
-                <div class="text-sm text-slate-600">Student Days: {{ c.student_borrowing_days ?? '—' }}</div>
-                <div class="text-sm text-slate-600">Employee Days: {{ c.employee_borrowing_days ?? '—' }}</div>
+                <p class="text-xs text-slate-500">#{{ c.id }}</p>
+                <p class="font-semibold text-slate-800">{{ c.name }}</p>
+                <p class="text-sm text-slate-600">Student Days: {{ c.student_borrowing_days ?? '—' }}</p>
+                <p class="text-sm text-slate-600">Employee Days: {{ c.employee_borrowing_days ?? '—' }}</p>
               </div>
-              <div class="flex flex-col items-end space-y-2">
-                <div class="flex space-x-1">
-                  <button @click="openEdit(c)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit" aria-label="Edit category">
-                    <PencilSquareIcon class="w-5 h-5" />
-                  </button>
-                  <button @click="confirmDelete(c)" :disabled="isSubmitting" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Delete" aria-label="Delete category">
-                    <TrashIcon class="w-5 h-5" />
-                  </button>
-                </div>
+              <div class="flex items-center gap-1">
+                <AppIconButton label="Edit category" @click="openEdit(c)">
+                  <PencilSquareIcon class="w-5 h-5" />
+                </AppIconButton>
+                <AppIconButton label="Delete category" variant="danger" :disabled="isSubmitting" @click="confirmDelete(c)">
+                  <TrashIcon class="w-5 h-5" />
+                </AppIconButton>
               </div>
             </div>
           </div>
+        </template>
 
-          <div v-if="(categories.data || []).length === 0" class="py-16 text-center text-slate-400 text-sm">No categories</div>
-        </div>
+        <template #empty>
+          <EmptyState title="No categories found" />
+        </template>
 
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click.prevent="goTo(categories.prev_page_url)" :disabled="!categories.prev_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
-          <span>Page {{ categories.current_page }} of {{ categories.last_page }}</span>
-          <button @click.prevent="goTo(categories.next_page_url)" :disabled="!categories.next_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
-        </div>
-      </div>
+        <template #footer>
+          <PaginationControl
+            :links="categories.links"
+            :current-page="categories.current_page"
+            :total-pages="categories.last_page"
+            :total="categories.total"
+          />
+        </template>
+      </AppTable>
 
-      <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">{{ editing ? 'Edit Category' : 'New Category' }}</h3>
+      <!-- Add/Edit Modal -->
+      <AppModal :show="showModal" :title="editing ? 'Edit Category' : 'New Category'" @close="closeModal">
+        <form @submit.prevent="submitForm">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
+            <input v-model="form.name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+            <div v-if="errors.name" class="text-red-600 text-xs mt-1">{{ errors.name[0] }}</div>
           </div>
-          <div class="px-6 py-5">
-            <form @submit.prevent="submitForm">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
-                <input v-model="form.name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                <div v-if="errors.name" class="text-red-600 text-xs mt-1">{{ errors.name[0] }}</div>
-              </div>
-              <div class="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Student Borrowing Days</label>
-                  <input v-model="form.student_borrowing_days" type="number" min="1" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                  <div v-if="errors.student_borrowing_days" class="text-red-600 text-xs mt-1">{{ errors.student_borrowing_days[0] }}</div>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Employee Borrowing Days</label>
-                  <input v-model="form.employee_borrowing_days" type="number" min="1" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                  <div v-if="errors.employee_borrowing_days" class="text-red-600 text-xs mt-1">{{ errors.employee_borrowing_days[0] }}</div>
-                </div>
-              </div>
-            </form>
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Student Borrowing Days</label>
+              <input v-model="form.student_borrowing_days" type="number" min="1" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <div v-if="errors.student_borrowing_days" class="text-red-600 text-xs mt-1">{{ errors.student_borrowing_days[0] }}</div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Employee Borrowing Days</label>
+              <input v-model="form.employee_borrowing_days" type="number" min="1" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+              <div v-if="errors.employee_borrowing_days" class="text-red-600 text-xs mt-1">{{ errors.employee_borrowing_days[0] }}</div>
+            </div>
           </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="submit" @click.prevent="submitForm" :disabled="isSubmitting" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
-          </div>
-        </div>
-      </div>
+        </form>
 
-      <!-- Delete confirm handled by SweetAlert -->
+        <template #footer>
+          <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+          <AppButton :loading="isSubmitting" @click.prevent="submitForm">{{ isSubmitting ? 'Saving…' : 'Save' }}</AppButton>
+        </template>
+      </AppModal>
+
+      <!-- Delete confirm handled by shared confirm dialog -->
 
     </div>
   </AdminLayout>
@@ -123,8 +133,17 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import Swal from 'sweetalert2'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { PlusIcon, PencilSquareIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import { useSubmit } from '@/Composables/useSubmit'
+import { confirmDelete as confirmDeleteDialog } from '@/Composables/useConfirm.js'
 
 const page = usePage()
 const categories = computed(() => page.props.categories || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null })
@@ -150,15 +169,8 @@ function openCreate(){ editing.value = null; form.value = { name: '', student_bo
 function openEdit(c){ editing.value = c.id; form.value = { name: c.name, student_borrowing_days: c.student_borrowing_days ?? '', employee_borrowing_days: c.employee_borrowing_days ?? '' }; errors.value = {}; showModal.value = true }
 function closeModal(){ showModal.value = false; errors.value = {} }
 async function confirmDelete(c){
-  const res = await Swal.fire({
-    title: `Delete ${c.name}?`,
-    text: 'This action cannot be undone.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'Yes, delete',
-    cancelButtonText: 'Cancel'
-  })
-  if (!res.isConfirmed) return
+  const ok = await confirmDeleteDialog(`Delete ${c.name}? This action cannot be undone.`)
+  if (!ok) return
   const id = c.id
   const previous = deleting.value
   deleting.value = null
@@ -207,7 +219,3 @@ function deleteCategory(){
 function goTo(url){ if(!url) return; window.location.href = url }
 
 </script>
-
-<style scoped>
-.table-auto th, .table-auto td { padding: 0.5rem; }
-</style>

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
 import ActiveUsersCard from '@/Components/Atlas/ActiveUsersCard.vue'
@@ -97,19 +98,15 @@ const traces = computed(() => props.infra?.traces ?? null)
   <Head title="Atlas WatchTower" />
   <AdminLayout title="Atlas WatchTower">
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Atlas WatchTower</h1>
-          <p class="text-sm text-slate-500">
-            App telemetry — last {{ windowHours }} hours. Powered by Laravel Pulse.
-          </p>
-        </div>
-        <AppBadge :color="enabled ? 'green' : 'slate'">
-          {{ enabled ? 'Recording' : 'Disabled' }}
-        </AppBadge>
-      </div>
+      <AppPageHeader title="Atlas WatchTower" :subtitle="`App telemetry — last ${windowHours} hours. Powered by Laravel Pulse.`">
+        <template #actions>
+          <AppBadge :color="enabled ? 'green' : 'slate'">
+            {{ enabled ? 'Recording' : 'Disabled' }}
+          </AppBadge>
+        </template>
+      </AppPageHeader>
 
-      <div v-if="!enabled" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <div v-if="!enabled" class="rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-700">
         Atlas WatchTower is currently disabled (<code>PULSE_ENABLED=false</code>). No new telemetry is being recorded.
       </div>
 
@@ -125,7 +122,7 @@ const traces = computed(() => props.infra?.traces ?? null)
         </template>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
           <div v-for="key in ['queued', 'processing', 'processed', 'released', 'failed']" :key="key">
-            <div class="text-2xl font-semibold" :class="key === 'failed' ? 'text-red-600' : 'text-slate-800'">
+            <div class="text-2xl font-semibold" :class="key === 'failed' ? 'text-danger-600' : 'text-slate-800'">
               {{ queueThroughput[key] ?? 0 }}
             </div>
             <div class="text-xs text-slate-500 capitalize">{{ key }}</div>
@@ -238,7 +235,7 @@ const traces = computed(() => props.infra?.traces ?? null)
             <div class="text-xs text-slate-500">Total traces</div>
           </div>
           <div>
-            <div class="text-2xl font-semibold" :class="traces.errors > 0 ? 'text-red-600' : 'text-slate-800'">{{ traces.errors }}</div>
+            <div class="text-2xl font-semibold" :class="traces.errors > 0 ? 'text-danger-600' : 'text-slate-800'">{{ traces.errors }}</div>
             <div class="text-xs text-slate-500">Errors/faults</div>
           </div>
           <div>
@@ -268,7 +265,7 @@ const traces = computed(() => props.infra?.traces ?? null)
             <div class="text-xs text-slate-500">Requests (last hr)</div>
           </div>
           <div>
-            <div class="text-lg font-semibold" :class="(latest(alb.errors5xx) ?? 0) > 0 ? 'text-red-600' : 'text-slate-800'">{{ latest(alb.errors5xx) ?? '—' }}</div>
+            <div class="text-lg font-semibold" :class="(latest(alb.errors5xx) ?? 0) > 0 ? 'text-danger-600' : 'text-slate-800'">{{ latest(alb.errors5xx) ?? '—' }}</div>
             <div class="text-xs text-slate-500">5xx (last hr)</div>
           </div>
           <div>

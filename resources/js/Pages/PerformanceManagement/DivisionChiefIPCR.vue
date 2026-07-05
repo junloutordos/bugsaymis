@@ -1,10 +1,21 @@
 <script setup>
 import { Head, router } from "@inertiajs/vue3"
 import AdminLayout from "@/Layouts/AdminLayout.vue"
+import AppPageHeader from "@/Components/AppPageHeader.vue"
+import AppFilterBar from "@/Components/AppFilterBar.vue"
+import AppTable from "@/Components/AppTable.vue"
+import AppButton from "@/Components/AppButton.vue"
+import AppBadge from "@/Components/AppBadge.vue"
+import AppModal from "@/Components/AppModal.vue"
+import AppInput from "@/Components/AppInput.vue"
+import AppSelect from "@/Components/AppSelect.vue"
+import AppTextarea from "@/Components/AppTextarea.vue"
+import EmptyState from "@/Components/EmptyState.vue"
+import PaginationControl from "@/Components/PaginationControl.vue"
 import { EyeIcon } from "@heroicons/vue/24/outline"
 import useDivisionChiefIPCR from "@/Composables/useIPCRDC.js"
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating"
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
 import Swal from "sweetalert2"
 import { useSubmit } from "@/Composables/useSubmit"
 
@@ -56,6 +67,8 @@ const paginated   = computed(() => {
 const goToPage  = (p) => { if (p >= 1 && p <= totalPages.value) currentPage.value = p }
 const resetPage = () => { currentPage.value = 1 }
 
+watch([searchQuery, selectedPeriod], () => resetPage())
+
 // ---------- Employees without IPCR ----------
 const employeesWithoutIpcr = computed(() => {
   const ipcrUserIds = new Set(props.ipcrs.map(i => i.user?.id).filter(Boolean))
@@ -67,6 +80,25 @@ const adjectivalRating = ipcrAdjectivalRating
 const formatDate = (val) => {
   if (!val) return "—"
   return new Date(val).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+// ---------- Status badge color mapping (AppBadge) ----------
+const ipcrBadgeColor = (status) => {
+  const map = {
+    "New Target":                "blue",
+    "For Review":                 "amber",
+    "Targets Approved":           "green",
+    "Submitted for Rating":       "orange",
+    "Rated & For PMT Review":     "purple",
+    "Submitted to PMT":           "purple",
+    "PMT Returned for Revision":  "red",
+    "Submitted to HR":            "blue",
+    "Approved by PMT":            "green",
+    "Director Signed":            "green",
+    "Returned for Revision":      "red",
+    "Rejected":                   "red",
+  }
+  return map[status] ?? "slate"
 }
 
 // ── Submit to HR ─────────────────────────────────────────────
@@ -232,9 +264,8 @@ const printMemo = () => {
     <div class="p-6 space-y-5">
 
       <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Division IPCR Targets</h1>
-        <div class="flex flex-wrap items-center gap-2">
+      <AppPageHeader title="Division IPCR Targets">
+        <template #actions>
           <!-- Submit to HR batch action -->
           <div class="flex items-center gap-2 rounded-lg px-3 py-2 bg-white border border-slate-200 shadow-sm">
             <select
@@ -244,219 +275,191 @@ const printMemo = () => {
               <option value="" disabled>— Period —</option>
               <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
             </select>
-            <button
-              @click="submitToHR"
+            <AppButton
+              size="sm"
               :disabled="ratedForHRCount === 0 || !submitToHRPeriod || isSubmitting"
-              class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+              @click="submitToHR"
             >
               {{ isSubmitting ? 'Processing…' : `Submit to HR (${ratedForHRCount})` }}
-            </button>
+            </AppButton>
           </div>
-          <button
-            @click="openReportModal"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
-            Generate Memo Report
-          </button>
-        </div>
-      </div>
+          <AppButton variant="secondary" @click="openReportModal">Generate Memo Report</AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
-        <input
+      <AppFilterBar>
+        <AppInput
           v-model="searchQuery"
-          @input="resetPage"
-          type="text"
           placeholder="Search by employee, title, period, or status..."
-          class="flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+          class="flex-1 min-w-52"
         />
-        <select
-          v-model="selectedPeriod"
-          @change="resetPage"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-        >
-          <option value="">All Periods</option>
+        <AppSelect v-model="selectedPeriod" placeholder="All Periods" class="min-w-40">
           <option v-for="p in ratingPeriods" :key="p" :value="p">{{ p }}</option>
-        </select>
-      </div>
+        </AppSelect>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Division</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg Rating</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="paginated.length === 0 && employeesWithoutIpcr.length === 0">
-                <td colspan="8" class="py-16 text-center text-slate-400 text-sm">
-                  No IPCRs found for your division with the selected filters.
-                </td>
-              </tr>
+      <AppTable :is-empty="paginated.length === 0 && employeesWithoutIpcr.length === 0" :skeleton-cols="8">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Division</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rating Period</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Title</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg Rating</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+          </tr>
+        </template>
 
-              <!-- IPCRs -->
-              <tr v-for="ipcr in paginated" :key="ipcr.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3">
-                  <div class="font-medium text-slate-800 text-sm">{{ ipcr.user?.name ?? "—" }}</div>
-                  <div class="text-xs text-slate-500">{{ ipcr.user?.position ?? "" }}</div>
-                </td>
-                <td class="px-4 py-3 text-xs text-slate-600">{{ ipcr.user?.division?.name ?? "—" }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.rating_period ?? "—" }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.title ?? "—" }}</td>
-                <td class="px-4 py-3 text-center">
-                  <span :class="statusClasses(ipcr.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
-                    {{ ipcr.status }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <template v-if="ipcr.overall_average">
-                    <div class="font-semibold text-slate-800 text-sm">{{ ipcr.overall_average }}</div>
-                    <div class="text-xs text-slate-400">{{ adjectivalRating(ipcr.overall_average) }}</div>
-                  </template>
-                  <span v-else class="text-slate-400">—</span>
-                </td>
-                <td class="px-4 py-3 text-center text-xs text-slate-500">{{ formatDate(ipcr.submitted_for_rating_at) }}</td>
-                <td class="px-4 py-3 text-center">
-                  <button @click="viewIPCR(ipcr)" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium">
-                    <EyeIcon class="w-4 h-4" /> View
-                  </button>
-                </td>
-              </tr>
+        <!-- IPCRs -->
+        <tr v-for="ipcr in paginated" :key="ipcr.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3">
+            <div class="font-medium text-slate-800 text-sm">{{ ipcr.user?.name ?? "—" }}</div>
+            <div class="text-xs text-slate-500">{{ ipcr.user?.position ?? "" }}</div>
+          </td>
+          <td class="px-4 py-3 text-xs text-slate-600">{{ ipcr.user?.division?.name ?? "—" }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.rating_period ?? "—" }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ ipcr.title ?? "—" }}</td>
+          <td class="px-4 py-3 text-center">
+            <AppBadge :color="ipcrBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <template v-if="ipcr.overall_average">
+              <div class="font-semibold text-slate-800 text-sm">{{ ipcr.overall_average }}</div>
+              <div class="text-xs text-slate-400">{{ adjectivalRating(ipcr.overall_average) }}</div>
+            </template>
+            <span v-else class="text-slate-400">—</span>
+          </td>
+          <td class="px-4 py-3 text-center text-xs text-slate-500">{{ formatDate(ipcr.submitted_for_rating_at) }}</td>
+          <td class="px-4 py-3 text-center">
+            <AppButton size="sm" variant="ghost" @click="viewIPCR(ipcr)">
+              <EyeIcon class="w-4 h-4" /> View
+            </AppButton>
+          </td>
+        </tr>
 
-              <!-- Employees without IPCR -->
-              <tr v-for="emp in employeesWithoutIpcr" :key="`emp-${emp.id}`" class="bg-slate-50/40">
-                <td class="px-4 py-3">
-                  <div class="font-medium text-slate-700 text-sm">{{ emp.name }}</div>
-                  <div class="text-xs text-slate-500">{{ emp.position ?? "" }}</div>
-                </td>
-                <td class="px-4 py-3 text-slate-400 text-sm">—</td>
-                <td class="px-4 py-3 text-slate-400 text-sm">—</td>
-                <td class="px-4 py-3 text-slate-400 text-sm">—</td>
-                <td class="px-4 py-3 text-center">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">No IPCR Created</span>
-                </td>
-                <td class="px-4 py-3 text-slate-400 text-center">—</td>
-                <td class="px-4 py-3 text-slate-400 text-center">—</td>
-                <td class="px-4 py-3"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <!-- Employees without IPCR -->
+        <tr v-for="emp in employeesWithoutIpcr" :key="`emp-${emp.id}`" class="bg-slate-50/40">
+          <td class="px-4 py-3">
+            <div class="font-medium text-slate-700 text-sm">{{ emp.name }}</div>
+            <div class="text-xs text-slate-500">{{ emp.position ?? "" }}</div>
+          </td>
+          <td class="px-4 py-3 text-slate-400 text-sm">—</td>
+          <td class="px-4 py-3 text-slate-400 text-sm">—</td>
+          <td class="px-4 py-3 text-slate-400 text-sm">—</td>
+          <td class="px-4 py-3 text-center">
+            <AppBadge color="slate">No IPCR Created</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-400 text-center">—</td>
+          <td class="px-4 py-3 text-slate-400 text-center">—</td>
+          <td class="px-4 py-3"></td>
+        </tr>
 
-        <!-- Pagination -->
-                <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="goToPage(currentPage - 1)"
-          @next="goToPage(currentPage + 1)"
-          @page="goToPage"
-        />
-      </div>
+        <template #mobileCard>
+          <div v-for="ipcr in paginated" :key="`m-${ipcr.id}`" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-sm text-slate-800">{{ ipcr.user?.name ?? "—" }}</p>
+                <p class="text-xs text-slate-500">{{ ipcr.user?.position ?? "" }}</p>
+                <p class="text-xs text-slate-400">{{ ipcr.rating_period ?? "—" }} &middot; {{ ipcr.title ?? "—" }}</p>
+              </div>
+              <AppBadge :color="ipcrBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span v-if="ipcr.overall_average">Avg {{ ipcr.overall_average }} ({{ adjectivalRating(ipcr.overall_average) }})</span>
+              <span v-else>No rating yet</span>
+              <span>{{ formatDate(ipcr.submitted_for_rating_at) }}</span>
+            </div>
+            <AppButton size="sm" variant="ghost" @click="viewIPCR(ipcr)">
+              <EyeIcon class="w-4 h-4" /> View
+            </AppButton>
+          </div>
+          <div v-for="emp in employeesWithoutIpcr" :key="`m-emp-${emp.id}`" class="p-4 space-y-2 bg-slate-50/40">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-sm text-slate-700">{{ emp.name }}</p>
+                <p class="text-xs text-slate-500">{{ emp.position ?? "" }}</p>
+              </div>
+              <AppBadge color="slate">No IPCR Created</AppBadge>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No IPCRs found for your division with the selected filters." />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="goToPage(currentPage - 1)"
+            @next="goToPage(currentPage + 1)"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
 
     </div>
 
     <!-- Add/Edit IPCR Modal -->
-    <div v-if="showModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-slate-800">{{ modalMode === 'create' ? 'Add Target' : 'Edit Target' }}</h2>
-          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Rating Period</label>
-            <input v-model="form.rating_period" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Title</label>
-            <input v-model="form.title" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-            <textarea v-model="form.remarks" rows="3" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
-          </div>
-        </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-          <button @click="submitIPCR" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">{{ modalMode === 'create' ? 'Add' : 'Update' }}</button>
-        </div>
+    <AppModal :show="showModal" :title="modalMode === 'create' ? 'Add Target' : 'Edit Target'" @close="closeModal">
+      <div class="space-y-4">
+        <AppInput v-model="form.rating_period" label="Rating Period" />
+        <AppInput v-model="form.title" label="Title" />
+        <AppTextarea v-model="form.remarks" label="Remarks" :rows="3" />
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+        <AppButton @click="submitIPCR">{{ modalMode === 'create' ? 'Add' : 'Update' }}</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Add Plans Modal -->
-    <div v-if="showAddPlansModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[80vh]">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <h2 class="text-base font-semibold text-slate-800">Select Plans for "{{ selectedIPCR?.title }}"</h2>
-          <button @click="closeAddPlansModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+    <AppModal :show="showAddPlansModal" :title="`Select Plans for &quot;${selectedIPCR?.title ?? ''}&quot;`" size="2xl" @close="closeAddPlansModal">
+      <AppInput v-model="planSearch" placeholder="Search plans..." class="mb-3" />
+      <div class="space-y-1 rounded-lg border border-slate-200 p-2">
+        <div v-for="plan in filteredPlans" :key="'plan-'+plan.id" class="flex items-start gap-2 py-2">
+          <input type="checkbox" :id="'plan-'+plan.id" :checked="isPlanSelected(plan.id)" @change="togglePlanSelection(plan)" class="mt-0.5" />
+          <label :for="'plan-'+plan.id" class="flex-1 cursor-pointer">
+            <div class="text-sm font-medium text-slate-700">{{ plan.success_indicator }}</div>
+            <div class="text-xs text-slate-500" v-if="plan.performance_indicator">{{ plan.performance_indicator.description }}</div>
+            <div class="text-xs text-slate-500" v-if="plan.office_involved">{{ plan.office_involved }}</div>
+          </label>
         </div>
-        <div class="px-6 py-4 shrink-0">
-          <input v-model="planSearch" type="text" placeholder="Search plans..." class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        </div>
-        <div class="flex-1 overflow-y-auto px-6 pb-2">
-          <div class="space-y-1 rounded-lg border border-slate-200 p-2">
-            <div v-for="plan in filteredPlans" :key="'plan-'+plan.id" class="flex items-start gap-2 py-2">
-              <input type="checkbox" :id="'plan-'+plan.id" :checked="isPlanSelected(plan.id)" @change="togglePlanSelection(plan)" class="mt-0.5" />
-              <label :for="'plan-'+plan.id" class="flex-1 cursor-pointer">
-                <div class="text-sm font-medium text-slate-700">{{ plan.success_indicator }}</div>
-                <div class="text-xs text-slate-500" v-if="plan.performance_indicator">{{ plan.performance_indicator.description }}</div>
-                <div class="text-xs text-slate-500" v-if="plan.office_involved">{{ plan.office_involved }}</div>
-              </label>
-            </div>
-            <div v-if="filteredPlans.length === 0" class="py-8 text-center text-slate-400 text-sm">No plans found.</div>
-          </div>
-        </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
-          <button @click="closeAddPlansModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-          <button @click="submitPlans" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Add Plans</button>
-        </div>
+        <div v-if="filteredPlans.length === 0" class="py-8 text-center text-slate-400 text-sm">No plans found.</div>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="closeAddPlansModal">Cancel</AppButton>
+        <AppButton @click="submitPlans">Add Plans</AppButton>
+      </template>
+    </AppModal>
 
     <!-- Memo Report Modal -->
-    <div v-if="showReportModal" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-slate-800">Generate IPCR Memo Report</h2>
-          <button @click="showReportModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+    <AppModal :show="showReportModal" title="Generate IPCR Memo Report" @close="showReportModal = false">
+      <div class="space-y-4">
+        <AppInput
+          v-model="reportTo"
+          label="TO (Recipient Name &amp; Designation)"
+          placeholder="e.g. JUAN D. DELA CRUZ, AO V / HRMO"
+        />
+        <div>
+          <AppSelect v-model="reportPeriod" label="Rating Period" :show-blank="false">
+            <option value="" disabled>— Select a rating period —</option>
+            <option v-for="period in ratingPeriods" :key="period" :value="period">{{ period }}</option>
+          </AppSelect>
+          <p v-if="ratingPeriods.length === 0" class="text-xs text-danger-600 mt-1">No rated IPCRs found.</p>
         </div>
-        <div class="px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">TO (Recipient Name &amp; Designation)</label>
-            <input v-model="reportTo" type="text" placeholder="e.g. JUAN D. DELA CRUZ, AO V / HRMO"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Rating Period</label>
-            <select v-model="reportPeriod" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="" disabled>— Select a rating period —</option>
-              <option v-for="period in ratingPeriods" :key="period" :value="period">{{ period }}</option>
-            </select>
-            <p v-if="ratingPeriods.length === 0" class="text-xs text-red-500 mt-1">No rated IPCRs found.</p>
-          </div>
-          <p class="text-xs text-slate-500">{{ ratedIPCRs.length }} rated employee(s) will be included for this period.</p>
-        </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="showReportModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-          <button @click="printMemo" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Print</button>
-        </div>
+        <p class="text-xs text-slate-500">{{ ratedIPCRs.length }} rated employee(s) will be included for this period.</p>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="showReportModal = false">Cancel</AppButton>
+        <AppButton @click="printMemo">Print</AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

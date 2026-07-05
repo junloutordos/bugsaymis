@@ -2,6 +2,12 @@
 import { ref, computed } from "vue";
 import { Head, useForm, router, usePage } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import AppPageHeader from "@/Components/AppPageHeader.vue";
+import AppButton from "@/Components/AppButton.vue";
+import AppBadge from "@/Components/AppBadge.vue";
+import AppTable from "@/Components/AppTable.vue";
+import EmptyState from "@/Components/EmptyState.vue";
+import { PlusIcon, CheckCircleIcon, PencilSquareIcon } from "@heroicons/vue/24/outline";
 
 const props = defineProps({
   types: {
@@ -30,12 +36,10 @@ const filteredTypes = computed(() => {
 });
 
 // ─── Category badge ───────────────────────────────────────────────────────────
-const categoryBadgeClass = {
-  allowance: "bg-emerald-100 text-emerald-800",
-  deduction: "bg-red-100 text-red-800",
-  bonus:     "bg-blue-100 text-blue-800",
-  other:     "bg-slate-100 text-slate-700",
-};
+function categoryBadgeColor(category) {
+  const map = { allowance: "green", deduction: "red", bonus: "blue", other: "slate" };
+  return map[category] ?? "slate";
+}
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 const showModal   = ref(false);
@@ -108,7 +112,16 @@ function toggleActive(type) {
   <Head title="Allowance Types" />
   <AdminLayout title="Allowance Types">
 
-    <div class="min-h-screen bg-slate-50 p-6">
+    <div class="space-y-5">
+
+      <AppPageHeader title="Allowance &amp; Deduction Types" subtitle="Manage allowances, deductions, bonuses, and other payroll components.">
+        <template #actions>
+          <AppButton @click="openCreate">
+            <PlusIcon class="h-4 w-4" />
+            Add New
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash message -->
       <transition
@@ -121,44 +134,25 @@ function toggleActive(type) {
       >
         <div
           v-if="flashSuccess"
-          class="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-emerald-800 text-sm"
+          class="flex items-center gap-2 rounded-lg bg-success-50 border border-success-100 text-success-700 px-4 py-3 text-sm"
         >
-          <svg class="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-          </svg>
+          <CheckCircleIcon class="h-4 w-4 shrink-0" />
           {{ flashSuccess }}
         </div>
       </transition>
-
-      <!-- Page header -->
-      <div class="mb-6 flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-800">Allowance &amp; Deduction Types</h1>
-          <p class="mt-1 text-sm text-slate-500">Manage allowances, deductions, bonuses, and other payroll components.</p>
-        </div>
-        <button
-          @click="openCreate"
-          class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-          </svg>
-          Add New
-        </button>
-      </div>
 
       <!-- Card -->
       <div class="rounded-xl border border-slate-100 bg-white shadow-sm">
 
         <!-- Category filter tabs -->
         <div class="border-b border-slate-100 px-4">
-          <nav class="flex space-x-1 -mb-px">
+          <nav class="flex space-x-1 -mb-px overflow-x-auto">
             <button
               v-for="tab in categoryTabs"
               :key="tab.key"
               @click="categoryFilter = tab.key"
               :class="[
-                'px-4 py-3 text-sm font-medium border-b-2 transition',
+                'px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap',
                 categoryFilter === tab.key
                   ? 'border-indigo-600 text-indigo-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
@@ -180,114 +174,142 @@ function toggleActive(type) {
         </div>
 
         <!-- Table -->
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Category</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Default Amount</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Fixed?</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Taxable?</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Mandatory?</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Active</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-              <tr
-                v-for="type in filteredTypes"
-                :key="type.id"
-                class="hover:bg-slate-50/60 transition"
+        <AppTable :is-empty="!filteredTypes.length" :skeleton-cols="9" :card="false">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Category</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Default Amount</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Fixed?</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Taxable?</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Mandatory?</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Active</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+            </tr>
+          </template>
+
+          <tr
+            v-for="type in filteredTypes"
+            :key="type.id"
+            class="hover:bg-slate-50/60 transition"
+          >
+            <!-- Code -->
+            <td class="px-4 py-3 text-sm font-mono font-medium text-slate-700">
+              {{ type.code }}
+            </td>
+            <!-- Name -->
+            <td class="px-4 py-3">
+              <div class="text-sm font-medium text-slate-800">{{ type.name }}</div>
+              <div v-if="type.description" class="text-xs text-slate-400 truncate max-w-xs">{{ type.description }}</div>
+            </td>
+            <!-- Category badge -->
+            <td class="px-4 py-3">
+              <AppBadge :color="categoryBadgeColor(type.category)" class="capitalize">{{ type.category }}</AppBadge>
+            </td>
+            <!-- Default amount -->
+            <td class="px-4 py-3 text-right text-sm text-slate-600">
+              <span v-if="type.default_amount != null">
+                {{ Number(type.default_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}
+              </span>
+              <span v-else class="text-slate-300">—</span>
+            </td>
+            <!-- Fixed -->
+            <td class="px-4 py-3 text-center">
+              <span v-if="type.is_fixed_amount" class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              </span>
+              <span v-else class="text-slate-300 text-xs">—</span>
+            </td>
+            <!-- Taxable -->
+            <td class="px-4 py-3 text-center">
+              <span v-if="type.is_taxable" class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              </span>
+              <span v-else class="text-slate-300 text-xs">—</span>
+            </td>
+            <!-- Mandatory -->
+            <td class="px-4 py-3 text-center">
+              <span v-if="type.is_mandatory" class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              </span>
+              <span v-else class="text-slate-300 text-xs">—</span>
+            </td>
+            <!-- Active toggle -->
+            <td class="px-4 py-3 text-center">
+              <button
+                @click="toggleActive(type)"
+                :class="[
+                  'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1',
+                  type.is_active ? 'bg-indigo-600' : 'bg-slate-200',
+                ]"
+                :title="type.is_active ? 'Click to deactivate' : 'Click to activate'"
               >
-                <!-- Code -->
-                <td class="px-4 py-3 text-sm font-mono font-medium text-slate-700">
-                  {{ type.code }}
-                </td>
-                <!-- Name -->
-                <td class="px-4 py-3">
-                  <div class="text-sm font-medium text-slate-800">{{ type.name }}</div>
-                  <div v-if="type.description" class="text-xs text-slate-400 truncate max-w-xs">{{ type.description }}</div>
-                </td>
-                <!-- Category badge -->
-                <td class="px-4 py-3">
+                <span
+                  :class="[
+                    'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                    type.is_active ? 'translate-x-4' : 'translate-x-0',
+                  ]"
+                />
+              </button>
+            </td>
+            <!-- Actions -->
+            <td class="px-4 py-3 text-center">
+              <AppButton size="sm" variant="ghost" @click="openEdit(type)">
+                <PencilSquareIcon class="h-3.5 w-3.5" />
+                Edit
+              </AppButton>
+            </td>
+          </tr>
+
+          <template #mobileCard>
+            <div v-for="type in filteredTypes" :key="type.id" class="p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-mono text-xs text-slate-500">{{ type.code }}</p>
+                  <p class="font-medium text-slate-800">{{ type.name }}</p>
+                  <p v-if="type.description" class="text-xs text-slate-400">{{ type.description }}</p>
+                </div>
+                <AppBadge :color="categoryBadgeColor(type.category)" class="capitalize">{{ type.category }}</AppBadge>
+              </div>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                <span>
+                  Default:
+                  <span v-if="type.default_amount != null">{{ Number(type.default_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</span>
+                  <span v-else>—</span>
+                </span>
+                <span>Fixed: {{ type.is_fixed_amount ? 'Yes' : 'No' }}</span>
+                <span>Taxable: {{ type.is_taxable ? 'Yes' : 'No' }}</span>
+                <span>Mandatory: {{ type.is_mandatory ? 'Yes' : 'No' }}</span>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <button
+                  @click="toggleActive(type)"
+                  :class="[
+                    'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1',
+                    type.is_active ? 'bg-indigo-600' : 'bg-slate-200',
+                  ]"
+                  :title="type.is_active ? 'Click to deactivate' : 'Click to activate'"
+                >
                   <span
                     :class="[
-                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-                      categoryBadgeClass[type.category] ?? 'bg-slate-100 text-slate-700',
+                      'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                      type.is_active ? 'translate-x-4' : 'translate-x-0',
                     ]"
-                  >
-                    {{ type.category }}
-                  </span>
-                </td>
-                <!-- Default amount -->
-                <td class="px-4 py-3 text-right text-sm text-slate-600">
-                  <span v-if="type.default_amount != null">
-                    {{ Number(type.default_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}
-                  </span>
-                  <span v-else class="text-slate-300">—</span>
-                </td>
-                <!-- Fixed -->
-                <td class="px-4 py-3 text-center">
-                  <span v-if="type.is_fixed_amount" class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
-                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                  </span>
-                  <span v-else class="text-slate-300 text-xs">—</span>
-                </td>
-                <!-- Taxable -->
-                <td class="px-4 py-3 text-center">
-                  <span v-if="type.is_taxable" class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                  </span>
-                  <span v-else class="text-slate-300 text-xs">—</span>
-                </td>
-                <!-- Mandatory -->
-                <td class="px-4 py-3 text-center">
-                  <span v-if="type.is_mandatory" class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600">
-                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                  </span>
-                  <span v-else class="text-slate-300 text-xs">—</span>
-                </td>
-                <!-- Active toggle -->
-                <td class="px-4 py-3 text-center">
-                  <button
-                    @click="toggleActive(type)"
-                    :class="[
-                      'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1',
-                      type.is_active ? 'bg-indigo-600' : 'bg-slate-200',
-                    ]"
-                    :title="type.is_active ? 'Click to deactivate' : 'Click to activate'"
-                  >
-                    <span
-                      :class="[
-                        'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                        type.is_active ? 'translate-x-4' : 'translate-x-0',
-                      ]"
-                    />
-                  </button>
-                </td>
-                <!-- Actions -->
-                <td class="px-4 py-3 text-center">
-                  <button
-                    @click="openEdit(type)"
-                    class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition"
-                  >
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 013.182 3.182L7.5 19.213l-4.5 1.125 1.125-4.5L16.862 3.487z"/>
-                    </svg>
-                    Edit
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="filteredTypes.length === 0">
-                <td colspan="9" class="px-4 py-10 text-center text-sm text-slate-400">
-                  No allowance types found for the selected filter.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  />
+                </button>
+                <AppButton size="sm" variant="ghost" @click="openEdit(type)">
+                  <PencilSquareIcon class="h-3.5 w-3.5" />
+                  Edit
+                </AppButton>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No allowance types found" subtitle="No allowance types found for the selected filter." />
+          </template>
+        </AppTable>
       </div>
     </div>
 
@@ -473,29 +495,12 @@ function toggleActive(type) {
 
               <!-- Modal footer -->
               <div class="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  @click="closeModal"
-                  class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
-                >
+                <AppButton type="button" variant="secondary" @click="closeModal">
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  :disabled="form.processing"
-                  class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 transition"
-                >
-                  <svg
-                    v-if="form.processing"
-                    class="h-4 w-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-                  </svg>
+                </AppButton>
+                <AppButton type="submit" :loading="form.processing">
                   {{ editingType ? 'Save Changes' : 'Create' }}
-                </button>
+                </AppButton>
               </div>
             </form>
           </div>

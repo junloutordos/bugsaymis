@@ -2,15 +2,16 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { badgeBase, statusBadgeClass, priorityBadgeClass, originBadgeClass } from '@/Composables/useStatusBadge.js'
-import FlashMessage from '@/Components/FlashMessage.vue'
-import PaginationControl from '@/Components/PaginationControl.vue'
-import EmptyState from '@/Components/EmptyState.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import AppFilterBar from '@/Components/AppFilterBar.vue'
 import AppInput from '@/Components/AppInput.vue'
-import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppSelect from '@/Components/AppSelect.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { userDisplayName } from '@/Utils/userDisplay.js'
 import {
   PlusIcon, ArrowUpTrayIcon, Cog6ToothIcon, MagnifyingGlassIcon,
@@ -86,12 +87,13 @@ const displayed  = computed(() => {
 })
 
 // ── Status helpers ─────────────────────────────────────────────────────────
+// Returns an AppBadge color key (not a raw Tailwind class).
 function overallBadge(doc) {
-  if (doc.overall_status === 'Completed') return 'bg-emerald-100 text-emerald-700'
-  if (doc.overall_status === 'Returned')  return 'bg-red-100 text-red-700'
-  if (doc.routings?.some(r => r.is_overdue)) return 'bg-red-100 text-red-700'
-  if (doc.routings?.some(r => r.status === 'Pending')) return 'bg-amber-100 text-amber-700'
-  return 'bg-blue-100 text-blue-700'
+  if (doc.overall_status === 'Completed') return 'green'
+  if (doc.overall_status === 'Returned')  return 'red'
+  if (doc.routings?.some(r => r.is_overdue)) return 'red'
+  if (doc.routings?.some(r => r.status === 'Pending')) return 'amber'
+  return 'blue'
 }
 function overallLabel(doc) {
   if (doc.overall_status === 'Completed') return 'Completed'
@@ -100,7 +102,13 @@ function overallLabel(doc) {
   if (doc.routings?.some(r => r.status === 'Pending')) return 'Pending Action'
   return doc.overall_status
 }
-// priorityBadgeClass + originBadgeClass imported from useStatusBadge.js
+function priorityColor(priority) {
+  const map = { Rush: 'red', Urgent: 'amber', Normal: 'slate' }
+  return map[priority] ?? 'slate'
+}
+function originColor(originType) {
+  return originType === 'external' ? 'green' : 'indigo'
+}
 
 function fmtDate(d) {
   if (!d) return '—'
@@ -169,68 +177,75 @@ const needsManualReceiver = computed(() =>
 <template>
   <Head title="Document Tracking" />
   <AdminLayout title="Document Tracking">
+    <div class="space-y-5">
 
-    <AppPageHeader
-      title="Document Tracking System"
-      subtitle="Track internal and external document routing across all offices"
-    >
-      <template #actions>
-        <AppButton
-          v-if="isAdmin"
-          as="a"
-          variant="secondary"
-          :href="route('document-tracking.types.index')"
-        >
-          <Cog6ToothIcon class="h-4 w-4" />
-          Document Types
-        </AppButton>
-        <AppButton @click="openModal('internal')">
-          <PlusIcon class="h-4 w-4" />
-          Internal
-        </AppButton>
-        <AppButton v-if="canLogExternal" variant="success" @click="openModal('external')">
-          <ArrowUpTrayIcon class="h-4 w-4" />
-          Log External
-        </AppButton>
-      </template>
-    </AppPageHeader>
+      <AppPageHeader
+        title="Document Tracking System"
+        subtitle="Track internal and external document routing across all offices"
+      >
+        <template #actions>
+          <AppButton
+            v-if="isAdmin"
+            as="link"
+            variant="secondary"
+            :href="route('document-tracking.types.index')"
+          >
+            <Cog6ToothIcon class="h-4 w-4" />
+            Document Types
+          </AppButton>
+          <AppButton @click="openModal('internal')">
+            <PlusIcon class="h-4 w-4" />
+            Internal
+          </AppButton>
+          <AppButton v-if="canLogExternal" variant="success" @click="openModal('external')">
+            <ArrowUpTrayIcon class="h-4 w-4" />
+            Log External
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-    <!-- Tabs -->
-    <div class="flex gap-0 border-b border-slate-200 mb-4 overflow-x-auto">
-      <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key"
-        class="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2"
-        :class="activeTab === tab.key ? 'text-indigo-600 border-indigo-600' : 'text-slate-500 border-transparent hover:text-slate-700'">
-        {{ tab.label }}
-        <span v-if="tab.key === 'mine' && myActionCount > 0"
-          class="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-          {{ myActionCount > 9 ? '9+' : myActionCount }}
-        </span>
-      </button>
-    </div>
-
-    <!-- Filters -->
-    <AppFilterBar>
-      <div class="relative min-w-[220px] flex-1">
-        <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <AppInput
-          v-model="search"
-          placeholder="Tracking no., subject, source office, sender..."
-          class="[&_input]:pl-9"
-        />
+      <!-- Flash -->
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm">
+        {{ $page.props.flash.success }}
       </div>
-      <AppSelect v-model="filterTypeId" placeholder="All Types" class="min-w-[160px]">
-        <option v-for="t in availableTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
-      </AppSelect>
-      <AppSelect v-model="filterPriority" placeholder="All Priorities" class="min-w-[150px]">
-        <option>Normal</option><option>Urgent</option><option>Rush</option>
-      </AppSelect>
-    </AppFilterBar>
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm">
+        {{ $page.props.flash.error }}
+      </div>
 
-    <!-- Table -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <EmptyState v-if="displayed.length === 0" title="No documents found" subtitle="Try adjusting your filters." />
-      <table v-else class="w-full text-sm">
-        <thead class="bg-slate-50 border-b border-slate-200">
+      <!-- Tabs -->
+      <div class="flex gap-0 border-b border-slate-200 overflow-x-auto">
+        <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key"
+          class="px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2"
+          :class="activeTab === tab.key ? 'text-indigo-600 border-indigo-600' : 'text-slate-500 border-transparent hover:text-slate-700'">
+          {{ tab.label }}
+          <span v-if="tab.key === 'mine' && myActionCount > 0"
+            class="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+            {{ myActionCount > 9 ? '9+' : myActionCount }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="relative min-w-[220px] flex-1">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <AppInput
+            v-model="search"
+            placeholder="Tracking no., subject, source office, sender..."
+            class="[&_input]:pl-9"
+          />
+        </div>
+        <AppSelect v-model="filterTypeId" placeholder="All Types" class="min-w-[160px]">
+          <option v-for="t in availableTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </AppSelect>
+        <AppSelect v-model="filterPriority" placeholder="All Priorities" class="min-w-[150px]">
+          <option>Normal</option><option>Urgent</option><option>Rush</option>
+        </AppSelect>
+      </AppFilterBar>
+
+      <!-- Table -->
+      <AppTable :is-empty="displayed.length === 0" :skeleton-cols="8">
+        <template #head>
           <tr>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Tracking No.</th>
             <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Subject</th>
@@ -241,229 +256,238 @@ const needsManualReceiver = computed(() =>
             <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
             <th class="px-3 py-3"></th>
           </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <tr v-for="doc in displayed" :key="doc.id" class="hover:bg-slate-50 transition-colors cursor-pointer"
-            @click="router.visit(route('document-tracking.show', doc.id))">
-            <td class="px-4 py-3">
-              <span class="font-mono text-xs font-bold text-indigo-600">{{ doc.tracking_no }}</span>
-              <div v-if="doc.document_number" class="text-[11px] text-slate-400">Ref: {{ doc.document_number }}</div>
-            </td>
-            <td class="px-4 py-3 max-w-[220px]">
-              <div class="flex items-center gap-1">
-                <LockClosedIcon v-if="doc.is_confidential" class="h-3.5 w-3.5 text-purple-500 shrink-0" />
-                <ExclamationTriangleIcon v-if="doc.routings?.some(r => r.is_overdue)" class="h-3.5 w-3.5 text-red-500 shrink-0" />
-                <span class="font-medium text-slate-800 truncate text-xs">{{ doc.subject }}</span>
-              </div>
-              <div v-if="doc.source_office" class="text-[11px] text-emerald-600 mt-0.5">{{ doc.source_office }}</div>
-            </td>
-            <td class="hidden md:table-cell px-4 py-3">
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold mr-1"
-                :class="originBadgeClass(doc.origin_type)">
-                {{ doc.origin_type === 'external' ? 'Ext' : 'Int' }}
-              </span>
-              <span class="text-xs text-slate-500">{{ doc.document_type?.name ?? '—' }}</span>
-            </td>
-            <td class="hidden lg:table-cell px-4 py-3">
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="priorityBadgeClass(doc.priority)">{{ doc.priority }}</span>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="overallBadge(doc)">
-                {{ overallLabel(doc) }}
-              </span>
-            </td>
-            <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-600">{{ doc.current_holder?.name ?? '—' }}</td>
-            <td class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">
-              {{ fmtDate(doc.date_received ?? doc.created_at) }}
-            </td>
-            <td class="px-3 py-3 text-right">
-              <span class="text-indigo-600 text-xs font-medium">View →</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        </template>
 
-      <PaginationControl
-        :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
-        @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
+        <tr v-for="doc in displayed" :key="doc.id" class="hover:bg-slate-50/60 cursor-pointer"
+          @click="router.visit(route('document-tracking.show', doc.id))">
+          <td class="px-4 py-3">
+            <span class="font-mono text-xs font-bold text-indigo-600">{{ doc.tracking_no }}</span>
+            <div v-if="doc.document_number" class="text-[11px] text-slate-400">Ref: {{ doc.document_number }}</div>
+          </td>
+          <td class="px-4 py-3 max-w-[220px]">
+            <div class="flex items-center gap-1">
+              <LockClosedIcon v-if="doc.is_confidential" class="h-3.5 w-3.5 text-purple-500 shrink-0" />
+              <ExclamationTriangleIcon v-if="doc.routings?.some(r => r.is_overdue)" class="h-3.5 w-3.5 text-red-500 shrink-0" />
+              <span class="font-medium text-slate-800 truncate text-xs">{{ doc.subject }}</span>
+            </div>
+            <div v-if="doc.source_office" class="text-[11px] text-emerald-600 mt-0.5">{{ doc.source_office }}</div>
+          </td>
+          <td class="hidden md:table-cell px-4 py-3">
+            <AppBadge :color="originColor(doc.origin_type)" class="mr-1">
+              {{ doc.origin_type === 'external' ? 'Ext' : 'Int' }}
+            </AppBadge>
+            <span class="text-xs text-slate-500">{{ doc.document_type?.name ?? '—' }}</span>
+          </td>
+          <td class="hidden lg:table-cell px-4 py-3">
+            <AppBadge :color="priorityColor(doc.priority)">{{ doc.priority }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <AppBadge :color="overallBadge(doc)">{{ overallLabel(doc) }}</AppBadge>
+          </td>
+          <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-600">{{ doc.current_holder?.name ?? '—' }}</td>
+          <td class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">
+            {{ fmtDate(doc.date_received ?? doc.created_at) }}
+          </td>
+          <td class="px-3 py-3 text-right">
+            <span class="text-indigo-600 text-xs font-medium">View →</span>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="doc in displayed" :key="doc.id" class="p-4 space-y-2 cursor-pointer"
+            @click="router.visit(route('document-tracking.show', doc.id))">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <span class="font-mono text-xs font-bold text-indigo-600">{{ doc.tracking_no }}</span>
+                <div class="flex items-center gap-1 mt-0.5">
+                  <LockClosedIcon v-if="doc.is_confidential" class="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                  <ExclamationTriangleIcon v-if="doc.routings?.some(r => r.is_overdue)" class="h-3.5 w-3.5 text-red-500 shrink-0" />
+                  <p class="font-medium text-slate-800 text-sm truncate">{{ doc.subject }}</p>
+                </div>
+                <p v-if="doc.source_office" class="text-[11px] text-emerald-600 mt-0.5">{{ doc.source_office }}</p>
+              </div>
+              <AppBadge :color="overallBadge(doc)">{{ overallLabel(doc) }}</AppBadge>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <AppBadge :color="originColor(doc.origin_type)">{{ doc.origin_type === 'external' ? 'Ext' : 'Int' }}</AppBadge>
+              <span class="text-xs text-slate-500">{{ doc.document_type?.name ?? '—' }}</span>
+              <AppBadge :color="priorityColor(doc.priority)">{{ doc.priority }}</AppBadge>
+            </div>
+            <div class="flex items-center justify-between pt-1 text-xs text-slate-500">
+              <span>{{ doc.current_holder?.name ?? '—' }} &middot; {{ fmtDate(doc.date_received ?? doc.created_at) }}</span>
+              <span class="text-indigo-600 font-medium">View →</span>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No documents found" subtitle="Try adjusting your filters." />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
+            @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
+        </template>
+      </AppTable>
+
     </div>
 
     <!-- Log / Create Modal -->
-    <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div class="fixed inset-0 bg-black/40" @click="showModal = false" />
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+    <AppModal
+      :show="showModal"
+      size="2xl"
+      :title="logOrigin === 'external' ? '📥 Log External Incoming Document' : '📄 Create Internal Document'"
+      :subtitle="logOrigin === 'external'
+        ? 'Record a document received from an external agency/office'
+        : 'Route an internal document across offices or personnel'"
+      @close="showModal = false"
+    >
+      <form @submit.prevent="submitForm" class="space-y-4">
 
-          <!-- Header -->
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
-            <div>
-              <h3 class="font-bold text-slate-800">
-                {{ logOrigin === 'external' ? '📥 Log External Incoming Document' : '📄 Create Internal Document' }}
-              </h3>
-              <p class="text-xs text-slate-500 mt-0.5">
-                {{ logOrigin === 'external'
-                  ? 'Record a document received from an external agency/office'
-                  : 'Route an internal document across offices or personnel' }}
-              </p>
-            </div>
-            <button @click="showModal = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
-          </div>
+        <!-- Document Type -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Document Type <span class="text-red-500">*</span></label>
+          <select v-model="form.document_type_id" required
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Select type…</option>
+            <option v-for="t in availableTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
+          </select>
+          <p v-if="selectedType" class="text-xs text-slate-500 mt-1">
+            Routing: <strong class="capitalize">{{ selectedType.routing_type }}</strong>
+            · Lead time: {{ selectedType.lead_time_hours }}h
+            <span v-if="selectedType.routing_steps?.length > 0">
+              · {{ selectedType.routing_steps.length }} auto-configured step(s)
+            </span>
+          </p>
+          <p v-if="errors.document_type_id" class="text-xs text-red-500 mt-1">{{ errors.document_type_id }}</p>
+        </div>
 
-          <!-- Body -->
-          <form @submit.prevent="submitForm" class="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+        <!-- Subject -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Subject <span class="text-red-500">*</span></label>
+          <input v-model="form.subject" type="text" required
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Brief subject / title of the document" />
+          <p v-if="errors.subject" class="text-xs text-red-500 mt-1">{{ errors.subject }}</p>
+        </div>
 
-            <!-- Document Type -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Document Type <span class="text-red-500">*</span></label>
-              <select v-model="form.document_type_id" required
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select type…</option>
-                <option v-for="t in availableTypes" :key="t.id" :value="t.id">[{{ t.code }}] {{ t.name }}</option>
-              </select>
-              <p v-if="selectedType" class="text-xs text-slate-500 mt-1">
-                Routing: <strong class="capitalize">{{ selectedType.routing_type }}</strong>
-                · Lead time: {{ selectedType.lead_time_hours }}h
-                <span v-if="selectedType.routing_steps?.length > 0">
-                  · {{ selectedType.routing_steps.length }} auto-configured step(s)
-                </span>
-              </p>
-              <p v-if="errors.document_type_id" class="text-xs text-red-500 mt-1">{{ errors.document_type_id }}</p>
-            </div>
-
-            <!-- Subject -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Subject <span class="text-red-500">*</span></label>
-              <input v-model="form.subject" type="text" required
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Brief subject / title of the document" />
-              <p v-if="errors.subject" class="text-xs text-red-500 mt-1">{{ errors.subject }}</p>
-            </div>
-
-            <!-- External fields -->
-            <template v-if="logOrigin === 'external'">
-              <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
-                <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">External Document Details</p>
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Source Office <span class="text-red-500">*</span></label>
-                    <input v-model="form.source_office" type="text" required
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="e.g. DepEd Region XIII" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Sender Name</label>
-                    <input v-model="form.sender_name" type="text"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="Signing official" />
-                  </div>
-                </div>
-                <div class="grid grid-cols-3 gap-3">
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Doc Date</label>
-                    <input v-model="form.date_of_document" type="date"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Date Received</label>
-                    <input v-model="form.date_received" type="date"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 mb-1">Ref. No.</label>
-                    <input v-model="form.document_number" type="text"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="Control no." />
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Priority / Urgency -->
+        <!-- External fields -->
+        <template v-if="logOrigin === 'external'">
+          <div class="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+            <p class="text-xs font-semibold text-green-700 uppercase tracking-wide">External Document Details</p>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Priority</label>
-                <select v-model="form.priority"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option>Normal</option><option>Urgent</option><option>Rush</option>
-                </select>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Source Office <span class="text-red-500">*</span></label>
+                <input v-model="form.source_office" type="text" required
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g. DepEd Region XIII" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-700 mb-1">Urgency</label>
-                <select v-model="form.urgency"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option>Normal</option><option>Urgent</option><option>Very Urgent</option>
-                </select>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Sender Name</label>
+                <input v-model="form.sender_name" type="text"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Signing official" />
               </div>
             </div>
-
-            <!-- Manual receiver -->
-            <div v-if="needsManualReceiver">
-              <label class="block text-sm font-medium text-slate-700 mb-1">Route To <span class="text-red-500">*</span></label>
-              <select v-model="form.receiver_id"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="">Select recipient…</option>
-                <option v-for="u in users" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
-              </select>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Doc Date</label>
+                <input v-model="form.date_of_document" type="date"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Date Received</label>
+                <input v-model="form.date_received" type="date"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">Ref. No.</label>
+                <input v-model="form.document_number" type="text"
+                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Control no." />
+              </div>
             </div>
+          </div>
+        </template>
 
-            <!-- Instructions -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Instructions / Routing Notes</label>
-              <textarea v-model="form.instructions" rows="2"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Instructions for the first receiver or routing notes…" />
-            </div>
-
-            <!-- Deadline -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Deadline (optional)</label>
-              <input v-model="form.deadline_at" type="datetime-local"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-
-            <!-- Scan / Attachment -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Attachment</label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleScan"
-                class="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-              <p class="text-xs text-slate-400 mt-1">PDF, JPG, PNG · Max 20 MB · Saved to Google Drive Records folder</p>
-              <p v-if="form.scan_filename" class="text-xs text-emerald-600 mt-1">✓ {{ form.scan_filename }}</p>
-            </div>
-
-            <!-- Description -->
-            <div>
-              <label class="block text-sm font-medium text-slate-700 mb-1">Description (optional)</label>
-              <textarea v-model="form.description" rows="2"
-                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Additional details about the document…" />
-            </div>
-
-            <!-- Confidential -->
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" v-model="form.is_confidential" class="rounded border-slate-300 text-indigo-600" />
-              <span class="text-sm text-slate-700 flex items-center gap-1">
-                <LockClosedIcon class="h-3.5 w-3.5 text-purple-500" /> Mark as confidential
-              </span>
-            </label>
-
-          </form>
-
-          <!-- Footer -->
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 rounded-b-2xl bg-white">
-            <button type="button" @click="showModal = false"
-              class="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
-              Cancel
-            </button>
-            <button @click="submitForm" :disabled="submitting"
-              class="px-5 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-              :class="logOrigin === 'external' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'">
-              {{ submitting ? 'Logging…' : (logOrigin === 'external' ? 'Log Document' : 'Create & Route') }}
-            </button>
+        <!-- Priority / Urgency -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">Priority</label>
+            <select v-model="form.priority"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option>Normal</option><option>Urgent</option><option>Rush</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">Urgency</label>
+            <select v-model="form.urgency"
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option>Normal</option><option>Urgent</option><option>Very Urgent</option>
+            </select>
           </div>
         </div>
-      </div>
-    </Teleport>
+
+        <!-- Manual receiver -->
+        <div v-if="needsManualReceiver">
+          <label class="block text-sm font-medium text-slate-700 mb-1">Route To <span class="text-red-500">*</span></label>
+          <select v-model="form.receiver_id"
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Select recipient…</option>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ userDisplayName(u, users) }}</option>
+          </select>
+        </div>
+
+        <!-- Instructions -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Instructions / Routing Notes</label>
+          <textarea v-model="form.instructions" rows="2"
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Instructions for the first receiver or routing notes…" />
+        </div>
+
+        <!-- Deadline -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Deadline (optional)</label>
+          <input v-model="form.deadline_at" type="datetime-local"
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <!-- Scan / Attachment -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Scan / Attachment</label>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleScan"
+            class="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
+          <p class="text-xs text-slate-400 mt-1">PDF, JPG, PNG · Max 20 MB · Saved to Google Drive Records folder</p>
+          <p v-if="form.scan_filename" class="text-xs text-emerald-600 mt-1">✓ {{ form.scan_filename }}</p>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Description (optional)</label>
+          <textarea v-model="form.description" rows="2"
+            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Additional details about the document…" />
+        </div>
+
+        <!-- Confidential -->
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" v-model="form.is_confidential" class="rounded border-slate-300 text-indigo-600" />
+          <span class="text-sm text-slate-700 flex items-center gap-1">
+            <LockClosedIcon class="h-3.5 w-3.5 text-purple-500" /> Mark as confidential
+          </span>
+        </label>
+
+      </form>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showModal = false">Cancel</AppButton>
+        <AppButton :variant="logOrigin === 'external' ? 'success' : 'primary'" :loading="submitting" @click="submitForm">
+          {{ logOrigin === 'external' ? 'Log Document' : 'Create & Route' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

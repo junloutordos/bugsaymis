@@ -1,7 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router } from '@inertiajs/vue3'
+import { Head, router, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ArrowDownTrayIcon, EyeIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -38,15 +44,15 @@ function buildExportUrl() {
   return route('csm.export') + (p.toString() ? '?' + p.toString() : '')
 }
 
-function adjectivalBadge(adj) {
+function adjectivalColor(adj) {
   const map = {
-    'Excellent':    'bg-emerald-100 text-emerald-700',
-    'Very Good':    'bg-blue-100 text-blue-700',
-    'Satisfactory': 'bg-violet-100 text-violet-700',
-    'Fair':         'bg-amber-100 text-amber-700',
-    'Poor':         'bg-red-100 text-red-600',
+    'Excellent':    'green',
+    'Very Good':    'blue',
+    'Satisfactory': 'purple',
+    'Fair':         'amber',
+    'Poor':         'red',
   }
-  return map[adj] ?? 'bg-slate-100 text-slate-600'
+  return map[adj] ?? 'slate'
 }
 
 function fmtDate(d) {
@@ -62,121 +68,123 @@ const moduleOptions = Object.entries(props.moduleLabels).map(([value, label]) =>
   <AdminLayout title="CSM Feedback">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-bold text-slate-800">CSM Feedback</h1>
-          <p class="text-sm text-slate-500 mt-0.5">All client satisfaction survey responses</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <a :href="route('csm.dashboard')"
-            class="border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-            Dashboard
-          </a>
-          <a :href="buildExportUrl()"
-            class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+      <AppPageHeader title="CSM Feedback" subtitle="All client satisfaction survey responses">
+        <template #actions>
+          <AppButton as="link" variant="secondary" :href="route('csm.dashboard')">Dashboard</AppButton>
+          <AppButton as="a" variant="success" :href="buildExportUrl()">
             <ArrowDownTrayIcon class="h-4 w-4" /> Export Excel
-          </a>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <input v-model="search" type="text" placeholder="Search…"
-            @keydown.enter="applyFilters"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 col-span-2 sm:col-span-1" />
+      <AppFilterBar>
+        <input v-model="search" type="text" placeholder="Search…"
+          @keydown.enter="applyFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
 
-          <select v-model="module" @change="applyFilters"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <option value="">All Modules</option>
-            <option v-for="opt in moduleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
+        <select v-model="module" @change="applyFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Modules</option>
+          <option v-for="opt in moduleOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
 
-          <select v-model="clientType" @change="applyFilters"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <option value="">All Client Types</option>
-            <option value="citizen">Citizen</option>
-            <option value="business">Business</option>
-            <option value="government">Government</option>
-          </select>
+        <select v-model="clientType" @change="applyFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Client Types</option>
+          <option value="citizen">Citizen</option>
+          <option value="business">Business</option>
+          <option value="government">Government</option>
+        </select>
 
-          <input v-model="month" type="month" @change="applyFilters"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <input v-model="month" type="month" @change="applyFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
 
-          <input v-model="dateFrom" type="date" placeholder="From" @change="applyFilters"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        <input v-model="dateFrom" type="date" placeholder="From" @change="applyFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
 
-          <input v-model="dateTo" type="date" placeholder="To" @change="applyFilters"
-            class="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-        </div>
-        <div class="mt-2 flex justify-end">
-          <button @click="applyFilters"
-            class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
-            Apply
-          </button>
-        </div>
-      </div>
+        <input v-model="dateTo" type="date" placeholder="To" @change="applyFilters"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+
+        <template #actions>
+          <AppButton size="sm" @click="applyFilters">Apply</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Module</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Respondent</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Client Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Office Availed</th>
-              <th class="px-4 py-3 text-center text-xs font-semibold text-amber-500 uppercase tracking-wide whitespace-nowrap">Avg SQD</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Adjectival</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-if="!responses.data?.length">
-              <td colspan="8" class="py-16 text-center text-slate-400 text-sm">No CSM responses found.</td>
-            </tr>
-            <tr v-for="r in responses.data" :key="r.id" class="hover:bg-slate-50/60">
-              <td class="px-4 py-2.5 text-slate-600 whitespace-nowrap text-xs">{{ fmtDate(r.created_at) }}</td>
-              <td class="px-4 py-2.5">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-medium whitespace-nowrap">
-                  {{ r.module_label }}
-                </span>
-              </td>
-              <td class="px-4 py-2.5 text-slate-700">{{ r.user?.name ?? '—' }}</td>
-              <td class="px-4 py-2.5 text-slate-600 capitalize text-xs">{{ r.client_type }}</td>
-              <td class="px-4 py-2.5 text-slate-600 text-xs">{{ r.office_availed }}</td>
-              <td class="px-4 py-2.5 text-center font-semibold tabular-nums"
-                :class="r.avg_sqd >= 4 ? 'text-emerald-600' : r.avg_sqd >= 3 ? 'text-amber-600' : 'text-red-500'">
-                {{ r.avg_sqd?.toFixed(2) ?? '—' }}
-              </td>
-              <td class="px-4 py-2.5">
-                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', adjectivalBadge(r.adjectival)]">
-                  {{ r.adjectival }}
-                </span>
-              </td>
-              <td class="px-4 py-2.5">
-                <a :href="route('csm.show', r.id)"
-                  class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
-                  <EyeIcon class="h-3.5 w-3.5" /> View
-                </a>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <AppTable :is-empty="!responses.data?.length" :skeleton-cols="8">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Module</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Respondent</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Client Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Office Availed</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Avg SQD</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Adjectival</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
 
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>{{ responses.from }}–{{ responses.to }} of {{ responses.total }}</span>
-          <div class="flex items-center gap-2">
-            <a v-if="responses.prev_page_url" :href="responses.prev_page_url"
-              class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-sm">Prev</a>
-            <a v-if="responses.next_page_url" :href="responses.next_page_url"
-              class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-sm">Next</a>
+        <tr v-for="r in responses.data" :key="r.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-2.5 text-slate-600 whitespace-nowrap text-xs">{{ fmtDate(r.created_at) }}</td>
+          <td class="px-4 py-2.5">
+            <AppBadge color="indigo">{{ r.module_label }}</AppBadge>
+          </td>
+          <td class="px-4 py-2.5 text-slate-700">{{ r.user?.name ?? '—' }}</td>
+          <td class="px-4 py-2.5 text-slate-600 capitalize text-xs">{{ r.client_type }}</td>
+          <td class="px-4 py-2.5 text-slate-600 text-xs">{{ r.office_availed }}</td>
+          <td class="px-4 py-2.5 text-center font-semibold tabular-nums"
+            :class="r.avg_sqd >= 4 ? 'text-success-700' : r.avg_sqd >= 3 ? 'text-warning-600' : 'text-danger-600'">
+            {{ r.avg_sqd?.toFixed(2) ?? '—' }}
+          </td>
+          <td class="px-4 py-2.5">
+            <AppBadge :color="adjectivalColor(r.adjectival)">{{ r.adjectival }}</AppBadge>
+          </td>
+          <td class="px-4 py-2.5">
+            <Link :href="route('csm.show', r.id)"
+              class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+              <EyeIcon class="h-3.5 w-3.5" /> View
+            </Link>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="r in responses.data" :key="r.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ r.user?.name ?? '—' }}</p>
+                <p class="text-xs text-slate-500">{{ fmtDate(r.created_at) }} &middot; <span class="capitalize">{{ r.client_type }}</span></p>
+              </div>
+              <AppBadge :color="adjectivalColor(r.adjectival)">{{ r.adjectival }}</AppBadge>
+            </div>
+            <AppBadge color="indigo">{{ r.module_label }}</AppBadge>
+            <p class="text-xs text-slate-500">{{ r.office_availed }}</p>
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-xs font-semibold tabular-nums"
+                :class="r.avg_sqd >= 4 ? 'text-success-700' : r.avg_sqd >= 3 ? 'text-warning-600' : 'text-danger-600'">
+                Avg SQD {{ r.avg_sqd?.toFixed(2) ?? '—' }}
+              </span>
+              <Link :href="route('csm.show', r.id)" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-xs font-medium">
+                <EyeIcon class="h-3.5 w-3.5" /> View
+              </Link>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No CSM responses found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :links="responses.links"
+            :current-page="responses.current_page"
+            :total-pages="responses.last_page"
+            :total="responses.total"
+          />
+        </template>
+      </AppTable>
 
     </div>
   </AdminLayout>

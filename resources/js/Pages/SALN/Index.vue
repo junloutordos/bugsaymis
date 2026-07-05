@@ -3,23 +3,20 @@
   <AdminLayout title="My SALN">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">
-            {{ viewedUser ? viewedUser.name + ' — SALN History' : 'My SALN' }}
-          </h1>
-          <p class="text-sm text-slate-500 mt-0.5">Statement of Assets, Liabilities and Net Worth</p>
-        </div>
-        <Link v-if="!viewedUser" :href="route('saln.create')"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors shadow-sm shrink-0">
-          <PlusIcon class="h-4 w-4" />
-          File New SALN
-        </Link>
-      </div>
+      <AppPageHeader
+        :title="viewedUser ? viewedUser.name + ' — SALN History' : 'My SALN'"
+        subtitle="Statement of Assets, Liabilities and Net Worth"
+      >
+        <template #actions>
+          <AppButton v-if="!viewedUser" as="link" :href="route('saln.create')">
+            <PlusIcon class="h-4 w-4" />
+            File New SALN
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
       <div v-if="$page.props.flash?.info" class="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
@@ -27,14 +24,12 @@
       </div>
 
       <!-- Empty state -->
-      <div v-if="records.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <DocumentTextIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No SALN records yet</p>
-        <p class="text-xs text-slate-400 mt-1">File your first SALN to get started.</p>
-        <Link v-if="!viewedUser" :href="route('saln.create')"
-          class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
-          <PlusIcon class="h-4 w-4" /> File SALN
-        </Link>
+      <div v-if="records.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <EmptyState title="No SALN records yet" subtitle="File your first SALN to get started." :icon="DocumentTextIcon">
+          <AppButton v-if="!viewedUser" as="link" :href="route('saln.create')" class="mt-4">
+            <PlusIcon class="h-4 w-4" /> File SALN
+          </AppButton>
+        </EmptyState>
       </div>
 
       <!-- Records grid -->
@@ -48,9 +43,7 @@
               <p class="text-2xl font-bold text-slate-800">{{ rec.year }}</p>
               <p class="text-xs text-slate-400 mt-0.5">As of {{ fmtDate(rec.as_of_date) }}</p>
             </div>
-            <span :class="statusBadge(rec.status)" class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold">
-              {{ rec.status_label }}
-            </span>
+            <AppBadge :color="statusBadge(rec.status)">{{ rec.status_label }}</AppBadge>
           </div>
 
           <!-- Financial summary -->
@@ -88,17 +81,14 @@
 
           <!-- Action -->
           <div class="flex gap-2 pt-1">
-            <Link :href="route('saln.show', rec.id)"
-              class="flex-1 text-center py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+            <AppButton as="link" :href="route('saln.show', rec.id)" variant="secondary" size="sm" class="flex-1 justify-center">
               {{ rec.is_editable ? 'Edit / View' : 'View' }}
-            </Link>
-            <a v-if="rec.status === 'approved' || rec.status === 'filed'"
-              :href="route('saln.pdf', rec.id)"
-              target="_blank"
-              class="px-3 py-2 text-sm text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-              title="Export PDF">
+            </AppButton>
+            <AppButton v-if="rec.status === 'approved' || rec.status === 'filed'"
+              as="a" :href="route('saln.pdf', rec.id)" target="_blank"
+              variant="secondary" size="sm" title="Export PDF">
               <DocumentArrowDownIcon class="h-4 w-4" />
-            </a>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -108,8 +98,12 @@
 </template>
 
 <script setup>
-import { Head, Link } from '@inertiajs/vue3'
+import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   PlusIcon, DocumentTextIcon, DocumentArrowDownIcon,
   CheckCircleIcon, InformationCircleIcon,
@@ -118,13 +112,13 @@ import {
 defineProps({ records: Array, viewedUser: Object, filters: Object, canManage: Boolean })
 
 const statusBadge = (s) => ({
-  draft:        'bg-slate-100 text-slate-600',
-  submitted:    'bg-blue-100 text-blue-700',
-  under_review: 'bg-amber-100 text-amber-700',
-  approved:     'bg-emerald-100 text-emerald-700',
-  returned:     'bg-red-100 text-red-600',
-  filed:        'bg-indigo-100 text-indigo-700',
-}[s] ?? 'bg-slate-100 text-slate-600')
+  draft:        'slate',
+  submitted:    'blue',
+  under_review: 'amber',
+  approved:     'green',
+  returned:     'red',
+  filed:        'indigo',
+}[s] ?? 'slate')
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
 const fmtMoney = (v) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 2 }).format(v ?? 0)

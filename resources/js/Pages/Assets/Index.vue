@@ -1,12 +1,19 @@
 <script setup>
 import { Head, usePage } from "@inertiajs/vue3"
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { PencilSquareIcon, TrashIcon, EyeIcon, XMarkIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, watch } from 'vue'
+import { PencilSquareIcon, TrashIcon, EyeIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 import { useSubmit } from "@/Composables/useSubmit"
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
 import { storageUrl } from "@/Composables/useStorage.js"
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 
 const props = defineProps({
   assets: Array,
@@ -21,13 +28,6 @@ const assets = ref(props.assets || [])
 const searchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
-
-// responsive: track window width to switch to card layout on small screens
-const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
-const isMobile = computed(() => windowWidth.value < 768)
-const handleResize = () => { windowWidth.value = window.innerWidth }
-onMounted(() => { window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredAssets = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -177,14 +177,17 @@ const getPhotoUrl = (asset) => {
 }
 
 const conditionBadge = (condition) => {
-  if (condition === 'New')  return 'bg-emerald-50 text-emerald-700'
-  if (condition === 'Good') return 'bg-blue-50 text-blue-700'
-  if (condition === 'Fair') return 'bg-amber-50 text-amber-700'
-  if (condition === 'Poor') return 'bg-red-50 text-red-600'
-  return 'bg-slate-100 text-slate-600'
+  if (condition === 'New')  return 'green'
+  if (condition === 'Good') return 'blue'
+  if (condition === 'Fair') return 'amber'
+  if (condition === 'Poor') return 'red'
+  return 'slate'
 }
 
-
+const statusBadgeColor = (status) => {
+  const map = { Active: 'green', Disposed: 'red', 'Under Repair': 'amber' }
+  return map[status] ?? 'slate'
+}
 </script>
 
 <template>
@@ -192,287 +195,246 @@ const conditionBadge = (condition) => {
   <AdminLayout title="Assets">
     <div class="space-y-5">
 
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-bold text-slate-800">Assets</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage asset inventory and assignments</p>
-        </div>
-        <button
-          @click="openModal"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-        >
-          <PlusIcon class="h-4 w-4" /> New Asset
-        </button>
-      </div>
+      <AppPageHeader title="Assets" subtitle="Manage asset inventory and assignments.">
+        <template #actions>
+          <AppButton @click="openModal">
+            <PlusIcon class="h-4 w-4" /> New Asset
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-      <!-- Table / Card container -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <!-- Filters -->
+      <AppFilterBar>
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search by name, property no, category…"
+          class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+        />
+      </AppFilterBar>
 
-        <!-- Card header / search -->
-        <div class="px-5 py-4 border-b border-slate-100">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search by name, property no, category…"
-            class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-          />
-        </div>
+      <!-- Table -->
+      <AppTable :is-empty="!filteredAssets.length" :skeleton-cols="9">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Property No</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Condition</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Assigned To</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
 
-        <!-- Desktop table -->
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Property No</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Category</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Condition</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Assigned To</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="asset in filteredAssets" :key="asset.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-500">{{ asset.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 font-mono">{{ asset.property_no }}</td>
-                <td class="px-4 py-3 text-sm font-medium text-slate-800">{{ asset.asset_name }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ asset.category }}</td>
-                <td class="px-4 py-3">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', conditionBadge(asset.condition)]">
-                    {{ asset.condition }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="[badgeBase, statusBadgeClass(asset.status)]">{{ asset.status }}</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ asset.assigned_user?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ asset.building?.name ?? asset.room?.name ?? '—' }}</td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1">
-                    <button @click="openView(asset)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View Photo">
-                      <EyeIcon class="w-4 h-4" />
-                    </button>
-                    <button @click="openEdit(asset)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                    <button @click="deleteAsset(asset)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredAssets.length === 0">
-                <td colspan="9" class="px-4 py-10 text-center text-sm text-slate-400">No assets found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <tr v-for="asset in filteredAssets" :key="asset.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-500">{{ asset.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 font-mono">{{ asset.property_no }}</td>
+          <td class="px-4 py-3 text-sm font-medium text-slate-800">{{ asset.asset_name }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ asset.category }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="conditionBadge(asset.condition)">{{ asset.condition }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusBadgeColor(asset.status)">{{ asset.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ asset.assigned_user?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ asset.building?.name ?? asset.room?.name ?? '—' }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <AppIconButton label="View asset photo" @click="openView(asset)">
+                <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton label="Edit asset" @click="openEdit(asset)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton label="Delete asset" variant="danger" @click="deleteAsset(asset)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
 
-        <!-- Mobile card list -->
-        <div v-else class="divide-y divide-slate-100">
+        <template #mobileCard>
           <div v-for="asset in filteredAssets" :key="asset.id" class="p-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-slate-800 truncate">{{ asset.asset_name }}</p>
                 <p class="text-xs text-slate-500 font-mono mt-0.5">{{ asset.property_no }}</p>
                 <div class="flex flex-wrap gap-1.5 mt-2">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', conditionBadge(asset.condition)]">{{ asset.condition }}</span>
-                  <span :class="[badgeBase, statusBadgeClass(asset.status)]">{{ asset.status }}</span>
+                  <AppBadge :color="conditionBadge(asset.condition)">{{ asset.condition }}</AppBadge>
+                  <AppBadge :color="statusBadgeColor(asset.status)">{{ asset.status }}</AppBadge>
                 </div>
                 <p class="text-xs text-slate-500 mt-1.5">{{ asset.category }}</p>
                 <p class="text-xs text-slate-500">Assigned: {{ asset.assigned_user?.name ?? '—' }}</p>
                 <p class="text-xs text-slate-500">Location: {{ asset.building?.name ?? asset.room?.name ?? '—' }}</p>
               </div>
               <div class="flex flex-col items-end gap-1.5 shrink-0">
-                <button @click="openView(asset)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                <AppIconButton label="View asset photo" @click="openView(asset)">
                   <EyeIcon class="w-4 h-4" />
-                </button>
-                <button @click="openEdit(asset)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                </AppIconButton>
+                <AppIconButton label="Edit asset" @click="openEdit(asset)">
                   <PencilSquareIcon class="w-4 h-4" />
-                </button>
-                <button @click="deleteAsset(asset)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors">
+                </AppIconButton>
+                <AppIconButton label="Delete asset" variant="danger" @click="deleteAsset(asset)">
                   <TrashIcon class="w-4 h-4" />
-                </button>
+                </AppIconButton>
               </div>
             </div>
           </div>
-          <div v-if="filteredAssets.length === 0" class="px-4 py-10 text-center text-sm text-slate-400">No assets found.</div>
-        </div>
+        </template>
 
-        <!-- Pagination -->
-                <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+        <template #empty>
+          <EmptyState title="No assets found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
       <!-- View Photo Modal -->
-      <div v-if="viewModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">Asset Photo</h2>
-            <button @click="closeView" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
+      <AppModal :show="viewModal" title="Asset Photo" size="lg" @close="closeView">
+        <div class="flex justify-center">
+          <div v-if="getPhotoUrl(viewAsset)" class="max-w-full">
+            <img :src="getPhotoUrl(viewAsset)" alt="asset photo" class="max-h-96 object-contain rounded-lg" />
           </div>
-          <div class="px-6 py-6 flex justify-center">
-            <div v-if="getPhotoUrl(viewAsset)" class="max-w-full">
-              <img :src="getPhotoUrl(viewAsset)" alt="asset photo" class="max-h-96 object-contain rounded-lg" />
-            </div>
-            <div v-else class="text-sm text-slate-400 py-8">No photo available.</div>
-          </div>
+          <div v-else class="text-sm text-slate-400 py-8">No photo available.</div>
         </div>
-      </div>
+      </AppModal>
 
       <!-- Add / Edit Asset Modal -->
-      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <AppModal
+        :show="showModal"
+        :title="editingId ? 'Edit Asset' : 'New Asset'"
+        size="2xl"
+        @close="closeModal"
+      >
+        <form @submit.prevent="submitAsset" class="space-y-4">
 
-          <!-- Header -->
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Asset' : 'New Asset' }}</h2>
-            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Property No</label>
+              <input
+                v-model="form.property_no"
+                type="text"
+                required
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
+              <input
+                v-model="form.asset_name"
+                type="text"
+                required
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              />
+            </div>
           </div>
 
-          <!-- Body -->
-          <div class="overflow-y-auto px-6 py-5">
-            <form @submit.prevent="submitAsset" class="space-y-4">
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Property No</label>
-                  <input
-                    v-model="form.property_no"
-                    type="text"
-                    required
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
-                  <input
-                    v-model="form.asset_name"
-                    type="text"
-                    required
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
-                <select
-                  v-model="form.category"
-                  required
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                >
-                  <option value="">-- Select Category --</option>
-                  <option value="IT and Technology">IT and Technology</option>
-                  <option value="Office Equipment">Office Equipment</option>
-                  <option value="Furniture and Fixtures">Furniture and Fixtures</option>
-                  <option value="Laboratory and Scientific Equipment">Laboratory and Scientific Equipment</option>
-                  <option value="Audio-Visual and Media Equipment">Audio-Visual and Media Equipment</option>
-                  <option value="Machineries">Machineries</option>
-                  <option value="Building Fixtures">Building Fixtures</option>
-                </select>
-              </div>
-
-              <div class="grid grid-cols-3 gap-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Condition</label>
-                  <select
-                    v-model="form.condition"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  >
-                    <option>New</option>
-                    <option>Good</option>
-                    <option>Fair</option>
-                    <option>Poor</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
-                  <select
-                    v-model="form.status"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  >
-                    <option>Active</option>
-                    <option>Disposed</option>
-                    <option>Under Repair</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Assigned User</label>
-                  <select
-                    v-model="form.assigned_user_id"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  >
-                    <option value="">--</option>
-                    <option v-for="u in props.users" :key="u.id" :value="u.id">{{ u.name }}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
-                  <select
-                    v-model="form.building_id"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  >
-                    <option value="">--</option>
-                    <option v-for="b in props.buildings" :key="b.id" :value="b.id">{{ b.name }}</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Room</label>
-                  <select
-                    v-model="form.room_id"
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                  >
-                    <option value="">--</option>
-                    <option v-for="r in filteredRooms" :key="r.id" :value="r.id">{{ r.name }}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Photo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-                  @change="handlePhoto"
-                />
-              </div>
-
-            </form>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
+            <select
+              v-model="form.category"
+              required
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+            >
+              <option value="">-- Select Category --</option>
+              <option value="IT and Technology">IT and Technology</option>
+              <option value="Office Equipment">Office Equipment</option>
+              <option value="Furniture and Fixtures">Furniture and Fixtures</option>
+              <option value="Laboratory and Scientific Equipment">Laboratory and Scientific Equipment</option>
+              <option value="Audio-Visual and Media Equipment">Audio-Visual and Media Equipment</option>
+              <option value="Machineries">Machineries</option>
+              <option value="Building Fixtures">Building Fixtures</option>
+            </select>
           </div>
 
-          <!-- Footer -->
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button
-              type="button"
-              @click="closeModal"
-              class="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-            >Cancel</button>
-            <button
-              type="button"
-              @click="submitAsset"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            >Save</button>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Condition</label>
+              <select
+                v-model="form.condition"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              >
+                <option>New</option>
+                <option>Good</option>
+                <option>Fair</option>
+                <option>Poor</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
+              <select
+                v-model="form.status"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              >
+                <option>Active</option>
+                <option>Disposed</option>
+                <option>Under Repair</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Assigned User</label>
+              <select
+                v-model="form.assigned_user_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              >
+                <option value="">--</option>
+                <option v-for="u in props.users" :key="u.id" :value="u.id">{{ u.name }}</option>
+              </select>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
+              <select
+                v-model="form.building_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              >
+                <option value="">--</option>
+                <option v-for="b in props.buildings" :key="b.id" :value="b.id">{{ b.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Room</label>
+              <select
+                v-model="form.room_id"
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              >
+                <option value="">--</option>
+                <option v-for="r in filteredRooms" :key="r.id" :value="r.id">{{ r.name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Photo</label>
+            <input
+              type="file"
+              accept="image/*"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              @change="handlePhoto"
+            />
+          </div>
+
+        </form>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+          <AppButton @click="submitAsset">Save</AppButton>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>

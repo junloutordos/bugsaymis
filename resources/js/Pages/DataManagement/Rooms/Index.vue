@@ -1,90 +1,69 @@
 <template>
   <Head title="Rooms" />
   <AdminLayout title="Rooms">
-    <div>
-      <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Rooms</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage campus rooms and spaces</p>
-        </div>
-        <button @click.prevent="openModal()"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          + New Room
-        </button>
-      </div>
+    <div class="space-y-5">
 
-      <!-- Table Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          <input v-model="searchQuery" type="text" placeholder="Search rooms..."
-            @keydown.enter.prevent="applyFilters"
-            class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-          <button @click="applyFilters"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Search
-          </button>
-          <button v-if="searchQuery" @click="clearFilters"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Clear
-          </button>
-        </div>
+      <AppPageHeader title="Rooms" subtitle="Manage campus rooms and spaces">
+        <template #actions>
+          <AppButton @click.prevent="openModal()">+ New Room</AppButton>
+        </template>
+      </AppPageHeader>
 
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Code</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Building</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Floor</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Section</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Occupant</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Capacity</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <!--<th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Gender</th>-->
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Remarks</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="r in filteredRooms" :key="r.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 font-medium">{{ r.name }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.code ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.building?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.floor ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.section_name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.office?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.capacity ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.room_type ?? '—' }}</td>
-                <!--<td class="px-4 py-3 text-sm text-slate-700">{{ r.comfort_gender ?? '—' }}</td>-->
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.remarks ?? '—' }}</td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1">
-                    <button @click.prevent="openModal(r)"
-                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="h-4 w-4" />
-                    </button>
-                    <button @click.prevent="destroy(r)" :disabled="isDeleting"
-                      class="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
-                      <TrashIcon class="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredRooms.length === 0">
-                <td colspan="11" class="py-16 text-center text-slate-400 text-sm">No rooms found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Filters -->
+      <AppFilterBar>
+        <input v-model="searchQuery" type="text" placeholder="Search rooms..."
+          @keydown.enter.prevent="applyFilters"
+          class="w-full sm:w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
 
-        <!-- Mobile card list -->
-        <div v-else class="p-4 space-y-3">
-          <div v-for="r in filteredRooms" :key="r.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+        <template #actions>
+          <AppButton size="sm" @click="applyFilters">Search</AppButton>
+          <AppButton v-if="searchQuery" size="sm" variant="secondary" @click="clearFilters">Clear</AppButton>
+        </template>
+      </AppFilterBar>
+
+      <!-- Table -->
+      <AppTable :is-empty="!filteredRooms.length" :skeleton-cols="10">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Code</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Building</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Floor</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Section</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Occupant</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Capacity</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Remarks</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
+
+        <tr v-for="r in filteredRooms" :key="r.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 font-medium">{{ r.name }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.code ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.building?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.floor ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.section_name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.office?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.capacity ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.room_type ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.remarks ?? '—' }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <AppIconButton label="Edit" @click.prevent="openModal(r)">
+                <PencilSquareIcon class="h-4 w-4" />
+              </AppIconButton>
+              <AppIconButton label="Delete" variant="danger" :disabled="isDeleting" @click.prevent="destroy(r)">
+                <TrashIcon class="h-4 w-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="r in filteredRooms" :key="r.id" class="p-4 space-y-2">
             <div class="flex justify-between items-start">
               <div>
                 <div class="text-xs text-slate-400">ID: {{ r.id }}</div>
@@ -95,137 +74,135 @@
                 <div class="text-xs text-slate-500">Type: {{ r.room_type ?? '—' }}</div>
               </div>
               <div class="flex flex-col items-end gap-2">
-                <button @click.prevent="openModal(r)"
-                  class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors">Edit</button>
-                <button @click.prevent="destroy(r)" :disabled="isDeleting"
-                  class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Delete</button>
+                <AppButton size="sm" @click.prevent="openModal(r)">Edit</AppButton>
+                <AppButton size="sm" variant="danger" :disabled="isDeleting" @click.prevent="destroy(r)">Delete</AppButton>
               </div>
             </div>
           </div>
-          <div v-if="filteredRooms.length === 0" class="py-16 text-center text-slate-400 text-sm">No rooms found.</div>
-        </div>
+        </template>
 
-        <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+        <template #empty>
+          <EmptyState title="No rooms found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
       <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Room' : 'New Room' }}</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+      <AppModal :show="showModal" :title="editingId ? 'Edit Room' : 'New Room'" size="2xl" @close="closeModal">
+        <form @submit.prevent="submitForm" class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-danger-600">*</span></label>
+            <input v-model="form.name" type="text"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+              required />
           </div>
-          <form @submit.prevent="submitForm" class="px-6 py-5 space-y-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Name <span class="text-red-500">*</span></label>
-              <input v-model="form.name" type="text"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
-                required />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Code</label>
-              <input v-model="form.code" type="text"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
-              <select v-model="form.building_id"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select building</option>
-                <option v-for="b in props.buildings" :key="b.id" :value="b.id">{{ b.name }}</option>
-              </select>
-            </div>
-            <div v-if="selectedBuilding && selectedBuilding.number_of_floors > 0">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Floor</label>
-              <select v-model="form.floor"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select floor</option>
-                <option v-for="f in floorOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Room Type</label>
-              <select v-model="form.room_type"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select room type</option>
-                <option value="Classroom">Classroom</option>
-                <option value="Admin">Admin</option>
-                <option value="Laboratory">Laboratory</option>
-                <option value="Computer Laboratory">Computer Laboratory</option>
-                <option value="Sports/Recreation">Sports/Recreation</option>
-                <option value="Assembly">Assembly</option>
-                <option value="Comfort Room">Comfort Room</option>
-              </select>
-            </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Code</label>
+            <input v-model="form.code" type="text"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Building</label>
+            <select v-model="form.building_id"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select building</option>
+              <option v-for="b in props.buildings" :key="b.id" :value="b.id">{{ b.name }}</option>
+            </select>
+          </div>
+          <div v-if="selectedBuilding && selectedBuilding.number_of_floors > 0">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Floor</label>
+            <select v-model="form.floor"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select floor</option>
+              <option v-for="f in floorOptions" :key="f.value" :value="f.value">{{ f.label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Room Type</label>
+            <select v-model="form.room_type"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select room type</option>
+              <option value="Classroom">Classroom</option>
+              <option value="Admin">Admin</option>
+              <option value="Laboratory">Laboratory</option>
+              <option value="Computer Laboratory">Computer Laboratory</option>
+              <option value="Sports/Recreation">Sports/Recreation</option>
+              <option value="Assembly">Assembly</option>
+              <option value="Comfort Room">Comfort Room</option>
+            </select>
+          </div>
 
-            <div v-if="form.room_type === 'Comfort Room'">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Comfort Room For</label>
-              <select v-model="form.comfort_gender"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select</option>
-                <option value="Female">Female</option>
-                <option value="Male">Male</option>
-                <option value="All Gender">All Gender</option>
-              </select>
-            </div>
+          <div v-if="form.room_type === 'Comfort Room'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Comfort Room For</label>
+            <select v-model="form.comfort_gender"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select</option>
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+              <option value="All Gender">All Gender</option>
+            </select>
+          </div>
 
-            <div v-if="form.room_type === 'Classroom'">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Section</label>
-              <select v-model="form.section_id"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">Select section</option>
-                <option v-for="s in sectionsList" :key="s.id" :value="s.id">{{ s.name }}</option>
-              </select>
-            </div>
+          <div v-if="form.room_type === 'Classroom'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Section</label>
+            <select v-model="form.section_id"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">Select section</option>
+              <option v-for="s in sectionsList" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
 
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
-              <input v-model.number="form.capacity" type="number" min="0"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            </div>
-            <div v-if="form.room_type === 'Admin'">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Occupant (Office)</label>
-              <select v-model="form.office_id"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option value="">--</option>
-                <option v-for="o in props.offices" :key="o.id" :value="o.id">{{ o.name }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-              <textarea v-model="form.remarks" rows="3"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
-            </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+            <input v-model.number="form.capacity" type="number" min="0"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          </div>
+          <div v-if="form.room_type === 'Admin'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Occupant (Office)</label>
+            <select v-model="form.office_id"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="">--</option>
+              <option v-for="o in props.offices" :key="o.id" :value="o.id">{{ o.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+            <textarea v-model="form.remarks" rows="3"
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"></textarea>
+          </div>
 
-            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <button type="button" @click="closeModal"
-                class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                Cancel
-              </button>
-              <button type="submit" :disabled="form.processing"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                {{ form.processing ? 'Saving…' : 'Save' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+          <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
+            <AppButton type="submit" :disabled="form.processing" :loading="form.processing">
+              {{ form.processing ? 'Saving…' : 'Save' }}
+            </AppButton>
+          </div>
+        </form>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
 import { Head, usePage, useForm } from '@inertiajs/vue3'
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 import { useSubmit } from '@/Composables/useSubmit'

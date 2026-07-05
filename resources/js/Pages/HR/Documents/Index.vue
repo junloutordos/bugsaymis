@@ -4,37 +4,25 @@
     <div class="space-y-5">
 
       <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <div class="flex items-center gap-2">
-            <a :href="route('hr.twoohone.index')" class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-              <ChevronLeftIcon class="h-4 w-4" />
-              201 Files
-            </a>
-          </div>
-          <h1 class="text-xl font-semibold text-slate-800 mt-1">{{ employee.name }}</h1>
-          <p class="text-sm text-slate-500 mt-0.5">
-            <span v-if="employee.position">{{ employee.position }}</span>
-            <span v-if="employee.employee_profile?.division" class="before:content-['·'] before:mx-1.5">{{ employee.employee_profile.division }}</span>
-            <span v-if="employee.employee_profile?.employee_no" class="before:content-['·'] before:mx-1.5">EMP# {{ employee.employee_profile.employee_no }}</span>
-          </p>
-        </div>
-        <button
-          v-if="canManage"
-          @click="uploadPanelOpen = !uploadPanelOpen"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm shrink-0"
-        >
-          <PlusIcon class="h-4 w-4" />
-          Upload Document
-        </button>
-      </div>
+      <AppPageHeader
+        :title="employee.name"
+        :subtitle="subtitleText"
+        :breadcrumb="[{ label: '201 Files', href: route('hr.twoohone.index') }]"
+      >
+        <template #actions>
+          <AppButton v-if="canManage" @click="uploadPanelOpen = !uploadPanelOpen">
+            <PlusIcon class="h-4 w-4" />
+            Upload Document
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash Messages -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />
         {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />
         {{ $page.props.flash.error }}
       </div>
@@ -155,15 +143,13 @@
 
           <!-- Actions -->
           <div class="sm:col-span-2 flex gap-3 justify-end">
-            <button type="button" @click="uploadPanelOpen = false; form.reset()"
-              class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+            <AppButton type="button" variant="secondary" @click="uploadPanelOpen = false; form.reset()">
               Cancel
-            </button>
-            <button type="submit" :disabled="form.processing"
-              class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg">
+            </AppButton>
+            <AppButton type="submit" :loading="form.processing">
               <ArrowUpTrayIcon class="h-4 w-4" />
               {{ form.processing ? 'Uploading…' : 'Upload' }}
-            </button>
+            </AppButton>
           </div>
         </form>
       </div>
@@ -221,14 +207,16 @@
           </div>
 
           <!-- Empty State -->
-          <div v-if="filteredDocuments.length === 0" class="py-14 text-center">
-            <FolderOpenIcon class="mx-auto h-10 w-10 text-slate-200 mb-3" />
-            <p class="text-sm font-medium text-slate-500">No documents in this folder</p>
+          <EmptyState
+            v-if="filteredDocuments.length === 0"
+            title="No documents in this folder"
+            :icon="FolderOpenIcon"
+          >
             <p v-if="activeCategory?.required" class="text-xs text-red-400 mt-1">
               This is a required folder — please upload the relevant document.
             </p>
             <p v-else class="text-xs text-slate-400 mt-1">Upload documents using the button above.</p>
-          </div>
+          </EmptyState>
 
           <!-- Document Items -->
           <ul v-else class="divide-y divide-slate-100">
@@ -263,17 +251,14 @@
 
               <!-- Actions -->
               <div class="shrink-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <a v-if="doc.file_path"
-                  :href="route('hr.employees.documents.download', doc.id)"
-                  class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 rounded-lg px-2.5 py-1.5 transition-colors">
+                <AppButton v-if="doc.file_path" as="a" :href="route('hr.employees.documents.download', doc.id)" variant="secondary" size="sm">
                   <ArrowDownTrayIcon class="h-3.5 w-3.5" />
                   Download
-                </a>
-                <button v-if="canManage" @click="confirmDelete(doc)"
-                  class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg px-2.5 py-1.5 transition-colors">
+                </AppButton>
+                <AppButton v-if="canManage" variant="danger" size="sm" @click="confirmDelete(doc)">
                   <TrashIcon class="h-3.5 w-3.5" />
                   Delete
-                </button>
+                </AppButton>
               </div>
             </li>
           </ul>
@@ -298,8 +283,8 @@
             </div>
           </div>
           <div class="flex gap-3 justify-end">
-            <button @click="deleteTarget = null" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="executeDelete" class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg">Delete</button>
+            <AppButton variant="secondary" @click="deleteTarget = null">Cancel</AppButton>
+            <AppButton variant="danger" @click="executeDelete">Delete</AppButton>
           </div>
         </div>
       </div>
@@ -312,6 +297,9 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   PlusIcon,
   ArrowUpTrayIcon,
@@ -327,7 +315,6 @@ import {
   PhotoIcon,
   PaperClipIcon,
   CalendarIcon,
-  ChevronLeftIcon,
   StarIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -336,6 +323,15 @@ const props = defineProps({
   documents:  Array,
   categories: Array,
   canManage:  Boolean,
+})
+
+// ── Header ────────────────────────────────────────────────────────────────────
+const subtitleText = computed(() => {
+  const parts = []
+  if (props.employee.position) parts.push(props.employee.position)
+  if (props.employee.employee_profile?.division) parts.push(props.employee.employee_profile.division)
+  if (props.employee.employee_profile?.employee_no) parts.push('EMP# ' + props.employee.employee_profile.employee_no)
+  return parts.join(' · ')
 })
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────

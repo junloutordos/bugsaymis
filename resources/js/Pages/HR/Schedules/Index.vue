@@ -3,23 +3,19 @@
   <AdminLayout title="Work Schedules">
     <div class="space-y-6">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Work Schedules</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Review employee submissions and manage schedule presets.</p>
-        </div>
-        <button @click="openAddPreset"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm">
-          <PlusIcon class="h-4 w-4" /> New Preset
-        </button>
-      </div>
+      <AppPageHeader title="Work Schedules" subtitle="Review employee submissions and manage schedule presets.">
+        <template #actions>
+          <AppButton @click="openAddPreset">
+            <PlusIcon class="h-4 w-4" /> New Preset
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm">
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm">
         {{ $page.props.flash.error }}
       </div>
 
@@ -29,15 +25,13 @@
           <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
             <ClockIcon class="h-4 w-4 text-amber-500" /> Pending Schedule Submissions
           </h2>
-          <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
-            :class="pendingSubmissions.length ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'">
-            {{ pendingSubmissions.length }} pending
-          </span>
+          <AppBadge :color="pendingSubmissions.length ? 'amber' : 'slate'">{{ pendingSubmissions.length }} pending</AppBadge>
         </div>
 
-        <div v-if="!pendingSubmissions.length" class="px-5 py-10 text-center text-slate-400 text-sm">
-          No pending submissions. Employees can submit schedule requests from their My Work Schedule page.
-        </div>
+        <EmptyState
+          v-if="!pendingSubmissions.length"
+          title="No pending submissions"
+          subtitle="Employees can submit schedule requests from their My Work Schedule page." />
 
         <div v-else class="divide-y divide-slate-100">
           <div v-for="sub in pendingSubmissions" :key="sub.id"
@@ -45,7 +39,7 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <p class="font-medium text-slate-800 text-sm">{{ sub.user?.name ?? '—' }}</p>
-                <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{{ sub.user?.emp_category ?? '—' }}</span>
+                <AppBadge color="slate">{{ sub.user?.emp_category ?? '—' }}</AppBadge>
               </div>
               <p class="text-sm text-slate-700 mt-0.5">{{ sub.name }}</p>
               <p class="text-xs text-slate-500 mt-0.5">
@@ -57,14 +51,12 @@
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <button @click="approveSubmission(sub)"
-                class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+              <AppButton size="sm" variant="success" @click="approveSubmission(sub)">
                 <CheckCircleIcon class="h-3.5 w-3.5" /> Approve
-              </button>
-              <button @click="openReject(sub)"
-                class="inline-flex items-center gap-1.5 border border-red-200 hover:bg-red-50 text-red-600 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+              </AppButton>
+              <AppButton size="sm" variant="danger" @click="openReject(sub)">
                 <XCircleIcon class="h-3.5 w-3.5" /> Reject
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -81,11 +73,9 @@
             <span class="text-xs text-slate-400">{{ presets.length }} preset(s)</span>
           </div>
 
-          <div v-if="!presets.length" class="px-5 py-12 text-center text-slate-400 text-sm">
-            No presets yet. Create one to get started.
-          </div>
+          <EmptyState v-if="!presets.length" title="No presets yet" subtitle="Create one to get started." />
 
-          <ul class="divide-y divide-slate-100">
+          <ul v-else class="divide-y divide-slate-100">
             <li v-for="p in presets" :key="p.id" class="px-5 py-4 flex items-start justify-between gap-3 hover:bg-slate-50/60">
               <div class="min-w-0">
                 <p class="font-medium text-slate-800 text-sm">{{ p.name }}</p>
@@ -95,13 +85,13 @@
                 </p>
                 <p v-if="p.remarks" class="text-xs text-slate-400 mt-0.5 truncate max-w-xs">{{ p.remarks }}</p>
               </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <button @click="openEditPreset(p)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600" title="Edit">
+              <div class="flex items-center gap-1 shrink-0">
+                <AppIconButton label="Edit" @click="openEditPreset(p)">
                   <PencilSquareIcon class="h-4 w-4" />
-                </button>
-                <button @click="deletePreset(p)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500" title="Delete">
+                </AppIconButton>
+                <AppIconButton label="Delete" variant="danger" @click="deletePreset(p)">
                   <TrashIcon class="h-4 w-4" />
-                </button>
+                </AppIconButton>
               </div>
             </li>
           </ul>
@@ -188,15 +178,13 @@
               </p>
             </div>
 
-            <button @click="submitAssign"
+            <AppButton
+              block
+              :loading="assignForm.processing"
               :disabled="assignForm.processing || !assignForm.preset_id || !assignForm.effective_date || !assignForm.user_ids.length"
-              class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
-              <svg v-if="assignForm.processing" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-              </svg>
+              @click="submitAssign">
               {{ assignForm.processing ? 'Assigning…' : 'Assign Schedule' }}
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -208,31 +196,42 @@
             <TableCellsIcon class="h-4 w-4 text-indigo-500" /> Current Assignments
           </h2>
         </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Schedule</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Work Days / Times</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Effective</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="!assignments.length">
-                <td colspan="5" class="px-4 py-10 text-center text-slate-400 text-sm">No schedules assigned yet.</td>
-              </tr>
-              <tr v-for="a in assignments" :key="a.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 font-medium text-slate-800">{{ a.user?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-500 text-xs">{{ a.user?.emp_category ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-700">{{ a.name }}</td>
-                <td class="px-4 py-3 text-slate-600 text-xs">{{ formatDaysWithTimes(a.daily_schedules) }}</td>
-                <td class="px-4 py-3 text-slate-500 text-xs">{{ a.effective_date }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
+        <AppTable :card="false" :is-empty="!assignments.length" :skeleton-cols="5">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Schedule</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Work Days / Times</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Effective</th>
+            </tr>
+          </template>
+
+          <tr v-for="a in assignments" :key="a.id" class="hover:bg-slate-50/60">
+            <td class="px-4 py-3 font-medium text-slate-800">{{ a.user?.name ?? '—' }}</td>
+            <td class="px-4 py-3 text-slate-500 text-xs">{{ a.user?.emp_category ?? '—' }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ a.name }}</td>
+            <td class="px-4 py-3 text-slate-600 text-xs">{{ formatDaysWithTimes(a.daily_schedules) }}</td>
+            <td class="px-4 py-3 text-slate-500 text-xs">{{ a.effective_date }}</td>
+          </tr>
+
+          <template #mobileCard>
+            <div v-for="a in assignments" :key="a.id" class="p-4 space-y-1">
+              <div class="flex items-start justify-between gap-2">
+                <p class="font-medium text-slate-800 text-sm">{{ a.user?.name ?? '—' }}</p>
+                <span class="text-xs text-slate-400">{{ a.user?.emp_category ?? '—' }}</span>
+              </div>
+              <p class="text-xs text-slate-600">{{ a.name }}</p>
+              <p class="text-xs text-slate-500">{{ formatDaysWithTimes(a.daily_schedules) }}</p>
+              <p class="text-xs text-slate-400">Effective {{ a.effective_date }}</p>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No schedules assigned yet" />
+          </template>
+        </AppTable>
       </div>
 
     </div>
@@ -331,11 +330,10 @@
           </div>
 
           <div class="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end shrink-0">
-            <button @click="presetModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="submitPreset" :disabled="presetForm.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">
+            <AppButton variant="secondary" @click="presetModal.open = false">Cancel</AppButton>
+            <AppButton :loading="presetForm.processing" :disabled="presetForm.processing" @click="submitPreset">
               {{ presetForm.processing ? 'Saving…' : 'Save Preset' }}
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -355,11 +353,10 @@
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
           </div>
           <div class="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
-            <button @click="rejectModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="submitReject" :disabled="rejectForm.processing"
-              class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-colors">
+            <AppButton variant="secondary" @click="rejectModal.open = false">Cancel</AppButton>
+            <AppButton variant="danger" :loading="rejectForm.processing" :disabled="rejectForm.processing" @click="submitReject">
               {{ rejectForm.processing ? 'Rejecting…' : 'Reject' }}
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -372,6 +369,13 @@
 import { ref, reactive, computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmAction, confirmDelete } from '@/Composables/useConfirm.js'
 import {
   PlusIcon, ClockIcon, PencilSquareIcon, TrashIcon,
   UserGroupIcon, TableCellsIcon, CheckCircleIcon, XCircleIcon,
@@ -389,8 +393,8 @@ const allDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 // ── Pending Submissions ───────────────────────────────────────────────────────
 
-function approveSubmission(sub) {
-  if (!confirm(`Approve the schedule submission for ${sub.user?.name}?`)) return
+async function approveSubmission(sub) {
+  if (!(await confirmAction({ title: 'Approve schedule submission?', text: `Approve the schedule submission for ${sub.user?.name}?`, confirmText: 'Approve' }))) return
   useForm({}).post(route('hr.schedules.approve', sub.id))
 }
 
@@ -500,8 +504,8 @@ function submitPreset() {
   }
 }
 
-function deletePreset(preset) {
-  if (!confirm(`Delete preset "${preset.name}"? This won't affect existing employee schedules.`)) return
+async function deletePreset(preset) {
+  if (!(await confirmDelete(`Delete preset "${preset.name}"? This won't affect existing employee schedules.`))) return
   useForm({}).delete(route('hr.schedules.presets.destroy', preset.id))
 }
 

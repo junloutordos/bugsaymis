@@ -3,47 +3,47 @@
   <AdminLayout title="Error Reports">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Error Reports</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Review and resolve user-reported system errors</p>
-        </div>
-      </div>
+      <AppPageHeader title="Error Reports" subtitle="Review and resolve user-reported system errors" />
 
       <!-- Stat cards -->
       <div class="grid grid-cols-3 gap-3">
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
-            <BugAntIcon class="h-5 w-5 text-red-500" />
+        <AppCard :padded="false">
+          <div class="px-4 py-3 flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-danger-50 flex items-center justify-center shrink-0">
+              <BugAntIcon class="h-5 w-5 text-danger-500" />
+            </div>
+            <div>
+              <p class="text-2xl font-bold text-danger-600">{{ counts.open }}</p>
+              <p class="text-xs text-slate-500">Open</p>
+            </div>
           </div>
-          <div>
-            <p class="text-2xl font-bold text-red-600">{{ counts.open }}</p>
-            <p class="text-xs text-slate-500">Open</p>
+        </AppCard>
+        <AppCard :padded="false">
+          <div class="px-4 py-3 flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-warning-50 flex items-center justify-center shrink-0">
+              <ArrowPathIcon class="h-5 w-5 text-warning-500" />
+            </div>
+            <div>
+              <p class="text-2xl font-bold text-warning-600">{{ counts.in_progress }}</p>
+              <p class="text-xs text-slate-500">In Progress</p>
+            </div>
           </div>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
-            <ArrowPathIcon class="h-5 w-5 text-amber-500" />
+        </AppCard>
+        <AppCard :padded="false">
+          <div class="px-4 py-3 flex items-center gap-3">
+            <div class="h-9 w-9 rounded-full bg-success-50 flex items-center justify-center shrink-0">
+              <CheckCircleIcon class="h-5 w-5 text-success-500" />
+            </div>
+            <div>
+              <p class="text-2xl font-bold text-success-600">{{ counts.resolved }}</p>
+              <p class="text-xs text-slate-500">Resolved</p>
+            </div>
           </div>
-          <div>
-            <p class="text-2xl font-bold text-amber-600">{{ counts.in_progress }}</p>
-            <p class="text-xs text-slate-500">In Progress</p>
-          </div>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-            <CheckCircleIcon class="h-5 w-5 text-emerald-500" />
-          </div>
-          <div>
-            <p class="text-2xl font-bold text-emerald-600">{{ counts.resolved }}</p>
-            <p class="text-xs text-slate-500">Resolved</p>
-          </div>
-        </div>
+        </AppCard>
       </div>
 
       <!-- Filters -->
-      <div class="flex flex-wrap gap-2">
+      <AppFilterBar>
         <select v-model="filters.status" @change="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
           <option value="">All Statuses</option>
@@ -61,27 +61,25 @@
         </select>
         <input v-model="filters.search" type="search" placeholder="Search reports…" @keyup.enter="applyFilters"
           class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 w-52 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
-        <button @click="applyFilters"
-          class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium">
-          Filter
-        </button>
-      </div>
+
+        <template #actions>
+          <AppButton size="sm" @click="applyFilters">Filter</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
 
       <!-- Empty -->
-      <div v-if="reports.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <BugAntIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">No reports found</p>
-      </div>
+      <AppCard v-if="reports.length === 0">
+        <EmptyState title="No reports found" :icon="BugAntIcon" />
+      </AppCard>
 
       <!-- Reports list -->
       <div v-else class="space-y-3">
-        <div v-for="r in reports" :key="r.id"
-          class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <AppCard v-for="r in reports" :key="r.id" :padded="false" class="overflow-hidden">
 
           <!-- Report header row -->
           <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-start gap-3 cursor-pointer"
@@ -89,14 +87,8 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-mono text-xs font-semibold text-slate-400">{{ r.report_no }}</span>
-                <span :class="priorityBadge(r.priority)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                  {{ r.priority.toUpperCase() }}
-                </span>
-                <span :class="statusBadge(r.status)"
-                  class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                  {{ statusLabel(r.status) }}
-                </span>
+                <AppBadge :color="priorityBadge(r.priority)">{{ r.priority.toUpperCase() }}</AppBadge>
+                <AppBadge :color="statusBadge(r.status)">{{ statusLabel(r.status) }}</AppBadge>
                 <CameraIcon v-if="r.has_screenshot" class="h-3.5 w-3.5 text-slate-400" title="Has screenshot" />
               </div>
               <p class="text-sm font-semibold text-slate-800 mt-1 truncate">{{ r.title }}</p>
@@ -176,20 +168,17 @@
                   class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"></textarea>
               </div>
 
-              <div v-if="r.resolved_at" class="text-xs text-emerald-600 flex items-center gap-1">
+              <div v-if="r.resolved_at" class="text-xs text-success-600 flex items-center gap-1">
                 <CheckCircleIcon class="h-3.5 w-3.5" /> Resolved on {{ formatDate(r.resolved_at) }}
               </div>
 
               <div class="flex justify-end">
-                <button @click="saveEdit(r)"
-                  class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">
-                  Save Changes
-                </button>
+                <AppButton @click="saveEdit(r)">Save Changes</AppButton>
               </div>
             </div>
 
           </div>
-        </div>
+        </AppCard>
       </div>
 
     </div>
@@ -200,6 +189,12 @@
 import { reactive, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   BugAntIcon, CheckCircleIcon, ArrowPathIcon, ChevronDownIcon,
   CameraIcon,
@@ -252,19 +247,19 @@ function statusLabel(s) {
 
 function statusBadge(s) {
   return {
-    open:        'bg-red-50 text-red-600',
-    in_progress: 'bg-amber-50 text-amber-700',
-    resolved:    'bg-emerald-50 text-emerald-700',
-  }[s] ?? 'bg-slate-100 text-slate-500'
+    open:        'red',
+    in_progress: 'amber',
+    resolved:    'green',
+  }[s] ?? 'slate'
 }
 
 function priorityBadge(p) {
   return {
-    critical: 'bg-red-600 text-white',
-    high:     'bg-red-100 text-red-700',
-    medium:   'bg-amber-100 text-amber-700',
-    low:      'bg-slate-100 text-slate-500',
-  }[p] ?? 'bg-slate-100 text-slate-500'
+    critical: 'red',
+    high:     'red',
+    medium:   'amber',
+    low:      'slate',
+  }[p] ?? 'slate'
 }
 
 function formatDate(iso) {

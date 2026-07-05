@@ -2,6 +2,14 @@
 import { ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { ArrowDownTrayIcon, ArrowPathIcon, ChartBarIcon, CheckCircleIcon, ClipboardDocumentCheckIcon, ClockIcon, Cog6ToothIcon, PlusIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -85,68 +93,75 @@ function statusClass(status) {
 function statusLabel(status) {
   return String(status ?? '').replaceAll('_', ' ')
 }
+
+function statusBadgeColor(status) {
+  return {
+    cleared: 'green',
+    ready_for_adviser: 'indigo',
+    pending_registrar: 'blue',
+    with_accountability: 'amber',
+    in_progress: 'slate',
+    open: 'slate',
+  }[status] ?? 'slate'
+}
 </script>
 
 <template>
   <Head title="Student Clearance" />
 
   <AdminLayout title="Student Clearance">
-    <div class="space-y-6">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Registrar</p>
-          <h1 class="text-2xl font-semibold text-slate-900">Student Year-End Clearance</h1>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <Link v-if="period" :href="route('student-clearance.report', period.id)" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+    <div class="space-y-5">
+
+      <AppPageHeader title="Student Year-End Clearance" subtitle="Registrar">
+        <template #actions>
+          <AppButton v-if="period" as="link" variant="secondary" :href="route('student-clearance.report', period.id)">
             <ChartBarIcon class="h-4 w-4" />
             Report
-          </Link>
-          <a v-if="period" :href="route('student-clearance.export', period.id)" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          </AppButton>
+          <AppButton v-if="period" as="a" variant="secondary" :href="route('student-clearance.export', period.id)">
             <ArrowDownTrayIcon class="h-4 w-4" />
             Export
-          </a>
-          <Link :href="route('student-clearance.queue')" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          </AppButton>
+          <AppButton as="link" :href="route('student-clearance.queue')">
             <ClipboardDocumentCheckIcon class="h-4 w-4" />
             Signatory Queue
-          </Link>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <section class="grid gap-4 lg:grid-cols-[1fr_1.5fr]">
-        <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 class="text-sm font-semibold text-slate-900">Create clearance period</h2>
-          <div class="mt-4 grid gap-3">
-            <select v-model="periodForm.school_year_id" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <AppCard title="Create clearance period">
+          <div class="grid gap-3">
+            <AppSelect v-model="periodForm.school_year_id" :show-blank="false">
               <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">{{ sy.name }}</option>
-            </select>
-            <input v-model="periodForm.title" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </AppSelect>
+            <AppInput v-model="periodForm.title" type="text" />
             <div class="grid gap-3 sm:grid-cols-2">
-              <input v-model="periodForm.opens_at" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <input v-model="periodForm.closes_at" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <AppInput v-model="periodForm.opens_at" type="date" />
+              <AppInput v-model="periodForm.closes_at" type="date" />
             </div>
-            <select v-model="periodForm.status" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <AppSelect v-model="periodForm.status" :show-blank="false">
               <option value="draft">Draft</option>
               <option value="open">Open</option>
               <option value="closed">Closed</option>
-            </select>
-            <button @click="createPeriod" :disabled="periodForm.processing" class="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
+            </AppSelect>
+            <AppButton :loading="periodForm.processing" @click="createPeriod">
               <PlusIcon class="h-4 w-4" />
               Create Period
-            </button>
+            </AppButton>
           </div>
-        </div>
+        </AppCard>
 
-        <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <AppCard>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-sm font-semibold text-slate-900">Active records</h2>
               <p class="mt-1 text-sm text-slate-500">{{ period?.title ?? 'Select a clearance period' }}</p>
             </div>
-            <select v-model="selectedPeriodId" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <AppSelect v-model="selectedPeriodId" :show-blank="false">
               <option :value="null">Latest period</option>
               <option v-for="p in periods" :key="p.id" :value="p.id">{{ p.title }} / {{ p.school_year?.name }}</option>
-            </select>
+            </AppSelect>
           </div>
 
           <div class="mt-5 grid gap-3 sm:grid-cols-3">
@@ -156,7 +171,7 @@ function statusLabel(status) {
               <p class="text-xs text-slate-500">Total</p>
             </div>
             <div class="rounded-lg border border-slate-200 p-4">
-              <CheckCircleIcon class="h-5 w-5 text-emerald-500" />
+              <CheckCircleIcon class="h-5 w-5 text-success-500" />
               <p class="mt-2 text-2xl font-semibold text-slate-900">{{ stats?.cleared ?? 0 }}</p>
               <p class="text-xs text-slate-500">Cleared</p>
             </div>
@@ -167,128 +182,119 @@ function statusLabel(status) {
             </div>
           </div>
 
-          <button v-if="period" @click="generate" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          <AppButton v-if="period" class="mt-5" @click="generate">
             <ArrowPathIcon class="h-4 w-4" />
             Generate / Sync Clearances
-          </button>
-        </div>
+          </AppButton>
+        </AppCard>
       </section>
 
-      <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div class="flex items-center gap-2 border-b border-slate-100 px-5 py-3">
-          <Cog6ToothIcon class="h-5 w-5 text-slate-400" />
-          <h2 class="text-sm font-semibold text-slate-900">Requirement signatories</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Requirement</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Group</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned user</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Permission fallback</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Applies to</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Active</th>
-                <th class="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="setting in requirementSettings" :key="setting.id" class="align-top">
-                <td class="px-4 py-3">
-                  <input v-model="settingDrafts[setting.id].requirement_label" :disabled="!canManageSettings" type="text" class="w-64 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500" />
-                  <p class="mt-1 text-xs text-slate-400">{{ setting.requirement_code }}</p>
-                </td>
-                <td class="px-4 py-3">
-                  <select v-model="settingDrafts[setting.id].requirement_group" :disabled="!canManageSettings" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500">
-                    <option value="laboratory">Laboratory</option>
-                    <option value="subject">Subject</option>
-                    <option value="administrative">Administrative</option>
-                    <option value="final">Final</option>
-                  </select>
-                </td>
-                <td class="px-4 py-3">
-                  <select v-model="settingDrafts[setting.id].assigned_user_id" :disabled="!canManageSettings || setting.requirement_type === 'section_adviser'" class="w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400">
-                    <option :value="null">{{ setting.requirement_type === 'section_adviser' ? 'Uses section adviser' : 'No direct user' }}</option>
-                    <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
-                  </select>
-                </td>
-                <td class="px-4 py-3">
-                  <select v-model="settingDrafts[setting.id].assigned_permission" :disabled="!canManageSettings" class="w-56 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500">
-                    <option value="">No permission fallback</option>
-                    <option v-for="permission in permissionOptions" :key="permission" :value="permission">{{ permission }}</option>
-                  </select>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex flex-wrap gap-1.5">
-                    <button
-                      v-for="grade in gradeLevels"
-                      :key="grade"
-                      type="button"
-                      :disabled="!canManageSettings"
-                      @click="toggleGrade(setting.id, grade)"
-                      class="rounded border px-2 py-1 text-xs"
-                      :class="settingDrafts[setting.id].applies_grade_levels.includes(grade) ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-500'"
-                    >
-                      G{{ grade }}
-                    </button>
-                  </div>
-                  <label class="mt-2 flex items-center gap-2 text-xs text-slate-600">
-                    <input v-model="settingDrafts[setting.id].intern_only" :disabled="!canManageSettings" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:bg-slate-100" />
-                    Intern only
-                  </label>
-                </td>
-                <td class="px-4 py-3">
-                  <input v-model="settingDrafts[setting.id].is_active" :disabled="!canManageSettings" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:bg-slate-100" />
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <button v-if="canManageSettings" @click="saveSetting(setting)" class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800">
-                    Save
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="requirementSettings.length === 0">
-                <td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">No requirement settings found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <AppCard :padded="false">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <Cog6ToothIcon class="h-5 w-5 text-slate-400" />
+            <h2 class="text-sm font-semibold text-slate-900">Requirement signatories</h2>
+          </div>
+        </template>
 
-      <section class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-100 px-5 py-3">
-          <h2 class="text-sm font-semibold text-slate-900">Students</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Section</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="clearance in clearances" :key="clearance.id" class="hover:bg-slate-50">
-                <td class="px-4 py-3">
-                  <Link :href="route('student-clearance.show', clearance.id)" class="font-medium text-indigo-700 hover:text-indigo-900">{{ clearance.student_name }}</Link>
-                  <p class="text-xs text-slate-500">{{ clearance.pisays_id }}</p>
-                </td>
-                <td class="px-4 py-3 text-slate-600">Grade {{ clearance.grade_level }} {{ clearance.section_name }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ clearance.progress.done }}/{{ clearance.progress.total }}</td>
-                <td class="px-4 py-3">
-                  <span class="rounded-full border px-2.5 py-1 text-xs font-medium capitalize" :class="statusClass(clearance.status)">
-                    {{ statusLabel(clearance.status) }}
-                  </span>
-                </td>
-              </tr>
-              <tr v-if="clearances.length === 0">
-                <td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No clearances generated.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <AppTable :is-empty="!requirementSettings.length" :skeleton-cols="7" :card="false">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Requirement</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Group</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned user</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Permission fallback</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Applies to</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Active</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </template>
+
+          <tr v-for="setting in requirementSettings" :key="setting.id" class="align-top">
+            <td class="px-4 py-3">
+              <AppInput v-model="settingDrafts[setting.id].requirement_label" :disabled="!canManageSettings" type="text" />
+              <p class="mt-1 text-xs text-slate-400">{{ setting.requirement_code }}</p>
+            </td>
+            <td class="px-4 py-3">
+              <AppSelect v-model="settingDrafts[setting.id].requirement_group" :disabled="!canManageSettings" :show-blank="false">
+                <option value="laboratory">Laboratory</option>
+                <option value="subject">Subject</option>
+                <option value="administrative">Administrative</option>
+                <option value="final">Final</option>
+              </AppSelect>
+            </td>
+            <td class="px-4 py-3">
+              <AppSelect v-model="settingDrafts[setting.id].assigned_user_id" :disabled="!canManageSettings || setting.requirement_type === 'section_adviser'" :show-blank="false">
+                <option :value="null">{{ setting.requirement_type === 'section_adviser' ? 'Uses section adviser' : 'No direct user' }}</option>
+                <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
+              </AppSelect>
+            </td>
+            <td class="px-4 py-3">
+              <AppSelect v-model="settingDrafts[setting.id].assigned_permission" :disabled="!canManageSettings" placeholder="No permission fallback">
+                <option v-for="permission in permissionOptions" :key="permission" :value="permission">{{ permission }}</option>
+              </AppSelect>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="grade in gradeLevels"
+                  :key="grade"
+                  type="button"
+                  :disabled="!canManageSettings"
+                  @click="toggleGrade(setting.id, grade)"
+                  class="rounded border px-2 py-1 text-xs"
+                  :class="settingDrafts[setting.id].applies_grade_levels.includes(grade) ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-500'"
+                >
+                  G{{ grade }}
+                </button>
+              </div>
+              <label class="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                <input v-model="settingDrafts[setting.id].intern_only" :disabled="!canManageSettings" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:bg-slate-100" />
+                Intern only
+              </label>
+            </td>
+            <td class="px-4 py-3">
+              <input v-model="settingDrafts[setting.id].is_active" :disabled="!canManageSettings" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:bg-slate-100" />
+            </td>
+            <td class="px-4 py-3 text-right">
+              <AppButton v-if="canManageSettings" size="sm" @click="saveSetting(setting)">Save</AppButton>
+            </td>
+          </tr>
+
+          <template #empty>
+            <EmptyState title="No requirement settings found" />
+          </template>
+        </AppTable>
+      </AppCard>
+
+      <AppCard title="Students" :padded="false">
+        <AppTable :is-empty="!clearances.length" :skeleton-cols="4" :card="false">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Section</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+            </tr>
+          </template>
+
+          <tr v-for="clearance in clearances" :key="clearance.id" class="hover:bg-slate-50">
+            <td class="px-4 py-3">
+              <Link :href="route('student-clearance.show', clearance.id)" class="font-medium text-indigo-700 hover:text-indigo-900">{{ clearance.student_name }}</Link>
+              <p class="text-xs text-slate-500">{{ clearance.pisays_id }}</p>
+            </td>
+            <td class="px-4 py-3 text-slate-600">Grade {{ clearance.grade_level }} {{ clearance.section_name }}</td>
+            <td class="px-4 py-3 text-slate-600">{{ clearance.progress.done }}/{{ clearance.progress.total }}</td>
+            <td class="px-4 py-3">
+              <AppBadge :color="statusBadgeColor(clearance.status)">{{ statusLabel(clearance.status) }}</AppBadge>
+            </td>
+          </tr>
+
+          <template #empty>
+            <EmptyState title="No clearances generated" />
+          </template>
+        </AppTable>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

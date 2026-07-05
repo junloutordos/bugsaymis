@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
 import {
     UserIcon, AcademicCapIcon, TrophyIcon, UserGroupIcon,
     BriefcaseIcon, HomeIcon, HeartIcon, ArrowLeftIcon,
@@ -77,35 +79,37 @@ const ratingLabel = (v) => {
         <div class="space-y-5">
             <!-- Back + Student Header -->
             <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-                <button @click="router.visit(route('guidance.cumulative.index'))" class="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+                <AppButton variant="ghost" @click="router.visit(route('guidance.cumulative.index'))">
                     <ArrowLeftIcon class="w-4 h-4" /> Back to list
-                </button>
+                </AppButton>
             </div>
 
             <!-- Student Info Card -->
-            <div class="bg-white rounded-xl border border-slate-200 p-5 flex flex-wrap gap-6">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
-                        <UserIcon class="w-6 h-6 text-indigo-500" />
+            <AppCard>
+                <div class="flex flex-wrap gap-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <UserIcon class="w-6 h-6 text-indigo-500" />
+                        </div>
+                        <div>
+                            <p class="font-semibold text-slate-800 text-base">{{ studentName }}</p>
+                            <p class="text-sm text-slate-500">{{ student.pisaysystemID || 'No barcode' }}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p class="font-semibold text-slate-800 text-base">{{ studentName }}</p>
-                        <p class="text-sm text-slate-500">{{ student.pisaysystemID || 'No barcode' }}</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-1 text-sm">
+                        <div><span class="text-slate-400">Batch</span><p class="font-medium text-slate-700">{{ student.batch || '—' }}</p></div>
+                        <div><span class="text-slate-400">Status</span><p class="font-medium text-slate-700">{{ student.status || '—' }}</p></div>
+                        <div><span class="text-slate-400">Sex</span><p class="font-medium text-slate-700">{{ student.sex || '—' }}</p></div>
+                        <div><span class="text-slate-400">Email</span><p class="font-medium text-slate-700 text-xs">{{ student.student_email || '—' }}</p></div>
                     </div>
+                    <a
+                        :href="route('students.health.show', student.pisaysystemID)"
+                        class="ml-auto self-center inline-flex items-center gap-1.5 text-sm text-rose-600 hover:text-rose-800 font-medium"
+                    >
+                        <HeartIcon class="w-4 h-4" /> Medical Records
+                    </a>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-1 text-sm">
-                    <div><span class="text-slate-400">Batch</span><p class="font-medium text-slate-700">{{ student.batch || '—' }}</p></div>
-                    <div><span class="text-slate-400">Status</span><p class="font-medium text-slate-700">{{ student.status || '—' }}</p></div>
-                    <div><span class="text-slate-400">Sex</span><p class="font-medium text-slate-700">{{ student.sex || '—' }}</p></div>
-                    <div><span class="text-slate-400">Email</span><p class="font-medium text-slate-700 text-xs">{{ student.student_email || '—' }}</p></div>
-                </div>
-                <a
-                    :href="route('students.health.show', student.pisaysystemID)"
-                    class="ml-auto self-center inline-flex items-center gap-1.5 text-sm text-rose-600 hover:text-rose-800 font-medium"
-                >
-                    <HeartIcon class="w-4 h-4" /> Medical Records
-                </a>
-            </div>
+            </AppCard>
 
             <!-- Tabs -->
             <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">

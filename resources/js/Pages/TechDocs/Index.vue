@@ -2,7 +2,10 @@
 import { ref, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { badgeBase, httpMethodBadgeClass, changelogTypeBadgeClass } from '@/Composables/useStatusBadge.js'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   MagnifyingGlassIcon, ChevronRightIcon, ChevronDownIcon,
   CircleStackIcon, CommandLineIcon, KeyIcon, CodeBracketIcon,
@@ -57,7 +60,10 @@ const pagedRoutes     = computed(() => {
 })
 watch([routeSearch, routeMethod], () => { routePage.value = 1 })
 
-// methodCls → httpMethodBadgeClass (from useStatusBadge.js)
+function methodBadgeColor(method) {
+  const map = { GET: 'green', POST: 'blue', PUT: 'amber', PATCH: 'orange', DELETE: 'red' }
+  return map[method] ?? 'slate'
+}
 
 // ── Schema section ─────────────────────────────────────────────────────────
 const tableSearch  = ref('')
@@ -77,10 +83,10 @@ function toggleTable(name) {
 }
 
 function keyBadge(key) {
-  if (key === 'PRI') return 'bg-yellow-100 text-yellow-700'
-  if (key === 'MUL') return 'bg-blue-100 text-blue-700'
-  if (key === 'UNI') return 'bg-purple-100 text-purple-700'
-  return ''
+  if (key === 'PRI') return 'amber'
+  if (key === 'MUL') return 'blue'
+  if (key === 'UNI') return 'purple'
+  return 'slate'
 }
 
 // ── Permissions section ────────────────────────────────────────────────────
@@ -310,7 +316,10 @@ const changelog = [
   },
 ]
 
-// typeColors → changelogTypeBadgeClass (from useStatusBadge.js)
+function changelogBadgeColor(type) {
+  const map = { feat: 'indigo', fix: 'red', ops: 'slate' }
+  return map[type] ?? 'indigo'
+}
 
 // ── Conventions data (kept in script to avoid template parser issues) ─────
 const conventions = [
@@ -514,16 +523,16 @@ function fmtType(t) {
               { label: 'Container', value: 'Docker · AWS ECS Fargate', color: 'orange' },
               { label: 'CI/CD', value: 'GitHub Actions → ECR → ECS', color: 'slate' },
               { label: 'PDF', value: 'mPDF 8 (tempDir = sys_get_temp_dir())', color: 'pink' },
-            ]" :key="item.label"
-              class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{{ item.label }}</p>
-              <p class="text-sm font-medium text-slate-800">{{ item.value }}</p>
+            ]" :key="item.label">
+              <AppCard>
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{{ item.label }}</p>
+                <p class="text-sm font-medium text-slate-800">{{ item.value }}</p>
+              </AppCard>
             </div>
           </div>
 
           <!-- Architecture -->
-          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <h2 class="text-base font-semibold text-slate-700 mb-3">Production Architecture</h2>
+          <AppCard title="Production Architecture">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div v-for="row in [
                 ['App URL',     'https://mis.crc.pshs.edu.ph'],
@@ -542,20 +551,19 @@ function fmtType(t) {
                 <span class="text-slate-700 font-mono text-xs break-all">{{ row[1] }}</span>
               </div>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Critical Rules -->
-          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-            <h2 class="text-base font-semibold text-slate-700 mb-3">⚠️ Critical Rules</h2>
+          <AppCard title="⚠️ Critical Rules">
             <ul class="space-y-2 text-sm text-slate-600">
-              <li class="flex gap-2"><span class="text-red-500 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">FormData / multipart/form-data</code> for file uploads — Cloudflare WAF blocks it (403). Use base64 JSON instead.</span></li>
-              <li class="flex gap-2"><span class="text-red-500 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">Storage::disk('public')</code> — S3 Block Public Access is ON. Always use <code class="bg-slate-100 px-1 rounded text-xs">Storage::disk('s3')</code>.</span></li>
-              <li class="flex gap-2"><span class="text-red-500 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">storage_path()</code> for mPDF — use <code class="bg-slate-100 px-1 rounded text-xs">sys_get_temp_dir()</code> (open_basedir restriction).</span></li>
-              <li class="flex gap-2"><span class="text-red-500 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">app</code> as Docker service name — always <code class="bg-slate-100 px-1 rounded text-xs">php</code>.</span></li>
-              <li class="flex gap-2"><span class="text-green-600 font-bold shrink-0">✓</span><span>Run Artisan via: <code class="bg-slate-100 px-1 rounded text-xs">docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan ..."</code></span></li>
-              <li class="flex gap-2"><span class="text-green-600 font-bold shrink-0">✓</span><span>Deploy: <code class="bg-slate-100 px-1 rounded text-xs">git push origin main</code> → GitHub Actions → ECR → ECS rolling update (~10 min)</span></li>
+              <li class="flex gap-2"><span class="text-danger-600 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">FormData / multipart/form-data</code> for file uploads — Cloudflare WAF blocks it (403). Use base64 JSON instead.</span></li>
+              <li class="flex gap-2"><span class="text-danger-600 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">Storage::disk('public')</code> — S3 Block Public Access is ON. Always use <code class="bg-slate-100 px-1 rounded text-xs">Storage::disk('s3')</code>.</span></li>
+              <li class="flex gap-2"><span class="text-danger-600 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">storage_path()</code> for mPDF — use <code class="bg-slate-100 px-1 rounded text-xs">sys_get_temp_dir()</code> (open_basedir restriction).</span></li>
+              <li class="flex gap-2"><span class="text-danger-600 font-bold shrink-0">✗</span><span><strong>Never</strong> use <code class="bg-slate-100 px-1 rounded text-xs">app</code> as Docker service name — always <code class="bg-slate-100 px-1 rounded text-xs">php</code>.</span></li>
+              <li class="flex gap-2"><span class="text-success-600 font-bold shrink-0">✓</span><span>Run Artisan via: <code class="bg-slate-100 px-1 rounded text-xs">docker compose exec php bash -c "cd /var/www/html/bugsaymis && php artisan ..."</code></span></li>
+              <li class="flex gap-2"><span class="text-success-600 font-bold shrink-0">✓</span><span>Deploy: <code class="bg-slate-100 px-1 rounded text-xs">git push origin main</code> → GitHub Actions → ECR → ECS rolling update (~10 min)</span></li>
             </ul>
-          </div>
+          </AppCard>
         </section>
 
         <!-- ══ 2. MODULES ═══════════════════════════════════════════════════ -->
@@ -563,8 +571,7 @@ function fmtType(t) {
           <h1 class="text-2xl font-bold text-slate-800">Module Reference</h1>
           <p class="text-slate-500 text-sm">{{ modules.length }} modules · click any card to expand</p>
 
-          <div v-for="mod in modules" :key="mod.name"
-            class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <AppCard v-for="mod in modules" :key="mod.name" :padded="false">
             <button @click="expandedTable === mod.name ? expandedTable = null : expandedTable = mod.name"
               class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition-colors">
               <div>
@@ -614,7 +621,7 @@ function fmtType(t) {
                 </ul>
               </div>
             </div>
-          </div>
+          </AppCard>
         </section>
 
         <!-- ══ 3. ROUTES ════════════════════════════════════════════════════ -->
@@ -640,50 +647,49 @@ function fmtType(t) {
           <p class="text-xs text-slate-400">Showing {{ filteredRoutes.length.toLocaleString() }} routes</p>
 
           <!-- Table -->
-          <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
-            <table class="w-full text-xs">
-              <thead class="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  <th class="px-3 py-2.5 text-left font-semibold text-slate-500 uppercase tracking-wide">Method</th>
-                  <th class="px-3 py-2.5 text-left font-semibold text-slate-500 uppercase tracking-wide">URI</th>
-                  <th class="hidden md:table-cell px-3 py-2.5 text-left font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                  <th class="hidden lg:table-cell px-3 py-2.5 text-left font-semibold text-slate-500 uppercase tracking-wide">Controller</th>
-                  <th class="hidden xl:table-cell px-3 py-2.5 text-left font-semibold text-slate-500 uppercase tracking-wide">Middleware</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                <tr v-for="r in pagedRoutes" :key="r.name + r.uri" class="hover:bg-slate-50">
-                  <td class="px-3 py-2">
-                    <div class="flex flex-wrap gap-1">
-                      <span v-for="m in r.methods" :key="m"
-                        class="inline-flex px-1.5 py-0.5 rounded font-bold text-[10px]"
-                        :class="httpMethodBadgeClass(m)">{{ m }}</span>
-                    </div>
-                  </td>
-                  <td class="px-3 py-2 font-mono text-slate-700 max-w-[200px] truncate">{{ r.uri }}</td>
-                  <td class="hidden md:table-cell px-3 py-2 text-slate-500 max-w-[160px] truncate">{{ r.name }}</td>
-                  <td class="hidden lg:table-cell px-3 py-2 text-slate-500 max-w-[200px] truncate font-mono">{{ r.controller }}</td>
-                  <td class="hidden xl:table-cell px-3 py-2">
-                    <div class="flex flex-wrap gap-0.5">
-                      <span v-for="mw in r.middleware.slice(0, 3)" :key="mw"
-                        class="bg-slate-100 text-slate-500 px-1 py-0.5 rounded text-[10px] font-mono">{{ mw }}</span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <AppTable :is-empty="!pagedRoutes.length" :skeleton-cols="5">
+            <template #head>
+              <tr>
+                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Method</th>
+                <th class="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">URI</th>
+                <th class="hidden md:table-cell px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+                <th class="hidden lg:table-cell px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Controller</th>
+                <th class="hidden xl:table-cell px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Middleware</th>
+              </tr>
+            </template>
 
-          <!-- Pagination -->
-          <div class="flex items-center justify-between text-xs text-slate-500">
-            <span>Page {{ routePage }} of {{ routeTotalPages }}</span>
-            <div class="flex gap-2">
-              <button @click="routePage--" :disabled="routePage === 1"
-                class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Prev</button>
-              <button @click="routePage++" :disabled="routePage === routeTotalPages"
-                class="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">Next</button>
-            </div>
-          </div>
+            <tr v-for="r in pagedRoutes" :key="r.name + r.uri" class="hover:bg-slate-50">
+              <td class="px-3 py-2 text-xs">
+                <div class="flex flex-wrap gap-1">
+                  <AppBadge v-for="m in r.methods" :key="m" :color="methodBadgeColor(m)">{{ m }}</AppBadge>
+                </div>
+              </td>
+              <td class="px-3 py-2 text-xs font-mono text-slate-700 max-w-[200px] truncate">{{ r.uri }}</td>
+              <td class="hidden md:table-cell px-3 py-2 text-xs text-slate-500 max-w-[160px] truncate">{{ r.name }}</td>
+              <td class="hidden lg:table-cell px-3 py-2 text-xs text-slate-500 max-w-[200px] truncate font-mono">{{ r.controller }}</td>
+              <td class="hidden xl:table-cell px-3 py-2">
+                <div class="flex flex-wrap gap-0.5">
+                  <span v-for="mw in r.middleware.slice(0, 3)" :key="mw"
+                    class="bg-slate-100 text-slate-500 px-1 py-0.5 rounded text-[10px] font-mono">{{ mw }}</span>
+                </div>
+              </td>
+            </tr>
+
+            <template #empty>
+              <EmptyState title="No routes match your filters" />
+            </template>
+
+            <template #footer>
+              <PaginationControl
+                :current-page="routePage"
+                :total-pages="routeTotalPages"
+                :total="filteredRoutes.length"
+                @prev="routePage--"
+                @next="routePage++"
+                @page="routePage = $event"
+              />
+            </template>
+          </AppTable>
         </section>
 
         <!-- ══ 4. DATABASE SCHEMA ═══════════════════════════════════════════ -->
@@ -698,8 +704,7 @@ function fmtType(t) {
           </div>
 
           <div class="space-y-2">
-            <div v-for="table in filteredTables" :key="table.name"
-              class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            <AppCard v-for="table in filteredTables" :key="table.name" :padded="false">
               <button @click="toggleTable(table.name)"
                 class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors">
                 <div class="flex items-center gap-3">
@@ -711,36 +716,34 @@ function fmtType(t) {
                   class="h-4 w-4 text-slate-400 shrink-0" />
               </button>
 
-              <div v-if="expandedTable === table.name" class="border-t border-slate-100 overflow-x-auto">
-                <table class="w-full text-xs">
-                  <thead class="bg-slate-50">
+              <div v-if="expandedTable === table.name" class="border-t border-slate-100">
+                <AppTable :card="false" :is-empty="!table.columns.length">
+                  <template #head>
                     <tr>
-                      <th class="px-3 py-2 text-left font-semibold text-slate-500">Column</th>
-                      <th class="px-3 py-2 text-left font-semibold text-slate-500">Type</th>
-                      <th class="px-3 py-2 text-left font-semibold text-slate-500">Null</th>
-                      <th class="px-3 py-2 text-left font-semibold text-slate-500">Key</th>
-                      <th class="px-3 py-2 text-left font-semibold text-slate-500">FK</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500">Column</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500">Type</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500">Null</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500">Key</th>
+                      <th class="px-3 py-2 text-left text-xs font-semibold text-slate-500">FK</th>
                     </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    <tr v-for="col in table.columns" :key="col.name"
-                      class="hover:bg-slate-50"
-                      :class="{ 'bg-yellow-50/50': col.key === 'PRI' }">
-                      <td class="px-3 py-1.5 font-mono font-medium text-slate-800">{{ col.name }}</td>
-                      <td class="px-3 py-1.5 font-mono text-indigo-700">{{ fmtType(col.type) }}</td>
-                      <td class="px-3 py-1.5 text-slate-400">{{ col.nullable ? 'YES' : '—' }}</td>
-                      <td class="px-3 py-1.5">
-                        <span v-if="col.key" class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold"
-                          :class="keyBadge(col.key)">{{ col.key }}</span>
-                      </td>
-                      <td class="px-3 py-1.5 font-mono text-xs text-blue-600">
-                        <span v-if="col.fk_table">{{ col.fk_table }}.{{ col.fk_column }}</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  </template>
+
+                  <tr v-for="col in table.columns" :key="col.name"
+                    class="hover:bg-slate-50"
+                    :class="{ 'bg-warning-50/50': col.key === 'PRI' }">
+                    <td class="px-3 py-1.5 text-xs font-mono font-medium text-slate-800">{{ col.name }}</td>
+                    <td class="px-3 py-1.5 text-xs font-mono text-indigo-700">{{ fmtType(col.type) }}</td>
+                    <td class="px-3 py-1.5 text-xs text-slate-400">{{ col.nullable ? 'YES' : '—' }}</td>
+                    <td class="px-3 py-1.5">
+                      <AppBadge v-if="col.key" :color="keyBadge(col.key)">{{ col.key }}</AppBadge>
+                    </td>
+                    <td class="px-3 py-1.5 font-mono text-xs text-blue-600">
+                      <span v-if="col.fk_table">{{ col.fk_table }}.{{ col.fk_column }}</span>
+                    </td>
+                  </tr>
+                </AppTable>
               </div>
-            </div>
+            </AppCard>
           </div>
         </section>
 
@@ -755,14 +758,13 @@ function fmtType(t) {
               class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
-          <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+          <AppCard>
             <p class="text-xs text-slate-500 mb-3">Usage in code: <code class="bg-slate-100 px-1.5 py-0.5 rounded">$user->hasPermission('module.sub.action')</code> · Middleware: <code class="bg-slate-100 px-1.5 py-0.5 rounded">permission:a|b</code> (ANY) · <code class="bg-slate-100 px-1.5 py-0.5 rounded">permission:a,b</code> (ALL)</p>
             <p class="text-xs text-slate-500">SuperAdmin (<code class="bg-slate-100 px-1.5 py-0.5 rounded">Administrator</code> role) bypasses all permission checks.</p>
-          </div>
+          </AppCard>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="group in filteredPerms" :key="group.group"
-              class="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+            <AppCard v-for="group in filteredPerms" :key="group.group">
               <p class="font-semibold text-slate-700 mb-2 capitalize flex items-center gap-2">
                 <KeyIcon class="h-3.5 w-3.5 text-amber-500" />
                 {{ group.group }}
@@ -772,7 +774,7 @@ function fmtType(t) {
                 <span v-for="p in group.permissions" :key="p"
                   class="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-mono">{{ p }}</span>
               </div>
-            </div>
+            </AppCard>
           </div>
         </section>
 
@@ -780,8 +782,7 @@ function fmtType(t) {
         <section v-if="activeSection === 'conventions'" class="space-y-5">
           <h1 class="text-2xl font-bold text-slate-800">Code Conventions</h1>
 
-          <div v-for="block in conventions" :key="block.title"
-            class="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <AppCard v-for="block in conventions" :key="block.title">
             <h2 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <CodeBracketIcon class="h-4 w-4 text-indigo-500" />
               {{ block.title }}
@@ -793,7 +794,7 @@ function fmtType(t) {
                 <span>{{ item }}</span>
               </li>
             </ul>
-          </div>
+          </AppCard>
         </section>
 
         <!-- ══ 7. INFRASTRUCTURE ════════════════════════════════════════════ -->
@@ -801,8 +802,7 @@ function fmtType(t) {
           <h1 class="text-2xl font-bold text-slate-800">Infrastructure & Deployment</h1>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div v-for="block in infraBlocks" :key="block.title"
-              class="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+            <AppCard v-for="block in infraBlocks" :key="block.title">
               <h2 class="font-semibold text-slate-700 mb-3 flex items-center gap-2">
                 <component :is="block.icon" class="h-4 w-4 shrink-0" :class="block.colorCls" />
                 {{ block.title }}
@@ -813,7 +813,7 @@ function fmtType(t) {
                   <span class="text-slate-300 shrink-0">·</span>{{ item }}
                 </li>
               </ul>
-            </div>
+            </AppCard>
           </div>
         </section>
 
@@ -822,14 +822,10 @@ function fmtType(t) {
           <h1 class="text-2xl font-bold text-slate-800">Changelog</h1>
           <p class="text-slate-500 text-sm">Release history for Atlas</p>
 
-          <div v-for="release in changelog" :key="release.version"
-            class="bg-white border border-slate-200 rounded-xl shadow-sm p-5">
+          <AppCard v-for="release in changelog" :key="release.version">
             <div class="flex items-center gap-3 mb-3">
               <span class="font-mono font-bold text-slate-800 text-base">v{{ release.version }}</span>
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="changelogTypeBadgeClass(release.type)">
-                {{ release.type }}
-              </span>
+              <AppBadge :color="changelogBadgeColor(release.type)">{{ release.type }}</AppBadge>
               <span class="text-sm text-slate-400">{{ release.date }}</span>
             </div>
             <ul class="space-y-1.5">
@@ -838,7 +834,7 @@ function fmtType(t) {
                 <span class="text-indigo-400 shrink-0">·</span>{{ item }}
               </li>
             </ul>
-          </div>
+          </AppCard>
         </section>
 
       </main>

@@ -178,7 +178,7 @@ function err(field) {
 
         <!-- N/A notice (shown on all steps except grade and review) -->
         <div v-if="step > 0 && step < 5"
-             class="mb-5 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-xs text-amber-800">
+             class="mb-5 rounded-lg bg-warning-50 border border-warning-100 px-4 py-2 text-xs text-warning-700">
           <strong>All fields are required.</strong> Enter <strong>N/A</strong> for any field that does not apply to you.
         </div>
 
@@ -390,7 +390,7 @@ function err(field) {
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Contact</p>
               <p>{{ form.email || '—' }} · {{ form.contact_no || '—' }}</p>
             </div>
-            <div class="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <div class="rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-xs text-warning-700">
               By submitting, I certify that all information provided is true and correct.
               I understand that providing false information may result in disqualification.
             </div>

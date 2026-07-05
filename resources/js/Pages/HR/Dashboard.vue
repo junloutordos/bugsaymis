@@ -1,5 +1,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
 import { Head, router, Link } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import {
@@ -198,10 +200,7 @@ const rewardsByTypeData = computed(() => ({
   <Head title="HR Dashboard" />
   <AdminLayout title="HR Dashboard">
     <div class="space-y-8">
-      <div>
-        <h1 class="text-xl font-bold text-slate-800">HR Dashboard</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Comprehensive overview across HR, Recruitment, Performance Management, Learning &amp; Development, SALN, and Rewards &amp; Recognition</p>
-      </div>
+      <AppPageHeader title="HR Dashboard" subtitle="Comprehensive overview across HR, Recruitment, Performance Management, Learning & Development, SALN, and Rewards & Recognition" />
 
       <!-- ── 1. HR Core ─────────────────────────────────────────────────────── -->
       <section v-if="hr" class="space-y-4">
@@ -221,18 +220,15 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-4">Employee Category Breakdown</h3>
+          <AppCard title="Employee Category Breakdown">
             <div style="height:220px;"><Doughnut :data="hrCategoryData" :options="doughnutOptions" /></div>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 lg:col-span-2">
-            <h3 class="text-sm font-semibold text-slate-700 mb-4">Attendance Trend (last 6 months)</h3>
+          </AppCard>
+          <AppCard title="Attendance Trend (last 6 months)" class="lg:col-span-2">
             <div style="height:220px;"><Line :data="hrAttendanceTrendData" :options="lineOptions" /></div>
-          </div>
+          </AppCard>
         </div>
 
-        <div v-if="hr.leaveTypeBreakdown?.length" class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 class="text-sm font-semibold text-slate-700 mb-3">Leave Type Breakdown (this year)</h3>
+        <AppCard v-if="hr.leaveTypeBreakdown?.length" title="Leave Type Breakdown (this year)">
           <table class="w-full text-sm">
             <thead><tr class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"><th class="py-1">Leave Type</th><th class="py-1 text-right">Applications</th><th class="py-1 text-right">Days</th></tr></thead>
             <tbody class="divide-y divide-slate-100">
@@ -243,12 +239,12 @@ const rewardsByTypeData = computed(() => ({
               </tr>
             </tbody>
           </table>
-        </div>
+        </AppCard>
 
         <!-- Today at a Glance -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <!-- On Leave Today -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <AppCard>
             <div class="flex items-center gap-2 mb-3">
               <CalendarDaysIcon class="h-4 w-4 text-amber-500" />
               <h3 class="text-sm font-semibold text-slate-700">On Leave Today</h3>
@@ -267,10 +263,10 @@ const rewardsByTypeData = computed(() => ({
               </div>
             </div>
             <p v-else class="text-sm text-slate-400">No approved leaves for today.</p>
-          </div>
+          </AppCard>
 
           <!-- On Gate Pass Today -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <AppCard>
             <div class="flex items-center gap-2 mb-3">
               <ArrowRightEndOnRectangleIcon class="h-4 w-4 text-sky-500" />
               <h3 class="text-sm font-semibold text-slate-700">On Gate Pass Today</h3>
@@ -288,7 +284,7 @@ const rewardsByTypeData = computed(() => ({
               </div>
             </div>
             <p v-else class="text-sm text-slate-400">No approved gate passes for today.</p>
-          </div>
+          </AppCard>
         </div>
       </section>
 
@@ -313,12 +309,10 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 lg:col-span-2">
-            <h3 class="text-sm font-semibold text-slate-700 mb-4">Monthly Pipeline</h3>
+          <AppCard title="Monthly Pipeline" class="lg:col-span-2">
             <div style="height:220px;"><Line :data="recruitmentPipelineData" :options="lineOptions" /></div>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Applications Stuck &gt;14 Days</h3>
+          </AppCard>
+          <AppCard title="Applications Stuck >14 Days">
             <table v-if="recruitment.stuckApplications?.length" class="w-full text-sm">
               <tbody class="divide-y divide-slate-100">
                 <tr v-for="row in recruitment.stuckApplications" :key="row.stage">
@@ -328,7 +322,7 @@ const rewardsByTypeData = computed(() => ({
               </tbody>
             </table>
             <p v-else class="text-sm text-slate-400">No applications stuck in a stage right now.</p>
-          </div>
+          </AppCard>
         </div>
       </section>
 
@@ -352,16 +346,13 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-4">Status Funnel</h3>
+          <AppCard title="Status Funnel">
             <div style="height:240px;"><Bar :data="pmsFunnelData" :options="hBarOptions" /></div>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-4">Rating Distribution</h3>
+          </AppCard>
+          <AppCard title="Rating Distribution">
             <div style="height:240px;"><Doughnut :data="pmsRatingData" :options="doughnutOptions" /></div>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Completion Rate by Division</h3>
+          </AppCard>
+          <AppCard title="Completion Rate by Division">
             <table class="w-full text-sm">
               <tbody class="divide-y divide-slate-100">
                 <tr v-for="row in pms.completionByDivision" :key="row.division">
@@ -371,7 +362,7 @@ const rewardsByTypeData = computed(() => ({
                 </tr>
               </tbody>
             </table>
-          </div>
+          </AppCard>
         </div>
       </section>
 
@@ -392,10 +383,9 @@ const rewardsByTypeData = computed(() => ({
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 class="text-sm font-semibold text-slate-700 mb-4">Sessions per Month</h3>
+        <AppCard title="Sessions per Month">
           <div style="height:220px;"><Bar :data="lndSessionsData" :options="vBarOptions" /></div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ── 5. SALN ─────────────────────────────────────────────────────────── -->
@@ -418,10 +408,9 @@ const rewardsByTypeData = computed(() => ({
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 max-w-md">
-          <h3 class="text-sm font-semibold text-slate-700 mb-4">Filing Status Breakdown</h3>
+        <AppCard title="Filing Status Breakdown" class="max-w-md">
           <div style="height:220px;"><Doughnut :data="salnStatusData" :options="doughnutOptions" /></div>
-        </div>
+        </AppCard>
       </section>
 
       <!-- ── 6. Rewards & Recognition ───────────────────────────────────────── -->
@@ -445,12 +434,10 @@ const rewardsByTypeData = computed(() => ({
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-4">Nominations by Award Type</h3>
+          <AppCard title="Nominations by Award Type">
             <div style="height:220px;"><Bar :data="rewardsByTypeData" :options="vBarOptions" /></div>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Awards by Incentive Type</h3>
+          </AppCard>
+          <AppCard title="Awards by Incentive Type">
             <table v-if="rewards.awardsByIncentive?.length" class="w-full text-sm">
               <thead><tr class="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"><th class="py-1">Type</th><th class="py-1 text-right">Count</th><th class="py-1 text-right">Total Value</th></tr></thead>
               <tbody class="divide-y divide-slate-100">
@@ -462,7 +449,7 @@ const rewardsByTypeData = computed(() => ({
               </tbody>
             </table>
             <p v-else class="text-sm text-slate-400">No awards recorded for this year.</p>
-          </div>
+          </AppCard>
         </div>
       </section>
 

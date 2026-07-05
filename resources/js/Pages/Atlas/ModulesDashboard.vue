@@ -2,8 +2,10 @@
 import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
 import AppCard from '@/Components/AppCard.vue'
 import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
 import AppModal from '@/Components/AppModal.vue'
 import {
   ArrowPathIcon,
@@ -329,27 +331,17 @@ async function saveSettings() {
     <Head title="Atlas Module Monitor" />
 
     <!-- ── Page Header ───────────────────────────────────────────────────── -->
-    <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-slate-800">Atlas Module Monitor</h1>
-        <p class="mt-0.5 text-sm text-slate-500">
-          Atlas health, maturity, and ecosystem status of all software modules
-        </p>
-      </div>
-      <div class="flex items-center gap-3">
+    <AppPageHeader title="Atlas Module Monitor" subtitle="Atlas health, maturity, and ecosystem status of all software modules" class="mb-6">
+      <template #actions>
         <span v-if="cachedAtFormatted" class="text-xs text-slate-400">
           Updated: {{ cachedAtFormatted }}
         </span>
-        <button
-          @click="refreshHealth"
-          :disabled="refreshing"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
-        >
+        <AppButton :loading="refreshing" :disabled="refreshing" @click="refreshHealth">
           <ArrowPathIcon :class="['h-4 w-4', refreshing && 'animate-spin']" />
           {{ refreshing ? 'Refreshing…' : 'Refresh Health' }}
-        </button>
-      </div>
-    </div>
+        </AppButton>
+      </template>
+    </AppPageHeader>
 
     <!-- ── System Summary Bar ────────────────────────────────────────────── -->
     <AppCard :padded="true" class="mb-6">
@@ -510,7 +502,7 @@ async function saveSettings() {
         <!-- Failed jobs warning -->
         <div
           v-if="mod.failed_jobs_count > 0"
-          class="mb-3 flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600"
+          class="mb-3 flex items-center gap-1.5 rounded-md bg-danger-50 px-2.5 py-1.5 text-xs text-danger-600"
         >
           <ExclamationTriangleIcon class="h-3.5 w-3.5 shrink-0" />
           {{ mod.failed_jobs_count }} failed job{{ mod.failed_jobs_count !== 1 ? 's' : '' }}
@@ -587,7 +579,7 @@ async function saveSettings() {
         </div>
 
         <!-- Metrics load error -->
-        <div v-else-if="!metricData" class="rounded-lg bg-red-50 p-4 text-sm text-red-600">
+        <div v-else-if="!metricData" class="rounded-lg bg-danger-50 p-4 text-sm text-danger-600">
           Failed to load module metrics. Try closing and reopening the module detail.
         </div>
 
@@ -642,8 +634,8 @@ async function saveSettings() {
             </div>
 
             <!-- Module notes -->
-            <div v-if="selectedModule.notes" class="mt-4 rounded-lg bg-amber-50 p-3">
-              <p class="text-xs leading-relaxed text-amber-700">
+            <div v-if="selectedModule.notes" class="mt-4 rounded-lg bg-warning-50 p-3">
+              <p class="text-xs leading-relaxed text-warning-700">
                 <span class="font-semibold">Note: </span>{{ selectedModule.notes }}
               </p>
             </div>
@@ -712,7 +704,7 @@ async function saveSettings() {
                 <p class="mb-1 text-xs font-medium text-slate-500">Pending Approvals</p>
                 <p
                   class="text-2xl font-bold"
-                  :class="metricData.metrics.operational.pending_approvals.value > 0 ? 'text-amber-600' : 'text-slate-800'"
+                  :class="metricData.metrics.operational.pending_approvals.value > 0 ? 'text-warning-600' : 'text-slate-800'"
                 >{{ formatNumber(metricData.metrics.operational.pending_approvals.value) }}</p>
                 <!-- Per-type drill-through links -->
                 <div v-if="metricData.metrics.operational.pending_approvals.details?.length" class="mt-1 space-y-1">
@@ -739,7 +731,7 @@ async function saveSettings() {
                 <p class="mb-1 text-xs font-medium text-slate-500">Queue Backlog</p>
                 <p
                   class="text-2xl font-bold"
-                  :class="metricData.metrics.operational.queue_backlog.value > 0 ? 'text-amber-600' : 'text-slate-800'"
+                  :class="metricData.metrics.operational.queue_backlog.value > 0 ? 'text-warning-600' : 'text-slate-800'"
                 >{{ formatNumber(metricData.metrics.operational.queue_backlog.value) }}</p>
                 <p class="text-[10px] text-slate-400">jobs pending</p>
               </div>
@@ -754,7 +746,7 @@ async function saveSettings() {
                 <p class="mb-1 text-xs font-medium text-slate-500">Unread Notifications</p>
                 <p
                   class="text-2xl font-bold"
-                  :class="metricData.metrics.operational.notifications_unread.value > 0 ? 'text-amber-600' : 'text-slate-800'"
+                  :class="metricData.metrics.operational.notifications_unread.value > 0 ? 'text-warning-600' : 'text-slate-800'"
                 >{{ formatNumber(metricData.metrics.operational.notifications_unread.value) }}</p>
                 <p class="text-[10px] text-slate-400">system-wide</p>
               </div>
@@ -775,9 +767,9 @@ async function saveSettings() {
                   <span
                     class="text-lg font-bold"
                     :class="{
-                      'text-emerald-600': metricData.metrics.operational.sla_compliance.status === 'ok',
-                      'text-amber-600':   metricData.metrics.operational.sla_compliance.status === 'warn',
-                      'text-red-600':     metricData.metrics.operational.sla_compliance.status === 'error',
+                      'text-success-600': metricData.metrics.operational.sla_compliance.status === 'ok',
+                      'text-warning-600': metricData.metrics.operational.sla_compliance.status === 'warn',
+                      'text-danger-600':  metricData.metrics.operational.sla_compliance.status === 'error',
                       'text-slate-700':   !['ok','warn','error'].includes(metricData.metrics.operational.sla_compliance.status),
                     }"
                   >{{ metricData.metrics.operational.sla_compliance.value !== null ? metricData.metrics.operational.sla_compliance.value + '%' : '—' }}</span>
@@ -851,11 +843,9 @@ async function saveSettings() {
                 />
               </div>
               <div class="mt-3 flex justify-end">
-                <button
-                  @click="saveSettings"
-                  :disabled="savingSettings"
-                  class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-                >{{ savingSettings ? 'Saving…' : 'Save Settings' }}</button>
+                <AppButton :loading="savingSettings" :disabled="savingSettings" @click="saveSettings">
+                  {{ savingSettings ? 'Saving…' : 'Save Settings' }}
+                </AppButton>
               </div>
             </div>
           </div>
@@ -947,11 +937,9 @@ async function saveSettings() {
                         Last scored {{ dimensionScoredAt(dimKey) }}
                         <template v-if="dimensionScoredBy(dimKey)">by {{ dimensionScoredBy(dimKey) }}</template>
                       </p>
-                      <button
-                        @click="saveDimension(dimKey)"
-                        :disabled="savingDimension"
-                        class="ml-auto rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-                      >{{ savingDimension ? 'Saving…' : 'Save Score' }}</button>
+                      <AppButton size="sm" class="ml-auto" :loading="savingDimension" :disabled="savingDimension" @click="saveDimension(dimKey)">
+                        {{ savingDimension ? 'Saving…' : 'Save Score' }}
+                      </AppButton>
                     </div>
                   </div>
                 </div>
@@ -964,19 +952,10 @@ async function saveSettings() {
       </template>
 
       <template #footer>
-        <div class="flex items-center justify-end gap-3">
-          <button
-            @click="closeDetail"
-            class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >Close</button>
-          <a
-            v-if="safeRoute(selectedModule?.route_name)"
-            :href="safeRoute(selectedModule.route_name)"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Open Module <ArrowTopRightOnSquareIcon class="h-4 w-4" />
-          </a>
-        </div>
+        <AppButton variant="secondary" @click="closeDetail">Close</AppButton>
+        <AppButton v-if="safeRoute(selectedModule?.route_name)" as="a" :href="safeRoute(selectedModule.route_name)">
+          Open Module <ArrowTopRightOnSquareIcon class="h-4 w-4" />
+        </AppButton>
       </template>
     </AppModal>
   </AdminLayout>

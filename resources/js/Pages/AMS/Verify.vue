@@ -23,8 +23,8 @@ function formatDate(d) {
     <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
 
       <div class="flex justify-center mb-5">
-        <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-          <CheckBadgeIcon class="w-9 h-9 text-green-600" />
+        <div class="w-16 h-16 rounded-full bg-success-100 flex items-center justify-center">
+          <CheckBadgeIcon class="w-9 h-9 text-success-600" />
         </div>
       </div>
 

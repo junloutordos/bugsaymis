@@ -102,10 +102,10 @@ function toggleId(id) {
       <input type="file" accept=".pdf,.jpg,.jpeg,.png" @change="handleFile"
         class="w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
       <p class="text-xs text-slate-400 mt-1">PDF, JPG, PNG</p>
-      <div v-if="newFileName" class="flex items-center gap-2 text-xs text-emerald-600 mt-1.5">
+      <div v-if="newFileName" class="flex items-center gap-2 text-xs text-success-600 mt-1.5">
         <CheckCircleIcon class="h-4 w-4" /> {{ newFileName }} selected
       </div>
-      <p v-if="form.errors.file_base64" class="mt-1 text-xs text-red-500">{{ form.errors.file_base64 }}</p>
+      <p v-if="form.errors.file_base64" class="mt-1 text-xs text-danger-600">{{ form.errors.file_base64 }}</p>
     </div>
 
     <!-- Visibility / Recipients -->
@@ -129,8 +129,7 @@ function toggleId(id) {
 
       <!-- Office selection -->
       <div v-if="form.recipient_type === 'office'" class="space-y-2 mt-3">
-        <input v-model="officeSearch" type="text" placeholder="Search offices…"
-          class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <AppInput v-model="officeSearch" placeholder="Search offices…" />
         <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
           <label v-for="o in filteredOffices" :key="o.id" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
             <input type="checkbox" :checked="form.recipient_ids.includes(o.id)" @change="toggleId(o.id)" class="rounded border-slate-300 text-indigo-600" />
@@ -142,8 +141,7 @@ function toggleId(id) {
 
       <!-- Division selection -->
       <div v-if="form.recipient_type === 'division'" class="space-y-2 mt-3">
-        <input v-model="divisionSearch" type="text" placeholder="Search divisions…"
-          class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <AppInput v-model="divisionSearch" placeholder="Search divisions…" />
         <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
           <label v-for="d in filteredDivisions" :key="d.id" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
             <input type="checkbox" :checked="form.recipient_ids.includes(d.id)" @change="toggleId(d.id)" class="rounded border-slate-300 text-indigo-600" />
@@ -158,8 +156,7 @@ function toggleId(id) {
 
       <!-- Individual selection -->
       <div v-if="form.recipient_type === 'individual'" class="space-y-2 mt-3">
-        <input v-model="userSearch" type="text" placeholder="Search by name…"
-          class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <AppInput v-model="userSearch" placeholder="Search by name…" />
         <div class="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
           <label v-for="u in filteredUsers.slice(0, 50)" :key="u.id" class="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
             <input type="checkbox" :checked="form.recipient_ids.includes(u.id)" @change="toggleId(u.id)" class="rounded border-slate-300 text-indigo-600" />
@@ -169,7 +166,7 @@ function toggleId(id) {
         <p v-if="form.recipient_ids.length" class="text-xs text-indigo-600 font-medium">{{ form.recipient_ids.length }} person(s) selected</p>
       </div>
 
-      <p v-if="form.errors.recipient_ids" class="mt-1 text-xs text-red-500">{{ form.errors.recipient_ids }}</p>
+      <p v-if="form.errors.recipient_ids" class="mt-1 text-xs text-danger-600">{{ form.errors.recipient_ids }}</p>
     </div>
   </div>
 </template>

@@ -4,18 +4,14 @@
     <template #default>
       <div class="space-y-6">
 
-        <!-- Page header + sub-nav -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 class="text-xl font-semibold text-slate-800">Guidance Dashboard</h1>
-            <p class="text-sm text-slate-500">GAD-ready analytics with sex-disaggregated data</p>
-          </div>
-          <div class="flex items-center gap-2 text-sm flex-wrap">
-            <span class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium">Dashboard</span>
-            <Link href="/guidance/consultations" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Consultations</Link>
-            <Link href="/guidance/session-reports" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Session Reports</Link>
-            <Link href="/guidance/reports" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Reports</Link>
-          </div>
+        <AppPageHeader title="Guidance Dashboard" subtitle="GAD-ready analytics with sex-disaggregated data" />
+
+        <!-- sub-nav -->
+        <div class="flex items-center gap-2 text-sm flex-wrap">
+          <span class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-medium">Dashboard</span>
+          <Link href="/guidance/consultations" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Consultations</Link>
+          <Link href="/guidance/session-reports" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Session Reports</Link>
+          <Link href="/guidance/reports" class="px-3 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100 font-medium transition-colors">Reports</Link>
         </div>
 
         <!-- ── GAD Banner ──────────────────────────────────────────────────── -->
@@ -29,17 +25,17 @@
 
         <!-- ── Summary stat cards ──────────────────────────────────────────── -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div v-for="card in statCards" :key="card.label" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+          <AppCard v-for="card in statCards" :key="card.label">
             <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">{{ card.label }}</p>
             <p :class="`text-3xl font-bold mt-1 ${card.color}`">{{ card.value }}</p>
-          </div>
+          </AppCard>
         </div>
 
         <!-- ── Sex disaggregation highlight ───────────────────────────────── -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <!-- All time sex breakdown -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <AppCard>
             <h2 class="text-sm font-semibold text-slate-700 mb-1">Sex Disaggregation — All Time</h2>
             <p class="text-xs text-slate-400 mb-4">Total: {{ stats.total }} consultation(s)</p>
             <div class="space-y-3">
@@ -56,10 +52,10 @@
                 </div>
               </div>
             </div>
-          </div>
+          </AppCard>
 
           <!-- This month sex breakdown -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <AppCard>
             <h2 class="text-sm font-semibold text-slate-700 mb-1">Sex Disaggregation — This Month</h2>
             <p class="text-xs text-slate-400 mb-4">Total: {{ stats.thisMonth }} consultation(s)</p>
             <div class="space-y-3">
@@ -76,11 +72,11 @@
                 </div>
               </div>
             </div>
-          </div>
+          </AppCard>
         </div>
 
         <!-- ── Monthly trend (sex-disaggregated grouped bars) ──────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+        <AppCard>
           <h2 class="text-sm font-semibold text-slate-700 mb-1">Monthly Trend — Last 6 Months</h2>
           <div class="flex items-center gap-4 mb-4 text-xs">
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span>Male</span>
@@ -100,13 +96,10 @@
               <span class="text-[9px] text-slate-500 text-center leading-tight">{{ month.label }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
 
         <!-- ── Concern × Sex matrix ────────────────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div class="px-5 py-4 border-b border-slate-100">
-            <h2 class="text-sm font-semibold text-slate-700">Consultations by Concern (Sex-Disaggregated)</h2>
-          </div>
+        <AppCard :padded="false" title="Consultations by Concern (Sex-Disaggregated)">
           <div class="overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead class="bg-slate-50">
@@ -140,16 +133,13 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </AppCard>
 
         <!-- ── Status × Sex + Consultation Type × Sex ─────────────────────── -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           <!-- Status breakdown -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h2 class="text-sm font-semibold text-slate-700">Status Breakdown (Sex-Disaggregated)</h2>
-            </div>
+          <AppCard :padded="false" title="Status Breakdown (Sex-Disaggregated)">
             <table class="min-w-full text-xs">
               <thead class="bg-slate-50">
                 <tr>
@@ -176,13 +166,10 @@
                 </tr>
               </tbody>
             </table>
-          </div>
+          </AppCard>
 
           <!-- Consultation type breakdown -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h2 class="text-sm font-semibold text-slate-700">Consultation Type (Sex-Disaggregated)</h2>
-            </div>
+          <AppCard :padded="false" title="Consultation Type (Sex-Disaggregated)">
             <table class="min-w-full text-xs">
               <thead class="bg-slate-50">
                 <tr>
@@ -206,7 +193,7 @@
                 </tr>
               </tbody>
             </table>
-          </div>
+          </AppCard>
         </div>
 
         <!-- ── GAD Summary Table ────────────────────────────────────────────── -->
@@ -253,11 +240,11 @@
         </div>
 
         <!-- ── Today's appointments ────────────────────────────────────────── -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <AppCard :padded="false">
+          <template #header>
             <h2 class="text-sm font-semibold text-slate-700">Today's Scheduled Appointments</h2>
             <span class="text-xs bg-indigo-50 text-indigo-600 font-semibold px-2 py-0.5 rounded-full">{{ todayAppointments.length }}</span>
-          </div>
+          </template>
           <div v-if="todayAppointments.length" class="divide-y divide-slate-50">
             <div v-for="appt in todayAppointments" :key="appt.id" class="px-5 py-3 flex items-center justify-between gap-3">
               <div>
@@ -271,7 +258,7 @@
             </div>
           </div>
           <p v-else class="px-5 py-6 text-center text-sm text-slate-400">No appointments scheduled today.</p>
-        </div>
+        </AppCard>
 
       </div>
     </template>
@@ -282,6 +269,8 @@
 import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
 
 const props = defineProps({
   stats:             Object,
@@ -297,8 +286,8 @@ const props = defineProps({
 const statCards = computed(() => [
   { label: 'Total Consultations', value: props.stats.total,     color: 'text-slate-800' },
   { label: 'This Month',          value: props.stats.thisMonth, color: 'text-indigo-600' },
-  { label: 'Pending',             value: props.stats.pending,   color: 'text-amber-500'  },
-  { label: 'Scheduled',           value: props.stats.scheduled, color: 'text-emerald-600' },
+  { label: 'Pending',             value: props.stats.pending,   color: 'text-warning-500'  },
+  { label: 'Scheduled',           value: props.stats.scheduled, color: 'text-success-600' },
 ])
 
 const trendMax = computed(() =>

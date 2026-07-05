@@ -1,68 +1,90 @@
 <template>
   <Head title="Attendance Logs" />
   <AdminLayout title="Attendance Logs">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Attendance Logs</h1>
-      </div>
+    <div class="space-y-5">
 
-      <div v-if="(attendances.data || []).length === 0" class="py-16 text-center text-slate-400 text-sm">No attendance records.</div>
+      <AppPageHeader title="Attendance Logs" />
 
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="overflow-x-auto rounded-xl border border-slate-100">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Badge</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Break Out</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Break In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Out</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Tardiness</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Under Time</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Over Time In</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Over Time Out</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="a in rows" :key="a.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.BadgeNumber }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.AttDate }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime1 || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime2 || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime3 || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime4 || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.tardiness !== null ? a.tardiness : '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.undertime !== null ? a.undertime : '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.OTIn || a.OTin || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ a.OTout || a.OTOut || '—' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table -->
+      <AppTable :is-empty="!rows.length" :skeleton-cols="10">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Badge</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time In</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Break Out</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Break In</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Out</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Tardiness</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Under Time</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Over Time In</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Over Time Out</th>
+          </tr>
+        </template>
 
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ attendances.current_page }} of {{ attendances.last_page }}</span>
-          <div class="flex gap-2">
-            <button @click.prevent="prev" :disabled="!attendances.prev_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
-            <button @click.prevent="next" :disabled="!attendances.next_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
+        <tr v-for="a in rows" :key="a.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.BadgeNumber }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.AttDate }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime1 || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime2 || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime3 || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.StartTime4 || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.tardiness !== null ? a.tardiness : '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.undertime !== null ? a.undertime : '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.OTIn || a.OTin || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ a.OTout || a.OTOut || '—' }}</td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="a in rows" :key="a.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">Badge {{ a.BadgeNumber }}</p>
+                <p class="text-xs text-slate-400">{{ a.AttDate }}</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500">
+              <span>Time In: {{ a.StartTime1 || '—' }}</span>
+              <span>Time Out: {{ a.StartTime4 || '—' }}</span>
+              <span>Break Out: {{ a.StartTime2 || '—' }}</span>
+              <span>Break In: {{ a.StartTime3 || '—' }}</span>
+              <span>Tardiness: {{ a.tardiness !== null ? a.tardiness : '—' }}</span>
+              <span>Under Time: {{ a.undertime !== null ? a.undertime : '—' }}</span>
+              <span>OT In: {{ a.OTIn || a.OTin || '—' }}</span>
+              <span>OT Out: {{ a.OTout || a.OTOut || '—' }}</span>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No attendance records" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :links="attendances.links"
+            :current-page="attendances.current_page"
+            :total-pages="attendances.last_page"
+            :total="attendances.total"
+          />
+        </template>
+      </AppTable>
+
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { Head, usePage, router } from '@inertiajs/vue3'
+import { Head, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import { computed } from 'vue'
 
 const page = usePage()
-const attendances = computed(() => page.props.attendances || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null })
+const attendances = computed(() => page.props.attendances || { data: [], current_page: 1, last_page: 1, links: [], total: 0 })
 
 // helper to read possibly differently-cased keys and return numeric value
 function getNumericField(row, candidates) {
@@ -92,13 +114,4 @@ const rows = computed(() => {
     })
   })
 })
-
-function prev() {
-  const url = attendances.value.prev_page_url
-  if (url) window.location.href = url
-}
-function next() {
-  const url = attendances.value.next_page_url
-  if (url) window.location.href = url
-}
 </script>

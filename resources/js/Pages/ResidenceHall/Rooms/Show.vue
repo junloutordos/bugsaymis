@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppModal from '@/Components/AppModal.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import { ArrowLeftIcon, UserIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -46,8 +50,13 @@ function submitAssign() {
   })
 }
 
-function unassign(dormer) {
-  if (!confirm(`Remove ${dormer.name} from Bed ${dormer.bed_number}?`)) return
+async function unassign(dormer) {
+  const confirmed = await confirmAction({
+    title: 'Remove from bed?',
+    text: `Remove ${dormer.name} from Bed ${dormer.bed_number}?`,
+    confirmText: 'Remove',
+  })
+  if (!confirmed) return
   router.post(route('rh.rooms.unassign-bed', props.room.id), {
     rh_intern_id: dormer.id,
   }, { preserveScroll: true })
@@ -66,21 +75,14 @@ const occupiedCount = computed(() => props.dormers.filter(d => d.bed_number).len
 
       <!-- Header -->
       <div class="flex items-center gap-3">
-        <Link :href="route('rh.rooms.index')"
-              class="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">
+        <AppButton as="link" variant="secondary" size="sm" :href="route('rh.rooms.index')">
           <ArrowLeftIcon class="w-4 h-4" />
-        </Link>
+        </AppButton>
         <div class="flex-1">
           <div class="flex items-center gap-2 flex-wrap">
-            <h1 class="text-xl font-semibold text-slate-800">Room {{ room.room_number }}</h1>
-            <span :class="['text-xs px-2 py-0.5 rounded-full font-medium',
-              room.residence_hall === 'BRH' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700']">
-              {{ room.residence_hall }}
-            </span>
-            <span :class="['text-xs px-2 py-0.5 rounded-full font-medium',
-              room.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500']">
-              {{ room.status }}
-            </span>
+            <h1 class="font-heading text-xl font-semibold text-slate-800">Room {{ room.room_number }}</h1>
+            <AppBadge :color="room.residence_hall === 'BRH' ? 'indigo' : 'purple'">{{ room.residence_hall }}</AppBadge>
+            <AppBadge :color="room.status === 'active' ? 'green' : 'slate'">{{ room.status }}</AppBadge>
           </div>
           <p class="text-sm text-slate-500 mt-0.5">{{ hallLabel }}{{ room.floor ? ' · Floor ' + room.floor : '' }}</p>
         </div>
@@ -162,35 +164,26 @@ const occupiedCount = computed(() => props.dormers.filter(d => d.bed_number).len
     </div>
 
     <!-- Assign Modal -->
-    <div v-if="showAssign" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
-        <h3 class="text-base font-semibold text-slate-800 mb-1">Assign to Bed {{ assignBed }}</h3>
-        <p class="text-sm text-slate-500 mb-4">Room {{ room.room_number }} · {{ room.residence_hall }}</p>
-
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Select Dormer</label>
-          <select v-model="assignId"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="">— Select —</option>
-            <option v-for="d in unassignedList" :key="d.id" :value="d.id">{{ d.name }}</option>
-          </select>
-          <p v-if="!unassignedList.length" class="text-xs text-slate-400 mt-2">
-            No unassigned dormers in this hall. Assign via the Dormer Roster first.
-          </p>
-        </div>
-
-        <div class="flex gap-3 mt-5">
-          <button @click="showAssign = false"
-                  class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">
-            Cancel
-          </button>
-          <button @click="submitAssign" :disabled="!assignId"
-                  class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            Assign
-          </button>
-        </div>
+    <AppModal :show="showAssign" :title="`Assign to Bed ${assignBed}`" :subtitle="`Room ${room.room_number} · ${room.residence_hall}`" size="sm" @close="showAssign = false">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Select Dormer</label>
+        <select v-model="assignId"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">— Select —</option>
+          <option v-for="d in unassignedList" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+        <p v-if="!unassignedList.length" class="text-xs text-slate-400 mt-2">
+          No unassigned dormers in this hall. Assign via the Dormer Roster first.
+        </p>
       </div>
-    </div>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <AppButton block variant="secondary" @click="showAssign = false">Cancel</AppButton>
+          <AppButton block :disabled="!assignId" @click="submitAssign">Assign</AppButton>
+        </div>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
@@ -35,6 +39,12 @@ const overallLabel = (avg) => {
 }
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'
+
+const breadcrumb = computed(() => [
+  { label: 'Sessions', href: route('lnd.sessions.index') },
+  { label: fmt(props.participant.session?.session_date), href: route('lnd.sessions.show', props.participant.session_id) },
+  { label: 'Evaluation' },
+])
 
 // ── Level 1 form ──────────────────────────────────────────────────────────────
 const l1Form = ref({
@@ -169,26 +179,15 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
 </script>
 
 <template>
+  <Head :title="`Evaluation · ${participant.employee?.name}`" />
   <AdminLayout :title="`Evaluation — ${participant.employee?.name}`">
-    <Head :title="`Evaluation · ${participant.employee?.name}`" />
+    <div class="space-y-6">
 
-    <div class="p-6 space-y-6">
-
-      <!-- Back + Header -->
-      <div class="flex items-center gap-2 text-sm">
-        <a :href="route('lnd.sessions.show', participant.session_id)"
-          class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-          Back to Session
-        </a>
-        <span class="text-slate-300">/</span>
-        <span class="font-medium text-slate-700">Evaluation</span>
-      </div>
+      <AppPageHeader title="Evaluation" :breadcrumb="breadcrumb" />
 
       <!-- Participant info + overall score -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="md:col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h2 class="text-base font-semibold text-slate-800 mb-3">Participant</h2>
+        <AppCard class="md:col-span-2" title="Participant">
           <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <dt class="text-slate-500">Name</dt>
             <dd class="font-medium text-slate-800">{{ participant.employee?.name }}</dd>
@@ -198,17 +197,15 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
             <dd class="text-slate-700">{{ fmt(participant.session?.session_date) }}</dd>
             <dt class="text-slate-500">Attendance</dt>
             <dd>
-              <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize',
-                participant.attendance_status === 'attended' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600']">
+              <AppBadge :color="participant.attendance_status === 'attended' ? 'green' : 'slate'" class="capitalize">
                 {{ participant.attendance_status }}
-              </span>
+              </AppBadge>
             </dd>
           </dl>
-        </div>
+        </AppCard>
 
         <!-- Overall Score Card -->
-        <div class="bg-white rounded-xl border shadow-sm p-5 flex flex-col items-center justify-center text-center"
-          :class="computedOverall ? 'border-indigo-200' : 'border-slate-100'">
+        <AppCard class="flex flex-col items-center justify-center text-center" :class="computedOverall ? 'border-indigo-200' : ''">
           <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Overall Average</div>
           <div :class="['text-5xl font-bold', overallColor(computedOverall)]">
             {{ computedOverall ?? '—' }}
@@ -225,12 +222,12 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
               </div>
             </div>
           </div>
-        </div>
+        </AppCard>
       </div>
 
       <!-- Level 1: Reaction -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="flex items-center gap-3 border-b border-slate-100 bg-purple-50 px-5 py-4">
+      <AppCard :padded="false">
+        <div class="flex items-center gap-3 border-b border-slate-100 bg-purple-50 px-5 py-4 rounded-t-xl">
           <span class="flex h-8 w-8 items-center justify-center rounded-full bg-purple-600 text-xs font-bold text-white">1</span>
           <div>
             <h3 class="font-semibold text-slate-800">Level 1 — Reaction</h3>
@@ -249,7 +246,7 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
               { label: 'Facilitation Quality', field: 'facilitation_score' },
               { label: 'Logistics & Venue', field: 'logistics_score' },
             ]" :key="field">
-              <label class="block text-xs font-medium text-slate-600 mb-2">{{ label }} <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-2">{{ label }} <span class="text-danger-600">*</span></label>
               <div class="flex gap-2">
                 <button v-for="n in 5" :key="n"
                   type="button"
@@ -271,20 +268,17 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Feedback / Comments</label>
             <textarea v-model="l1Form.reaction_feedback" rows="3"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
           </div>
           <div class="flex justify-end">
-            <button @click="saveL1" :disabled="l1Saving"
-              class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ l1Saving ? 'Saving…' : 'Save Level 1' }}
-            </button>
+            <AppButton :loading="l1Saving" @click="saveL1">Save Level 1</AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Level 2: Learning -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="flex items-center gap-3 border-b border-slate-100 bg-blue-50 px-5 py-4">
+      <AppCard :padded="false">
+        <div class="flex items-center gap-3 border-b border-slate-100 bg-blue-50 px-5 py-4 rounded-t-xl">
           <span class="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
           <div>
             <h3 class="font-semibold text-slate-800">Level 2 — Learning</h3>
@@ -297,7 +291,7 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
         </div>
         <div class="p-5 space-y-4">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-2">Learning Score <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-2">Learning Score <span class="text-danger-600">*</span></label>
             <div class="flex gap-2 max-w-sm">
               <button v-for="n in 5" :key="n"
                 type="button"
@@ -318,20 +312,17 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Feedback / Comments</label>
             <textarea v-model="l2Form.learning_feedback" rows="3"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
           </div>
           <div class="flex justify-end">
-            <button @click="saveL2" :disabled="l2Saving"
-              class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ l2Saving ? 'Saving…' : 'Save Level 2' }}
-            </button>
+            <AppButton :loading="l2Saving" @click="saveL2">Save Level 2</AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Level 3: Behavior -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="flex items-center gap-3 border-b border-slate-100 bg-amber-50 px-5 py-4">
+      <AppCard :padded="false">
+        <div class="flex items-center gap-3 border-b border-slate-100 bg-amber-50 px-5 py-4 rounded-t-xl">
           <span class="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">3</span>
           <div>
             <h3 class="font-semibold text-slate-800">Level 3 — Behavior</h3>
@@ -345,7 +336,7 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
         <div class="p-5 space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-2">Behavior Score <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Behavior Score <span class="text-danger-600">*</span></label>
               <div class="flex gap-2">
                 <button v-for="n in 5" :key="n"
                   type="button"
@@ -364,9 +355,9 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
               </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Assessment Date <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Assessment Date <span class="text-danger-600">*</span></label>
               <input v-model="l3Form.behavior_assessed_date" type="date"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <div v-if="evaluation.behavior_assessed_by" class="mt-1 text-xs text-slate-400">
                 Assessed by: {{ evaluation.behavior_assessor?.name }}
               </div>
@@ -375,20 +366,17 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Feedback / Comments</label>
             <textarea v-model="l3Form.behavior_feedback" rows="3"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
           </div>
           <div class="flex justify-end">
-            <button @click="saveL3" :disabled="l3Saving"
-              class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ l3Saving ? 'Saving…' : 'Save Level 3' }}
-            </button>
+            <AppButton :loading="l3Saving" @click="saveL3">Save Level 3</AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Level 4: Results -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="flex items-center gap-3 border-b border-slate-100 bg-emerald-50 px-5 py-4">
+      <AppCard :padded="false">
+        <div class="flex items-center gap-3 border-b border-slate-100 bg-emerald-50 px-5 py-4 rounded-t-xl">
           <span class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">4</span>
           <div>
             <h3 class="font-semibold text-slate-800">Level 4 — Results</h3>
@@ -402,7 +390,7 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
         <div class="p-5 space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-2">Results Score <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-2">Results Score <span class="text-danger-600">*</span></label>
               <div class="flex gap-2">
                 <button v-for="n in 5" :key="n"
                   type="button"
@@ -421,9 +409,9 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
               </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Assessment Date <span class="text-red-500">*</span></label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Assessment Date <span class="text-danger-600">*</span></label>
               <input v-model="l4Form.results_assessed_date" type="date"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <div v-if="evaluation.results_assessed_by" class="mt-1 text-xs text-slate-400">
                 Assessed by: {{ evaluation.results_assessor?.name }}
               </div>
@@ -432,41 +420,32 @@ const setScore = (formObj, field, val) => { formObj[field] = val }
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Feedback / Comments</label>
             <textarea v-model="l4Form.results_feedback" rows="3"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
           </div>
           <div class="flex justify-end">
-            <button @click="saveL4" :disabled="l4Saving"
-              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ l4Saving ? 'Saving…' : 'Save Level 4' }}
-            </button>
+            <AppButton :loading="l4Saving" @click="saveL4">Save Level 4</AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- General Feedback -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100 bg-slate-50">
-          <h3 class="font-semibold text-slate-800">General Feedback & Recommendations</h3>
-        </div>
-        <div class="p-5 space-y-4">
+      <AppCard title="General Feedback & Recommendations">
+        <div class="space-y-4">
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Overall Feedback</label>
             <textarea v-model="fbForm.feedback" rows="3"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
           </div>
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Recommendations</label>
             <textarea v-model="fbForm.recommendations" rows="3"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 resize-none" />
+              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
           </div>
           <div class="flex justify-end">
-            <button @click="saveFeedback" :disabled="fbSaving"
-              class="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-              {{ fbSaving ? 'Saving…' : 'Save Feedback' }}
-            </button>
+            <AppButton :loading="fbSaving" @click="saveFeedback">Save Feedback</AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
     </div>
   </AdminLayout>

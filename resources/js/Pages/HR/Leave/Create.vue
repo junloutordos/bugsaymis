@@ -3,11 +3,7 @@
   <AdminLayout title="File Leave Application">
     <div class="max-w-2xl mx-auto space-y-5">
 
-      <!-- Header -->
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">File Leave Application</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Submit a new leave request for approval.</p>
-      </div>
+      <AppPageHeader title="File Leave Application" subtitle="Submit a new leave request for approval." />
 
       <!-- Credits summary -->
       <div v-if="credits.length" class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
@@ -15,7 +11,7 @@
         <div class="flex flex-wrap gap-3">
           <div v-for="c in credits" :key="c.id" class="text-xs">
             <span class="font-medium text-slate-700">{{ c.leave_type?.name }}:</span>
-            <span class="ml-1 font-bold" :class="Number(c.balance ?? c.earned) > 0 ? 'text-emerald-600' : 'text-red-500'">
+            <span class="ml-1 font-bold" :class="Number(c.balance ?? c.earned) > 0 ? 'text-success-600' : 'text-danger-500'">
               {{ c.balance ?? (Number(c.earned) - Number(c.used ?? 0)) }} days
             </span>
           </div>
@@ -23,176 +19,164 @@
       </div>
 
       <!-- Form -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
+      <AppCard>
+        <div class="space-y-5">
 
-        <!-- 6.A Leave Type -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
-            6.A Type of Leave to be Availed of <span class="text-red-500">*</span>
-          </label>
-          <p v-if="form.errors.leave_type_id" class="text-red-500 text-xs mb-2">{{ form.errors.leave_type_id }}</p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
-            <label
-              v-for="lt in officialLeaveTypes"
-              :key="lt.code"
-              class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
-              :class="{ 'opacity-40 cursor-not-allowed': !typeByCode[lt.code] }"
-            >
-              <input
-                type="radio"
-                :value="lt.code"
-                v-model="selectedCode"
-                :disabled="!typeByCode[lt.code]"
-                @change="selectLeaveType(lt.code)"
-                class="accent-indigo-600"
-              />
-              {{ lt.label }}
+          <!-- 6.A Leave Type -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+              6.A Type of Leave to be Availed of <span class="text-red-500">*</span>
             </label>
+            <p v-if="form.errors.leave_type_id" class="text-red-500 text-xs mb-2">{{ form.errors.leave_type_id }}</p>
 
-            <!-- Other purpose row -->
-            <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input
-                type="radio"
-                value="__other__"
-                v-model="selectedCode"
-                @change="onSelectOtherPurpose"
-                class="accent-indigo-600"
-              />
-              <span>Other purpose:</span>
-            </label>
-          </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+              <label
+                v-for="lt in officialLeaveTypes"
+                :key="lt.code"
+                class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                :class="{ 'opacity-40 cursor-not-allowed': !typeByCode[lt.code] }"
+              >
+                <input
+                  type="radio"
+                  :value="lt.code"
+                  v-model="selectedCode"
+                  :disabled="!typeByCode[lt.code]"
+                  @change="selectLeaveType(lt.code)"
+                  class="accent-indigo-600"
+                />
+                {{ lt.label }}
+              </label>
 
-          <!-- Other purpose sub-options -->
-          <div v-if="selectedCode === '__other__'" class="mt-2 ml-6 space-y-1.5 border-l-2 border-slate-100 pl-4">
-            <label
-              v-for="opt in otherPurposeOptions"
-              :key="opt.code"
-              class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
-              :class="{ 'opacity-40 cursor-not-allowed': !typeByCode[opt.code] }"
-            >
-              <input
-                type="radio"
-                :value="opt.code"
-                v-model="otherPurposeCode"
-                :disabled="!typeByCode[opt.code]"
-                @change="selectOtherPurpose(opt.code)"
-                class="accent-indigo-600"
-              />
-              {{ opt.label }}
-            </label>
-          </div>
-        </div>
+              <!-- Other purpose row -->
+              <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="radio"
+                  value="__other__"
+                  v-model="selectedCode"
+                  @change="onSelectOtherPurpose"
+                  class="accent-indigo-600"
+                />
+                <span>Other purpose:</span>
+              </label>
+            </div>
 
-        <!-- 6.B Leave Details (conditional) -->
-        <div v-if="showLeaveDetails">
-          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
-            6.B Details of Leave
-          </label>
-
-          <div v-if="leaveDetailOptions.length" class="space-y-1.5">
-            <label
-              v-for="opt in leaveDetailOptions"
-              :key="opt.value"
-              class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
-            >
-              <input
-                type="radio"
-                :value="opt.value"
-                v-model="form.leave_details"
-                class="accent-indigo-600"
-              />
-              {{ opt.label }}
-            </label>
-          </div>
-
-          <input
-            v-if="showSpecify"
-            v-model="form.leave_details_specify"
-            type="text"
-            placeholder="Please specify…"
-            class="mt-2 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-          />
-        </div>
-
-        <!-- Date Selection (multi-date, non-consecutive) -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
-            Leave Date(s) <span class="text-red-500">*</span>
-          </label>
-          <p class="text-xs text-slate-400 mb-2">You can add multiple non-consecutive dates.</p>
-          <p v-if="form.errors.dates" class="text-red-500 text-xs mb-2">{{ form.errors.dates }}</p>
-
-          <!-- Date adder -->
-          <div class="flex gap-2 items-center">
-            <input
-              v-model="dateInput"
-              type="date"
-              class="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              @keydown.enter.prevent="addDate"
-            />
-            <button
-              type="button"
-              @click="addDate"
-              class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors font-medium whitespace-nowrap"
-            >
-              Add Date
-            </button>
-          </div>
-
-          <!-- Selected dates chips -->
-          <div v-if="selectedDates.length" class="mt-3 flex flex-wrap gap-2">
-            <div
-              v-for="d in sortedDates"
-              :key="d"
-              class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium px-2.5 py-1 rounded-full"
-            >
-              <span>{{ formatDate(d) }}</span>
-              <button
-                type="button"
-                @click="removeDate(d)"
-                class="text-indigo-400 hover:text-indigo-700 leading-none"
-                title="Remove"
-              ><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4 shrink-0"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+            <!-- Other purpose sub-options -->
+            <div v-if="selectedCode === '__other__'" class="mt-2 ml-6 space-y-1.5 border-l-2 border-slate-100 pl-4">
+              <label
+                v-for="opt in otherPurposeOptions"
+                :key="opt.code"
+                class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+                :class="{ 'opacity-40 cursor-not-allowed': !typeByCode[opt.code] }"
+              >
+                <input
+                  type="radio"
+                  :value="opt.code"
+                  v-model="otherPurposeCode"
+                  :disabled="!typeByCode[opt.code]"
+                  @change="selectOtherPurpose(opt.code)"
+                  class="accent-indigo-600"
+                />
+                {{ opt.label }}
+              </label>
             </div>
           </div>
 
-          <!-- Working days preview -->
-          <div v-if="selectedDates.length" class="mt-2 bg-slate-50 rounded-lg px-4 py-2 text-sm text-slate-600">
-            Selected: <strong class="text-slate-800">{{ selectedDates.length }}</strong> date(s) &mdash;
-            Estimated working days: <strong class="text-slate-800">{{ computedDays }}</strong>
+          <!-- 6.B Leave Details (conditional) -->
+          <div v-if="showLeaveDetails">
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+              6.B Details of Leave
+            </label>
+
+            <div v-if="leaveDetailOptions.length" class="space-y-1.5">
+              <label
+                v-for="opt in leaveDetailOptions"
+                :key="opt.value"
+                class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer"
+              >
+                <input
+                  type="radio"
+                  :value="opt.value"
+                  v-model="form.leave_details"
+                  class="accent-indigo-600"
+                />
+                {{ opt.label }}
+              </label>
+            </div>
+
+            <AppInput
+              v-if="showSpecify"
+              v-model="form.leave_details_specify"
+              placeholder="Please specify…"
+              class="mt-2"
+            />
           </div>
-        </div>
 
-        <!-- Reason -->
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Reason / Remarks</label>
-          <textarea v-model="form.reason" rows="3" placeholder="Optional remarks…"
-                    class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"></textarea>
-        </div>
+          <!-- Date Selection (multi-date, non-consecutive) -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+              Leave Date(s) <span class="text-red-500">*</span>
+            </label>
+            <p class="text-xs text-slate-400 mb-2">You can add multiple non-consecutive dates.</p>
+            <p v-if="form.errors.dates" class="text-red-500 text-xs mb-2">{{ form.errors.dates }}</p>
 
-        <!-- Supporting Document -->
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Supporting Document <span class="font-normal text-slate-400">(PDF/JPG/PNG, max 5MB)</span></label>
-          <input @change="e => form.supporting_document = e.target.files[0]"
-                 type="file" accept=".pdf,.jpg,.jpeg,.png"
-                 class="w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-200 file:text-xs file:font-medium file:bg-slate-50 hover:file:bg-slate-100" />
-          <p v-if="form.errors.supporting_document" class="text-red-500 text-xs mt-1">{{ form.errors.supporting_document }}</p>
-        </div>
+            <!-- Date adder -->
+            <div class="flex gap-2 items-center">
+              <div class="flex-1">
+                <AppInput
+                  v-model="dateInput"
+                  type="date"
+                  @keydown.enter.prevent="addDate"
+                />
+              </div>
+              <AppButton type="button" @click="addDate">Add Date</AppButton>
+            </div>
 
-        <!-- Actions -->
-        <div class="flex gap-3 justify-end pt-2">
-          <Link :href="route('hr.leave.index')"
-                class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
-            Cancel
-          </Link>
-          <button @click="openPinModal" :disabled="form.processing"
-                  class="px-6 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
-            {{ form.processing ? 'Filing…' : 'File Application' }}
-          </button>
-        </div>
+            <!-- Selected dates chips -->
+            <div v-if="selectedDates.length" class="mt-3 flex flex-wrap gap-2">
+              <div
+                v-for="d in sortedDates"
+                :key="d"
+                class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium px-2.5 py-1 rounded-full"
+              >
+                <span>{{ formatDate(d) }}</span>
+                <button
+                  type="button"
+                  @click="removeDate(d)"
+                  class="text-indigo-400 hover:text-indigo-700 leading-none"
+                  title="Remove"
+                ><XMarkIcon class="h-4 w-4 shrink-0" /></button>
+              </div>
+            </div>
 
-      </div>
+            <!-- Working days preview -->
+            <div v-if="selectedDates.length" class="mt-2 bg-slate-50 rounded-lg px-4 py-2 text-sm text-slate-600">
+              Selected: <strong class="text-slate-800">{{ selectedDates.length }}</strong> date(s) &mdash;
+              Estimated working days: <strong class="text-slate-800">{{ computedDays }}</strong>
+            </div>
+          </div>
+
+          <!-- Reason -->
+          <AppTextarea v-model="form.reason" label="Reason / Remarks" placeholder="Optional remarks…" :rows="3" />
+
+          <!-- Supporting Document -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Supporting Document <span class="font-normal text-slate-400">(PDF/JPG/PNG, max 5MB)</span></label>
+            <input @change="e => form.supporting_document = e.target.files[0]"
+                   type="file" accept=".pdf,.jpg,.jpeg,.png"
+                   class="w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-200 file:text-xs file:font-medium file:bg-slate-50 hover:file:bg-slate-100" />
+            <p v-if="form.errors.supporting_document" class="text-red-500 text-xs mt-1">{{ form.errors.supporting_document }}</p>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-3 justify-end pt-2">
+            <AppButton as="link" variant="secondary" :href="route('hr.leave.index')">Cancel</AppButton>
+            <AppButton type="button" @click="openPinModal" :disabled="form.processing" :loading="form.processing">
+              {{ form.processing ? 'Filing…' : 'File Application' }}
+            </AppButton>
+          </div>
+
+        </div>
+      </AppCard>
     </div>
     <DigitalSignaturePin
       :show="showSubmitPin"
@@ -208,9 +192,15 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTextarea from '@/Components/AppTextarea.vue'
+import AppButton from '@/Components/AppButton.vue'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   leaveTypes:   Array,

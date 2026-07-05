@@ -2,8 +2,14 @@
 import { ref, computed, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
-  ArrowUpCircleIcon,
   ArrowPathIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
@@ -104,13 +110,13 @@ function setOverride(studentId, standing) {
 
 function standingColor(s) {
   const map = {
-    Promoted:  'bg-green-100 text-green-700',
-    Retained:  'bg-amber-100 text-amber-700',
-    Excluded:  'bg-red-100 text-red-700',
-    Transferred: 'bg-blue-100 text-blue-700',
-    Dropped:   'bg-slate-100 text-slate-500',
+    Promoted:    'green',
+    Retained:    'amber',
+    Excluded:    'red',
+    Transferred: 'blue',
+    Dropped:     'slate',
   }
-  return map[s] ?? 'bg-slate-100 text-slate-500'
+  return map[s] ?? 'slate'
 }
 
 function geColor(ge) {
@@ -127,200 +133,224 @@ const GRADE_LABELS = { 7:'Gr.7',8:'Gr.8',9:'Gr.9',10:'Gr.10',11:'Gr.11',12:'Gr.1
 <template>
   <Head title="Year-End Promotion" />
   <AdminLayout title="Year-End Promotion">
+    <div class="space-y-5">
 
-    <!-- Header -->
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <div class="flex items-center gap-2">
-        <ArrowUpCircleIcon class="w-6 h-6 text-indigo-600" />
+      <AppPageHeader title="Year-End Promotion" subtitle="Review standings and advance students to the next school year." />
+
+      <!-- Flash -->
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
+      </div>
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm">
+        {{ $page.props.flash.error }}
+      </div>
+
+      <!-- Configuration strip -->
+      <AppFilterBar>
         <div>
-          <h1 class="text-lg font-semibold text-slate-800">Year-End Promotion</h1>
-          <p class="text-xs text-slate-500">Review standings and advance students to the next school year.</p>
+          <label class="block text-xs font-medium text-slate-600 mb-1">From School Year</label>
+          <select
+            v-model="schoolYearId"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
+              {{ sy.name }}{{ sy.is_current ? ' (Current)' : '' }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">To School Year <span class="text-slate-400">(next)</span></label>
+          <select
+            v-model="nextSchoolYearId"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option :value="null">— Select —</option>
+            <option v-for="sy in nextSchoolYears" :key="sy.id" :value="sy.id">{{ sy.name }}</option>
+          </select>
+        </div>
+
+        <template #actions>
+          <AppButton variant="secondary" :loading="loadingPreview" @click="loadPreview">
+            <ArrowPathIcon v-if="!loadingPreview" class="h-4 w-4" />
+            {{ loadingPreview ? 'Loading…' : 'Load Preview' }}
+          </AppButton>
+          <AppButton v-if="previewRows.length > 0" @click="openConfirm">
+            <CheckCircleIcon class="h-4 w-4" />
+            Confirm Promotion
+          </AppButton>
+        </template>
+      </AppFilterBar>
+
+      <!-- Stats strip -->
+      <div v-if="previewRows.length > 0" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div class="bg-white rounded-xl border border-slate-200 p-3 text-center">
+          <p class="text-xs text-slate-500">Total</p>
+          <p class="text-2xl font-bold text-slate-800">{{ stats.total }}</p>
+        </div>
+        <div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center">
+          <p class="text-xs text-slate-500">Promoted</p>
+          <p class="text-2xl font-bold text-green-700">{{ stats.promoted }}</p>
+        </div>
+        <div class="bg-amber-50 rounded-xl border border-amber-200 p-3 text-center">
+          <p class="text-xs text-slate-500">Retained</p>
+          <p class="text-2xl font-bold text-amber-700">{{ stats.retained }}</p>
+        </div>
+        <div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center">
+          <p class="text-xs text-slate-500">Excluded</p>
+          <p class="text-2xl font-bold text-red-600">{{ stats.excluded }}</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-3 text-center">
+          <p class="text-xs text-slate-500">No Grades</p>
+          <p class="text-2xl font-bold" :class="stats.noGrades > 0 ? 'text-amber-600' : 'text-slate-600'">
+            {{ stats.noGrades }}
+          </p>
         </div>
       </div>
-    </div>
 
-    <!-- Configuration strip -->
-    <div class="bg-white rounded-xl border border-slate-200 p-4 mb-5 flex flex-wrap items-end gap-4">
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">From School Year</label>
-        <select
-          v-model="schoolYearId"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
-            {{ sy.name }}{{ sy.is_current ? ' (Current)' : '' }}
-          </option>
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">To School Year <span class="text-slate-400">(next)</span></label>
-        <select
-          v-model="nextSchoolYearId"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option :value="null">— Select —</option>
-          <option v-for="sy in nextSchoolYears" :key="sy.id" :value="sy.id">{{ sy.name }}</option>
-        </select>
-      </div>
-
-      <button
-        @click="loadPreview"
-        :disabled="loadingPreview"
-        class="flex items-center gap-1.5 border border-indigo-200 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-medium"
+      <!-- Warning if uncomputed -->
+      <div
+        v-if="previewRows.length > 0 && stats.noGrades > 0"
+        class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-amber-700 text-sm"
       >
-        <ArrowPathIcon class="w-4 h-4" :class="loadingPreview ? 'animate-spin' : ''" />
-        {{ loadingPreview ? 'Loading…' : 'Load Preview' }}
-      </button>
-
-      <button
-        v-if="previewRows.length > 0"
-        @click="openConfirm"
-        class="ml-auto flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-      >
-        <CheckCircleIcon class="w-4 h-4" />
-        Confirm Promotion
-      </button>
-    </div>
-
-    <!-- Stats strip -->
-    <div v-if="previewRows.length > 0" class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
-      <div class="bg-white rounded-xl border border-slate-200 p-3 text-center">
-        <p class="text-xs text-slate-500">Total</p>
-        <p class="text-2xl font-bold text-slate-800">{{ stats.total }}</p>
-      </div>
-      <div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center">
-        <p class="text-xs text-slate-500">Promoted</p>
-        <p class="text-2xl font-bold text-green-700">{{ stats.promoted }}</p>
-      </div>
-      <div class="bg-amber-50 rounded-xl border border-amber-200 p-3 text-center">
-        <p class="text-xs text-slate-500">Retained</p>
-        <p class="text-2xl font-bold text-amber-700">{{ stats.retained }}</p>
-      </div>
-      <div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center">
-        <p class="text-xs text-slate-500">Excluded</p>
-        <p class="text-2xl font-bold text-red-600">{{ stats.excluded }}</p>
-      </div>
-      <div class="bg-slate-50 rounded-xl border border-slate-200 p-3 text-center">
-        <p class="text-xs text-slate-500">No Grades</p>
-        <p class="text-2xl font-bold" :class="stats.noGrades > 0 ? 'text-amber-600' : 'text-slate-600'">
-          {{ stats.noGrades }}
-        </p>
-      </div>
-    </div>
-
-    <!-- Warning if uncomputed -->
-    <div
-      v-if="previewRows.length > 0 && stats.noGrades > 0"
-      class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 flex items-center gap-2 text-amber-700 text-sm"
-    >
-      <ExclamationTriangleIcon class="w-4 h-4 shrink-0" />
-      {{ stats.noGrades }} student(s) have no computed grades. Go to Academic Transcripts and run "Compute All Grades" first.
-    </div>
-
-    <!-- Preview table -->
-    <div v-if="previewRows.length > 0" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
-        <div class="relative flex-1 max-w-xs">
-          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            v-model="searchQ"
-            type="text"
-            placeholder="Filter by section or student ID…"
-            class="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <p class="text-xs text-slate-400">Override individual standing by clicking the badge</p>
+        <ExclamationTriangleIcon class="w-4 h-4 shrink-0" />
+        {{ stats.noGrades }} student(s) have no computed grades. Go to Academic Transcripts and run "Compute All Grades" first.
       </div>
 
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-50 border-b border-slate-200">
-          <tr>
-            <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Student ID</th>
-            <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase">Grade / Section</th>
-            <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Subjects</th>
-            <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Failed</th>
-            <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">GWA</th>
-            <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase">Standing</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <tr v-for="row in filteredRows" :key="row.student_id" class="hover:bg-slate-50">
-            <td class="px-4 py-2 tabular-nums text-slate-600">{{ row.student_id }}</td>
-            <td class="px-4 py-2">
+      <!-- Preview table -->
+      <div v-if="previewRows.length > 0" class="space-y-3">
+        <AppFilterBar>
+          <div class="relative w-full sm:w-80">
+            <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              v-model="searchQ"
+              type="text"
+              placeholder="Filter by section or student ID…"
+              class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <template #actions>
+            <span class="text-xs text-slate-400">Override individual standing by clicking the badge</span>
+          </template>
+        </AppFilterBar>
+
+        <AppTable :is-empty="!filteredRows.length" :skeleton-cols="6">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Student ID</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade / Section</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Subjects</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Failed</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">GWA</th>
+              <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide">Standing</th>
+            </tr>
+          </template>
+
+          <tr v-for="row in filteredRows" :key="row.student_id" class="hover:bg-slate-50/60">
+            <td class="px-4 py-3 tabular-nums text-slate-600">{{ row.student_id }}</td>
+            <td class="px-4 py-3">
               {{ GRADE_LABELS[row.grade_level] ?? '—' }}
               <span class="text-slate-400"> · {{ row.section_name }}</span>
             </td>
-            <td class="px-4 py-2 text-center text-slate-600">{{ row.subject_count }}</td>
-            <td class="px-4 py-2 text-center" :class="row.failed_subject_count > 0 ? 'text-red-600 font-semibold' : 'text-slate-600'">
+            <td class="px-4 py-3 text-center text-slate-600">{{ row.subject_count }}</td>
+            <td class="px-4 py-3 text-center" :class="row.failed_subject_count > 0 ? 'text-red-600 font-semibold' : 'text-slate-600'">
               {{ row.failed_subject_count }}
             </td>
-            <td class="px-4 py-2 text-center" :class="geColor(row.gwa)">{{ row.gwa_display }}</td>
-            <td class="px-4 py-2 text-center">
+            <td class="px-4 py-3 text-center" :class="geColor(row.gwa)">{{ row.gwa_display }}</td>
+            <td class="px-4 py-3 text-center">
               <!-- Clickable standing badge cycles through Promoted → Retained → Excluded → Promoted -->
               <button
-                :class="['text-xs px-3 py-1 rounded-full font-medium', standingColor(effectiveStanding(row))]"
                 :title="overrides[row.student_id] ? 'Overridden — click to cycle' : 'Click to override'"
                 @click="setOverride(row.student_id, ({
-                  Promoted:  'Retained',
-                  Retained:  'Excluded',
-                  Excluded:  'Promoted',
+                  Promoted:    'Retained',
+                  Retained:    'Excluded',
+                  Excluded:    'Promoted',
                   Transferred: 'Promoted',
-                  Dropped:   'Promoted',
+                  Dropped:     'Promoted',
                 })[effectiveStanding(row)] ?? 'Promoted')"
               >
-                {{ effectiveStanding(row) }}
-                <span v-if="overrides[row.student_id]" class="ml-1 opacity-60">✱</span>
+                <AppBadge :color="standingColor(effectiveStanding(row))">
+                  {{ effectiveStanding(row) }}
+                  <span v-if="overrides[row.student_id]" class="ml-1 opacity-60">✱</span>
+                </AppBadge>
               </button>
             </td>
           </tr>
-        </tbody>
-      </table>
-    </div>
 
-    <!-- Empty state -->
-    <div v-else-if="!loadingPreview" class="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
-      Click "Load Preview" to see the promotion results for the selected school year.
+          <template #mobileCard>
+            <div v-for="row in filteredRows" :key="row.student_id" class="p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="text-xs text-slate-500 tabular-nums">{{ row.student_id }}</p>
+                  <p class="font-medium text-slate-800">
+                    {{ GRADE_LABELS[row.grade_level] ?? '—' }}
+                    <span class="text-slate-400 font-normal"> · {{ row.section_name }}</span>
+                  </p>
+                </div>
+                <button
+                  :title="overrides[row.student_id] ? 'Overridden — click to cycle' : 'Click to override'"
+                  @click="setOverride(row.student_id, ({
+                    Promoted:    'Retained',
+                    Retained:    'Excluded',
+                    Excluded:    'Promoted',
+                    Transferred: 'Promoted',
+                    Dropped:     'Promoted',
+                  })[effectiveStanding(row)] ?? 'Promoted')"
+                >
+                  <AppBadge :color="standingColor(effectiveStanding(row))">
+                    {{ effectiveStanding(row) }}
+                    <span v-if="overrides[row.student_id]" class="ml-1 opacity-60">✱</span>
+                  </AppBadge>
+                </button>
+              </div>
+              <div class="flex justify-between text-xs text-slate-500">
+                <span>{{ row.subject_count }} subjects</span>
+                <span :class="row.failed_subject_count > 0 ? 'text-red-600 font-semibold' : ''">{{ row.failed_subject_count }} failed</span>
+                <span :class="geColor(row.gwa)">GWA {{ row.gwa_display }}</span>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No students match your filter" />
+          </template>
+        </AppTable>
+      </div>
+
+      <!-- Empty state (no preview loaded yet) -->
+      <div v-else-if="!loadingPreview" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <EmptyState title="No preview loaded" subtitle="Click &quot;Load Preview&quot; to see the promotion results for the selected school year." />
+      </div>
+
     </div>
 
     <!-- ── Confirm modal ───────────────────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="showConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/40" @click="showConfirmModal = false" />
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-          <h3 class="font-semibold text-slate-800 mb-2">Confirm Year-End Promotion</h3>
-
-          <div class="bg-slate-50 rounded-lg p-4 mb-4 text-sm space-y-1">
-            <p><b>From:</b> {{ schoolYears.find(s => s.id === schoolYearId)?.name }}</p>
-            <p><b>To:</b> {{ schoolYears.find(s => s.id === nextSchoolYearId)?.name }}</p>
-            <div class="border-t border-slate-200 mt-2 pt-2 space-y-0.5">
-              <p class="text-green-700"><b>Promoting:</b> {{ stats.promoted }} students</p>
-              <p class="text-amber-600"><b>Retaining:</b> {{ stats.retained }} students</p>
-              <p v-if="stats.excluded > 0" class="text-red-600"><b>Excluding:</b> {{ stats.excluded }} students</p>
-              <p v-if="Object.keys(overrides).length > 0" class="text-indigo-600">
-                <b>Manual overrides:</b> {{ Object.keys(overrides).length }} student(s)
-              </p>
-            </div>
-          </div>
-
-          <p class="text-xs text-slate-500 mb-4">
-            This will finalise academic standings for S.Y. {{ schoolYears.find(s => s.id === schoolYearId)?.name }}
-            and create enrollment records for the following school year. <b>This action cannot be undone.</b>
+    <AppModal :show="showConfirmModal" title="Confirm Year-End Promotion" size="md" @close="showConfirmModal = false">
+      <div class="bg-slate-50 rounded-lg p-4 mb-4 text-sm space-y-1">
+        <p><b>From:</b> {{ schoolYears.find(s => s.id === schoolYearId)?.name }}</p>
+        <p><b>To:</b> {{ schoolYears.find(s => s.id === nextSchoolYearId)?.name }}</p>
+        <div class="border-t border-slate-200 mt-2 pt-2 space-y-0.5">
+          <p class="text-green-700"><b>Promoting:</b> {{ stats.promoted }} students</p>
+          <p class="text-amber-600"><b>Retaining:</b> {{ stats.retained }} students</p>
+          <p v-if="stats.excluded > 0" class="text-red-600"><b>Excluding:</b> {{ stats.excluded }} students</p>
+          <p v-if="Object.keys(overrides).length > 0" class="text-indigo-600">
+            <b>Manual overrides:</b> {{ Object.keys(overrides).length }} student(s)
           </p>
-
-          <div class="flex justify-end gap-2">
-            <button @click="showConfirmModal = false" class="px-4 py-2 text-sm border border-slate-200 rounded-lg">Cancel</button>
-            <button
-              @click="runConfirm"
-              :disabled="confirmForm.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {{ confirmForm.processing ? 'Processing…' : 'Yes, Confirm Promotion' }}
-            </button>
-          </div>
         </div>
       </div>
-    </Teleport>
+
+      <p class="text-xs text-slate-500">
+        This will finalise academic standings for S.Y. {{ schoolYears.find(s => s.id === schoolYearId)?.name }}
+        and create enrollment records for the following school year. <b>This action cannot be undone.</b>
+      </p>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="showConfirmModal = false">Cancel</AppButton>
+        <AppButton :loading="confirmForm.processing" @click="runConfirm">
+          {{ confirmForm.processing ? 'Processing…' : 'Yes, Confirm Promotion' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

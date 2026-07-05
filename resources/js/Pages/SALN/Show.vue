@@ -3,44 +3,36 @@
   <AdminLayout :title="`SALN ${saln.year}`">
     <div class="space-y-5">
 
-      <!-- Back + header row -->
-      <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <Link :href="route('saln.index')" class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800">
-            <ChevronLeftIcon class="h-4 w-4" />My SALN
-          </Link>
-          <h1 class="text-xl font-semibold text-slate-800 mt-1">SALN {{ saln.year }} — {{ saln.user?.name }}</h1>
-          <p class="text-sm text-slate-500 mt-0.5">As of {{ fmtDate(saln.as_of_date) }}</p>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <span :class="statusBadge(saln.status)" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold">
-            {{ saln.status_label }}
-          </span>
-          <!-- PDF export -->
-          <a v-if="saln.status === 'approved' || saln.status === 'filed'"
-            :href="route('saln.pdf', saln.id)" target="_blank"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+      <!-- Back -->
+      <Link :href="route('saln.index')" class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800">
+        <ChevronLeftIcon class="h-4 w-4" />My SALN
+      </Link>
+
+      <!-- Header -->
+      <AppPageHeader :title="`SALN ${saln.year} — ${saln.user?.name}`" :subtitle="`As of ${fmtDate(saln.as_of_date)}`">
+        <template #actions>
+          <AppBadge :color="statusBadge(saln.status)">{{ saln.status_label }}</AppBadge>
+          <AppButton v-if="saln.status === 'approved' || saln.status === 'filed'"
+            as="a" :href="route('saln.pdf', saln.id)" target="_blank" variant="secondary" size="sm">
             <DocumentArrowDownIcon class="h-4 w-4" />Export PDF
-          </a>
-          <!-- Submit -->
-          <button v-if="saln.is_submittable" @click="confirmSubmit = true"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm">
+          </AppButton>
+          <AppButton v-if="saln.is_submittable" size="sm" @click="confirmSubmit = true">
             <PaperAirplaneIcon class="h-4 w-4" />Submit for Review
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Return notice -->
-      <div v-if="saln.status === 'returned'" class="flex gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-        <ExclamationTriangleIcon class="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+      <div v-if="saln.status === 'returned'" class="flex gap-3 bg-danger-50 border border-danger-100 rounded-xl px-5 py-4">
+        <ExclamationTriangleIcon class="h-5 w-5 text-danger-500 shrink-0 mt-0.5" />
         <div>
-          <p class="text-sm font-semibold text-red-700">Returned for Revision</p>
-          <p class="text-xs text-red-600 mt-0.5">{{ lastReturnRemark }}</p>
+          <p class="text-sm font-semibold text-danger-700">Returned for Revision</p>
+          <p class="text-xs text-danger-600 mt-0.5">{{ lastReturnRemark }}</p>
         </div>
       </div>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm">
         {{ $page.props.flash.success }}
       </div>
 
@@ -56,12 +48,12 @@
         </div>
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 text-center">
           <p class="text-xs text-slate-400 uppercase tracking-wide">Total Liabilities</p>
-          <p class="text-base font-bold text-rose-600 mt-1">{{ fmtMoney(saln.total_liabilities) }}</p>
+          <p class="text-base font-bold text-danger-600 mt-1">{{ fmtMoney(saln.total_liabilities) }}</p>
         </div>
         <div class="rounded-xl border px-4 py-3 text-center shadow-sm"
-          :class="saln.net_worth >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
+          :class="saln.net_worth >= 0 ? 'bg-success-50 border-success-100' : 'bg-danger-50 border-danger-100'">
           <p class="text-xs text-slate-500 uppercase tracking-wide">Net Worth</p>
-          <p class="text-base font-bold mt-1" :class="saln.net_worth >= 0 ? 'text-emerald-700' : 'text-red-600'">
+          <p class="text-base font-bold mt-1" :class="saln.net_worth >= 0 ? 'text-success-700' : 'text-danger-600'">
             {{ fmtMoney(saln.net_worth) }}
           </p>
           <p class="text-[10px] text-slate-400 mt-0.5">Assets − Liabilities</p>
@@ -109,11 +101,10 @@
             </div>
 
             <form v-else @submit.prevent="saveHeader" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">As of Date <span class="text-red-500">*</span></label>
-                <input v-model="headerForm.as_of_date" type="date"
-                  class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-              </div>
+              <AppInput
+                v-model="headerForm.as_of_date"
+                type="date" label="As of Date" required
+                :error="headerForm.errors.as_of_date" />
               <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FieldInput label="Spouse Name" v-model="headerForm.spouse_name" />
                 <FieldInput label="Spouse Position" v-model="headerForm.spouse_position" />
@@ -121,12 +112,10 @@
                 <FieldInput label="Spouse Gov't ID" v-model="headerForm.spouse_government_id" />
               </div>
               <div class="sm:col-span-2 flex gap-3 justify-end">
-                <button type="button" @click="editHeader = false"
-                  class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-                <button type="submit" :disabled="headerForm.processing"
-                  class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg">
+                <AppButton type="button" variant="secondary" @click="editHeader = false">Cancel</AppButton>
+                <AppButton type="submit" :loading="headerForm.processing">
                   {{ headerForm.processing ? 'Saving…' : 'Save Changes' }}
-                </button>
+                </AppButton>
               </div>
             </form>
           </div>
@@ -138,36 +127,45 @@
                 <h2 class="text-sm font-semibold text-slate-700">Unmarried Children Below 18 in Declarant's Household</h2>
                 <p class="text-xs text-slate-400 mt-0.5">As required by CSC SALN Form No. SALN-1</p>
               </div>
-              <button v-if="saln.is_editable" @click="showAddChild = true"
-                class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
-                + Add Child
-              </button>
+              <AppButton v-if="saln.is_editable" variant="secondary" size="sm" @click="showAddChild = true">
+                <PlusIcon class="h-3.5 w-3.5" />Add Child
+              </AppButton>
             </div>
 
-            <div v-if="saln.children.length === 0" class="py-6 text-center text-slate-400 text-sm bg-slate-50 rounded-lg">
-              No children declared.
-            </div>
-            <table v-else class="w-full text-sm">
-              <thead>
-                <tr class="text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
-                  <th class="pb-2 text-left">Name of Child</th>
-                  <th class="pb-2 text-center w-16">Age</th>
-                  <th v-if="saln.is_editable" class="pb-2 w-20"></th>
+            <AppTable :card="false" :is-empty="saln.children.length === 0">
+              <template #head>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name of Child</th>
+                  <th class="px-4 py-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide w-16">Age</th>
+                  <th v-if="saln.is_editable" class="px-4 py-2 w-20"></th>
                 </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-50">
-                <tr v-for="c in saln.children" :key="c.id" class="group">
-                  <td class="py-2.5 font-medium text-slate-800">{{ c.name }}</td>
-                  <td class="py-2.5 text-center text-slate-600">{{ c.age }}</td>
-                  <td v-if="saln.is_editable" class="py-2.5 text-right">
-                    <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
-                      <button @click="openEditChild(c)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
-                      <button @click="deleteChild(c.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+              </template>
+              <tr v-for="c in saln.children" :key="c.id" class="group">
+                <td class="px-4 py-2.5 font-medium text-slate-800">{{ c.name }}</td>
+                <td class="px-4 py-2.5 text-center text-slate-600">{{ c.age }}</td>
+                <td v-if="saln.is_editable" class="px-4 py-2.5 text-right">
+                  <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
+                    <AppIconButton label="Edit" size="sm" @click="openEditChild(c)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                    <AppIconButton label="Delete" variant="danger" size="sm" @click="deleteChild(c.id)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                  </div>
+                </td>
+              </tr>
+              <template #empty>
+                <p class="text-sm text-slate-400">No children declared.</p>
+              </template>
+              <template #mobileCard>
+                <div v-for="c in saln.children" :key="c.id" class="p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-medium text-slate-800">{{ c.name }}</p>
+                    <p class="text-xs text-slate-500">Age {{ c.age }}</p>
+                  </div>
+                  <div v-if="saln.is_editable" class="flex gap-1">
+                    <AppIconButton label="Edit" size="sm" @click="openEditChild(c)"><PencilIcon class="h-4 w-4" /></AppIconButton>
+                    <AppIconButton label="Delete" variant="danger" size="sm" @click="deleteChild(c.id)"><TrashIcon class="h-4 w-4" /></AppIconButton>
+                  </div>
+                </div>
+              </template>
+            </AppTable>
           </div>
 
           <!-- ── Tab: Real Properties ── -->
@@ -202,7 +200,7 @@
                     <td v-if="saln.is_editable" class="py-2.5 text-right">
                       <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
                         <button @click="openEditReal(p)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
-                        <button @click="deleteReal(p.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
+                        <button @click="deleteReal(p.id)" class="text-xs text-danger-500 hover:underline px-2">Del</button>
                       </div>
                     </td>
                   </tr>
@@ -244,7 +242,7 @@
                     <td v-if="saln.is_editable" class="py-2.5 text-right">
                       <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
                         <button @click="openEditPersonal(p)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
-                        <button @click="deletePersonal(p.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
+                        <button @click="deletePersonal(p.id)" class="text-xs text-danger-500 hover:underline px-2">Del</button>
                       </div>
                     </td>
                   </tr>
@@ -276,18 +274,18 @@
                   <tr v-for="l in saln.liabilities" :key="l.id" class="group">
                     <td class="py-2.5 text-slate-700">{{ l.nature === 'others' ? l.nature_other : l.nature?.replace(/_/g,' ') }}</td>
                     <td class="py-2.5 font-medium text-slate-800">{{ l.creditor_name }}</td>
-                    <td class="py-2.5 text-right tabular-nums font-medium text-rose-600">{{ fmtMoney(l.outstanding_balance) }}</td>
+                    <td class="py-2.5 text-right tabular-nums font-medium text-danger-600">{{ fmtMoney(l.outstanding_balance) }}</td>
                     <td v-if="saln.is_editable" class="py-2.5 text-right">
                       <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
                         <button @click="openEditLiability(l)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
-                        <button @click="deleteLiability(l.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
+                        <button @click="deleteLiability(l.id)" class="text-xs text-danger-500 hover:underline px-2">Del</button>
                       </div>
                     </td>
                   </tr>
                 </tbody>
                 <tfoot><tr class="border-t border-slate-200">
                   <td colspan="2" class="pt-2 text-xs font-semibold text-slate-500 text-right">Total Outstanding Balance:</td>
-                  <td class="pt-2 text-right font-bold text-rose-600">{{ fmtMoney(saln.total_liabilities) }}</td>
+                  <td class="pt-2 text-right font-bold text-danger-600">{{ fmtMoney(saln.total_liabilities) }}</td>
                   <td v-if="saln.is_editable"></td>
                 </tr></tfoot>
               </table>
@@ -320,7 +318,7 @@
                     <td v-if="saln.is_editable" class="py-2.5 text-right">
                       <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
                         <button @click="openEditBusiness(b)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
-                        <button @click="deleteBusiness(b.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
+                        <button @click="deleteBusiness(b.id)" class="text-xs text-danger-500 hover:underline px-2">Del</button>
                       </div>
                     </td>
                   </tr>
@@ -353,7 +351,7 @@
                     <td v-if="saln.is_editable" class="py-2.5 text-right">
                       <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
                         <button @click="openEditRelative(r)" class="text-xs text-indigo-600 hover:underline px-2">Edit</button>
-                        <button @click="deleteRelative(r.id)" class="text-xs text-red-500 hover:underline px-2">Del</button>
+                        <button @click="deleteRelative(r.id)" class="text-xs text-danger-500 hover:underline px-2">Del</button>
                       </div>
                     </td>
                   </tr>
@@ -392,7 +390,6 @@
         title="Submit SALN for Review?"
         message="Once submitted, you cannot edit this SALN unless the committee returns it. Make sure all sections are complete."
         confirm-label="Submit"
-        confirm-class="bg-indigo-600 hover:bg-indigo-700"
         @confirm="submitSaln"
         @cancel="confirmSubmit = false" />
 
@@ -429,20 +426,16 @@
         :title="editingChild ? 'Edit Child' : 'Add Child'"
         @close="closeChildModal" @save="saveChild">
         <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Name of Child <span class="text-red-500">*</span></label>
-            <input v-model="childForm.name" type="text" maxlength="255" placeholder="Full name"
-              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': childForm.errors.name }" />
-            <p v-if="childForm.errors.name" class="text-xs text-red-500 mt-1">{{ childForm.errors.name }}</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Age <span class="text-red-500">*</span></label>
-            <input v-model.number="childForm.age" type="number" min="0" max="17" placeholder="0–17"
-              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': childForm.errors.age }" />
-            <p v-if="childForm.errors.age" class="text-xs text-red-500 mt-1">{{ childForm.errors.age }}</p>
-          </div>
+          <AppInput
+            v-model="childForm.name"
+            type="text" maxlength="255" placeholder="Full name"
+            label="Name of Child" required
+            :error="childForm.errors.name" />
+          <AppInput
+            v-model.number="childForm.age"
+            type="number" min="0" max="17" placeholder="0–17"
+            label="Age" required
+            :error="childForm.errors.age" />
         </div>
       </FormModal>
 
@@ -461,8 +454,16 @@
 import { ref, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppTable from '@/Components/AppTable.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import {
   ChevronLeftIcon, PaperAirplaneIcon, DocumentArrowDownIcon, ExclamationTriangleIcon,
+  PlusIcon, PencilIcon, TrashIcon,
 } from '@heroicons/vue/24/outline'
 
 // Sub-components (defined inline below)
@@ -545,8 +546,8 @@ function saveReal() {
   }
 }
 function closeRealModal() { showAddReal.value = false; editingReal.value = null; realForm.reset() }
-function deleteReal(id) {
-  if (confirm('Remove this real property?'))
+async function deleteReal(id) {
+  if (await confirmDelete('Remove this real property?'))
     router.delete(route('saln.real-properties.destroy', [props.saln.id, id]))
 }
 
@@ -568,8 +569,8 @@ function savePersonal() {
   }
 }
 function closePersonalModal() { showAddPersonal.value = false; editingPersonal.value = null; personalForm.reset() }
-function deletePersonal(id) {
-  if (confirm('Remove this personal property?'))
+async function deletePersonal(id) {
+  if (await confirmDelete('Remove this personal property?'))
     router.delete(route('saln.personal-properties.destroy', [props.saln.id, id]))
 }
 
@@ -590,8 +591,8 @@ function saveLiability() {
   }
 }
 function closeLiabilityModal() { showAddLiability.value = false; editingLiability.value = null; liabilityForm.reset() }
-function deleteLiability(id) {
-  if (confirm('Remove this liability?'))
+async function deleteLiability(id) {
+  if (await confirmDelete('Remove this liability?'))
     router.delete(route('saln.liabilities.destroy', [props.saln.id, id]))
 }
 
@@ -614,8 +615,8 @@ function saveBusiness() {
   }
 }
 function closeBusinessModal() { showAddBusiness.value = false; editingBusiness.value = null; businessForm.reset() }
-function deleteBusiness(id) {
-  if (confirm('Remove this business interest?'))
+async function deleteBusiness(id) {
+  if (await confirmDelete('Remove this business interest?'))
     router.delete(route('saln.business-interests.destroy', [props.saln.id, id]))
 }
 
@@ -637,8 +638,8 @@ function saveChild() {
   }
 }
 function closeChildModal() { showAddChild.value = false; editingChild.value = null; childForm.reset() }
-function deleteChild(id) {
-  if (confirm('Remove this child?'))
+async function deleteChild(id) {
+  if (await confirmDelete('Remove this child?'))
     router.delete(route('saln.children.destroy', [props.saln.id, id]))
 }
 
@@ -660,8 +661,8 @@ function saveRelative() {
   }
 }
 function closeRelativeModal() { showAddRelative.value = false; editingRelative.value = null; relativeForm.reset() }
-function deleteRelative(id) {
-  if (confirm('Remove this relative?'))
+async function deleteRelative(id) {
+  if (await confirmDelete('Remove this relative?'))
     router.delete(route('saln.relatives.destroy', [props.saln.id, id]))
 }
 
@@ -671,14 +672,17 @@ const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-PH', { dateStyle:'
 const fmtMoney    = (v) => new Intl.NumberFormat('en-PH', { style:'currency', currency:'PHP', maximumFractionDigits:2 }).format(v ?? 0)
 
 const statusBadge = (s) => ({
-  draft:'bg-slate-100 text-slate-600', submitted:'bg-blue-100 text-blue-700',
-  under_review:'bg-amber-100 text-amber-700', approved:'bg-emerald-100 text-emerald-700',
-  returned:'bg-red-100 text-red-600', filed:'bg-indigo-100 text-indigo-700',
-}[s] ?? 'bg-slate-100 text-slate-600')
+  draft:        'slate',
+  submitted:    'blue',
+  under_review: 'amber',
+  approved:     'green',
+  returned:     'red',
+  filed:        'indigo',
+}[s] ?? 'slate')
 
 const trailDot = (action) => ({
   created:'bg-slate-400', updated:'bg-slate-400', submitted:'bg-blue-500',
-  reviewed:'bg-amber-400', approved:'bg-emerald-500', returned:'bg-red-400',
+  reviewed:'bg-warning-500', approved:'bg-success-500', returned:'bg-danger-500',
   filed:'bg-indigo-500', reopened:'bg-purple-400',
 }[action] ?? 'bg-slate-400')
 </script>

@@ -1,93 +1,83 @@
 <template>
   <Head title="Online Time Punches" />
   <AdminLayout title="Online Time Punches">
-    <div class="max-w-2xl mx-auto space-y-6">
+    <div class="max-w-2xl mx-auto space-y-5">
+
+      <AppPageHeader title="Online Time Punches" subtitle="Face-verified time in/out for today." />
 
       <!-- Not enrolled -->
-      <div v-if="!enrollmentStatus" class="bg-white rounded-xl border border-slate-100 shadow-sm p-8 text-center">
+      <AppCard v-if="!enrollmentStatus" class="text-center">
         <p class="text-slate-600 mb-4">You haven't enrolled your face yet. Enrollment is required before you can use Online Time Punches.</p>
-        <Link :href="route('hr.face-enrollment.self')"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          Enroll My Face
-        </Link>
-      </div>
+        <AppButton as="link" :href="route('hr.face-enrollment.self')">Enroll My Face</AppButton>
+      </AppCard>
 
       <!-- Pending approval -->
-      <div v-else-if="enrollmentStatus === 'pending'" class="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center">
-        <p class="text-amber-700 font-medium">Your face enrollment is awaiting HR approval.</p>
-        <p class="text-sm text-amber-600 mt-1">You'll be able to punch in once it's approved.</p>
+      <div v-else-if="enrollmentStatus === 'pending'" class="bg-warning-50 border border-warning-100 rounded-xl p-8 text-center">
+        <p class="text-warning-700 font-medium">Your face enrollment is awaiting HR approval.</p>
+        <p class="text-sm text-warning-600 mt-1">You'll be able to punch in once it's approved.</p>
       </div>
 
       <!-- Rejected -->
-      <div v-else-if="enrollmentStatus === 'rejected'" class="bg-rose-50 border border-rose-200 rounded-xl p-8 text-center">
-        <p class="text-rose-700 font-medium">Your face enrollment was rejected.</p>
-        <Link :href="route('hr.face-enrollment.self')"
-              class="inline-flex items-center gap-2 mt-3 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          Re-enroll
-        </Link>
+      <div v-else-if="enrollmentStatus === 'rejected'" class="bg-danger-50 border border-danger-100 rounded-xl p-8 text-center">
+        <p class="text-danger-700 font-medium">Your face enrollment was rejected.</p>
+        <AppButton as="link" :href="route('hr.face-enrollment.self')" class="mt-3">Re-enroll</AppButton>
       </div>
 
       <!-- Approved: punch dashboard -->
-      <template v-else>
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-xl font-semibold text-slate-800">Today's Punches</h2>
-            <span class="text-sm text-slate-400">{{ today }}</span>
-          </div>
-          <div class="p-5 grid grid-cols-2 gap-3">
-            <div v-for="slot in punchSlots" :key="slot.type"
-                 class="rounded-xl p-3 flex flex-col items-center gap-2 border-2"
-                 :class="slotClass(slot.type)">
-              <span class="text-xs font-semibold uppercase tracking-wide" :class="slotLabelClass(slot.type)">{{ slot.label }}</span>
-              <span class="text-sm font-bold" :class="slotLabelClass(slot.type)">
-                {{ punchFor(slot.type) ? fmtTime(punchFor(slot.type).punched_at) : '—' }}
-              </span>
-              <span v-if="punchFor(slot.type)" class="text-[10px]" :class="statusTextClass(punchFor(slot.type).match_status)">
-                {{ statusLabel(punchFor(slot.type).match_status) }}
-              </span>
-              <button v-if="canPunch(slot.type)" @click="openCamera(slot.type)"
-                      class="mt-1 w-full inline-flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                Punch
-              </button>
-            </div>
+      <AppCard v-else title="Today's Punches" :padded="false">
+        <template #header>
+          <span class="text-sm text-slate-400">{{ today }}</span>
+        </template>
+        <div class="p-5 grid grid-cols-2 gap-3">
+          <div v-for="slot in punchSlots" :key="slot.type"
+               class="rounded-xl p-3 flex flex-col items-center gap-2 border-2"
+               :class="slotClass(slot.type)">
+            <span class="text-xs font-semibold uppercase tracking-wide" :class="slotLabelClass(slot.type)">{{ slot.label }}</span>
+            <span class="text-sm font-bold" :class="slotLabelClass(slot.type)">
+              {{ punchFor(slot.type) ? fmtTime(punchFor(slot.type).punched_at) : '—' }}
+            </span>
+            <AppBadge v-if="punchFor(slot.type)" :color="statusBadgeColor(punchFor(slot.type).match_status)">
+              {{ statusLabel(punchFor(slot.type).match_status) }}
+            </AppBadge>
+            <AppButton v-if="canPunch(slot.type)" size="sm" block class="mt-1" @click="openCamera(slot.type)">
+              Punch
+            </AppButton>
           </div>
         </div>
-      </template>
+      </AppCard>
 
       <!-- Camera Modal -->
-      <div v-if="showCamera" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-4 space-y-3">
-          <h3 class="text-base font-semibold text-slate-800 text-center">{{ activeSlotLabel }}</h3>
-
+      <AppModal
+        :show="showCamera"
+        :title="activeSlotLabel"
+        size="sm"
+        :close-on-backdrop="false"
+        :show-close-button="false"
+        @close="cancelCamera"
+      >
+        <div class="space-y-3">
           <div v-if="!capturedImage" class="relative">
             <video ref="videoEl" autoplay playsinline class="w-full rounded-lg bg-black" style="max-height:280px;" />
-            <button @click="capture"
-                    class="mt-3 w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <AppButton block class="mt-3" @click="capture">
               📸 Capture Photo
-            </button>
+            </AppButton>
           </div>
 
           <div v-else class="space-y-3">
             <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" style="max-height:280px;object-fit:cover;" alt="Captured photo" />
             <div class="flex gap-3">
-              <button @click="retake"
-                      class="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                Retake
-              </button>
-              <button @click="confirmPunch" :disabled="loading"
-                      class="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              <AppButton variant="secondary" block @click="retake">Retake</AppButton>
+              <AppButton block :loading="loading" @click="confirmPunch">
                 {{ loading ? 'Verifying…' : 'Confirm Punch' }}
-              </button>
+              </AppButton>
             </div>
           </div>
 
-          <button @click="cancelCamera" class="text-sm text-slate-400 hover:text-slate-600 w-full text-center">
-            Cancel
-          </button>
+          <AppButton variant="ghost" block @click="cancelCamera">Cancel</AppButton>
 
           <canvas ref="canvasEl" class="hidden" />
         </div>
-      </div>
+      </AppModal>
 
     </div>
   </AdminLayout>
@@ -95,8 +85,13 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 
@@ -147,6 +142,12 @@ function statusTextClass(status) {
   if (status === 'verified') return 'text-emerald-500'
   if (status === 'manual_review') return 'text-amber-500'
   return 'text-rose-500'
+}
+
+function statusBadgeColor(status) {
+  if (status === 'verified') return 'green'
+  if (status === 'manual_review') return 'amber'
+  return 'red'
 }
 
 function statusLabel(status) {

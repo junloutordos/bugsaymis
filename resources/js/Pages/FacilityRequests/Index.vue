@@ -3,11 +3,18 @@ import { Head, usePage, useForm, router } from "@inertiajs/vue3";
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
 import { ref, reactive, computed, watch } from "vue";
 import axios from "axios";
-import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { PencilSquareIcon, TrashIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import CsmForm from '@/Components/CsmForm.vue'
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
@@ -70,6 +77,17 @@ const filteredRequests = computed(() => props.requests?.data ?? [])
 const currentPage = computed(() => props.requests?.current_page ?? 1)
 const totalPages = computed(() => props.requests?.last_page ?? 1)
 
+// Column count varies with role — mirrors which columns are actually rendered below.
+const emptyColspan = computed(() => hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief') ? 8 : 9)
+
+// ── Status badge color mapping (AppBadge color keywords) ─────────────────────
+function statusColor(status) {
+  const s = (status ?? '').toString().toLowerCase().trim()
+  if (['approved', 'ocd approved', 'fad approved'].includes(s)) return 'green'
+  if (['pending', 'pending division chief approval', 'pending fad approval', 'pending ocd approval'].includes(s)) return 'amber'
+  if (['declined', 'rejected'].includes(s)) return 'red'
+  return 'slate'
+}
 
 const showModal = ref(false);
 const editingRequest = ref(null);
@@ -462,124 +480,98 @@ const bookingsForDate = (dt) => {
 <template>
   <Head title="Facility Requests" />
   <AdminLayout title="Facility Requests">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Facility Requests</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage facility and venue booking requests</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            v-if="!hasRole('GSU Head')"
-            @click.prevent="handleNewRequest()"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
-            + New Request
-          </button>
-          <button
-            @click.prevent="openCalendar()"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-            title="View calendar"
-          >
-            View Calendar
-          </button>
-        </div>
-      </div>
+    <div class="space-y-5">
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+      <AppPageHeader title="Facility Requests" subtitle="Manage facility and venue booking requests">
+        <template #actions>
+          <AppButton v-if="!hasRole('GSU Head')" @click.prevent="handleNewRequest()">
+            + New Request
+          </AppButton>
+          <AppButton variant="secondary" @click.prevent="openCalendar()">
+            View Calendar
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Search -->
+      <AppFilterBar>
+        <div class="relative flex-1 min-w-[180px] sm:w-72 sm:flex-none">
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Search facility requests…"
             @keydown.enter.prevent="applyFilters"
-            class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
-          <button @click="applyFilters" :disabled="isLoading"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Search
-          </button>
-          <button v-if="searchQuery" @click="clearFilters" :disabled="isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Clear
-          </button>
-          <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
+          <span v-if="isLoading" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">Searching…</span>
         </div>
+        <template #actions>
+          <AppButton :disabled="isLoading" @click="applyFilters">Search</AppButton>
+          <AppButton v-if="searchQuery" variant="secondary" :disabled="isLoading" @click="clearFilters">Clear</AppButton>
+        </template>
+      </AppFilterBar>
 
-        <!-- Desktop table -->
-        <div class="hidden sm:block overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
-                <th v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Unit</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Activity</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date(s)</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time(s)</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Venue</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ req.id }}</td>
-                <td v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 text-sm text-slate-700">{{ req.requester?.name ?? req.requestor ?? '—' }}</td>
-                <td v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ req.activity ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
-                  {{ req.date_start ? new Date(req.date_start).toLocaleDateString() : '—' }}
-                  <span v-if="req.date_end"> — {{ new Date(req.date_end).toLocaleDateString() }}</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
-                  <span v-if="req.time_start">{{ (req.time_start || '').slice(0,5) }}</span>
-                  <span v-if="req.time_end"> <span v-if="req.time_start">—</span> {{ (req.time_end || '').slice(0,5) }}</span>
-                  <span v-if="!req.time_start && !req.time_end">—</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ venueDisplay(req.venue) }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-1.5 justify-center">
-                    <button v-if="hasRole('Administrator')" @click.prevent="openModal(req)"
-                            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                    <button v-if="hasRole('Administrator')" @click.prevent="destroy(req)"
-                            class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                    <button
-                      v-if="(hasRole('Administrator') && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (hasRole('GSU Head') && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
-                      @click.prevent="openPrint(req)"
-                      class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
-                      <PrinterIcon class="w-4 h-4" />
-                    </button>
-                    <!-- CSM Survey button — shown to requestor when FAD approves -->
-                    <button
-                      v-if="req.status === 'Approved' && req.requestor_id === page.props.auth.user.id"
-                      @click.prevent="openCsmModal(req)"
-                      class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                      Confirm &amp; Rate
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredRequests.length === 0">
-                <td :colspan="(hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief') ? 8 : 9)" class="py-16 text-center text-slate-400 text-sm">No facility requests found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table card -->
+      <AppTable :is-empty="filteredRequests.length === 0" :skeleton-cols="emptyColspan">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+            <th v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Unit</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Activity</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date(s)</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time(s)</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Venue</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+          </tr>
+        </template>
 
-        <!-- Mobile cards -->
-        <div class="sm:hidden p-4 space-y-3">
-          <div v-for="req in filteredRequests" :key="req.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+        <tr v-for="req in filteredRequests" :key="req.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ req.id }}</td>
+          <td v-if="!hasAnyRole('Staff','Faculty')" class="px-4 py-3 text-sm text-slate-700">{{ req.requester?.name ?? req.requestor ?? '—' }}</td>
+          <td v-if="!hasAnyRole('Staff','Faculty','GSU Head','Administrator','DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ req.requester?.division?.division_name ?? req.unit ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ req.activity ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+            {{ req.date_start ? new Date(req.date_start).toLocaleDateString() : '—' }}
+            <span v-if="req.date_end"> — {{ new Date(req.date_end).toLocaleDateString() }}</span>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700 whitespace-nowrap">
+            <span v-if="req.time_start">{{ (req.time_start || '').slice(0,5) }}</span>
+            <span v-if="req.time_end"> <span v-if="req.time_start">—</span> {{ (req.time_end || '').slice(0,5) }}</span>
+            <span v-if="!req.time_start && !req.time_end">—</span>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ venueDisplay(req.venue) }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <AppBadge :color="statusColor(req.status)">{{ req.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex items-center gap-1.5 justify-center">
+              <AppIconButton v-if="hasRole('Administrator')" label="Edit facility request" @click.prevent="openModal(req)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="hasRole('Administrator')" label="Delete facility request" variant="danger" @click.prevent="destroy(req)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton
+                v-if="(hasRole('Administrator') && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (hasRole('GSU Head') && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
+                label="Print facility request"
+                @click.prevent="openPrint(req)">
+                <PrinterIcon class="w-4 h-4" />
+              </AppIconButton>
+              <!-- CSM Survey button — shown to requestor when FAD approves -->
+              <AppButton
+                v-if="req.status === 'Approved' && req.requestor_id === page.props.auth.user.id"
+                size="sm" variant="success"
+                @click.prevent="openCsmModal(req)">
+                Confirm &amp; Rate
+              </AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="req in filteredRequests" :key="req.id" class="p-4 space-y-2">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <p class="text-xs text-slate-500">Request #{{ req.id }}</p>
@@ -598,227 +590,219 @@ const bookingsForDate = (dt) => {
               <div><span class="font-medium text-slate-500">Time:</span> {{ req.time_start ? (req.time_start || '').slice(0,5) : '—' }}<span v-if="req.time_end"> — {{ (req.time_end || '').slice(0,5) }}</span></div>
               <div><span class="font-medium text-slate-500">Venue:</span> {{ venueDisplay(req.venue) }}</div>
               <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
-                <span :class="[badgeBase, statusBadgeClass(req.status)]">{{ req.status }}</span>
+                <AppBadge :color="statusColor(req.status)">{{ req.status }}</AppBadge>
               </div>
             </div>
             <div class="mt-3 flex flex-wrap items-center gap-2">
-              <button v-if="hasRole('Administrator')" @click.prevent="openModal(req)"
-                      class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+              <AppButton v-if="hasRole('Administrator')" size="sm" @click.prevent="openModal(req)">
                 <PencilSquareIcon class="w-3.5 h-3.5" /> Edit
-              </button>
-              <button v-if="hasRole('Administrator')" @click.prevent="destroy(req)"
-                      class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+              </AppButton>
+              <AppButton v-if="hasRole('Administrator')" size="sm" variant="danger" @click.prevent="destroy(req)">
                 <TrashIcon class="w-3.5 h-3.5" />
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 v-if="(hasRole('Administrator') && (req.status === 'OCD Approved' || req.status === 'FAD Approved')) || (hasRole('GSU Head') && (req.status === 'OCD Approved' || req.status === 'FAD Approved'))"
-                @click.prevent="openPrint(req)"
-                class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
+                size="sm" variant="secondary"
+                @click.prevent="openPrint(req)">
                 <PrinterIcon class="w-3.5 h-3.5" /> Print
-              </button>
+              </AppButton>
             </div>
           </div>
-          <div v-if="filteredRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No facility requests found.</div>
-        </div>
+        </template>
 
-        <!-- Pagination -->
-        <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="props.requests?.total ?? 0"
-          @prev="goToPage(currentPage - 1)"
-          @next="goToPage(currentPage + 1)"
-          @page="goToPage"
-        />
-      </div>
+        <template #empty>
+          <EmptyState title="No facility requests found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total="props.requests?.total ?? 0"
+            @prev="goToPage(currentPage - 1)"
+            @next="goToPage(currentPage + 1)"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
 
       <!-- Calendar Modal -->
-      <div v-if="showCalendar" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-        <div class="bg-white w-full sm:rounded-2xl sm:shadow-xl sm:max-w-4xl relative overflow-auto max-h-[90vh]">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button @click.prevent="prevMonth" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">‹</button>
-              <span class="text-sm font-semibold text-slate-800">{{ monthLabel }}</span>
-              <button @click.prevent="nextMonth" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">›</button>
-            </div>
-            <div class="flex items-center gap-2">
-              <button @click.prevent="fetchBookings" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Refresh</button>
-              <button @click.prevent="showCalendar = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
-                <XMarkIcon class="w-4 h-4" />
-              </button>
-            </div>
+      <AppModal :show="showCalendar" size="4xl" body-class="p-4" @close="showCalendar = false">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <AppIconButton label="Previous month" size="sm" @click.prevent="prevMonth">‹</AppIconButton>
+            <span class="text-sm font-semibold text-slate-800">{{ monthLabel }}</span>
+            <AppIconButton label="Next month" size="sm" @click.prevent="nextMonth">›</AppIconButton>
           </div>
-          <div class="p-4">
-            <div class="grid grid-cols-7 gap-1 mb-1">
-              <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d" class="text-center text-xs font-semibold text-slate-500 py-1">{{ d }}</div>
-            </div>
-            <div class="grid grid-cols-7 gap-1">
-              <template v-for="(d, idx) in monthDays" :key="d ? d.toISOString() : 'blank-' + idx">
-                <div class="border border-slate-100 rounded-lg p-1.5 min-h-[72px] bg-white">
-                  <div class="text-xs text-slate-500 mb-1">{{ d ? d.getDate() : '' }}</div>
-                  <div class="space-y-0.5 text-xs">
-                    <div v-if="d" v-for="b in bookingsForDate(d)" :key="b.id" class="bg-indigo-50 text-indigo-700 p-1 rounded text-[10px]">
-                      <div class="font-medium truncate">{{ b.facility_name ?? '—' }}</div>
-                      <div class="text-indigo-500">{{ b.start_time ?? '—' }} — {{ b.end_time ?? '—' }}</div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </div>
+        </template>
+        <div class="grid grid-cols-7 gap-1 mb-1">
+          <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d" class="text-center text-xs font-semibold text-slate-500 py-1">{{ d }}</div>
         </div>
-      </div>
+        <div class="grid grid-cols-7 gap-1">
+          <template v-for="(d, idx) in monthDays" :key="d ? d.toISOString() : 'blank-' + idx">
+            <div class="border border-slate-100 rounded-lg p-1.5 min-h-[72px] bg-white">
+              <div class="text-xs text-slate-500 mb-1">{{ d ? d.getDate() : '' }}</div>
+              <div class="space-y-0.5 text-xs">
+                <div v-if="d" v-for="b in bookingsForDate(d)" :key="b.id" class="bg-indigo-50 text-indigo-700 p-1 rounded text-[10px]">
+                  <div class="font-medium truncate">{{ b.facility_name ?? '—' }}</div>
+                  <div class="text-indigo-500">{{ b.start_time ?? '—' }} — {{ b.end_time ?? '—' }}</div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <template #footer>
+          <AppButton variant="secondary" size="sm" @click.prevent="fetchBookings">Refresh</AppButton>
+        </template>
+      </AppModal>
 
       <!-- Create / Edit Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-        <div class="bg-white w-full h-full sm:h-auto sm:rounded-2xl sm:shadow-xl sm:max-w-lg relative overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">{{ editingRequest ? 'Edit Facility Request' : 'New Facility Request' }}</h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="closeModal">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
+      <AppModal
+        :show="showModal"
+        :title="editingRequest ? 'Edit Facility Request' : 'New Facility Request'"
+        size="lg"
+        body-class="px-6 py-5 space-y-4"
+        @close="closeModal"
+      >
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Activity</label>
+            <input v-model="form.activity" @input="validateField('activity')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.activity ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.activity" class="mt-1 text-xs text-red-600">{{ fieldErrors.activity }}</p>
           </div>
-          <div class="px-6 py-5 space-y-4 max-h-[80vh] overflow-auto">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Activity</label>
-                <input v-model="form.activity" @input="validateField('activity')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.activity ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.activity" class="mt-1 text-xs text-red-600">{{ fieldErrors.activity }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Purpose</label>
-                <input v-model="form.purpose" @input="validateField('purpose')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.purpose ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.purpose" class="mt-1 text-xs text-red-600">{{ fieldErrors.purpose }}</p>
-              </div>
-            </div>
-
-            <div class="mt-2">
-              <label class="inline-flex items-center gap-3">
-                <input type="checkbox" v-model="form.requires_it_assistance" class="h-4 w-4"
-                       @change="onItAssistanceChange" />
-                <span class="text-sm text-slate-700">Requires IT Technical Assistance</span>
-              </label>
-              <p class="text-xs text-slate-500 mt-1">If enabled, an IT Job Request will be automatically created for this event.</p>
-            </div>
-
-            <div v-if="form.requires_it_assistance" class="mt-3">
-              <label class="block text-xs font-medium text-slate-600 mb-1">Assign IT Personnel</label>
-              <select v-model="form.assigned_mis_user" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                <option :value="null">-- Assign Personnel--</option>
-                <option v-for="u in usersList" :key="u.id" :value="u.id">{{ u.name }} - {{ u.position ?? '' }}</option>
-              </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Nature of Activity</label>
-                <select v-model="form.nature" @change="validateField('nature')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.nature ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']">
-                  <option value="">-- Select Nature --</option>
-                  <option value="Curricular">Curricular</option>
-                  <option value="Co-Curricular">Co-Curricular</option>
-                  <option value="Others">Others (please specify)</option>
-                </select>
-                <p v-if="fieldErrors.nature" class="mt-1 text-xs text-red-600">{{ fieldErrors.nature }}</p>
-              </div>
-
-              <div v-if="form.nature === 'Others'">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Please specify</label>
-                <input v-model="form.nature_other" @input="validateField('nature_other')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.nature_other ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.nature_other" class="mt-1 text-xs text-red-600">{{ fieldErrors.nature_other }}</p>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Participants (description)</label>
-                <input v-model="form.participants" @input="validateField('participants')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.participants ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" placeholder="e.g. Students, Faculty" />
-                <p v-if="fieldErrors.participants" class="mt-1 text-xs text-red-600">{{ fieldErrors.participants }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Number of Male Participants</label>
-                <input v-model.number="form.male" type="number" min="0" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Number of Female Participants</label>
-                <input v-model.number="form.female" type="number" min="0" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
-                <input v-model="form.date_start" @change="validateField('date_start')" type="date" :min="minEventDate" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_start ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.date_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_start }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
-                <input v-model="form.date_end" @change="validateField('date_end')" type="date" :min="form.date_start || minEventDate" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_end ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.date_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_end }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
-                <input v-model="form.time_start" @change="validateField('time_start')" type="time" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.time_start ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.time_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_start }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">End Time</label>
-                <input v-model="form.time_end" @change="validateField('time_end')" type="time" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.time_end ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.time_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_end }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Venue</label>
-                <select v-model="form.venue" multiple @change="validateField('venue')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.venue ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']">
-                  <option v-for="f in props.facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
-                </select>
-                <p v-if="fieldErrors.venue" class="mt-1 text-xs text-red-600">{{ fieldErrors.venue }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Equipment Needed</label>
-                <select v-model="form.equipment" multiple @change="validateField('equipment_quantities')" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-                  <option value="Chairs">Chairs</option>
-                  <option value="Tables">Tables</option>
-                  <option value="Microphone">Microphone</option>
-                  <option value="Whiteboard">Whiteboard</option>
-                  <option value="Projector">Projector</option>
-                  <option value="Electric Fans">Electric Fans</option>
-                  <option value="Airconditioner">Airconditioner</option>
-                  <option value="Trashbins">Trashbins</option>
-                </select>
-              </div>
-            </div>
-
-            <div v-if="form.equipment && form.equipment.length" class="space-y-2">
-              <label class="block text-xs font-medium text-slate-600">Equipment Quantities</label>
-              <div v-for="eq in form.equipment" :key="eq" class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <div class="w-full sm:w-1/2 text-sm text-slate-700">{{ eq }}</div>
-                <div class="w-full sm:w-1/2">
-                  <input type="number" min="1" v-model.number="form.equipment_quantities[eq]" @input="validateField('equipment_quantities')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.equipment_quantities?.[eq] ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" placeholder="Quantity" />
-                  <p v-if="fieldErrors.equipment_quantities?.[eq]" class="mt-1 text-xs text-red-600">{{ fieldErrors.equipment_quantities[eq] }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Other Equipment (describe)</label>
-              <input v-model="form.others" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" placeholder="e.g. podium, stage lights" />
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click.prevent="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button @click.prevent="editingRequest ? submit() : openPinModal()" :disabled="form.processing || pinLoading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-              <span v-if="form.processing">Submitting…</span>
-              <span v-else>Submit</span>
-            </button>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Purpose</label>
+            <input v-model="form.purpose" @input="validateField('purpose')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.purpose ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.purpose" class="mt-1 text-xs text-red-600">{{ fieldErrors.purpose }}</p>
           </div>
         </div>
-      </div>
+
+        <div class="mt-2">
+          <label class="inline-flex items-center gap-3">
+            <input type="checkbox" v-model="form.requires_it_assistance" class="h-4 w-4"
+                   @change="onItAssistanceChange" />
+            <span class="text-sm text-slate-700">Requires IT Technical Assistance</span>
+          </label>
+          <p class="text-xs text-slate-500 mt-1">If enabled, an IT Job Request will be automatically created for this event.</p>
+        </div>
+
+        <div v-if="form.requires_it_assistance" class="mt-3">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Assign IT Personnel</label>
+          <select v-model="form.assigned_mis_user" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+            <option :value="null">-- Assign Personnel--</option>
+            <option v-for="u in usersList" :key="u.id" :value="u.id">{{ u.name }} - {{ u.position ?? '' }}</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Nature of Activity</label>
+            <select v-model="form.nature" @change="validateField('nature')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.nature ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']">
+              <option value="">-- Select Nature --</option>
+              <option value="Curricular">Curricular</option>
+              <option value="Co-Curricular">Co-Curricular</option>
+              <option value="Others">Others (please specify)</option>
+            </select>
+            <p v-if="fieldErrors.nature" class="mt-1 text-xs text-red-600">{{ fieldErrors.nature }}</p>
+          </div>
+
+          <div v-if="form.nature === 'Others'">
+            <label class="block text-xs font-medium text-slate-600 mb-1">Please specify</label>
+            <input v-model="form.nature_other" @input="validateField('nature_other')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.nature_other ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.nature_other" class="mt-1 text-xs text-red-600">{{ fieldErrors.nature_other }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Participants (description)</label>
+            <input v-model="form.participants" @input="validateField('participants')" type="text" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.participants ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" placeholder="e.g. Students, Faculty" />
+            <p v-if="fieldErrors.participants" class="mt-1 text-xs text-red-600">{{ fieldErrors.participants }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Number of Male Participants</label>
+            <input v-model.number="form.male" type="number" min="0" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Number of Female Participants</label>
+            <input v-model.number="form.female" type="number" min="0" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Start Date</label>
+            <input v-model="form.date_start" @change="validateField('date_start')" type="date" :min="minEventDate" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_start ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.date_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_start }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">End Date</label>
+            <input v-model="form.date_end" @change="validateField('date_end')" type="date" :min="form.date_start || minEventDate" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_end ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.date_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_end }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Start Time</label>
+            <input v-model="form.time_start" @change="validateField('time_start')" type="time" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.time_start ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.time_start" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_start }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">End Time</label>
+            <input v-model="form.time_end" @change="validateField('time_end')" type="time" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.time_end ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.time_end" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_end }}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Venue</label>
+            <select v-model="form.venue" multiple @change="validateField('venue')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.venue ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']">
+              <option v-for="f in props.facilities" :key="f.id" :value="f.id">{{ f.name }}</option>
+            </select>
+            <p v-if="fieldErrors.venue" class="mt-1 text-xs text-red-600">{{ fieldErrors.venue }}</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Equipment Needed</label>
+            <select v-model="form.equipment" multiple @change="validateField('equipment_quantities')" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+              <option value="Chairs">Chairs</option>
+              <option value="Tables">Tables</option>
+              <option value="Microphone">Microphone</option>
+              <option value="Whiteboard">Whiteboard</option>
+              <option value="Projector">Projector</option>
+              <option value="Electric Fans">Electric Fans</option>
+              <option value="Airconditioner">Airconditioner</option>
+              <option value="Trashbins">Trashbins</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="form.equipment && form.equipment.length" class="space-y-2">
+          <label class="block text-xs font-medium text-slate-600">Equipment Quantities</label>
+          <div v-for="eq in form.equipment" :key="eq" class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <div class="w-full sm:w-1/2 text-sm text-slate-700">{{ eq }}</div>
+            <div class="w-full sm:w-1/2">
+              <input type="number" min="1" v-model.number="form.equipment_quantities[eq]" @input="validateField('equipment_quantities')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.equipment_quantities?.[eq] ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" placeholder="Quantity" />
+              <p v-if="fieldErrors.equipment_quantities?.[eq]" class="mt-1 text-xs text-red-600">{{ fieldErrors.equipment_quantities[eq] }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Other Equipment (describe)</label>
+          <input v-model="form.others" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" placeholder="e.g. podium, stage lights" />
+        </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click.prevent="closeModal">Cancel</AppButton>
+          <AppButton :loading="form.processing" :disabled="form.processing || pinLoading" @click.prevent="editingRequest ? submit() : openPinModal()">
+            <span v-if="form.processing">Submitting…</span>
+            <span v-else>Submit</span>
+          </AppButton>
+        </template>
+      </AppModal>
 
     </div>
     <CsmForm

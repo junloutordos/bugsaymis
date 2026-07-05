@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
 
 const props = defineProps({
   year:         { type: Number, required: true },
@@ -45,17 +47,18 @@ const fillText = (rate) => {
   <AdminLayout title="Recruitment Reports">
     <div class="space-y-6 max-w-6xl mx-auto">
 
-      <!-- Year selector / header row -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Recruitment Dashboard</h1>
+      <AppPageHeader title="Recruitment Dashboard" />
+
+      <!-- Year selector -->
+      <AppFilterBar>
         <div class="flex items-center gap-2">
-          <label class="text-xs font-medium text-slate-600">Year:</label>
-          <select v-model="selectedYear" @change="changeYear"
+          <label class="text-xs font-medium text-slate-600" for="report-year">Year:</label>
+          <select id="report-year" v-model="selectedYear" @change="changeYear"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
             <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
           </select>
         </div>
-      </div>
+      </AppFilterBar>
 
       <!-- KPI Cards -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">

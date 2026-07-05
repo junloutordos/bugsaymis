@@ -1,10 +1,222 @@
+<template>
+  <Head title="Request for Services" />
+  <AdminLayout title="Request for Services">
+    <div class="space-y-5">
+
+      <AppPageHeader title="Request for Services" subtitle="Manage reproduction, security, and janitorial service requests">
+        <template #actions>
+          <AppButton @click="handleNewRequest">+ New Request</AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Filters -->
+      <AppFilterBar>
+        <input v-model="searchQuery" type="text" placeholder="Search requests…"
+               @keydown.enter.prevent="applyFilters"
+               class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+        <template #actions>
+          <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
+          <AppButton size="sm" :disabled="isLoading" @click="applyFilters">Search</AppButton>
+          <AppButton v-if="searchQuery" size="sm" variant="secondary" :disabled="isLoading" @click="clearFilters">Clear</AppButton>
+        </template>
+      </AppFilterBar>
+
+      <!-- Table -->
+      <AppTable :is-empty="filteredRequests.length === 0" :skeleton-cols="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief') ? 8 : 7">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Service</th>
+            <th v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Needed</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Needed</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Purpose(s)</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
+
+        <tr v-for="r in filteredRequests" :key="r.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            {{ r.service_type }}
+            <div v-if="r.service_type==='Reproduction'" class="text-xs text-slate-500">{{ r.copies }} copies × {{ r.sheets_per_set }} sheets</div>
+          </td>
+          <td v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ r.requester?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.date_needed }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.time_needed || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ r.purposes || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <AppBadge :color="statusColor(r.status)">{{ r.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1.5">
+              <AppIconButton v-if="r.status === 'Pending' && roleNames.some(rn => rn !== 'Staff')" label="Edit request" size="sm" @click.prevent="openEdit(r)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="r.status === 'Pending' && roleNames.some(rn => rn !== 'Staff')" label="Delete request" variant="danger" size="sm" @click.prevent="remove(r.id)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="r.status === 'Pending' && hasRole('DivisionChief')" label="Approve request" variant="success" size="sm" @click.prevent="approveRequest(r)">
+                <CheckIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="r.status === 'Pending' && hasRole('DivisionChief')" label="Decline request" variant="danger" size="sm" @click.prevent="declineRequest(r)">
+                <XMarkIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppButton v-if="r.status === 'Approved' && r.requestor_id === page.props.auth.user.id" size="sm" variant="success" @click.prevent="openCsmModal(r)">Confirm &amp; Rate</AppButton>
+              <AppButton v-if="canPrint(r)" as="a" :href="route('service-requests.print', r.id)" target="_blank" variant="secondary" size="sm" title="Print">
+                <PrinterIcon class="w-4 h-4" />
+              </AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="r in filteredRequests" :key="r.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-xs text-slate-500">Request #{{ r.id }}</p>
+                <p class="text-sm font-semibold text-slate-800 mt-0.5">{{ r.service_type ?? '—' }}</p>
+                <p v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="text-xs text-slate-600 mt-1">Requestor: {{ r.requester?.name ?? '—' }}</p>
+              </div>
+              <div class="shrink-0 text-right text-xs text-slate-600">
+                <div>{{ r.date_needed ?? '—' }}</div>
+                <div class="text-slate-400">{{ r.time_needed ?? '—' }}</div>
+              </div>
+            </div>
+            <div class="space-y-1 text-xs text-slate-700">
+              <div><span class="font-medium text-slate-500">Purpose:</span> {{ r.purposes || '—' }}</div>
+              <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
+                <AppBadge :color="statusColor(r.status)">{{ r.status }}</AppBadge>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <AppIconButton v-if="r.status === 'Pending' && roleNames.some(rn => rn !== 'Staff')" label="Edit request" size="sm" @click.prevent="openEdit(r)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="r.status === 'Pending' && roleNames.some(rn => rn !== 'Staff')" label="Delete request" variant="danger" size="sm" @click.prevent="remove(r.id)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppButton v-if="canPrint(r)" as="a" :href="route('service-requests.print', r.id)" target="_blank" variant="secondary" size="sm" title="Print">
+                <PrinterIcon class="w-4 h-4" />
+              </AppButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No requests" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            :total="props.requests?.total ?? 0"
+            @prev="goToPage(currentPage - 1)"
+            @next="goToPage(currentPage + 1)"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
+
+      <!-- Modal -->
+      <AppModal :show="showModal" :title="editingId ? 'Edit Service Request' : 'New Service Request'" @close="closeModal">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Service requested</label>
+            <select v-model="form.service_type" @change="validateField('service_type')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.service_type ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']">
+              <option>Reproduction</option>
+              <option>Security</option>
+              <option>Janitorial</option>
+            </select>
+            <p v-if="fieldErrors.service_type" class="mt-1 text-xs text-red-600">{{ fieldErrors.service_type }}</p>
+          </div>
+
+          <div v-if="form.service_type === 'Reproduction'" class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Number of copies</label>
+              <input v-model.number="form.copies" @input="validateField('copies')" type="number" min="1" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.copies ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+              <p v-if="fieldErrors.copies" class="mt-1 text-xs text-red-600">{{ fieldErrors.copies }}</p>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Sheets per set</label>
+              <input v-model.number="form.sheets_per_set" @input="validateField('sheets_per_set')" type="number" min="1" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.sheets_per_set ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+              <p v-if="fieldErrors.sheets_per_set" class="mt-1 text-xs text-red-600">{{ fieldErrors.sheets_per_set }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Date Needed</label>
+              <input v-model="form.date_needed" @change="validateField('date_needed')" type="date" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_needed ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+              <p v-if="fieldErrors.date_needed" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_needed }}</p>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Time Needed</label>
+              <input v-model="form.time_needed" @change="validateField('time_needed')" type="time" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.time_needed ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+              <p v-if="fieldErrors.time_needed" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_needed }}</p>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Purpose(s)</label>
+            <input v-model="form.purposes" @input="validateField('purposes')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.purposes ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
+            <p v-if="fieldErrors.purposes" class="mt-1 text-xs text-red-600">{{ fieldErrors.purposes }}</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Details</label>
+            <textarea v-model="form.details" @input="validateField('details')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.details ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" rows="4"></textarea>
+            <p v-if="fieldErrors.details" class="mt-1 text-xs text-red-600">{{ fieldErrors.details }}</p>
+          </div>
+        </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+          <AppButton :loading="form.processing" @click="editingId ? submit() : openPinModal()">
+            {{ editingId ? 'Update' : 'Submit' }}
+          </AppButton>
+        </template>
+      </AppModal>
+    </div>
+    <DigitalSignaturePin
+      :show="showSubmitPin"
+      :hasPin="hasPin"
+      :signatureUri="signatureUri"
+      :loading="pinLoading"
+      confirmLabel="Sign & Submit"
+      @confirm="handlePinConfirm"
+      @cancel="handlePinCancel"
+    />
+    <CsmForm
+      :show="showCsmModal"
+      respondable-type="service-request"
+      :respondable-id="requestToCsm?.id ?? 0"
+      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
+      office-availed="General Services Unit"
+      service-key="others"
+      service-other-label="Request for Service"
+      @close="showCsmModal = false"
+      @submitted="showCsmModal = false"
+    />
+  </AdminLayout>
+</template>
+
 <script setup>
 import { Head, useForm, router, usePage } from "@inertiajs/vue3";
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { ref, reactive, computed } from "vue";
 import Swal from 'sweetalert2'
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
-import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { PencilSquareIcon, TrashIcon, PrinterIcon, XMarkIcon, CheckIcon } from "@heroicons/vue/24/outline";
 import { useSubmit } from "@/Composables/useSubmit";
 import CsmForm from '@/Components/CsmForm.vue'
 import DigitalSignaturePin from '@/Components/DigitalSignaturePin.vue'
@@ -87,13 +299,6 @@ const requestsList = computed(() => props.requests?.data ?? [])
 const filteredRequests = computed(() => props.requests?.data ?? [])
 const currentPage = computed(() => props.requests?.current_page ?? 1)
 const totalPages = computed(() => props.requests?.last_page ?? 1)
-
-// responsive: track window width to toggle between table and card layouts
-const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
-const isMobile = computed(() => windowWidth.value < 768)
-const handleResize = () => { windowWidth.value = window.innerWidth }
-onMounted(() => { window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const roleName = computed(() => page.props.auth?.user?.role?.name ?? '');
 const roleNames = computed(() => page.props.auth?.user?.roleNames ?? (roleName.value ? [roleName.value] : []));
@@ -217,229 +422,22 @@ const remove = (id) => {
   })
 };
 
-
-
 const canPrint = (r) => {
   const st = (r?.status || '').toString().toLowerCase();
   if (!st.includes('approved') && st !== 'completed') return false
   const isOwn = r?.requestor_id === page.props.auth?.user?.id
   return props.canViewAll || isOwn
 };
+
+function statusColor(status) {
+  const map = {
+    'Pending':      'amber',
+    'Approved':     'green',
+    'Declined':     'red',
+    'FAD Approved': 'green',
+    'FAD Declined': 'red',
+    'GSU Approved': 'green',
+  }
+  return map[status] ?? 'slate'
+}
 </script>
-
-<template>
-  <Head title="Request for Services" />
-  <AdminLayout title="Request for Services">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Request for Services</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage reproduction, security, and janitorial service requests</p>
-        </div>
-        <button @click="handleNewRequest" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          + New Request
-        </button>
-      </div>
-
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
-          <input v-model="searchQuery" type="text" placeholder="Search requests…"
-                 @keydown.enter.prevent="applyFilters"
-                 class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-          <button @click="applyFilters" :disabled="isLoading"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Search
-          </button>
-          <button v-if="searchQuery" @click="clearFilters" :disabled="isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">
-            Clear
-          </button>
-          <span v-if="isLoading" class="text-xs text-slate-400">Searching...</span>
-        </div>
-
-        <!-- Mobile cards -->
-        <div v-if="isMobile" class="p-4 space-y-3">
-          <div v-for="r in filteredRequests" :key="r.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <p class="text-xs text-slate-500">Request #{{ r.id }}</p>
-                <p class="text-sm font-semibold text-slate-800 mt-0.5">{{ r.service_type ?? '—' }}</p>
-                <p v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="text-xs text-slate-600 mt-1">Requestor: {{ r.requester?.name ?? '—' }}</p>
-              </div>
-              <div class="shrink-0 text-right text-xs text-slate-600">
-                <div>{{ r.date_needed ?? '—' }}</div>
-                <div class="text-slate-400">{{ r.time_needed ?? '—' }}</div>
-              </div>
-            </div>
-            <div class="mt-2 space-y-1 text-xs text-slate-700">
-              <div><span class="font-medium text-slate-500">Purpose:</span> {{ r.purposes || '—' }}</div>
-              <div class="flex items-center gap-2"><span class="font-medium text-slate-500">Status:</span>
-                <span :class="[badgeBase, statusBadgeClass(r.status)]">{{ r.status }}</span>
-              </div>
-            </div>
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="openEdit(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"><PencilSquareIcon class="w-4 h-4"/></button>
-              <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="remove(r.id)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors"><TrashIcon class="w-4 h-4"/></button>
-              <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print"><PrinterIcon class="w-4 h-4"/></a>
-            </div>
-          </div>
-          <div v-if="filteredRequests.length === 0" class="py-16 text-center text-slate-400 text-sm">No requests</div>
-        </div>
-
-        <!-- Desktop table -->
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Service</th>
-                <th v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Requestor</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date Needed</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time Needed</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Purpose(s)</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="r in filteredRequests" :key="r.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  {{ r.service_type }}
-                  <div v-if="r.service_type==='Reproduction'" class="text-xs text-slate-500">{{ r.copies }} copies × {{ r.sheets_per_set }} sheets</div>
-                </td>
-                <td v-if="hasAnyRole('Administrator', 'GSU Head', 'DivisionChief')" class="px-4 py-3 text-sm text-slate-700">{{ r.requester?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.date_needed }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.time_needed || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ r.purposes || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span :class="[badgeBase, statusBadgeClass(r.status)]">{{ r.status }}</span>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1.5">
-                    <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="openEdit(r)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                    <button v-if="r.status === 'Pending' && roleNames.some(r => r !== 'Staff')" @click.prevent="remove(r.id)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                    <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="approveRequest(r)" class="p-1.5 rounded-lg hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 transition-colors" title="Approve"><CheckIcon class="w-4 h-4"/></button>
-                    <button v-if="r.status === 'Pending' && hasRole('DivisionChief')" @click.prevent="declineRequest(r)" class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Decline"><XMarkIcon class="w-4 h-4"/></button>
-                    <button v-if="r.status === 'Approved' && r.requestor_id === page.props.auth.user.id" @click.prevent="openCsmModal(r)" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">Confirm &amp; Rate</button>
-                    <a v-if="canPrint(r)" :href="route('service-requests.print', r.id)" target="_blank" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Print">
-                      <PrinterIcon class="w-4 h-4" />
-                    </a>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredRequests.length === 0">
-                <td :colspan="(hasAnyRole('Administrator', 'GSU Head', 'DivisionChief') ? 8 : 7)" class="py-16 text-center text-slate-400 text-sm">No requests</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Pagination -->
-        <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          :total="props.requests?.total ?? 0"
-          @prev="goToPage(currentPage - 1)"
-          @next="goToPage(currentPage + 1)"
-          @page="goToPage"
-        />
-      </div>
-
-      <!-- Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-slate-800">{{ editingId ? 'Edit Service Request' : 'New Service Request' }}</h2>
-            <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <XMarkIcon class="w-4 h-4" />
-            </button>
-          </div>
-          <div class="px-6 py-5 space-y-4">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Service requested</label>
-              <select v-model="form.service_type" @change="validateField('service_type')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.service_type ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']">
-                <option>Reproduction</option>
-                <option>Security</option>
-                <option>Janitorial</option>
-              </select>
-              <p v-if="fieldErrors.service_type" class="mt-1 text-xs text-red-600">{{ fieldErrors.service_type }}</p>
-            </div>
-
-            <div v-if="form.service_type === 'Reproduction'" class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Number of copies</label>
-                <input v-model.number="form.copies" @input="validateField('copies')" type="number" min="1" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.copies ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.copies" class="mt-1 text-xs text-red-600">{{ fieldErrors.copies }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Sheets per set</label>
-                <input v-model.number="form.sheets_per_set" @input="validateField('sheets_per_set')" type="number" min="1" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.sheets_per_set ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.sheets_per_set" class="mt-1 text-xs text-red-600">{{ fieldErrors.sheets_per_set }}</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Date Needed</label>
-                <input v-model="form.date_needed" @change="validateField('date_needed')" type="date" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.date_needed ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.date_needed" class="mt-1 text-xs text-red-600">{{ fieldErrors.date_needed }}</p>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Time Needed</label>
-                <input v-model="form.time_needed" @change="validateField('time_needed')" type="time" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.time_needed ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-                <p v-if="fieldErrors.time_needed" class="mt-1 text-xs text-red-600">{{ fieldErrors.time_needed }}</p>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Purpose(s)</label>
-              <input v-model="form.purposes" @input="validateField('purposes')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.purposes ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" />
-              <p v-if="fieldErrors.purposes" class="mt-1 text-xs text-red-600">{{ fieldErrors.purposes }}</p>
-            </div>
-
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Details</label>
-              <textarea v-model="form.details" @input="validateField('details')" :class="['w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500', fieldErrors.details ? 'border-red-400' : 'border-slate-200 focus:border-indigo-400']" rows="4"></textarea>
-              <p v-if="fieldErrors.details" class="mt-1 text-xs text-red-600">{{ fieldErrors.details }}</p>
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button @click="editingId ? submit() : openPinModal()" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">
-              <span v-if="form.processing">Processing…</span>
-              <span v-else>{{ editingId ? 'Update' : 'Submit' }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <DigitalSignaturePin
-      :show="showSubmitPin"
-      :hasPin="hasPin"
-      :signatureUri="signatureUri"
-      :loading="pinLoading"
-      confirmLabel="Sign & Submit"
-      @confirm="handlePinConfirm"
-      @cancel="handlePinCancel"
-    />
-    <CsmForm
-      :show="showCsmModal"
-      respondable-type="service-request"
-      :respondable-id="requestToCsm?.id ?? 0"
-      :transaction-date="requestToCsm?.created_at?.slice(0,10) ?? ''"
-      office-availed="General Services Unit"
-      service-key="others"
-      service-other-label="Request for Service"
-      @close="showCsmModal = false"
-      @submitted="showCsmModal = false"
-    />
-  </AdminLayout>
-</template>

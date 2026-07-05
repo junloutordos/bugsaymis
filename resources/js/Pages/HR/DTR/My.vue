@@ -4,7 +4,7 @@
     <div class="space-y-5">
 
       <!-- Employee Header -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+      <AppCard>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div class="flex items-center gap-3">
             <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
@@ -24,24 +24,23 @@
             </div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <button @click="changeMonth(-1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
-              <ChevronLeftIcon class="h-4 w-4 text-slate-600" />
-            </button>
+            <AppIconButton label="Previous month" variant="secondary" @click="changeMonth(-1)">
+              <ChevronLeftIcon class="h-4 w-4" />
+            </AppIconButton>
             <input
               v-model="currentMonth"
               type="month"
               @change="goMonth"
               class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
-            <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
-              <ChevronRightIcon class="h-4 w-4 text-slate-600" />
-            </button>
-            <button v-if="isCos && isCurrentMonth && !props.advanceRecord" @click="submitMyAdvanceGenerate" :disabled="advanceGenerating"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+            <AppIconButton label="Next month" variant="secondary" @click="changeMonth(1)">
+              <ChevronRightIcon class="h-4 w-4" />
+            </AppIconButton>
+            <AppButton v-if="isCos && isCurrentMonth && !props.advanceRecord" variant="warning" :disabled="advanceGenerating" @click="submitMyAdvanceGenerate"
               title="Generate your advance cut-off entry for tomorrow">
               <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
               {{ advanceGenerating ? 'Generating…' : 'Generate Advance Entry' }}
-            </button>
+            </AppButton>
             <div v-if="isCos" class="flex flex-wrap items-end gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
               <div>
                 <label class="block text-[10px] font-semibold uppercase tracking-wide text-amber-700">Checklist from</label>
@@ -56,21 +55,20 @@
                   title="Checklist date to" />
               </div>
             </div>
-            <button @click="printChecklist"
-               class="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+            <AppButton class="ml-1" @click="printChecklist">
               <PrinterIcon class="h-4 w-4" />Print Checklist
-            </button>
+            </AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Flash -->
       <div v-if="$page.props.flash?.success"
-        class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.success }}
       </div>
       <div v-if="$page.props.flash?.error"
-        class="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        class="bg-danger-50 border border-danger-100 text-danger-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />{{ $page.props.flash.error }}
       </div>
 
@@ -104,15 +102,14 @@
           <p class="text-sm font-semibold text-amber-800">You have pending penned entries</p>
           <p class="text-xs text-amber-600 mt-0.5">Once you submit, your entries will be locked for review. HR/Admin can unlock if corrections are needed.</p>
         </div>
-        <button @click="confirmSubmitPenned"
-          class="shrink-0 inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm">
+        <AppButton variant="warning" class="shrink-0" @click="confirmSubmitPenned">
           <LockClosedIcon class="h-4 w-4" /> Submit & Lock
-        </button>
+        </AppButton>
       </div>
 
       <div v-if="allSubmitted"
-           class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3 text-sm text-emerald-700">
-        <LockClosedIcon class="h-5 w-5 shrink-0 text-emerald-500" />
+           class="bg-success-50 border border-success-100 rounded-xl p-4 flex items-center gap-3 text-sm text-success-700">
+        <LockClosedIcon class="h-5 w-5 shrink-0 text-success-500" />
         <span>Penned entries for <strong>{{ currentMonth }}</strong> have been submitted and are locked. Contact HR if corrections are needed.</span>
       </div>
 
@@ -161,7 +158,8 @@
       </div>
 
       <!-- Calendar Grid -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+      <AppCard :padded="false">
+       <div class="p-4">
         <h2 class="text-sm font-semibold text-slate-700 mb-3">{{ monthLabel }}</h2>
         <div class="grid grid-cols-7 mb-1">
           <div v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d"
@@ -250,17 +248,17 @@
             </template>
           </div>
         </div>
-      </div>
+       </div>
+      </AppCard>
 
       <!-- Detail Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-sm font-semibold text-slate-700">Detail Records</h2>
           <p class="text-xs text-slate-400">Click the pencil icon on any row to submit a penned entry for missing time slots.</p>
         </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
+        <AppTable :card="false" :is-empty="!records.length" :skeleton-cols="14">
+          <template #head>
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Day</th>
@@ -277,11 +275,8 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                 <th class="px-4 py-3"></th>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="!records.length">
-                <td colspan="14" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
-              </tr>
+          </template>
+
               <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50/60'">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
@@ -326,11 +321,10 @@
                 <td class="px-4 py-2.5">
                   <div class="flex items-center gap-1 flex-wrap">
                     <!-- Main status badge — hidden when a specific badge below replaces it -->
-                    <span v-if="r.attendance_status !== 'on_leave' && !r.is_travel && !gatepassByDate[toDateStr(r.work_date)]"
-                          :class="statusBadge(r.attendance_status)"
-                          class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                    <AppBadge v-if="r.attendance_status !== 'on_leave' && !r.is_travel && !gatepassByDate[toDateStr(r.work_date)]"
+                          :color="statusBadgeColor(r.attendance_status)">
                       {{ statusLabel(r.attendance_status) }}
-                    </span>
+                    </AppBadge>
                     <!-- Gate pass badge (replaces main status badge) -->
                     <span v-if="gatepassByDate[toDateStr(r.work_date)]"
                           class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap"
@@ -383,21 +377,78 @@
                   </template>
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+
+          <template #mobileCard>
+            <div v-for="r in records" :key="r.id" class="p-4 space-y-2" :class="r.is_advance ? 'bg-amber-50/60' : ''">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="text-sm font-medium text-slate-800">{{ toDateStr(r.work_date) }}</p>
+                  <p class="text-xs text-slate-500">{{ getDayName(r.work_date) }}</p>
+                </div>
+                <div class="flex items-center gap-1 flex-wrap justify-end">
+                  <AppBadge v-if="r.attendance_status !== 'on_leave' && !r.is_travel && !gatepassByDate[toDateStr(r.work_date)]"
+                        :color="statusBadgeColor(r.attendance_status)">
+                    {{ statusLabel(r.attendance_status) }}
+                  </AppBadge>
+                  <span v-if="gatepassByDate[toDateStr(r.work_date)]"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 whitespace-nowrap">
+                    {{ gatepassByDate[toDateStr(r.work_date)].label }}
+                  </span>
+                  <span v-if="r.attendance_status === 'on_leave'"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 whitespace-nowrap">
+                    {{ r.leave_application?.leave_type?.code || 'L' }}
+                  </span>
+                  <span v-if="r.is_travel"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-600 whitespace-nowrap">T</span>
+                  <span v-if="r.is_advance"
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 whitespace-nowrap">Advance</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-mono">
+                <span>AM {{ tableCellText(r, 'time_in_am') }} – {{ tableCellText(r, 'time_out_am') }}</span>
+                <span>PM {{ tableCellText(r, 'time_in_pm') }} – {{ tableCellText(r, 'time_out_pm') }}</span>
+              </div>
+              <div class="flex flex-wrap gap-3 text-xs text-slate-500">
+                <span>Hrs: <strong class="text-slate-700">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</strong></span>
+                <span>Late: {{ fmtMinutes(r.late_minutes) }}</span>
+                <span>UT: {{ fmtMinutes(r.undertime_minutes) }}</span>
+                <span>OT: {{ fmtMinutes(r.overtime_minutes) }}</span>
+              </div>
+              <div class="pt-1">
+                <template v-if="r.is_advance">
+                  <button @click="saveAdvancePenned(r)" :disabled="advancePennedForm.processing"
+                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded font-medium disabled:opacity-50 whitespace-nowrap">
+                    {{ advancePennedForm.processing ? '…' : 'Save' }}
+                  </button>
+                </template>
+                <template v-else>
+                  <LockClosedIcon v-if="r.penned_submitted_at" class="h-4 w-4 text-amber-400" />
+                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
+                  <button v-else-if="hasMissingSlots(r) || r.is_travel" @click="openEdit(r)"
+                    class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 transition-colors">
+                    <PencilSquareIcon class="h-4 w-4" />Submit penned entry
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No records for this month." />
+          </template>
+        </AppTable>
+      </AppCard>
 
     </div>
 
     <!-- Penned Entry Modal -->
-    <Teleport to="body">
-      <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-          <h3 class="text-base font-semibold text-slate-800 mb-0.5">
-            {{ editModal.record?.is_advance ? 'Submit Advance Entry' : 'Submit Penned Entry' }}
-          </h3>
-          <p class="text-sm text-slate-400 mb-1">{{ toDateStr(editModal.record?.work_date) }} — {{ getDayName(editModal.record?.work_date) }}</p>
+    <AppModal
+      :show="editModal.open"
+      size="sm"
+      :title="editModal.record?.is_advance ? 'Submit Advance Entry' : 'Submit Penned Entry'"
+      :subtitle="`${toDateStr(editModal.record?.work_date)} — ${getDayName(editModal.record?.work_date)}`"
+      @close="editModal.open = false"
+    >
           <p v-if="editModal.record?.is_advance" class="text-[11px] text-amber-600 mb-4 font-medium">
             This is an advance cut-off entry. Enter your <span class="font-semibold">expected</span> time for this date. It will be replaced by biometric data once the actual day passes.
           </p>
@@ -443,16 +494,13 @@
             </div>
           </div>
 
-          <div class="flex gap-3 justify-end mt-5">
-            <button @click="editModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="submitEdit" :disabled="editForm.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">
-              {{ editForm.processing ? 'Submitting…' : 'Submit Penned Entry' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      <template #footer>
+        <AppButton variant="secondary" @click="editModal.open = false">Cancel</AppButton>
+        <AppButton @click="submitEdit" :loading="editForm.processing">
+          {{ editForm.processing ? 'Submitting…' : 'Submit Penned Entry' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -461,6 +509,13 @@
 import { ref, computed, reactive } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 import {
@@ -777,6 +832,19 @@ function statusLabel(status) {
     on_official_business: 'OB',
     wfh:                  'WFH',
   }[status] ?? (status ?? '').replace(/_/g, ' ')
+}
+
+// AppBadge color key for the detail-table main status pill (calendar cells keep using statusBadge() above)
+function statusBadgeColor(status) {
+  return {
+    present:              'green',
+    absent:               'red',
+    half_day:             'amber',
+    on_leave:             'blue',
+    holiday:              'purple',
+    on_official_business: 'orange',
+    wfh:                  'slate',
+  }[status] ?? 'slate'
 }
 
 function fieldLabel(field) {

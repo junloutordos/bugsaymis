@@ -1,7 +1,14 @@
 <script setup>
 import { Head } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
+import AppPageHeader from "@/Components/AppPageHeader.vue";
+import AppCard from "@/Components/AppCard.vue";
+import AppButton from "@/Components/AppButton.vue";
+import AppBadge from "@/Components/AppBadge.vue";
+import AppModal from "@/Components/AppModal.vue";
+import AppInput from "@/Components/AppInput.vue";
+import AppTextarea from "@/Components/AppTextarea.vue";
+import { CheckIcon, PlusIcon, ArrowPathIcon, PrinterIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import Swal from "sweetalert2";
@@ -434,6 +441,30 @@ const submitForRating = () => {
 // ---------- UI Helpers ----------
 const statusBadgeClass = ipcrStatusClass;
 
+// AppBadge color mapping (mirrors ipcrStatusClass palette)
+function statusBadgeColor(status) {
+  const map = {
+    "New Target": "blue",
+    "For Review": "amber",
+    "Targets Approved": "green",
+    "Submitted for Rating": "orange",
+    "Rated & For PMT Review": "purple",
+    "Submitted to PMT": "purple",
+    "PMT Returned for Revision": "red",
+    "Submitted to HR": "blue",
+    "Approved by PMT": "green",
+    "Director Signed": "green",
+    "Returned for Revision": "red",
+    "Rejected": "red",
+  };
+  return map[status] ?? "slate";
+}
+
+const breadcrumbItems = computed(() => [
+  { label: "My IPCR Targets", href: route("employee-ipcr.index") },
+  { label: props.ipcr.title },
+]);
+
 // ---------- Correct Summary Calculation with Sorting + Weights ----------
 const summaryByFunctionType = computed(() => {
   const summary = {};
@@ -645,102 +676,80 @@ const pullFLAccomplishments = () => {
     <div class="p-6 space-y-5">
 
       <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <button @click="$inertia.get(route('employee-ipcr.index'))"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm mb-3">
-            <ArrowLeftIcon class="w-4 h-4" /> Back to IPCR List
-          </button>
-          <h1 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h1>
-          <p class="text-sm text-slate-500">Rating Period: {{ ipcr.rating_period }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <span :class="statusBadgeClass(ipcr.status)"
-            class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
-            {{ ipcr.status }}
-          </span>
-        </div>
-      </div>
+      <AppPageHeader :title="ipcr.title" :subtitle="`Rating Period: ${ipcr.rating_period}`" :breadcrumb="breadcrumbItems">
+        <template #actions>
+          <AppBadge :color="statusBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
+        </template>
+      </AppPageHeader>
 
       <!-- IPCR Details Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-base font-semibold text-slate-800">IPCR Details</h2>
           <div class="flex flex-wrap items-center gap-2 no-print">
-            <button
+            <AppButton
               v-if="isOwner && ipcr.status === 'New Target'"
               @click="submitForReview"
+              :loading="isSubmitting"
               :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckIcon class="h-4 w-4" />
               {{ isSubmitting ? 'Processing…' : 'Submit for Review and Approval' }}
-            </button>
+            </AppButton>
 
-            <button
+            <AppButton
               v-if="isOwner && ipcr.status === 'Targets Approved'"
               @click="submitForRating"
+              :loading="isSubmitting"
               :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckIcon class="h-4 w-4" />
               {{ isSubmitting ? 'Processing…' : 'Submit for Rating of the Accomplishment' }}
-            </button>
+            </AppButton>
 
             <!-- Faculty Loading sync — CID teachers only, available before submission -->
-            <button
+            <AppButton
               v-if="isFaculty && ['New Target', 'For Review', 'Targets Approved', 'Returned for Revision'].includes(ipcr.status)"
+              variant="success"
               @click="pullFLAccomplishments"
+              :loading="isSubmitting"
               :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               title="Copy accomplishments and ratings from your Faculty Loading committee assignments"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
+              <ArrowPathIcon class="h-4 w-4" />
               {{ isSubmitting ? 'Processing…' : 'Sync from Faculty Loading' }}
-            </button>
+            </AppButton>
 
-            <button
+            <AppButton
               v-if="isOwner && ipcr.status === 'Returned for Revision'"
               @click="showAddPlansModal = true"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
+              <PlusIcon class="h-4 w-4" />
               Add Plans
-            </button>
+            </AppButton>
 
-            <button
+            <AppButton
               v-if="isOwner && ipcr.status === 'Returned for Revision'"
+              variant="secondary"
               @click="resubmit"
+              :loading="isSubmitting"
               :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
+              <ArrowPathIcon class="h-4 w-4" />
               {{ isSubmitting ? 'Processing…' : 'Resubmit for Review' }}
-            </button>
+            </AppButton>
 
-            <button
+            <AppButton
               v-if="isAtPMTStage || ipcr.status === 'Targets Approved'"
+              variant="secondary"
               @click="printIPCR"
-              class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 9v6h12V9M6 9V5h12v4M6 15v4h12v-4M6 15H4v4h16v-4h-2" />
-              </svg>
+              <PrinterIcon class="h-4 w-4" />
               Print IPCR
-            </button>
+            </AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Plans Table Card -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm" id="ipcr-printable">
@@ -949,12 +958,14 @@ const pullFLAccomplishments = () => {
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
                           <div class="flex items-start gap-2">
                             <span class="flex-1">{{ piPlans[0].pivot?.remarks || "—" }}</span>
-                            <button
+                            <AppButton
                               v-if="isOwner && ipcr.status === 'Returned for Revision'"
+                              variant="danger"
+                              size="sm"
+                              class="shrink-0 no-print"
                               @click="removePlan(piPlans[0])"
-                              class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
                               title="Remove plan"
-                            >Remove</button>
+                            >Remove</AppButton>
                           </div>
                         </td>
                       </tr>
@@ -1037,12 +1048,14 @@ const pullFLAccomplishments = () => {
                         <td class="px-4 py-3 text-sm text-slate-700 border border-slate-200">
                           <div class="flex items-start gap-2">
                             <span class="flex-1">{{ plan.pivot?.remarks || "—" }}</span>
-                            <button
+                            <AppButton
                               v-if="isOwner && ipcr.status === 'Returned for Revision'"
+                              variant="danger"
+                              size="sm"
+                              class="shrink-0 no-print"
                               @click="removePlan(plan)"
-                              class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded-lg text-xs font-medium transition-colors shrink-0 no-print"
                               title="Remove plan"
-                            >Remove</button>
+                            >Remove</AppButton>
                           </div>
                         </td>
 
@@ -1168,66 +1181,51 @@ const pullFLAccomplishments = () => {
   </AdminLayout>
 
   <!-- Update Accomplishment Modal -->
-  <Teleport to="body">
-    <div v-if="isModalOpen"
-      class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
-      @click.self="closeModal">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-800">Update Accomplishment</h3>
-          <button @click="closeModal" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        <div class="px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment</label>
-            <input type="text" v-model="form.accomplishment" :disabled="hasSupervisorRating(currentPlan?.pivot)"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">MOVs Link</label>
-            <input type="text" v-model="form.mov_link" :disabled="hasSupervisorRating(currentPlan?.pivot)"
-              class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Quality</label>
-              <input type="number" min="0" max="100" v-model="form.quality" :disabled="hasSupervisorRating(currentPlan?.pivot)"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Efficiency</label>
-              <input type="number" min="0" max="100" v-model="form.efficiency" :disabled="hasSupervisorRating(currentPlan?.pivot)"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">Timeliness</label>
-              <input type="number" min="0" max="100" v-model="form.timeliness" :disabled="hasSupervisorRating(currentPlan?.pivot)"
-                class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400"/>
-            </div>
-          </div>
-          <div class="text-sm text-slate-600">Average: <strong class="text-slate-800">{{ liveAverage }}</strong></div>
-          <div v-if="hasSupervisorRating(currentPlan?.pivot)"
-            class="rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs text-red-600">
-            Supervisor ratings are present for this plan. Self editing is disabled.
-          </div>
-        </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click="closeModal"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Close
-          </button>
-          <button v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ isSubmitting ? 'Saving…' : 'Save' }}
-          </button>
-        </div>
+  <AppModal :show="isModalOpen" title="Update Accomplishment" @close="closeModal">
+    <div class="space-y-4">
+      <AppInput
+        label="Accomplishment"
+        v-model="form.accomplishment"
+        :disabled="hasSupervisorRating(currentPlan?.pivot)"
+      />
+      <AppInput
+        label="MOVs Link"
+        v-model="form.mov_link"
+        :disabled="hasSupervisorRating(currentPlan?.pivot)"
+      />
+      <div class="grid grid-cols-3 gap-3">
+        <AppInput
+          label="Quality"
+          type="number" min="0" max="100"
+          v-model="form.quality"
+          :disabled="hasSupervisorRating(currentPlan?.pivot)"
+        />
+        <AppInput
+          label="Efficiency"
+          type="number" min="0" max="100"
+          v-model="form.efficiency"
+          :disabled="hasSupervisorRating(currentPlan?.pivot)"
+        />
+        <AppInput
+          label="Timeliness"
+          type="number" min="0" max="100"
+          v-model="form.timeliness"
+          :disabled="hasSupervisorRating(currentPlan?.pivot)"
+        />
+      </div>
+      <div class="text-sm text-slate-600">Average: <strong class="text-slate-800">{{ liveAverage }}</strong></div>
+      <div v-if="hasSupervisorRating(currentPlan?.pivot)"
+        class="rounded-lg bg-danger-50 border border-danger-100 px-3 py-2 text-xs text-danger-600">
+        Supervisor ratings are present for this plan. Self editing is disabled.
       </div>
     </div>
-  </Teleport>
+    <template #footer>
+      <AppButton variant="secondary" @click="closeModal">Close</AppButton>
+      <AppButton v-if="!hasSupervisorRating(currentPlan?.pivot)" @click="saveModal" :loading="isSubmitting" :disabled="isSubmitting">
+        {{ isSubmitting ? 'Saving…' : 'Save' }}
+      </AppButton>
+    </template>
+  </AppModal>
 
   <!-- Add Plans Modal -->
   <Teleport to="body">

@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-3">
 
-    <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+    <div class="bg-warning-50 border border-warning-100 rounded-lg px-3 py-2 text-xs text-warning-700">
       Disclose relatives within the 4th civil degree of consanguinity or affinity who are in government service (R.A. 6713, Sec. 8).
     </div>
 

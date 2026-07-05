@@ -1,7 +1,15 @@
 <script setup>
 import { Head } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon } from "@heroicons/vue/24/outline";
+import AppPageHeader from "@/Components/AppPageHeader.vue";
+import AppButton from "@/Components/AppButton.vue";
+import AppIconButton from "@/Components/AppIconButton.vue";
+import AppFilterBar from "@/Components/AppFilterBar.vue";
+import AppTable from "@/Components/AppTable.vue";
+import AppBadge from "@/Components/AppBadge.vue";
+import EmptyState from "@/Components/EmptyState.vue";
+import PaginationControl from "@/Components/PaginationControl.vue";
+import { EyeIcon, PencilSquareIcon, TrashIcon, PlusIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { useOutcomes } from "@/Composables/useOutcomes.js";
 
 const props = defineProps({
@@ -26,82 +34,115 @@ const {
 
 // Dropdown options
 const outcomeTypes = ["Strategic Functions", "Core Functions", "Support Functions"];
+
+function outcomeTypeColor(type) {
+  const map = {
+    "Strategic Functions": "indigo",
+    "Core Functions": "blue",
+    "Support Functions": "purple",
+  };
+  return map[type] ?? "slate";
+}
 </script>
 
 <template>
   <Head title="Agency Organizational Outcomes" />
   <AdminLayout title="Agency Organizational Outcome Management">
-    <div class="p-6 space-y-5">
+    <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Organizational Outcomes</h1>
-        <button @click="openModal('create')" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          <PlusIcon class="w-4 h-4" /> New Outcome
-        </button>
-      </div>
+      <AppPageHeader title="Organizational Outcomes" subtitle="Manage agency strategic, core, and support function outcomes.">
+        <template #actions>
+          <AppButton @click="openModal('create')">
+            <PlusIcon class="w-4 h-4" /> New Outcome
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap items-center gap-3">
+      <AppFilterBar>
         <input
           v-model="searchQuery"
           type="text"
           placeholder="Search outcomes..."
           class="flex-1 min-w-52 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
         />
-      </div>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Outcome</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sub-Outcome</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created At</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.outcome }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.sub_outcome ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.function_type ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(outcome.created_at).toLocaleDateString() }}</td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex justify-center gap-1 items-center">
-                    <button @click="openModal('view', outcome)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                      <EyeIcon class="w-4 h-4" />
-                    </button>
-                    <button @click="openModal('edit', outcome)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-amber-700 transition-colors">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                    <button @click="deleteOutcome(outcome)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-red-600 transition-colors">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredOutcomes.length===0">
-                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">No outcomes found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <AppTable :is-empty="filteredOutcomes.length === 0" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Outcome</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Sub-Outcome</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Created At</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+          </tr>
+        </template>
 
-        <!-- Pagination -->
-                <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+        <tr v-for="outcome in filteredOutcomes" :key="outcome.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.outcome }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ outcome.sub_outcome ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <AppBadge v-if="outcome.function_type" :color="outcomeTypeColor(outcome.function_type)">{{ outcome.function_type }}</AppBadge>
+            <span v-else>—</span>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ new Date(outcome.created_at).toLocaleDateString() }}</td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex justify-center gap-1 items-center">
+              <AppIconButton label="View" @click="openModal('view', outcome)">
+                <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton label="Edit" variant="warning" @click="openModal('edit', outcome)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton label="Delete" variant="danger" @click="deleteOutcome(outcome)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="outcome in filteredOutcomes" :key="outcome.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ outcome.outcome }}</p>
+                <p class="text-xs text-slate-500">{{ outcome.sub_outcome ?? '—' }}</p>
+              </div>
+              <AppBadge v-if="outcome.function_type" :color="outcomeTypeColor(outcome.function_type)">{{ outcome.function_type }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-400">Created {{ new Date(outcome.created_at).toLocaleDateString() }}</p>
+            <div class="flex items-center gap-1 pt-1">
+              <AppIconButton label="View" @click="openModal('view', outcome)">
+                <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton label="Edit" variant="warning" @click="openModal('edit', outcome)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton label="Delete" variant="danger" @click="deleteOutcome(outcome)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No outcomes found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
       <!-- Modal -->
       <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/50 z-50 p-4">
@@ -110,9 +151,9 @@ const outcomeTypes = ["Strategic Functions", "Core Functions", "Support Function
             <h2 class="text-base font-semibold text-slate-800">
               {{ modalMode==='create' ? 'New Outcome' : modalMode==='edit' ? 'Edit Outcome' : 'View Outcome' }}
             </h2>
-            <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" @click="closeModal">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
+            <AppIconButton label="Close" @click="closeModal">
+              <XMarkIcon class="w-4 h-4" />
+            </AppIconButton>
           </div>
 
           <!-- VIEW MODE -->
@@ -155,8 +196,8 @@ const outcomeTypes = ["Strategic Functions", "Core Functions", "Support Function
               </div>
             </div>
             <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-              <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-              <button type="submit" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Save</button>
+              <AppButton type="button" variant="secondary" @click="closeModal">Cancel</AppButton>
+              <AppButton type="submit">Save</AppButton>
             </div>
           </form>
         </div>

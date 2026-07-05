@@ -3,18 +3,15 @@
   <AdminLayout title="Refer to Guidance">
     <div class="max-w-2xl mx-auto space-y-5">
 
-      <!-- Header -->
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">Refer a Student to the Guidance Office</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Search for a student and fill in the referral details below.</p>
-      </div>
+      <AppPageHeader title="Refer a Student to the Guidance Office" subtitle="Search for a student and fill in the referral details below." />
 
       <!-- Success banner -->
-      <div v-if="successMessage" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm">
+      <div v-if="successMessage" class="bg-success-50 border border-success-100 text-success-700 rounded-xl px-4 py-3 text-sm">
         {{ successMessage }}
       </div>
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-5">
+      <AppCard>
+        <div class="space-y-5">
 
         <!-- Student Search -->
         <div>
@@ -101,24 +98,24 @@
 
         <!-- Actions -->
         <div class="flex gap-3 justify-end pt-2 border-t border-slate-100">
-          <button
+          <AppButton
             type="button"
+            variant="secondary"
             @click="resetForm"
-            class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
           >
             Clear
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
             @click="submitReferral"
-            :disabled="loading"
-            class="px-6 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+            :loading="loading"
           >
             {{ loading ? 'Submitting…' : 'Submit Referral' }}
-          </button>
+          </AppButton>
         </div>
 
-      </div>
+        </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>
@@ -127,6 +124,9 @@
 import { ref, computed, watch } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
 import Swal from 'sweetalert2'
 import 'sweetalert2/dist/sweetalert2.min.css'
 

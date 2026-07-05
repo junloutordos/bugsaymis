@@ -10,23 +10,23 @@
       </div>
 
       <div class="grid grid-cols-2 gap-6 mb-6">
-        <button @click="setType('walk-in')" :class="type==='walk-in' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'" class="py-8 rounded-xl text-center shadow-lg text-lg">Walk-in Consultation</button>
-        <button @click="setType('scheduled')" :class="type==='scheduled' ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'" class="py-8 rounded-xl text-center shadow-lg text-lg">Scheduled Consultation</button>
+        <button @click="setType('walk-in')" :class="type==='walk-in' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800'" class="py-8 rounded-xl text-center shadow-lg text-lg">Walk-in Consultation</button>
+        <button @click="setType('scheduled')" :class="type==='scheduled' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800'" class="py-8 rounded-xl text-center shadow-lg text-lg">Scheduled Consultation</button>
       </div>
 
       <div class="bg-white/90 p-6 rounded-xl shadow-lg">
         <form @submit.prevent="submit">
                 <div class="mb-4">
-                  <label class="block text-sm font-medium text-gray-700">PISAY ID</label>
-                  <input ref="pisayInput" v-model="form.pisay" @input="formatPisay" type="text" maxlength="13" class="mt-1 block w-full rounded border-gray-300" placeholder="13-XXXX-XXX" />
+                  <label for="kiosk-pisay" class="block text-sm font-medium text-gray-700">PISAY ID</label>
+                  <input id="kiosk-pisay" ref="pisayInput" v-model="form.pisay" @input="formatPisay" type="text" maxlength="13" class="mt-1 block w-full rounded border-gray-300" placeholder="13-XXXX-XXX" />
                 </div>
 
           <div v-if="type==='scheduled'" class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Choose a schedule</label>
+            <label for="kiosk-schedule" class="block text-sm font-medium text-gray-700">Choose a schedule</label>
             <div class="mt-2">
               <div v-if="physicianSchedules.length === 0" class="text-sm text-gray-500">No physician schedules available.</div>
               <div v-else>
-                <select v-model="form.physician_schedule_id" class="mt-1 block w-full rounded border-gray-300 p-2">
+                <select id="kiosk-schedule" v-model="form.physician_schedule_id" class="mt-1 block w-full rounded border-gray-300 p-2">
                   <option value="" disabled>Select a schedule</option>
                   <option v-for="s in physicianSchedules" :key="s.id" :value="s.id">{{ formatDate(s.schedule_date) }} — {{ s.time_start }}{{ s.time_end ? ' - ' + s.time_end : '' }}</option>
                 </select>
@@ -64,17 +64,17 @@
             </div>
 
             <div v-if="form.concerns.includes('Others')" class="mt-3">
-              <label class="block text-sm font-medium text-gray-700">Please specify</label>
-              <input v-model="form.other_concern" type="text" class="mt-1 block w-full rounded border-gray-300" placeholder="Describe other concern" />
+              <label for="kiosk-other-concern" class="block text-sm font-medium text-gray-700">Please specify</label>
+              <input id="kiosk-other-concern" v-model="form.other_concern" type="text" class="mt-1 block w-full rounded border-gray-300" placeholder="Describe other concern" />
             </div>
             <div v-if="form.concerns.includes('Injury')" class="mt-3">
-              <label class="block text-sm font-medium text-gray-700">Type of injury</label>
-              <input v-model="form.injury_type" type="text" class="mt-1 block w-full rounded border-gray-300" placeholder="Describe injury (e.g. cut, sprain)" />
+              <label for="kiosk-injury-type" class="block text-sm font-medium text-gray-700">Type of injury</label>
+              <input id="kiosk-injury-type" v-model="form.injury_type" type="text" class="mt-1 block w-full rounded border-gray-300" placeholder="Describe injury (e.g. cut, sprain)" />
             </div>
           </div>
 
           <div class="flex justify-center">
-            <button type="submit" :disabled="form.processing" class="px-8 py-4 bg-green-600 text-white rounded-lg text-lg disabled:opacity-60 inline-flex items-center justify-center">
+            <button type="submit" :disabled="form.processing" class="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-lg disabled:opacity-60 inline-flex items-center justify-center">
               <span v-if="form.processing" class="inline-flex items-center">
                 <svg class="animate-spin mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

@@ -58,7 +58,7 @@
                     <PencilIcon class="h-4 w-4" />
                   </button>
                   <button type="button" @click="$emit('delete', item)"
-                    class="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    class="p-1 rounded text-slate-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
                     title="Delete">
                     <TrashIcon class="h-4 w-4" />
                   </button>

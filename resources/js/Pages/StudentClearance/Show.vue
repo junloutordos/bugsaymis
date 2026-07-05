@@ -2,6 +2,9 @@
 import { computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import { ArrowLeftIcon, CheckCircleIcon, ClipboardDocumentCheckIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -51,6 +54,22 @@ function statusLabel(status) {
   }[status] ?? String(status ?? '').replaceAll('_', ' ')
 }
 
+function statusBadgeColor(status) {
+  return {
+    cleared: 'green',
+    waived: 'blue',
+    not_applicable: 'slate',
+    hold: 'amber',
+    returned: 'red',
+    pending_registrar: 'blue',
+    ready_for_adviser: 'indigo',
+    with_accountability: 'amber',
+    pending: 'slate',
+    in_progress: 'slate',
+    open: 'slate',
+  }[status] ?? 'slate'
+}
+
 function adviserReview() {
   router.post(route('student-clearance.adviser-review', props.clearance.id), {}, { preserveScroll: true })
 }
@@ -70,7 +89,7 @@ function finalizeClearance() {
         Back to clearance dashboard
       </Link>
 
-      <section class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <AppCard>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">{{ clearance.period.title }}</p>
@@ -79,21 +98,19 @@ function finalizeClearance() {
               {{ clearance.pisays_id }} / Grade {{ clearance.grade_level }} {{ clearance.section_name }}
             </p>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <span class="rounded-full border px-2.5 py-1 text-xs font-medium capitalize" :class="statusClass(clearance.status)">
-              {{ statusLabel(clearance.status) }}
-            </span>
-            <button @click="adviserReview" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <div class="flex flex-wrap items-center gap-2">
+            <AppBadge :color="statusBadgeColor(clearance.status)">{{ statusLabel(clearance.status) }}</AppBadge>
+            <AppButton variant="secondary" @click="adviserReview">
               <ClipboardDocumentCheckIcon class="h-4 w-4" />
               Adviser Review
-            </button>
-            <a :href="route('student-clearance.pdf', clearance.id)" target="_blank" class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            </AppButton>
+            <AppButton as="a" variant="secondary" :href="route('student-clearance.pdf', clearance.id)" target="_blank">
               PDF
-            </a>
-            <button @click="finalizeClearance" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            </AppButton>
+            <AppButton @click="finalizeClearance">
               <CheckCircleIcon class="h-4 w-4" />
               Finalize
-            </button>
+            </AppButton>
           </div>
         </div>
 
@@ -111,12 +128,9 @@ function finalizeClearance() {
             <p class="mt-1 text-sm font-medium text-slate-900">{{ clearance.period.school_year_name }}</p>
           </div>
         </div>
-      </section>
+      </AppCard>
 
-      <section v-for="group in groups" :key="group.key" class="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div class="border-b border-slate-100 px-5 py-3">
-          <h2 class="text-sm font-semibold text-slate-900">{{ group.label }}</h2>
-        </div>
+      <AppCard v-for="group in groups" :key="group.key" :title="group.label" :padded="false">
         <div class="divide-y divide-slate-100">
           <div v-for="item in group.items" :key="item.id" class="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_auto]">
             <div>
@@ -124,19 +138,17 @@ function finalizeClearance() {
               <p class="mt-1 text-xs text-slate-500">
                 {{ item.assigned_to ?? item.assigned_permission ?? 'Unassigned' }}
               </p>
-              <p v-if="item.blocker_summary" class="mt-2 text-sm text-amber-700">{{ item.blocker_summary }}</p>
-              <p v-else-if="item.accountability" class="mt-2 text-sm text-amber-700">{{ item.accountability }}</p>
+              <p v-if="item.blocker_summary" class="mt-2 text-sm text-warning-700">{{ item.blocker_summary }}</p>
+              <p v-else-if="item.accountability" class="mt-2 text-sm text-warning-700">{{ item.accountability }}</p>
               <p v-if="item.remarks" class="mt-1 text-sm text-slate-500">{{ item.remarks }}</p>
             </div>
             <div class="lg:text-right">
-              <span class="rounded-full border px-2.5 py-1 text-xs font-medium capitalize" :class="statusClass(item.status)">
-                {{ statusLabel(item.status) }}
-              </span>
+              <AppBadge :color="statusBadgeColor(item.status)">{{ statusLabel(item.status) }}</AppBadge>
               <p v-if="item.signed_by" class="mt-1 text-xs text-slate-500">{{ item.signed_by }}</p>
             </div>
           </div>
         </div>
-      </section>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

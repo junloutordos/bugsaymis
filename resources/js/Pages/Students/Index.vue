@@ -4,6 +4,15 @@ import AdminLayout from "@/Layouts/AdminLayout.vue"
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { EyeIcon, PencilSquareIcon } from "@heroicons/vue/24/outline"
 import { storageUrl } from "@/Composables/useStorage.js"
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import AppInput from '@/Components/AppInput.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   students: Object,
@@ -273,71 +282,49 @@ const confirmCrop = async () => {
 <template>
   <Head title="Students" />
   <AdminLayout title="Students">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Students</h1>
-          <p class="text-sm text-slate-500">Browse and view student records</p>
-        </div>
-      </div>
+    <div class="space-y-5">
+      <AppPageHeader title="Students" subtitle="Browse and view student records" />
 
-      <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search students..."
-          @keydown.enter="performSearch"
-          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64"
-        />
-        <button @click="performSearch" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Search</button>
-      </div>
+      <AppFilterBar>
+        <AppInput v-model="searchQuery" type="text" placeholder="Search students..." @keydown.enter="performSearch" class="w-full sm:w-64" />
+        <template #actions>
+          <AppButton size="sm" @click="performSearch">Search</AppButton>
+        </template>
+      </AppFilterBar>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Desktop table -->
-        <div class="hidden md:block overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{{ vf.label }}</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="student in filteredStudents" :key="student.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ student.id }}</td>
-                <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-sm text-slate-700">
-                  <span v-if="vf.type === 'age'">{{ getAge(student, vf.keys) }}</span>
-                  <span v-else>
-                    <span v-if="vf.label === 'Last Name' || vf.label === 'First Name' || vf.label === 'Middle Name'">
-                      {{ (getFieldValue(student, vf.keys) ?? '').toString().toUpperCase() }}
-                    </span>
-                    <span v-else>{{ getFieldValue(student, vf.keys) }}</span>
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1">
-                    <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
-                      <EyeIcon class="w-4 h-4" />
-                    </button>
-                    <button v-if="can_manage_students" @click="openEdit(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredStudents.length === 0">
-                <td :colspan="visibleFields.length + 2" class="py-16 text-center text-slate-400 text-sm">No students found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <AppTable :is-empty="filteredStudents.length === 0" :skeleton-cols="visibleFields.length + 2">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{{ vf.label }}</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
 
-        <!-- Mobile card list -->
-        <div class="md:hidden divide-y divide-slate-100">
+        <tr v-for="student in filteredStudents" :key="student.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ student.id }}</td>
+          <td v-for="vf in visibleFields" :key="vf.label" class="px-4 py-3 text-sm text-slate-700">
+            <span v-if="vf.type === 'age'">{{ getAge(student, vf.keys) }}</span>
+            <span v-else>
+              <span v-if="vf.label === 'Last Name' || vf.label === 'First Name' || vf.label === 'Middle Name'">
+                {{ (getFieldValue(student, vf.keys) ?? '').toString().toUpperCase() }}
+              </span>
+              <span v-else>{{ getFieldValue(student, vf.keys) }}</span>
+            </span>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <AppIconButton label="View" @click="openView(student)">
+                <EyeIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="can_manage_students" label="Edit" @click="openEdit(student)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
           <div v-for="student in filteredStudents" :key="student.id" class="p-4">
             <div class="flex items-start justify-between">
               <div>
@@ -347,197 +334,165 @@ const confirmCrop = async () => {
                 <div class="text-xs text-slate-500">Age: {{ getAge(student, ['birthday','birthdate','dob']) }} · Sex: {{ getFieldValue(student, ['sex','gender']) }}</div>
               </div>
               <div class="flex items-center gap-1">
-                <button @click="openView(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="View">
+                <AppIconButton label="View" @click="openView(student)">
                   <EyeIcon class="w-4 h-4" />
-                </button>
-                <button v-if="can_manage_students" @click="openEdit(student)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
+                </AppIconButton>
+                <AppIconButton v-if="can_manage_students" label="Edit" @click="openEdit(student)">
                   <PencilSquareIcon class="w-4 h-4" />
-                </button>
+                </AppIconButton>
               </div>
             </div>
           </div>
-          <div v-if="filteredStudents.length === 0" class="py-16 text-center text-slate-400 text-sm">No students found.</div>
-        </div>
+        </template>
 
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ currentPage }} of {{ lastPage }}</span>
-          <div class="flex gap-2">
-            <button @click.prevent="goTo(prevUrl)" :disabled="!prevUrl" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
-            <button @click.prevent="goTo(nextUrl)" :disabled="!nextUrl" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+        <template #empty>
+          <EmptyState title="No students found" />
+        </template>
+
+        <template #footer>
+          <div class="flex items-center justify-between px-4 py-3 text-sm text-slate-600">
+            <span>Page {{ currentPage }} of {{ lastPage }}</span>
+            <div class="flex gap-2">
+              <AppButton size="sm" variant="secondary" :disabled="!prevUrl" @click.prevent="goTo(prevUrl)">Prev</AppButton>
+              <AppButton size="sm" variant="secondary" :disabled="!nextUrl" @click.prevent="goTo(nextUrl)">Next</AppButton>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+      </AppTable>
 
       <!-- Edit Modal -->
-      <div v-if="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50 overflow-auto">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">Edit Student</h3>
-            <button @click="showModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-            </button>
-          </div>
-          <div class="px-6 py-5">
-            <div class="max-h-[55vh] overflow-auto pr-1">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div v-for="col in editableColumns" :key="col.Field">
-                  <label class="block text-xs font-medium text-slate-600 mb-1">{{ col.Field }}</label>
-                  <input v-model="form[col.Field]" type="text" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full" />
-                </div>
-              </div>
-            </div>
-            <div class="flex justify-end mt-6 gap-2">
-              <button @click="showModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-              <button @click="submitEdit" :disabled="isSaving" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                {{ isSaving ? 'Saving…' : 'Save Changes' }}
-              </button>
-            </div>
+      <AppModal :show="showModal" title="Edit Student" size="2xl" @close="showModal = false">
+        <div class="max-h-[55vh] overflow-auto pr-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <AppInput v-for="col in editableColumns" :key="col.Field" v-model="form[col.Field]" :label="col.Field" type="text" />
           </div>
         </div>
-      </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="showModal = false">Cancel</AppButton>
+          <AppButton :loading="isSaving" @click="submitEdit">Save Changes</AppButton>
+        </template>
+      </AppModal>
 
       <!-- View Modal -->
-      <div v-if="showViewModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50 overflow-auto">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-full sm:max-w-2xl max-h-[90vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">Student Details</h3>
-            <button @click="closeView" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-            </button>
-          </div>
-
-          <div class="px-6 py-5 max-h-[70vh] overflow-auto">
-            <div class="mb-5 flex items-center gap-4">
-              <div class="flex flex-col items-center gap-1.5">
-                <div v-if="profilePic(viewStudent)">
-                  <img :src="profilePic(viewStudent)" alt="Profile" class="w-24 h-24 object-cover rounded-xl border border-slate-200" />
-                </div>
-                <div v-else class="w-24 h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-xs text-slate-500">No photo</div>
-                <button v-if="props.can_manage_students" @click="openPhotoModal(viewStudent)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">Change Photo</button>
-              </div>
-              <div class="flex-1">
-                <div class="text-sm font-semibold text-slate-800">{{ viewStudent ? ((viewStudent.last_name ?? viewStudent.lastname ?? viewStudent.lname ?? '') + ', ' + (viewStudent.first_name ?? viewStudent.firstname ?? viewStudent.fname ?? '') + (viewStudent.middle_name ? ' ' + (viewStudent.middle_name ?? viewStudent.middlename ?? viewStudent.mname) : '')) : '—' }}</div>
-                <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ viewStudent ? (viewStudent.pisaysystemID ?? viewStudent.pisay_system_id ?? viewStudent.pisay_id ?? viewStudent.pisayid ?? '—') : '—' }}</div>
-              </div>
+      <AppModal :show="showViewModal" title="Student Details" size="2xl" @close="closeView">
+        <div class="mb-5 flex items-center gap-4">
+          <div class="flex flex-col items-center gap-1.5">
+            <div v-if="profilePic(viewStudent)">
+              <img :src="profilePic(viewStudent)" alt="Profile" class="w-24 h-24 object-cover rounded-xl border border-slate-200" />
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div v-for="col in columns" :key="'view-'+col.Field">
-                <label class="block text-xs font-medium text-slate-600 mb-1">{{ col.Field }}</label>
-                <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  {{ viewStudent ? (viewStudent[col.Field] ?? '—') : '—' }}
-                </div>
-              </div>
-            </div>
+            <div v-else class="w-24 h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-xs text-slate-500">No photo</div>
+            <button v-if="props.can_manage_students" @click="openPhotoModal(viewStudent)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-colors">Change Photo</button>
           </div>
-
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
-            <button v-if="can_manage_students && viewStudent" @click="openEdit(viewStudent); closeView()" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              <PencilSquareIcon class="w-4 h-4" /> Edit
-            </button>
-            <a v-if="viewStudent" :href="route('students.id-card', viewStudent.id)" target="_blank" @click="closeView" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Print ID Card</a>
-            <button @click="closeView" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
+          <div class="flex-1">
+            <div class="text-sm font-semibold text-slate-800">{{ viewStudent ? ((viewStudent.last_name ?? viewStudent.lastname ?? viewStudent.lname ?? '') + ', ' + (viewStudent.first_name ?? viewStudent.firstname ?? viewStudent.fname ?? '') + (viewStudent.middle_name ? ' ' + (viewStudent.middle_name ?? viewStudent.middlename ?? viewStudent.mname) : '')) : '—' }}</div>
+            <div class="text-xs text-slate-500 mt-1">PISAY ID: {{ viewStudent ? (viewStudent.pisaysystemID ?? viewStudent.pisay_system_id ?? viewStudent.pisay_id ?? viewStudent.pisayid ?? '—') : '—' }}</div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Photo Crop Modal -->
-    <div v-if="showPhotoModal" class="fixed inset-0 flex items-center justify-center bg-slate-900/60 z-[60]">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-800">Update Photo</h3>
-          <button @click="showPhotoModal = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-          </button>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div v-for="col in columns" :key="'view-'+col.Field">
+            <label class="block text-xs font-medium text-slate-600 mb-1">{{ col.Field }}</label>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {{ viewStudent ? (viewStudent[col.Field] ?? '—') : '—' }}
+            </div>
+          </div>
         </div>
 
-        <div class="px-6 py-5">
-          <!-- File picker -->
-          <div v-if="!photoPreviewSrc" class="flex flex-col items-center gap-4 py-6">
-            <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            </div>
-            <label class="cursor-pointer">
-              <span class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Choose Photo</span>
-              <input type="file" accept="image/*" @change="onFileSelect" class="sr-only" />
-            </label>
-            <p class="text-xs text-slate-500 text-center">JPG, PNG, or WebP.</p>
-          </div>
+        <template #footer>
+          <AppButton v-if="can_manage_students && viewStudent" variant="secondary" @click="openEdit(viewStudent); closeView()">
+            <PencilSquareIcon class="w-4 h-4" /> Edit
+          </AppButton>
+          <AppButton v-if="viewStudent" as="a" :href="route('students.id-card', viewStudent.id)" target="_blank" @click="closeView">Print ID Card</AppButton>
+          <AppButton variant="secondary" @click="closeView">Close</AppButton>
+        </template>
+      </AppModal>
 
-          <!-- Crop UI -->
-          <div v-else>
-            <!-- Crop container: image pans freely under the fixed square frame -->
+      <!-- Photo Crop Modal -->
+      <AppModal :show="showPhotoModal" title="Update Photo" size="sm" @close="showPhotoModal = false">
+        <!-- File picker -->
+        <div v-if="!photoPreviewSrc" class="flex flex-col items-center gap-4 py-6">
+          <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </div>
+          <label class="cursor-pointer">
+            <span class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Choose Photo</span>
+            <input type="file" accept="image/*" @change="onFileSelect" class="sr-only" />
+          </label>
+          <p class="text-xs text-slate-500 text-center">JPG, PNG, or WebP.</p>
+        </div>
+
+        <!-- Crop UI -->
+        <div v-else>
+          <!-- Crop container: image pans freely under the fixed square frame -->
+          <div
+            ref="cropContainerRef"
+            class="relative overflow-hidden rounded-lg bg-slate-900 select-none"
+            :class="isDragging ? 'cursor-grabbing' : 'cursor-grab'"
+            :style="{ height: CONTAINER_H + 'px' }"
+            @mousedown.prevent="startPan"
+            @touchstart.prevent="startPan"
+          >
+            <img
+              ref="cropImg"
+              :src="photoPreviewSrc"
+              @load="onImgLoad"
+              class="absolute pointer-events-none"
+              :style="{
+                width: imgDispW + 'px',
+                maxWidth: 'none',
+                left: imgLeft + 'px',
+                top: imgTop + 'px',
+              }"
+              alt=""
+            />
+            <!-- Fixed square frame: box-shadow darkens everything outside it -->
             <div
-              ref="cropContainerRef"
-              class="relative overflow-hidden rounded-lg bg-slate-900 select-none"
-              :class="isDragging ? 'cursor-grabbing' : 'cursor-grab'"
-              :style="{ height: CONTAINER_H + 'px' }"
-              @mousedown.prevent="startPan"
-              @touchstart.prevent="startPan"
-            >
-              <img
-                ref="cropImg"
-                :src="photoPreviewSrc"
-                @load="onImgLoad"
-                class="absolute pointer-events-none"
-                :style="{
-                  width: imgDispW + 'px',
-                  maxWidth: 'none',
-                  left: imgLeft + 'px',
-                  top: imgTop + 'px',
-                }"
-                alt=""
-              />
-              <!-- Fixed square frame: box-shadow darkens everything outside it -->
-              <div
-                class="absolute pointer-events-none"
-                :style="{
-                  top: frameTop + 'px',
-                  left: frameLeft + 'px',
-                  width: FRAME + 'px',
-                  height: FRAME + 'px',
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
-                  border: '2px solid rgba(255,255,255,0.75)',
-                }"
-              ></div>
-            </div>
-
-            <!-- Zoom slider -->
-            <div class="mt-3 flex items-center gap-3 px-1">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="6"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
-              </svg>
-              <input
-                type="range"
-                v-model.number="imgScale"
-                :min="1"
-                :max="3"
-                step="0.001"
-                @input="clampPan"
-                class="w-full h-1.5 accent-indigo-600 cursor-pointer"
-              />
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="6"/><path stroke-linecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
-              </svg>
-            </div>
-            <p class="text-xs text-slate-500 mt-1.5 text-center">Drag to reposition · slider to zoom</p>
-            <div v-if="photoError" class="mt-2 text-xs text-red-600 text-center">{{ photoError }}</div>
+              class="absolute pointer-events-none"
+              :style="{
+                top: frameTop + 'px',
+                left: frameLeft + 'px',
+                width: FRAME + 'px',
+                height: FRAME + 'px',
+                boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
+                border: '2px solid rgba(255,255,255,0.75)',
+              }"
+            ></div>
           </div>
+
+          <!-- Zoom slider -->
+          <div class="mt-3 flex items-center gap-3 px-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="6"/><path stroke-linecap="round" d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input
+              type="range"
+              v-model.number="imgScale"
+              :min="1"
+              :max="3"
+              step="0.001"
+              @input="clampPan"
+              class="w-full h-1.5 accent-indigo-600 cursor-pointer"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="6"/><path stroke-linecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
+            </svg>
+          </div>
+          <p class="text-xs text-slate-500 mt-1.5 text-center">Drag to reposition · slider to zoom</p>
+          <div v-if="photoError" class="mt-2 text-xs text-danger-600 text-center">{{ photoError }}</div>
         </div>
 
-        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-2">
-          <button v-if="photoPreviewSrc" @click="photoPreviewSrc = null" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Change Image</button>
-          <div v-else></div>
-          <div class="flex gap-2">
-            <button @click="showPhotoModal = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Cancel</button>
-            <button v-if="photoPreviewSrc" @click="confirmCrop" :disabled="photoUploading" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              {{ photoUploading ? 'Uploading…' : 'Upload Photo' }}
-            </button>
+        <template #footer>
+          <div class="flex w-full items-center justify-between gap-2">
+            <AppButton v-if="photoPreviewSrc" variant="secondary" @click="photoPreviewSrc = null">Change Image</AppButton>
+            <div v-else></div>
+            <div class="flex gap-2">
+              <AppButton variant="secondary" @click="showPhotoModal = false">Cancel</AppButton>
+              <AppButton v-if="photoPreviewSrc" :loading="photoUploading" @click="confirmCrop">Upload Photo</AppButton>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>

@@ -1,6 +1,9 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   HomeModernIcon, UserGroupIcon, DocumentTextIcon,
   ExclamationTriangleIcon, ClipboardDocumentListIcon,
@@ -17,13 +20,13 @@ const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
   : '—'
 
-const statusClass = (s) => ({
-  pending:   'bg-amber-100 text-amber-700',
-  evaluated: 'bg-sky-100 text-sky-700',
-  approved:  'bg-emerald-100 text-emerald-700',
-  rejected:  'bg-rose-100 text-rose-700',
-  waitlisted: 'bg-slate-100 text-slate-600',
-}[s] || 'bg-slate-100 text-slate-600')
+const statusColor = (s) => ({
+  pending:   'amber',
+  evaluated: 'blue',
+  approved:  'green',
+  rejected:  'red',
+  waitlisted: 'slate',
+}[s] || 'slate')
 
 const hallLabel = (h) => h === 'BRH' ? 'Boys Residence Hall' : 'Girls Residence Hall'
 const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-500'
@@ -34,14 +37,14 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
   <AdminLayout title="Residence Hall">
     <div class="space-y-6">
 
-      <!-- Header -->
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">Residence Hall Dashboard</h1>
-        <p class="text-sm text-slate-500">
-          {{ myHall ? hallLabel(myHall) : 'All Halls' }}
-          <span v-if="currentSy"> · SY {{ currentSy }}</span>
-        </p>
-      </div>
+      <AppPageHeader title="Residence Hall Dashboard">
+        <template #actions>
+          <span class="text-sm text-slate-500">
+            {{ myHall ? hallLabel(myHall) : 'All Halls' }}
+            <span v-if="currentSy"> · SY {{ currentSy }}</span>
+          </span>
+        </template>
+      </AppPageHeader>
 
       <!-- Hall Stats Cards -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -130,16 +133,14 @@ const hallColor = (h) => h === 'BRH' ? 'border-l-indigo-500' : 'border-l-pink-50
             </div>
             <div class="flex items-center gap-3">
               <span class="text-xs text-slate-400">{{ fmtDate(app.created_at) }}</span>
-              <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', statusClass(app.status)]">
-                {{ app.status }}
-              </span>
+              <AppBadge :color="statusColor(app.status)" class="capitalize">{{ app.status }}</AppBadge>
             </div>
           </Link>
         </div>
       </div>
 
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm p-10 text-center text-slate-400 text-sm">
-        No pending applications for {{ currentSy || 'the current school year' }}.
+      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm">
+        <EmptyState :title="`No pending applications for ${currentSy || 'the current school year'}`" />
       </div>
 
     </div>

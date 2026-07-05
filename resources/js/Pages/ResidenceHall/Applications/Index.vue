@@ -2,6 +2,14 @@
 import { ref, computed, watch } from 'vue'
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import { MagnifyingGlassIcon, PlusIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
@@ -46,13 +54,13 @@ const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
   : '—'
 
-const statusClass = (s) => ({
-  pending:   'bg-amber-100 text-amber-700',
-  evaluated: 'bg-sky-100 text-sky-700',
-  approved:  'bg-emerald-100 text-emerald-700',
-  rejected:  'bg-rose-100 text-rose-700',
-  waitlisted: 'bg-slate-100 text-slate-600',
-}[s] || 'bg-slate-100 text-slate-600')
+const statusColor = (s) => ({
+  pending:   'amber',
+  evaluated: 'blue',
+  approved:  'green',
+  rejected:  'red',
+  waitlisted: 'slate',
+}[s] || 'slate')
 
 // ── New Application Modal ──────────────────────────────────────────────────
 const showNew    = ref(false)
@@ -121,27 +129,24 @@ function submitNew() {
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
       <!-- Flash -->
-      <div v-if="flash.success" class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
+      <div v-if="flash.success" class="flex items-center gap-2 bg-success-50 border border-success-100 rounded-xl px-4 py-3 text-sm text-success-700">
         {{ flash.success }}
       </div>
-      <div v-if="flash.error" class="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-800">
+      <div v-if="flash.error" class="flex items-center gap-2 bg-danger-50 border border-danger-100 rounded-xl px-4 py-3 text-sm text-danger-700">
         {{ flash.error }}
       </div>
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Accommodation Applications</h1>
-          <p class="text-sm text-slate-500">SSM 5.1 — Evaluation and approval of RH applications</p>
-        </div>
-        <button @click="openNew"
-                class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <PlusIcon class="w-4 h-4" />
-          New Application
-        </button>
-      </div>
+      <AppPageHeader title="Accommodation Applications" subtitle="SSM 5.1 — Evaluation and approval of RH applications">
+        <template #actions>
+          <AppButton @click="openNew">
+            <PlusIcon class="w-4 h-4" />
+            New Application
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div class="flex-1 min-w-[180px]">
           <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
           <select v-model="syId" @change="applyFilters"
@@ -171,75 +176,79 @@ function submitNew() {
                    class="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
-      </div>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50">
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Hall</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Province</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Filed</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="app in displayed" :key="app.id" class="hover:bg-slate-50 transition-colors">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ app.student_name }}</td>
-              <td class="px-4 py-3 text-slate-600">{{ app.grade_level || '—' }}</td>
-              <td class="px-4 py-3">
-                <span :class="['text-xs px-2 py-0.5 rounded-full font-medium',
-                  app.preferred_hall === 'BRH' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700']">
-                  {{ app.preferred_hall }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-600">{{ app.home_province || '—' }}</td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ fmtDate(app.created_at) }}</td>
-              <td class="px-4 py-3">
-                <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', statusClass(app.status)]">
-                  {{ app.status }}
-                </span>
-              </td>
-              <td class="px-4 py-3">
-                <Link :href="route('rh.applications.show', app.id)"
-                      class="text-xs text-indigo-600 hover:underline font-medium">Review</Link>
-              </td>
-            </tr>
-            <tr v-if="!displayed.length">
-              <td colspan="7" class="text-center py-12 text-slate-400 text-sm">No applications found.</td>
-            </tr>
-          </tbody>
-        </table>
+      <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
+        <template #head>
+          <tr>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Hall</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Province</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Filed</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
 
-        <PaginationControl
-          v-if="totalPages > 1"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+        <tr v-for="app in displayed" :key="app.id" class="hover:bg-slate-50 transition-colors">
+          <td class="px-4 py-3 font-medium text-slate-800">{{ app.student_name }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ app.grade_level || '—' }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="app.preferred_hall === 'BRH' ? 'indigo' : 'purple'">{{ app.preferred_hall }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-600">{{ app.home_province || '—' }}</td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ fmtDate(app.created_at) }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusColor(app.status)" class="capitalize">{{ app.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <Link :href="route('rh.applications.show', app.id)"
+                  class="text-xs text-indigo-600 hover:underline font-medium">Review</Link>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="app in displayed" :key="app.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ app.student_name }}</p>
+                <p class="text-xs text-slate-500">Grade {{ app.grade_level || '—' }} &middot; {{ app.home_province || '—' }}</p>
+              </div>
+              <AppBadge :color="statusColor(app.status)" class="capitalize">{{ app.status }}</AppBadge>
+            </div>
+            <div class="flex items-center justify-between">
+              <AppBadge :color="app.preferred_hall === 'BRH' ? 'indigo' : 'purple'">{{ app.preferred_hall }}</AppBadge>
+              <span class="text-xs text-slate-400">Filed {{ fmtDate(app.created_at) }}</span>
+            </div>
+            <Link :href="route('rh.applications.show', app.id)" class="text-xs text-indigo-600 hover:underline font-medium">Review</Link>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No applications found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            v-if="totalPages > 1"
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
     </div>
 
     <!-- New Application Modal -->
-    <div v-if="showNew" class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <h3 class="text-base font-semibold text-slate-800">New Application</h3>
-          <button @click="showNew = false" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500">
-            <XMarkIcon class="w-4 h-4" />
-          </button>
-        </div>
-
+    <AppModal :show="showNew" title="New Application" size="lg" @close="showNew = false">
         <!-- Student search -->
         <div class="relative">
-          <label class="block text-xs font-medium text-slate-600 mb-1">Student <span class="text-rose-500">*</span></label>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Student <span class="text-danger-500">*</span></label>
           <input v-model="studentQuery" type="text" placeholder="Search by name or PISAY ID…"
                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <ul v-if="studentResults.length" class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto text-sm">
@@ -255,7 +264,7 @@ function submitNew() {
         <div class="grid grid-cols-2 gap-3">
           <!-- School Year -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">School Year <span class="text-rose-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">School Year <span class="text-danger-500">*</span></label>
             <select v-model="newForm.school_year_id"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option v-for="sy in schoolYears" :key="sy.id" :value="sy.id">
@@ -273,7 +282,7 @@ function submitNew() {
 
           <!-- Preferred Hall -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Preferred Hall <span class="text-rose-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Preferred Hall <span class="text-danger-500">*</span></label>
             <select v-model="newForm.preferred_hall"
                     class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
               <option value="BRH">BRH — Boys</option>
@@ -325,19 +334,15 @@ function submitNew() {
           </div>
         </div>
 
-        <div class="flex gap-3 pt-1">
-          <button @click="showNew = false"
-                  class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">
-            Cancel
-          </button>
-          <button @click="submitNew"
-                  :disabled="submitting || !newForm.student_id || !newForm.preferred_hall || !newForm.school_year_id"
-                  class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            {{ submitting ? 'Saving…' : 'Record Application' }}
-          </button>
+      <template #footer>
+        <div class="flex gap-3 w-full">
+          <AppButton block variant="secondary" @click="showNew = false">Cancel</AppButton>
+          <AppButton block :disabled="!newForm.student_id || !newForm.preferred_hall || !newForm.school_year_id" :loading="submitting" @click="submitNew">
+            Record Application
+          </AppButton>
         </div>
-      </div>
-    </div>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

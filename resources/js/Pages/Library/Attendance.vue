@@ -1,68 +1,75 @@
 <template>
   <Head title="Library Attendance" />
   <AdminLayout title="Library Attendance">
-    <div>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Library Attendance</h1>
-      </div>
+    <div class="space-y-5">
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-5 py-4 border-b border-slate-100">
+      <AppPageHeader title="Library Attendance" subtitle="Scan log of library visits." />
+
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="relative w-full sm:w-64">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             v-model="q"
-            @keydown.enter="search"
+            @keydown.enter.prevent="search"
             type="text"
             placeholder="Search by name or Pisay ID"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 w-full sm:w-64"
+            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PISAY ID</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">STUDENT NAME</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">SCAN TIME</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="att in attendances.data" :key="att.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ att.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ att.pisay_systemid || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ (att.student_name ?? '—').toUpperCase() }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(att.scanned_at) }}</td>
-              </tr>
-              <tr v-if="(attendances.data || []).length === 0"><td :colspan="4" class="py-16 text-center text-slate-400 text-sm">No attendance records</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <template #actions>
+          <AppButton size="sm" @click="search">Search</AppButton>
+        </template>
+      </AppFilterBar>
 
-        <!-- Mobile cards -->
-        <div v-else class="space-y-3 p-4 sm:hidden">
-          <div v-for="att in attendances.data" :key="att.id" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
-            <div class="flex items-start justify-between">
+      <!-- Table -->
+      <AppTable :is-empty="!attendances.data?.length" :skeleton-cols="4">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">PISAY ID</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Student Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Scan Time</th>
+          </tr>
+        </template>
+
+        <tr v-for="att in attendances.data" :key="att.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ att.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ att.pisay_systemid || '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ (att.student_name ?? '—').toUpperCase() }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ formatDate(att.scanned_at) }}</td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="att in attendances.data" :key="att.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
               <div>
-                <div class="text-xs text-slate-500">#{{ att.id }}</div>
-                <div class="font-semibold text-slate-800">{{ (att.student_name ?? '—').toUpperCase() }}</div>
-                <div class="text-sm text-slate-600">PISAY ID: {{ att.pisay_systemid || '—' }}</div>
+                <p class="text-xs text-slate-500">#{{ att.id }}</p>
+                <p class="font-semibold text-slate-800">{{ (att.student_name ?? '—').toUpperCase() }}</p>
+                <p class="text-sm text-slate-600">PISAY ID: {{ att.pisay_systemid || '—' }}</p>
               </div>
-              <div class="text-right text-sm">
-                <div class="text-slate-600">{{ formatDate(att.scanned_at) }}</div>
+              <div class="text-right text-sm text-slate-600">
+                {{ formatDate(att.scanned_at) }}
               </div>
             </div>
           </div>
+        </template>
 
-          <div v-if="(attendances.data || []).length === 0" class="py-16 text-center text-slate-400 text-sm">No attendance records</div>
-        </div>
+        <template #empty>
+          <EmptyState title="No attendance records" />
+        </template>
 
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click.prevent="prev" :disabled="!attendances.prev_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
-          <span>Page {{ attendances.current_page }} of {{ attendances.last_page }}</span>
-          <button @click.prevent="next" :disabled="!attendances.next_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
-        </div>
-      </div>
+        <template #footer>
+          <PaginationControl
+            :links="attendances.links"
+            :current-page="attendances.current_page"
+            :total-pages="attendances.last_page"
+            :total="attendances.total"
+          />
+        </template>
+      </AppTable>
+
     </div>
   </AdminLayout>
 </template>
@@ -71,6 +78,13 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { usePage, router, Head } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import AppPageHeader from '@/Components/AppPageHeader.vue';
+import AppButton from '@/Components/AppButton.vue';
+import AppFilterBar from '@/Components/AppFilterBar.vue';
+import AppTable from '@/Components/AppTable.vue';
+import EmptyState from '@/Components/EmptyState.vue';
+import PaginationControl from '@/Components/PaginationControl.vue';
+import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
 
 const page = usePage();
 const attendances = computed(() => page.props.attendances || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null });
@@ -103,7 +117,3 @@ function formatDate(v) {
   return new Date(v).toLocaleString();
 }
 </script>
-
-<style scoped>
-.table-auto th, .table-auto td { padding: 0.5rem; }
-</style>

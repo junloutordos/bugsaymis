@@ -2,6 +2,10 @@
 import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import { ArrowLeftIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -27,8 +31,10 @@ function submitEvaluation() {
   })
 }
 
-function submitApproval() {
-  if (!confirm(`${approveForm.value.status === 'approved' ? 'Approve' : 'Reject'} this application?`)) return
+async function submitApproval() {
+  const action = approveForm.value.status === 'approved' ? 'Approve' : 'Reject'
+  const confirmed = await confirmAction({ title: `${action} this application?`, confirmText: action })
+  if (!confirmed) return
   router.post(route('rh.applications.approve', props.application.id), approveForm.value, {
     preserveScroll: true,
   })
@@ -38,13 +44,13 @@ const fmtDate = (d) => d
   ? new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
   : '—'
 
-const statusClass = (s) => ({
-  pending:   'bg-amber-100 text-amber-700',
-  evaluated: 'bg-sky-100 text-sky-700',
-  approved:  'bg-emerald-100 text-emerald-700',
-  rejected:  'bg-rose-100 text-rose-700',
-  waitlisted: 'bg-slate-100 text-slate-600',
-}[s] || 'bg-slate-100 text-slate-600')
+const statusColor = (s) => ({
+  pending:   'amber',
+  evaluated: 'blue',
+  approved:  'green',
+  rejected:  'red',
+  waitlisted: 'slate',
+}[s] || 'slate')
 </script>
 
 <template>
@@ -54,22 +60,18 @@ const statusClass = (s) => ({
 
       <!-- Back + Title -->
       <div class="flex items-center gap-3">
-        <Link :href="route('rh.applications.index')"
-              class="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600">
+        <AppButton as="link" variant="secondary" size="sm" :href="route('rh.applications.index')">
           <ArrowLeftIcon class="w-4 h-4" />
-        </Link>
+        </AppButton>
         <div>
-          <h1 class="text-xl font-semibold text-slate-800">Application Review</h1>
+          <h1 class="font-heading text-xl font-semibold text-slate-800">Application Review</h1>
           <p class="text-sm text-slate-500">SSM 5.1 — Evaluation of RH Accommodation Application</p>
         </div>
-        <span :class="['ml-auto text-xs px-3 py-1 rounded-full font-semibold capitalize', statusClass(application.status)]">
-          {{ application.status }}
-        </span>
+        <AppBadge :color="statusColor(application.status)" class="ml-auto capitalize">{{ application.status }}</AppBadge>
       </div>
 
       <!-- Student Info -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Student Information</h2>
+      <AppCard title="Student Information">
         <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
             <span class="text-slate-500">Name</span>
@@ -88,19 +90,15 @@ const statusClass = (s) => ({
             <p class="font-medium text-slate-800 mt-0.5">{{ student.sex || '—' }}</p>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Application Details -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Application Details</h2>
+      <AppCard title="Application Details">
         <div class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <div>
             <span class="text-slate-500">Preferred Hall</span>
             <p class="font-medium mt-0.5">
-              <span :class="['text-xs px-2 py-0.5 rounded-full font-medium',
-                application.preferred_hall === 'BRH' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700']">
-                {{ application.preferred_hall }}
-              </span>
+              <AppBadge :color="application.preferred_hall === 'BRH' ? 'indigo' : 'purple'">{{ application.preferred_hall }}</AppBadge>
             </p>
           </div>
           <div>
@@ -130,21 +128,20 @@ const statusClass = (s) => ({
             <p class="font-medium text-slate-800 mt-0.5">{{ fmtDate(application.created_at) }}</p>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Already an intern -->
-      <div v-if="existingIntern" class="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-        <CheckCircleIcon class="w-5 h-5 text-emerald-600 flex-shrink-0" />
-        <p class="text-sm text-emerald-800">
+      <div v-if="existingIntern" class="flex items-center gap-3 bg-success-50 border border-success-100 rounded-xl p-4">
+        <CheckCircleIcon class="w-5 h-5 text-success-600 flex-shrink-0" />
+        <p class="text-sm text-success-700">
           This student has already been enrolled as an intern.
           <Link :href="route('rh.interns.show', existingIntern.id)" class="font-medium underline">View intern record</Link>
         </p>
       </div>
 
       <!-- Evaluation Panel (RH Committee) -->
-      <div v-if="!existingIntern && ['pending', 'evaluated', 'waitlisted'].includes(application.status)"
-           class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">RH Committee Evaluation</h2>
+      <AppCard v-if="!existingIntern && ['pending', 'evaluated', 'waitlisted'].includes(application.status)"
+           title="RH Committee Evaluation">
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-medium text-slate-600 mb-1">Recommendation</label>
@@ -168,45 +165,35 @@ const statusClass = (s) => ({
                       class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
           </div>
           <div class="flex justify-end">
-            <button @click="submitEvaluation" :disabled="!evaluateForm.status"
-                    class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg text-sm font-medium">
-              Submit Evaluation
-            </button>
+            <AppButton :disabled="!evaluateForm.status" @click="submitEvaluation">Submit Evaluation</AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Approval Panel (Campus Director) -->
-      <div v-if="!existingIntern && application.status === 'evaluated'"
-           class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Campus Director Approval</h2>
+      <AppCard v-if="!existingIntern && application.status === 'evaluated'" title="Campus Director Approval">
         <div v-if="application.evaluation_notes" class="mb-3 p-3 bg-slate-50 rounded-lg text-sm text-slate-700">
           <span class="text-xs text-slate-500 block mb-1">Committee Notes</span>
           {{ application.evaluation_notes }}
         </div>
         <div class="flex gap-3">
-          <button @click="approveForm.status = 'approved'; submitApproval()"
-                  class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <AppButton block variant="success" @click="approveForm.status = 'approved'; submitApproval()">
             <CheckCircleIcon class="w-4 h-4" /> Approve
-          </button>
-          <button @click="approveForm.status = 'rejected'; submitApproval()"
-                  class="flex-1 inline-flex items-center justify-center gap-2 border border-rose-200 text-rose-600 hover:bg-rose-50 px-4 py-2 rounded-lg text-sm font-medium">
+          </AppButton>
+          <AppButton block variant="danger" @click="approveForm.status = 'rejected'; submitApproval()">
             <XCircleIcon class="w-4 h-4" /> Reject
-          </button>
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Approved — enroll as intern -->
       <div v-if="!existingIntern && application.status === 'approved'"
-           class="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
-        <h2 class="text-sm font-semibold text-emerald-800 mb-2">Application Approved</h2>
-        <p class="text-sm text-emerald-700 mb-4">
+           class="bg-success-50 border border-success-100 rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-success-700 mb-2">Application Approved</h2>
+        <p class="text-sm text-success-700 mb-4">
           Approved on {{ fmtDate(application.approved_at) }}. You can now assign a room and enroll this student as an intern.
         </p>
-        <Link :href="route('rh.interns.index')"
-              class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          Go to Intern Roster
-        </Link>
+        <AppButton as="link" variant="success" :href="route('rh.interns.index')">Go to Intern Roster</AppButton>
       </div>
 
     </div>

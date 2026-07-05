@@ -3,8 +3,10 @@
   <AdminLayout title="Work From Home">
     <div class="max-w-2xl mx-auto space-y-6">
 
+      <AppPageHeader title="Work From Home" subtitle="Track your time in/out, breaks, and daily accomplishments." />
+
       <!-- Status Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 class="text-xl font-semibold text-slate-800">Today's WFH Status</h2>
           <span class="text-sm text-slate-400">{{ today }}</span>
@@ -101,10 +103,10 @@
             </div>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Camera Card -->
-      <div v-if="showCamera" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard v-if="showCamera" :padded="false">
         <div class="px-5 py-4 border-b border-slate-100">
           <h3 class="text-xl font-semibold text-slate-800">
             {{ cameraMode === 'in' ? 'Capture Time-In Photo' : 'Capture Time-Out Photo' }}
@@ -114,60 +116,51 @@
           <div v-if="!capturedImage" class="relative">
             <video ref="videoEl" autoplay playsinline
                    class="w-full rounded-lg bg-black" style="max-height:280px;" />
-            <button @click="capture"
-                    class="mt-3 w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              📸 Capture Photo
-            </button>
+            <AppButton block class="mt-3" @click="capture">📸 Capture Photo</AppButton>
           </div>
 
           <div v-else class="space-y-3">
             <img :src="capturedImage" class="w-full rounded-lg border border-slate-200" alt="Captured photo"
                  style="max-height:280px;object-fit:cover;" />
             <div class="flex gap-3">
-              <button @click="retake"
-                      class="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                Retake
-              </button>
-              <button @click="confirmCapture" :disabled="loading"
-                      class="flex-1 inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              <AppButton variant="secondary" block class="flex-1" @click="retake">Retake</AppButton>
+              <AppButton block class="flex-1" :disabled="loading" @click="confirmCapture">
                 {{ loading ? 'Saving…' : (cameraMode === 'in' ? 'Confirm Time In' : 'Confirm Time Out') }}
-              </button>
+              </AppButton>
             </div>
           </div>
 
-          <button @click="cancelCamera" class="text-sm text-slate-400 hover:text-slate-600 w-full text-center">
-            Cancel
-          </button>
+          <AppButton variant="ghost" block @click="cancelCamera">Cancel</AppButton>
 
           <canvas ref="canvasEl" class="hidden" />
         </div>
-      </div>
+      </AppCard>
 
       <!-- Action Buttons -->
       <div v-if="!showCamera" class="flex flex-wrap gap-3">
-        <button v-if="!attendance"
-                @click="openCamera('in')"
-                class="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
+        <AppButton v-if="!attendance"
+                   variant="success" size="lg" class="flex-1"
+                   @click="openCamera('in')">
           🟢 Time In
-        </button>
+        </AppButton>
 
-        <button v-if="attendance && !attendance.break_out && !attendance.time_out"
-                @click="recordBreak('out')" :disabled="breakLoading"
-                class="flex-1 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
-          🍽️ {{ breakLoading ? 'Saving…' : 'Break Out' }}
-        </button>
+        <AppButton v-if="attendance && !attendance.break_out && !attendance.time_out"
+                   variant="warning" size="lg" class="flex-1"
+                   :disabled="breakLoading" @click="recordBreak('out')">
+          {{ breakLoading ? 'Saving…' : '🍽️ Break Out' }}
+        </AppButton>
 
-        <button v-if="attendance && attendance.break_out && !attendance.break_in && !attendance.time_out"
-                @click="recordBreak('in')" :disabled="breakLoading"
-                class="flex-1 inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
-          ✅ {{ breakLoading ? 'Saving…' : 'Break In' }}
-        </button>
+        <AppButton v-if="attendance && attendance.break_out && !attendance.break_in && !attendance.time_out"
+                   variant="success" size="lg" class="flex-1"
+                   :disabled="breakLoading" @click="recordBreak('in')">
+          {{ breakLoading ? 'Saving…' : '✅ Break In' }}
+        </AppButton>
 
-        <button v-if="attendance && !attendance.time_out"
-                @click="openCamera('out')"
-                class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm">
+        <AppButton v-if="attendance && !attendance.time_out"
+                   size="lg" class="flex-1"
+                   @click="openCamera('out')">
           🔵 Time Out
-        </button>
+        </AppButton>
 
         <div v-if="attendance && attendance.time_out"
              class="flex-1 py-3 bg-slate-100 text-slate-500 rounded-xl text-center text-sm font-medium">
@@ -176,7 +169,7 @@
       </div>
 
       <!-- Today's Accomplishments -->
-      <div v-if="attendance" class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard v-if="attendance" :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <p class="font-semibold text-slate-800">Today's Accomplishments</p>
@@ -184,10 +177,9 @@
               {{ localAccomplishments.length }} recorded today
             </p>
           </div>
-          <button @click="showAccomplishmentPanel = !showAccomplishmentPanel"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <AppButton size="sm" @click="showAccomplishmentPanel = !showAccomplishmentPanel">
             {{ showAccomplishmentPanel ? 'Hide' : 'Add / View' }}
-          </button>
+          </AppButton>
         </div>
 
         <div v-if="showAccomplishmentPanel" class="p-5 space-y-4">
@@ -198,10 +190,10 @@
             @updated="onAccomplishmentUpdated"
           />
         </div>
-      </div>
+      </AppCard>
 
       <!-- ── My WFH History ──────────────────────────────────────────────────── -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
           <h2 class="text-base font-semibold text-slate-800">My WFH History</h2>
           <div class="flex items-center gap-2">
@@ -211,19 +203,15 @@
               @change="loadHistory"
               class="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
-            <button @click="loadHistory" :disabled="historyLoading"
-              class="px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-medium transition-colors disabled:opacity-50">
+            <AppButton size="sm" variant="secondary" :disabled="historyLoading" @click="loadHistory">
               {{ historyLoading ? 'Loading…' : 'Refresh' }}
-            </button>
+            </AppButton>
           </div>
         </div>
 
         <div class="divide-y divide-slate-100">
           <!-- Empty state -->
-          <div v-if="!historyLoading && !historyRecords.length"
-               class="py-12 text-center text-slate-400 text-sm">
-            No WFH records for this month.
-          </div>
+          <EmptyState v-if="!historyLoading && !historyRecords.length" title="No WFH records for this month." />
 
           <!-- Loading -->
           <div v-if="historyLoading" class="py-12 text-center text-slate-400 text-sm">
@@ -249,35 +237,29 @@
 
                 <!-- Status pills -->
                 <div class="flex flex-wrap gap-1.5">
-                  <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5"
-                        :class="record.time_in ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'">
+                  <AppBadge :color="record.time_in ? 'green' : 'slate'">
                     In {{ record.time_in ? fmtShortTime(record.time_in) : '—' }}
-                  </span>
-                  <span v-if="record.break_out"
-                        class="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full px-2 py-0.5">
+                  </AppBadge>
+                  <AppBadge v-if="record.break_out" color="amber">
                     Break Out {{ fmtShortTime(record.break_out) }}
-                  </span>
-                  <span v-if="record.break_in"
-                        class="inline-flex items-center gap-1 text-xs font-medium bg-teal-100 text-teal-700 rounded-full px-2 py-0.5">
+                  </AppBadge>
+                  <AppBadge v-if="record.break_in" color="purple">
                     Break In {{ fmtShortTime(record.break_in) }}
-                  </span>
-                  <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5"
-                        :class="record.time_out ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'">
+                  </AppBadge>
+                  <AppBadge :color="record.time_out ? 'blue' : 'slate'">
                     Out {{ record.time_out ? fmtShortTime(record.time_out) : '—' }}
-                  </span>
-                  <span v-if="record.accomplishments?.length"
-                        class="inline-flex items-center gap-1 text-xs font-medium bg-indigo-100 text-indigo-700 rounded-full px-2 py-0.5">
+                  </AppBadge>
+                  <AppBadge v-if="record.accomplishments?.length" color="indigo">
                     📝 {{ record.accomplishments.length }}
-                  </span>
+                  </AppBadge>
                 </div>
               </div>
 
               <!-- Chevron -->
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 shrink-0 transition-transform"
-                   :class="{ 'rotate-180': expandedHistoryId === record.id }"
-                   fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDownIcon
+                class="h-4 w-4 text-slate-400 shrink-0 transition-transform"
+                :class="{ 'rotate-180': expandedHistoryId === record.id }"
+              />
             </button>
 
             <!-- Expanded panel -->
@@ -305,42 +287,27 @@
         </div>
 
         <!-- Pagination -->
-        <div v-if="historyMeta && historyMeta.last_page > 1"
-             class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>Page {{ historyMeta.current_page }} of {{ historyMeta.last_page }}</span>
-          <div class="flex gap-2">
-            <button @click="loadHistory(historyMeta.current_page - 1)"
-                    :disabled="historyMeta.current_page <= 1"
-                    class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-              ← Prev
-            </button>
-            <button @click="loadHistory(historyMeta.current_page + 1)"
-                    :disabled="historyMeta.current_page >= historyMeta.last_page"
-                    class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-              Next →
-            </button>
-          </div>
-        </div>
-      </div>
+        <PaginationControl
+          v-if="historyMeta"
+          :current-page="historyMeta.current_page"
+          :total-pages="historyMeta.last_page"
+          @prev="loadHistory(historyMeta.current_page - 1)"
+          @next="loadHistory(historyMeta.current_page + 1)"
+        />
+      </AppCard>
 
       <!-- Print shortcuts -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-4 flex flex-wrap gap-3 items-center">
-        <span class="text-sm font-medium text-slate-600 mr-auto">Print Reports</span>
-        <button @click="showTimeLogPrintModal = true"
-           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          🖨️ Time Logs
-        </button>
-        <button @click="showPrintModal = true"
-           class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          🖨️ Accomplishments
-        </button>
-      </div>
+      <AppCard>
+        <div class="flex flex-wrap gap-3 items-center">
+          <span class="text-sm font-medium text-slate-600 mr-auto">Print Reports</span>
+          <AppButton variant="secondary" @click="showTimeLogPrintModal = true">🖨️ Time Logs</AppButton>
+          <AppButton variant="secondary" @click="showPrintModal = true">🖨️ Accomplishments</AppButton>
+        </div>
+      </AppCard>
 
       <!-- Print Time Logs Modal -->
-      <div v-if="showTimeLogPrintModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-          <h2 class="text-base font-semibold text-slate-800">Print Time Logs</h2>
-
+      <AppModal :show="showTimeLogPrintModal" title="Print Time Logs" size="sm" @close="showTimeLogPrintModal = false">
+        <div class="space-y-4">
           <div class="flex gap-3">
             <label v-for="opt in [{v:'daily',l:'Daily'},{v:'monthly',l:'Monthly'},{v:'range',l:'Date Range'}]" :key="opt.v"
               class="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
@@ -373,22 +340,17 @@
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
             </div>
           </div>
-
-          <div class="flex justify-end gap-3 pt-1">
-            <button @click="showTimeLogPrintModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-            <a :href="printTimeLogsUrl" target="_blank"
-               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              🖨️ Print
-            </a>
-          </div>
         </div>
-      </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="showTimeLogPrintModal = false">Cancel</AppButton>
+          <AppButton as="a" :href="printTimeLogsUrl" target="_blank">🖨️ Print</AppButton>
+        </template>
+      </AppModal>
 
       <!-- Print Accomplishments Modal -->
-      <div v-if="showPrintModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-          <h2 class="text-base font-semibold text-slate-800">Print Accomplishments</h2>
-
+      <AppModal :show="showPrintModal" title="Print Accomplishments" size="sm" @close="showPrintModal = false">
+        <div class="space-y-4">
           <div class="flex gap-3">
             <label v-for="opt in [{v:'daily',l:'Daily'},{v:'monthly',l:'Monthly'},{v:'range',l:'Date Range'}]" :key="opt.v"
               class="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
@@ -421,16 +383,13 @@
                 class="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
             </div>
           </div>
-
-          <div class="flex justify-end gap-3 pt-1">
-            <button @click="showPrintModal = false" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
-            <a :href="printAccomplishmentsUrl" target="_blank"
-               class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-              🖨️ Print
-            </a>
-          </div>
         </div>
-      </div>
+
+        <template #footer>
+          <AppButton variant="secondary" @click="showPrintModal = false">Cancel</AppButton>
+          <AppButton as="a" :href="printAccomplishmentsUrl" target="_blank">🖨️ Print</AppButton>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>
@@ -440,6 +399,14 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { ChevronDownIcon } from '@heroicons/vue/24/outline'
 import Swal from 'sweetalert2'
 import axios from 'axios'
 import AccomplishmentForm from './AccomplishmentForm.vue'

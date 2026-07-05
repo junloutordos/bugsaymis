@@ -4,7 +4,7 @@
     <div class="space-y-5">
 
       <!-- Employee Header -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+      <AppCard>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div class="flex items-center gap-3">
             <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
@@ -24,30 +24,28 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button @click="changeMonth(-1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
-              <ChevronLeftIcon class="h-4 w-4 text-slate-600" />
-            </button>
+            <AppIconButton label="Previous month" variant="secondary" @click="changeMonth(-1)">
+              <ChevronLeftIcon class="h-4 w-4" />
+            </AppIconButton>
             <input
               v-model="currentMonth"
               type="month"
               @change="goMonth"
               class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
-            <button @click="changeMonth(1)" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50">
-              <ChevronRightIcon class="h-4 w-4 text-slate-600" />
-            </button>
-            <button @click="doRecompute" :disabled="recomputing"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-medium disabled:opacity-50"
+            <AppIconButton label="Next month" variant="secondary" @click="changeMonth(1)">
+              <ChevronRightIcon class="h-4 w-4" />
+            </AppIconButton>
+            <AppButton variant="secondary" :disabled="recomputing" @click="doRecompute"
               title="Recompute late/undertime based on current schedule">
               <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': recomputing }" />
               {{ recomputing ? 'Recomputing…' : 'Recompute' }}
-            </button>
-            <button v-if="canAdvanceGenerate" @click="submitAdvanceGenerate" :disabled="advanceGenerating"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-lg transition-colors font-medium"
+            </AppButton>
+            <AppButton v-if="canAdvanceGenerate" variant="warning" :disabled="advanceGenerating" @click="submitAdvanceGenerate"
               title="Generate advance cut-off entry for this COS employee">
               <BoltIcon class="h-4 w-4" :class="{ 'animate-pulse': advanceGenerating }" />
               {{ advanceGenerating ? 'Generating…' : 'Advance Entry' }}
-            </button>
+            </AppButton>
             <!-- COS: date range pickers for checklist -->
             <template v-if="isCos">
               <input v-model="cosDateFrom" type="date"
@@ -58,32 +56,29 @@
                 class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                 title="Checklist date to" />
             </template>
-            <a :href="cosChecklistUrl()" target="_blank"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium">
+            <AppButton as="a" :href="cosChecklistUrl()" target="_blank" variant="success">
               <ClipboardDocumentListIcon class="h-4 w-4" />Checklist
-            </a>
-            <a :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
+            </AppButton>
+            <AppButton as="a" :href="route('hr.dtr.print', employee.id) + '?month=' + currentMonth" target="_blank">
               <PrinterIcon class="h-4 w-4" />Print
-            </a>
+            </AppButton>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Penned entries submitted banner + unlock -->
-      <div v-if="allSubmitted" class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden">
+      <div v-if="allSubmitted" class="bg-warning-50 border border-warning-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden">
         <div class="flex items-start gap-2">
-          <LockClosedIcon class="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <LockClosedIcon class="h-5 w-5 text-warning-500 shrink-0 mt-0.5" />
           <div>
             <p class="text-sm font-semibold text-amber-800">Penned entries submitted</p>
             <p class="text-xs text-amber-600 mt-0.5">{{ employee.name }} has locked their penned entries for {{ currentMonth }}. Review and unlock if corrections are needed.</p>
           </div>
         </div>
-        <button @click="unlockPenned" :disabled="unlocking"
-          class="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg font-medium shrink-0 transition-colors">
+        <AppButton variant="warning" class="shrink-0" :disabled="unlocking" @click="unlockPenned">
           <LockOpenIcon class="h-4 w-4" />
           {{ unlocking ? 'Unlocking…' : 'Unlock Submissions' }}
-        </button>
+        </AppButton>
       </div>
 
       <!-- Summary Stats -->
@@ -131,7 +126,8 @@
       </div>
 
       <!-- Calendar Grid -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+      <AppCard :padded="false">
+       <div class="p-4">
         <h2 class="text-sm font-semibold text-slate-700 mb-3">{{ monthLabel }}</h2>
 
         <!-- Day headers -->
@@ -207,16 +203,16 @@
             </template>
           </div>
         </div>
-      </div>
+       </div>
+      </AppCard>
 
       <!-- Detail Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100">
           <h2 class="text-sm font-semibold text-slate-700">Detail Records</h2>
         </div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
+        <AppTable :card="false" :is-empty="!records.length" :skeleton-cols="14">
+          <template #head>
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Day</th>
@@ -233,11 +229,8 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                 <th class="px-4 py-3 print:hidden"></th>
               </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="!records.length">
-                <td colspan="14" class="px-4 py-12 text-center text-slate-400 text-sm">No records for this month.</td>
-              </tr>
+          </template>
+
               <tr v-for="r in records" :key="r.id" :class="r.is_advance ? 'bg-amber-50/60 hover:bg-amber-50' : (r.wfh_attendance_id && r.wfh_overridden ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50/60')">
                 <td class="px-4 py-2.5 text-slate-700 whitespace-nowrap text-xs">{{ toDateStr(r.work_date) }}</td>
                 <td class="px-4 py-2.5 text-slate-500 text-xs font-medium">{{ getDayName(r.work_date) }}</td>
@@ -278,9 +271,9 @@
                 </td>
                 <td class="px-4 py-2.5">
                   <div class="flex items-center gap-1 flex-wrap">
-                    <span :class="statusBadge(r.attendance_status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap">
+                    <AppBadge :color="statusBadgeColor(r.attendance_status)">
                       {{ statusLabel(r.attendance_status) }}
-                    </span>
+                    </AppBadge>
                     <span v-if="r.wfh_attendance_id"
                       class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap"
                       title="Times sourced from WFH attendance log">WFH</span>
@@ -304,19 +297,67 @@
                   </template>
                 </td>
               </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+
+          <template #mobileCard>
+            <div v-for="r in records" :key="r.id" class="p-4 space-y-2" :class="r.is_advance ? 'bg-amber-50/60' : (r.wfh_attendance_id && r.wfh_overridden ? 'bg-red-50' : '')">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="text-sm font-medium text-slate-800">{{ toDateStr(r.work_date) }}</p>
+                  <p class="text-xs text-slate-500">{{ getDayName(r.work_date) }}</p>
+                </div>
+                <div class="flex items-center gap-1 flex-wrap justify-end">
+                  <AppBadge :color="statusBadgeColor(r.attendance_status)">{{ statusLabel(r.attendance_status) }}</AppBadge>
+                  <span v-if="r.wfh_attendance_id"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600 whitespace-nowrap">WFH</span>
+                  <span v-if="r.is_advance"
+                    class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 whitespace-nowrap">Advance</span>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-mono">
+                <span>AM {{ timeCell(r, 'time_in_am') }} – {{ timeCell(r, 'time_out_am') }}</span>
+                <span>PM {{ timeCell(r, 'time_in_pm') }} – {{ timeCell(r, 'time_out_pm') }}</span>
+              </div>
+              <div class="flex flex-wrap gap-3 text-xs text-slate-500">
+                <span>Hrs: <strong class="text-slate-700">{{ r.hours_worked > 0 ? r.hours_worked : '—' }}</strong></span>
+                <span>Late: {{ fmtMinutes(r.late_minutes) }}</span>
+                <span>UT: {{ fmtMinutes(r.undertime_minutes) }}</span>
+                <span>OT: {{ fmtMinutes(r.overtime_minutes) }}</span>
+              </div>
+              <div class="pt-1 print:hidden">
+                <template v-if="r.is_advance && (isAdmin || canManageDtr)">
+                  <button @click="saveAdvancePenned(r)" :disabled="advancePennedForm.processing"
+                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded font-medium disabled:opacity-50 whitespace-nowrap">
+                    {{ advancePennedForm.processing ? '…' : 'Save' }}
+                  </button>
+                </template>
+                <template v-else>
+                  <button v-if="!r.is_locked && (isAdmin || canManageDtr)" @click="openEdit(r)"
+                    class="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 transition-colors">
+                    <PencilSquareIcon class="h-4 w-4" />Edit
+                  </button>
+                  <LockClosedIcon v-else-if="r.is_locked" class="h-4 w-4 text-red-300" />
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No records for this month." />
+          </template>
+        </AppTable>
+      </AppCard>
 
     </div>
 
     <!-- Edit / Penned Entry Modal -->
-    <Teleport to="body">
-      <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm print:hidden">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-          <h3 class="text-base font-semibold text-slate-800 mb-0.5">DTR Record</h3>
-          <p class="text-sm text-slate-400 mb-1">{{ toDateStr(editModal.record?.work_date) }} — {{ getDayName(editModal.record?.work_date) }}</p>
+    <AppModal
+      :show="editModal.open"
+      size="sm"
+      title="DTR Record"
+      :subtitle="`${toDateStr(editModal.record?.work_date)} — ${getDayName(editModal.record?.work_date)}`"
+      body-class="px-6 py-5 print:hidden"
+      @close="editModal.open = false"
+    >
 
           <!-- Admin mode: all fields editable, no red styling -->
           <template v-if="isAdmin">
@@ -367,16 +408,13 @@
             </div>
           </template>
 
-          <div class="flex gap-3 justify-end mt-5">
-            <button @click="editModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="submitEdit" :disabled="editForm.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">
-              {{ editForm.processing ? 'Saving…' : 'Save' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      <template #footer>
+        <AppButton variant="secondary" @click="editModal.open = false">Cancel</AppButton>
+        <AppButton @click="submitEdit" :loading="editForm.processing">
+          {{ editForm.processing ? 'Saving…' : 'Save' }}
+        </AppButton>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>
@@ -385,6 +423,13 @@
 import { ref, computed, reactive } from 'vue'
 import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   ChevronLeftIcon, ChevronRightIcon, PrinterIcon,
   PencilSquareIcon, LockClosedIcon, ArrowPathIcon,
@@ -628,6 +673,19 @@ function statusLabel(status) {
     on_official_business: 'OB',
     wfh:                  'WFH',
   }[status] ?? (status ?? '').replace(/_/g, ' ')
+}
+
+// AppBadge color key for the detail-table main status pill (calendar cells keep using statusBadge() above)
+function statusBadgeColor(status) {
+  return {
+    present:              'green',
+    absent:               'red',
+    half_day:             'amber',
+    on_leave:             'blue',
+    holiday:              'purple',
+    on_official_business: 'orange',
+    wfh:                  'slate',
+  }[status] ?? 'slate'
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

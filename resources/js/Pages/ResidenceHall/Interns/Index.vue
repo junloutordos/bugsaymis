@@ -2,6 +2,14 @@
 import { ref, computed } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import axios from 'axios'
 
@@ -85,16 +93,14 @@ const fmtDate = (d) => d
   ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
   : '—'
 
-const statusClass = (s) => ({
-  active:       'bg-emerald-100 text-emerald-700',
-  checked_out:  'bg-slate-100 text-slate-600',
-  suspended:    'bg-amber-100 text-amber-700',
-  terminated:   'bg-rose-100 text-rose-700',
-}[s] || 'bg-slate-100 text-slate-600')
+const statusColor = (s) => ({
+  active:       'green',
+  checked_out:  'slate',
+  suspended:    'amber',
+  terminated:   'red',
+}[s] || 'slate')
 
-const hallBadge = (h) => h === 'BRH'
-  ? 'bg-indigo-100 text-indigo-700'
-  : 'bg-pink-100 text-pink-700'
+const hallColor = (h) => h === 'BRH' ? 'indigo' : 'purple'
 </script>
 
 <template>
@@ -102,19 +108,16 @@ const hallBadge = (h) => h === 'BRH'
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Dormer Roster</h1>
-          <p class="text-sm text-slate-500">Active dormitory residents</p>
-        </div>
-        <button @click="showAdd = true"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <PlusIcon class="w-4 h-4" /> Enroll Dormer
-        </button>
-      </div>
+      <AppPageHeader title="Dormer Roster" subtitle="Active dormitory residents">
+        <template #actions>
+          <AppButton @click="showAdd = true">
+            <PlusIcon class="w-4 h-4" /> Enroll Dormer
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">School Year</label>
           <select v-model="syId" @change="applyFilters"
@@ -143,64 +146,75 @@ const hallBadge = (h) => h === 'BRH'
                    class="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
-      </div>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50">
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Hall</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Bed</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Check-in</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="intern in displayed" :key="intern.id" class="hover:bg-slate-50 transition-colors">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ intern.student_name }}</td>
-              <td class="px-4 py-3">
-                <span v-if="intern.room" :class="['text-xs px-2 py-0.5 rounded-full font-medium', hallBadge(intern.room.residence_hall)]">
-                  {{ intern.room.residence_hall }}
-                </span>
-                <span v-else class="text-slate-400 text-xs">—</span>
-              </td>
-              <td class="px-4 py-3 text-slate-600">{{ intern.room?.room_number || '—' }}</td>
-              <td class="px-4 py-3 text-slate-600">{{ intern.bed_number || '—' }}</td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ fmtDate(intern.check_in_date) }}</td>
-              <td class="px-4 py-3">
-                <span :class="['text-xs px-2 py-0.5 rounded-full font-medium capitalize', statusClass(intern.status)]">
-                  {{ intern.status.replace('_', ' ') }}
-                </span>
-              </td>
-              <td class="px-4 py-3">
-                <Link :href="route('rh.interns.show', intern.id)"
-                      class="text-xs text-indigo-600 hover:underline font-medium">View</Link>
-              </td>
-            </tr>
-            <tr v-if="!displayed.length">
-              <td colspan="7" class="text-center py-12 text-slate-400 text-sm">No dormers found.</td>
-            </tr>
-          </tbody>
-        </table>
+      <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
+        <template #head>
+          <tr>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Hall</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Room</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Bed</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Check-in</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
 
-        <PaginationControl
-          v-if="totalPages > 1"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+        <tr v-for="intern in displayed" :key="intern.id" class="hover:bg-slate-50 transition-colors">
+          <td class="px-4 py-3 font-medium text-slate-800">{{ intern.student_name }}</td>
+          <td class="px-4 py-3">
+            <AppBadge v-if="intern.room" :color="hallColor(intern.room.residence_hall)">{{ intern.room.residence_hall }}</AppBadge>
+            <span v-else class="text-slate-400 text-xs">—</span>
+          </td>
+          <td class="px-4 py-3 text-slate-600">{{ intern.room?.room_number || '—' }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ intern.bed_number || '—' }}</td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ fmtDate(intern.check_in_date) }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusColor(intern.status)" class="capitalize">{{ intern.status.replace('_', ' ') }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <Link :href="route('rh.interns.show', intern.id)"
+                  class="text-xs text-indigo-600 hover:underline font-medium">View</Link>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="intern in displayed" :key="intern.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ intern.student_name }}</p>
+                <p class="text-xs text-slate-500">Room {{ intern.room?.room_number || '—' }} &middot; Bed {{ intern.bed_number || '—' }}</p>
+              </div>
+              <AppBadge :color="statusColor(intern.status)" class="capitalize">{{ intern.status.replace('_', ' ') }}</AppBadge>
+            </div>
+            <div class="flex items-center justify-between">
+              <AppBadge v-if="intern.room" :color="hallColor(intern.room.residence_hall)">{{ intern.room.residence_hall }}</AppBadge>
+              <span class="text-xs text-slate-400">Check-in {{ fmtDate(intern.check_in_date) }}</span>
+            </div>
+            <Link :href="route('rh.interns.show', intern.id)" class="text-xs text-indigo-600 hover:underline font-medium">View</Link>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No dormers found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            v-if="totalPages > 1"
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
       <!-- Add Intern Modal -->
-      <div v-if="showAdd" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-          <h3 class="text-base font-semibold text-slate-800 mb-4">Enroll New Dormer</h3>
+      <AppModal :show="showAdd" title="Enroll New Dormer" size="lg" @close="showAdd = false; addForm.reset(); selectedStudent = null; studentQuery = ''">
           <div class="space-y-3">
 
             <!-- Student search -->
@@ -268,18 +282,16 @@ const hallBadge = (h) => h === 'BRH'
             </div>
 
           </div>
-          <div class="flex gap-3 mt-5">
-            <button @click="showAdd = false; addForm.reset(); selectedStudent = null; studentQuery = ''"
-                    class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">
-              Cancel
-            </button>
-            <button @click="submitAdd" :disabled="!addForm.student_id || !addForm.rh_room_id || addForm.processing"
-                    class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+
+        <template #footer>
+          <div class="flex gap-3 w-full">
+            <AppButton block variant="secondary" @click="showAdd = false; addForm.reset(); selectedStudent = null; studentQuery = ''">Cancel</AppButton>
+            <AppButton block :disabled="!addForm.student_id || !addForm.rh_room_id" :loading="addForm.processing" @click="submitAdd">
               Enroll Dormer
-            </button>
+            </AppButton>
           </div>
-        </div>
-      </div>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>

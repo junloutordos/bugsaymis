@@ -4,16 +4,18 @@ import { Head, router, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppModal from '@/Components/AppModal.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
 import OrgTreeNode from './Partials/OrgTreeNode.vue'
 import {
   PlusIcon,
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
-  BuildingLibraryIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
-  PrinterIcon,
   ChartBarIcon,
   ClockIcon,
   ArrowsRightLeftIcon,
@@ -238,119 +240,79 @@ function toggleInactive() {
     <div class="space-y-5">
 
       <!-- ── Page header ──────────────────────────────────────────────────────── -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800 flex items-center gap-2">
-            <BuildingLibraryIcon class="h-6 w-6 text-indigo-500" />
-            Organizational Structure
-          </h1>
-          <p class="text-sm text-slate-500 mt-0.5">
-            Manage the official hierarchy of organizational units.
-          </p>
-        </div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <!-- Export/Report shortcuts -->
-          <a
-            v-if="can.export"
-            :href="route('hr.org.export.pdf')"
-            target="_blank"
-            class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg"
-            title="Download PDF"
-          >
-            <ArrowDownTrayIcon class="h-4 w-4" />
-          </a>
-          <a
-            v-if="can.reports"
-            :href="route('hr.org.reports')"
-            class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg"
-            title="Reports"
-          >
-            <ChartBarIcon class="h-4 w-4" />
-          </a>
-          <a
-            v-if="can.versions"
-            :href="route('hr.org.versions.index')"
-            class="inline-flex items-center gap-1.5 text-sm px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg"
-            title="Versions"
-          >
-            <ClockIcon class="h-4 w-4" />
-          </a>
-          <!-- Sync from Divisions & Offices -->
-          <button
+      <AppPageHeader title="Organizational Structure" subtitle="Manage the official hierarchy of organizational units.">
+        <template #actions>
+          <AppButton v-if="can.export" as="a" :href="route('hr.org.export.pdf')" target="_blank" variant="secondary" size="sm">
+            <ArrowDownTrayIcon class="h-4 w-4" /> PDF
+          </AppButton>
+          <AppButton v-if="can.reports" as="a" :href="route('hr.org.reports')" variant="secondary" size="sm">
+            <ChartBarIcon class="h-4 w-4" /> Reports
+          </AppButton>
+          <AppButton v-if="can.versions" as="a" :href="route('hr.org.versions.index')" variant="secondary" size="sm">
+            <ClockIcon class="h-4 w-4" /> Versions
+          </AppButton>
+          <AppButton
             v-if="can.sync"
+            :variant="showLegacyPanel ? 'warning' : 'secondary'"
+            size="sm"
             @click="showLegacyPanel = !showLegacyPanel"
-            :class="[
-              'inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors border',
-              showLegacyPanel
-                ? 'bg-amber-50 border-amber-300 text-amber-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
-            ]"
-            title="Reconcile with Divisions & Offices"
           >
-            <ArrowsRightLeftIcon class="h-4 w-4" />
-            <span class="hidden sm:inline">Sync Data</span>
-          </button>
-          <button
-            v-if="can.create"
-            @click="openCreate()"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shadow-sm"
-          >
+            <ArrowsRightLeftIcon class="h-4 w-4" /> <span class="hidden sm:inline">Sync Data</span>
+          </AppButton>
+          <AppButton v-if="can.create" @click="openCreate()">
             <PlusIcon class="h-4 w-4" /> New Unit
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- ── Flash messages ───────────────────────────────────────────────────── -->
-      <div v-if="flash.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="flash.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ flash.success }}
       </div>
-      <div v-if="flash.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="flash.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ flash.error }}
       </div>
 
       <!-- ── Inertia flash ────────────────────────────────────────────────────── -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" /> {{ $page.props.flash.error }}
       </div>
 
       <!-- ── Legacy Data Reconciliation Panel ─────────────────────────────────── -->
-      <div v-if="showLegacyPanel" class="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-4">
+      <div v-if="showLegacyPanel" class="bg-warning-50 border border-warning-100 rounded-xl p-5 space-y-4">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h2 class="text-sm font-semibold text-amber-800 flex items-center gap-2">
+            <h2 class="text-sm font-semibold text-warning-700 flex items-center gap-2">
               <ArrowsRightLeftIcon class="h-4 w-4" />
               Existing Divisions &amp; Offices
             </h2>
-            <p class="text-xs text-amber-700 mt-1">
+            <p class="text-xs text-warning-700 mt-1">
               These are the canonical divisions and offices used throughout the system (Leave, DTR, Payroll, etc.).
-              Units marked <span class="font-semibold text-emerald-700">linked</span> already have a corresponding org unit.
+              Units marked <span class="font-semibold text-success-700">linked</span> already have a corresponding org unit.
               Click <strong>Sync Now</strong> to rebuild the org tree from this data.
             </p>
           </div>
-          <button @click="showLegacyPanel = false" class="text-amber-500 hover:text-amber-700 text-xs shrink-0">Close</button>
+          <button @click="showLegacyPanel = false" class="text-warning-500 hover:text-warning-700 text-xs shrink-0">Close</button>
         </div>
 
         <!-- Division list -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div
             v-for="div in divisions" :key="div.id"
-            class="bg-white rounded-lg border border-amber-200 p-3 space-y-2"
+            class="bg-white rounded-lg border border-warning-100 p-3 space-y-2"
           >
             <div class="flex items-center justify-between gap-2">
               <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">{{ div.acronym }}</span>
-              <span :class="div.is_linked ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'"
-                    class="text-xs px-2 py-0.5 rounded-full font-medium">
-                {{ div.is_linked ? 'Linked' : 'Not linked' }}
-              </span>
+              <AppBadge :color="div.is_linked ? 'green' : 'red'">{{ div.is_linked ? 'Linked' : 'Not linked' }}</AppBadge>
             </div>
             <p class="text-xs font-medium text-slate-700 leading-tight">{{ div.name }}</p>
             <ul class="space-y-1">
               <li v-for="off in div.offices" :key="off.id" class="flex items-center justify-between gap-1">
                 <span class="text-xs text-slate-600 truncate">{{ off.name }}</span>
-                <span :class="off.is_linked ? 'text-emerald-600' : 'text-red-400'" class="text-xs shrink-0">
+                <span :class="off.is_linked ? 'text-success-600' : 'text-danger-500'" class="text-xs shrink-0">
                   {{ off.is_linked ? '✓' : '—' }}
                 </span>
               </li>
@@ -360,19 +322,14 @@ function toggleInactive() {
 
         <!-- Summary + Sync button -->
         <div class="flex items-center justify-between pt-1">
-          <p class="text-xs text-amber-700">
-            <span v-if="allLinked" class="text-emerald-700 font-semibold">All divisions and offices are linked.</span>
+          <p class="text-xs text-warning-700">
+            <span v-if="allLinked" class="text-success-700 font-semibold">All divisions and offices are linked.</span>
             <span v-else class="font-semibold">Some records are not yet linked to org units.</span>
             Syncing will rebuild the tree to match exactly.
           </p>
-          <button
-            v-if="can.sync"
-            @click="showSyncConfirm = true"
-            class="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            <ArrowsRightLeftIcon class="h-4 w-4" />
-            Sync Now
-          </button>
+          <AppButton v-if="can.sync" variant="warning" size="sm" @click="showSyncConfirm = true">
+            <ArrowsRightLeftIcon class="h-4 w-4" /> Sync Now
+          </AppButton>
         </div>
       </div>
 
@@ -393,21 +350,17 @@ function toggleInactive() {
                 class="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
-            <button
+            <AppButton
               v-if="can.update"
+              :variant="includeInactive ? 'warning' : 'secondary'"
+              size="sm"
               @click="toggleInactive"
-              :class="[
-                'text-xs px-3 py-1.5 rounded-lg border transition-colors',
-                includeInactive
-                  ? 'bg-amber-50 border-amber-200 text-amber-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100',
-              ]"
             >
               {{ includeInactive ? 'Hiding inactive' : 'Show inactive' }}
-            </button>
-            <button @click="reloadTree" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400" title="Refresh">
+            </AppButton>
+            <AppIconButton label="Refresh" size="sm" @click="reloadTree">
               <ArrowPathIcon class="h-4 w-4" />
-            </button>
+            </AppIconButton>
           </div>
 
           <!-- Tree -->
@@ -457,9 +410,9 @@ function toggleInactive() {
             </div>
             <div>
               <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Status</p>
-              <span :class="selectedNode.is_active ? 'text-emerald-600' : 'text-slate-400'" class="mt-0.5">
+              <AppBadge :color="selectedNode.is_active ? 'green' : 'slate'" class="mt-0.5">
                 {{ selectedNode.is_active ? 'Active' : 'Inactive' }}
-              </span>
+              </AppBadge>
             </div>
             <div v-if="selectedNode.current_head?.length">
               <p class="text-xs text-slate-400 uppercase tracking-wide font-medium">Head</p>
@@ -471,26 +424,15 @@ function toggleInactive() {
             </div>
             <!-- Actions -->
             <div class="pt-2 flex gap-2 flex-wrap">
-              <button
-                v-if="can.update"
-                @click="openEdit(selectedNode)"
-                class="text-xs px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-medium"
-              >
+              <AppButton v-if="can.update" size="sm" variant="secondary" @click="openEdit(selectedNode)">
                 Edit
-              </button>
-              <button
-                v-if="can.create"
-                @click="openCreate(selectedNode)"
-                class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium"
-              >
+              </AppButton>
+              <AppButton v-if="can.create" size="sm" variant="secondary" @click="openCreate(selectedNode)">
                 Add Child
-              </button>
-              <a
-                :href="route('hr.org.units.show', selectedNode.id)"
-                class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium"
-              >
+              </AppButton>
+              <AppButton size="sm" variant="secondary" as="a" :href="route('hr.org.units.show', selectedNode.id)">
                 View Page →
-              </a>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -504,34 +446,34 @@ function toggleInactive() {
         <div class="grid grid-cols-2 gap-4">
           <!-- Code -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-danger-600">*</span></label>
             <input v-model="form.code" type="text" maxlength="50" placeholder="e.g. ACAD-DIV"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': errors.code }"
+              :class="{ 'border-danger-500': errors.code }"
             />
-            <p v-if="errors.code" class="text-red-500 text-xs mt-1">{{ errors.code[0] }}</p>
+            <p v-if="errors.code" class="text-danger-600 text-xs mt-1">{{ errors.code[0] }}</p>
           </div>
           <!-- Type -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-danger-600">*</span></label>
             <select v-model="form.type"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': errors.type }"
+              :class="{ 'border-danger-500': errors.type }"
             >
               <option v-for="t in types" :key="t" :value="t" class="capitalize">{{ t }}</option>
             </select>
-            <p v-if="errors.type" class="text-red-500 text-xs mt-1">{{ errors.type[0] }}</p>
+            <p v-if="errors.type" class="text-danger-600 text-xs mt-1">{{ errors.type[0] }}</p>
           </div>
         </div>
 
         <!-- Name -->
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Full Name <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Full Name <span class="text-danger-600">*</span></label>
           <input v-model="form.name" type="text" placeholder="Official unit name"
             class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            :class="{ 'border-red-400': errors.name }"
+            :class="{ 'border-danger-500': errors.name }"
           />
-          <p v-if="errors.name" class="text-red-500 text-xs mt-1">{{ errors.name[0] }}</p>
+          <p v-if="errors.name" class="text-danger-600 text-xs mt-1">{{ errors.name[0] }}</p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -547,14 +489,14 @@ function toggleInactive() {
             <label class="block text-xs font-medium text-slate-600 mb-1">Parent Unit</label>
             <select v-model="form.parent_id"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': errors.parent_id }"
+              :class="{ 'border-danger-500': errors.parent_id }"
             >
               <option :value="null">— None (root) —</option>
               <option v-for="u in flatUnits" :key="u.id" :value="u.id">
                 {{ '–'.repeat(u.depth) }} {{ u.name }} ({{ u.code }})
               </option>
             </select>
-            <p v-if="errors.parent_id" class="text-red-500 text-xs mt-1">{{ errors.parent_id[0] }}</p>
+            <p v-if="errors.parent_id" class="text-danger-600 text-xs mt-1">{{ errors.parent_id[0] }}</p>
           </div>
         </div>
 
@@ -599,11 +541,10 @@ function toggleInactive() {
       </form>
 
       <template #footer>
-        <button @click="showCreate = false" class="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-        <button @click="submitCreate" :disabled="loading"
-          class="text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-60">
+        <AppButton variant="secondary" @click="showCreate = false">Cancel</AppButton>
+        <AppButton :loading="loading" @click="submitCreate">
           {{ loading ? 'Saving…' : 'Create Unit' }}
-        </button>
+        </AppButton>
       </template>
     </AppModal>
 
@@ -612,15 +553,15 @@ function toggleInactive() {
       <form @submit.prevent="submitUpdate" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Code <span class="text-danger-600">*</span></label>
             <input v-model="form.code" type="text" maxlength="50"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': errors.code }"
+              :class="{ 'border-danger-500': errors.code }"
             />
-            <p v-if="errors.code" class="text-red-500 text-xs mt-1">{{ errors.code[0] }}</p>
+            <p v-if="errors.code" class="text-danger-600 text-xs mt-1">{{ errors.code[0] }}</p>
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Type <span class="text-danger-600">*</span></label>
             <select v-model="form.type"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
             >
@@ -629,12 +570,12 @@ function toggleInactive() {
           </div>
         </div>
         <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Full Name <span class="text-red-500">*</span></label>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Full Name <span class="text-danger-600">*</span></label>
           <input v-model="form.name" type="text"
             class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            :class="{ 'border-red-400': errors.name }"
+            :class="{ 'border-danger-500': errors.name }"
           />
-          <p v-if="errors.name" class="text-red-500 text-xs mt-1">{{ errors.name[0] }}</p>
+          <p v-if="errors.name" class="text-danger-600 text-xs mt-1">{{ errors.name[0] }}</p>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -647,7 +588,7 @@ function toggleInactive() {
             <label class="block text-xs font-medium text-slate-600 mb-1">Parent Unit</label>
             <select v-model="form.parent_id"
               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              :class="{ 'border-red-400': errors.parent_id }"
+              :class="{ 'border-danger-500': errors.parent_id }"
             >
               <option :value="null">— None (root) —</option>
               <option
@@ -658,7 +599,7 @@ function toggleInactive() {
                 {{ '–'.repeat(u.depth) }} {{ u.name }} ({{ u.code }})
               </option>
             </select>
-            <p v-if="errors.parent_id" class="text-red-500 text-xs mt-1">{{ errors.parent_id[0] }}</p>
+            <p v-if="errors.parent_id" class="text-danger-600 text-xs mt-1">{{ errors.parent_id[0] }}</p>
           </div>
         </div>
         <div>
@@ -714,11 +655,10 @@ function toggleInactive() {
       </form>
 
       <template #footer>
-        <button @click="showEdit = false" class="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-        <button @click="submitUpdate" :disabled="loading"
-          class="text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium disabled:opacity-60">
+        <AppButton variant="secondary" @click="showEdit = false">Cancel</AppButton>
+        <AppButton :loading="loading" @click="submitUpdate">
           {{ loading ? 'Saving…' : 'Save Changes' }}
-        </button>
+        </AppButton>
       </template>
     </AppModal>
 
@@ -736,11 +676,10 @@ function toggleInactive() {
         <li>Already-linked units are updated in place (names, status).</li>
       </ul>
       <template #footer>
-        <button @click="showSyncConfirm = false" class="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-        <button @click="submitSync" :disabled="syncForm.processing"
-          class="text-sm px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium disabled:opacity-60">
+        <AppButton variant="secondary" @click="showSyncConfirm = false">Cancel</AppButton>
+        <AppButton variant="warning" :loading="syncForm.processing" @click="submitSync">
           {{ syncForm.processing ? 'Syncing…' : 'Sync Now' }}
-        </button>
+        </AppButton>
       </template>
     </AppModal>
 
@@ -753,11 +692,10 @@ function toggleInactive() {
         Active employees or child units will prevent deletion.
       </p>
       <template #footer>
-        <button @click="showDelete = false" class="text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">Cancel</button>
-        <button @click="submitDelete" :disabled="loading"
-          class="text-sm px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium disabled:opacity-60">
+        <AppButton variant="secondary" @click="showDelete = false">Cancel</AppButton>
+        <AppButton variant="danger" :loading="loading" @click="submitDelete">
           {{ loading ? 'Archiving…' : 'Archive' }}
-        </button>
+        </AppButton>
       </template>
     </AppModal>
 

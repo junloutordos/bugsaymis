@@ -2,6 +2,14 @@
 import { ref, computed } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import { BanknotesIcon, MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -67,16 +75,13 @@ const currentYears = computed(() => {
   <AdminLayout title="Residence Hall">
     <div class="space-y-5">
 
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Fee Ledger</h1>
-          <p class="text-sm text-slate-500">Monthly lodging and appliance fees</p>
-        </div>
-        <button @click="showGenerate = true"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <ArrowPathIcon class="w-4 h-4" /> Generate Month
-        </button>
-      </div>
+      <AppPageHeader title="Fee Ledger" subtitle="Monthly lodging and appliance fees">
+        <template #actions>
+          <AppButton @click="showGenerate = true">
+            <ArrowPathIcon class="w-4 h-4" /> Generate Month
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Summary Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -88,18 +93,18 @@ const currentYears = computed(() => {
           <p class="text-xs text-slate-500 mb-1">Total Billed</p>
           <p class="text-lg font-bold text-slate-800">₱{{ fmt(summary.total_amount) }}</p>
         </div>
-        <div class="bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm p-4">
-          <p class="text-xs text-emerald-600 mb-1">Collected</p>
-          <p class="text-lg font-bold text-emerald-700">₱{{ fmt(summary.paid_amount) }}</p>
+        <div class="bg-success-50 rounded-xl border border-success-100 shadow-sm p-4">
+          <p class="text-xs text-success-600 mb-1">Collected</p>
+          <p class="text-lg font-bold text-success-700">₱{{ fmt(summary.paid_amount) }}</p>
         </div>
-        <div class="bg-amber-50 rounded-xl border border-amber-100 shadow-sm p-4">
-          <p class="text-xs text-amber-600 mb-1">Unpaid</p>
-          <p class="text-2xl font-bold text-amber-700">{{ summary.unpaid_count }}</p>
+        <div class="bg-warning-50 rounded-xl border border-warning-100 shadow-sm p-4">
+          <p class="text-xs text-warning-600 mb-1">Unpaid</p>
+          <p class="text-2xl font-bold text-warning-700">{{ summary.unpaid_count }}</p>
         </div>
       </div>
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
           <select v-model.number="month" @change="applyFilters"
@@ -131,99 +136,104 @@ const currentYears = computed(() => {
                    class="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
-      </div>
+      </AppFilterBar>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50">
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Hall / Room</th>
-              <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lodging</th>
-              <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Appliance</th>
-              <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <tr v-for="f in displayed" :key="f.id" class="hover:bg-slate-50 transition-colors">
-              <td class="px-4 py-3 font-medium text-slate-800">{{ f.student_name }}</td>
-              <td class="px-4 py-3 text-slate-600 text-xs hidden md:table-cell">
-                <span v-if="f.residence_hall"
-                      :class="['px-1.5 py-0.5 rounded-full font-medium mr-1', f.residence_hall === 'BRH' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700']">
-                  {{ f.residence_hall }}
-                </span>
-                Rm {{ f.room_number || '—' }}
-              </td>
-              <td class="px-4 py-3 text-right text-slate-600">₱{{ fmt(f.lodging_fee) }}</td>
-              <td class="px-4 py-3 text-right text-slate-500 hidden lg:table-cell">₱{{ fmt(f.appliance_fee) }}</td>
-              <td class="px-4 py-3 text-right font-semibold text-slate-800">₱{{ fmt(f.total_fee) }}</td>
-              <td class="px-4 py-3">
-                <div>
-                  <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', f.is_paid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700']">
-                    {{ f.is_paid ? 'Paid' : 'Unpaid' }}
-                  </span>
-                  <p v-if="f.paid_at" class="text-xs text-slate-400 mt-0.5">{{ fmtDate(f.paid_at) }}</p>
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <button v-if="!f.is_paid" @click="markPaid(f)"
-                        class="text-xs text-indigo-600 hover:underline font-medium">Mark Paid</button>
-              </td>
-            </tr>
-            <tr v-if="!displayed.length">
-              <td colspan="7" class="text-center py-12 text-slate-400 text-sm">
-                No fee records for this period.
-                <span class="block mt-1 text-xs">Use "Generate Month" to create fee records for all active dormers.</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <PaginationControl
-          v-if="totalPages > 1"
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+      <AppTable :is-empty="!displayed.length" :skeleton-cols="7">
+        <template #head>
+          <tr>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Student</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Hall / Room</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lodging</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Appliance</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</th>
+            <th class="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="f in displayed" :key="f.id" class="hover:bg-slate-50 transition-colors">
+          <td class="px-4 py-3 font-medium text-slate-800">{{ f.student_name }}</td>
+          <td class="px-4 py-3 text-slate-600 text-xs hidden md:table-cell">
+            <AppBadge v-if="f.residence_hall" :color="f.residence_hall === 'BRH' ? 'indigo' : 'purple'" class="mr-1">{{ f.residence_hall }}</AppBadge>
+            Rm {{ f.room_number || '—' }}
+          </td>
+          <td class="px-4 py-3 text-right text-slate-600">₱{{ fmt(f.lodging_fee) }}</td>
+          <td class="px-4 py-3 text-right text-slate-500 hidden lg:table-cell">₱{{ fmt(f.appliance_fee) }}</td>
+          <td class="px-4 py-3 text-right font-semibold text-slate-800">₱{{ fmt(f.total_fee) }}</td>
+          <td class="px-4 py-3">
+            <div>
+              <AppBadge :color="f.is_paid ? 'green' : 'amber'">{{ f.is_paid ? 'Paid' : 'Unpaid' }}</AppBadge>
+              <p v-if="f.paid_at" class="text-xs text-slate-400 mt-0.5">{{ fmtDate(f.paid_at) }}</p>
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            <AppButton v-if="!f.is_paid" size="sm" variant="ghost" @click="markPaid(f)">Mark Paid</AppButton>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="f in displayed" :key="f.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ f.student_name }}</p>
+                <p class="text-xs text-slate-500">
+                  <AppBadge v-if="f.residence_hall" :color="f.residence_hall === 'BRH' ? 'indigo' : 'purple'">{{ f.residence_hall }}</AppBadge>
+                  Rm {{ f.room_number || '—' }}
+                </p>
+              </div>
+              <AppBadge :color="f.is_paid ? 'green' : 'amber'">{{ f.is_paid ? 'Paid' : 'Unpaid' }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-500">Lodging ₱{{ fmt(f.lodging_fee) }} &middot; Appliance ₱{{ fmt(f.appliance_fee) }}</p>
+            <p class="text-sm font-semibold text-slate-800">Total ₱{{ fmt(f.total_fee) }}</p>
+            <AppButton v-if="!f.is_paid" size="sm" variant="ghost" @click="markPaid(f)">Mark Paid</AppButton>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No fee records for this period" subtitle='Use &quot;Generate Month&quot; to create fee records for all active dormers.' />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            v-if="totalPages > 1"
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
 
     </div>
 
     <!-- Generate Modal -->
-    <div v-if="showGenerate" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
-        <h3 class="text-base font-semibold text-slate-800 mb-1">Generate Monthly Fees</h3>
-        <p class="text-sm text-slate-500 mb-4">Creates fee records for all active dormers in the selected month.</p>
-        <div class="flex gap-3">
-          <div class="flex-1">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
-            <select v-model.number="genMonth"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option v-for="(m, i) in MONTHS" :key="i + 1" :value="i + 1">{{ m }}</option>
-            </select>
-          </div>
-          <div class="flex-1">
-            <label class="block text-xs font-medium text-slate-600 mb-1">Year</label>
-            <select v-model.number="genYear"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option v-for="y in currentYears" :key="y" :value="y">{{ y }}</option>
-            </select>
-          </div>
+    <AppModal :show="showGenerate" title="Generate Monthly Fees" subtitle="Creates fee records for all active dormers in the selected month." size="sm" @close="showGenerate = false">
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
+          <select v-model.number="genMonth"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option v-for="(m, i) in MONTHS" :key="i + 1" :value="i + 1">{{ m }}</option>
+          </select>
         </div>
-        <div class="flex gap-3 mt-5">
-          <button @click="showGenerate = false"
-                  class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">Cancel</button>
-          <button @click="generate"
-                  class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            Generate
-          </button>
+        <div class="flex-1">
+          <label class="block text-xs font-medium text-slate-600 mb-1">Year</label>
+          <select v-model.number="genYear"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option v-for="y in currentYears" :key="y" :value="y">{{ y }}</option>
+          </select>
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <div class="flex gap-3 w-full">
+          <AppButton block variant="secondary" @click="showGenerate = false">Cancel</AppButton>
+          <AppButton block @click="generate">Generate</AppButton>
+        </div>
+      </template>
+    </AppModal>
 
   </AdminLayout>
 </template>

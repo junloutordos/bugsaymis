@@ -14,8 +14,8 @@ const props = defineProps({
     <div class="max-w-md w-full">
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
 
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-5">
-          <CheckCircleIcon class="w-9 h-9 text-green-600" />
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success-100 mb-5">
+          <CheckCircleIcon class="w-9 h-9 text-success-600" />
         </div>
 
         <h1 class="text-xl font-bold text-slate-800 mb-2">Application Submitted!</h1>
@@ -45,7 +45,7 @@ const props = defineProps({
           </div>
         </div>
 
-        <div class="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3 text-xs text-amber-700 text-left mb-6">
+        <div class="rounded-lg bg-warning-50 border border-warning-100 px-4 py-3 text-xs text-warning-700 text-left mb-6">
           <strong>Keep your reference number.</strong> You will need it for follow-up inquiries with the Registrar's Office.
           You will be notified by email once a decision has been made.
         </div>

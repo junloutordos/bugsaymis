@@ -3,6 +3,12 @@ import { ref, computed, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { MagnifyingGlassIcon, ArrowUpTrayIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import AppButton from '@/Components/AppButton.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 
 const props = defineProps({
   employees:  Array,
@@ -95,70 +101,62 @@ const submit = () => {
     <div class="max-w-4xl mx-auto space-y-6">
 
       <!-- Header -->
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">Import Legacy Leave</h1>
-        <p class="text-sm text-slate-500 mt-0.5">
-          Record approved leave from the previous system so it appears in DTR. Credits are
-          <span class="font-medium text-amber-600">not re-deducted</span> — the old system already handled that.
-          After importing, re-run DTR generation for the affected date range.
-        </p>
+      <AppPageHeader title="Import Legacy Leave" subtitle="Record approved leave from the previous system so it appears in DTR." />
+
+      <div class="rounded-lg bg-warning-50 border border-warning-100 px-4 py-3 text-xs text-warning-700">
+        Credits are <strong>not re-deducted</strong> — the old system already handled that.
+        After importing, re-run DTR generation for the affected date range.
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
         <!-- Left: Employee picker -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-4">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">1. Select Employee</p>
+        <AppCard title="1. Select Employee">
+          <div class="space-y-4">
+            <!-- Search -->
+            <div class="relative">
+              <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                v-model="search"
+                @keydown.enter.prevent="applySearch"
+                type="text"
+                placeholder="Search by name or badge ID…"
+                class="rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+              />
+            </div>
+            <div class="flex gap-2">
+              <AppButton size="sm" @click="applySearch">Search</AppButton>
+              <AppButton v-if="search" size="sm" variant="secondary" @click="clearSearch">Clear</AppButton>
+            </div>
 
-          <!-- Search -->
-          <div class="relative">
-            <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              v-model="search"
-              @keydown.enter.prevent="applySearch"
-              type="text"
-              placeholder="Search by name or badge ID…"
-              class="rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-            />
+            <!-- Employee list -->
+            <ul class="divide-y divide-slate-100 max-h-72 overflow-y-auto rounded-lg border border-slate-100">
+              <li v-if="employees.length === 0" class="px-4 py-6">
+                <EmptyState title="No employees found" />
+              </li>
+              <li
+                v-for="emp in employees"
+                :key="emp.id"
+                @click="selectEmployee(emp)"
+                class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors"
+                :class="selected?.id === emp.id ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''"
+              >
+                <div>
+                  <p class="text-sm font-medium text-slate-800">{{ emp.name }}</p>
+                  <p class="text-xs text-slate-500">{{ emp.badge_id ?? '—' }} · {{ emp.emp_category }}</p>
+                </div>
+                <CheckCircleIcon v-if="selected?.id === emp.id" class="h-5 w-5 text-indigo-500 flex-shrink-0" />
+              </li>
+            </ul>
           </div>
-          <div class="flex gap-2">
-            <button @click="applySearch" type="button"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Search</button>
-            <button v-if="search" @click="clearSearch" type="button"
-                    class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">Clear</button>
-          </div>
-
-          <!-- Employee list -->
-          <ul class="divide-y divide-slate-100 max-h-72 overflow-y-auto rounded-lg border border-slate-100">
-            <li v-if="employees.length === 0" class="px-4 py-6 text-center text-sm text-slate-400">
-              No employees found.
-            </li>
-            <li
-              v-for="emp in employees"
-              :key="emp.id"
-              @click="selectEmployee(emp)"
-              class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors"
-              :class="selected?.id === emp.id ? 'bg-indigo-50 border-l-2 border-indigo-500' : ''"
-            >
-              <div>
-                <p class="text-sm font-medium text-slate-800">{{ emp.name }}</p>
-                <p class="text-xs text-slate-500">{{ emp.badge_id ?? '—' }} · {{ emp.emp_category }}</p>
-              </div>
-              <CheckCircleIcon v-if="selected?.id === emp.id" class="h-5 w-5 text-indigo-500 flex-shrink-0" />
-            </li>
-          </ul>
-        </div>
+        </AppCard>
 
         <!-- Right: Leave details form -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 space-y-4">
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">2. Leave Details</p>
-
+        <AppCard title="2. Leave Details">
           <!-- No employee selected state -->
-          <div v-if="!selected" class="rounded-lg bg-slate-50 border border-slate-100 px-4 py-8 text-center text-sm text-slate-400">
-            Select an employee on the left to fill in leave details.
-          </div>
+          <EmptyState v-if="!selected" title="Select an employee on the left to fill in leave details." />
 
-          <template v-else>
+          <div v-else class="space-y-4">
             <!-- Selected employee pill -->
             <div class="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-2">
               <CheckCircleIcon class="h-4 w-4 text-indigo-500 flex-shrink-0" />
@@ -166,78 +164,32 @@ const submit = () => {
             </div>
 
             <!-- Leave type -->
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
-                Leave Type <span class="text-red-500">*</span>
-              </label>
-              <p v-if="form.errors.leave_type_id" class="text-red-500 text-xs mb-1">{{ form.errors.leave_type_id }}</p>
-              <select
-                v-model="form.leave_type_id"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-              >
-                <option value="" disabled>Select leave type…</option>
-                <option v-for="lt in leaveTypes" :key="lt.id" :value="lt.id">
-                  {{ lt.code }} — {{ lt.name }}
-                </option>
-              </select>
-            </div>
+            <AppSelect v-model="form.leave_type_id" label="Leave Type" required placeholder="Select leave type…" :error="form.errors.leave_type_id">
+              <option v-for="lt in leaveTypes" :key="lt.id" :value="lt.id">
+                {{ lt.code }} — {{ lt.name }}
+              </option>
+            </AppSelect>
 
             <!-- Date range -->
             <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
-                  Date From <span class="text-red-500">*</span>
-                </label>
-                <p v-if="form.errors.date_from" class="text-red-500 text-xs mb-1">{{ form.errors.date_from }}</p>
-                <input
-                  v-model="form.date_from"
-                  type="date"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
-                  Date To <span class="text-red-500">*</span>
-                </label>
-                <p v-if="form.errors.date_to" class="text-red-500 text-xs mb-1">{{ form.errors.date_to }}</p>
-                <input
-                  v-model="form.date_to"
-                  type="date"
-                  :min="form.date_from"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-                />
-              </div>
+              <AppInput v-model="form.date_from" type="date" label="Date From" required :error="form.errors.date_from" />
+              <AppInput v-model="form.date_to" type="date" label="Date To" required :min="form.date_from" :error="form.errors.date_to" />
             </div>
 
             <!-- Days applied -->
             <div>
-              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
-                Days Applied <span class="text-red-500">*</span>
-              </label>
-              <p class="text-xs text-slate-400 mb-1">Auto-computed from the date range (weekdays only). Adjust if needed.</p>
-              <p v-if="form.errors.days_applied" class="text-red-500 text-xs mb-1">{{ form.errors.days_applied }}</p>
-              <input
+              <AppInput
                 v-model="form.days_applied"
-                type="number"
-                min="0.5"
-                step="0.5"
-                placeholder="e.g. 1"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
+                type="number" min="0.5" step="0.5" placeholder="e.g. 1"
+                label="Days Applied" required :error="form.errors.days_applied"
               />
+              <p class="text-xs text-slate-400 mt-1">Auto-computed from the date range (weekdays only). Adjust if needed.</p>
             </div>
 
             <!-- Legacy reference number -->
             <div>
-              <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
-                Legacy Reference No.
-              </label>
-              <p class="text-xs text-slate-400 mb-1">Control number or reference from the old system (optional).</p>
-              <input
-                v-model="form.legacy_ref"
-                type="text"
-                placeholder="e.g. LV-2024-00123"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-              />
+              <AppInput v-model="form.legacy_ref" type="text" placeholder="e.g. LV-2024-00123" label="Legacy Reference No." />
+              <p class="text-xs text-slate-400 mt-1">Control number or reference from the old system (optional).</p>
             </div>
 
             <!-- Without pay -->
@@ -251,23 +203,24 @@ const submit = () => {
             </label>
 
             <!-- Reminder banner -->
-            <div class="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3 text-xs text-amber-700 leading-relaxed">
+            <div class="rounded-lg bg-warning-50 border border-warning-100 px-4 py-3 text-xs text-warning-700 leading-relaxed">
               <strong>After importing:</strong> go to HR &rsaquo; DTR Management, select this employee, and
               re-run DTR generation for the leave date range so the records reflect
               <em>On Leave</em>.
             </div>
 
             <!-- Submit -->
-            <button
+            <AppButton
+              block
               @click="submit"
               :disabled="form.processing || !form.user_id || !form.leave_type_id || !form.date_from || !form.date_to || !form.days_applied"
-              class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium w-full justify-center"
+              :loading="form.processing"
             >
               <ArrowUpTrayIcon class="h-4 w-4" />
               {{ form.processing ? 'Importing…' : 'Import Legacy Leave' }}
-            </button>
-          </template>
-        </div>
+            </AppButton>
+          </div>
+        </AppCard>
       </div>
 
     </div>

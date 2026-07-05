@@ -2,6 +2,9 @@
 import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import {
   MagnifyingGlassIcon,
   ChevronDownIcon,
@@ -553,41 +556,39 @@ const totalArticles = computed(() =>
   <AdminLayout title="Help & Documentation">
     <div class="max-w-4xl mx-auto space-y-6">
 
-      <!-- Header -->
-      <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-8 text-white">
-        <div class="flex items-center gap-3 mb-3">
-          <QuestionMarkCircleIcon class="w-8 h-8 text-indigo-200" />
-          <h1 class="font-heading text-2xl font-bold">Atlas Help Center</h1>
-        </div>
-        <p class="text-indigo-200 text-sm mb-6">
-          Find answers to common questions about all modules in the PSHS Caraga Region Campus Management Information System.
-        </p>
-        <!-- Search -->
+      <AppPageHeader
+        title="Atlas Help Center"
+        subtitle="Find answers to common questions about all modules in the PSHS Caraga Region Campus Management Information System."
+      />
+
+      <!-- Search -->
+      <AppCard>
         <div class="relative">
-          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-300" />
+          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             v-model="search"
             type="text"
             placeholder="Search for help topics, questions, or keywords…"
-            class="w-full pl-10 pr-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-white/40 text-sm"
+            class="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
-        <p class="text-indigo-300 text-xs mt-3">
+        <p class="text-slate-400 text-xs mt-3">
           {{ totalArticles }} articles across {{ sections.length }} modules
         </p>
-      </div>
+      </AppCard>
 
       <!-- Empty state -->
-      <div v-if="filteredSections.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <QuestionMarkCircleIcon class="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p class="text-slate-500 font-medium">No results found for "{{ search }}"</p>
-        <p class="text-slate-400 text-sm mt-1">Try a different keyword or browse the sections below.</p>
+      <EmptyState
+        v-if="filteredSections.length === 0"
+        :icon="QuestionMarkCircleIcon"
+        :title="`No results found for &quot;${search}&quot;`"
+        subtitle="Try a different keyword or browse the sections below."
+      >
         <button @click="search = ''" class="mt-4 text-sm text-indigo-600 hover:text-indigo-800 font-medium">Clear search</button>
-      </div>
+      </EmptyState>
 
       <!-- Sections -->
-      <div v-for="section in filteredSections" :key="section.id"
-        class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard v-for="section in filteredSections" :key="section.id" :padded="false">
 
         <!-- Section header -->
         <button
@@ -613,12 +614,12 @@ const totalArticles = computed(() =>
               <span>{{ article.q }}</span>
             </p>
             <p class="text-sm text-slate-600 leading-relaxed flex items-start gap-2">
-              <span class="text-emerald-500 font-bold shrink-0 mt-0.5">A</span>
+              <span class="text-success-600 font-bold shrink-0 mt-0.5">A</span>
               <span>{{ article.a }}</span>
             </p>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Footer -->
       <div class="bg-slate-50 rounded-xl border border-slate-100 p-5 text-center">

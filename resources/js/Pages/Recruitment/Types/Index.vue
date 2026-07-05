@@ -1,18 +1,30 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Head, router, usePage } from '@inertiajs/vue3'
+import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
   types: { type: Array, required: true },
 })
 
-const page = usePage()
-
 // ── Selected type for editing ──────────────────────────────────────────────────
 const selectedType = ref(null)
 const activePanel  = ref(null) // 'flags' | 'criteria' | 'onboarding'
+
+const flagFields = [
+  { key: 'has_ranking',              label: 'Has Ranking',              desc: 'Enable applicant ranking' },
+  { key: 'has_exam',                 label: 'Has Written Exam',         desc: 'Include exam stage in workflow' },
+  { key: 'has_interview',            label: 'Has Interview',            desc: 'Include interview stage' },
+  { key: 'requires_csc_eligibility', label: 'Requires CSC Eligibility', desc: 'Mandate CSC eligibility cert' },
+  { key: 'requires_prc_license',     label: 'Requires PRC License',     desc: 'Mandate PRC license' },
+  { key: 'is_active',                label: 'Active',                   desc: 'Show in job item creation' },
+]
 
 const selectType = (type, panel = 'flags') => {
   selectedType.value = type
@@ -64,12 +76,7 @@ const addCriterion = () => {
 }
 
 const deleteCriterion = async (criterion) => {
-  const res = await Swal.fire({
-    title: `Remove "${criterion.name}"?`,
-    icon: 'warning', showCancelButton: true,
-    confirmButtonColor: '#ef4444', confirmButtonText: 'Remove', reverseButtons: true,
-  })
-  if (!res.isConfirmed) return
+  if (!(await confirmDelete(`Remove "${criterion.name}"? This cannot be undone.`))) return
 
   router.delete(route('recruitment.types.criteria.destroy', [selectedType.value.id, criterion.id]), {
     onSuccess: () => Swal.fire({ icon: 'success', title: 'Removed.', timer: 1200, showConfirmButton: false }),
@@ -98,12 +105,7 @@ const addRequirement = () => {
 }
 
 const deleteRequirement = async (req) => {
-  const res = await Swal.fire({
-    title: `Remove "${req.requirement_name}"?`,
-    icon: 'warning', showCancelButton: true,
-    confirmButtonColor: '#ef4444', confirmButtonText: 'Remove', reverseButtons: true,
-  })
-  if (!res.isConfirmed) return
+  if (!(await confirmDelete(`Remove "${req.requirement_name}"? This cannot be undone.`))) return
 
   router.delete(route('recruitment.types.onboarding.destroy', [selectedType.value.id, req.id]), {
     onSuccess: () => Swal.fire({ icon: 'success', title: 'Removed.', timer: 1200, showConfirmButton: false }),
@@ -113,27 +115,26 @@ const deleteRequirement = async (req) => {
 
 const weightColor = computed(() => {
   const w = totalWeight.value
-  if (w > 100.01) return 'text-red-600'
-  if (w === 100)  return 'text-emerald-600'
-  return 'text-amber-600'
+  if (w > 100.01) return 'text-danger-600'
+  if (w === 100)  return 'text-success-600'
+  return 'text-warning-600'
 })
+
+function statusColor(isActive) {
+  return isActive ? 'green' : 'slate'
+}
 </script>
 
 <template>
   <Head title="Recruitment Type Configuration" />
   <AdminLayout title="Recruitment Types">
-    <div>
-      <!-- Flash -->
-      <div v-if="page.props.flash?.success" class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">
-        {{ page.props.flash.success }}
-      </div>
+    <div class="space-y-5">
 
-      <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Recruitment Type Configuration</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Configure recruitment types, criteria, and onboarding requirements</p>
-        </div>
+      <AppPageHeader title="Recruitment Type Configuration" subtitle="Configure recruitment types, criteria, and onboarding requirements" />
+
+      <!-- Flash -->
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm">
+        {{ $page.props.flash.success }}
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -149,18 +150,15 @@ const weightColor = computed(() => {
                 <h3 class="font-semibold text-slate-800 text-sm">{{ type.name }}</h3>
                 <p v-if="type.description" class="text-xs text-slate-400 mt-0.5 line-clamp-2">{{ type.description }}</p>
               </div>
-              <span class="flex-shrink-0 ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    :class="type.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'">
-                {{ type.is_active ? 'Active' : 'Inactive' }}
-              </span>
+              <AppBadge :color="statusColor(type.is_active)">{{ type.is_active ? 'Active' : 'Inactive' }}</AppBadge>
             </div>
             <!-- Capability badges -->
             <div class="mt-2 flex flex-wrap gap-1">
-              <span v-if="type.has_ranking"              class="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-md">Ranking</span>
-              <span v-if="type.has_exam"                 class="px-1.5 py-0.5 bg-amber-50 text-amber-600 text-xs rounded-md">Exam</span>
-              <span v-if="type.has_interview"            class="px-1.5 py-0.5 bg-purple-50 text-purple-600 text-xs rounded-md">Interview</span>
-              <span v-if="type.requires_csc_eligibility" class="px-1.5 py-0.5 bg-yellow-50 text-yellow-600 text-xs rounded-md">CSC Elig.</span>
-              <span v-if="type.requires_prc_license"     class="px-1.5 py-0.5 bg-teal-50 text-teal-600 text-xs rounded-md">PRC</span>
+              <AppBadge v-if="type.has_ranking" color="blue">Ranking</AppBadge>
+              <AppBadge v-if="type.has_exam" color="amber">Exam</AppBadge>
+              <AppBadge v-if="type.has_interview" color="purple">Interview</AppBadge>
+              <AppBadge v-if="type.requires_csc_eligibility" color="orange">CSC Elig.</AppBadge>
+              <AppBadge v-if="type.requires_prc_license" color="indigo">PRC</AppBadge>
             </div>
             <!-- Quick nav -->
             <div v-if="selectedType?.id === type.id" class="mt-3 flex gap-1 flex-wrap">
@@ -202,14 +200,7 @@ const weightColor = computed(() => {
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label v-for="flag in [
-                  { key: 'has_ranking',              label: 'Has Ranking',              desc: 'Enable applicant ranking' },
-                  { key: 'has_exam',                 label: 'Has Written Exam',         desc: 'Include exam stage in workflow' },
-                  { key: 'has_interview',            label: 'Has Interview',            desc: 'Include interview stage' },
-                  { key: 'requires_csc_eligibility', label: 'Requires CSC Eligibility', desc: 'Mandate CSC eligibility cert' },
-                  { key: 'requires_prc_license',     label: 'Requires PRC License',     desc: 'Mandate PRC license' },
-                  { key: 'is_active',                label: 'Active',                   desc: 'Show in job item creation' },
-                ]" :key="flag.key"
+                <label v-for="flag in flagFields" :key="flag.key"
                       class="flex items-start gap-3 p-3 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-50/60 transition-colors">
                   <input type="checkbox" v-model="flagForm[flag.key]"
                          class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
@@ -221,10 +212,7 @@ const weightColor = computed(() => {
               </div>
 
               <div class="flex justify-end pt-2 border-t border-slate-100">
-                <button @click="saveFlags" :disabled="flagSaving"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                  {{ flagSaving ? 'Saving…' : 'Save Settings' }}
-                </button>
+                <AppButton :loading="flagSaving" @click="saveFlags">Save Settings</AppButton>
               </div>
             </div>
           </div>
@@ -236,7 +224,7 @@ const weightColor = computed(() => {
               <span class="text-sm font-semibold" :class="weightColor">
                 Total: {{ totalWeight.toFixed(2) }}%
                 <span v-if="totalWeight > 100.01" class="text-xs"> (exceeds 100!)</span>
-                <span v-else-if="totalWeight < 99.99 && criteria.length" class="text-xs text-amber-500"> (not 100%)</span>
+                <span v-else-if="totalWeight < 99.99 && criteria.length" class="text-xs text-warning-500"> (not 100%)</span>
               </span>
             </div>
             <div class="p-5 space-y-4">
@@ -248,13 +236,10 @@ const weightColor = computed(() => {
                     <div class="text-sm font-medium text-slate-800">{{ c.name }}</div>
                     <div class="text-xs text-slate-400 mt-0.5">Weight: {{ c.weight_percentage }}% · {{ c.scoring_guide ?? 'No guide' }}</div>
                   </div>
-                  <button @click="deleteCriterion(c)"
-                    class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
-                    Remove
-                  </button>
+                  <AppButton size="sm" variant="danger" @click="deleteCriterion(c)">Remove</AppButton>
                 </div>
               </div>
-              <div v-else class="py-8 text-slate-400 text-sm text-center">No criteria yet. Add one below.</div>
+              <EmptyState v-else title="No criteria yet" subtitle="Add one below." />
 
               <!-- Add criterion form -->
               <div class="border-t border-slate-100 pt-4">
@@ -264,14 +249,14 @@ const weightColor = computed(() => {
                     <label class="block text-xs font-medium text-slate-600 mb-1">Name *</label>
                     <input v-model="criteriaForm.name" type="text" placeholder="e.g. Education"
                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                    <p v-if="criteriaErrors.name" class="text-red-500 text-xs mt-1">{{ criteriaErrors.name }}</p>
+                    <p v-if="criteriaErrors.name" class="text-danger-500 text-xs mt-1">{{ criteriaErrors.name }}</p>
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-slate-600 mb-1">Weight % *</label>
                     <input v-model="criteriaForm.weight_percentage" type="number" min="0.01" max="100" step="0.01"
                       :placeholder="`Remaining: ${(100 - totalWeight).toFixed(2)}%`"
                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                    <p v-if="criteriaErrors.weight_percentage" class="text-red-500 text-xs mt-1">{{ criteriaErrors.weight_percentage }}</p>
+                    <p v-if="criteriaErrors.weight_percentage" class="text-danger-500 text-xs mt-1">{{ criteriaErrors.weight_percentage }}</p>
                   </div>
                   <div class="sm:col-span-2">
                     <label class="block text-xs font-medium text-slate-600 mb-1">Scoring Guide</label>
@@ -280,10 +265,7 @@ const weightColor = computed(() => {
                   </div>
                 </div>
                 <div class="flex justify-end mt-3">
-                  <button @click="addCriterion" :disabled="criteriaSaving"
-                    class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                    {{ criteriaSaving ? 'Adding…' : '+ Add Criterion' }}
-                  </button>
+                  <AppButton :loading="criteriaSaving" @click="addCriterion">+ Add Criterion</AppButton>
                 </div>
               </div>
             </div>
@@ -302,18 +284,14 @@ const weightColor = computed(() => {
                   <div>
                     <div class="flex items-center gap-2">
                       <span class="text-sm font-medium text-slate-800">{{ req.requirement_name }}</span>
-                      <span v-if="req.is_required" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600">Required</span>
-                      <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">Optional</span>
+                      <AppBadge :color="req.is_required ? 'red' : 'slate'">{{ req.is_required ? 'Required' : 'Optional' }}</AppBadge>
                     </div>
                     <div v-if="req.description" class="text-xs text-slate-400 mt-0.5">{{ req.description }}</div>
                   </div>
-                  <button @click="deleteRequirement(req)"
-                    class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
-                    Remove
-                  </button>
+                  <AppButton size="sm" variant="danger" @click="deleteRequirement(req)">Remove</AppButton>
                 </div>
               </div>
-              <div v-else class="py-8 text-slate-400 text-sm text-center">No requirements yet.</div>
+              <EmptyState v-else title="No requirements yet" />
 
               <!-- Add form -->
               <div class="border-t border-slate-100 pt-4">
@@ -323,7 +301,7 @@ const weightColor = computed(() => {
                     <label class="block text-xs font-medium text-slate-600 mb-1">Requirement Name *</label>
                     <input v-model="reqForm.requirement_name" type="text" placeholder="e.g. NBI Clearance"
                       class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                    <p v-if="reqErrors.requirement_name" class="text-red-500 text-xs mt-1">{{ reqErrors.requirement_name }}</p>
+                    <p v-if="reqErrors.requirement_name" class="text-danger-500 text-xs mt-1">{{ reqErrors.requirement_name }}</p>
                   </div>
                   <div class="sm:col-span-2">
                     <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
@@ -342,10 +320,7 @@ const weightColor = computed(() => {
                   </div>
                 </div>
                 <div class="flex justify-end mt-3">
-                  <button @click="addRequirement" :disabled="reqSaving"
-                    class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                    {{ reqSaving ? 'Adding…' : '+ Add Requirement' }}
-                  </button>
+                  <AppButton :loading="reqSaving" @click="addRequirement">+ Add Requirement</AppButton>
                 </div>
               </div>
             </div>

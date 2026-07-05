@@ -1,275 +1,268 @@
 <template>
   <Head title="Borrowings" />
   <AdminLayout title="Borrowings">
-    <div>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Borrowings</h1>
-        <div class="flex items-center gap-3">
-          <div class="relative">
-            <input v-model="q" placeholder="Search borrowings..." class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 pr-8" />
-            <button v-if="q" @click="clearSearch" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" aria-label="Clear search">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 8.586l4.95-4.95a1 1 0 111.414 1.414L11.414 10l4.95 4.95a1 1 0 01-1.414 1.414L10 11.414l-4.95 4.95a1 1 0 01-1.414-1.414L8.586 10 3.636 5.05A1 1 0 015.05 3.636L10 8.586z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </div>
-          <button @click="openCreate" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+    <div class="space-y-5">
+
+      <AppPageHeader title="Borrowings" subtitle="Track collection borrow and return activity.">
+        <template #actions>
+          <AppButton @click="openCreate">
+            <PlusIcon class="h-4 w-4" />
             New Borrowing
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div v-if="!isMobile" class="overflow-x-auto rounded-xl border border-slate-100">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Collection</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrower</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Section</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrow Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Due Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Return Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="b in borrowings.data" :key="b.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ b.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <button @click="openCollectionHistory(b.collection?.id)" class="text-indigo-600 hover:underline">{{ b.collection?.title || '—' }}</button>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-indigo-600 hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ b.section_name || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ b.borrow_date }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ b.due_date }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ b.return_date || '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <div>{{ b.status }}</div>
-                  <div v-if="isOverdue(b)" class="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600">Overdue</div>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <div class="flex items-center gap-2">
-                    <button v-if="!b.return_date" @click="processReturn(b)" :disabled="isSubmitting" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" :title="'Return ' + (b.collection?.title || '')">
-                      <CheckCircleIcon class="h-5 w-5 text-emerald-600" />
-                    </button>
-                    <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Override due date">
-                      <PencilSquareIcon class="h-5 w-5 text-amber-600" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="(borrowings.data || []).length === 0"><td :colspan="9" class="py-16 text-center text-slate-400 text-sm">No borrowings</td></tr>
-            </tbody>
-          </table>
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="relative w-full sm:w-72">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            v-model="q"
+            type="text"
+            placeholder="Search borrowings..."
+            class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+          />
+          <AppIconButton
+            v-if="q"
+            label="Clear search"
+            size="sm"
+            class="absolute right-1 top-1/2 -translate-y-1/2"
+            @click="clearSearch"
+          >
+            <XMarkIcon class="h-4 w-4" />
+          </AppIconButton>
         </div>
+      </AppFilterBar>
 
-        <!-- Mobile cards -->
-        <div v-else class="space-y-3 p-4 sm:hidden">
-          <div v-for="b in borrowings.data" :key="b.id" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
-            <div class="flex items-start justify-between">
+      <!-- Table -->
+      <AppTable :is-empty="!(borrowings.data || []).length" :skeleton-cols="9">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Collection</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrower</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Section</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrow Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Due Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Return Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
+
+        <tr v-for="b in borrowings.data" :key="b.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-slate-700">{{ b.id }}</td>
+          <td class="px-4 py-3 text-slate-700">
+            <button @click="openCollectionHistory(b.collection?.id)" class="text-indigo-600 hover:text-indigo-800 font-medium hover:underline">{{ b.collection?.title || '—' }}</button>
+          </td>
+          <td class="px-4 py-3 text-slate-700">
+            <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-indigo-600 hover:text-indigo-800 font-medium hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button>
+          </td>
+          <td class="px-4 py-3 text-slate-700">{{ b.section_name || '—' }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ b.borrow_date }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ b.due_date }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ b.return_date || '—' }}</td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2">
+              <AppBadge :color="statusColor(b.status)">{{ b.status }}</AppBadge>
+              <AppBadge v-if="isOverdue(b)" color="red">Overdue</AppBadge>
+            </div>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-1">
+              <AppIconButton v-if="!b.return_date" :label="'Return ' + (b.collection?.title || '')" variant="success" :disabled="isSubmitting" @click="processReturn(b)">
+                <CheckCircleIcon class="h-5 w-5" />
+              </AppIconButton>
+              <AppIconButton v-if="b.status !== 'Returned'" label="Override due date" variant="warning" @click="openOverride(b)">
+                <PencilSquareIcon class="h-5 w-5" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="b in borrowings.data" :key="b.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
               <div>
-                <div class="text-xs text-slate-500">#{{ b.id }}</div>
-                <div class="font-semibold text-slate-800">{{ b.collection?.title || '—' }}</div>
-                <div class="text-sm text-slate-600">Borrower: <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-indigo-600 hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button></div>
-                <div class="text-sm text-slate-500">Section: {{ b.section_name || '—' }}</div>
-                <div class="text-sm text-slate-500">Borrow: {{ b.borrow_date }} • Due: {{ b.due_date }}</div>
-                <div class="text-sm text-slate-500">Return: {{ b.return_date || '—' }} • Status: {{ b.status }}</div>
-                <div v-if="isOverdue(b)" class="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-600">Overdue</div>
-              </div>
-              <div class="flex flex-col items-end space-y-2">
-                <div class="flex flex-col space-y-2">
-                  <button v-if="!b.return_date" @click="processReturn(b)" :disabled="isSubmitting" class="p-1.5 rounded-lg hover:bg-slate-100 text-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" :title="'Return ' + (b.collection?.title || '')">
-                    <CheckCircleIcon class="h-5 w-5" />
-                  </button>
-                  <button v-if="b.status !== 'Returned'" @click="openOverride(b)" class="p-1.5 rounded-lg hover:bg-slate-100 text-amber-600 transition-colors" title="Override due date">
-                    <PencilSquareIcon class="h-5 w-5" />
-                  </button>
+                <p class="text-xs text-slate-500">#{{ b.id }}</p>
+                <p class="font-medium text-slate-800">{{ b.collection?.title || '—' }}</p>
+                <p class="text-xs text-slate-500">Borrower: <button @click="openBorrowerHistory(b.borrower_type, b.borrower_id)" class="text-indigo-600 hover:underline">{{ b.borrower_name || (b.borrower_type + ' #' + b.borrower_id) }}</button></p>
+                <p class="text-xs text-slate-500">Section: {{ b.section_name || '—' }}</p>
+                <p class="text-xs text-slate-500">Borrow: {{ b.borrow_date }} &bull; Due: {{ b.due_date }}</p>
+                <p class="text-xs text-slate-500">Return: {{ b.return_date || '—' }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <AppBadge :color="statusColor(b.status)">{{ b.status }}</AppBadge>
+                  <AppBadge v-if="isOverdue(b)" color="red">Overdue</AppBadge>
                 </div>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                <AppIconButton v-if="!b.return_date" :label="'Return ' + (b.collection?.title || '')" variant="success" :disabled="isSubmitting" @click="processReturn(b)">
+                  <CheckCircleIcon class="h-5 w-5" />
+                </AppIconButton>
+                <AppIconButton v-if="b.status !== 'Returned'" label="Override due date" variant="warning" @click="openOverride(b)">
+                  <PencilSquareIcon class="h-5 w-5" />
+                </AppIconButton>
               </div>
             </div>
           </div>
+        </template>
 
-          <div v-if="(borrowings.data || []).length === 0" class="py-16 text-center text-slate-400 text-sm">No borrowings</div>
-        </div>
+        <template #empty>
+          <EmptyState title="No borrowings found" />
+        </template>
 
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click.prevent="goTo(borrowings.prev_page_url)" :disabled="!borrowings.prev_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Prev</button>
-          <span>Page {{ borrowings.current_page }} of {{ borrowings.last_page }}</span>
-          <button @click.prevent="goTo(borrowings.next_page_url)" :disabled="!borrowings.next_page_url" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50">Next</button>
-        </div>
-      </div>
-
-      <!-- Modal create -->
-      <div v-if="showModal" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">New Borrowing</h3>
-          </div>
-          <div class="px-6 py-5">
-            <form @submit.prevent="submitForm">
-              <div class="space-y-3">
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Collection ID</label>
-                  <input ref="collectionRef" v-model="form.collection_id" @input="validateField('collection_id')" @keydown.enter.prevent="onCollectionEnter" type="text" autocomplete="off" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.collection_id ? 'border-red-500' : 'border-slate-200']" />
-                  <p v-if="fieldErrors.collection_id" class="mt-1 text-xs text-red-600">{{ fieldErrors.collection_id }}</p>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Borrower Type</label>
-                  <select v-model="form.borrower_type" @change="validateField('borrower_type')" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.borrower_type ? 'border-red-500' : 'border-slate-200']">
-                    <option value="student">Student</option>
-                    <option value="employee">Employee</option>
-                  </select>
-                  <p v-if="fieldErrors.borrower_type" class="mt-1 text-xs text-red-600">{{ fieldErrors.borrower_type }}</p>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Borrower ID</label>
-                  <select v-if="form.borrower_type === 'employee'" ref="borrowerRef" v-model="form.borrower_id" @change="validateField('borrower_id')" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.borrower_id ? 'border-red-500' : 'border-slate-200']">
-                    <option value="">-- Select employee --</option>
-                    <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
-                  </select>
-                  <input v-else ref="borrowerRef" v-model="form.borrower_id" @input="validateField('borrower_id')" placeholder="PISAY System ID" type="text" autocomplete="off" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.borrower_id ? 'border-red-500' : 'border-slate-200']" />
-                  <p v-if="fieldErrors.borrower_id" class="mt-1 text-xs text-red-600">{{ fieldErrors.borrower_id }}</p>
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-                  <input v-model="form.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-                </div>
-              </div>
-
-              <div class="flex justify-end mt-4 gap-2">
-                <button type="button" @click="closeModal" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-                <button type="submit" @click.prevent="submitForm" :disabled="isSubmitting" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Process Borrow' }}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- Collection history modal -->
-      <div v-show="showHistory" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">Collection Borrowing History</h3>
-          </div>
-          <div class="px-6 py-5">
-            <div v-if="historyLoading" class="text-sm text-slate-500">Loading...</div>
-            <div v-else>
-              <div class="overflow-x-auto rounded-xl border border-slate-100">
-                <table class="min-w-full divide-y divide-slate-100 text-sm">
-                  <thead class="bg-slate-50">
-                    <tr>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrower</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrow Date</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Due Date</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Return Date</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    <tr v-for="h in history" :key="h.id" class="hover:bg-slate-50/60">
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.id }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.borrower_name }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.borrow_date }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.due_date }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.return_date || '—' }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.status }}</td>
-                    </tr>
-                    <tr v-if="(history || []).length === 0"><td :colspan="6" class="py-16 text-center text-slate-400 text-sm">No history</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="closeHistory" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Borrower history modal -->
-      <div v-show="showBorrowerHistory" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">Borrower History</h3>
-          </div>
-          <div class="px-6 py-5">
-            <div v-if="borrowerHistoryLoading" class="text-sm text-slate-500">Loading...</div>
-            <div v-else>
-              <div class="overflow-x-auto rounded-xl border border-slate-100">
-                <table class="min-w-full divide-y divide-slate-100 text-sm">
-                  <thead class="bg-slate-50">
-                    <tr>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Collection</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrow Date</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Due Date</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Return Date</th>
-                      <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    <tr v-for="h in borrowerHistory" :key="h.id" class="hover:bg-slate-50/60">
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.id }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.collection_title || h.collection?.title || '—' }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.borrow_date }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.due_date }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.return_date || '—' }}</td>
-                      <td class="px-4 py-3 text-sm text-slate-700">{{ h.status }}</td>
-                    </tr>
-                    <tr v-if="(borrowerHistory || []).length === 0"><td :colspan="6" class="py-16 text-center text-slate-400 text-sm">No history</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button @click="closeBorrowerHistory" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Close</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Override Modal -->
-      <div v-show="showOverride" class="fixed inset-0 flex items-start sm:items-center justify-center py-8 sm:py-0 bg-slate-900/50 z-50">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-auto">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 class="text-base font-semibold text-slate-800">Override Due Date</h3>
-          </div>
-          <div class="px-6 py-5">
-            <form @submit.prevent="submitOverride">
-              <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">Due Date</label>
-                <input type="date" v-model="overrideForm.due_date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-              <div class="mt-3">
-                <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
-                <input v-model="overrideForm.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-              </div>
-            </form>
-          </div>
-          <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-            <button type="button" @click="closeOverride" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-            <button type="submit" @click.prevent="submitOverride" :disabled="isSubmitting" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ isSubmitting ? 'Saving…' : 'Save' }}</button>
-          </div>
-        </div>
-      </div>
+        <template #footer>
+          <PaginationControl
+            :current-page="borrowings.current_page"
+            :total-pages="borrowings.last_page"
+            @prev="goTo(borrowings.prev_page_url)"
+            @next="goTo(borrowings.next_page_url)"
+          />
+        </template>
+      </AppTable>
 
     </div>
+
+    <!-- Modal create -->
+    <AppModal :show="showModal" title="New Borrowing" @close="closeModal">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Collection ID</label>
+          <input ref="collectionRef" v-model="form.collection_id" @input="validateField('collection_id')" @keydown.enter.prevent="onCollectionEnter" type="text" autocomplete="off" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.collection_id ? 'border-red-500' : 'border-slate-200']" />
+          <p v-if="fieldErrors.collection_id" class="mt-1 text-xs text-red-600">{{ fieldErrors.collection_id }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Borrower Type</label>
+          <select v-model="form.borrower_type" @change="validateField('borrower_type')" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.borrower_type ? 'border-red-500' : 'border-slate-200']">
+            <option value="student">Student</option>
+            <option value="employee">Employee</option>
+          </select>
+          <p v-if="fieldErrors.borrower_type" class="mt-1 text-xs text-red-600">{{ fieldErrors.borrower_type }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Borrower ID</label>
+          <select v-if="form.borrower_type === 'employee'" ref="borrowerRef" v-model="form.borrower_id" @change="validateField('borrower_id')" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.borrower_id ? 'border-red-500' : 'border-slate-200']">
+            <option value="">-- Select employee --</option>
+            <option v-for="e in employees" :key="e.id" :value="e.id">{{ e.name }}</option>
+          </select>
+          <input v-else ref="borrowerRef" v-model="form.borrower_id" @input="validateField('borrower_id')" placeholder="PISAY System ID" type="text" autocomplete="off" :class="['w-full rounded-lg border px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400', fieldErrors.borrower_id ? 'border-red-500' : 'border-slate-200']" />
+          <p v-if="fieldErrors.borrower_id" class="mt-1 text-xs text-red-600">{{ fieldErrors.borrower_id }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+          <input v-model="form.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+        </div>
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeModal">Cancel</AppButton>
+        <AppButton :loading="isSubmitting" @click="submitForm">Process Borrow</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Collection history modal -->
+    <AppModal :show="showHistory" title="Collection Borrowing History" size="2xl" @close="closeHistory">
+      <AppTable :loading="historyLoading" :is-empty="!historyLoading && (history || []).length === 0" :skeleton-cols="6" :card="false">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrower</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrow Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Due Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Return Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+          </tr>
+        </template>
+
+        <tr v-for="h in history" :key="h.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-slate-700">{{ h.id }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.borrower_name }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.borrow_date }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.due_date }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.return_date || '—' }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.status }}</td>
+        </tr>
+
+        <template #empty>
+          <EmptyState title="No history found" />
+        </template>
+      </AppTable>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeHistory">Close</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Borrower history modal -->
+    <AppModal :show="showBorrowerHistory" title="Borrower History" size="2xl" @close="closeBorrowerHistory">
+      <AppTable :loading="borrowerHistoryLoading" :is-empty="!borrowerHistoryLoading && (borrowerHistory || []).length === 0" :skeleton-cols="6" :card="false">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Collection</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Borrow Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Due Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Return Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+          </tr>
+        </template>
+
+        <tr v-for="h in borrowerHistory" :key="h.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-slate-700">{{ h.id }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.collection_title || h.collection?.title || '—' }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.borrow_date }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.due_date }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.return_date || '—' }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ h.status }}</td>
+        </tr>
+
+        <template #empty>
+          <EmptyState title="No history found" />
+        </template>
+      </AppTable>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeBorrowerHistory">Close</AppButton>
+      </template>
+    </AppModal>
+
+    <!-- Override Modal -->
+    <AppModal :show="showOverride" title="Override Due Date" @close="closeOverride">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Due Date</label>
+        <input type="date" v-model="overrideForm.due_date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+      </div>
+      <div class="mt-3">
+        <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
+        <input v-model="overrideForm.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+      </div>
+
+      <template #footer>
+        <AppButton variant="secondary" @click="closeOverride">Cancel</AppButton>
+        <AppButton :loading="isSubmitting" @click="submitOverride">Save</AppButton>
+      </template>
+    </AppModal>
+
   </AdminLayout>
 </template>
 
 <script setup>
 import Swal from 'sweetalert2'
-import { ref, nextTick, watch, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, nextTick, watch, reactive, computed } from 'vue'
 import { usePage, router, Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { CheckCircleIcon, PencilSquareIcon } from "@heroicons/vue/24/outline";
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { CheckCircleIcon, PencilSquareIcon, PlusIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/vue/24/outline";
 import { useSubmit } from '@/Composables/useSubmit'
+import { confirmAction } from '@/Composables/useConfirm.js'
 
 const page = usePage()
 const borrowings = page.props.borrowings || { data: [], current_page: 1, last_page: 1, prev_page_url: null, next_page_url: null }
@@ -297,14 +290,6 @@ const borrowerRef = ref(null)
 const employeesRef = ref(null)
 const q = ref(page.props.q || '')
 let qTimeout = null
-
-// Responsive: track window width to toggle table vs mobile cards
-const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
-const isMobile = computed(() => windowWidth.value < 640)
-function handleResize() { windowWidth.value = window.innerWidth }
-
-onMounted(() => { window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 watch(q, (val) => {
   if (qTimeout) clearTimeout(qTimeout)
@@ -368,6 +353,11 @@ const isOverdue = (b) => {
   }
 }
 
+function statusColor(status) {
+  const map = { Returned: 'green', Borrowed: 'blue', Overdue: 'red' }
+  return map[status] ?? 'slate'
+}
+
 watch(() => form.value.borrower_type, (val) => {
   form.value.borrower_id = ''
   // focus borrower field when switching type
@@ -395,15 +385,12 @@ function submitForm(){
 }
 
 async function processReturn(b){
-  const res = await Swal.fire({
+  const ok = await confirmAction({
     title: 'Mark as returned?',
     text: 'This will mark the borrowing as returned and update the collection status to Available.',
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Yes, return',
-    cancelButtonText: 'Cancel'
+    confirmText: 'Yes, return',
   })
-  if (!res.isConfirmed) return
+  if (!ok) return
   submit.post(route('library.borrowings.return', b.id), {}, {
     onSuccess: () => { Swal.fire({ icon: 'success', title: 'Return processed', timer: 1200, showConfirmButton: false }).then(() => { router.get(route('library.borrowings.index'), { q: q.value }) }) },
     onError: (e) => { console.error('return error', e); Swal.fire({ icon: 'error', title: 'Failed to process return' }) }

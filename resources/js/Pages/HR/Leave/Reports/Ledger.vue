@@ -2,6 +2,14 @@
 import { ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 
 const props = defineProps({
   transactions: Object,
@@ -61,6 +69,18 @@ const txTypeClass = (type) => ({
   FORFEITURE:   'bg-slate-100 text-slate-600',
 })[type] ?? 'bg-slate-100 text-slate-600'
 
+// AppBadge color mapping for the per-row transaction type badge
+const txTypeBadgeColor = (type) => ({
+  INITIAL:      'purple',
+  ACCRUAL:      'green',
+  DEDUCTION:    'red',
+  ADJUSTMENT:   'blue',
+  RESTORATION:  'amber',
+  MONETIZATION: 'orange',
+  CARRYOVER:    'indigo',
+  FORFEITURE:   'slate',
+})[type] ?? 'slate'
+
 const signed = (n) => { const v = Number(n); return v >= 0 ? `+${v.toFixed(4)}` : v.toFixed(4) }
 const fmtDt  = (d) => d ? new Date(d).toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—'
 
@@ -75,14 +95,11 @@ const total     = props.transactions?.total ?? 0
   <AdminLayout title="Leave Credit Ledger">
     <div class="space-y-5">
 
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">Leave Credit Ledger</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Full audit trail of all leave credit transactions. Filter by employee, type, or date.</p>
-      </div>
+      <AppPageHeader title="Leave Credit Ledger" subtitle="Full audit trail of all leave credit transactions. Filter by employee, type, or date." />
 
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 space-y-3">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <AppFilterBar>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 w-full">
           <div>
             <label class="block text-xs font-medium text-slate-500 mb-1">Year</label>
             <select v-model="f.year" class="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -119,16 +136,11 @@ const total     = props.transactions?.total ?? 0
             <input v-model="f.date_to" type="date" class="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
-        <div class="flex gap-2">
-          <button @click="applyFilters" :disabled="isLoading"
-                  class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-            Apply Filters
-          </button>
-          <button @click="reset" class="border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            Reset
-          </button>
-        </div>
-      </div>
+        <template #actions>
+          <AppButton size="sm" :loading="isLoading" @click="applyFilters">Apply Filters</AppButton>
+          <AppButton size="sm" variant="secondary" @click="reset">Reset</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Summary chips -->
       <div v-if="summary.length" class="flex flex-wrap gap-2">
@@ -142,57 +154,78 @@ const total     = props.transactions?.total ?? 0
       </div>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="px-4 py-3 border-b border-slate-100 text-xs text-slate-500">{{ total }} transaction(s)</div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance After</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Remarks</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recorded By</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="tx in txData" :key="tx.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ fmtDt(tx.created_at) }}</td>
-                <td class="px-4 py-3">
+      <AppCard :padded="false">
+        <template #header>
+          <span class="text-xs text-slate-500">{{ total }} transaction(s)</span>
+        </template>
+        <AppTable :is-empty="!txData.length" :skeleton-cols="8" :card="false">
+          <template #head>
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Employee</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Leave</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
+              <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Balance After</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Remarks</th>
+              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recorded By</th>
+            </tr>
+          </template>
+
+          <tr v-for="tx in txData" :key="tx.id" class="hover:bg-slate-50/60">
+            <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{{ fmtDt(tx.created_at) }}</td>
+            <td class="px-4 py-3">
+              <p class="font-medium text-slate-800 text-xs">{{ tx.user?.name ?? '—' }}</p>
+              <p class="text-xs text-slate-400">{{ tx.user?.badge_id ?? '' }}</p>
+            </td>
+            <td class="px-4 py-3">
+              <AppBadge :color="txTypeBadgeColor(tx.type)">{{ tx.type }}</AppBadge>
+            </td>
+            <td class="px-4 py-3 text-slate-600 text-xs">{{ tx.leave_type?.code ?? '—' }}</td>
+            <td class="px-4 py-3 text-right font-mono font-semibold text-xs"
+                :class="Number(tx.amount) >= 0 ? 'text-emerald-600' : 'text-red-600'">
+              {{ signed(tx.amount) }}
+            </td>
+            <td class="px-4 py-3 text-right font-mono text-slate-700 text-xs">{{ Number(tx.balance_after).toFixed(4) }}</td>
+            <td class="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" :title="tx.remarks">{{ tx.remarks ?? '—' }}</td>
+            <td class="px-4 py-3 text-xs text-slate-500">{{ tx.recorder?.name ?? 'System' }}</td>
+          </tr>
+
+          <template #mobileCard>
+            <div v-for="tx in txData" :key="tx.id" class="p-4 space-y-1.5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
                   <p class="font-medium text-slate-800 text-xs">{{ tx.user?.name ?? '—' }}</p>
                   <p class="text-xs text-slate-400">{{ tx.user?.badge_id ?? '' }}</p>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="['inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold', txTypeClass(tx.type)]">{{ tx.type }}</span>
-                </td>
-                <td class="px-4 py-3 text-slate-600 text-xs">{{ tx.leave_type?.code ?? '—' }}</td>
-                <td class="px-4 py-3 text-right font-mono font-semibold text-xs"
-                    :class="Number(tx.amount) >= 0 ? 'text-emerald-600' : 'text-red-600'">
-                  {{ signed(tx.amount) }}
-                </td>
-                <td class="px-4 py-3 text-right font-mono text-slate-700 text-xs">{{ Number(tx.balance_after).toFixed(4) }}</td>
-                <td class="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" :title="tx.remarks">{{ tx.remarks ?? '—' }}</td>
-                <td class="px-4 py-3 text-xs text-slate-500">{{ tx.recorder?.name ?? 'System' }}</td>
-              </tr>
-              <tr v-if="!txData.length">
-                <td colspan="8" class="py-12 text-center text-slate-400 text-sm">No transactions match the selected filters.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-if="lastPage > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ curPage }} of {{ lastPage }}</span>
-          <div class="flex gap-2">
-            <button @click="goToPage(curPage - 1)" :disabled="curPage === 1 || isLoading"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm disabled:opacity-50">Prev</button>
-            <button @click="goToPage(curPage + 1)" :disabled="curPage === lastPage || isLoading"
-                    class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm disabled:opacity-50">Next</button>
-          </div>
-        </div>
-      </div>
+                </div>
+                <AppBadge :color="txTypeBadgeColor(tx.type)">{{ tx.type }}</AppBadge>
+              </div>
+              <p class="text-xs text-slate-500">{{ fmtDt(tx.created_at) }} &middot; {{ tx.leave_type?.code ?? '—' }}</p>
+              <div class="flex justify-between text-xs">
+                <span class="font-mono font-semibold" :class="Number(tx.amount) >= 0 ? 'text-emerald-600' : 'text-red-600'">{{ signed(tx.amount) }}</span>
+                <span class="font-mono text-slate-700">Balance {{ Number(tx.balance_after).toFixed(4) }}</span>
+              </div>
+              <p v-if="tx.remarks" class="text-xs text-slate-500 truncate" :title="tx.remarks">{{ tx.remarks }}</p>
+              <p class="text-xs text-slate-400">Recorded by {{ tx.recorder?.name ?? 'System' }}</p>
+            </div>
+          </template>
+
+          <template #empty>
+            <EmptyState title="No transactions match the selected filters" />
+          </template>
+
+          <template #footer>
+            <PaginationControl
+              :current-page="curPage"
+              :total-pages="lastPage"
+              :total="total"
+              @prev="goToPage(curPage - 1)"
+              @next="goToPage(curPage + 1)"
+              @page="goToPage"
+            />
+          </template>
+        </AppTable>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

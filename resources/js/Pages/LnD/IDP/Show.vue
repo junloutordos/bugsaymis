@@ -1,6 +1,12 @@
 <script setup>
+import { computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppBreadcrumb from '@/Components/AppBreadcrumb.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   idp: { type: Object, required: true },
@@ -8,43 +14,52 @@ const props = defineProps({
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'
 
-const approvalColors = { draft: 'bg-gray-100 text-gray-600', submitted: 'bg-yellow-100 text-yellow-700', approved: 'bg-green-100 text-green-700', returned: 'bg-red-100 text-red-600' }
-const statusColors   = { planned: 'bg-blue-100 text-blue-700', ongoing: 'bg-yellow-100 text-yellow-700', completed: 'bg-green-100 text-green-700', deferred: 'bg-orange-100 text-orange-700', cancelled: 'bg-red-100 text-red-600' }
-const levelColors    = { none: 'bg-gray-100 text-gray-500', basic: 'bg-blue-100 text-blue-600', intermediate: 'bg-indigo-100 text-indigo-700', advanced: 'bg-purple-100 text-purple-700' }
+const approvalLabel = {
+  draft:     'Draft',
+  submitted: 'Pending Approval',
+  approved:  'Approved',
+  returned:  'Returned',
+}
+
+function approvalBadgeColor(status) {
+  const map = { draft: 'slate', submitted: 'amber', approved: 'green', returned: 'red' }
+  return map[status] ?? 'slate'
+}
+function statusBadgeColor(status) {
+  const map = { planned: 'blue', ongoing: 'amber', completed: 'green', deferred: 'orange', cancelled: 'red' }
+  return map[status] ?? 'slate'
+}
+function levelBadgeColor(level) {
+  const map = { none: 'slate', basic: 'blue', intermediate: 'indigo', advanced: 'purple' }
+  return map[level] ?? 'slate'
+}
+
 const interventionLabel = { training: 'Training', coaching: 'Coaching', assignment: 'Assignment', self_study: 'Self-Study', e_learning: 'E-Learning', other: 'Other' }
+
+const breadcrumbItems = computed(() => [
+  { label: 'IDP List', href: route('lnd.idp.index') },
+  { label: props.idp.competency },
+])
 </script>
 
 <template>
   <AdminLayout :title="`IDP — ${idp.competency}`">
     <Head :title="`IDP · ${idp.competency}`" />
 
-    <div class="p-6 space-y-5">
+    <div class="space-y-5">
 
-      <!-- Breadcrumb -->
-      <div class="flex items-center gap-2 text-sm">
-        <a :href="route('lnd.idp.index')"
-          class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-          IDP List
-        </a>
-        <span class="text-slate-300">/</span>
-        <span class="font-medium text-slate-700 truncate">{{ idp.competency }}</span>
-      </div>
+      <AppBreadcrumb :items="breadcrumbItems" />
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
 
         <!-- Main details -->
         <div class="md:col-span-2 space-y-5">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+          <AppCard :padded="false">
             <div class="px-5 py-4 border-b border-slate-100 flex items-start justify-between">
               <h2 class="text-xl font-semibold text-slate-800">{{ idp.competency }}</h2>
               <div class="flex gap-2 shrink-0">
-                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', approvalColors[idp.approval_status] ?? 'bg-slate-100 text-slate-600']">
-                  {{ idp.approval_status === 'submitted' ? 'Pending Approval' : idp.approval_status.charAt(0).toUpperCase() + idp.approval_status.slice(1) }}
-                </span>
-                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize', statusColors[idp.status] ?? 'bg-slate-100 text-slate-600']">
-                  {{ idp.status }}
-                </span>
+                <AppBadge :color="approvalBadgeColor(idp.approval_status)">{{ approvalLabel[idp.approval_status] ?? idp.approval_status }}</AppBadge>
+                <AppBadge :color="statusBadgeColor(idp.status)"><span class="capitalize">{{ idp.status }}</span></AppBadge>
               </div>
             </div>
             <div class="p-5">
@@ -64,9 +79,9 @@ const interventionLabel = { training: 'Training', coaching: 'Coaching', assignme
                 <dt class="text-slate-500">Competency Gap</dt>
                 <dd>
                   <div class="inline-flex items-center gap-1 text-xs">
-                    <span :class="['rounded px-2 py-0.5 font-medium', levelColors[idp.current_level]]">{{ idp.current_level }}</span>
-                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    <span :class="['rounded px-2 py-0.5 font-medium', levelColors[idp.target_level]]">{{ idp.target_level }}</span>
+                    <AppBadge :color="levelBadgeColor(idp.current_level)">{{ idp.current_level }}</AppBadge>
+                    <ChevronRightIcon class="w-3 h-3 text-slate-400" />
+                    <AppBadge :color="levelBadgeColor(idp.target_level)">{{ idp.target_level }}</AppBadge>
                   </div>
                 </dd>
                 <dt class="text-slate-500">Timeline</dt>
@@ -76,36 +91,30 @@ const interventionLabel = { training: 'Training', coaching: 'Coaching', assignme
                 </dd>
               </dl>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Development Activity -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h3 class="text-base font-semibold text-slate-800">Development Activity</h3>
-            </div>
-            <div class="p-5">
-              <p class="text-sm text-slate-700 whitespace-pre-line">{{ idp.development_activity ?? '—' }}</p>
-            </div>
-          </div>
+          <AppCard title="Development Activity">
+            <p class="text-sm text-slate-700 whitespace-pre-line">{{ idp.development_activity ?? '—' }}</p>
+          </AppCard>
         </div>
 
         <!-- Remarks Sidebar -->
         <div class="space-y-4">
-          <div v-if="idp.supervisor_remarks" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+          <AppCard v-if="idp.supervisor_remarks">
             <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Supervisor Remarks</h4>
             <p class="text-sm text-slate-700">{{ idp.supervisor_remarks }}</p>
             <p v-if="idp.approved_by" class="mt-2 text-xs text-slate-400">
               By {{ idp.approved_by?.name }} · {{ fmt(idp.approved_at) }}
             </p>
-          </div>
-          <div v-if="idp.employee_remarks" class="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+          </AppCard>
+          <AppCard v-if="idp.employee_remarks">
             <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Employee Remarks</h4>
             <p class="text-sm text-slate-700">{{ idp.employee_remarks }}</p>
-          </div>
-          <div v-if="!idp.supervisor_remarks && !idp.employee_remarks"
-            class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center text-slate-400 text-sm">
-            No remarks yet.
-          </div>
+          </AppCard>
+          <AppCard v-if="!idp.supervisor_remarks && !idp.employee_remarks" :padded="false">
+            <EmptyState title="No remarks yet." />
+          </AppCard>
         </div>
       </div>
     </div>

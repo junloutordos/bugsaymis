@@ -1,9 +1,7 @@
 <template>
   <div>
     <!-- Empty state -->
-    <p v-if="!items.length" class="py-16 text-center text-slate-400 text-sm">
-      No accomplishments recorded yet.
-    </p>
+    <EmptyState v-if="!items.length" title="No accomplishments recorded yet." />
 
     <!-- List -->
     <ul v-else class="space-y-3">
@@ -18,10 +16,9 @@
           <div class="flex-1 min-w-0 space-y-1">
             <div class="flex items-start gap-2 flex-wrap">
               <p class="text-sm text-slate-800 flex-1">{{ item.description || item.title }}</p>
-              <span v-if="item.time_from || item.time_to"
-                class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 rounded px-1.5 py-0.5 font-medium shrink-0">
+              <AppBadge v-if="item.time_from || item.time_to" color="indigo">
                 🕐 {{ item.time_from ? fmtTime(item.time_from) : '—' }} – {{ item.time_to ? fmtTime(item.time_to) : '—' }}
-              </span>
+              </AppBadge>
             </div>
 
             <!-- Proof badge -->
@@ -54,29 +51,18 @@
 
           <!-- Action buttons -->
           <div class="flex items-center gap-1 shrink-0">
-            <button
-              @click="startEdit(item)"
-              title="Edit accomplishment"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-500 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                   viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-            <button
-              @click="confirmDelete(item)"
+            <AppIconButton label="Edit accomplishment" size="sm" @click="startEdit(item)">
+              <PencilSquareIcon class="h-4 w-4" />
+            </AppIconButton>
+            <AppIconButton
+              label="Delete accomplishment"
+              variant="danger"
+              size="sm"
               :disabled="deletingId === item.id"
-              title="Delete accomplishment"
-              class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 disabled:opacity-40 transition-colors"
+              @click="confirmDelete(item)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                   viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-4 0a1 1 0 00-1 1v1h6V4a1 1 0 00-1-1m-4 0h4" />
-              </svg>
-            </button>
+              <TrashIcon class="h-4 w-4" />
+            </AppIconButton>
           </div>
         </div>
 
@@ -95,34 +81,30 @@
               <label class="block text-xs font-medium text-slate-600 mb-1">Time To</label>
               <input v-model="editForm.time_to" type="time"
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full"
-                :class="{ 'border-red-400': editErrors.time_to }" />
-              <p v-if="editErrors.time_to" class="text-red-500 text-xs mt-1">{{ editErrors.time_to }}</p>
+                :class="{ 'border-danger-400': editErrors.time_to }" />
+              <p v-if="editErrors.time_to" class="text-danger-600 text-xs mt-1">{{ editErrors.time_to }}</p>
             </div>
           </div>
 
           <!-- Description -->
           <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Accomplishment <span class="text-danger-600">*</span></label>
             <textarea
               v-model="editForm.description"
               rows="3"
               maxlength="2000"
               class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full resize-none"
-              :class="{ 'border-red-400': editErrors.description }"
+              :class="{ 'border-danger-400': editErrors.description }"
             />
-            <p v-if="editErrors.description" class="text-red-500 text-xs mt-1">{{ editErrors.description }}</p>
+            <p v-if="editErrors.description" class="text-danger-600 text-xs mt-1">{{ editErrors.description }}</p>
           </div>
 
           <!-- Actions -->
           <div class="flex gap-2">
-            <button @click="cancelEdit"
-              class="flex-1 px-3 py-2 text-sm text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg font-medium transition-colors">
-              Cancel
-            </button>
-            <button @click="submitEdit(item)" :disabled="savingId === item.id"
-              class="flex-1 px-3 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg font-medium transition-colors">
+            <AppButton variant="secondary" block class="flex-1" @click="cancelEdit">Cancel</AppButton>
+            <AppButton block class="flex-1" :disabled="savingId === item.id" @click="submitEdit(item)">
               {{ savingId === item.id ? 'Saving…' : 'Save' }}
-            </button>
+            </AppButton>
           </div>
         </div>
       </li>
@@ -134,6 +116,11 @@
 import { ref, reactive } from 'vue'
 import axios from 'axios'
 import Swal from 'sweetalert2'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 // ── Props & Emits ─────────────────────────────────────────────────────────────
 const props = defineProps({

@@ -7,10 +7,10 @@ const colorMap = {
   slate:  'bg-slate-100 text-slate-600',
   indigo: 'bg-indigo-50 text-indigo-700',
   blue:   'bg-blue-50 text-blue-700',
-  green:  'bg-emerald-50 text-emerald-700',
-  amber:  'bg-amber-50 text-amber-700',
+  green:  'bg-success-50 text-success-700',
+  amber:  'bg-warning-50 text-warning-700',
   orange: 'bg-orange-50 text-orange-700',
-  red:    'bg-red-50 text-red-600',
+  red:    'bg-danger-50 text-danger-600',
   purple: 'bg-purple-50 text-purple-700',
 }
 

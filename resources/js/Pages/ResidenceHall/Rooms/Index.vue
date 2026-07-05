@@ -2,6 +2,12 @@
 import { ref, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 import { PlusIcon, PencilIcon, TrashIcon, MapIcon, ListBulletIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -60,8 +66,9 @@ function save() {
   }
 }
 
-function remove(room) {
-  if (!confirm(`Delete Room ${room.room_number} (${room.residence_hall})?`)) return
+async function remove(room) {
+  const confirmed = await confirmDelete(`Delete Room ${room.room_number} (${room.residence_hall})?`)
+  if (!confirmed) return
   router.delete(route('rh.rooms.destroy', room.id), { preserveScroll: true })
 }
 
@@ -105,12 +112,8 @@ const mapCardClass = (room) => {
   <Head title="RH Rooms" />
   <AdminLayout title="Residence Hall">
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Room Management</h1>
-          <p class="text-sm text-slate-500">{{ myHall ? (myHall === 'BRH' ? 'Boys Residence Hall' : 'Girls Residence Hall') : 'All Halls' }}</p>
-        </div>
-        <div class="flex items-center gap-2">
+      <AppPageHeader title="Room Management" :subtitle="myHall ? (myHall === 'BRH' ? 'Boys Residence Hall' : 'Girls Residence Hall') : 'All Halls'">
+        <template #actions>
           <!-- View toggle -->
           <div class="flex rounded-lg border border-slate-200 overflow-hidden">
             <button @click="viewMode = 'list'"
@@ -122,12 +125,11 @@ const mapCardClass = (room) => {
               <MapIcon class="w-4 h-4" /> Floor Map
             </button>
           </div>
-          <button @click="openAdd"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <AppButton @click="openAdd">
             <PlusIcon class="w-4 h-4" /> Add Room
-          </button>
-        </div>
-      </div>
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Legend (map view only) -->
       <div v-if="viewMode === 'map'" class="flex flex-wrap items-center gap-4 text-xs text-slate-500">
@@ -185,9 +187,7 @@ const mapCardClass = (room) => {
                 <div class="text-lg font-bold text-slate-800">{{ room.room_number }}</div>
                 <div class="text-xs text-slate-400">Floor {{ room.floor || '—' }}</div>
               </div>
-              <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', room.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500']">
-                {{ room.status }}
-              </span>
+              <AppBadge :color="room.status === 'active' ? 'green' : 'slate'">{{ room.status }}</AppBadge>
             </div>
             <!-- Occupancy bar -->
             <div class="mb-3">
@@ -206,14 +206,8 @@ const mapCardClass = (room) => {
                     class="flex-1 text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center justify-center gap-1 font-medium">
                 <MapIcon class="w-3 h-3" /> Bed Map
               </Link>
-              <button @click="openEdit(room)"
-                      class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
-                <PencilIcon class="w-3 h-3" />
-              </button>
-              <button @click="remove(room)"
-                      class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-rose-500 hover:bg-rose-50">
-                <TrashIcon class="w-3 h-3" />
-              </button>
+              <AppIconButton label="Edit room" size="sm" @click="openEdit(room)"><PencilIcon class="w-3 h-3" /></AppIconButton>
+              <AppIconButton label="Delete room" size="sm" variant="danger" @click="remove(room)"><TrashIcon class="w-3 h-3" /></AppIconButton>
             </div>
           </div>
           <div v-if="!brhRooms.length" class="col-span-full text-sm text-slate-400 text-center py-8">
@@ -233,9 +227,7 @@ const mapCardClass = (room) => {
                 <div class="text-lg font-bold text-slate-800">{{ room.room_number }}</div>
                 <div class="text-xs text-slate-400">Floor {{ room.floor || '—' }}</div>
               </div>
-              <span :class="['text-xs px-2 py-0.5 rounded-full font-medium', room.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500']">
-                {{ room.status }}
-              </span>
+              <AppBadge :color="room.status === 'active' ? 'green' : 'slate'">{{ room.status }}</AppBadge>
             </div>
             <div class="mb-3">
               <div class="flex justify-between text-xs text-slate-500 mb-1">
@@ -253,14 +245,8 @@ const mapCardClass = (room) => {
                     class="flex-1 text-xs py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 inline-flex items-center justify-center gap-1 font-medium">
                 <MapIcon class="w-3 h-3" /> Bed Map
               </Link>
-              <button @click="openEdit(room)"
-                      class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
-                <PencilIcon class="w-3 h-3" />
-              </button>
-              <button @click="remove(room)"
-                      class="text-xs py-1.5 px-2 rounded-lg border border-slate-200 text-rose-500 hover:bg-rose-50">
-                <TrashIcon class="w-3 h-3" />
-              </button>
+              <AppIconButton label="Edit room" size="sm" @click="openEdit(room)"><PencilIcon class="w-3 h-3" /></AppIconButton>
+              <AppIconButton label="Delete room" size="sm" variant="danger" @click="remove(room)"><TrashIcon class="w-3 h-3" /></AppIconButton>
             </div>
           </div>
           <div v-if="!grhRooms.length" class="col-span-full text-sm text-slate-400 text-center py-8">
@@ -272,9 +258,7 @@ const mapCardClass = (room) => {
       </template><!-- end list view -->
 
       <!-- Add/Edit Modal -->
-      <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-          <h3 class="text-base font-semibold text-slate-800 mb-4">{{ editTarget ? 'Edit Room' : 'Add Room' }}</h3>
+      <AppModal :show="showModal" :title="editTarget ? 'Edit Room' : 'Add Room'" size="md" @close="showModal = false">
           <div class="space-y-3">
             <div v-if="!myHall">
               <label class="block text-xs font-medium text-slate-600 mb-1">Residence Hall</label>
@@ -317,18 +301,14 @@ const mapCardClass = (room) => {
                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
           </div>
-          <div class="flex gap-3 mt-5">
-            <button @click="showModal = false"
-                    class="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">
-              Cancel
-            </button>
-            <button @click="save"
-                    class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-              {{ editTarget ? 'Save Changes' : 'Add Room' }}
-            </button>
+
+        <template #footer>
+          <div class="flex gap-3 w-full">
+            <AppButton block variant="secondary" @click="showModal = false">Cancel</AppButton>
+            <AppButton block @click="save">{{ editTarget ? 'Save Changes' : 'Add Room' }}</AppButton>
           </div>
-        </div>
-      </div>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>

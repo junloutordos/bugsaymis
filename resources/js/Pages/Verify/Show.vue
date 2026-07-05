@@ -34,11 +34,11 @@ function formatDate(iso) {
         <!-- Valid -->
         <div v-if="props.valid && props.record" class="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-lg overflow-hidden">
             <!-- Green banner -->
-            <div class="bg-emerald-600 px-6 py-5 flex items-center gap-3">
+            <div class="bg-success-600 px-6 py-5 flex items-center gap-3">
                 <CheckBadgeIcon class="w-8 h-8 text-white shrink-0" />
                 <div>
                     <p class="text-white font-bold text-lg leading-tight">Document Verified</p>
-                    <p class="text-emerald-100 text-sm">This document is authentic and has not been altered.</p>
+                    <p class="text-success-100 text-sm">This document is authentic and has not been altered.</p>
                 </div>
             </div>
 
@@ -90,11 +90,11 @@ function formatDate(iso) {
 
         <!-- Invalid -->
         <div v-else class="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-lg overflow-hidden">
-            <div class="bg-red-600 px-6 py-5 flex items-center gap-3">
+            <div class="bg-danger-600 px-6 py-5 flex items-center gap-3">
                 <XCircleIcon class="w-8 h-8 text-white shrink-0" />
                 <div>
                     <p class="text-white font-bold text-lg leading-tight">Invalid or Unknown Document</p>
-                    <p class="text-red-100 text-sm">This document could not be verified. It may have been altered or the link is invalid.</p>
+                    <p class="text-danger-100 text-sm">This document could not be verified. It may have been altered or the link is invalid.</p>
                 </div>
             </div>
             <div class="px-6 py-5">

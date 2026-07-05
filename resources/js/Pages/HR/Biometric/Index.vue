@@ -3,20 +3,14 @@
   <AdminLayout title="Biometric Logs">
     <div class="space-y-5">
 
-      <!-- Page Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Biometric Logs</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Import and resolve biometric punch records.</p>
-        </div>
-      </div>
+      <AppPageHeader title="Biometric Logs" subtitle="Import and resolve biometric punch records." />
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <CheckCircleIcon class="h-4 w-4 shrink-0" />
         {{ $page.props.flash.success }}
       </div>
-      <div v-if="$page.props.flash?.error" class="bg-red-50 border border-red-200 text-red-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+      <div v-if="$page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
         <ExclamationCircleIcon class="h-4 w-4 shrink-0" />
         {{ $page.props.flash.error }}
       </div>
@@ -52,17 +46,14 @@
                 class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
-            <button
+            <AppButton
               type="submit"
+              block
+              :loading="uploadForm.processing"
               :disabled="uploadForm.processing || !uploadForm.files.length"
-              class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              <svg v-if="uploadForm.processing" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-              </svg>
-              <span>{{ uploadForm.processing ? 'Importing…' : 'Import Now' }}</span>
-            </button>
+              {{ uploadForm.processing ? 'Importing…' : 'Import Now' }}
+            </AppButton>
           </form>
         </div>
 
@@ -88,7 +79,7 @@
       </div>
 
       <!-- Filter Bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div class="flex-1 min-w-[160px]">
           <label class="block text-xs font-medium text-slate-500 mb-1">Search Device ID</label>
           <input
@@ -111,67 +102,79 @@
             <option value="true">Resolved</option>
           </select>
         </div>
-        <button @click="applyFilters" class="bg-slate-700 hover:bg-slate-800 text-white text-sm px-4 py-2 rounded-lg transition-colors">
-          Filter
-        </button>
-      </div>
+        <template #actions>
+          <AppButton size="sm" @click="applyFilters">Filter</AppButton>
+        </template>
+      </AppFilterBar>
 
       <!-- Logs Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Device Employee ID</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Matched User</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date &amp; Time</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Device</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-if="!logs.data?.length">
-                <td colspan="7" class="px-4 py-12 text-center text-slate-400 text-sm">No logs found.</td>
-              </tr>
-              <tr v-for="log in logs.data" :key="log.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 font-mono text-slate-700">{{ log.device_employee_id }}</td>
-                <td class="px-4 py-3 text-slate-700">{{ log.user?.name ?? '—' }}</td>
-                <td class="px-4 py-3 text-slate-700 whitespace-nowrap">{{ log.log_datetime }}</td>
-                <td class="px-4 py-3">
-                  <span :class="logTypeBadge(log.log_type)" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
-                    {{ log.log_type.replace('_', ' ') }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-slate-500 text-xs">{{ log.device_id ?? '—' }}</td>
-                <td class="px-4 py-3">
-                  <span v-if="log.is_resolved" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700">Resolved</span>
-                  <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">Unresolved</span>
-                </td>
-                <td class="px-4 py-3">
-                  <button
-                    v-if="!log.is_resolved"
-                    @click="openResolve(log)"
-                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                  >
-                    Resolve
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <AppTable :is-empty="!logs.data?.length" :skeleton-cols="7">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Device Employee ID</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Matched User</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date &amp; Time</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Device</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
 
-        <!-- Pagination -->
-        <div class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <span>Page {{ logs.current_page }} of {{ logs.last_page }}</span>
-          <div class="flex gap-2">
-            <button @click="goToPage(logs.prev_page_url)" :disabled="!logs.prev_page_url" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-40 hover:bg-slate-50">Prev</button>
-            <button @click="goToPage(logs.next_page_url)" :disabled="!logs.next_page_url" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm disabled:opacity-40 hover:bg-slate-50">Next</button>
+        <tr v-for="log in logs.data" :key="log.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 font-mono text-slate-700">{{ log.device_employee_id }}</td>
+          <td class="px-4 py-3 text-slate-700">{{ log.user?.name ?? '—' }}</td>
+          <td class="px-4 py-3 text-slate-700 whitespace-nowrap">{{ log.log_datetime }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="logTypeBadge(log.log_type)">{{ log.log_type.replace('_', ' ') }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ log.device_id ?? '—' }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="log.is_resolved ? 'green' : 'amber'">{{ log.is_resolved ? 'Resolved' : 'Unresolved' }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <button
+              v-if="!log.is_resolved"
+              @click="openResolve(log)"
+              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Resolve
+            </button>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="log in logs.data" :key="log.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-mono text-xs text-slate-500">{{ log.device_employee_id }}</p>
+                <p class="font-medium text-slate-800 text-sm">{{ log.user?.name ?? '—' }}</p>
+                <p class="text-xs text-slate-400">{{ log.log_datetime }}</p>
+              </div>
+              <AppBadge :color="log.is_resolved ? 'green' : 'amber'">{{ log.is_resolved ? 'Resolved' : 'Unresolved' }}</AppBadge>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <AppBadge :color="logTypeBadge(log.log_type)">{{ log.log_type.replace('_', ' ') }}</AppBadge>
+              <span>{{ log.device_id ?? '—' }}</span>
+            </div>
+            <div v-if="!log.is_resolved" class="flex justify-end pt-1">
+              <button @click="openResolve(log)" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Resolve</button>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No logs found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :links="logs.links"
+            :current-page="logs.current_page"
+            :total-pages="logs.last_page"
+            :total="logs.total" />
+        </template>
+      </AppTable>
 
     </div>
 
@@ -197,14 +200,14 @@
             </select>
           </div>
           <div class="flex gap-3 justify-end">
-            <button @click="resolveModal.open = false" class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button
-              @click="submitResolve"
+            <AppButton variant="secondary" @click="resolveModal.open = false">Cancel</AppButton>
+            <AppButton
               :disabled="!resolveForm.user_id || resolveForm.processing"
-              class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+              :loading="resolveForm.processing"
+              @click="submitResolve"
             >
               Resolve
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -217,6 +220,13 @@
 import { ref, reactive } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import {
   ArrowUpTrayIcon,
   CheckCircleIcon,
@@ -280,9 +290,9 @@ function submitResolve () {
 
 function logTypeBadge (type) {
   return {
-    time_in:  'bg-emerald-50 text-emerald-700',
-    time_out: 'bg-blue-50 text-blue-700',
-    auto:     'bg-slate-100 text-slate-600',
-  }[type] ?? 'bg-slate-100 text-slate-600'
+    time_in:  'green',
+    time_out: 'blue',
+    auto:     'slate',
+  }[type] ?? 'slate'
 }
 </script>

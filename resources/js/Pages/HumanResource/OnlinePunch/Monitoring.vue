@@ -3,8 +3,10 @@
   <AdminLayout title="Online Time Punches — Monitoring">
     <div class="space-y-5">
 
+      <AppPageHeader title="Online Time Punches" subtitle="Monitor face-verified time punches across employees." />
+
       <!-- Filters -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppFilterBar>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Month</label>
           <input v-model="filterMonth" type="month"
@@ -28,66 +30,76 @@
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full" />
         </div>
 
-        <button @click="load" :disabled="loading"
-          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          {{ loading ? 'Loading…' : 'Apply' }}
-        </button>
-      </div>
+        <template #actions>
+          <AppButton size="sm" :loading="loading" @click="load">
+            {{ loading ? 'Loading…' : 'Apply' }}
+          </AppButton>
+        </template>
+      </AppFilterBar>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div v-if="!rows.length && !loading" class="py-16 text-center text-slate-400 text-sm">
-          No online time punches found.
-        </div>
+      <!-- Table -->
+      <AppTable :loading="loading" :is-empty="!rows.length" :skeleton-cols="8">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Punch</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Liveness</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Match Score</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Photo</th>
+          </tr>
+        </template>
 
-        <div v-else class="overflow-x-auto rounded-xl border border-slate-100">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Punch</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Time</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Liveness</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Match Score</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Photo</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-slate-800">{{ row.user?.name }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ row.work_date }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ punchLabel(row.punch_type) }}</td>
-                <td class="px-4 py-3 text-slate-600">{{ fmtTime(row.punched_at) }}</td>
-                <td class="px-4 py-3 text-center text-slate-600">{{ row.liveness_confidence ?? '—' }}</td>
-                <td class="px-4 py-3 text-center text-slate-600">{{ row.match_score ?? '—' }}</td>
-                <td class="px-4 py-3 text-center">
-                  <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5"
-                        :class="statusPillClass(row.match_status)">
-                    {{ statusLabel(row.match_status) }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <a v-if="row.photo_url" :href="row.photo_url" target="_blank" class="text-indigo-600 hover:underline text-xs">View</a>
-                  <span v-else class="text-slate-300 text-xs">—</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-slate-800">{{ row.user?.name }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ row.work_date }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ punchLabel(row.punch_type) }}</td>
+          <td class="px-4 py-3 text-slate-600">{{ fmtTime(row.punched_at) }}</td>
+          <td class="px-4 py-3 text-center text-slate-600">{{ row.liveness_confidence ?? '—' }}</td>
+          <td class="px-4 py-3 text-center text-slate-600">{{ row.match_score ?? '—' }}</td>
+          <td class="px-4 py-3 text-center">
+            <AppBadge :color="statusBadgeColor(row.match_status)">{{ statusLabel(row.match_status) }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <a v-if="row.photo_url" :href="row.photo_url" target="_blank" class="text-indigo-600 hover:underline text-xs">View</a>
+            <span v-else class="text-slate-300 text-xs">—</span>
+          </td>
+        </tr>
 
-        <!-- Pagination -->
-        <div v-if="meta && meta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-          <div class="flex gap-2">
-            <button @click="load(meta.current_page - 1)" :disabled="meta.current_page <= 1"
-              class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">← Prev</button>
-            <button @click="load(meta.current_page + 1)" :disabled="meta.current_page >= meta.last_page"
-              class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">Next →</button>
+        <template #mobileCard>
+          <div v-for="row in rows" :key="row.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-slate-800">{{ row.user?.name }}</p>
+                <p class="text-xs text-slate-500">{{ row.work_date }} &middot; {{ punchLabel(row.punch_type) }} &middot; {{ fmtTime(row.punched_at) }}</p>
+              </div>
+              <AppBadge :color="statusBadgeColor(row.match_status)">{{ statusLabel(row.match_status) }}</AppBadge>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span>Liveness {{ row.liveness_confidence ?? '—' }} &middot; Match {{ row.match_score ?? '—' }}</span>
+              <a v-if="row.photo_url" :href="row.photo_url" target="_blank" class="text-indigo-600 hover:underline">View photo</a>
+              <span v-else class="text-slate-300">—</span>
+            </div>
           </div>
-        </div>
-      </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No online time punches found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="meta?.current_page"
+            :total-pages="meta?.last_page"
+            :total="meta?.total"
+            @prev="load(meta.current_page - 1)"
+            @next="load(meta.current_page + 1)"
+            @page="load($event)"
+          />
+        </template>
+      </AppTable>
     </div>
   </AdminLayout>
 </template>
@@ -96,6 +108,13 @@
 import { ref, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import axios from 'axios'
 
 const currentMonth = new Date().toISOString().slice(0, 7)
@@ -113,7 +132,7 @@ async function load(page = 1) {
       params: { month: filterMonth.value, status: filterStatus.value, search: searchQuery.value, page },
     })
     rows.value = data.data
-    meta.value = { current_page: data.current_page, last_page: data.last_page }
+    meta.value = { current_page: data.current_page, last_page: data.last_page, total: data.total }
   } finally {
     loading.value = false
   }
@@ -127,6 +146,12 @@ function statusPillClass(status) {
   if (status === 'verified') return 'bg-emerald-100 text-emerald-700'
   if (status === 'manual_review') return 'bg-amber-100 text-amber-700'
   return 'bg-rose-100 text-rose-700'
+}
+
+function statusBadgeColor(status) {
+  if (status === 'verified') return 'green'
+  if (status === 'manual_review') return 'amber'
+  return 'red'
 }
 
 function statusLabel(status) {

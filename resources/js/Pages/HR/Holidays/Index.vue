@@ -3,20 +3,17 @@
   <AdminLayout title="Holidays">
     <div class="space-y-5">
 
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Holidays</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage official holidays used in DTR and leave computations.</p>
-        </div>
-        <button @click="openAdd"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-medium">
-          + Add Holiday
-        </button>
-      </div>
+      <AppPageHeader title="Holidays" subtitle="Manage official holidays used in DTR and leave computations.">
+        <template #actions>
+          <AppButton @click="openAdd">
+            <PlusIcon class="h-4 w-4" />
+            Add Holiday
+          </AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- Flash -->
-      <div v-if="$page.props.flash?.success" class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg px-4 py-3 text-sm">
+      <div v-if="$page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm">
         {{ $page.props.flash.success }}
       </div>
 
@@ -35,51 +32,64 @@
       </div>
 
       <!-- Table -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recurring</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            <tr v-if="!filtered.length">
-              <td colspan="6" class="px-4 py-12 text-center text-slate-400 text-sm">No holidays found.</td>
-            </tr>
-            <tr v-for="h in filtered" :key="h.id" class="hover:bg-slate-50/60">
-              <td class="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{{ fmtDate(h.holiday_date) }}</td>
-              <td class="px-4 py-3 text-slate-800">
-                {{ h.name }}
-                <p v-if="h.description" class="text-xs text-slate-400 mt-0.5">{{ h.description }}</p>
-              </td>
-              <td class="px-4 py-3">
-                <span :class="typeClass(h.type)"
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold">
-                  {{ typeLabel(h.type) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-500 text-xs">{{ h.is_recurring ? 'Yes' : 'No' }}</td>
-              <td class="px-4 py-3">
-                <span :class="h.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold">
-                  {{ h.is_active ? 'Active' : 'Inactive' }}
-                </span>
-              </td>
-              <td class="px-4 py-3 flex gap-2 justify-end">
-                <button @click="openEdit(h)"
-                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
-                <button @click="confirmDelete(h)"
-                        class="text-xs text-red-500 hover:text-red-700 font-medium">Delete</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <AppTable :is-empty="!filtered.length" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Recurring</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="h in filtered" :key="h.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{{ fmtDate(h.holiday_date) }}</td>
+          <td class="px-4 py-3 text-slate-800">
+            {{ h.name }}
+            <p v-if="h.description" class="text-xs text-slate-400 mt-0.5">{{ h.description }}</p>
+          </td>
+          <td class="px-4 py-3">
+            <AppBadge :color="typeColor(h.type)">{{ typeLabel(h.type) }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-slate-500 text-xs">{{ h.is_recurring ? 'Yes' : 'No' }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="h.is_active ? 'green' : 'slate'">{{ h.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex gap-2 justify-end">
+              <AppButton size="sm" variant="ghost" @click="openEdit(h)">Edit</AppButton>
+              <AppButton size="sm" variant="danger" @click="confirmDelete(h)">Delete</AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="h in filtered" :key="h.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="text-xs text-slate-500">{{ fmtDate(h.holiday_date) }}</p>
+                <p class="font-medium text-slate-800">{{ h.name }}</p>
+                <p v-if="h.description" class="text-xs text-slate-400">{{ h.description }}</p>
+              </div>
+              <AppBadge :color="h.is_active ? 'green' : 'slate'">{{ h.is_active ? 'Active' : 'Inactive' }}</AppBadge>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-slate-500">
+              <AppBadge :color="typeColor(h.type)">{{ typeLabel(h.type) }}</AppBadge>
+              <span>Recurring: {{ h.is_recurring ? 'Yes' : 'No' }}</span>
+            </div>
+            <div class="flex gap-2 justify-end pt-1">
+              <AppButton size="sm" variant="ghost" @click="openEdit(h)">Edit</AppButton>
+              <AppButton size="sm" variant="danger" @click="confirmDelete(h)">Delete</AppButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No holidays found" />
+        </template>
+      </AppTable>
 
     </div>
 
@@ -136,12 +146,10 @@
           </div>
 
           <div class="flex gap-3 justify-end mt-5">
-            <button @click="modal = false"
-                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="submit" :disabled="form.processing"
-                    class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors">
-              {{ form.processing ? 'Saving…' : (editing ? 'Update' : 'Add Holiday') }}
-            </button>
+            <AppButton variant="secondary" @click="modal = false">Cancel</AppButton>
+            <AppButton :loading="form.processing" @click="submit">
+              {{ editing ? 'Update' : 'Add Holiday' }}
+            </AppButton>
           </div>
         </div>
       </div>
@@ -154,10 +162,8 @@
           <h3 class="text-base font-semibold text-slate-800 mb-2">Delete Holiday</h3>
           <p class="text-sm text-slate-600 mb-5">Remove <strong>{{ deleteTarget.name }}</strong>? This cannot be undone.</p>
           <div class="flex gap-3 justify-end">
-            <button @click="deleteTarget = null"
-                    class="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
-            <button @click="doDelete"
-                    class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">Delete</button>
+            <AppButton variant="secondary" @click="deleteTarget = null">Cancel</AppButton>
+            <AppButton variant="danger" @click="doDelete">Delete</AppButton>
           </div>
         </div>
       </div>
@@ -170,6 +176,12 @@
 import { ref, computed } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import { PlusIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   holidays: Array,
@@ -252,13 +264,13 @@ function typeLabel(t) {
   }[t] ?? t
 }
 
-function typeClass(t) {
+function typeColor(t) {
   return {
-    regular:             'bg-red-100 text-red-700',
-    special_non_working: 'bg-amber-100 text-amber-700',
-    special_working:     'bg-blue-100 text-blue-700',
-    local:               'bg-purple-100 text-purple-700',
-  }[t] ?? 'bg-slate-100 text-slate-500'
+    regular:             'red',
+    special_non_working: 'amber',
+    special_working:     'blue',
+    local:               'purple',
+  }[t] ?? 'slate'
 }
 
 function fmtDate(d) {

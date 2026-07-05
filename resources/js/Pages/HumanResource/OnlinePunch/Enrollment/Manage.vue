@@ -3,7 +3,9 @@
   <AdminLayout title="Face Enrollment — HR Review">
     <div class="space-y-5">
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-wrap gap-3 items-end">
+      <AppPageHeader title="Face Enrollment" subtitle="Review employee face-enrollment requests for Online Time Punches." />
+
+      <AppFilterBar>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Status</label>
           <select v-model="filterStatus" @change="load()"
@@ -14,47 +16,73 @@
             <option value="">All</option>
           </select>
         </div>
-      </div>
+      </AppFilterBar>
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div v-if="!rows.length && !loading" class="py-16 text-center text-slate-400 text-sm">
-          No enrollments found.
-        </div>
+      <AppTable :loading="loading" :is-empty="!rows.length" :skeleton-cols="4">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Employee</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Submitted</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
 
-        <div v-else class="divide-y divide-slate-100">
-          <div v-for="row in rows" :key="row.id" class="px-5 py-4 flex items-center gap-4">
-            <img v-if="row.photo_url" :src="row.photo_url" class="w-16 h-16 rounded-full object-cover border" alt="Enrollment photo" />
-            <div class="flex-1">
-              <p class="font-medium text-slate-800">{{ row.user?.name }}</p>
-              <p class="text-xs text-slate-400">{{ row.user?.position }}</p>
-              <p class="text-xs text-slate-400">Submitted {{ fmtDate(row.consent_given_at) }}</p>
+        <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              <img v-if="row.photo_url" :src="row.photo_url" class="w-10 h-10 rounded-full object-cover border border-slate-100" alt="Enrollment photo" />
+              <div>
+                <p class="font-medium text-slate-800">{{ row.user?.name }}</p>
+                <p class="text-xs text-slate-400">{{ row.user?.position }}</p>
+              </div>
             </div>
-            <span class="inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5" :class="statusPillClass(row.status)">
-              {{ row.status }}
-            </span>
+          </td>
+          <td class="px-4 py-3 text-slate-600">{{ fmtDate(row.consent_given_at) }}</td>
+          <td class="px-4 py-3">
+            <AppBadge :color="statusBadgeColor(row.status)">{{ row.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
             <div v-if="row.status === 'pending'" class="flex gap-2">
-              <button @click="approve(row)"
-                class="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                Approve
-              </button>
-              <button @click="rejectPrompt(row)"
-                class="inline-flex items-center gap-1 bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
-                Reject
-              </button>
+              <AppButton size="sm" variant="success" @click="approve(row)">Approve</AppButton>
+              <AppButton size="sm" variant="danger" @click="rejectPrompt(row)">Reject</AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="row in rows" :key="row.id" class="p-4 space-y-2">
+            <div class="flex items-center gap-3">
+              <img v-if="row.photo_url" :src="row.photo_url" class="w-12 h-12 rounded-full object-cover border border-slate-100" alt="Enrollment photo" />
+              <div class="flex-1">
+                <p class="font-medium text-slate-800">{{ row.user?.name }}</p>
+                <p class="text-xs text-slate-400">{{ row.user?.position }}</p>
+                <p class="text-xs text-slate-400">Submitted {{ fmtDate(row.consent_given_at) }}</p>
+              </div>
+              <AppBadge :color="statusBadgeColor(row.status)">{{ row.status }}</AppBadge>
+            </div>
+            <div v-if="row.status === 'pending'" class="flex gap-2 pt-1">
+              <AppButton size="sm" variant="success" @click="approve(row)">Approve</AppButton>
+              <AppButton size="sm" variant="danger" @click="rejectPrompt(row)">Reject</AppButton>
             </div>
           </div>
-        </div>
+        </template>
 
-        <div v-if="meta && meta.last_page > 1" class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>Page {{ meta.current_page }} of {{ meta.last_page }}</span>
-          <div class="flex gap-2">
-            <button @click="load(meta.current_page - 1)" :disabled="meta.current_page <= 1"
-              class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">← Prev</button>
-            <button @click="load(meta.current_page + 1)" :disabled="meta.current_page >= meta.last_page"
-              class="px-3 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition-colors">Next →</button>
-          </div>
-        </div>
-      </div>
+        <template #empty>
+          <EmptyState title="No enrollments found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="meta?.current_page"
+            :total-pages="meta?.last_page"
+            :total="meta?.total"
+            @prev="load(meta.current_page - 1)"
+            @next="load(meta.current_page + 1)"
+            @page="load($event)"
+          />
+        </template>
+      </AppTable>
     </div>
   </AdminLayout>
 </template>
@@ -63,7 +91,15 @@
 import { ref, onMounted } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import Swal from 'sweetalert2'
+import { confirmAction } from '@/Composables/useConfirm.js'
 import axios from 'axios'
 
 const filterStatus = ref('pending')
@@ -78,20 +114,18 @@ async function load(page = 1) {
       params: { status: filterStatus.value, page },
     })
     rows.value = data.data
-    meta.value = { current_page: data.current_page, last_page: data.last_page }
+    meta.value = { current_page: data.current_page, last_page: data.last_page, total: data.total }
   } finally {
     loading.value = false
   }
 }
 
 async function approve(row) {
-  const confirm = await Swal.fire({
+  const confirmed = await confirmAction({
     title: `Approve ${row.user?.name}'s face enrollment?`,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: 'Approve',
+    confirmText: 'Approve',
   })
-  if (!confirm.isConfirmed) return
+  if (!confirmed) return
 
   await axios.post(route('hr.face-enrollment.approve', { enrollment: row.id }))
   Swal.fire({ icon: 'success', title: 'Approved', timer: 1500, showConfirmButton: false })
@@ -118,6 +152,12 @@ function statusPillClass(status) {
   if (status === 'approved') return 'bg-emerald-100 text-emerald-700'
   if (status === 'pending') return 'bg-amber-100 text-amber-700'
   return 'bg-rose-100 text-rose-700'
+}
+
+function statusBadgeColor(status) {
+  if (status === 'approved') return 'green'
+  if (status === 'pending') return 'amber'
+  return 'red'
 }
 
 function fmtDate(val) {

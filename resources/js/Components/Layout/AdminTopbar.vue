@@ -40,7 +40,7 @@ const emit = defineEmits(['toggle-mobile', 'toggle-collapse', 'report-error', 'o
         >
           <Bars3Icon class="h-5 w-5 text-slate-500" />
         </button>
-        <span v-if="title" class="hidden truncate text-sm font-medium text-slate-700 md:block">{{ title }}</span>
+        <span v-if="title" class="hidden truncate font-heading text-sm font-semibold text-slate-700 md:block">{{ title }}</span>
       </div>
 
       <div class="flex min-w-0 items-center gap-1 sm:gap-2">

@@ -4,23 +4,20 @@
       <!-- Back + Header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div class="flex items-center gap-3">
-          <Link :href="route('rewards.nominations.index')" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">←</Link>
+          <AppButton as="link" variant="ghost" size="sm" :href="route('rewards.nominations.index')" aria-label="Back to nominations">←</AppButton>
           <div>
-            <h1 class="text-xl font-semibold text-slate-800">{{ nomination.reward_type?.name }}</h1>
+            <h1 class="font-heading text-xl font-semibold text-slate-800">{{ nomination.reward_type?.name }}</h1>
             <p class="text-sm text-slate-500">Nomination #{{ nomination.id }}</p>
           </div>
         </div>
-        <span :class="[badgeBase, statusBadgeClass(nomination.status), 'capitalize']">{{ nomination.status }}</span>
+        <AppBadge :color="statusColor(nomination.status)" class="capitalize">{{ nomination.status }}</AppBadge>
       </div>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <!-- Main Info -->
         <div class="space-y-4 lg:col-span-2">
           <!-- Details Card -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Nomination Details</h2>
-            </div>
+          <AppCard title="Nomination Details" :padded="false">
             <div class="p-5">
               <dl class="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -53,13 +50,10 @@
                 <p class="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{{ nomination.justification }}</p>
               </div>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Evaluations -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Evaluations</h2>
-            </div>
+          <AppCard title="Evaluations" :padded="false">
             <div class="p-5">
               <div v-if="nomination.evaluations?.length" class="space-y-3">
                 <div v-for="ev in nomination.evaluations" :key="ev.id"
@@ -67,9 +61,7 @@
                   <div class="flex items-center justify-between">
                     <span class="font-medium text-slate-800">{{ ev.evaluator?.name }}</span>
                     <div class="flex items-center gap-2">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 capitalize">
-                        {{ ev.evaluation_stage }}
-                      </span>
+                      <AppBadge color="blue" class="capitalize">{{ ev.evaluation_stage }}</AppBadge>
                       <span class="text-base font-bold text-indigo-700">{{ ev.score }}/100</span>
                     </div>
                   </div>
@@ -78,13 +70,10 @@
               </div>
               <p v-else class="text-sm text-slate-400">No evaluations yet.</p>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Approvals -->
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Approvals</h2>
-            </div>
+          <AppCard title="Approvals" :padded="false">
             <div class="p-5">
               <div v-if="nomination.approvals?.length" class="space-y-3">
                 <div v-for="ap in nomination.approvals" :key="ap.id"
@@ -94,10 +83,7 @@
                       <p class="font-medium text-slate-800">{{ ap.approver?.name }}</p>
                       <p class="text-xs text-slate-500 capitalize">{{ ap.level.replace('_', ' ') }}</p>
                     </div>
-                    <span :class="decisionClass(ap.decision)"
-                      class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize">
-                      {{ ap.decision ?? 'Pending' }}
-                    </span>
+                    <AppBadge :color="decisionColor(ap.decision)" class="capitalize">{{ ap.decision ?? 'Pending' }}</AppBadge>
                   </div>
                   <p v-if="ap.remarks" class="mt-1 text-slate-600">{{ ap.remarks }}</p>
                   <p v-if="ap.decided_at" class="mt-0.5 text-xs text-slate-400">
@@ -107,13 +93,10 @@
               </div>
               <p v-else class="text-sm text-slate-400">No approval decisions yet.</p>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Award -->
-          <div v-if="nomination.reward" class="bg-white rounded-xl border border-slate-100 shadow-sm">
-            <div class="px-5 py-4 border-b border-slate-100">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Award Recorded</h2>
-            </div>
+          <AppCard v-if="nomination.reward" title="Award Recorded" :padded="false">
             <div class="p-5">
               <dl class="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -134,13 +117,13 @@
                 </div>
               </dl>
             </div>
-          </div>
+          </AppCard>
 
           <!-- Record Award (if approved and no award yet) -->
           <div v-if="nomination.status === 'approved' && !nomination.reward"
-            class="bg-white rounded-xl border border-emerald-200 shadow-sm">
-            <div class="px-5 py-4 border-b border-emerald-100">
-              <h2 class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Record Award</h2>
+            class="bg-white rounded-xl border border-success-100 shadow-sm">
+            <div class="px-5 py-4 border-b border-success-100">
+              <h2 class="text-xs font-semibold uppercase tracking-wide text-success-700">Record Award</h2>
             </div>
             <div class="p-5">
               <form @submit.prevent="submitAward" class="space-y-3">
@@ -168,20 +151,14 @@
                   <label class="block text-xs font-medium text-slate-600 mb-1">Remarks</label>
                   <textarea v-model="awardForm.remarks" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" rows="2" />
                 </div>
-                <button type="submit"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                  Record Award
-                </button>
+                <AppButton type="submit" variant="success">Record Award</AppButton>
               </form>
             </div>
           </div>
         </div>
 
         <!-- Sidebar: Activity Log -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm h-fit">
-          <div class="px-5 py-4 border-b border-slate-100">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Activity Log</h2>
-          </div>
+        <AppCard title="Activity Log" :padded="false" class="h-fit">
           <div class="p-5">
             <div v-if="nomination.logs?.length" class="space-y-3">
               <div v-for="log in nomination.logs" :key="log.id" class="border-l-2 border-indigo-200 pl-3">
@@ -193,7 +170,7 @@
             </div>
             <p v-else class="text-xs text-slate-400">No activity yet.</p>
           </div>
-        </div>
+        </AppCard>
       </div>
     </div>
   </AdminLayout>
@@ -202,7 +179,9 @@
 <script setup>
 import { Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import { statusBadgeClass, badgeBase } from '@/Composables/useStatusBadge.js'
+import AppCard from '@/Components/AppCard.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppButton from '@/Components/AppButton.vue'
 
 const props = defineProps({ nomination: Object })
 
@@ -223,11 +202,21 @@ function formatDate(d) {
 }
 
 
-function decisionClass(d) {
+function decisionColor(d) {
   return {
-    approved: 'bg-emerald-50 text-emerald-700',
-    rejected: 'bg-red-50 text-red-600',
-    deferred: 'bg-amber-50 text-amber-700',
-  }[d] ?? 'bg-slate-100 text-slate-600'
+    approved: 'green',
+    rejected: 'red',
+    deferred: 'amber',
+  }[d] ?? 'slate'
+}
+
+function statusColor(s) {
+  return {
+    pending: 'amber',
+    screened: 'green',
+    evaluated: 'blue',
+    approved: 'green',
+    rejected: 'red',
+  }[s] ?? 'slate'
 }
 </script>

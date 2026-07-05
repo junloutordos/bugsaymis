@@ -1,6 +1,8 @@
 <script setup>
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppCard from '@/Components/AppCard.vue'
+import AppButton from '@/Components/AppButton.vue'
 import { DocumentArrowDownIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({ item: Object, batch: Object })
@@ -49,17 +51,15 @@ const deductions = [
     <div class="max-w-2xl mx-auto">
       <!-- Actions -->
       <div class="flex items-center justify-between mb-4">
-        <a :href="route('payroll.my-payslips.index')"
-           class="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-800 transition-colors">
+        <AppButton as="a" variant="ghost" :href="route('payroll.my-payslips.index')">
           <ArrowLeftIcon class="w-4 h-4" /> Back to Payslips
-        </a>
-        <a :href="route('payroll.my-payslips.pdf', item.id)" target="_blank"
-           class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+        </AppButton>
+        <AppButton as="a" :href="route('payroll.my-payslips.pdf', item.id)" target="_blank">
           <DocumentArrowDownIcon class="w-4 h-4" /> Download PDF
-        </a>
+        </AppButton>
       </div>
 
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+      <AppCard :padded="false">
         <!-- Header -->
         <div class="bg-slate-800 text-white px-6 py-4 text-center">
           <div class="text-xs opacity-70">Republic of the Philippines · Department of Science and Technology</div>
@@ -120,7 +120,7 @@ const deductions = [
           <div>Amount Due (2nd half): <strong>₱ {{ fmt(item.second_half_amount) }}</strong></div>
         </div>
         <div class="px-6 pb-4 text-sm text-slate-600">Received thru: <strong>ATM</strong></div>
-      </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>

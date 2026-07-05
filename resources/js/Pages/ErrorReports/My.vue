@@ -3,89 +3,123 @@
   <AdminLayout title="My Error Reports">
     <div class="space-y-5">
 
-      <div>
-        <h1 class="text-xl font-semibold text-slate-800">My Error Reports</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Track the status of errors you have reported</p>
-      </div>
+      <AppPageHeader title="My Error Reports" subtitle="Track the status of errors you have reported" />
 
-      <!-- Empty -->
-      <div v-if="reports.length === 0" class="bg-white rounded-xl border border-slate-100 shadow-sm py-16 text-center">
-        <BugAntIcon class="mx-auto h-12 w-12 text-slate-200 mb-3" />
-        <p class="text-sm font-medium text-slate-500">You haven't reported any errors yet</p>
-        <p class="text-xs text-slate-400 mt-1">Use the "Report an Error" button in the top navigation bar.</p>
-      </div>
+      <!-- Table -->
+      <AppTable :is-empty="reports.length === 0" :skeleton-cols="5">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Report</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </template>
 
-      <div v-else class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-          <thead class="bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Report</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Priority</th>
-              <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Submitted</th>
-              <th class="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-50">
-            <template v-for="r in reports" :key="r.id">
-              <tr class="hover:bg-slate-50/50 cursor-pointer" @click="toggle(r.id)">
-                <td class="px-4 py-3">
-                  <p class="font-mono text-xs text-slate-400">{{ r.report_no }}</p>
-                  <p class="font-medium text-slate-800 truncate max-w-xs">{{ r.title }}</p>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="statusBadge(r.status)"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
-                    {{ statusLabel(r.status) }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <span :class="priorityBadge(r.priority)"
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                    {{ r.priority.toUpperCase() }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-xs text-slate-500">{{ formatDate(r.created_at) }}</td>
-                <td class="px-4 py-3 text-right">
-                  <ChevronDownIcon class="h-4 w-4 text-slate-400 inline transition-transform"
-                    :class="expanded === r.id ? 'rotate-180' : ''" />
-                </td>
-              </tr>
+        <template v-for="r in reports" :key="r.id">
+          <tr class="hover:bg-slate-50/50 cursor-pointer" @click="toggle(r.id)">
+            <td class="px-4 py-3">
+              <p class="font-mono text-xs text-slate-400">{{ r.report_no }}</p>
+              <p class="font-medium text-slate-800 truncate max-w-xs">{{ r.title }}</p>
+            </td>
+            <td class="px-4 py-3">
+              <AppBadge :color="statusColor(r.status)">{{ statusLabel(r.status) }}</AppBadge>
+            </td>
+            <td class="px-4 py-3">
+              <AppBadge :color="priorityColor(r.priority)">{{ r.priority.toUpperCase() }}</AppBadge>
+            </td>
+            <td class="px-4 py-3 text-xs text-slate-500">{{ formatDate(r.created_at) }}</td>
+            <td class="px-4 py-3 text-right">
+              <ChevronDownIcon class="h-4 w-4 text-slate-400 inline transition-transform"
+                :class="expanded === r.id ? 'rotate-180' : ''" />
+            </td>
+          </tr>
 
-              <!-- Expanded detail -->
-              <tr v-if="expanded === r.id">
-                <td colspan="5" class="px-4 py-4 bg-slate-50 border-t border-slate-100">
-                  <div class="space-y-3 max-w-2xl">
-                    <div>
-                      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</p>
-                      <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ r.description }}</p>
-                    </div>
+          <!-- Expanded detail -->
+          <tr v-if="expanded === r.id">
+            <td colspan="5" class="px-4 py-4 bg-slate-50 border-t border-slate-100">
+              <div class="space-y-3 max-w-2xl">
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</p>
+                  <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ r.description }}</p>
+                </div>
 
-                    <div v-if="r.action_taken" class="rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
-                      <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">MIS Action Taken</p>
-                      <p class="text-sm text-emerald-800 whitespace-pre-wrap">{{ r.action_taken }}</p>
-                    </div>
+                <div v-if="r.action_taken" class="rounded-lg bg-success-50 border border-success-100 px-4 py-3">
+                  <p class="text-xs font-semibold text-success-700 uppercase tracking-wide mb-1">MIS Action Taken</p>
+                  <p class="text-sm text-success-700 whitespace-pre-wrap">{{ r.action_taken }}</p>
+                </div>
 
-                    <div v-if="r.resolved_at" class="text-xs text-emerald-600 flex items-center gap-1">
-                      <CheckCircleIcon class="h-3.5 w-3.5" /> Resolved on {{ formatDate(r.resolved_at) }}
-                    </div>
+                <div v-if="r.resolved_at" class="text-xs text-success-600 flex items-center gap-1">
+                  <CheckCircleIcon class="h-3.5 w-3.5" /> Resolved on {{ formatDate(r.resolved_at) }}
+                </div>
 
-                    <div v-if="r.assignee_name" class="text-xs text-slate-500">
-                      Assigned to: <span class="font-medium text-slate-700">{{ r.assignee_name }}</span>
-                    </div>
+                <div v-if="r.assignee_name" class="text-xs text-slate-500">
+                  Assigned to: <span class="font-medium text-slate-700">{{ r.assignee_name }}</span>
+                </div>
 
-                    <div v-if="r.has_screenshot">
-                      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Your Screenshot</p>
-                      <img :src="r.screenshot_url" alt="Screenshot"
-                        class="rounded-lg border border-slate-200 max-h-64 object-contain bg-slate-50" />
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+                <div v-if="r.has_screenshot">
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Your Screenshot</p>
+                  <img :src="r.screenshot_url" alt="Screenshot"
+                    class="rounded-lg border border-slate-200 max-h-64 object-contain bg-slate-50" />
+                </div>
+              </div>
+            </td>
+          </tr>
+        </template>
+
+        <template #mobileCard>
+          <div v-for="r in reports" :key="r.id" class="p-4 space-y-2" @click="toggle(r.id)">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="font-mono text-xs text-slate-400">{{ r.report_no }}</p>
+                <p class="font-medium text-slate-800 truncate">{{ r.title }}</p>
+              </div>
+              <ChevronDownIcon class="h-4 w-4 text-slate-400 shrink-0 transition-transform"
+                :class="expanded === r.id ? 'rotate-180' : ''" />
+            </div>
+            <div class="flex items-center gap-2">
+              <AppBadge :color="statusColor(r.status)">{{ statusLabel(r.status) }}</AppBadge>
+              <AppBadge :color="priorityColor(r.priority)">{{ r.priority.toUpperCase() }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-500">{{ formatDate(r.created_at) }}</p>
+
+            <div v-if="expanded === r.id" class="pt-2 space-y-3 border-t border-slate-100">
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</p>
+                <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ r.description }}</p>
+              </div>
+
+              <div v-if="r.action_taken" class="rounded-lg bg-success-50 border border-success-100 px-4 py-3">
+                <p class="text-xs font-semibold text-success-700 uppercase tracking-wide mb-1">MIS Action Taken</p>
+                <p class="text-sm text-success-700 whitespace-pre-wrap">{{ r.action_taken }}</p>
+              </div>
+
+              <div v-if="r.resolved_at" class="text-xs text-success-600 flex items-center gap-1">
+                <CheckCircleIcon class="h-3.5 w-3.5" /> Resolved on {{ formatDate(r.resolved_at) }}
+              </div>
+
+              <div v-if="r.assignee_name" class="text-xs text-slate-500">
+                Assigned to: <span class="font-medium text-slate-700">{{ r.assignee_name }}</span>
+              </div>
+
+              <div v-if="r.has_screenshot">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Your Screenshot</p>
+                <img :src="r.screenshot_url" alt="Screenshot"
+                  class="rounded-lg border border-slate-200 max-h-64 object-contain bg-slate-50" />
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState
+            :icon="BugAntIcon"
+            title="You haven't reported any errors yet"
+            subtitle='Use the &quot;Report an Error&quot; button in the top navigation bar.'
+          />
+        </template>
+      </AppTable>
 
     </div>
   </AdminLayout>
@@ -95,6 +129,10 @@
 import { ref } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
 import { BugAntIcon, CheckCircleIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 
 defineProps({ reports: { type: Array, default: () => [] } })
@@ -108,21 +146,21 @@ function statusLabel(s) {
   return { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved' }[s] ?? s
 }
 
-function statusBadge(s) {
+function statusColor(s) {
   return {
-    open:        'bg-red-50 text-red-600',
-    in_progress: 'bg-amber-50 text-amber-700',
-    resolved:    'bg-emerald-50 text-emerald-700',
-  }[s] ?? 'bg-slate-100 text-slate-500'
+    open:        'red',
+    in_progress: 'amber',
+    resolved:    'green',
+  }[s] ?? 'slate'
 }
 
-function priorityBadge(p) {
+function priorityColor(p) {
   return {
-    critical: 'bg-red-600 text-white',
-    high:     'bg-red-100 text-red-700',
-    medium:   'bg-amber-100 text-amber-700',
-    low:      'bg-slate-100 text-slate-500',
-  }[p] ?? 'bg-slate-100 text-slate-500'
+    critical: 'red',
+    high:     'orange',
+    medium:   'amber',
+    low:      'slate',
+  }[p] ?? 'slate'
 }
 
 function formatDate(iso) {

@@ -1,12 +1,219 @@
+<template>
+  <Head title="Knowledge Management" />
+  <AdminLayout title="Knowledge Management">
+    <div class="space-y-5">
+
+      <AppPageHeader
+        title="Knowledge Management"
+        subtitle="Searchable repository of memoranda, orders, and other issuances from the Office of the Executive Director"
+      >
+        <template v-if="canManage" #actions>
+          <AppButton variant="secondary" @click="openCatModal">
+            <Cog6ToothIcon class="h-4 w-4" /> Categories
+          </AppButton>
+          <AppButton as="link" :href="route('km.create')">
+            <PlusIcon class="h-4 w-4" /> Upload Document
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Flash -->
+      <div v-if="flash.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+        <CheckCircleIcon class="h-4 w-4 shrink-0" />{{ flash.success }}
+      </div>
+      <div v-if="flash.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm">
+        {{ flash.error }}
+      </div>
+
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="relative flex-1 min-w-[200px]">
+          <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input v-model="search" type="text" placeholder="Search title, reference no., description…"
+            class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <select v-model="filterCategory"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Categories</option>
+          <option v-for="c in categories" :key="c.code" :value="c.code">{{ c.label }}</option>
+        </select>
+        <select v-model="filterYear"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="">All Years</option>
+          <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+        </select>
+      </AppFilterBar>
+
+      <!-- Table -->
+      <AppTable :is-empty="displayed.length === 0" :skeleton-cols="canManage ? 7 : 5">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
+            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Reference No.</th>
+            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Issued</th>
+            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Read</th>
+            <th class="px-3 py-3"></th>
+          </tr>
+        </template>
+
+        <tr v-for="i in displayed" :key="i.id"
+          class="hover:bg-slate-50/60 cursor-pointer"
+          @click="router.visit(route('km.show', i.id))">
+          <td class="px-4 py-3">
+            <AppBadge :color="categoryBadgeColor(i.category_code)">{{ i.category?.label ?? i.category_code }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 max-w-[260px]">
+            <div class="flex items-center gap-2">
+              <span v-if="!i.is_acknowledged" class="inline-block w-2 h-2 rounded-full bg-danger-600 shrink-0"></span>
+              <p class="text-sm font-medium text-slate-800 truncate">{{ i.title }}</p>
+              <LockClosedIcon v-if="canManage && i.recipient_type !== 'all'" class="h-3.5 w-3.5 text-slate-400 shrink-0" title="Restricted" />
+            </div>
+            <p class="text-xs text-slate-400 truncate">{{ fmtSize(i.file_size) }}</p>
+          </td>
+          <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-600 font-mono">{{ i.reference_no ?? '—' }}</td>
+          <td class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">{{ fmtDate(i.issued_date) }}</td>
+          <td v-if="canManage" class="hidden md:table-cell px-4 py-3">
+            <AppBadge :color="statusBadgeColor(i.status)" class="capitalize">{{ i.status }}</AppBadge>
+          </td>
+          <td v-if="canManage" class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">
+            {{ i.acknowledgments_count }}/{{ readDenominator(i) }}
+          </td>
+          <td class="px-3 py-3 text-right">
+            <span class="text-indigo-600 text-xs font-medium">View →</span>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="i in displayed" :key="i.id" class="p-4 space-y-2 cursor-pointer"
+            @click="router.visit(route('km.show', i.id))">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <span v-if="!i.is_acknowledged" class="inline-block w-2 h-2 rounded-full bg-danger-600 shrink-0"></span>
+                <p class="text-sm font-medium text-slate-800 truncate">{{ i.title }}</p>
+                <LockClosedIcon v-if="canManage && i.recipient_type !== 'all'" class="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              </div>
+              <AppBadge :color="categoryBadgeColor(i.category_code)">{{ i.category?.label ?? i.category_code }}</AppBadge>
+            </div>
+            <p class="text-xs text-slate-500">{{ i.reference_no ?? '—' }} &middot; {{ fmtDate(i.issued_date) }}</p>
+            <div v-if="canManage" class="flex items-center justify-between text-xs text-slate-500">
+              <AppBadge :color="statusBadgeColor(i.status)" class="capitalize">{{ i.status }}</AppBadge>
+              <span>{{ i.acknowledgments_count }}/{{ readDenominator(i) }} read</span>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No documents found" subtitle="Try adjusting your search or filters." />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
+            @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
+        </template>
+      </AppTable>
+
+    </div>
+
+    <!-- Manage Categories Modal -->
+    <Teleport to="body">
+      <div v-if="showCatModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+            <h3 class="font-semibold text-slate-800">Manage Categories</h3>
+            <button @click="closeCatModal" class="text-slate-400 hover:text-slate-600">
+              <XMarkIcon class="h-5 w-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="overflow-y-auto flex-1 px-5 py-4 space-y-1">
+            <div v-for="cat in allCategories" :key="cat.code"
+              class="rounded-lg border border-slate-200 px-3 py-2.5">
+
+              <!-- View row -->
+              <div v-if="editingCode !== cat.code" class="flex items-center gap-3">
+                <AppBadge :color="categoryBadgeColor(cat.code)" class="shrink-0">{{ cat.code }}</AppBadge>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-slate-800 truncate">{{ cat.label }}</p>
+                  <p v-if="cat.description" class="text-xs text-slate-400 truncate">{{ cat.description }}</p>
+                </div>
+                <span v-if="!cat.is_active"
+                  class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 border border-slate-200 rounded px-1.5 py-0.5 shrink-0">
+                  Inactive
+                </span>
+                <button @click="startEdit(cat)" class="text-slate-400 hover:text-indigo-600 shrink-0">
+                  <PencilIcon class="h-4 w-4" />
+                </button>
+              </div>
+
+              <!-- Edit row -->
+              <div v-else class="space-y-2">
+                <div class="flex items-center gap-2 mb-1">
+                  <AppBadge :color="categoryBadgeColor(cat.code)">{{ cat.code }}</AppBadge>
+                  <span class="text-xs text-slate-400">Code is permanent</span>
+                </div>
+                <AppInput v-model="editForm.label" placeholder="Label" :error="editForm.errors.label" />
+                <AppInput v-model="editForm.description" placeholder="Description (optional)" />
+                <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input type="checkbox" v-model="editForm.is_active" class="rounded" />
+                  Active (visible in dropdowns)
+                </label>
+                <div class="flex gap-2 pt-1">
+                  <AppButton size="sm" :disabled="editForm.processing" @click="saveEdit(cat.code)">
+                    <CheckIcon class="h-3.5 w-3.5" /> Save
+                  </AppButton>
+                  <AppButton size="sm" variant="secondary" @click="cancelEdit">Cancel</AppButton>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add new category -->
+          <div class="border-t border-slate-200 px-5 py-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add New Category</p>
+            <div class="flex gap-2 mb-2">
+              <input v-model="addForm.code" type="text" placeholder="Code (e.g. MC2)"
+                maxlength="10"
+                @input="addForm.code = addForm.code.toUpperCase()"
+                class="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
+              <div class="flex-1">
+                <AppInput v-model="addForm.label" placeholder="Label" />
+              </div>
+            </div>
+            <AppInput v-model="addForm.description" placeholder="Description (optional)" />
+            <p v-if="addForm.errors.code" class="text-xs text-danger-600 mt-1 mb-1">{{ addForm.errors.code }}</p>
+            <p v-if="addForm.errors.label" class="text-xs text-danger-600 mb-1">{{ addForm.errors.label }}</p>
+            <AppButton class="mt-2" :disabled="addForm.processing || !addForm.code || !addForm.label" @click="submitAdd">
+              <PlusIcon class="h-4 w-4" /> Add Category
+            </AppButton>
+          </div>
+
+        </div>
+      </div>
+    </Teleport>
+
+  </AdminLayout>
+</template>
+
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Head, router, usePage, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import FlashMessage from '@/Components/FlashMessage.vue'
-import PaginationControl from '@/Components/PaginationControl.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppInput from '@/Components/AppInput.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
 import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import {
-  PlusIcon, MagnifyingGlassIcon, LockClosedIcon, Cog6ToothIcon, XMarkIcon, PencilIcon, CheckIcon,
+  PlusIcon, MagnifyingGlassIcon, LockClosedIcon, Cog6ToothIcon, XMarkIcon, PencilIcon, CheckIcon, CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const page = usePage()
@@ -43,23 +250,29 @@ watch(search, (val) => {
   }, 400)
 })
 
-const categoryColors = {
-  MEMO:  'bg-violet-100 text-violet-700',
-  MC:    'bg-indigo-100 text-indigo-700',
-  OO:    'bg-cyan-100 text-cyan-700',
-  SO:    'bg-blue-100 text-blue-700',
-  AO:    'bg-amber-100 text-amber-700',
-  EO:    'bg-rose-100 text-rose-700',
-  BR:    'bg-emerald-100 text-emerald-700',
-  ADV:   'bg-sky-100 text-sky-700',
-  GUIDE: 'bg-teal-100 text-teal-700',
-  OTHER: 'bg-slate-100 text-slate-600',
+const categoryBadgeColors = {
+  MEMO:  'purple',
+  MC:    'indigo',
+  OO:    'blue',
+  SO:    'blue',
+  AO:    'amber',
+  EO:    'red',
+  BR:    'green',
+  ADV:   'blue',
+  GUIDE: 'orange',
+  OTHER: 'slate',
+}
+function categoryBadgeColor(code) {
+  return categoryBadgeColors[code] ?? categoryBadgeColors.OTHER
 }
 
-const statusCls = {
-  active:     'bg-emerald-100 text-emerald-700',
-  superseded: 'bg-amber-100 text-amber-700',
-  archived:   'bg-slate-100 text-slate-500',
+const statusBadgeColors = {
+  active:     'green',
+  superseded: 'amber',
+  archived:   'slate',
+}
+function statusBadgeColor(status) {
+  return statusBadgeColors[status] ?? 'slate'
 }
 
 const years = computed(() => {
@@ -129,202 +342,3 @@ function submitAdd() {
   })
 }
 </script>
-
-<template>
-  <Head title="Knowledge Management" />
-  <AdminLayout title="Knowledge Management">
-
-    <FlashMessage :success="flash.success" :error="flash.error" />
-
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-      <div>
-        <h2 class="text-xl font-semibold text-slate-800">Knowledge Management</h2>
-        <p class="text-xs text-slate-500 mt-0.5">
-          Searchable repository of memoranda, orders, and other issuances from the Office of the Executive Director
-        </p>
-      </div>
-      <div v-if="canManage" class="flex items-center gap-2">
-        <button @click="openCatModal"
-          class="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg bg-white hover:bg-slate-50">
-          <Cog6ToothIcon class="h-4 w-4" /> Categories
-        </button>
-        <a :href="route('km.create')"
-          class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-indigo-600 hover:bg-indigo-700">
-          <PlusIcon class="h-4 w-4" /> Upload Document
-        </a>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="flex flex-col sm:flex-row gap-2 mb-4">
-      <div class="relative flex-1">
-        <MagnifyingGlassIcon class="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-        <input v-model="search" type="text" placeholder="Search title, reference no., description…"
-          class="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      </div>
-      <select v-model="filterCategory"
-        class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">All Categories</option>
-        <option v-for="c in categories" :key="c.code" :value="c.code">{{ c.label }}</option>
-      </select>
-      <select v-model="filterYear"
-        class="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">All Years</option>
-        <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
-      </select>
-    </div>
-
-    <!-- Table -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <EmptyState v-if="displayed.length === 0"
-        title="No documents found"
-        subtitle="Try adjusting your search or filters." />
-      <table v-else class="w-full text-sm">
-        <thead class="bg-slate-50 border-b border-slate-200">
-          <tr>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
-            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Title</th>
-            <th class="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Reference No.</th>
-            <th class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Issued</th>
-            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-            <th v-if="canManage" class="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Read</th>
-            <th class="px-3 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <tr v-for="i in displayed" :key="i.id"
-            class="hover:bg-slate-50 transition-colors cursor-pointer"
-            @click="router.visit(route('km.show', i.id))">
-            <td class="px-4 py-3">
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                :class="categoryColors[i.category_code] ?? categoryColors.OTHER">
-                {{ i.category?.label ?? i.category_code }}
-              </span>
-            </td>
-            <td class="px-4 py-3 max-w-[260px]">
-              <div class="flex items-center gap-2">
-                <span v-if="!i.is_acknowledged" class="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
-                <p class="text-sm font-medium text-slate-800 truncate">{{ i.title }}</p>
-                <LockClosedIcon v-if="canManage && i.recipient_type !== 'all'" class="h-3.5 w-3.5 text-slate-400 shrink-0" title="Restricted" />
-              </div>
-              <p class="text-xs text-slate-400 truncate">{{ fmtSize(i.file_size) }}</p>
-            </td>
-            <td class="hidden lg:table-cell px-4 py-3 text-xs text-slate-600 font-mono">{{ i.reference_no ?? '—' }}</td>
-            <td class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">{{ fmtDate(i.issued_date) }}</td>
-            <td v-if="canManage" class="hidden md:table-cell px-4 py-3">
-              <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize"
-                :class="statusCls[i.status] ?? 'bg-slate-100 text-slate-600'">
-                {{ i.status }}
-              </span>
-            </td>
-            <td v-if="canManage" class="hidden md:table-cell px-4 py-3 text-xs text-slate-500">
-              {{ i.acknowledgments_count }}/{{ readDenominator(i) }}
-            </td>
-            <td class="px-3 py-3 text-right">
-              <span class="text-indigo-600 text-xs font-medium">View →</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <PaginationControl
-        :current-page="currentPage" :total-pages="totalPages" :total="filtered.length"
-        @prev="currentPage--" @next="currentPage++" @page="currentPage = $event" />
-    </div>
-
-    <!-- Manage Categories Modal -->
-    <Teleport to="body">
-      <div v-if="showCatModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
-
-          <!-- Header -->
-          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-            <h3 class="font-semibold text-slate-800">Manage Categories</h3>
-            <button @click="closeCatModal" class="text-slate-400 hover:text-slate-600">
-              <XMarkIcon class="h-5 w-5" />
-            </button>
-          </div>
-
-          <!-- Body -->
-          <div class="overflow-y-auto flex-1 px-5 py-4 space-y-1">
-            <div v-for="cat in allCategories" :key="cat.code"
-              class="rounded-lg border border-slate-200 px-3 py-2.5">
-
-              <!-- View row -->
-              <div v-if="editingCode !== cat.code" class="flex items-center gap-3">
-                <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0"
-                  :class="categoryColors[cat.code] ?? categoryColors.OTHER">
-                  {{ cat.code }}
-                </span>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-slate-800 truncate">{{ cat.label }}</p>
-                  <p v-if="cat.description" class="text-xs text-slate-400 truncate">{{ cat.description }}</p>
-                </div>
-                <span v-if="!cat.is_active"
-                  class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 border border-slate-200 rounded px-1.5 py-0.5 shrink-0">
-                  Inactive
-                </span>
-                <button @click="startEdit(cat)" class="text-slate-400 hover:text-indigo-600 shrink-0">
-                  <PencilIcon class="h-4 w-4" />
-                </button>
-              </div>
-
-              <!-- Edit row -->
-              <div v-else class="space-y-2">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                    :class="categoryColors[cat.code] ?? categoryColors.OTHER">
-                    {{ cat.code }}
-                  </span>
-                  <span class="text-xs text-slate-400">Code is permanent</span>
-                </div>
-                <input v-model="editForm.label" type="text" placeholder="Label"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <input v-model="editForm.description" type="text" placeholder="Description (optional)"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                  <input type="checkbox" v-model="editForm.is_active" class="rounded" />
-                  Active (visible in dropdowns)
-                </label>
-                <p v-if="editForm.errors.label" class="text-xs text-red-500">{{ editForm.errors.label }}</p>
-                <div class="flex gap-2 pt-1">
-                  <button @click="saveEdit(cat.code)" :disabled="editForm.processing"
-                    class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
-                    <CheckIcon class="h-3.5 w-3.5" /> Save
-                  </button>
-                  <button @click="cancelEdit"
-                    class="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Add new category -->
-          <div class="border-t border-slate-200 px-5 py-4">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Add New Category</p>
-            <div class="flex gap-2 mb-2">
-              <input v-model="addForm.code" type="text" placeholder="Code (e.g. MC2)"
-                maxlength="10"
-                @input="addForm.code = addForm.code.toUpperCase()"
-                class="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
-              <input v-model="addForm.label" type="text" placeholder="Label"
-                class="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <input v-model="addForm.description" type="text" placeholder="Description (optional)"
-              class="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-2" />
-            <p v-if="addForm.errors.code"  class="text-xs text-red-500 mb-1">{{ addForm.errors.code }}</p>
-            <p v-if="addForm.errors.label" class="text-xs text-red-500 mb-1">{{ addForm.errors.label }}</p>
-            <button @click="submitAdd" :disabled="addForm.processing || !addForm.code || !addForm.label"
-              class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50">
-              <PlusIcon class="h-4 w-4" /> Add Category
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </Teleport>
-
-  </AdminLayout>
-</template>

@@ -1,11 +1,16 @@
 <script setup>
 import { Head } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
+import AppButton from "@/Components/AppButton.vue";
+import AppCard from "@/Components/AppCard.vue";
+import AppBadge from "@/Components/AppBadge.vue";
+import AppModal from "@/Components/AppModal.vue";
+import AppInput from "@/Components/AppInput.vue";
+import AppTextarea from "@/Components/AppTextarea.vue";
 import { ArrowLeftIcon } from "@heroicons/vue/24/outline";
 import { ref, computed } from "vue";
 import Swal from "sweetalert2";
 import { useSubmit } from "@/Composables/useSubmit";
-import { ipcrStatusClass } from "@/Composables/ipcrStatusClass";
 import { ipcrAdjectivalRating } from "@/Composables/ipcrAdjectivalRating";
 
 const props = defineProps({
@@ -353,8 +358,24 @@ function formatAccDate(d) {
   return new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
 }
 
-// ---------- Status badge ----------
-const statusBadgeClass = ipcrStatusClass;
+// ---------- Status badge color mapping (AppBadge) ----------
+const ipcrBadgeColor = (status) => {
+  const map = {
+    "New Target":                "blue",
+    "For Review":                 "amber",
+    "Targets Approved":           "green",
+    "Submitted for Rating":       "orange",
+    "Rated & For PMT Review":     "purple",
+    "Submitted to PMT":           "purple",
+    "PMT Returned for Revision":  "red",
+    "Submitted to HR":            "blue",
+    "Approved by PMT":            "green",
+    "Director Signed":            "green",
+    "Returned for Revision":      "red",
+    "Rejected":                   "red",
+  };
+  return map[status] ?? "slate";
+};
 
 const printIPCR = () => window.print();
 
@@ -408,67 +429,54 @@ const approveTargets = () => {
       <!-- Page header -->
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div class="flex items-center gap-3">
-          <button @click="$inertia.get(route('employee-ipcr.index'))"
-            class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+          <AppButton as="link" variant="ghost" size="sm" :href="route('employee-ipcr.index')">
             <ArrowLeftIcon class="w-4 h-4" /> Back to IPCR List
-          </button>
+          </AppButton>
         </div>
       </div>
 
       <!-- IPCR Details Card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
+      <AppCard :padded="false">
         <div class="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 class="text-xl font-semibold text-slate-800">{{ ipcr.title }}</h1>
             <p class="text-sm text-slate-500 mt-0.5">Rating Period: {{ ipcr.rating_period }}</p>
           </div>
           <div class="flex items-center gap-2">
-            <span :class="statusBadgeClass(ipcr.status)"
-              class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium">
-              {{ ipcr.status }}
-            </span>
+            <AppBadge :color="ipcrBadgeColor(ipcr.status)">{{ ipcr.status }}</AppBadge>
           </div>
         </div>
         <div class="p-5 flex flex-wrap gap-2">
           <template v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'">
-            <button @click="saveRatings" :disabled="isSubmitting"
-              class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            <AppButton :loading="isSubmitting" :disabled="isSubmitting" @click="saveRatings">
               {{ isSubmitting ? 'Processing…' : 'Save Ratings' }}
-            </button>
+            </AppButton>
             <span v-if="!allPlansRated"
-              class="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              class="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium bg-warning-50 text-warning-700 border border-warning-100">
               ⚠ {{ unratedPlans.length }} plan(s) still awaiting rating
             </span>
           </template>
-          <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="approveTargets"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          <AppButton v-if="canManageIpcr && ipcr.status === 'For Review'" :loading="isSubmitting" :disabled="isSubmitting" @click="approveTargets">
             {{ isSubmitting ? 'Processing…' : 'Approve Targets' }}
-          </button>
-          <button v-if="canManageIpcr && ipcr.status === 'For Review'" @click="disapproveTargets"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          </AppButton>
+          <AppButton v-if="canManageIpcr && ipcr.status === 'For Review'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="disapproveTargets">
             {{ isSubmitting ? 'Processing…' : 'Return for Revision' }}
-          </button>
-          <button v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" @click="returnAccomplishment"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+          </AppButton>
+          <AppButton v-if="canManageIpcr && ipcr.status === 'Submitted for Rating'" variant="danger" :loading="isSubmitting" :disabled="isSubmitting" @click="returnAccomplishment">
             {{ isSubmitting ? 'Processing…' : 'Return Accomplishment for Revision' }}
-          </button>
+          </AppButton>
           <span v-if="canManageIpcr && ipcr.status === 'Rated & For PMT Review'"
             class="inline-flex items-center text-sm text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-2 rounded-lg">
             Rated — use the <strong class="mx-1">Division index page</strong> to batch-submit to HR.
           </span>
-          <button v-if="canManageIpcr && ipcr.status === 'PMT Returned for Revision'" @click="showReturnFromPMTModal = true"
-            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <AppButton v-if="canManageIpcr && ipcr.status === 'PMT Returned for Revision'" variant="danger" @click="showReturnFromPMTModal = true">
             Return to Employee
-          </button>
-          <button v-if="isAtRatedStage" @click="printIPCR"
-            class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          </AppButton>
+          <AppButton v-if="isAtRatedStage" variant="secondary" @click="printIPCR">
             Print / View PDF
-          </button>
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Plans Section -->
       <div class="bg-white rounded-xl border border-slate-100 shadow-sm" id="ipcr-printable">
@@ -590,9 +598,9 @@ const approveTargets = () => {
                           <div>{{ piPlans[0].success_indicator }}</div>
                           <div class="text-xs text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
                             <span>Rater: {{ piPlans[0].rated_by || 'Division Chief' }}<template v-if="piPlans[0].offices?.length"> — {{ piPlans[0].offices.map(o => o.name).join(', ') }}</template><template v-if="piPlans[0].committees?.length"> — {{ piPlans[0].committees.map(c => c.name).join(', ') }}</template><template v-if="piPlans[0].special_assignments?.length"> — {{ piPlans[0].special_assignments.map(a => a.name).join(', ') }}</template></span>
-                            <span :class="['inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold', ratingStatusChip(piPlans[0]).cls]">
+                            <AppBadge :color="ratingStatusChip(piPlans[0]).rated ? 'green' : 'amber'">
                               {{ ratingStatusChip(piPlans[0]).label }}
-                            </span>
+                            </AppBadge>
                           </div>
                         </td>
 

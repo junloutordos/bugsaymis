@@ -1,25 +1,29 @@
 <script setup>
-import { Head, usePage, useForm } from "@inertiajs/vue3";
+import { Head, usePage, useForm, router } from "@inertiajs/vue3";
 import AdminLayout from "@/Layouts/AdminLayout.vue";
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
-import { PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/vue/24/outline";
+import { ref, computed } from "vue";
+import { PlusIcon, PencilSquareIcon, TrashIcon } from "@heroicons/vue/24/outline";
 import Swal from 'sweetalert2'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppIconButton from '@/Components/AppIconButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import AppModal from '@/Components/AppModal.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
+import { confirmDelete } from '@/Composables/useConfirm.js'
 
 const props = defineProps({ facilities: Array, buildings: Array });
 const page = usePage();
+const isAdmin = computed(() => page.props.auth?.user?.role?.name === 'Administrator')
 
 const facilitiesList = ref(props.facilities || [])
 const searchQuery = ref('')
 const appliedSearchQuery = ref('')
 const currentPage = ref(1)
 const perPage = 10
-
-// responsive: track window width to switch to card layout on small screens
-const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
-const isMobile = computed(() => windowWidth.value < 768)
-const handleResize = () => { windowWidth.value = window.innerWidth }
-onMounted(() => { window.addEventListener('resize', handleResize) })
-onBeforeUnmount(() => { window.removeEventListener('resize', handleResize) })
 
 const filteredFacilities = computed(() => {
   const q = appliedSearchQuery.value.trim().toLowerCase()
@@ -42,6 +46,16 @@ function clearFilters() {
   searchQuery.value = ''
   appliedSearchQuery.value = ''
   currentPage.value = 1
+}
+
+function statusColor(status) {
+  const map = {
+    'Available':          'green',
+    'Reserved':           'blue',
+    'Maintenance':        'amber',
+    'Under Maintenance':  'amber',
+  }
+  return map[status] ?? 'slate'
 }
 
 const form = useForm({ name: '', location: '', capacity: '', description: '' });
@@ -84,22 +98,11 @@ const submit = () => {
   }
 };
 
-const destroy = (f) => {
-  Swal.fire({
-    title: 'Delete this facility?',
-    text: 'This action cannot be undone.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'Yes, delete',
-    cancelButtonText: 'Cancel'
-  }).then((res) => {
-    if (!res.isConfirmed) return
-    import('@inertiajs/vue3').then(({ router }) => {
-      router.delete(route('facilities.destroy', f.id), {
-        onSuccess: () => { Swal.fire({ icon: 'success', title: 'Facility deleted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
-        onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors || {}).flat().join('\n') }) }
-      })
-    })
+const destroy = async (f) => {
+  if (!(await confirmDelete('This action cannot be undone.'))) return
+  router.delete(route('facilities.destroy', f.id), {
+    onSuccess: () => { Swal.fire({ icon: 'success', title: 'Facility deleted', timer: 1200, showConfirmButton: false }).then(() => { window.location.reload() }) },
+    onError: (errors) => { Swal.fire({ icon: 'error', title: 'Failed to delete', text: Object.values(errors || {}).flat().join('\n') }) }
   })
 };
 </script>
@@ -107,153 +110,133 @@ const destroy = (f) => {
 <template>
   <Head title="Facilities" />
   <AdminLayout title="Facilities">
-    <div>
-      <!-- Page header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-800">Facilities</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Manage venues and facilities</p>
-        </div>
-        <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openCreate"
-                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          + New Facility
-        </button>
-      </div>
+    <div class="space-y-5">
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <!-- Search -->
-        <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+      <AppPageHeader title="Facilities" subtitle="Manage venues and facilities">
+        <template #actions>
+          <AppButton v-if="isAdmin" @click="openCreate">
+            <PlusIcon class="h-4 w-4" />
+            New Facility
+          </AppButton>
+        </template>
+      </AppPageHeader>
+
+      <!-- Filters -->
+      <AppFilterBar>
+        <div class="relative w-full sm:w-72">
           <input
             v-model="searchQuery"
             type="text"
             placeholder="Search facilities…"
             @keydown.enter.prevent="applyFilters"
-            class="w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400"
           />
-          <button @click="applyFilters"
-                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Search
-          </button>
-          <button v-if="searchQuery" @click="clearFilters"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            Clear
-          </button>
         </div>
+        <template #actions>
+          <AppButton size="sm" @click="applyFilters">Search</AppButton>
+          <AppButton v-if="searchQuery" size="sm" variant="secondary" @click="clearFilters">Clear</AppButton>
+        </template>
+      </AppFilterBar>
 
-        <!-- Desktop table -->
-        <div v-if="!isMobile" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Capacity</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="f in filteredFacilities" :key="f.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ f.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700 font-medium">{{ f.name }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ f.location ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ f.capacity ?? '—' }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">{{ f.status }}</span>
-                </td>
-                <td class="px-4 py-3 text-center">
-                  <div class="flex items-center gap-1.5 justify-center">
-                    <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openEdit(f)"
-                            class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" title="Edit">
-                      <PencilSquareIcon class="w-4 h-4" />
-                    </button>
-                    <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="destroy(f)"
-                            class="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-600 transition-colors" title="Delete">
-                      <TrashIcon class="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="filteredFacilities.length === 0">
-                <td colspan="6" class="py-16 text-center text-slate-400 text-sm">No facilities found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table -->
+      <AppTable :is-empty="!filteredFacilities.length" :skeleton-cols="6">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Name</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Location</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Capacity</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Status</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Action</th>
+          </tr>
+        </template>
 
-        <!-- Mobile card list -->
-        <div v-else class="p-4 space-y-3">
-          <div v-for="f in filteredFacilities" :key="f.id" class="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
-            <div class="flex justify-between items-start">
+        <tr v-for="f in filteredFacilities" :key="f.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ f.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700 font-medium">{{ f.name }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ f.location ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ f.capacity ?? '—' }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <AppBadge :color="statusColor(f.status)">{{ f.status }}</AppBadge>
+          </td>
+          <td class="px-4 py-3 text-center">
+            <div class="flex items-center gap-1.5 justify-center">
+              <AppIconButton v-if="isAdmin" label="Edit facility" @click="openEdit(f)">
+                <PencilSquareIcon class="w-4 h-4" />
+              </AppIconButton>
+              <AppIconButton v-if="isAdmin" label="Delete facility" variant="danger" @click="destroy(f)">
+                <TrashIcon class="w-4 h-4" />
+              </AppIconButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="f in filteredFacilities" :key="f.id" class="p-4 space-y-2">
+            <div class="flex justify-between items-start gap-2">
               <div>
                 <p class="text-xs text-slate-500">ID: {{ f.id }}</p>
                 <p class="text-sm font-semibold text-slate-800 mt-0.5">{{ f.name }}</p>
                 <p class="text-xs text-slate-600 mt-1">Location: {{ f.location ?? '—' }}</p>
                 <p class="text-xs text-slate-600">Capacity: {{ f.capacity ?? '—' }}</p>
-                <p class="text-xs text-slate-600">Status: {{ f.status ?? '—' }}</p>
               </div>
-              <div class="flex flex-col items-end gap-2">
-                <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="openEdit(f)"
-                        class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Edit</button>
-                <button v-if="page.props.auth?.user?.role?.name === 'Administrator'" @click.prevent="destroy(f)"
-                        class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">Delete</button>
-              </div>
+              <AppBadge :color="statusColor(f.status)">{{ f.status ?? '—' }}</AppBadge>
+            </div>
+            <div v-if="isAdmin" class="flex gap-2 justify-end pt-1">
+              <AppButton size="sm" variant="ghost" @click="openEdit(f)">Edit</AppButton>
+              <AppButton size="sm" variant="danger" @click="destroy(f)">Delete</AppButton>
             </div>
           </div>
-          <div v-if="filteredFacilities.length === 0" class="py-16 text-center text-slate-400 text-sm">No facilities found.</div>
-        </div>
+        </template>
 
-        <PaginationControl
-          :current-page="currentPage"
-          :total-pages="totalPages"
-          @prev="currentPage--"
-          @next="currentPage++"
-          @page="currentPage = $event"
-        />
-      </div>
+        <template #empty>
+          <EmptyState title="No facilities found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :current-page="currentPage"
+            :total-pages="totalPages"
+            @prev="currentPage--"
+            @next="currentPage++"
+            @page="currentPage = $event"
+          />
+        </template>
+      </AppTable>
+
     </div>
 
     <!-- Add / Edit Modal -->
-    <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-slate-800">{{ editing ? 'Edit Facility' : 'New Facility' }}</h2>
-          <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors" @click="showForm = false">
-            <XMarkIcon class="w-4 h-4" />
-          </button>
+    <AppModal :show="showForm" :title="editing ? 'Edit Facility' : 'New Facility'" @close="showForm = false">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
+          <input v-model="form.name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <p v-if="form.errors.name" class="text-danger-600 text-xs mt-1">{{ form.errors.name }}</p>
         </div>
-        <div class="px-6 py-5 space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Name</label>
-            <input v-model="form.name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            <p v-if="form.errors.name" class="text-red-600 text-xs mt-1">{{ form.errors.name }}</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Location</label>
-            <select v-model="form.location" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
-              <option value="">Select building</option>
-              <option v-for="b in props.buildings" :key="b.id" :value="b.name">{{ b.name }}</option>
-            </select>
-            <p v-if="form.errors.location" class="text-red-600 text-xs mt-1">{{ form.errors.location }}</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
-            <input type="number" v-model.number="form.capacity" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            <p v-if="form.errors.capacity" class="text-red-600 text-xs mt-1">{{ form.errors.capacity }}</p>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
-            <input v-model="form.description" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
-            <p v-if="form.errors.description" class="text-red-600 text-xs mt-1">{{ form.errors.description }}</p>
-          </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Location</label>
+          <select v-model="form.location" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400">
+            <option value="">Select building</option>
+            <option v-for="b in props.buildings" :key="b.id" :value="b.name">{{ b.name }}</option>
+          </select>
+          <p v-if="form.errors.location" class="text-danger-600 text-xs mt-1">{{ form.errors.location }}</p>
         </div>
-        <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-          <button @click.prevent="showForm = false" class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">Cancel</button>
-          <button @click.prevent="submit" :disabled="form.processing" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-60">Save</button>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Capacity</label>
+          <input type="number" v-model.number="form.capacity" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <p v-if="form.errors.capacity" class="text-danger-600 text-xs mt-1">{{ form.errors.capacity }}</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Description</label>
+          <input v-model="form.description" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
+          <p v-if="form.errors.description" class="text-danger-600 text-xs mt-1">{{ form.errors.description }}</p>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <AppButton variant="secondary" @click="showForm = false">Cancel</AppButton>
+        <AppButton :loading="form.processing" @click="submit">Save</AppButton>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>

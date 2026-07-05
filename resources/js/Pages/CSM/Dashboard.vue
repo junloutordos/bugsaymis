@@ -1,5 +1,8 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppCard from '@/Components/AppCard.vue'
 import { Head, router } from '@inertiajs/vue3'
 import { computed } from 'vue'
 import {
@@ -127,17 +130,11 @@ const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 
   <AdminLayout title="CSM Feedback Dashboard">
     <div class="space-y-6">
 
-      <!-- Header -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-bold text-slate-800">Client Satisfaction Dashboard</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Aggregated feedback from all General Services modules</p>
-        </div>
-        <a :href="route('csm.list')"
-          class="inline-flex items-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          View All Feedback →
-        </a>
-      </div>
+      <AppPageHeader title="Client Satisfaction Dashboard" subtitle="Aggregated feedback from all General Services modules">
+        <template #actions>
+          <AppButton as="link" variant="secondary" :href="route('csm.list')">View All Feedback →</AppButton>
+        </template>
+      </AppPageHeader>
 
       <!-- KPI Cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -146,15 +143,15 @@ const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 
           <div class="text-2xl font-bold text-indigo-700">{{ total }}</div>
           <div class="text-xs text-indigo-500 font-semibold">Total Responses</div>
         </div>
-        <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
-          <ChatBubbleLeftRightIcon class="h-5 w-5 text-emerald-500 mx-auto mb-1" />
-          <div class="text-2xl font-bold text-emerald-700">{{ thisMonth }}</div>
-          <div class="text-xs text-emerald-500 font-semibold">This Month</div>
+        <div class="bg-success-50 border border-success-100 rounded-xl p-4 text-center">
+          <ChatBubbleLeftRightIcon class="h-5 w-5 text-success-600 mx-auto mb-1" />
+          <div class="text-2xl font-bold text-success-700">{{ thisMonth }}</div>
+          <div class="text-xs text-success-600 font-semibold">This Month</div>
         </div>
-        <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center">
-          <StarIcon class="h-5 w-5 text-amber-500 mx-auto mb-1" />
-          <div class="text-2xl font-bold text-amber-700">{{ overallAvg }} <span class="text-base">/ 5</span></div>
-          <div class="text-xs text-amber-500 font-semibold">Avg SQD Score</div>
+        <div class="bg-warning-50 border border-warning-100 rounded-xl p-4 text-center">
+          <StarIcon class="h-5 w-5 text-warning-600 mx-auto mb-1" />
+          <div class="text-2xl font-bold text-warning-700">{{ overallAvg }} <span class="text-base">/ 5</span></div>
+          <div class="text-xs text-warning-600 font-semibold">Avg SQD Score</div>
         </div>
         <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center">
           <UserGroupIcon class="h-5 w-5 text-slate-400 mx-auto mb-1" />
@@ -166,45 +163,38 @@ const starRating = computed(() => Math.round((props.overallAvg / 5) * 5 * 10) / 
       <!-- Charts row 1 -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <!-- Module breakdown -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 class="text-sm font-semibold text-slate-700 mb-3">Responses by Module</h3>
+        <AppCard title="Responses by Module">
           <div style="height:200px"><Doughnut :data="moduleChart" :options="donutOpts" /></div>
-        </div>
+        </AppCard>
 
         <!-- Monthly trend -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 lg:col-span-2">
-          <h3 class="text-sm font-semibold text-slate-700 mb-3">Monthly Trend — Last 12 Months</h3>
+        <AppCard title="Monthly Trend — Last 12 Months" class="lg:col-span-2">
           <div style="height:200px"><Line :data="trendChart" :options="lineOpts" /></div>
-        </div>
+        </AppCard>
       </div>
 
       <!-- Charts row 2 -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- SQD scores -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 class="text-sm font-semibold text-slate-700 mb-1">SQD Avg Scores per Dimension</h3>
-          <p class="text-xs text-slate-400 mb-3">Scale 1–5 (N/A excluded)</p>
+        <AppCard title="SQD Avg Scores per Dimension" subtitle="Scale 1–5 (N/A excluded)">
           <div style="height:260px"><Bar :data="sqdChart" :options="barOpts" /></div>
-        </div>
+        </AppCard>
 
         <!-- Adjectival + client type -->
         <div class="space-y-4">
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Adjectival Distribution</h3>
+          <AppCard title="Adjectival Distribution">
             <div style="height:140px"><Doughnut :data="adjectivalChart" :options="donutOpts" /></div>
-          </div>
-          <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Client Type</h3>
+          </AppCard>
+          <AppCard title="Client Type">
             <div style="height:120px"><Doughnut :data="clientTypeChart" :options="donutOpts" /></div>
-          </div>
+          </AppCard>
         </div>
       </div>
 
       <!-- CC1 awareness -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-        <h3 class="text-sm font-semibold text-slate-700 mb-3">Citizen's Charter Awareness (CC1)</h3>
+      <AppCard title="Citizen's Charter Awareness (CC1)">
         <div style="height:180px"><Doughnut :data="cc1Chart" :options="donutOpts" /></div>
-      </div>
+      </AppCard>
 
     </div>
   </AdminLayout>

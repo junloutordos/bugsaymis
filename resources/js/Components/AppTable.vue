@@ -6,10 +6,13 @@
  * semantics, loading skeleton, and optional empty/footer slots.
  *
  * Slots:
- *   head    — <tr> with <th> cells (required)
- *   default — one or more <tr> rows (required)
- *   empty   — shown when isEmpty=true; defaults to a centred "No records" message
- *   footer  — bottom area (pagination, totals, etc.)
+ *   head       — <tr> with <th> cells (required)
+ *   default    — one or more <tr> rows (required)
+ *   empty      — shown when isEmpty=true; defaults to a centred "No records" message
+ *   footer     — bottom area (pagination, totals, etc.)
+ *   mobileCard — optional; when provided, the <table> is hidden below the `sm`
+ *                breakpoint and this slot (a stack of cards) renders instead,
+ *                so the table stays desktop-only while mobile gets a card list.
  *
  * Props:
  *   loading      — show shimmer skeleton rows instead of slot content
@@ -54,7 +57,7 @@ const widthFor = (i) => skeletonWidths[i % skeletonWidths.length]
   <div :class="card ? 'bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden' : ''">
 
     <!-- Horizontal scroll container -->
-    <div class="overflow-x-auto">
+    <div :class="['overflow-x-auto', $slots.mobileCard ? 'hidden sm:block' : '']">
       <table class="min-w-full divide-y divide-slate-100 text-sm">
 
         <!-- Header -->
@@ -89,6 +92,23 @@ const widthFor = (i) => skeletonWidths[i % skeletonWidths.length]
         </tbody>
 
       </table>
+    </div>
+
+    <!-- Mobile card list (opt-in via the mobileCard slot) -->
+    <div v-if="$slots.mobileCard" class="sm:hidden divide-y divide-slate-100 bg-white">
+      <div v-if="loading" class="p-4 space-y-4">
+        <div v-for="r in 4" :key="r" class="animate-pulse space-y-2">
+          <div class="h-3.5 w-2/3 rounded-full bg-slate-200" />
+          <div class="h-3 w-1/2 rounded-full bg-slate-200" />
+        </div>
+      </div>
+      <div v-else-if="isEmpty" class="py-14 text-center px-4">
+        <slot name="empty">
+          <InboxIcon class="h-10 w-10 mx-auto mb-3 text-slate-300" />
+          <p class="text-sm font-medium text-slate-500">No records found</p>
+        </slot>
+      </div>
+      <slot v-else name="mobileCard" />
     </div>
 
     <!-- Footer (pagination, totals, etc.) -->

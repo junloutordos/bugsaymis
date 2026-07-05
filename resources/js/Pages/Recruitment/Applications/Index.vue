@@ -1,7 +1,14 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { Head, router, usePage, Link } from '@inertiajs/vue3'
+import { Head, router, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppPageHeader from '@/Components/AppPageHeader.vue'
+import AppButton from '@/Components/AppButton.vue'
+import AppFilterBar from '@/Components/AppFilterBar.vue'
+import AppTable from '@/Components/AppTable.vue'
+import AppBadge from '@/Components/AppBadge.vue'
+import EmptyState from '@/Components/EmptyState.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import Swal from 'sweetalert2'
 
 const props = defineProps({
@@ -58,17 +65,17 @@ const goToPage = (p) => {
   })
 }
 
-// ── Stage colors ───────────────────────────────────────────────────────────────
+// ── Stage colors (AppBadge color keywords) ──────────────────────────────────────
 const stageColors = {
-  submitted:  'bg-gray-100 text-gray-600',
-  screening:  'bg-yellow-100 text-yellow-700',
-  exam:       'bg-orange-100 text-orange-700',
-  interview:  'bg-purple-100 text-purple-700',
-  ranking:    'bg-blue-100 text-blue-700',
-  selection:  'bg-indigo-100 text-indigo-700',
-  placement:  'bg-green-100 text-green-700',
-  rejected:   'bg-red-100 text-red-600',
-  withdrawn:  'bg-gray-100 text-gray-400',
+  submitted:  'slate',
+  screening:  'amber',
+  exam:       'orange',
+  interview:  'purple',
+  ranking:    'blue',
+  selection:  'indigo',
+  placement:  'green',
+  rejected:   'red',
+  withdrawn:  'slate',
 }
 
 // ── Quick reject ───────────────────────────────────────────────────────────────
@@ -107,23 +114,20 @@ const terminalStages = ['rejected', 'withdrawn', 'placement']
 <template>
   <Head title="Applications — Recruitment" />
   <AdminLayout title="Applications">
-    <div>
+    <div class="space-y-5">
+
+      <AppPageHeader title="Applications" :subtitle="`${applications.total ?? 0} total`" />
+
       <!-- Flash -->
-      <div v-if="page.props.flash?.success" class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm">
+      <div v-if="page.props.flash?.success" class="bg-success-50 border border-success-100 text-success-700 rounded-lg px-4 py-3 text-sm">
         {{ page.props.flash.success }}
       </div>
-      <div v-if="page.props.flash?.error" class="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm">
+      <div v-if="page.props.flash?.error" class="bg-danger-50 border border-danger-100 text-danger-600 rounded-lg px-4 py-3 text-sm">
         {{ page.props.flash.error }}
       </div>
 
-      <!-- Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 class="text-xl font-semibold text-slate-800">Applications</h1>
-        <span class="text-sm text-slate-500">{{ applications.total ?? 0 }} total</span>
-      </div>
-
       <!-- Filter bar -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mb-4 flex flex-wrap items-center gap-3">
+      <AppFilterBar>
         <div class="relative flex-1 min-w-[180px] sm:max-w-xs">
           <input v-model="search" type="text" placeholder="Search applicant name…"
                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400" />
@@ -137,81 +141,91 @@ const terminalStages = ['rejected', 'withdrawn', 'placement']
           <option value="">All Types</option>
           <option v-for="t in recruitmentTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
         </select>
-      </div>
+      </AppFilterBar>
 
-      <!-- Table card -->
-      <div class="bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="overflow-x-auto rounded-xl">
-          <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Applicant</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Position</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Applied</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rank</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Stage</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100">
-              <tr v-for="app in applications.data" :key="app.id" class="hover:bg-slate-50/60">
-                <td class="px-4 py-3 text-sm text-slate-700">{{ app.id }}</td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  <div class="font-medium text-slate-800">
-                    {{ app.applicant?.last_name }}, {{ app.applicant?.first_name }}
-                  </div>
-                  <div v-if="app.is_internal" class="text-xs text-indigo-500">Internal</div>
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  {{ app.job_vacancy?.job_item?.position_title ?? '—' }}
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">
-                  {{ app.job_vacancy?.job_item?.recruitment_type?.name ?? '—' }}
-                </td>
-                <td class="px-4 py-3 text-sm text-slate-700">{{ formatDateTime(app.created_at) }}</td>
-                <td class="px-4 py-3 text-center">
-                  <span v-if="app.ranking_summary?.rank" class="font-bold text-indigo-600">#{{ app.ranking_summary.rank }}</span>
-                  <span v-else class="text-slate-300">—</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize" :class="stageColors[app.current_stage]">
-                    {{ app.current_stage }}
-                  </span>
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-1 justify-center">
-                    <Link :href="route('recruitment.applications.show', app.id)"
-                          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                      View
-                    </Link>
-                    <button v-if="!terminalStages.includes(app.current_stage)"
-                            @click="quickReject(app)"
-                            class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                      Reject
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="applications.data?.length === 0">
-                <td colspan="8" class="py-16 text-center text-slate-400 text-sm">No applications found.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- Table -->
+      <AppTable :is-empty="!applications.data?.length" :skeleton-cols="8">
+        <template #head>
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">#</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Applicant</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Position</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Type</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Applied</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Rank</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Stage</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Actions</th>
+          </tr>
+        </template>
 
-        <!-- Pagination -->
-        <div v-if="applications.last_page > 1" class="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
-          <button @click="goToPage(applications.current_page - 1)"
-                  :disabled="applications.current_page === 1 || isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Prev</button>
-          <span>Page {{ applications.current_page }} of {{ applications.last_page }}</span>
-          <button @click="goToPage(applications.current_page + 1)"
-                  :disabled="applications.current_page === applications.last_page || isLoading"
-                  class="inline-flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-40">Next</button>
-        </div>
-      </div>
+        <tr v-for="app in applications.data" :key="app.id" class="hover:bg-slate-50/60">
+          <td class="px-4 py-3 text-sm text-slate-700">{{ app.id }}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            <div class="font-medium text-slate-800">
+              {{ app.applicant?.last_name }}, {{ app.applicant?.first_name }}
+            </div>
+            <div v-if="app.is_internal" class="text-xs text-indigo-500">Internal</div>
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            {{ app.job_vacancy?.job_item?.position_title ?? '—' }}
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">
+            {{ app.job_vacancy?.job_item?.recruitment_type?.name ?? '—' }}
+          </td>
+          <td class="px-4 py-3 text-sm text-slate-700">{{ formatDateTime(app.created_at) }}</td>
+          <td class="px-4 py-3 text-center">
+            <span v-if="app.ranking_summary?.rank" class="font-bold text-indigo-600">#{{ app.ranking_summary.rank }}</span>
+            <span v-else class="text-slate-300">—</span>
+          </td>
+          <td class="px-4 py-3">
+            <AppBadge :color="stageColors[app.current_stage] ?? 'slate'" class="capitalize">{{ app.current_stage }}</AppBadge>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex items-center gap-2 justify-center">
+              <AppButton as="link" size="sm" :href="route('recruitment.applications.show', app.id)">View</AppButton>
+              <AppButton v-if="!terminalStages.includes(app.current_stage)" size="sm" variant="danger" @click="quickReject(app)">Reject</AppButton>
+            </div>
+          </td>
+        </tr>
+
+        <template #mobileCard>
+          <div v-for="app in applications.data" :key="app.id" class="p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="text-xs text-slate-400">#{{ app.id }}</p>
+                <p class="font-medium text-slate-800">{{ app.applicant?.last_name }}, {{ app.applicant?.first_name }}</p>
+                <p v-if="app.is_internal" class="text-xs text-indigo-500">Internal</p>
+                <p class="text-xs text-slate-500">{{ app.job_vacancy?.job_item?.position_title ?? '—' }}</p>
+              </div>
+              <AppBadge :color="stageColors[app.current_stage] ?? 'slate'" class="capitalize">{{ app.current_stage }}</AppBadge>
+            </div>
+            <div class="flex justify-between text-xs text-slate-500">
+              <span>{{ app.job_vacancy?.job_item?.recruitment_type?.name ?? '—' }}</span>
+              <span v-if="app.ranking_summary?.rank" class="font-bold text-indigo-600">#{{ app.ranking_summary.rank }}</span>
+            </div>
+            <p class="text-xs text-slate-400">Applied {{ formatDateTime(app.created_at) }}</p>
+            <div class="flex items-center gap-2 pt-1">
+              <AppButton as="link" size="sm" :href="route('recruitment.applications.show', app.id)">View</AppButton>
+              <AppButton v-if="!terminalStages.includes(app.current_stage)" size="sm" variant="danger" @click="quickReject(app)">Reject</AppButton>
+            </div>
+          </div>
+        </template>
+
+        <template #empty>
+          <EmptyState title="No applications found" />
+        </template>
+
+        <template #footer>
+          <PaginationControl
+            :links="applications.links"
+            :current-page="applications.current_page"
+            :total-pages="applications.last_page"
+            :total="applications.total"
+            @page="goToPage"
+          />
+        </template>
+      </AppTable>
+
     </div>
   </AdminLayout>
 </template>
