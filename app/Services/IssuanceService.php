@@ -27,7 +27,6 @@ class IssuanceService
         $max = DB::table('issuances')
             ->where('type', $type)
             ->where('year', $year)
-            ->where('month', $month)
             ->lockForUpdate()
             ->max('series_no') ?? 0;
 
