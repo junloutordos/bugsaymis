@@ -2,7 +2,7 @@
   "containerDefinitions": [
     {
       "name": "worker",
-      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app:c3835ad160dcf87102a4aed3f5eb724f8bfe30c4",
+      "image": "971422671747.dkr.ecr.ap-southeast-1.amazonaws.com/crcmis/app:6a499de5cce27b5bb4ed68d024e760e2602e7007",
       "cpu": 0,
       "essential": true,
       "environment": [
