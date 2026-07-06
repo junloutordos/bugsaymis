@@ -356,6 +356,11 @@ const fetchEmployees = async () => {
     loadingEmployees.value = false;
   }
 };
+// AppSelect forwards @change via $attrs BEFORE emitting update:modelValue,
+// so a @change handler sees the stale patient_type — watch the form instead.
+watch(() => appointmentForm.patient_type, (type) => {
+  if (type === 'employee' && !employees.value.length) fetchEmployees();
+});
 const submitAppointment = () => {
   // assemble concern string from selected checkboxes similar to kiosk
   const assembled = (appointmentForm.concerns || []).map(c => {
@@ -463,7 +468,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
           <div v-if="hasAnyRole('Nurse', 'Administrator')">
             <label class="block text-xs font-medium text-slate-600 mb-1">Patient</label>
             <div class="flex gap-2">
-              <AppSelect v-model="appointmentForm.patient_type" :show-blank="false" @change="() => { if (appointmentForm.patient_type === 'employee') fetchEmployees(); }">
+              <AppSelect v-model="appointmentForm.patient_type" :show-blank="false">
                 <option value="student">Student</option>
                 <option value="employee">Employee</option>
               </AppSelect>
@@ -473,7 +478,7 @@ const isStaff = roleNames.length > 0 && roleNames.every(r => r === 'Staff');
               <div v-else class="flex-1">
                 <AppSelect v-model="appointmentForm.employee_id" :show-blank="false">
                   <option value="" disabled>Select employee</option>
-                  <option v-for="u in employees" :key="u.id" :value="u.id">{{ u.name }} — {{ u.office || '' }}</option>
+                  <option v-for="u in employees" :key="u.id" :value="u.id">{{ u.name }}{{ u.office ? ' — ' + u.office : '' }}</option>
                 </AppSelect>
               </div>
             </div>

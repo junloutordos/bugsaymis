@@ -155,7 +155,9 @@ class UserController extends Controller
      */
     public function selectList(Request $request)
     {
-        $query = User::query()->select('id', 'name', 'badge_id', 'office_id')->where('status', '<>', 'inactive');
+        $query = User::query()->select('id', 'name', 'badge_id', 'office_id')
+            ->with('office:id,name')
+            ->where('status', '<>', 'inactive');
 
         // optional filter by emp_category or search
         if ($request->filled('emp_category')) {
@@ -174,6 +176,7 @@ class UserController extends Controller
                 'name' => $u->name,
                 'badge_id' => $u->badge_id,
                 'office_id' => $u->office_id,
+                'office' => $u->office?->name,
             ];
         });
 
