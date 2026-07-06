@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import axios from 'axios'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AgentSpecsModal from '@/Components/AgentSpecsModal.vue'
+import PaginationControl from '@/Components/PaginationControl.vue'
 import {
   Chart as ChartJS,
   Title, Tooltip, Legend,
@@ -12,7 +14,7 @@ import {
 } from 'chart.js'
 import { Line } from 'vue-chartjs'
 import {
-  ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon,
+  ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon, CpuChipIcon,
 } from '@heroicons/vue/24/outline'
 
 ChartJS.register(Title, Tooltip, Legend, CategoryScale, LinearScale, PointElement, LineElement, Filler)
@@ -120,6 +122,25 @@ async function toggleExpand(device) {
       loadingHistory.value = false
     }
   }
+}
+
+const specsEquipment = ref(null)
+const specsByDevice = ref({})
+const loadingSpecsId = ref(null)
+
+async function openSpecs(device) {
+  if (!specsByDevice.value[device.id]) {
+    loadingSpecsId.value = device.id
+    try {
+      const { data } = await axios.get(route('atlas-sentinel.health-dashboard.specs', device.id))
+      specsByDevice.value[device.id] = data.device
+    } finally {
+      loadingSpecsId.value = null
+    }
+  }
+  // AgentSpecsModal expects an equipment object with the device nested
+  // under agent_device — the inverse of this dashboard's device-first shape.
+  specsEquipment.value = { ...(device.equipment || {}), agent_device: specsByDevice.value[device.id] }
 }
 
 function trendChartData(deviceId) {
@@ -258,6 +279,7 @@ function offlineAfterFailedUpdate(device) {
               <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer" @click="sortBy('last_checkin_at')">
                 Last Check-in
               </th>
+              <th class="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
@@ -329,9 +351,20 @@ function offlineAfterFailedUpdate(device) {
                     {{ checkinAgeMinutes(device.last_checkin_at) }} min ago
                   </div>
                 </td>
+                <td class="px-4 py-3">
+                  <button
+                    @click.stop="openSpecs(device)"
+                    :disabled="loadingSpecsId === device.id"
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 transition-colors"
+                    title="View Agent Specs"
+                  >
+                    <CpuChipIcon class="w-4 h-4" />
+                    {{ loadingSpecsId === device.id ? 'Loading…' : 'Specs' }}
+                  </button>
+                </td>
               </tr>
               <tr v-if="expandedDeviceId === device.id">
-                <td colspan="9" class="px-4 py-4 bg-slate-50">
+                <td colspan="10" class="px-4 py-4 bg-slate-50">
                   <div v-if="loadingHistory" class="text-sm text-slate-400">Loading trend...</div>
                   <div v-else-if="(historyByDevice[device.id] || []).length === 0" class="text-sm text-slate-400">
                     No scored history yet for this device.
@@ -357,6 +390,13 @@ function offlineAfterFailedUpdate(device) {
           @page="currentPage = $event"
         />
       </div>
+
+      <AgentSpecsModal
+        v-if="specsEquipment"
+        :equipment="specsEquipment"
+        :latestAgentVersion="latestAgentVersion"
+        @close="specsEquipment = null"
+      />
     </div>
   </AdminLayout>
 </template>

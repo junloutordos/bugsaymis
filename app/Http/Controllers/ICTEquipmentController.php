@@ -123,6 +123,20 @@ class ICTEquipmentController extends Controller
         return response()->json(['history' => $history]);
     }
 
+    /**
+     * GET /atlas-sentinel/health-dashboard/{device}/specs
+     *
+     * Full spec payload for one device's Agent Specs modal — fetched on
+     * demand rather than eager-loaded fleet-wide (software inventories
+     * alone would bloat the dashboard payload).
+     */
+    public function healthSpecs(IctEquipmentDevice $device)
+    {
+        $device->load(['healthSnapshot', 'hardwareInventory', 'securityStatus', 'softwareInventory']);
+
+        return response()->json(['device' => $device]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([

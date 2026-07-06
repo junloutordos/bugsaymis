@@ -897,6 +897,9 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
     Route::get('/atlas-sentinel/health-dashboard/{device}/history', [ICTEquipmentController::class, 'healthHistory'])
         ->middleware('permission:it.equipment.view')
         ->name('atlas-sentinel.health-dashboard.history');
+    Route::get('/atlas-sentinel/health-dashboard/{device}/specs', [ICTEquipmentController::class, 'healthSpecs'])
+        ->middleware('permission:it.equipment.view')
+        ->name('atlas-sentinel.health-dashboard.specs');
 
     // Atlas Sentinel remote-help queue (attended RustDesk sessions)
     Route::middleware('permission:atlas.sentinel.remote-help.manage')->group(function () {
