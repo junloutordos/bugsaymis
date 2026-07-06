@@ -1103,21 +1103,6 @@ export const menuItems = [
       },
     ],
   },
-  {
-    label: "Quiz",
-    icon: PuzzlePieceIcon,
-    roles: ["Administrator", "Faculty", "Staff", "MIS", "HR"],
-    children: [
-      {
-        label: "Quizzes",
-        routeName: "quiz.index",
-        href: route("quiz.index"),
-        icon: PuzzlePieceIcon,
-        roles: [],
-        permissions: ["quiz.manage", "quiz.view_all"],
-      },
-    ],
-  },
   // {
   //   label: "Supply & Property",
   //   icon: ShoppingCartIcon,
@@ -1291,6 +1276,22 @@ export const menuItems = [
         href: route("class-records.page.index"),
         icon: ClipboardDocumentListIcon,
         roles: ["Administrator", "Faculty", "CID Chief", "OCD"],
+      },
+    ],
+  },
+
+  {
+    label: "Quiz",
+    icon: PuzzlePieceIcon,
+    roles: ["Administrator", "Faculty", "Staff", "MIS", "HR"],
+    children: [
+      {
+        label: "Quizzes",
+        routeName: "quiz.index",
+        href: route("quiz.index"),
+        icon: PuzzlePieceIcon,
+        roles: [],
+        permissions: ["quiz.manage", "quiz.view_all"],
       },
     ],
   },
