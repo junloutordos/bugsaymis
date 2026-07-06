@@ -244,6 +244,13 @@ export const menuItems = [
         permissions: ["it.equipment.view"],
       },
       {
+        label: "Remote Help",
+        routeName: "atlas-sentinel.remote-help.index",
+        href: route("atlas-sentinel.remote-help.index"),
+        icon: CursorArrowRippleIcon,
+        permissions: ["atlas.sentinel.remote-help.manage"],
+      },
+      {
         label: "Device Backups",
         routeName: "atlas-sentinel.backups.index",
         href: route("atlas-sentinel.backups.index"),

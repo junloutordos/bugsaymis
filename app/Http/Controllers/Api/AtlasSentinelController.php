@@ -25,6 +25,7 @@ use App\Services\AtlasSentinelHealthEvaluator;
 use App\Services\AtlasSentinelNetworkLocationResolver;
 use App\Services\AtlasSentinelFleetStateService;
 use App\Services\AtlasSentinelRemediationDispatcher;
+use App\Services\AtlasSentinelRemoteHelpService;
 use App\Services\AtlasSentinelScoringService;
 use App\Services\AtlasSentinelSecurityEvaluator;
 use Illuminate\Http\JsonResponse;
@@ -56,6 +57,7 @@ class AtlasSentinelController extends Controller
         private AtlasSentinelRemediationDispatcher $remediationDispatcher,
         private AtlasSentinelBackupService $backupService,
         private AtlasSentinelFleetStateService $fleetStateService,
+        private AtlasSentinelRemoteHelpService $remoteHelpService,
     ) {
     }
 
@@ -705,6 +707,8 @@ class AtlasSentinelController extends Controller
             'last_backup'         => $lastBackup,
             'recent_remediations' => $recentRemediations,
             'report_categories'   => ITJobCategory::orderBy('name')->pluck('name'),
+            'remote_help_enabled' => $this->remoteHelpService->enabled(),
+            'remote_help_download_url' => config('atlas_sentinel.remote_help.anydesk.download_url'),
         ]);
     }
 

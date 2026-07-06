@@ -898,6 +898,20 @@ Route::middleware(['auth', 'pshs.email'])->group(function () {
         ->middleware('permission:it.equipment.view')
         ->name('atlas-sentinel.health-dashboard.history');
 
+    // Atlas Sentinel remote-help queue (attended RustDesk sessions)
+    Route::middleware('permission:atlas.sentinel.remote-help.manage')->group(function () {
+        Route::get('/atlas-sentinel/remote-help', [\App\Http\Controllers\AtlasSentinelRemoteHelpController::class, 'index'])
+            ->name('atlas-sentinel.remote-help.index');
+        Route::get('/atlas-sentinel/remote-help/poll', [\App\Http\Controllers\AtlasSentinelRemoteHelpController::class, 'poll'])
+            ->name('atlas-sentinel.remote-help.poll');
+        Route::post('/atlas-sentinel/remote-help/{helpRequest}/claim', [\App\Http\Controllers\AtlasSentinelRemoteHelpController::class, 'claim'])
+            ->name('atlas-sentinel.remote-help.claim');
+        Route::post('/atlas-sentinel/remote-help/{helpRequest}/reveal', [\App\Http\Controllers\AtlasSentinelRemoteHelpController::class, 'reveal'])
+            ->name('atlas-sentinel.remote-help.reveal');
+        Route::post('/atlas-sentinel/remote-help/{helpRequest}/end', [\App\Http\Controllers\AtlasSentinelRemoteHelpController::class, 'end'])
+            ->name('atlas-sentinel.remote-help.end');
+    });
+
     // Atlas Sentinel document backups — schedule management + status
     Route::get('/atlas-sentinel/backups', [\App\Http\Controllers\AtlasSentinelBackupController::class, 'index'])
         ->middleware('permission:it.equipment.view')

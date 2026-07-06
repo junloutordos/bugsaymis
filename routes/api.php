@@ -9,6 +9,7 @@ use App\Http\Controllers\StudentAttendance\Api\ScheduleApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentApiController;
 use App\Http\Controllers\StudentAttendance\Api\StudentSelfController;
 use App\Http\Controllers\Api\AtlasSentinelController;
+use App\Http\Controllers\Api\AtlasSentinelRemoteHelpController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -120,6 +121,17 @@ Route::prefix('ict-agent')->name('ict-agent.')->group(function () {
             ->name('report-problem')
             ->middleware('throttle:6,1');
         Route::get('/releases/{encodedKey}', [AtlasSentinelController::class, 'releaseDownload'])->name('releases.show');
+
+        // Remote help ("Ask for Remote Help") — attended AnyDesk sessions.
+        // `current` (GET) is declared before the wildcard {helpRequest} POSTs so
+        // the literal segment can never be swallowed by the binding.
+        Route::get('/remote-help/current', [AtlasSentinelRemoteHelpController::class, 'current'])->name('remote-help.current');
+        Route::post('/remote-help', [AtlasSentinelRemoteHelpController::class, 'request'])
+            ->name('remote-help.request')
+            ->middleware('throttle:6,1');
+        Route::post('/remote-help/{helpRequest}/report-id', [AtlasSentinelRemoteHelpController::class, 'reportId'])->name('remote-help.report-id');
+        Route::post('/remote-help/{helpRequest}/cancel', [AtlasSentinelRemoteHelpController::class, 'cancel'])->name('remote-help.cancel');
+        Route::post('/remote-help/{helpRequest}/session-ended', [AtlasSentinelRemoteHelpController::class, 'sessionEnded'])->name('remote-help.session-ended');
 
         // Document backup — run dispatched via the checkin response; file
         // bytes go straight to Google Drive via server-issued resumable

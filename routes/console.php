@@ -45,6 +45,11 @@ Schedule::command('atlas-sentinel:expire-stale-remediations')->everyFifteenMinut
 //    checking in, instead of relying on someone noticing the dashboard badge
 Schedule::command('atlas-sentinel:notify-stale-devices')->everyFifteenMinutes()->withoutOverlapping();
 
+// ── Atlas Sentinel: time out unclaimed/overlong remote-help requests and
+//    force-finalize sessions a dark agent never acked (must run often so an
+//    abandoned request rotates its one-time password promptly) ─────────────
+Schedule::command('atlas-sentinel:expire-remote-help')->everyMinute()->withoutOverlapping();
+
 // NOTE: no pulse:trim schedule — the command does not exist. Pulse trims old
 // entries itself from the pulse:work daemon (per pulse.storage.trim.keep).
 
