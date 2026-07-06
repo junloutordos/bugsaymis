@@ -134,12 +134,6 @@
   color: rgb(21, 0, 247) !important;
   font-weight: 600;
 }
-.fc .fc-daygrid-event {
-  background: none !important;
-  border: none !important;
-  padding: 0 !important;
-  margin-top: 0.25rem;
-}
 .fc .fc-daygrid-event-dot {
   border: none !important;
   background-color: #3b82f6;
