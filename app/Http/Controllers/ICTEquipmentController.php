@@ -104,6 +104,7 @@ class ICTEquipmentController extends Controller
             'devices' => $devices,
             'sort'    => $sort,
             'direction' => $direction,
+            'latestAgentVersion' => AtlasSentinelRelease::latestRelease()?->version,
         ]);
     }
 

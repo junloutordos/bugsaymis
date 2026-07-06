@@ -23,6 +23,7 @@ use App\Services\AtlasSentinelBackupService;
 use App\Services\AtlasSentinelDiagnosticsService;
 use App\Services\AtlasSentinelHealthEvaluator;
 use App\Services\AtlasSentinelNetworkLocationResolver;
+use App\Services\AtlasSentinelFleetStateService;
 use App\Services\AtlasSentinelRemediationDispatcher;
 use App\Services\AtlasSentinelScoringService;
 use App\Services\AtlasSentinelSecurityEvaluator;
@@ -54,6 +55,7 @@ class AtlasSentinelController extends Controller
         private AtlasSentinelSecurityEvaluator $securityEvaluator,
         private AtlasSentinelRemediationDispatcher $remediationDispatcher,
         private AtlasSentinelBackupService $backupService,
+        private AtlasSentinelFleetStateService $fleetStateService,
     ) {
     }
 
@@ -380,14 +382,10 @@ class AtlasSentinelController extends Controller
         }
 
         $latestRelease = AtlasSentinelRelease::latestRelease();
-        // version_compare alone isn't enough — it does NOT treat "1.0.3" and
-        // "1.0.3.0" as equal (verified: returns -1), so a device freshly
-        // updated to the latest release kept getting re-offered the same
-        // version forever, hammering the Updater every checkin. Truncate the
-        // agent's 4-part AssemblyVersion down to the release's 3-part scheme
-        // before comparing.
-        $reportedVersion = $this->truncateVersion($validated['agent_version'] ?? $device->agent_version ?? '');
-        if ($latestRelease && version_compare($latestRelease->version, $reportedVersion) !== 0) {
+        $reportedVersion = $validated['agent_version'] ?? $device->agent_version ?? null;
+        if ($latestRelease
+            && $this->fleetStateService->shouldOfferUpdate($latestRelease->version, $reportedVersion)
+            && $this->fleetStateService->tryReserveUpdateOfferSlot($latestRelease->version)) {
             $response['update'] = [
                 'version'      => $latestRelease->version,
                 'download_url' => route('ict-agent.releases.show', ['encodedKey' => $this->encodeS3Key($latestRelease->s3_key)]),
@@ -396,16 +394,6 @@ class AtlasSentinelController extends Controller
         }
 
         return response()->json($response);
-    }
-
-    /**
-     * Drops to the first 3 dot-separated segments — release versions are
-     * always 3-part ("1.0.3"); the agent's .NET AssemblyVersion is always
-     * 4-part ("1.0.3.0"), and version_compare treats those as unequal.
-     */
-    private function truncateVersion(string $version): string
-    {
-        return implode('.', array_slice(explode('.', $version), 0, 3));
     }
 
     /**
@@ -568,11 +556,19 @@ class AtlasSentinelController extends Controller
             abort(404);
         }
 
-        $contents = Storage::disk('s3')->get($s3Key);
-
-        return response($contents, 200)
-            ->header('Content-Type', 'application/octet-stream')
-            ->header('Content-Disposition', 'attachment; filename="' . basename($s3Key) . '"');
+        // Release zips are ~100MB — stream from S3 instead of buffering the
+        // whole object in PHP memory, or a fleet-wide update exhausts FPM.
+        return response()->stream(function () use ($s3Key) {
+            $stream = Storage::disk('s3')->readStream($s3Key);
+            fpassthru($stream);
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type'        => 'application/octet-stream',
+            'Content-Length'      => (string) Storage::disk('s3')->size($s3Key),
+            'Content-Disposition' => 'attachment; filename="' . basename($s3Key) . '"',
+        ]);
     }
 
     private function encodeS3Key(string $s3Key): string

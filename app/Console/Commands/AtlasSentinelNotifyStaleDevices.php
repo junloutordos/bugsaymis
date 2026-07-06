@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\IctEquipmentDevice;
 use App\Models\User;
+use App\Services\AtlasSentinelFleetStateService;
 use App\Services\NotificationService;
 use Illuminate\Console\Command;
 
@@ -20,17 +21,14 @@ class AtlasSentinelNotifyStaleDevices extends Command
     protected $signature = 'atlas-sentinel:notify-stale-devices';
     protected $description = 'Notify IT staff when an enrolled device has not checked in past the stale threshold';
 
-    // Matches the "Stale" badge threshold already used in the Agent Specs UI.
-    const STALE_AFTER_MINUTES = 40;
-
     // Once notified, don't nag again for the same still-down device until
     // this much time has passed.
     const RENOTIFY_AFTER_HOURS = 6;
 
-    public function handle(): int
+    public function handle(AtlasSentinelFleetStateService $fleetStateService): int
     {
         $staleDevices = IctEquipmentDevice::with('equipment')
-            ->where('last_checkin_at', '<', now()->subMinutes(self::STALE_AFTER_MINUTES))
+            ->where('last_checkin_at', '<', now()->subMinutes(AtlasSentinelFleetStateService::STALE_AFTER_MINUTES))
             ->where(function ($query) {
                 $query->whereNull('stale_notified_at')
                     ->orWhere('stale_notified_at', '<', now()->subHours(self::RENOTIFY_AFTER_HOURS));
@@ -49,7 +47,7 @@ class AtlasSentinelNotifyStaleDevices extends Command
 
         foreach ($staleDevices as $device) {
             $label = $device->equipment?->description ?? $device->hostname ?? "Device #{$device->id}";
-            $minutesSince = $device->last_checkin_at ? now()->diffInMinutes($device->last_checkin_at) : null;
+            $minutesSince = $fleetStateService->minutesSinceCheckin($device->last_checkin_at);
 
             foreach ($recipients as $user) {
                 NotificationService::notifyUser(
